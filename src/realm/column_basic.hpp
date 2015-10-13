@@ -69,7 +69,7 @@ public:
 
     BasicColumn(Allocator&, ref_type, bool nullable);
 
-    std::size_t size() const noexcept final;
+    size_t size() const noexcept final;
     bool is_empty() const noexcept { return size() == 0; }
 
     bool is_nullable() const noexcept override
@@ -100,59 +100,59 @@ public:
         BasicArray<T>* in_fallback;
     };
 
-    void get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+    void get_leaf(size_t ndx, size_t& ndx_in_leaf,
                           LeafInfo& inout_leaf_info) const noexcept;
 
-    T get(std::size_t ndx) const noexcept;
-    StringData get_index_data(std::size_t, StringIndex::StringConversionBuffer& buffer) const noexcept final;
+    T get(size_t ndx) const noexcept;
+    StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     void add(T value = T());
-    void set(std::size_t ndx, T value);
-    void insert(std::size_t ndx, T value = T());
+    void set(size_t ndx, T value);
+    void insert(size_t ndx, T value = T());
     void erase(size_t row_ndx);
     void erase(size_t row_ndx, bool is_last);
-    void move_last_over(std::size_t row_ndx);
+    void move_last_over(size_t row_ndx);
     void clear();
 
-    std::size_t count(T value) const;
+    size_t count(T value) const;
 
     typedef typename AggReturnType<T>::sum_type SumType;
-    SumType sum(std::size_t begin = 0, std::size_t end = npos,
-                std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
+    SumType sum(size_t begin = 0, size_t end = npos,
+                size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    double average(std::size_t begin = 0, std::size_t end = npos,
-                   std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
+    double average(size_t begin = 0, size_t end = npos,
+                   size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    T maximum(std::size_t begin = 0, std::size_t end = npos,
-              std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
+    T maximum(size_t begin = 0, size_t end = npos,
+              size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    T minimum(std::size_t begin = 0, std::size_t end = npos,
-              std::size_t limit = std::size_t(-1), size_t* return_ndx = nullptr) const;
+    T minimum(size_t begin = 0, size_t end = npos,
+              size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
+    size_t find_first(T value, size_t begin = 0 , size_t end = npos) const;
 
-    void find_all(IntegerColumn& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
+    void find_all(IntegerColumn& result, T value, size_t begin = 0, size_t end = npos) const;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order.
-    std::size_t lower_bound(T value) const noexcept;
-    std::size_t upper_bound(T value) const noexcept;
+    size_t lower_bound(T value) const noexcept;
+    size_t upper_bound(T value) const noexcept;
     //@{
 
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;
 
-    static ref_type create(Allocator&, std::size_t size = 0);
+    static ref_type create(Allocator&, size_t size = 0);
 
     // Overrriding method in ColumnBase
-    ref_type write(std::size_t, std::size_t, std::size_t,
+    ref_type write(size_t, size_t, size_t,
                    _impl::OutputStream&) const override;
 
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
-    void clear(std::size_t, bool) override;
-    void refresh_accessor_tree(std::size_t, const Spec&) override;
+    void clear(size_t, bool) override;
+    void refresh_accessor_tree(size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
     void verify() const override;
@@ -165,11 +165,11 @@ protected:
 
 private:
     /// \param row_ndx Must be `realm::npos` if appending.
-    void do_insert(std::size_t row_ndx, T value, std::size_t num_rows);
+    void do_insert(size_t row_ndx, T value, size_t num_rows);
 
     // Called by Array::bptree_insert().
-    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
-                                Allocator&, std::size_t insert_ndx,
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, size_t ndx_in_parent,
+                                Allocator&, size_t insert_ndx,
                                 Array::TreeInsert<BasicColumn<T>>&);
 
     class SetLeafElem;
@@ -177,14 +177,14 @@ private:
     class CreateHandler;
     class SliceHandler;
 
-    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_move_last_over(size_t row_ndx, size_t last_row_ndx);
     void do_clear();
 
     bool m_nullable;
 
 #ifdef REALM_DEBUG
-    static std::size_t verify_leaf(MemRef, Allocator&);
-    void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+    static size_t verify_leaf(MemRef, Allocator&);
+    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                      std::ostream&) const override;
     static void leaf_dumper(MemRef, Allocator&, std::ostream&, int level);
 #endif
@@ -194,7 +194,7 @@ private:
 };
 
 template <class T>
-void BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
+void BasicColumn<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
                                          LeafInfo& leaf) const noexcept
 {
     if (!m_array->is_inner_bptree_node()) {
@@ -202,14 +202,14 @@ void BasicColumn<T>::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
         *leaf.out_leaf_ptr = static_cast<const BasicArray<T>*>(m_array.get());
         return;
     }
-    std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
+    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
     leaf.in_fallback->init_from_mem(p.first);
     *leaf.out_leaf_ptr = leaf.in_fallback;
     ndx_in_leaf = p.second;
 }
 
 template <class T>
-StringData BasicColumn<T>::get_index_data(std::size_t, StringIndex::StringConversionBuffer&) const noexcept
+StringData BasicColumn<T>::get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not supported for floating-point columns yet.");
     REALM_UNREACHABLE();

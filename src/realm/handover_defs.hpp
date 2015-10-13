@@ -30,13 +30,13 @@ enum class MutableSourcePayload { Move };
 struct TableView_Handover_patch;
 
 struct LinkView_Handover_patch {
-    std::size_t m_table_num;
-    std::size_t m_col_num;
-    std::size_t m_row_ndx;
+    size_t m_table_num;
+    size_t m_col_num;
+    size_t m_row_ndx;
 };
 
 struct Query_Handover_patch {
-    std::size_t m_table_num;
+    size_t m_table_num;
     bool m_has_table;
     std::unique_ptr<TableView_Handover_patch> table_view_data;
     std::unique_ptr<LinkView_Handover_patch> link_view_data;
@@ -44,10 +44,10 @@ struct Query_Handover_patch {
 };
 
 struct TableView_Handover_patch {
-    std::size_t table_num;
-    std::size_t linked_table_num;
-    std::size_t linked_column;
-    std::size_t linked_row;
+    size_t table_num;
+    size_t linked_table_num;
+    size_t linked_column;
+    size_t linked_row;
     bool was_in_sync;
     Query_Handover_patch query_patch;
     std::unique_ptr<LinkView_Handover_patch> linkview_patch;
@@ -57,8 +57,8 @@ struct TableView_Handover_patch {
 //inline Query_Handover_patch::~Query_Handover_patch() { delete table_view_data; delete link_view_data; }
 
 struct RowBase_Handover_patch {
-    std::size_t table_num;
-    std::size_t row_ndx;
+    size_t table_num;
+    size_t row_ndx;
 };
 
 

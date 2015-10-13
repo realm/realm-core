@@ -131,11 +131,12 @@ namespace realm {
     // The case folded form would probably be using UTF-32 or UTF-16.
 
 
-    /// If successfull, writes a string to \a target of the same size as
-    /// \a source, and returns true. Returns false if invalid UTF-8
-    /// encoding was encountered.
-    bool case_map(StringData source, char* target, bool upper);
-    std::string case_map(StringData source, bool upper);
+    /// If successful, returns a string of the same size as \a source.
+    /// Returns none if invalid UTF-8 encoding was encountered.
+    util::Optional<std::string> case_map(StringData source, bool upper);
+
+    enum IgnoreErrorsTag { IgnoreErrors };
+    std::string case_map(StringData source, bool upper, IgnoreErrorsTag);
 
     /// Assumes that the sizes of \a needle_upper and \a needle_lower are
     /// identical to the size of \a haystack. Returns false if the needle
@@ -145,8 +146,8 @@ namespace realm {
     /// Assumes that the sizes of \a needle_upper and \a needle_lower are
     /// both equal to \a needle_size. Returns haystack.size() if the
     /// needle was not found.
-    std::size_t search_case_fold(StringData haystack, const char* needle_upper,
-        const char* needle_lower, std::size_t needle_size);
+    size_t search_case_fold(StringData haystack, const char* needle_upper,
+        const char* needle_lower, size_t needle_size);
 
 
 } // namespace realm

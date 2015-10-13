@@ -1,23 +1,22 @@
-# NEXT RELEASE
+# 0.94.1 Release notes
 
 ### Bugfixes:
 
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
+* Fixed a bug in SharedGroup::Compact() which could leave the database in an
+  inconsistent state.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Queries are no longer limited to 16 levels of grouping.
 
 -----------
 
 ### Internals:
 
-* De-templatified (!) some methods in SharedGroup in preparation for a refactoring
-  which will utilise virtual methods (you can't have virtual template methods)
+* Minor reorg removing a template parameter to SharedGroup::advance_read()
+  and friends.
+* Obsolete YAML-based documentation removed.
+* Removed `std::` in front integral types (e.g. `size_t`, `int64_t` etc.)
 
 ----------------------------------------------
 

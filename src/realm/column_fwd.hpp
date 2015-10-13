@@ -39,8 +39,8 @@ template <class T, bool Nullable = false> class Column;
 template<class T> class BasicColumn;
 
 // Shortcuts, aka typedefs.
-using IntegerColumn = Column<std::int64_t, false>;
-using IntNullColumn = Column<std::int64_t, true>;
+using IntegerColumn = Column<int64_t, false>;
+using IntNullColumn = Column<int64_t, true>;
 using DoubleColumn = BasicColumn<double>;
 using FloatColumn = BasicColumn<float>;
 
