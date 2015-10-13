@@ -85,15 +85,6 @@
 #endif
 
 
-/* Support for C++11 r-value references and std::move().
- *
- * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC_4_3 || \
-    REALM_HAVE_CLANG_FEATURE(cxx_rvalue_references) && _LIBCPP_VERSION >= 1001
-#  define REALM_HAVE_CXX11_RVALUE_REFERENCE 1
-#endif
-
-
 /* Support for the C++11 'decltype' keyword. */
 #if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
     REALM_HAVE_CLANG_FEATURE(cxx_decltype) || \
