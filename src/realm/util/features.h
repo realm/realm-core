@@ -85,14 +85,6 @@
 #endif
 
 
-/* Support for C++11 static_assert(). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_static_assert) || \
-    REALM_HAVE_AT_LEAST_MSVC_10_2010
-#  define REALM_HAVE_CXX11_STATIC_ASSERT 1
-#endif
-
-
 /* Support for C++11 r-value references and std::move().
  *
  * NOTE: Not yet fully supported in MSVC++ 12 (2013). */

@@ -130,7 +130,7 @@ private:
     typedef std::conditional<cond_3, long,             type_2>::type type_3;
     typedef std::conditional<cond_4, unsigned,         type_3>::type type_4;
     typedef std::conditional<cond_5, int,              type_4>::type type_5;
-    REALM_STATIC_ASSERT(!(std::is_same<type_5, void>::value), "Failed to promote `wchar_t`");
+    static_assert(!(std::is_same<type_5, void>::value), "Failed to promote `wchar_t`");
 public:
     typedef type_5 type;
 };
@@ -192,10 +192,10 @@ template<class A, class B> struct ChooseWidestInt {
 private:
     typedef std::numeric_limits<A> lim_a;
     typedef std::numeric_limits<B> lim_b;
-    REALM_STATIC_ASSERT(lim_a::is_specialized && lim_b::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
-    REALM_STATIC_ASSERT(lim_a::is_integer && lim_b::is_integer,
-                          "Both types must be integers");
+    static_assert(lim_a::is_specialized && lim_b::is_specialized,
+                  "std::numeric_limits<> must be specialized for both types");
+    static_assert(lim_a::is_integer && lim_b::is_integer,
+                  "Both types must be integers");
 public:
     typedef typename std::conditional<(lim_a::digits >= lim_b::digits), A, B>::type type;
 };
@@ -223,7 +223,7 @@ private:
     };
 public:
     typedef typename FindType<types, dummy<bits>::template pred>::type type;
-    REALM_STATIC_ASSERT(!(std::is_same<type, void>::value), "No unsigned type is that wide");
+    static_assert(!(std::is_same<type, void>::value), "No unsigned type is that wide");
 };
 
 

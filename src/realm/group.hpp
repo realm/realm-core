@@ -790,7 +790,7 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 
 template<class T> inline BasicTableRef<T> Group::get_table(size_t table_ndx)
 {
-    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    static_assert(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = &T::matches_dynamic_type;
@@ -800,7 +800,7 @@ template<class T> inline BasicTableRef<T> Group::get_table(size_t table_ndx)
 
 template<class T> inline BasicTableRef<const T> Group::get_table(size_t table_ndx) const
 {
-    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    static_assert(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = &T::matches_dynamic_type;
@@ -810,7 +810,7 @@ template<class T> inline BasicTableRef<const T> Group::get_table(size_t table_nd
 
 template<class T> inline BasicTableRef<T> Group::get_table(StringData name)
 {
-    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    static_assert(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = &T::matches_dynamic_type;
@@ -820,7 +820,7 @@ template<class T> inline BasicTableRef<T> Group::get_table(StringData name)
 
 template<class T> inline BasicTableRef<const T> Group::get_table(StringData name) const
 {
-    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    static_assert(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = &T::matches_dynamic_type;
@@ -831,7 +831,7 @@ template<class T> inline BasicTableRef<const T> Group::get_table(StringData name
 template<class T>
 inline BasicTableRef<T> Group::add_table(StringData name, bool require_unique_name)
 {
-    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    static_assert(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescSetter desc_setter = &T::set_dynamic_type;
@@ -841,7 +841,7 @@ inline BasicTableRef<T> Group::add_table(StringData name, bool require_unique_na
 
 template<class T> inline BasicTableRef<T> Group::get_or_add_table(StringData name, bool* was_added)
 {
-    REALM_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    static_assert(IsBasicTable<T>::value, "Invalid table type");
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     DescMatcher desc_matcher = &T::matches_dynamic_type;

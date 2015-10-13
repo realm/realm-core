@@ -122,7 +122,7 @@ void ArrayString::set(size_t ndx, StringData value)
     char* end = begin + (m_width - 1);
     begin = std::copy(value.data(), value.data() + value.size(), begin);
     std::fill(begin, end, 0); // Pad with zero bytes
-    REALM_STATIC_ASSERT(max_width <= max_width, "Padding size must fit in 7-bits");
+    static_assert(max_width <= max_width, "Padding size must fit in 7-bits");
 
     if (value.is_null()) {
         REALM_ASSERT_3(m_width, <= , 128);

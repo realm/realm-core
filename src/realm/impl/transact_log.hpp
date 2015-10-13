@@ -566,7 +566,7 @@ inline void TransactLogEncoder::append(const char* data, size_t size)
 template <class T>
 char* TransactLogEncoder::encode_int(char* ptr, T value)
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<T>::is_integer, "Integer required");
+    static_assert(std::numeric_limits<T>::is_integer, "Integer required");
     bool negative = util::is_negative(value);
     if (negative) {
         // The following conversion is guaranteed by C++11 to never
@@ -585,7 +585,7 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     // number of value bits in 'unsigned').
     const int bits_per_byte = 7;
     const int max_bytes = (num_bits + (bits_per_byte-1)) / bits_per_byte;
-    REALM_STATIC_ASSERT(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
+    static_assert(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
     // An explicit constant maximum number of iterations is specified
     // in the hope that it will help the optimizer (to do loop
     // unrolling, for example).
@@ -603,18 +603,18 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
 
 inline char* TransactLogEncoder::encode_float(char* ptr, float value)
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
-                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
-                          "Unsupported 'float' representation");
+    static_assert(std::numeric_limits<float>::is_iec559 &&
+                      sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                  "Unsupported 'float' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
     return std::copy(val_ptr, val_ptr + sizeof value, ptr);
 }
 
 inline char* TransactLogEncoder::encode_double(char* ptr, double value)
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
-                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
-                          "Unsupported 'double' representation");
+    static_assert(std::numeric_limits<double>::is_iec559 &&
+                      sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                  "Unsupported 'double' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
     return std::copy(val_ptr, val_ptr + sizeof value, ptr);
 }
@@ -1736,9 +1736,9 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
 
 inline float TransactLogParser::read_float()
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
-                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
-                          "Unsupported 'float' representation");
+    static_assert(std::numeric_limits<float>::is_iec559 &&
+                      sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                  "Unsupported 'float' representation");
     float value;
     read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
     return value;
@@ -1747,9 +1747,9 @@ inline float TransactLogParser::read_float()
 
 inline double TransactLogParser::read_double()
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
-                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
-                          "Unsupported 'double' representation");
+    static_assert(std::numeric_limits<double>::is_iec559 &&
+                      sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                  "Unsupported 'double' representation");
     double value;
     read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
     return value;
