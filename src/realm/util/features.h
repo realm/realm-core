@@ -46,12 +46,6 @@
 #endif
 
 
-
-#if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__ || _MSC_VER >= 1700
-#  define REALM_HAVE_CXX11 1
-#endif
-
-
 /* See these links for information about feature check macroes in GCC,
  * Clang, and MSVC:
  *
@@ -85,12 +79,8 @@
 #endif
 
 
-/* The way to specify that a function never returns.
- *
- * NOTE: C++11 generalized attributes are not yet fully supported in
- * MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 8) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_attributes)
+/* The way to specify that a function never returns. */
+#if REALM_HAVE_AT_LEAST_GCC(4, 8) || REALM_HAVE_CLANG_FEATURE(cxx_attributes)
 #  define REALM_NORETURN [[noreturn]]
 #elif __GNUC__
 #  define REALM_NORETURN __attribute__((noreturn))
