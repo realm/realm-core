@@ -155,13 +155,15 @@
 /* Device (Apple Watch) or simulator. */
 #    define REALM_WATCHOS 1
 /* The necessary signal handling / mach exception APIs are all unavailable */
-#    undef REALM_ENABLE_ENCRYPTION
+#    undef  REALM_ENABLE_ENCRYPTION
+#    define REALM_ENABLE_ENCRYPTION 0
 #  endif
 #  if TARGET_OS_TV
 /* Device (Apple TV) or simulator. */
 #    define REALM_TVOS 1
 /* The necessary signal handling / mach exception APIs are all unavailable */
-#    undef REALM_ENABLE_ENCRYPTION
+#    undef  REALM_ENABLE_ENCRYPTION
+#    define REALM_ENABLE_ENCRYPTION 0
 #  endif
 #endif
 

@@ -77,7 +77,7 @@ namespace {
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 // Also: async requires interprocess communication, which does not work with our current encryption support.
 #if !defined(_WIN32) && !defined(__APPLE__)
-#  if REALM_ANDROID || defined DISABLE_ASYNC || defined REALM_ENABLE_ENCRYPTION
+#  if REALM_ANDROID || defined DISABLE_ASYNC || REALM_ENABLE_ENCRYPTION
 bool allow_async = false;
 #  else
 bool allow_async = true;
@@ -119,7 +119,7 @@ void writer(std::string path, int id)
 }
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !defined REALM_ENABLE_ENCRYPTION
+#if !defined(__APPLE__) && !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, std::string path, int id)
 {
@@ -168,7 +168,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if !defined(__APPLE__) && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -1328,7 +1328,7 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 #if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
@@ -1397,7 +1397,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 }
 
 #endif // not ios or android
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
@@ -2373,7 +2373,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
-#ifndef REALM_ENABLE_ENCRYPTION // encrpted buffers aren't supported
+#if !REALM_ENABLE_ENCRYPTION // encrpted buffers aren't supported
     // The empty group created initially by a shared group accessor is special
     // in that it contains no nodes, and the root-ref is therefore zero. The
     // following block checks that the contents of such a file is still
