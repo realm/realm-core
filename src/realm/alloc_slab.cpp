@@ -199,7 +199,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #endif
 
                 char* addr = translate(ref);
-#ifdef REALM_ENABLE_ALLOC_SET_ZERO
+#if REALM_ENABLE_ALLOC_SET_ZERO
                 std::fill(addr, addr+size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
@@ -251,7 +251,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
         std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
-#ifdef REALM_ENABLE_ALLOC_SET_ZERO
+#if REALM_ENABLE_ALLOC_SET_ZERO
     std::fill(slab.addr, slab.addr+size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
@@ -350,7 +350,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
     // FIXME: Check if we can extend current space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
-    // fill with zero if REALM_ENABLE_ALLOC_SET_ZERO is defined.
+    // fill with zero if REALM_ENABLE_ALLOC_SET_ZERO is non-zero.
 
     // Allocate new space
     MemRef new_mem = do_alloc(new_size); // Throws

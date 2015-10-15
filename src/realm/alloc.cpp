@@ -49,7 +49,7 @@ public:
             REALM_ASSERT_DEBUG(errno == ENOMEM);
             throw std::bad_alloc();
         }
-#ifdef REALM_ENABLE_ALLOC_SET_ZERO
+#if REALM_ENABLE_ALLOC_SET_ZERO
         std::fill(addr, addr+size, 0);
 #endif
         return MemRef(addr, reinterpret_cast<size_t>(addr));
@@ -63,7 +63,7 @@ public:
             REALM_ASSERT_DEBUG(errno == ENOMEM);
             throw std::bad_alloc();
         }
-#ifdef REALM_ENABLE_ALLOC_SET_ZERO
+#if REALM_ENABLE_ALLOC_SET_ZERO
         std::fill(new_addr+old_size, new_addr+new_size, 0);
 #else
         static_cast<void>(old_size);
