@@ -135,7 +135,7 @@
 #endif
 
 
-#if defined ANDROID
+#if defined __ANDROID__
 #  define REALM_ANDROID 1
 #endif
 
