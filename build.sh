@@ -967,11 +967,9 @@ EOF
         rm -f "$REALM_HOME/$file_name" || exit 1
         (cd "$REALM_HOME/$ANDROID_DIR" && tar czf "$REALM_HOME/$file_name" include $tar_files) || exit 1
 
-        echo "Unpacking in ../realm_java/$dir_name"
-        mkdir -p ../realm_java/realm-jni/build || exit 1 # to help Mr. Jenkins
-        cp "$REALM_HOME/$file_name" ../realm_java/realm-jni/build
-        (cd ../realm_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
-        (cd ../realm_java/$dir_name && tar xzf "$REALM_HOME/$file_name") || exit 1
+        echo "Copying to ../realm-java/"
+        mkdir -p ../realm-java/ || exit 1 # to help Mr. Jenkins
+        cp "$REALM_HOME/$file_name" "../realm-java/core-android-$realm_version.tar.gz"
         ;;
 
     "build-cocoa")
