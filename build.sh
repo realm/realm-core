@@ -968,6 +968,7 @@ EOF
         (cd "$REALM_HOME/$ANDROID_DIR" && tar czf "$REALM_HOME/$file_name" include $tar_files) || exit 1
 
         echo "Copying to ../realm-java/"
+        mkdir -p ../realm-java/ || exit 1 # to help Mr. Jenkins
         cp "$REALM_HOME/$file_name" "../realm-java/core-android-$realm_version.tar.gz"
         ;;
 
