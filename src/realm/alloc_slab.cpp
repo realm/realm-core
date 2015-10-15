@@ -575,6 +575,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             m_file_on_streaming_form = false;
             writable_map.sync();
         }
+
+        if (cfg.skip_validate) {
+            top_ref = footer->m_top_ref;
+        }
     }
 
     fcg.release(); // Do not close
