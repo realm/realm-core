@@ -21,13 +21,17 @@
 #define REALM_UTIL_FEATURES_H
 
 #ifdef _MSC_VER
-#pragma warning(disable:4800) // Visual Studio int->bool performance warnings
+#  pragma warning(disable:4800) // Visual Studio int->bool performance warnings
 #endif
 
 #ifdef REALM_HAVE_CONFIG
 #  include <realm/util/config.h>
 #else
-#  define REALM_VERSION "unknown"
+#  define REALM_VERSION               "unknown"
+#  define REALM_ENABLE_ALLOC_SET_ZERO 0
+#  define REALM_ENABLE_ENCRYPTION     0
+#  define REALM_ENABLE_ASSERTIONS     0
+
 #  ifndef _WIN32
 #    define REALM_INSTALL_PREFIX      "/usr/local"
 #    define REALM_INSTALL_EXEC_PREFIX REALM_INSTALL_PREFIX
