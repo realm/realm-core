@@ -30,11 +30,22 @@
 #include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <cerrno>
 
 #include <realm/util/terminate.hpp>
 
 namespace realm {
 namespace util {
+
+#define MPROTECT(addr, len, prot) \
+{ \
+    int mpt_ret = mprotect(addr, len, prot); \
+    if (mpt_ret != 0) { \
+        int mpt_err = errno; \
+        terminate("mprotect failed. Return value and errno.", __FILE__, __LINE__, \
+                mpt_ret, mpt_err); \
+    } \
+}
 
 SharedFileInfo::SharedFileInfo(const uint8_t* key, int fd)
 : fd(fd), cryptor(key)
@@ -363,7 +374,7 @@ void EncryptedFileMapping::mark_unreadable(size_t i) noexcept
         flush();
 
     if (m_read_pages[i]) {
-        mprotect(page_addr(i), m_page_size, PROT_NONE);
+        MPROTECT(page_addr(i), m_page_size, PROT_NONE);
         m_read_pages[i] = false;
     }
 }
@@ -373,7 +384,7 @@ void EncryptedFileMapping::mark_readable(size_t i) noexcept
     if (i >= m_read_pages.size() || (m_read_pages[i] && !m_write_pages[i]))
         return;
 
-    mprotect(page_addr(i), m_page_size, PROT_READ);
+    MPROTECT(page_addr(i), m_page_size, PROT_READ);
     m_read_pages[i] = true;
     m_write_pages[i] = false;
 }
@@ -384,7 +395,7 @@ void EncryptedFileMapping::mark_unwritable(size_t i) noexcept
         return;
 
     REALM_ASSERT(m_read_pages[i]);
-    mprotect(page_addr(i), m_page_size, PROT_READ);
+    MPROTECT(page_addr(i), m_page_size, PROT_READ);
     m_write_pages[i] = false;
     // leave dirty bit set
 }
@@ -408,12 +419,12 @@ bool EncryptedFileMapping::copy_read_page(size_t page) noexcept
 void EncryptedFileMapping::read_page(size_t i) noexcept
 {
     char* addr = page_addr(i);
-    mprotect(addr, m_page_size, PROT_READ | PROT_WRITE);
+    MPROTECT(addr, m_page_size, PROT_READ | PROT_WRITE);
 
     if (!copy_read_page(i))
         m_file.cryptor.read(m_file.fd, i * m_page_size, addr, m_page_size);
 
-    mprotect(page_addr(i), m_page_size, PROT_READ);
+    MPROTECT(page_addr(i), m_page_size, PROT_READ);
     m_read_pages[i] = true;
     m_write_pages[i] = false;
 }
@@ -426,7 +437,7 @@ void EncryptedFileMapping::write_page(size_t page) noexcept
             m->mark_unreadable(page);
     }
 
-    mprotect(page_addr(page), m_page_size, PROT_READ | PROT_WRITE);
+    MPROTECT(page_addr(page), m_page_size, PROT_READ | PROT_WRITE);
     m_write_pages[page] = true;
     m_dirty_pages[page] = true;
 }
@@ -474,7 +485,7 @@ void EncryptedFileMapping::flush() noexcept
     for (size_t i = 0; i < m_page_count; ++i) {
         if (!m_read_pages[i]) {
             if (start < i)
-                mprotect(page_addr(start), (i - start) * m_page_size, PROT_READ);
+                MPROTECT(page_addr(start), (i - start) * m_page_size, PROT_READ);
             start = i + 1;
         }
         else if (start == i && !m_write_pages[i])
@@ -490,7 +501,7 @@ void EncryptedFileMapping::flush() noexcept
         m_write_pages[i] = false;
     }
     if (start < m_page_count)
-        mprotect(page_addr(start), (m_page_count - start) * m_page_size, PROT_READ);
+        MPROTECT(page_addr(start), (m_page_count - start) * m_page_size, PROT_READ);
 
     validate();
 }
@@ -555,10 +566,10 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
             m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
         mark_readable(0);
         if (m_page_count > 1)
-            mprotect(page_addr(1), (m_page_count - 1) * m_page_size, PROT_NONE);
+            MPROTECT(page_addr(1), (m_page_count - 1) * m_page_size, PROT_NONE);
     }
     else
-        mprotect(m_addr, m_page_count * m_page_size - m_file_offset, PROT_NONE);
+        MPROTECT(m_addr, m_page_count * m_page_size - m_file_offset, PROT_NONE);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept

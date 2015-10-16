@@ -412,7 +412,9 @@ void signal_handler(int code, siginfo_t* info, void* ctx)
 {
     if (signal_test_state == signal_test_state_Untested) {
         signal_test_state = info->si_addr == expected_si_addr ? signal_test_state_Works : signal_test_state_Broken;
-        mprotect(expected_si_addr, page_size(), PROT_READ | PROT_WRITE);
+        if (mprotect(expected_si_addr, page_size(), PROT_READ | PROT_WRITE) != 0) {
+            signal_test_state = signal_test_state_Broken;
+        }
         return;
     }
 
@@ -474,10 +476,15 @@ void install_handler()
     }
 
     // Should produce a SIGSEGV with si_addr = expected_si_addr
-    mprotect(expected_si_addr, size, PROT_NONE);
+    if (mprotect(expected_si_addr, size, PROT_NONE) != 0) {
+        throw EncryptionNotSupportedOnThisDevice();
+    }
     *static_cast<char *>(expected_si_addr) = 0;
 
-    ::munmap(expected_si_addr, size);
+    if (::munmap(expected_si_addr, size) != 0) {
+        int err = errno;
+        throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+    }
     if (signal_test_state != signal_test_state_Works)
         throw EncryptionNotSupportedOnThisDevice();
 }
