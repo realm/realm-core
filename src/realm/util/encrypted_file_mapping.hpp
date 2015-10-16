@@ -112,7 +112,7 @@ public:
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping
-    void set(void* new_addr, size_t new_size, size_t new_file_offset);
+    void set(void* new_addr, size_t new_size, size_t new_file_offset, File::AccessMode access);
 
 private:
     SharedFileInfo& m_file;

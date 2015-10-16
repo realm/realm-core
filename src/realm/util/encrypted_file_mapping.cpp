@@ -343,13 +343,12 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 : m_file(file)
 , m_page_size(realm::util::page_size())
 , m_blocks_per_page(m_page_size / block_size)
-, m_access(access)
 #ifdef REALM_DEBUG
 , m_validate_buffer(new char[m_page_size])
 #endif
 {
     REALM_ASSERT(m_blocks_per_page * block_size == m_page_size);
-    set(addr, size, file_offset); // throws
+    set(addr, size, file_offset, access); // throws
     file.mappings.push_back(this);
 }
 
@@ -536,7 +535,7 @@ void EncryptedFileMapping::handle_access(void* addr) noexcept
     }
 }
 
-void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
+void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset, File::AccessMode access)
 {
     REALM_ASSERT(new_file_offset % m_page_size == 0);
     REALM_ASSERT(new_size % m_page_size == 0);
@@ -570,6 +569,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     }
     else
         MPROTECT(m_addr, m_page_count * m_page_size - m_file_offset, PROT_NONE);
+    m_access = access;
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept

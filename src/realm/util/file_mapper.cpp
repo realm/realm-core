@@ -718,7 +718,7 @@ void munmap(void* addr, size_t size) noexcept
 }
 
 void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, 
-             File::AccessMode a, size_t new_size)
+             File::AccessMode access, size_t new_size)
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     {
@@ -730,7 +730,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
                 return old_addr;
 
             void* new_addr = mmap_anon(rounded_new_size);
-            m->mapping->set(new_addr, rounded_new_size, file_offset);
+            m->mapping->set(new_addr, rounded_new_size, file_offset, access);
             int i = ::munmap(old_addr, rounded_old_size);
             m->addr = new_addr;
             m->size = rounded_new_size;
@@ -755,7 +755,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
     // Fall back to no-mremap case if it's not supported
 #endif
 
-    void* new_addr = mmap(fd, new_size, a, file_offset, nullptr);
+    void* new_addr = mmap(fd, new_size, access, file_offset, nullptr);
     if (::munmap(old_addr, old_size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
