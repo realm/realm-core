@@ -610,8 +610,7 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
         uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
         m_file_on_streaming_form = (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
         if (m_file_on_streaming_form) {
-            const StreamingFooter& footer =
-                *(reinterpret_cast<StreamingFooter*>(map.get_addr()+initial_size_of_file) - 1);
+            const StreamingFooter& footer = *(reinterpret_cast<StreamingFooter*>(data+size) - 1);
             top_ref = ref_type(footer.m_top_ref);
         }
         else {
