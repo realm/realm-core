@@ -35,6 +35,8 @@
 
 ### Internals:
 
+* Minor reorg removing a template parameter to SharedGroup::advance_read()
+  and friends.
 * Obsolete YAML-based documentation removed.
 * Removed `std::` in front integral types (e.g. `size_t`, `int64_t` etc.)
 

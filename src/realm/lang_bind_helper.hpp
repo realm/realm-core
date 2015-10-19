@@ -350,7 +350,7 @@ inline void LangBindHelper::advance_read(SharedGroup& sg, History& history,
                                          SharedGroup::VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    ForwardBulkObserver* observer = 0;
     sgf::advance_read(sg, history, observer, version);
 }
 
@@ -359,13 +359,14 @@ inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, O&& 
                                          SharedGroup::VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::advance_read(sg, history, &observer, version);
+    ForwardObserver<O> bulked(observer);
+    sgf::advance_read(sg, history, &bulked, version);
 }
 
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    ForwardBulkObserver* observer = 0;
     sgf::promote_to_write(sg, history, observer);
 }
 
@@ -373,7 +374,8 @@ template<class O>
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history, O&& observer)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::promote_to_write(sg, history, &observer);
+    ForwardObserver<O> bulked(observer);
+    sgf::promote_to_write(sg, history, &bulked);
 }
 
 inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
@@ -385,7 +387,7 @@ inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    BackwardBulkObserver* observer = 0;
     sgf::rollback_and_continue_as_read(sg, history, observer);
 }
 
@@ -394,7 +396,8 @@ inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, Histo
                                                           O&& observer)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::rollback_and_continue_as_read(sg, history, &observer);
+    BackwardObserver<O> bulked(observer);
+    sgf::rollback_and_continue_as_read(sg, history, &bulked);
 }
 
 } // namespace realm

@@ -129,6 +129,9 @@ struct IncompatibleLockFile: std::runtime_error {
 ///    are destruction of the shared group, and GroupShared::rollback(). If
 ///    GroupShared::end_write() is called, the new state becomes "no transaction
 ///    in progress"
+class ForwardBulkObserver;
+class BackwardBulkObserver;
+
 class SharedGroup {
 public:
     enum DurabilityLevel {
@@ -597,10 +600,10 @@ private:
 
     //@{
     /// See LangBindHelper.
-    template<class O> void advance_read(History&, O* observer, VersionID);
-    template<class O> void promote_to_write(History&, O* observer);
+    void advance_read(History&, ForwardBulkObserver* observer, VersionID);
+    void promote_to_write(History&, ForwardBulkObserver* observer);
     void commit_and_continue_as_read();
-    template<class O> void rollback_and_continue_as_read(History&, O* observer);
+    void rollback_and_continue_as_read(History&, BackwardBulkObserver* observer);
     //@}
 
     // Advance the readlock to the given version and return the transaction logs
@@ -612,6 +615,49 @@ private:
     friend class _impl::SharedGroupFriend;
 };
 
+
+// Template helper classes used to generate a "bulkified" Observer based on
+// provided observers.
+
+class ForwardBulkObserver {
+public:
+    virtual void handle(const BinaryData* begin, const BinaryData* end) = 0;
+    virtual ~ForwardBulkObserver() {};
+};
+
+template<typename Observer> class ForwardObserver : public ForwardBulkObserver {
+public:
+    ForwardObserver(Observer& o) : m_o(o) {}
+    void handle(const BinaryData* begin, const BinaryData* end) override
+    {
+        _impl::TransactLogParser parser;
+        _impl::MultiLogNoCopyInputStream in(begin, end);
+        parser.parse(in, m_o); // Throws
+        m_o.parse_complete(); // Throws
+    }
+private:
+    Observer& m_o;
+};
+
+
+class BackwardBulkObserver {
+public:
+    virtual void handle(_impl::TransactLogParser& parser, _impl::TransactReverser& reverser) = 0;
+    virtual ~BackwardBulkObserver() {};
+};
+
+template<typename Observer> class BackwardObserver : public BackwardBulkObserver {
+public:
+    BackwardObserver(Observer& o) : m_o(o) {}
+    void handle(_impl::TransactLogParser& parser, _impl::TransactReverser& reverser) override
+    {
+        _impl::ReversedNoCopyInputStream reversed_in(reverser);
+        parser.parse(reversed_in, m_o); // Throws
+        m_o.parse_complete(); // Throws
+    }
+private:
+    Observer& m_o;
+};
 
 
 class ReadTransaction {
@@ -879,8 +925,7 @@ std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup
 }
 
 
-template<class O>
-inline void SharedGroup::advance_read(History& history, O* observer, VersionID version)
+inline void SharedGroup::advance_read(History& history, ForwardBulkObserver* observer, VersionID version)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
@@ -896,17 +941,14 @@ inline void SharedGroup::advance_read(History& history, O* observer, VersionID v
     const BinaryData* changesets_end = changesets_begin + num_changesets;
 
     if (observer) {
-        _impl::TransactLogParser parser;
-        _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-        parser.parse(in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        observer->handle(changesets_begin, changesets_end);
     }
     _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
     using gf = _impl::GroupFriend;
     gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size, in); // Throws
 }
 
-template<class O> inline void SharedGroup::promote_to_write(History& history, O* observer)
+inline void SharedGroup::promote_to_write(History& history, ForwardBulkObserver* observer)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
@@ -958,8 +1000,8 @@ inline void SharedGroup::commit_and_continue_as_read()
     m_transact_stage = transact_Reading;
 }
 
-template<class O>
-inline void SharedGroup::rollback_and_continue_as_read(History& history, O* observer)
+
+inline void SharedGroup::rollback_and_continue_as_read(History& history, BackwardBulkObserver* observer)
 {
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
@@ -981,9 +1023,7 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
     parser.parse(in, reverser); // Throws
 
     if (observer && uncommitted_changes.size()) {
-        _impl::ReversedNoCopyInputStream reversed_in(reverser);
-        parser.parse(reversed_in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        observer->handle(parser, reverser);
     }
 
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
