@@ -358,8 +358,8 @@ size_t GroupWriter::get_free_space(size_t size)
 }
 
 
-inline std::size_t GroupWriter::split_freelist_chunk(std::size_t index, std::size_t start_pos, 
-                                                     std::size_t alloc_pos, std::size_t chunk_size, 
+inline size_t GroupWriter::split_freelist_chunk(size_t index, size_t start_pos,
+                                                     size_t alloc_pos, size_t chunk_size,
                                                      bool is_shared)
 {
     m_free_positions.insert(index, start_pos);
@@ -374,13 +374,13 @@ inline std::size_t GroupWriter::split_freelist_chunk(std::size_t index, std::siz
 }
 
 
-std::pair<std::size_t, std::size_t> 
-GroupWriter::search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin, 
-                                                   std::size_t end, bool& found)
+std::pair<size_t, size_t>
+GroupWriter::search_free_space_in_part_of_freelist(size_t size, size_t begin,
+                                                   size_t end, bool& found)
 {
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
-    for (std::size_t i = begin; i != end; ++i) {
+    for (size_t i = begin; i != end; ++i) {
         size_t chunk_size = to_size_t(m_free_lengths.get(i));
         if (chunk_size < size) {
             continue;
@@ -421,7 +421,7 @@ GroupWriter::search_free_space_in_part_of_freelist(std::size_t size, std::size_t
 
 std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
-    typedef std::pair<std::size_t, std::size_t> Chunk;
+    typedef std::pair<size_t, size_t> Chunk;
     Chunk chunk;
     bool found;
     // Since we do a first-fit search for small chunks, the top pieces are
@@ -447,7 +447,7 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
         // so search that particular entry
         end = m_free_lengths.size();
         chunk = search_free_space_in_part_of_freelist(size, end-1, end, found);
-    } 
+    }
     while (!found);
     return chunk;
 }

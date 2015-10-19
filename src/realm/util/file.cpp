@@ -763,7 +763,7 @@ void File::unlock() noexcept
 }
 
 
-void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) const
+void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
 {
 #ifdef _WIN32 // Windows version
 

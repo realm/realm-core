@@ -265,7 +265,7 @@ TestList& get_default_test_list();
 struct PatternBasedFileOrder {
     PatternBasedFileOrder(const char** patterns_begin, const char** patterns_end);
 
-    template<std::size_t N> PatternBasedFileOrder(const char* (&patterns)[N]);
+    template<size_t N> PatternBasedFileOrder(const char* (&patterns)[N]);
 
     bool operator()(TestDetails*, TestDetails*);
 
@@ -483,7 +483,7 @@ inline PatternBasedFileOrder::PatternBasedFileOrder(const char** patterns_begin,
 {
 }
 
-template<std::size_t N>
+template<size_t N>
 inline PatternBasedFileOrder::PatternBasedFileOrder(const char* (&patterns)[N]):
     m_wrap(patterns, patterns+N)
 {

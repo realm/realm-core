@@ -41,21 +41,21 @@ public:
     VerifiedInteger(Random&);
     ~VerifiedInteger();
     void add(int64_t value);
-    void insert(std::size_t ndx, int64_t value);
-    void insert(std::size_t ndx, const char *value);
-    int64_t get(std::size_t ndx);
-    void set(std::size_t ndx, int64_t value);
-    void erase(std::size_t ndx);
+    void insert(size_t ndx, int64_t value);
+    void insert(size_t ndx, const char *value);
+    int64_t get(size_t ndx);
+    void set(size_t ndx, int64_t value);
+    void erase(size_t ndx);
     void clear();
     size_t find_first(int64_t value);
-    void find_all(IntegerColumn &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
-    std::size_t size();
-    int64_t sum(std::size_t start = 0, std::size_t end = -1);
-    int64_t maximum(std::size_t start = 0, std::size_t end = -1);
-    int64_t minimum(std::size_t start = 0, std::size_t end = -1);
+    void find_all(IntegerColumn &c, int64_t value, size_t start = 0, size_t end = -1);
+    size_t size();
+    int64_t sum(size_t start = 0, size_t end = -1);
+    int64_t maximum(size_t start = 0, size_t end = -1);
+    int64_t minimum(size_t start = 0, size_t end = -1);
     bool verify();
     bool occasional_verify();
-    void verify_neighbours(std::size_t ndx);
+    void verify_neighbours(size_t ndx);
 
 private:
     std::vector<int64_t> v;

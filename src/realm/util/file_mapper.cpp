@@ -666,7 +666,7 @@ size_t round_up_to_page_size(size_t size) noexcept
 }
 #endif
 
-void* mmap(int fd, size_t size, File::AccessMode access, std::size_t offset, const char* encryption_key)
+void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
 {
 #ifdef REALM_ENABLE_ENCRYPTION
     if (encryption_key) {
@@ -710,7 +710,7 @@ void munmap(void* addr, size_t size) noexcept
     }
 }
 
-void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, 
+void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
              File::AccessMode a, size_t new_size)
 {
 #ifdef REALM_ENABLE_ENCRYPTION

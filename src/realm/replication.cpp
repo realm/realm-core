@@ -567,7 +567,7 @@ public:
         return true;
     }
 
-    bool erase_group_level_table(std::size_t table_ndx, size_t num_tables) noexcept
+    bool erase_group_level_table(size_t table_ndx, size_t num_tables) noexcept
     {
         if (REALM_UNLIKELY(num_tables != m_group.size()))
             return false;
@@ -579,7 +579,7 @@ public:
         return true;
     }
 
-    bool rename_group_level_table(std::size_t table_ndx, StringData new_name) noexcept
+    bool rename_group_level_table(size_t table_ndx, StringData new_name) noexcept
     {
 #ifdef REALM_DEBUG
         if (m_log)
@@ -589,7 +589,7 @@ public:
         return true;
     }
 
-    bool move_group_level_table(std::size_t table_ndx_1, std::size_t table_ndx_2) noexcept
+    bool move_group_level_table(size_t table_ndx_1, size_t table_ndx_2) noexcept
     {
 #ifdef REALM_DEBUG
         if (m_log)
@@ -845,7 +845,7 @@ std::string TrivialReplication::do_get_database_path()
 void TrivialReplication::do_initiate_transact(SharedGroup&, version_type)
 {
     char* data = m_transact_log_buffer.data();
-    std::size_t size = m_transact_log_buffer.size();
+    size_t size = m_transact_log_buffer.size();
     set_buffer(data, data + size);
 }
 
@@ -853,7 +853,7 @@ Replication::version_type
 TrivialReplication::do_prepare_commit(SharedGroup&, version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
-    std::size_t size = write_position() - data;
+    size_t size = write_position() - data;
     version_type new_version = orig_version + 1;
     prepare_changeset(data, size, new_version); // Throws
     return new_version;
@@ -876,7 +876,7 @@ void TrivialReplication::do_clear_interrupt() noexcept
 {
 }
 
-void TrivialReplication::transact_log_append(const char* data, std::size_t size, char** new_begin, char** new_end)
+void TrivialReplication::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(size, new_begin, new_end);
     *new_begin = std::copy(data, data + size, *new_begin);

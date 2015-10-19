@@ -554,7 +554,7 @@ void Array::set(size_t ndx, int64_t value)
     (this->*(m_vtable->setter))(ndx, value);
 }
 
-void Array::set_as_ref(std::size_t ndx, ref_type ref)
+void Array::set_as_ref(size_t ndx, ref_type ref)
 {
     set(ndx, from_ref(ref));
 }
@@ -748,7 +748,7 @@ void Array::set_all_to_zero()
 // pointed at are sorted increasingly
 //
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-std::size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
+size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
     switch (m_width) {
         case 0:
@@ -772,8 +772,8 @@ std::size_t Array::find_gte(const int64_t target, size_t start, Array const* ind
     }
 }
 
-template<std::size_t w>
-std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const* indirection) const
+template<size_t w>
+size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
     REALM_ASSERT(start < (indirection ? indirection->size() : size()));
 
@@ -1733,7 +1733,7 @@ void Array::alloc(size_t size, size_t width)
             if (new_capacity_bytes > max_array_payload) // cap at max allowed allocation
                 new_capacity_bytes = max_array_payload;
             capacity_bytes = new_capacity_bytes;
-            
+
             // If doubling is not enough, expand enough to fit
             if (capacity_bytes < needed_bytes) {
                 size_t rest = (~needed_bytes & 0x7) + 1;

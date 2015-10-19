@@ -326,7 +326,7 @@ bool LinkListColumn::compare_link_list(const LinkListColumn& c) const
 }
 
 
-void LinkListColumn::do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx)
+void LinkListColumn::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
 {
     LinkViewRef links = get(row_ndx);
     links->do_nullify_link(old_target_row_ndx);

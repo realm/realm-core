@@ -67,7 +67,7 @@ inline OutputStream::~OutputStream() noexcept
 {
 }
 
-inline std::size_t OutputStream::get_ref_of_next_array() const noexcept
+inline size_t OutputStream::get_ref_of_next_array() const noexcept
 {
     return m_next_ref;
 }

@@ -27,7 +27,7 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
 }
 
 
-void ArrayBigBlobs::set(std::size_t ndx, BinaryData value, bool add_zero_term)
+void ArrayBigBlobs::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <, size());
     REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);

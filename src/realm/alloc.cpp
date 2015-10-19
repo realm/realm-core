@@ -8,9 +8,9 @@
 using namespace realm;
 
 
-// FIXME: Casting a pointers to std::size_t is inherently
+// FIXME: Casting a pointers to size_t is inherently
 // nonportable. For example, systems exist where pointers are 64 bits
-// and std::size_t is 32. One idea would be to use a different type
+// and size_t is 32. One idea would be to use a different type
 // for refs such as std::uintptr_t, the problem with this one is that
 // while it is described by the C++11 standard it is not required to
 // be present. C++03 does not even mention it. A real working solution

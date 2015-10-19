@@ -64,7 +64,7 @@ PlatformSpecificCondVar::~PlatformSpecificCondVar() noexcept
 
 
 
-void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string path, std::size_t offset_of_condvar)
+void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string path, size_t offset_of_condvar)
 {
     REALM_ASSERT(m_shared_part == nullptr);
     close();
@@ -76,7 +76,7 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
 #endif
 }
 
-sem_t* PlatformSpecificCondVar::get_semaphore(std::string path, std::size_t offset)
+sem_t* PlatformSpecificCondVar::get_semaphore(std::string path, size_t offset)
 {
     uint64_t magic = 0;
     for (unsigned int i=0; i<path.length(); ++i)

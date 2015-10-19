@@ -177,7 +177,7 @@ public:
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
             typename ColType::LeafInfo leaf { &m_leaf_ptr, m_array_ptr.get() };
-            std::size_t ndx_in_leaf;
+            size_t ndx_in_leaf;
             m_column->get_leaf(index, ndx_in_leaf, leaf);
             m_leaf_start = index - ndx_in_leaf;
             const size_t leaf_size = m_leaf_ptr->size();
@@ -347,12 +347,12 @@ protected:
     const Table* m_table;
     std::string error_code;
 
-    const ColumnBase& get_column_base(const Table& table, std::size_t ndx)
+    const ColumnBase& get_column_base(const Table& table, size_t ndx)
     {
         return table.get_column_base(ndx);
     }
 
-    ColumnType get_real_column_type(const Table& table, std::size_t ndx)
+    ColumnType get_real_column_type(const Table& table, size_t ndx)
     {
         return table.get_real_column_type(ndx);
     }
@@ -764,7 +764,7 @@ public:
         int c = TConditionFunction::condition;
         return this->aggregate_local_impl(st, start, end, local_limit, source_column, c);
     }
-    
+
 
     size_t find_first_local(size_t start, size_t end) override
     {
@@ -777,8 +777,8 @@ public:
                 this->get_leaf(*this->m_condition_column, start);
             }
 
-            // FIXME: Create a fast bypass when you just need to check 1 row, which is used alot from within core. 
-            // It should just call array::get and save the initial overhead of find_first() which has become quite 
+            // FIXME: Create a fast bypass when you just need to check 1 row, which is used alot from within core.
+            // It should just call array::get and save the initial overhead of find_first() which has become quite
             // big. Do this when we have cleaned up core a bit more.
 
             size_t end2;
@@ -892,7 +892,7 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
-        
+
         auto find = [&](bool nullability)   {
             bool m_value_nan = nullability ? null::is_null_float(m_value) : false;
             for (size_t s = start; s < end; ++s) {
@@ -1086,7 +1086,7 @@ public:
                 if (s >= m_end_s || s < m_leaf_start) {
                     // we exceeded current leaf's range
                     clear_leaf_state();
-                    std::size_t ndx_in_leaf;
+                    size_t ndx_in_leaf;
                     m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
                     m_leaf_start = s - ndx_in_leaf;
 
@@ -1278,7 +1278,7 @@ public:
             const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
             if (s >= m_leaf_end || s < m_leaf_start) {
                 clear_leaf_state();
-                std::size_t ndx_in_leaf;
+                size_t ndx_in_leaf;
                 m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
                 m_leaf_start = s - ndx_in_leaf;
                 if (m_leaf_type == StringColumn::leaf_type_Small)

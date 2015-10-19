@@ -31,42 +31,42 @@ public:
 
     explicit ArrayBigBlobs(Allocator&, bool nullable) noexcept;
 
-    BinaryData get(std::size_t ndx) const noexcept;
-    void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
+    BinaryData get(size_t ndx) const noexcept;
+    void set(size_t ndx, BinaryData value, bool add_zero_term = false);
     void add(BinaryData value, bool add_zero_term = false);
-    void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void erase(std::size_t ndx);
-    void truncate(std::size_t size);
+    void insert(size_t ndx, BinaryData value, bool add_zero_term = false);
+    void erase(size_t ndx);
+    void truncate(size_t size);
     void clear();
     void destroy();
 
-    std::size_t count(BinaryData value, bool is_string = false, std::size_t begin = 0,
-                      std::size_t end = npos) const noexcept;
-    std::size_t find_first(BinaryData value, bool is_string = false, std::size_t begin = 0,
-                           std::size_t end = npos) const noexcept;
+    size_t count(BinaryData value, bool is_string = false, size_t begin = 0,
+                      size_t end = npos) const noexcept;
+    size_t find_first(BinaryData value, bool is_string = false, size_t begin = 0,
+                           size_t end = npos) const noexcept;
     void find_all(IntegerColumn& result, BinaryData value, bool is_string = false,
-                  std::size_t add_offset = 0,
-                  std::size_t begin = 0, std::size_t end = npos);
+                  size_t add_offset = 0,
+                  size_t begin = 0, size_t end = npos);
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static BinaryData get(const char* header, std::size_t ndx, Allocator&) noexcept;
+    static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
+    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term,
                                 TreeInsertBase& state);
 
     //@{
     /// Those that return a string, discard the terminating zero from
     /// the stored value. Those that accept a string argument, add a
     /// terminating zero before storing the value.
-    StringData get_string(std::size_t ndx) const noexcept;
+    StringData get_string(size_t ndx) const noexcept;
     void add_string(StringData value);
-    void set_string(std::size_t ndx, StringData value);
-    void insert_string(std::size_t ndx, StringData value);
-    static StringData get_string(const char* header, std::size_t ndx, Allocator&, bool nullable) noexcept;
-    ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
+    void set_string(size_t ndx, StringData value);
+    void insert_string(size_t ndx, StringData value);
+    static StringData get_string(const char* header, size_t ndx, Allocator&, bool nullable) noexcept;
+    ref_type bptree_leaf_insert_string(size_t ndx, StringData, TreeInsertBase& state);
     //@}
 
     /// Create a new empty big blobs array and attach this accessor to
@@ -79,7 +79,7 @@ public:
 
     /// Construct a copy of the specified slice of this big blobs
     /// array using the specified target allocator.
-    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+    MemRef slice(size_t offset, size_t size, Allocator& target_alloc) const;
 
 #ifdef REALM_DEBUG
     void verify() const;
@@ -99,7 +99,7 @@ inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc, bool nullable) noexcept:
 {
 }
 
-inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const noexcept
+inline BinaryData ArrayBigBlobs::get(size_t ndx) const noexcept
 {
     ref_type ref = get_as_ref(ndx);
     if (ref == 0)
@@ -124,7 +124,7 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
     return BinaryData(blob_data, blob_size);
 }
 
-inline void ArrayBigBlobs::erase(std::size_t ndx)
+inline void ArrayBigBlobs::erase(size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
     if (blob_ref != 0) { // nothing to destroy if null
@@ -133,7 +133,7 @@ inline void ArrayBigBlobs::erase(std::size_t ndx)
     Array::erase(ndx);
 }
 
-inline void ArrayBigBlobs::truncate(std::size_t size)
+inline void ArrayBigBlobs::truncate(size_t size)
 {
     Array::truncate_and_destroy_children(size);
 }
@@ -148,7 +148,7 @@ inline void ArrayBigBlobs::destroy()
     Array::destroy_deep();
 }
 
-inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const noexcept
+inline StringData ArrayBigBlobs::get_string(size_t ndx) const noexcept
 {
     BinaryData bin = get(ndx);
     if (bin.is_null())
@@ -157,7 +157,7 @@ inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const noexcept
         return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
 
-inline void ArrayBigBlobs::set_string(std::size_t ndx, StringData value)
+inline void ArrayBigBlobs::set_string(size_t ndx, StringData value)
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
@@ -173,7 +173,7 @@ inline void ArrayBigBlobs::add_string(StringData value)
     add(bin, add_zero_term);
 }
 
-inline void ArrayBigBlobs::insert_string(std::size_t ndx, StringData value)
+inline void ArrayBigBlobs::insert_string(size_t ndx, StringData value)
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
@@ -193,7 +193,7 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
         return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
 
-inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(std::size_t ndx, StringData value,
+inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(size_t ndx, StringData value,
                                                          TreeInsertBase& state)
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
@@ -208,7 +208,7 @@ inline void ArrayBigBlobs::create()
     Array::create(type_HasRefs, context_flag); // Throws
 }
 
-inline MemRef ArrayBigBlobs::slice(std::size_t offset, std::size_t size,
+inline MemRef ArrayBigBlobs::slice(size_t offset, size_t size,
                                    Allocator& target_alloc) const
 {
     return slice_and_clone_children(offset, size, target_alloc);

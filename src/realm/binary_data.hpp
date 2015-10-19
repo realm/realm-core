@@ -40,18 +40,18 @@ namespace realm {
 class BinaryData {
 public:
     BinaryData() noexcept : m_data(0), m_size(0) {}
-    BinaryData(const char* data, std::size_t size) noexcept: m_data(data), m_size(size) {}
-    template<std::size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
+    BinaryData(const char* data, size_t size) noexcept: m_data(data), m_size(size) {}
+    template<size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
     template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);
 
 #if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     template<class T, class A> explicit operator std::basic_string<char, T, A>() const;
 #endif
 
-    char operator[](std::size_t i) const noexcept { return m_data[i]; }
+    char operator[](size_t i) const noexcept { return m_data[i]; }
 
     const char* data() const noexcept { return m_data; }
-    std::size_t size() const noexcept { return m_size; }
+    size_t size() const noexcept { return m_size; }
 
     /// Is this a null reference?
     ///
@@ -104,7 +104,7 @@ public:
 
 private:
     const char* m_data;
-    std::size_t m_size;
+    size_t m_size;
 };
 
 /// A read-only chunk of binary data.

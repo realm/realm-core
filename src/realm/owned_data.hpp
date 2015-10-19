@@ -32,7 +32,7 @@ public:
     OwnedData() noexcept {}
 
     /// If \a data is 'null', \a size must be zero.
-    OwnedData(const char* data, std::size_t size) : m_size(size)
+    OwnedData(const char* data, size_t size) : m_size(size)
     {
         REALM_ASSERT_DEBUG(data || size == 0);
         if (data) {
@@ -42,7 +42,7 @@ public:
     }
 
     /// If \a data is 'null', \a size must be zero.
-    OwnedData(std::unique_ptr<char[]> data, std::size_t size) noexcept :
+    OwnedData(std::unique_ptr<char[]> data, size_t size) noexcept :
         m_data(std::move(data)), m_size(size)
     {
         REALM_ASSERT_DEBUG(m_data || m_size == 0);
@@ -55,11 +55,11 @@ public:
     OwnedData& operator=(OwnedData&&) = default;
 
     const char* data() const { return m_data.get(); }
-    std::size_t size() const { return m_size; }
+    size_t size() const { return m_size; }
 
 private:
     std::unique_ptr<char[]> m_data;
-    std::size_t m_size = 0;
+    size_t m_size = 0;
 };
 
 inline OwnedData& OwnedData::operator=(const OwnedData& other)

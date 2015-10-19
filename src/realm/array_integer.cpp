@@ -55,7 +55,7 @@ std::vector<int64_t> ArrayInteger::to_vector() const
     return v;
 }
 
-MemRef ArrayIntNull::create_array(Type type, bool context_flag, std::size_t size, int_fast64_t value, Allocator& alloc)
+MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, int_fast64_t value, Allocator& alloc)
 {
     MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, value, alloc); // Throws
     ArrayIntNull arr(alloc);
@@ -137,9 +137,9 @@ void ArrayIntNull::replace_nulls_with(int64_t new_null)
 {
     int64_t old_null = Array::get(0);
     Array::set(0, new_null);
-    std::size_t i = 1;
+    size_t i = 1;
     while (true) {
-        std::size_t found = Array::find_first(old_null, i);
+        size_t found = Array::find_first(old_null, i);
         if (found < Array::size()) {
             Array::set(found, new_null);
             i = found + 1;
@@ -186,7 +186,7 @@ void ArrayIntNull::avoid_null_collision(int64_t value)
     }
 }
 
-void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, std::size_t col_offset, std::size_t begin, std::size_t end) const
+void ArrayIntNull::find_all(IntegerColumn* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
     // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
     // in the result column. Since find_all may be invoked many times for different leaves in the
@@ -215,7 +215,7 @@ namespace {
 // FIXME: Move this logic to BpTree.
 struct ArrayIntNullLeafInserter {
     template <class T>
-    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, std::size_t ndx, T value, Array::TreeInsertBase& state)
+    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, size_t ndx, T value, Array::TreeInsertBase& state)
     {
         size_t leaf_size = self.size();
         REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
@@ -253,17 +253,17 @@ struct ArrayIntNullLeafInserter {
 
 } // anonymous namespace
 
-ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, int64_t value, Array::TreeInsertBase& state)
+ref_type ArrayIntNull::bptree_leaf_insert(size_t ndx, int64_t value, Array::TreeInsertBase& state)
 {
     return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, value, state);
 }
 
-ref_type ArrayIntNull::bptree_leaf_insert(std::size_t ndx, null, Array::TreeInsertBase& state)
+ref_type ArrayIntNull::bptree_leaf_insert(size_t ndx, null, Array::TreeInsertBase& state)
 {
     return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, null{}, state);
 }
 
-MemRef ArrayIntNull::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const
+MemRef ArrayIntNull::slice(size_t offset, size_t size, Allocator& target_alloc) const
 {
     // NOTE: It would be nice to consolidate this with Array::slice somehow.
 

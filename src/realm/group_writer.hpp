@@ -66,10 +66,10 @@ public:
     /// returned by write_group().
     void commit(ref_type new_top_ref);
 
-    std::size_t get_file_size() const noexcept;
+    size_t get_file_size() const noexcept;
 
     /// Write the specified chunk into free space.
-    void write(const char* data, std::size_t size);
+    void write(const char* data, size_t size);
 
     ref_type write_array(const char*, size_t, uint_fast32_t) override;
 
@@ -98,7 +98,7 @@ private:
     ///
     /// \return The position within the database file of the allocated
     /// chunk.
-    std::size_t get_free_space(std::size_t size);
+    size_t get_free_space(size_t size);
 
     /// Find a block of free space that is at least as big as the
     /// specified size and which will allow an allocation that is mapped
@@ -110,14 +110,14 @@ private:
     /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
     /// is the index of a chunk whose size is at least the requestd
     /// size, and `chunk_size` is the size of that chunk.
-    std::pair<std::size_t, std::size_t> reserve_free_space(std::size_t size);
+    std::pair<size_t, size_t> reserve_free_space(size_t size);
 
     /// Search only a range of the free list for a block as big as the
     /// specified size. Return a pair with index and size of the found chunk.
     /// \param found indicates whether a suitable block was found.
-    std::pair<std::size_t, std::size_t>
-    search_free_space_in_part_of_freelist(std::size_t size, std::size_t begin,
-                                          std::size_t end, bool& found);
+    std::pair<size_t, size_t>
+    search_free_space_in_part_of_freelist(size_t size, size_t begin,
+                                          size_t end, bool& found);
 
     /// Extend the file to ensure that a chunk of free space of the
     /// specified size is available. The specified size does not need
@@ -127,11 +127,11 @@ private:
     /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
     /// is the index of a chunk whose size is at least the requestd
     /// size, and `chunk_size` is the size of that chunk.
-    std::pair<std::size_t, std::size_t> extend_free_space(std::size_t requested_size);
+    std::pair<size_t, size_t> extend_free_space(size_t requested_size);
 
-    void write_array_at(ref_type ref, const char* data, std::size_t size);
-    std::size_t split_freelist_chunk(std::size_t index, std::size_t start_pos,
-                                     std::size_t alloc_pos, std::size_t chunk_size, bool is_shared);
+    void write_array_at(ref_type ref, const char* data, size_t size);
+    size_t split_freelist_chunk(size_t index, size_t start_pos,
+                                     size_t alloc_pos, size_t chunk_size, bool is_shared);
 };
 
 
@@ -139,7 +139,7 @@ private:
 
 // Implementation:
 
-inline std::size_t GroupWriter::get_file_size() const noexcept
+inline size_t GroupWriter::get_file_size() const noexcept
 {
     return m_file_map.get_size();
 }
