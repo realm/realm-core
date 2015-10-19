@@ -12,12 +12,20 @@
 ### Enhancements:
 
 * Queries are no longer limited to 16 levels of grouping.
+* New substring operations (ranged insert, erase on values in string columns).
+* Adds schema change notification handler API to Group.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* New operations: Swap rows, move rows, move column, move group level table.
+* Changes order of nullify instructions that appeared as a result of erase
+  to occur in the transaction log before the erase instruction that caused
+  them.
+* New utility class: DirScanner.
+* New test utility function: quote.
+
 
 ----------------------------------------------
 
