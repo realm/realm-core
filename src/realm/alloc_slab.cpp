@@ -600,14 +600,23 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     // Verify the data structures
     std::string path; // No path
     bool is_shared = false;
-    ref_type top_ref = validate_buffer(data, size, path, is_shared); // Throws
+    validate_buffer(data, size, path, is_shared); // Throws
 
+    ref_type top_ref;
     {
         const Header& header = reinterpret_cast<const Header&>(*data);
         int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
         m_file_format = header.m_file_format[select_field];
         uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
         m_file_on_streaming_form = (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+        if (m_file_on_streaming_form) {
+            const StreamingFooter& footer =
+                *(reinterpret_cast<StreamingFooter*>(map.get_addr()+initial_size_of_file) - 1);
+            top_ref = ref_type(footer.m_top_ref);
+        }
+        else {
+            top_ref = ref_type(ref);
+        }
     }
 
     m_data        = data;
@@ -640,8 +649,8 @@ void SlabAlloc::attach_empty()
 }
 
 
-ref_type SlabAlloc::validate_buffer(const char* data, size_t size, const std::string& path,
-                                    bool is_shared)
+void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string& path,
+                                bool is_shared)
 {
     // Verify that size is sane and 8-byte aligned
     if (REALM_UNLIKELY(size < sizeof (Header) || size % 8 != 0))
@@ -685,9 +694,6 @@ ref_type SlabAlloc::validate_buffer(const char* data, size_t size, const std::st
         throw InvalidDatabase("Bad Realm file header (#2)", path);
     if (REALM_UNLIKELY(ref >= size))
         throw InvalidDatabase("Bad Realm file header (#3)", path);
-
-    ref_type top_ref = ref_type(ref);
-    return top_ref;
 }
 
 
