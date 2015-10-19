@@ -196,8 +196,8 @@ public:
     template<class L> void set(size_t i, const util::Tuple<L>& tuple)
     {
         using namespace realm::util;
-        REALM_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
-                              "Wrong number of tuple elements");
+        static_assert(TypeCount<L>::value == TypeCount<Columns>::value,
+                      "Wrong number of tuple elements");
         ForEachType<Columns, _impl::AssignIntoCol>::exec(static_cast<Table*>(this), i, tuple);
     }
 

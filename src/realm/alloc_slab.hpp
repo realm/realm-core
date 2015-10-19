@@ -324,8 +324,8 @@ private:
         uint64_t m_magic_cookie;
     };
 
-    REALM_STATIC_ASSERT(sizeof (Header) == 24, "Bad header size");
-    REALM_STATIC_ASSERT(sizeof (StreamingFooter) == 16, "Bad footer size");
+    static_assert(sizeof (Header) == 24, "Bad header size");
+    static_assert(sizeof (StreamingFooter) == 16, "Bad footer size");
 
     static const Header empty_file_header;
     static const Header streaming_header;

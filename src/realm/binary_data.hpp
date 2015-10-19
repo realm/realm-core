@@ -44,9 +44,7 @@ public:
     template<size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
     template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);
 
-#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     template<class T, class A> explicit operator std::basic_string<char, T, A>() const;
-#endif
 
     char operator[](size_t i) const noexcept { return m_data[i]; }
 
@@ -95,12 +93,7 @@ public:
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept;
-#else
-    typedef const char* BinaryData::*unspecified_bool_type;
-    operator unspecified_bool_type() const noexcept;
-#endif
 
 private:
     const char* m_data;
@@ -131,14 +124,10 @@ template<class T, class A> inline BinaryData::BinaryData(const std::basic_string
 {
 }
 
-#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-
 template<class T, class A> inline BinaryData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
 }
-
-#endif
 
 inline bool BinaryData::is_null() const noexcept
 {
@@ -211,17 +200,10 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const B
     return out;
 }
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 inline BinaryData::operator bool() const noexcept
 {
     return !is_null();
 }
-#else
-inline BinaryData::operator unspecified_bool_type() const noexcept
-{
-    return is_null() ? 0 : &BinaryData::m_data;
-}
-#endif
 
 } // namespace realm
 

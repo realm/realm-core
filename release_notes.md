@@ -2,8 +2,7 @@
 
 ### Bugfixes:
 
-* Fixed a bug in SharedGroup::Compact() which could leave the database in an
-  inconsistent state.
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -26,6 +25,26 @@
 * New utility class: DirScanner.
 * New test utility function: quote.
 
+
+----------------------------------------------
+
+# 0.94.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug in SharedGroup::Compact() which could leave the database in an
+  inconsistent state.
+
+### Enhancements:
+
+* Queries are no longer limited to 16 levels of grouping.
+
+-----------
+
+### Internals:
+
+* Obsolete YAML-based documentation removed.
+* Removed `std::` in front integral types (e.g. `size_t`, `int64_t` etc.)
 
 ----------------------------------------------
 
@@ -85,7 +104,7 @@
 # 0.93.0 Release notes
 
 ### Bugfixes:
-* Fixed severe bug in Array allocator that could give asserts like 
+* Fixed severe bug in Array allocator that could give asserts like
   `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`, especially
   for BinaryData columns. This bug could be triggered by using binary data
   blobs with a size in the range between 8M and 16M.
@@ -119,7 +138,7 @@
   to another during handover_export() leading to corruption.
 * Query expression operators now give correct results when an argument comes
   from a link.
-* Fixed a bug in the way the new memory mapping machinery interacted with 
+* Fixed a bug in the way the new memory mapping machinery interacted with
   encryption.
 * Query expression comparisons now give correct results when comparing a linked
   column with a column in the base table.

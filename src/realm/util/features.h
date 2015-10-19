@@ -46,12 +46,6 @@
 #endif
 
 
-
-#if __cplusplus >= 201103 || __GXX_EXPERIMENTAL_CXX0X__ || _MSC_VER >= 1700
-#  define REALM_HAVE_CXX11 1
-#endif
-
-
 /* See these links for information about feature check macroes in GCC,
  * Clang, and MSVC:
  *
@@ -85,61 +79,8 @@
 #endif
 
 
-/* Support for C++11 variadic templates. */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_variadic_templates) || \
-    REALM_HAVE_AT_LEAST_MSVC_12_2013
-#  define REALM_HAVE_CXX11_VARIADIC_TEMPLATES 1
-#endif
-
-
-/* Support for C++11 static_assert(). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_static_assert) || \
-    REALM_HAVE_AT_LEAST_MSVC_10_2010
-#  define REALM_HAVE_CXX11_STATIC_ASSERT 1
-#endif
-
-
-/* Support for C++11 r-value references and std::move().
- *
- * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC_4_3 || \
-    REALM_HAVE_CLANG_FEATURE(cxx_rvalue_references) && _LIBCPP_VERSION >= 1001
-#  define REALM_HAVE_CXX11_RVALUE_REFERENCE 1
-#endif
-
-
-/* Support for the C++11 'decltype' keyword. */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 3) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_decltype) || \
-    REALM_HAVE_AT_LEAST_MSVC_12_2013
-#  define REALM_HAVE_CXX11_DECLTYPE 1
-#endif
-
-
-/* Support for C++11 initializer lists. */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 4) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_generalized_initializers) || \
-    REALM_HAVE_AT_LEAST_MSVC_12_2013
-#  define REALM_HAVE_CXX11_INITIALIZER_LISTS 1
-#endif
-
-
-/* Support for C++11 explicit conversion operators. */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 5) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_explicit_conversions) || \
-    REALM_HAVE_AT_LEAST_MSVC_12_2013
-#  define REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS 1
-#endif
-
-
-/* The way to specify that a function never returns.
- *
- * NOTE: C++11 generalized attributes are not yet fully supported in
- * MSVC++ 12 (2013). */
-#if REALM_HAVE_CXX11 && REALM_HAVE_AT_LEAST_GCC(4, 8) || \
-    REALM_HAVE_CLANG_FEATURE(cxx_attributes)
+/* The way to specify that a function never returns. */
+#if REALM_HAVE_AT_LEAST_GCC(4, 8) || REALM_HAVE_CLANG_FEATURE(cxx_attributes)
 #  define REALM_NORETURN [[noreturn]]
 #elif __GNUC__
 #  define REALM_NORETURN __attribute__((noreturn))
@@ -194,7 +135,7 @@
 #endif
 
 
-#if defined ANDROID
+#if defined __ANDROID__
 #  define REALM_ANDROID 1
 #endif
 

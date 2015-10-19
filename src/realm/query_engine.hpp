@@ -284,8 +284,8 @@ public:
         using TResult = typename ColumnTypeTraitsSum<TSourceValue, TAction>::sum_type;
 
         // Sum of float column must accumulate in double
-        REALM_STATIC_ASSERT( !(TAction == act_Sum && (std::is_same<TSourceColumn, float>::value &&
-                                                        !std::is_same<TResult, double>::value)), "");
+        static_assert( !(TAction == act_Sum && (std::is_same<TSourceColumn, float>::value &&
+                                                !std::is_same<TResult, double>::value)), "");
 
         TSourceValue av{};
         // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is discarded

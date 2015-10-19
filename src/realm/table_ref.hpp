@@ -136,8 +136,6 @@ public:
     constexpr BasicTableRef() noexcept {}
     ~BasicTableRef() noexcept {}
 
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
-
     // Copy construct
     BasicTableRef(const BasicTableRef& r) noexcept: util::bind_ptr<T>(r) {}
     template<class U> BasicTableRef(const BasicTableRef<U>& r) noexcept:
@@ -155,19 +153,6 @@ public:
     // Move assign
     BasicTableRef& operator=(BasicTableRef&&) noexcept;
     template<class U> BasicTableRef& operator=(BasicTableRef<U>&&) noexcept;
-
-#else // !REALM_HAVE_CXX11_RVALUE_REFERENCE
-
-    // Copy construct
-    BasicTableRef(const BasicTableRef& r) noexcept: util::bind_ptr<T>(r) {}
-    template<class U> BasicTableRef(BasicTableRef<U> r) noexcept:
-        util::bind_ptr<T>(move(r)) {}
-
-    // Copy assign
-    BasicTableRef& operator=(BasicTableRef) noexcept;
-    template<class U> BasicTableRef& operator=(BasicTableRef<U>) noexcept;
-
-#endif // !REALM_HAVE_CXX11_RVALUE_REFERENCE
 
     // Replacement for std::move() in C++03
     friend BasicTableRef move(BasicTableRef& r) noexcept
@@ -200,21 +185,7 @@ public:
 #endif
     using util::bind_ptr<T>::operator->;
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     using util::bind_ptr<T>::operator bool;
-#else
-#  ifdef __clang__
-    // Clang 3.0 and 3.1 has a bug that causes it to effectively
-    // ignore the 'using' declaration.
-    typedef typename util::bind_ptr<T>::unspecified_bool_type unspecified_bool_type;
-    operator unspecified_bool_type() const noexcept
-    {
-        return util::bind_ptr<T>::operator unspecified_bool_type();
-    }
-#  else
-    using util::bind_ptr<T>::operator typename util::bind_ptr<T>::unspecified_bool_type;
-#  endif
-#endif
 
     T* get() const noexcept { return util::bind_ptr<T>::get(); }
     void reset() noexcept { util::bind_ptr<T>::reset(); }
@@ -299,8 +270,6 @@ template<class T, class U> bool operator>=(T*, const BasicTableRef<U>&) noexcept
 
 // Implementation:
 
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
-
 template<class T>
 inline BasicTableRef<T>& BasicTableRef<T>::operator=(const BasicTableRef& r) noexcept
 {
@@ -328,24 +297,6 @@ inline BasicTableRef<T>& BasicTableRef<T>::operator=(BasicTableRef<U>&& r) noexc
     this->util::bind_ptr<T>::operator=(std::move(r));
     return *this;
 }
-
-#else // !REALM_HAVE_CXX11_RVALUE_REFERENCE
-
-template<class T>
-inline BasicTableRef<T>& BasicTableRef<T>::operator=(BasicTableRef r) noexcept
-{
-    this->util::bind_ptr<T>::operator=(move(static_cast<util::bind_ptr<T>&>(r)));
-    return *this;
-}
-
-template<class T> template<class U>
-inline BasicTableRef<T>& BasicTableRef<T>::operator=(BasicTableRef<U> r) noexcept
-{
-    this->util::bind_ptr<T>::operator=(move(static_cast<util::bind_ptr<U>&>(r)));
-    return *this;
-}
-
-#endif // !REALM_HAVE_CXX11_RVALUE_REFERENCE
 
 template<class T> template<class U>
 bool BasicTableRef<T>::operator==(const BasicTableRef<U>& p) const noexcept

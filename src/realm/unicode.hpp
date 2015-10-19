@@ -20,6 +20,7 @@
 #ifndef REALM_UNICODE_HPP
 #define REALM_UNICODE_HPP
 
+#include <locale>
 #include <stdint.h>
 #include <string>
 
@@ -28,9 +29,6 @@
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
 
-#if REALM_HAVE_CXX11
-#  include <locale>
-#endif
 
 namespace realm {
 

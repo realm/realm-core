@@ -122,7 +122,7 @@ struct SpecBase {
     ///
     /// FIXME: ConvenienceMethods may not contain any virtual methods,
     /// nor may it contain any data memebers. We might want to check
-    /// this by REALM_STATIC_ASSERT(sizeof(Derivative of
+    /// this by static_assert(sizeof(Derivative of
     /// ConvenienceMethods) == 1)), however, this would not be
     /// guaranteed by the standard, since even an empty class may add
     /// to the size of the derived class. Fortunately, as long as

@@ -64,6 +64,7 @@ Available modes are:
     config:                             
     clean:                              
     build:                              
+    build-arm-benchmark:
     build-config-progs:                 
     build-osx:                          
     build-iphone:                       
@@ -78,7 +79,6 @@ Available modes are:
     check-debug:                        
     memcheck:                           
     memcheck-debug:                     
-    check-doc-examples:                 
     check-testcase:                     
     check-testcase-debug:               
     memcheck-testcase:                  
@@ -967,11 +967,9 @@ EOF
         rm -f "$REALM_HOME/$file_name" || exit 1
         (cd "$REALM_HOME/$ANDROID_DIR" && tar czf "$REALM_HOME/$file_name" include $tar_files) || exit 1
 
-        echo "Unpacking in ../realm_java/$dir_name"
-        mkdir -p ../realm_java/realm-jni/build || exit 1 # to help Mr. Jenkins
-        cp "$REALM_HOME/$file_name" ../realm_java/realm-jni/build
-        (cd ../realm_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
-        (cd ../realm_java/$dir_name && tar xzf "$REALM_HOME/$file_name") || exit 1
+        echo "Copying to ../realm-java/"
+        mkdir -p ../realm-java/ || exit 1 # to help Mr. Jenkins
+        cp "$REALM_HOME/$file_name" "../realm-java/core-android-$realm_version.tar.gz"
         ;;
 
     "build-cocoa")
@@ -1055,7 +1053,6 @@ EOF
     "test"|"test-debug"|\
     "check"|"check-debug"|\
     "memcheck"|"memcheck-debug"|\
-    "check-doc-examples"|\
     "check-testcase"|"check-testcase-debug"|\
     "memcheck-testcase"|"memcheck-testcase-debug")
         auto_configure || exit 1
@@ -2892,6 +2889,10 @@ EOF
         exit 0
         ;;
 
+    "build-arm-benchmark")
+        CC=arm-linux-gnueabihf-gcc AR=arm-linux-gnueabihf-ar LD=arm-linux-gnueabihf-g++ make benchmark-common-tasks COMPILER_IS_GCC_LIKE=1 LD_IS_GCC_LIKE=1 EXTRA_CFLAGS=-mthumb
+        ;;
+
     "jenkins-pull-request")
         # Run by Jenkins for each pull request whenever it changes
         if ! [ -d "$WORKSPACE" ]; then
@@ -2913,7 +2914,6 @@ EOF
         sh build.sh build || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
         sh build.sh install || exit 1
-        sh build.sh check-doc-examples || exit 1
         (
             cd "examples" || exit 1
             make || exit 1

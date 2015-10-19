@@ -300,7 +300,7 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
 }
 
 
-size_t Table::get_num_strong_backlinks(std::size_t row_ndx) const noexcept
+size_t Table::get_num_strong_backlinks(size_t row_ndx) const noexcept
 {
     size_t sum = 0;
     size_t col_ndx_begin = m_spec.get_public_column_count();
@@ -3672,7 +3672,7 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 {
     // We iterate entire blocks at a time by keeping current leaf cached
     if (i >= state.block_end) {
-        std::size_t ndx_in_leaf;
+        size_t ndx_in_leaf;
         IntegerColumn::LeafInfo leaf { &state.block, &state.cache };
         state.enums->IntegerColumn::get_leaf(i, ndx_in_leaf, leaf);
         state.offset = i - ndx_in_leaf;
@@ -3736,7 +3736,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         state.enums = &enums;
         state.keys.assign(key_count, 0);
 
-        std::size_t ndx_in_leaf;
+        size_t ndx_in_leaf;
         IntegerColumn::LeafInfo leaf { &state.block, &state.cache };
         enums.IntegerColumn::get_leaf(0, ndx_in_leaf, leaf);
         state.offset = 0 - ndx_in_leaf;
@@ -3959,7 +3959,7 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
     return const_cast<Table*>(this)->get_range_view(begin, end);
 }
 
-TableView Table::get_backlink_view(std::size_t row_ndx, Table *src_table, std::size_t src_col_ndx)
+TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_col_ndx)
 {
     TableView tv(src_table, this, src_col_ndx, row_ndx);
     tv.do_sync();
@@ -4258,7 +4258,7 @@ void Table::update_from_parent(size_t old_baseline) noexcept
 
 
 // to JSON: ------------------------------------------
-void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string,
+void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth, std::map<std::string,
                         std::string>* renames) const
 {
     std::map<std::string, std::string> renames2;
@@ -4317,7 +4317,7 @@ void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
     out << "]";
 }
 
-void Table::to_json_row(std::size_t row_ndx, std::ostream& out, size_t link_depth,
+void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
     std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const
 {
     out << "{";
@@ -5396,7 +5396,7 @@ void Table::verify() const
         REALM_ASSERT_3(n, ==, m_cols.size());
         for (size_t i = 0; i != n; ++i) {
             const ColumnBase& column = get_column_base(i);
-            std::size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
+            size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
             REALM_ASSERT_3(ndx_in_parent, ==, column.get_ndx_in_parent());
             column.verify(*this, i);
             REALM_ASSERT_3(column.size(), ==, m_size);
