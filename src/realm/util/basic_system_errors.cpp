@@ -33,7 +33,7 @@ std::string system_category::message(int value) const
         return buffer; // Guaranteed to be NULL-terminated
     }
 
-#elif defined __APPLE__ && defined __MACH__ // OSX, iOS and WatchOS version
+#elif REALM_PLATFORM_APPLE
 
     {
         const int result = strerror_r(value, buffer, max_msg_size);

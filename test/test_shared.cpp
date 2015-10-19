@@ -76,7 +76,7 @@ namespace {
 
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 // Also: async requires interprocess communication, which does not work with our current encryption support.
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
 #  if REALM_ANDROID || defined DISABLE_ASYNC || REALM_ENABLE_ENCRYPTION
 bool allow_async = false;
 #  else
@@ -119,7 +119,7 @@ void writer(std::string path, int id)
 }
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
+#if !REALM_PLATFORM_APPLE && !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, std::string path, int id)
 {
@@ -168,7 +168,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if !REALM_PLATFORM_APPLE && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -1836,7 +1836,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 
 // disable shared async on windows and any Apple operating system
 // TODO: enable async daemon for OS X - think how to do it in XCode (no issue for build.sh)
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
 // Todo. Keywords: winbug
 TEST_IF(Shared_Async, allow_async)
 {
@@ -2099,9 +2099,9 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
-#endif // !defined(_WIN32) && !defined(__APPLE__)
+#endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
 
 // Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
