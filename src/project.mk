@@ -72,14 +72,9 @@ ifneq ($(REALM_HAVE_CONFIG),)
   libdir      = $(INSTALL_LIBDIR)
   libexecdir  = $(INSTALL_LIBEXECDIR)
   ifeq ($(ENABLE_ENCRYPTION),yes)
-    PROJECT_CFLAGS += -DREALM_ENABLE_ENCRYPTION
     ifeq ($(OS),Linux)
       PROJECT_LDFLAGS += -lcrypto
     endif
-  endif
-else
-  ifneq ($(REALM_ENABLE_ALLOC_SET_ZERO),)
-    PROJECT_CFLAGS += -DREALM_ENABLE_ALLOC_SET_ZERO
   endif
 endif
 

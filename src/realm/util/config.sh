@@ -82,30 +82,22 @@ cat >"$target" <<EOF
  *
  *************************************************************************/
 
-#define REALM_VERSION "$realm_version_escaped"
+#define REALM_VERSION               "$realm_version_escaped"
 
-#define REALM_INSTALL_PREFIX      "$install_prefix_escaped"
-#define REALM_INSTALL_EXEC_PREFIX "$install_exec_prefix_escaped"
-#define REALM_INSTALL_INCLUDEDIR  "$install_includedir_escaped"
-#define REALM_INSTALL_BINDIR      "$install_bindir_escaped"
-#define REALM_INSTALL_LIBDIR      "$install_libdir_escaped"
-#define REALM_INSTALL_LIBEXECDIR  "$install_libexecdir_escaped"
+#define REALM_INSTALL_PREFIX        "$install_prefix_escaped"
+#define REALM_INSTALL_EXEC_PREFIX   "$install_exec_prefix_escaped"
+#define REALM_INSTALL_INCLUDEDIR    "$install_includedir_escaped"
+#define REALM_INSTALL_BINDIR        "$install_bindir_escaped"
+#define REALM_INSTALL_LIBDIR        "$install_libdir_escaped"
+#define REALM_INSTALL_LIBEXECDIR    "$install_libexecdir_escaped"
 
 #ifdef REALM_DEBUG
-#  define REALM_MAX_BPNODE_SIZE $max_bpnode_size_debug
+#  define REALM_MAX_BPNODE_SIZE     $max_bpnode_size_debug
 #else
-#  define REALM_MAX_BPNODE_SIZE $max_bpnode_size
+#  define REALM_MAX_BPNODE_SIZE     $max_bpnode_size
 #endif
 
-#if $enable_alloc_set_zero
-#  define REALM_ENABLE_ALLOC_SET_ZERO 1
-#endif
-
-#if $enable_encryption
-#  define REALM_ENABLE_ENCRYPTION 1
-#endif
-
-#if $enable_assertions
-#  define REALM_ENABLE_ASSERTIONS 1
-#endif
+#define REALM_ENABLE_ALLOC_SET_ZERO $enable_alloc_set_zero
+#define REALM_ENABLE_ENCRYPTION     $enable_encryption
+#define REALM_ENABLE_ASSERTIONS     $enable_assertions
 EOF
