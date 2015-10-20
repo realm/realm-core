@@ -216,47 +216,47 @@ public:
     // Aggregates
     size_t count(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
 
-    int64_t sum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    int64_t sum_int(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
                     size_t limit = size_t(-1)) const;
 
-    double  average_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
+    double  average_int(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
                         size_t limit = size_t(-1)) const;
 
-    int64_t maximum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                        size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    int64_t maximum_int(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
+                        size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    int64_t minimum_int(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                        size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    int64_t minimum_int(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
+                        size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    double sum_float(    size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double sum_float(    size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
                          size_t limit = size_t(-1)) const;
 
-    double average_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double average_float(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
                          size_t limit = size_t(-1)) const;
 
-    float  maximum_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
-                         size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    float  maximum_float(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                         size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    float  minimum_float(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
-                         size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    float  minimum_float(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                         size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    double sum_double(    size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double sum_double(    size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
                           size_t limit = size_t(-1)) const;
 
-    double average_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
+    double average_double(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
                           size_t limit = size_t(-1)) const;
 
-    double maximum_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                          size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    double maximum_double(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
+                          size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    double minimum_double(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                          size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    double minimum_double(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
+                          size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    DateTime maximum_datetime(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1),
-                              size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    DateTime maximum_datetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                              size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    DateTime minimum_datetime(size_t column_ndx, size_t* resultcount = 0, size_t start = 0, size_t end = size_t(-1), 
-                              size_t limit = size_t(-1), size_t* return_ndx = 0) const;
+    DateTime minimum_datetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), 
+                              size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
     // Deletion
     size_t  remove(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
@@ -327,7 +327,7 @@ private:
 
     template <typename TConditionFunction, class T> Query& add_condition(size_t column_ndx, T value);
 
-    template<typename T, bool Nullable> double average(size_t column_ndx, size_t* resultcount = 0, size_t start = 0,
+    template<typename T, bool Nullable> double average(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0,
                                         size_t end=size_t(-1), size_t limit = size_t(-1)) const;
 
     template <Action action, typename T, typename R, class ColClass>

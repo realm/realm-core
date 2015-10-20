@@ -149,10 +149,10 @@ public:
 
     static const size_t max_column_name_length = 63;
 
-    size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0, bool nullable = false);
+    size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = nullptr, bool nullable = false);
 
     void insert_column(size_t col_ndx, DataType type, StringData name,
-                       DescriptorRef* subdesc = 0, bool nullable = false);
+                       DescriptorRef* subdesc = nullptr, bool nullable = false);
 
     size_t add_column_link(DataType type, StringData name, Table& target,
                                 LinkType = link_Weak);
