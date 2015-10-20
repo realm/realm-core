@@ -72,6 +72,18 @@ public:
 
     ~SlabAlloc() noexcept override;
     SlabAlloc();
+
+    struct Config {
+        bool is_shared = false;
+        bool read_only = false;
+        bool no_create = false;
+        bool skip_validate = false;
+        bool server_sync_mode = false;
+        bool session_initiator = false;
+        bool clear_file = false;
+        const char* encryption_key = 0;
+    };
+
     /// Attach this allocator to the specified file.
     ///
     /// When used by free-standing Group instances, no concurrency is
@@ -120,17 +132,6 @@ public:
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
-    struct Config {
-        bool is_shared = false;
-        bool read_only = false;
-        bool no_create = false;
-        bool skip_validate = false;
-        bool server_sync_mode = false;
-        bool session_initiator = false;
-        bool clear_file = false;
-        const char* encryption_key = 0;
-    };
-
     ref_type attach_file(const std::string& path, Config& cfg);
 
     /// Attach this allocator to the specified memory buffer.
@@ -397,8 +398,7 @@ private:
     /// Throws InvalidDatabase if the file is not a Realm file, if the file is
     /// corrupted, or if the specified encryption key is incorrect. This
     /// function will not detect all forms of corruption, though.
-    void validate_buffer(const char* data, size_t len, const std::string& path,
-                         ref_type& top_ref, bool is_shared);
+    void validate_buffer(const char* data, size_t len, const std::string& path, bool is_shared);
 
     class ChunkRefEq;
     class ChunkRefEndEq;

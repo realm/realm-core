@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a bug that lead to SharedGroup::compact failing to attach to the newly
+  written file.
 
 ### API breaking changes:
 
