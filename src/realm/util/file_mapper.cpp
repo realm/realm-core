@@ -659,6 +659,7 @@ namespace realm {
 namespace util {
 
 
+#if REALM_ENABLE_ENCRYPTION
 // handle_reads() and handle_writes():
 // FIXME: This approach is not performant enough. It uses locking and it requires traversing
 // an inefficient datastructure merely for administrative purposes. It is ok to be expensive
@@ -689,10 +690,6 @@ void handle_writes(void* addr, size_t size)
     }
 }
 
-
-
-
-#if REALM_ENABLE_ENCRYPTION
 size_t round_up_to_page_size(size_t size) noexcept
 {
     return (size + page_size() - 1) & ~(page_size() - 1);
