@@ -39,7 +39,7 @@ namespace realm {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() noexcept : m_data(0), m_size(0) {}
+    BinaryData() noexcept : m_data(nullptr), m_size(0) {}
     BinaryData(const char* data, size_t size) noexcept: m_data(data), m_size(size) {}
     template<size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
     template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);

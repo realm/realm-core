@@ -100,9 +100,9 @@ private:
 // Implementation
 
 inline MemoryInputStreambuf::MemoryInputStreambuf():
-    m_begin(0),
-    m_end(0),
-    m_curr(0)
+    m_begin(nullptr),
+    m_end(nullptr),
+    m_curr(nullptr)
 {
 }
 

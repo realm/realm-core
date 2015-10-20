@@ -12,7 +12,7 @@
 
 using namespace realm;
 
-Query::Query() : m_view(nullptr), m_source_table_view(0), m_owns_source_table_view(false)
+Query::Query() : m_view(nullptr), m_source_table_view(nullptr), m_owns_source_table_view(false)
 {
     create();
 }
@@ -27,7 +27,7 @@ Query::Query(Table& table, TableViewBase* tv)
 Query::Query(const Table& table, const LinkViewRef& lv):
     m_table((const_cast<Table&>(table)).get_table_ref()),
     m_view(lv.get()),
-    m_source_link_view(lv), m_source_table_view(0), m_owns_source_table_view(false)
+    m_source_link_view(lv), m_source_table_view(nullptr), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
     create();
@@ -93,7 +93,7 @@ Query::~Query() noexcept
 }
 
 Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(0)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
 {
     patch.m_has_table = bool(source.m_table);
     if (patch.m_has_table) {
@@ -105,7 +105,7 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
         m_owns_source_table_view = true;
     }
     else { 
-        patch.table_view_data = 0;
+        patch.table_view_data = nullptr;
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
@@ -115,7 +115,7 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
 }
 
 Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(0)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
 {
     patch.m_has_table = bool(source.m_table);
     if (patch.m_has_table) {
@@ -127,7 +127,7 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
         m_owns_source_table_view = true;
     }
     else {
-        patch.table_view_data = 0;
+        patch.table_view_data = nullptr;
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);

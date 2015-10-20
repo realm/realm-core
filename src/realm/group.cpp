@@ -324,7 +324,7 @@ size_t Group::create_table(StringData name)
 
     // Need slot for table accessor
     if (!m_table_accessors.empty())
-        m_table_accessors.push_back(0); // Throws
+        m_table_accessors.push_back(nullptr); // Throws
 
     if (Replication* repl = m_alloc.get_replication())
         repl->insert_group_level_table(ndx, ndx, name); // Throws
@@ -912,10 +912,10 @@ public:
 
         if (!m_group.m_table_accessors.empty()) {
             // for end-insertions, table_ndx will be equal to num_tables
-            m_group.m_table_accessors.push_back(0); // Throws
+            m_group.m_table_accessors.push_back(nullptr); // Throws
             size_t last_ndx = num_tables;
             m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
-            m_group.m_table_accessors[table_ndx] = 0;
+            m_group.m_table_accessors[table_ndx] = nullptr;
             if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
                 typedef _impl::TableFriend tf;
                 tf::mark(*moved_table);
