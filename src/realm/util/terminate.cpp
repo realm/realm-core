@@ -21,7 +21,7 @@
 #include <sstream>
 #include <realm/util/features.h>
 
-#ifdef REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE
 #  include <dlfcn.h>
 #  include <execinfo.h>
 #  include <CoreFoundation/CoreFoundation.h>
