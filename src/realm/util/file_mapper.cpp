@@ -546,36 +546,6 @@ bool handle_access(void *addr)
     return false;
 }
 
-// handle_reads() and handle_writes():
-// FIXME: This approach is not performant enough. It uses locking and it requires traversing
-// an inefficient datastructure merely for administrative purposes. It is ok to be expensive
-// when encryption is actually triggered, but most calls to these methods are not expected
-// to actually trigger any encryption activities. A performant solution is needed before
-// we can release it (except, possibly, for investigation purposes).
-void handle_reads(void* addr, size_t size)
-{
-    SpinLockGuard lock(mapping_lock);
-    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
-        mapping_and_addr& m = mappings_by_addr[i];
-        if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
-            continue;
-
-        m.mapping->handle_reads(addr, size);
-    }
-}
-
-void handle_writes(void* addr, size_t size)
-{
-    SpinLockGuard lock(mapping_lock);
-    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
-        mapping_and_addr& m = mappings_by_addr[i];
-        if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
-            continue;
-
-        m.mapping->handle_writes(addr, size);
-    }
-}
-
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 {
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
@@ -633,6 +603,21 @@ void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
         mappings_by_file.push_back(f); // can't throw due to reserve() above
         it = mappings_by_file.end() - 1;
     }
+
+    try {
+        mapping_and_addr m;
+        m.addr = addr;
+        m.size = size;
+        m.mapping = new EncryptedFileMapping(*it->info, file_offset, addr, size, access);
+        mappings_by_addr.push_back(m); // can't throw due to reserve() above
+    }
+    catch (...) {
+        if (it->info->mappings.empty()) {
+            ::close(it->info->fd);
+            mappings_by_file.erase(it);
+        }
+        throw;
+    }
 }
 
 void remove_mapping(void* addr, size_t size)
@@ -672,6 +657,40 @@ void* mmap_anon(size_t size)
 
 namespace realm {
 namespace util {
+
+
+// handle_reads() and handle_writes():
+// FIXME: This approach is not performant enough. It uses locking and it requires traversing
+// an inefficient datastructure merely for administrative purposes. It is ok to be expensive
+// when encryption is actually triggered, but most calls to these methods are not expected
+// to actually trigger any encryption activities. A performant solution is needed before
+// we can release it (except, possibly, for investigation purposes).
+void handle_reads(void* addr, size_t size)
+{
+    SpinLockGuard lock(mapping_lock);
+    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
+        mapping_and_addr& m = mappings_by_addr[i];
+        if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
+            continue;
+
+        m.mapping->handle_reads(addr, size);
+    }
+}
+
+void handle_writes(void* addr, size_t size)
+{
+    SpinLockGuard lock(mapping_lock);
+    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
+        mapping_and_addr& m = mappings_by_addr[i];
+        if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
+            continue;
+
+        m.mapping->handle_writes(addr, size);
+    }
+}
+
+
+
 
 #if REALM_ENABLE_ENCRYPTION
 size_t round_up_to_page_size(size_t size) noexcept
