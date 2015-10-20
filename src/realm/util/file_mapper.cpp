@@ -546,6 +546,36 @@ bool handle_access(void *addr)
     return false;
 }
 
+// handle_reads() and handle_writes():
+// FIXME: This approach is not performant enough. It uses locking and it requires traversing
+// an inefficient datastructure merely for administrative purposes. It is ok to be expensive
+// when encryption is actually triggered, but most calls to these methods are not expected
+// to actually trigger any encryption activities. A performant solution is needed before
+// we can release it (except, possibly, for investigation purposes).
+void handle_reads(void* addr, size_t size)
+{
+    SpinLockGuard lock(mapping_lock);
+    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
+        mapping_and_addr& m = mappings_by_addr[i];
+        if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
+            continue;
+
+        m.mapping->handle_reads(addr, size);
+    }
+}
+
+void handle_writes(void* addr, size_t size)
+{
+    SpinLockGuard lock(mapping_lock);
+    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
+        mapping_and_addr& m = mappings_by_addr[i];
+        if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
+            continue;
+
+        m.mapping->handle_writes(addr, size);
+    }
+}
+
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 {
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
@@ -570,7 +600,6 @@ void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
         throw DecryptionFailed();
 
     SpinLockGuard lock(mapping_lock);
-    install_handler();
 
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
@@ -603,21 +632,6 @@ void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
 
         mappings_by_file.push_back(f); // can't throw due to reserve() above
         it = mappings_by_file.end() - 1;
-    }
-
-    try {
-        mapping_and_addr m;
-        m.addr = addr;
-        m.size = size;
-        m.mapping = new EncryptedFileMapping(*it->info, file_offset, addr, size, access);
-        mappings_by_addr.push_back(m); // can't throw due to reserve() above
-    }
-    catch (...) {
-        if (it->info->mappings.empty()) {
-            ::close(it->info->fd);
-            mappings_by_file.erase(it);
-        }
-        throw;
     }
 }
 

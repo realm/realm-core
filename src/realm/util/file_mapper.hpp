@@ -29,6 +29,8 @@ void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
 void munmap(void *addr, size_t size) noexcept;
 void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
 void msync(void *addr, size_t size);
+void handle_reads(void* addr, size_t size);
+void handle_writes(void* addr, size_t size);
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;
