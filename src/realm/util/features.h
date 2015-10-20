@@ -143,7 +143,8 @@
 #  define REALM_ANDROID 1
 #endif
 
-
+// Some documentation of the defines provided by Apple:
+// http://developer.apple.com/library/mac/documentation/Porting/Conceptual/PortingUnix/compiling/compiling.html#//apple_ref/doc/uid/TP40002850-SW13
 #if defined __APPLE__ && defined __MACH__
 #  define REALM_PLATFORM_APPLE 1
 /* Apple OSX and iOS (Darwin). */
