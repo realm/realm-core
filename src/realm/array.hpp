@@ -1108,7 +1108,7 @@ private:
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
 protected:
-    size_t m_width = 0;  // Size of an element (meaning depend on type of array).
+    uint8_t m_width = 0;  // Size of an element (meaning depend on type of array).
     bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
     bool m_has_refs;        // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;    // Meaning depends on context.

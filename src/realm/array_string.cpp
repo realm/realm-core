@@ -112,7 +112,7 @@ void ArrayString::set(size_t ndx, StringData value)
             }
         }
 
-        m_width = new_width;
+        m_width = uint8_t(new_width);
     }
 
     REALM_ASSERT_3(0, <, m_width);
