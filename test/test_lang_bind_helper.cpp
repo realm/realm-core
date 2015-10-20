@@ -8970,14 +8970,14 @@ TEST(LangBindHelper_RollbackToInitialState2)
     sg_w.rollback();
 }
 
-TEST(LangBindHelper_Compact)
+void LangBindHelper_Compact(std::string path, bool encrypt, TestResults* test_results_ptr)
 {
-    SHARED_GROUP_TEST_PATH(path);
+    TestResults& test_results = *test_results_ptr;
     size_t N = 100;
 
     {
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key(encrypt)));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key(encrypt));
         WriteTransaction w(sg_w);
         TableRef table = w.get_or_add_table("test");
         table->add_column(type_Int, "int");
@@ -8989,8 +8989,8 @@ TEST(LangBindHelper_Compact)
         sg_w.close();
     }
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(encrypt)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(encrypt));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
@@ -8998,20 +8998,34 @@ TEST(LangBindHelper_Compact)
     }
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(encrypt)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(encrypt));
         CHECK_EQUAL(true, sg.compact());
         sg.close();
     }
     
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(encrypt)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(encrypt));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
         sg.close();
     }
+}
+
+TEST(LangBindHelper_CompactEncrypted)
+{
+    SHARED_GROUP_TEST_PATH(p);
+    std::string path(p);
+    LangBindHelper_Compact(path, true, &test_results);
+}
+
+TEST(LangBindHelper_CompactUnencrypted)
+{
+    SHARED_GROUP_TEST_PATH(p);
+    std::string path(p);
+    LangBindHelper_Compact(path, false, &test_results);
 }
 
 #endif

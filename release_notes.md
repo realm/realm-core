@@ -33,7 +33,7 @@
 
 ### Bugfixes:
 
-* Fixed a bug in SharedGroup::Compact() which could leave the database in an
+* Fixed a bug in SharedGroup::compact() which could leave the database in an
   inconsistent state.
 
 ### Enhancements:
