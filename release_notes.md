@@ -1,23 +1,9 @@
-# NEXT RELEASE
+# 0.94.2 Release notes
 
 ### Bugfixes:
 
 * Fixed a bug that lead to SharedGroup::compact failing to attach to the newly
   written file.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
