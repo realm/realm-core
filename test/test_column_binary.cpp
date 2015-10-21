@@ -353,4 +353,6 @@ TEST(ColumnBinary_Nulls)
     c.destroy();
 }
 
+
+
 #endif // TEST_COLUMN_BINARY

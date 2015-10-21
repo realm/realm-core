@@ -383,19 +383,21 @@ bool BinaryColumn::upgrade_root_leaf(size_t value_size)
 
 class BinaryColumn::CreateHandler: public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    CreateHandler(Allocator& alloc, bool nullable): m_alloc(alloc), m_nullable(nullable) {}
+
     ref_type create_leaf(size_t size) override
     {
-        MemRef mem = ArrayBinary::create_array(size, m_alloc); // Throws
+        MemRef mem = ArrayBinary::create_array(size, m_alloc, m_nullable); // Throws
         return mem.m_ref;
     }
 private:
     Allocator& m_alloc;
+    bool m_nullable;
 };
 
-ref_type BinaryColumn::create(Allocator& alloc, size_t size)
+ref_type BinaryColumn::create(Allocator& alloc, size_t size, bool nullable)
 {
-    CreateHandler handler(alloc);
+    CreateHandler handler(alloc, nullable);
     return ColumnBase::create(alloc, size, handler);
 }
 

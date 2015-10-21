@@ -6306,6 +6306,26 @@ TEST(Table_AllocatorCapacityBug)
     }
 }
 
+TEST(ColumnBinary_InitOfEmptyColumn2)
+{
+    Table t;
+    t.add_column(type_Int, "works");
+    t.add_empty_row();
+    t.add_empty_row();
+    t.add_empty_row();
+    t.add_empty_row();
+    t.add_empty_row();
+    t.add_empty_row();
+    t.add_empty_row();
+    t.add_column(type_Binary, "doesn't work");
+    t.add_column(type_String, "doesn't work");
+    CHECK_NOT_EQUAL(BinaryData(), t.get_binary(1, 0));
+    CHECK_NOT_EQUAL(StringData(), t.get_string(2, 0));
+    CHECK(!t.is_null(1, 0));
+    CHECK(!t.is_null(2, 0));
 
+
+
+}
 
 #endif // TEST_TABLE
