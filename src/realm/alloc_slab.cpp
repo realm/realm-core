@@ -12,6 +12,8 @@
 #include <memory>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/util/file_mapper.hpp>
+
 
 using namespace realm;
 using namespace realm::util;
@@ -502,7 +504,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     ref_type top_ref;
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
-
+        realm::util::handle_reads(map, 0, initial_size_of_file);
         if (!cfg.skip_validate) {
             // Verify the data structures
             validate_buffer(map.get_addr(), initial_size_of_file, path, cfg.is_shared); // Throws
@@ -510,6 +512,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
+            realm::util::handle_writes(writable_map, 0);
             Header& header = *writable_map.get_addr();
             header.m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
         }
@@ -576,6 +579,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite,
                                            sizeof (Header)); // Throws
+            realm::util::handle_writes(writable_map, 0);
             Header& writable_header = *writable_map.get_addr();
             writable_header.m_top_ref[1] = footer.m_top_ref;
             writable_map.sync();
