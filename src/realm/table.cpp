@@ -655,7 +655,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 }
 
 
-void Table::do_insert_column_unless_exists(Descriptor& desc, std::size_t col_ndx, DataType type,
+void Table::do_insert_column_unless_exists(Descriptor& desc, size_t col_ndx, DataType type,
                                            StringData name, Table *link_target_table, bool nullable,
                                            bool* was_inserted)
 {
