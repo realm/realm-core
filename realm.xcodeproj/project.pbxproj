@@ -652,15 +652,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
-		F4CD03741BA2FF640043533A /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
 		F4D0FC141B00E0D70040956A /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
