@@ -573,9 +573,18 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_write_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
 
+// FIXME: Check if we still need to read the first block every time.
     if (first_init && m_file_offset == 0) {
-        if (!copy_read_page(0))
+#ifdef REALM_DEBUG
+        mprotect(page_addr(0), m_page_size, PROT_READ | PROT_WRITE);
+#endif
+        if (!copy_read_page(0)) {
             m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
+#ifdef REALM_DEBUG
+        mprotect(page_addr(0), m_page_size,
+                m_access == File::access_ReadOnly ? PROT_READ : PROT_READ | PROT_WRITE);
+#endif
+        }
         mark_readable(0);
     }
 }
