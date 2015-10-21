@@ -240,6 +240,8 @@ size_t GroupWriter::write_group()
     m_free_lengths.set(reserve_ndx, rest); // Throws
 
     // The free-list now have their final form, so we can write them to the file
+    char* start_addr = m_file_map.get_addr() + reserve_pos;
+    realm::util::handle_writes(start_addr, reserve_size);
     write_array_at(free_positions_pos, m_free_positions.get_header(),
                    free_positions_size); // Throws
     write_array_at(free_sizes_pos, m_free_lengths.get_header(),
@@ -492,6 +494,7 @@ void GroupWriter::write(const char* data, size_t size)
 
     // Write the block
     char* dest_addr = m_file_map.get_addr() + pos;
+    realm::util::handle_writes(dest_addr, size);
     std::copy(data, data+size, dest_addr);
 }
 
@@ -504,6 +507,7 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
 
     // Write the block
     char* dest_addr = m_file_map.get_addr() + pos;
+    realm::util::handle_writes(dest_addr, size);
 #ifdef REALM_DEBUG
     const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
     std::copy(cksum_bytes, cksum_bytes+4, dest_addr);
@@ -541,6 +545,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     // being top_refs (only one valid at a time) and the last being the info
     // block.
     char* file_header = m_file_map.get_addr();
+    realm::util::handle_writes(file_header, sizeof(SlabAlloc::Header));
 
     // Least significant bit in last byte of info block indicates which top_ref
     // block is valid - other bits remain unchanged
@@ -561,6 +566,8 @@ void GroupWriter::commit(ref_type new_top_ref)
     // Make sure that all data and the top pointer is written to stable storage
     if (!disable_sync)
         m_file_map.sync(); // Throws
+
+    realm::util::handle_writes(file_header, sizeof(SlabAlloc::Header));
 
     // update selector - must happen after write of all data and top pointer
     file_header[16+7] = char(select_field); // swap

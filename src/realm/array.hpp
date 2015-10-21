@@ -49,6 +49,7 @@ Searching: The main finding function is:
 
 #include <realm/util/meta.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/file_mapper.hpp>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
 #include <realm/string_data.hpp>
@@ -1367,7 +1368,9 @@ inline void Array::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
+    realm::util::handle_reads(header, header_size);
     init_from_mem(MemRef(header, ref));
+    realm::util::handle_reads(header, get_byte_size());
 }
 
 
