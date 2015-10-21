@@ -328,11 +328,15 @@ const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
 
 void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 {
+    timer.pause();
     benchmark.before_each(sg);
+    timer.unpause();
 
     benchmark(sg);
 
+    timer.pause();
     benchmark.after_each(sg);
+    timer.unpause();
 }
 
 
