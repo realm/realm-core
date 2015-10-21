@@ -465,7 +465,7 @@ private:
 
             // std::vector guarantees contiguous storage
             pollfd* fds = &m_pollfd_slots.front();
-            nfds_t nfds = m_pollfd_slots.size();
+            nfds_t nfds = nfds_t(m_pollfd_slots.size());
             for (;;) {
                 int max_wait_millis = -1; // Wait indefinitely
                 if (next_wait_op) {
@@ -870,7 +870,7 @@ void socket_base::set_option(opt_enum opt, const void* value_data, size_t value_
     int option_name = 0;
     map_option(opt, level, option_name);
 
-    int ret = ::setsockopt(m_sock_fd, level, option_name, value_data, value_size);
+    int ret = ::setsockopt(m_sock_fd, level, option_name, value_data, socklen_t(value_size));
     if (REALM_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
         return;
