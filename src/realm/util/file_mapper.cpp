@@ -644,7 +644,11 @@ void remove_mapping(void* addr, size_t size)
 
 void* mmap_anon(size_t size)
 {
+#ifdef REALM_DEBUG
+    void* addr = ::mmap(0, size, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
+#else
     void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+#endif
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
@@ -673,8 +677,16 @@ void handle_reads(void* addr, size_t size)
         mapping_and_addr& m = mappings_by_addr[i];
         if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
             continue;
-
+#ifdef REALM_DEBUG
+        size_t mapped_size = round_up_to_page_size(size);
+        void* mapped_start_addr = m.addr +
+            (static_cast<char*>(addr) - static_cast<char*>(m.addr)) / page_size() * page_size();
+        REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ | PROT_WRITE) == 0);
+#endif
         m.mapping->handle_reads(addr, size);
+#ifdef REALM_DEBUG
+        REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ) == 0);
+#endif
     }
 }
 
@@ -686,6 +698,12 @@ void handle_writes(void* addr, size_t size)
         if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
             continue;
 
+#ifdef REALM_DEBUG
+        size_t mapped_size = round_up_to_page_size(size);
+        void* mapped_start_addr = m.addr +
+            (static_cast<char*>(addr) - static_cast<char*>(m.addr)) / page_size() * page_size();
+        REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ | PROT_WRITE) == 0);
+#endif
         m.mapping->handle_writes(addr, size);
     }
 }

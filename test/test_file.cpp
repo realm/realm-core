@@ -144,7 +144,7 @@ TEST(File_MapMultiplePages)
             CHECK_EQUAL(map.get_addr()[i], i);
             if (map.get_addr()[i] != i)
                 return;
-          }
+        }
     }
 }
 
@@ -297,23 +297,28 @@ TEST(File_Resize)
     CHECK_EQUAL(page_size() * 2, f.get_size());
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
-        for (unsigned int i = 0; i < page_size() * 2; ++i)
+        for (unsigned int i = 0; i < page_size() * 2; ++i) {
+            realm::util::handle_writes(m, i);
             m.get_addr()[i] = static_cast<unsigned char>(i);
+        }
 
         // Resizing away the first write is indistinguishable in encrypted files
         // from the process being interrupted before it does the first write,
         // but with subsequent writes it can tell that there was once valid
         // encrypted data there, so flush and write a second time
         m.sync();
-        for (unsigned int i = 0; i < page_size() * 2; ++i)
+        for (unsigned int i = 0; i < page_size() * 2; ++i) {
+            realm::util::handle_writes(m, i);
             m.get_addr()[i] = static_cast<unsigned char>(i);
+        }
     }
 
     f.resize(page_size());
     CHECK_EQUAL(page_size(), f.get_size());
     {
-        File::Map<unsigned char> m(f, File::access_ReadWrite, page_size());
+        File::Map<unsigned char> m(f, File::access_ReadOnly, page_size());
         for (unsigned int i = 0; i < page_size(); ++i) {
+            realm::util::handle_reads(m, i);
             CHECK_EQUAL(static_cast<unsigned char>(i), m.get_addr()[i]);
             if (static_cast<unsigned char>(i) != m.get_addr()[i])
                 return;
@@ -324,12 +329,15 @@ TEST(File_Resize)
     CHECK_EQUAL(page_size() * 2, f.get_size());
     {
         File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
-        for (unsigned int i = 0; i < page_size() * 2; ++i)
+        for (unsigned int i = 0; i < page_size() * 2; ++i) {
+            realm::util::handle_writes(m, i);
             m.get_addr()[i] = static_cast<unsigned char>(i);
+        }
     }
     {
-        File::Map<unsigned char> m(f, File::access_ReadWrite, page_size() * 2);
+        File::Map<unsigned char> m(f, File::access_ReadOnly, page_size() * 2);
         for (unsigned int i = 0; i < page_size() * 2; ++i) {
+            realm::util::handle_reads(m, i);
             CHECK_EQUAL(static_cast<unsigned char>(i), m.get_addr()[i]);
             if (static_cast<unsigned char>(i) != m.get_addr()[i])
                 return;

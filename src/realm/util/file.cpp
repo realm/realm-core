@@ -373,6 +373,7 @@ error:
     if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
+        realm::util::handle_reads(map, pos, size);
         memcpy(data, map.get_addr() + pos, size);
         lseek(m_fd, size, SEEK_CUR);
         return map.get_size() - pos;
@@ -431,6 +432,7 @@ void File::write(const char* data, size_t size)
     if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
+        realm::util::handle_writes(map, pos, size);
         memcpy(map.get_addr() + pos, data, size);
         lseek(m_fd, size, SEEK_CUR);
         return;
