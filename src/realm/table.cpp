@@ -761,6 +761,7 @@ void Table::do_insert_root_column(size_t ndx, ColumnType type, StringData name, 
 
     Spec::ColumnInfo info = m_spec.get_column_info(ndx);
     size_t ndx_in_parent = info.m_column_ref_ndx;
+
     ref_type col_ref = create_column(type, m_size, nullable, m_columns.get_alloc()); // Throws
     m_columns.insert(ndx_in_parent, col_ref); // Throws
 }
@@ -1846,7 +1847,7 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_String:
             return StringColumn::create(alloc, size); // Throws
         case col_type_Binary:
-            return BinaryColumn::create(alloc, size); // Throws
+            return BinaryColumn::create(alloc, size, nullable); // Throws
         case col_type_Table:
             return SubtableColumn::create(alloc, size); // Throws
         case col_type_Mixed:
