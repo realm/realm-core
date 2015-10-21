@@ -43,14 +43,14 @@ template<typename T>
 void handle_reads(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-    handle_reads(addr+index, sizeof(T)*num_elements-1);
+    handle_reads(addr+index, sizeof(T)*num_elements);
 }
 
 template<typename T>
 void handle_writes(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-    handle_writes(addr+index, sizeof(T)*num_elements-1);
+    handle_writes(addr+index, sizeof(T)*num_elements);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
