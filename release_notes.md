@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed mremap() fallback on Blackberry.
 
 ### API breaking changes:
 

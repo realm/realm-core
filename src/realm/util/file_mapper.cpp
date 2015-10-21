@@ -742,7 +742,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
         if (new_addr != MAP_FAILED)
             return new_addr;
         int err = errno; // Eliminate any risk of clobbering
-        if (err != ENOTSUP)
+        if (err != ENOTSUP && err != ENOSYS)
             throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
     }
     // Fall back to no-mremap case if it's not supported
