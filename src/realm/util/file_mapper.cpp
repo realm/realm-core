@@ -670,17 +670,18 @@ namespace util {
 // when encryption is actually triggered, but most calls to these methods are not expected
 // to actually trigger any encryption activities. A performant solution is needed before
 // we can release it (except, possibly, for investigation purposes).
-void handle_reads(void* addr, size_t size)
+void handle_reads(const void* addr, size_t size)
 {
     SpinLockGuard lock(mapping_lock);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
         mapping_and_addr& m = mappings_by_addr[i];
-        if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
+        if (m.addr >= static_cast<const char*>(addr) + size 
+            || static_cast<const char*>(m.addr) + m.size <= addr)
             continue;
 #ifdef REALM_DEBUG_WITH_MPROTECT
         size_t mapped_size = round_up_to_page_size(size);
         void* mapped_start_addr = m.addr +
-            (static_cast<char*>(addr) - static_cast<char*>(m.addr)) / page_size() * page_size();
+            (static_cast<const char*>(addr) - static_cast<const char*>(m.addr)) / page_size() * page_size();
         REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ | PROT_WRITE) == 0);
 #endif
         m.mapping->handle_reads(addr, size);
@@ -690,18 +691,19 @@ void handle_reads(void* addr, size_t size)
     }
 }
 
-void handle_writes(void* addr, size_t size)
+void handle_writes(const void* addr, size_t size)
 {
     SpinLockGuard lock(mapping_lock);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
         mapping_and_addr& m = mappings_by_addr[i];
-        if (m.addr >= static_cast<char*>(addr) + size || static_cast<char*>(m.addr) + m.size <= addr)
+        if (m.addr >= static_cast<const char*>(addr) + size 
+            || static_cast<const char*>(m.addr) + m.size <= addr)
             continue;
 
 #ifdef REALM_DEBUG_WITH_MPROTECT
         size_t mapped_size = round_up_to_page_size(size);
         void* mapped_start_addr = m.addr +
-            (static_cast<char*>(addr) - static_cast<char*>(m.addr)) / page_size() * page_size();
+            (static_cast<const char*>(addr) - static_cast<const char*>(m.addr)) / page_size() * page_size();
         REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ | PROT_WRITE) == 0);
 #endif
         m.mapping->handle_writes(addr, size);

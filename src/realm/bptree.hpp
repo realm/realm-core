@@ -302,6 +302,8 @@ template <class T, bool N>
 std::unique_ptr<Array> BpTree<T,N>::create_root_from_ref(Allocator& alloc, ref_type ref)
 {
     const char* header = alloc.translate(ref);
+    size_t header_size = Array::header_size;
+    realm::util::handle_reads(header, header_size);
     std::unique_ptr<Array> new_root;
     if (Array::get_is_inner_bptree_node_from_header(header)) {
         new_root.reset(new Array{alloc});

@@ -112,11 +112,11 @@ public:
 
     // Open for read access to all blocks touched by an address range,
     // nop if range is already readable
-    void handle_reads(void* addr, size_t size) noexcept;
+    void handle_reads(const void* addr, size_t size) noexcept;
 
     // Open for write access to all blocks touched by an address range,
     // nop if range is already writable
-    void handle_writes(void* addr, size_t size) noexcept;
+    void handle_writes(const void* addr, size_t size) noexcept;
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping

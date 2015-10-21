@@ -31,11 +31,11 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::
 void msync(void *addr, size_t size);
 
 #if REALM_ENABLE_ENCRYPTION
-void handle_reads(void* addr, size_t size);
-void handle_writes(void* addr, size_t size);
+void handle_reads(const void* addr, size_t size);
+void handle_writes(const void* addr, size_t size);
 #else
-void inline handle_reads(void*, size_t) {}
-void inline handle_writes(void*, size_t) {}
+void inline handle_reads(const void*, size_t) {}
+void inline handle_writes(const void*, size_t) {}
 #endif
 
 // helpers for encrypted Maps

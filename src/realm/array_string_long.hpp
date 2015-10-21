@@ -127,7 +127,9 @@ inline void ArrayStringLong::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
+    realm::util::handle_reads(header, header_size);
     init_from_mem(MemRef(header, ref));
+    realm::util::handle_reads(header, get_byte_size());
     m_nullable = (Array::size() == 3);
 }
 

@@ -515,7 +515,7 @@ void EncryptedFileMapping::handle_access(void* addr) noexcept
     }
 }
 
-void EncryptedFileMapping::handle_reads(void* addr, size_t size) noexcept
+void EncryptedFileMapping::handle_reads(const void* addr, size_t size) noexcept
 {
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
     size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) / m_page_size;
@@ -530,7 +530,7 @@ void EncryptedFileMapping::handle_reads(void* addr, size_t size) noexcept
 }
 
 
-void EncryptedFileMapping::handle_writes(void* addr, size_t size) noexcept
+void EncryptedFileMapping::handle_writes(const void* addr, size_t size) noexcept
 {
     REALM_ASSERT(m_access == File::access_ReadWrite);
 
