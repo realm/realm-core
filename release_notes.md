@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Maybe fixed mremap() fallback on Blackberry.
+* Fixed mremap() fallback on Blackberry.
 
 ### API breaking changes:
 
