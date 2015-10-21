@@ -215,7 +215,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
     m_array(create_node(alloc, false)), // Throws
-    m_target_column(0),
+    m_target_column(nullptr),
     m_deny_duplicate_values(false)
 {
 }

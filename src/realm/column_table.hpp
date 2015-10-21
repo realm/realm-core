@@ -202,8 +202,8 @@ public:
     // have the same data type (as returned by
     // Table::get_column_type()).
 
-    void add(const Table* value = 0);
-    void insert(size_t ndx, const Table* value = 0);
+    void add(const Table* value = nullptr);
+    void insert(size_t ndx, const Table* value = nullptr);
     void set(size_t ndx, const Table*);
     void clear_table(size_t ndx);
 

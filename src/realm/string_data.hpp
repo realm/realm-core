@@ -154,7 +154,7 @@ private:
 // Implementation:
 
 inline StringData::StringData() noexcept:
-    m_data(0),
+    m_data(nullptr),
     m_size(0)
 {
 }

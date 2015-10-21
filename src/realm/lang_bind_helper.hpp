@@ -78,7 +78,7 @@ public:
     static const Table* get_table(const Group&, StringData name);
 
     static Table* add_table(Group&, StringData name, bool require_unique_name = true);
-    static Table* get_or_add_table(Group&, StringData name, bool* was_added = 0);
+    static Table* get_or_add_table(Group&, StringData name, bool* was_added = nullptr);
 
     //@}
 
@@ -350,7 +350,7 @@ inline void LangBindHelper::advance_read(SharedGroup& sg, History& history,
                                          SharedGroup::VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::advance_read(sg, history, observer, version);
 }
 
@@ -365,7 +365,7 @@ inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, O&& 
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::promote_to_write(sg, history, observer);
 }
 
@@ -385,7 +385,7 @@ inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::rollback_and_continue_as_read(sg, history, observer);
 }
 

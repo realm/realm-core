@@ -81,7 +81,7 @@ public:
         bool server_sync_mode = false;
         bool session_initiator = false;
         bool clear_file = false;
-        const char* encryption_key = 0;
+        const char* encryption_key = nullptr;
     };
 
     /// Attach this allocator to the specified file.
