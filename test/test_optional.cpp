@@ -53,6 +53,28 @@ TEST(Optional_MoveValueConstructor)
     CHECK_EQUAL(a, "");
 }
 
+TEST(Optional_CopyAssignment)
+{
+    Optional<std::string> a { "foo" };
+    Optional<std::string> b;
+    b = a;
+    CHECK(bool(a));
+    CHECK(bool(b));
+    CHECK_EQUAL(*a, "foo");
+    CHECK_EQUAL(*b, "foo");
+}
+
+TEST(Optional_MoveAssignment)
+{
+    Optional<std::string> a { "foo" };
+    Optional<std::string> b;
+    b = std::move(a);
+    CHECK(bool(a));
+    CHECK(bool(b));
+    CHECK_EQUAL(*a, "");
+    CHECK_EQUAL(*b, "foo");
+}
+
 struct SetBooleanOnDestroy {
     bool& m_b;
     explicit SetBooleanOnDestroy(bool& b) : m_b(b) {}
