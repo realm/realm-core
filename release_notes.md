@@ -1,22 +1,8 @@
-# NEXT RELEASE
+# 0.94.3 Release notes
 
 ### Bugfixes:
 
 * Fixed mremap() fallback on Blackberry.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
