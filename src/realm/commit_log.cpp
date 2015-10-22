@@ -190,9 +190,6 @@ protected:
     mutable uint_fast64_t m_read_version;
     mutable uint_fast64_t m_read_offset;
 
-    // FIXME: Part of non-persisting temporary implementation
-    std::map<version_type, std::string> m_reciprocal_transforms;
-
 
     // Make sure the header is available and mapped. This is required for any
     // access to metadata.  Calling the method while the mutex is locked will
