@@ -278,6 +278,7 @@ void recover_from_dead_owner()
 inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble() const
 {
     CommitLogHeader* header = m_header.get_addr();
+    realm::util::handle_reads(m_header, sizeof (CommitLogHeader));
     if (header->use_preamble_a)
         return & header->preamble_a;
     return & header->preamble_b;
@@ -287,6 +288,7 @@ inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble() c
 inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble_for_write()
 {
     CommitLogHeader* header = m_header.get_addr();
+    realm::util::handle_reads(m_header, sizeof (CommitLogHeader));
     CommitLogPreamble* from;
     CommitLogPreamble* to;
     if (header->use_preamble_a) {
@@ -305,6 +307,7 @@ inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble_for
 inline void WriteLogCollector::sync_header()
 {
     CommitLogHeader* header = m_header.get_addr();
+    realm::util::handle_writes(m_header, sizeof (CommitLogHeader));
     header->use_preamble_a = !header->use_preamble_a;
 }
 
@@ -463,6 +466,7 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
     EntryHeader hdr;
     hdr.size = entry.changeset.size();
+    realm::util::handle_writes(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
     write_ptr += sizeof(EntryHeader);
     std::copy(entry.changeset.data(), entry.changeset.data() + entry.changeset.size(), write_ptr);
@@ -526,12 +530,16 @@ void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_ver
 void WriteLogCollector::set_log_entry_internal(HistoryEntry* entry,
                                                const EntryHeader* hdr, const char* log)
 {
+    realm::util::handle_reads(hdr, sizeof (EntryHeader));
+    realm::util::handle_reads(log, hdr->size);
     entry->changeset = BinaryData(log, hdr->size);
 }
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
                                                const EntryHeader* hdr, const char* log)
 {
+    realm::util::handle_reads(hdr, sizeof (EntryHeader));
+    realm::util::handle_reads(log, hdr->size);
     *entry = BinaryData(log, hdr->size);
 }
 
