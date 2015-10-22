@@ -269,6 +269,8 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
     chunks& free_space = read_only ? m_free_read_only : m_free_space;
+    if (read_only)
+        realm::util::handle_reads(addr, Array::header_size);
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
     free(malloc_debug_map[ref]);

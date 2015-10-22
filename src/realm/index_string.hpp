@@ -208,7 +208,9 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
     m_target_column(target_column),
     m_deny_duplicate_values(deny_duplicate_values)
 {
-    REALM_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
+    char* header = alloc.translate(ref);
+    realm::util::handle_reads(header, Array::header_size);
+    REALM_ASSERT(Array::get_context_flag_from_header(header));
     m_array->init_from_ref(ref);
     set_parent(parent, ndx_in_parent);
 }

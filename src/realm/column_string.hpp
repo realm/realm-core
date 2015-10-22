@@ -319,6 +319,7 @@ inline size_t StringColumn::get_size_from_ref(ref_type root_ref,
                                                    Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
+    realm::util::handle_reads(root_header, Array::header_size);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
     if (root_is_leaf) {
         bool long_strings = Array::get_hasrefs_from_header(root_header);

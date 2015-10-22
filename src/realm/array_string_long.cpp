@@ -161,6 +161,7 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     if (nullable) {
         get_three(header, 0, offsets_ref, blob_ref, nulls_ref);
         const char* nulls_header = alloc.translate(nulls_ref);
+        // array::get does handle_reads
         if (Array::get(nulls_header, ndx) == 0)
             return realm::null();
     }
@@ -186,6 +187,7 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     const char* blob_header = alloc.translate(blob_ref);
     const char* data = ArrayBlob::get(blob_header, begin);
     size_t size = end - begin;
+    realm::util::handle_reads(data, size);
     return StringData(data, size);
 }
 

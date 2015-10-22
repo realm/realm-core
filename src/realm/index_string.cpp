@@ -409,7 +409,9 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     // If there already is a list of matches, we see if we fit there
     // or it has to be split into a subindex
     ref_type ref = to_ref(slot_value);
-    if (!Array::get_context_flag_from_header(alloc.translate(ref))) {
+    char* header = alloc.translate(ref);
+    realm::util::handle_reads(header, Array::header_size);
+    if (!Array::get_context_flag_from_header(header)) {
         IntegerColumn sub(alloc, ref); // Throws
         sub.set_parent(m_array.get(), ins_pos_refs);
 
@@ -479,7 +481,9 @@ void StringIndex::distinct(IntegerColumn& result) const
             }
             else {
                 // A real ref either points to a list or a subindex
-                if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+                char* header = alloc.translate(to_ref(ref));
+                realm::util::handle_reads(header, Array::header_size);
+                if (Array::get_context_flag_from_header(header)) {
                     StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column,
                                     m_deny_duplicate_values, alloc);
                     ndx.distinct(result);
@@ -528,7 +532,9 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
             }
             else {
                 // A real ref either points to a list or a subindex
-                if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+                char* header = alloc.translate(to_ref(ref));
+                realm::util::handle_reads(header, Array::header_size);
+                if (Array::get_context_flag_from_header(header)) {
                     StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column,
                                     m_deny_duplicate_values, alloc);
                     ndx.adjust_row_indexes(min_row_ndx, diff);
@@ -601,7 +607,9 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
         }
         else {
             // A real ref either points to a list or a subindex
-            if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+            char* header = alloc.translate(to_ref(ref));
+            realm::util::handle_reads(header, Array::header_size);
+            if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
                 subindex.do_delete(row_ndx, value, offset+4);
@@ -661,7 +669,9 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
         }
         else {
             // A real ref either points to a list or a subindex
-            if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+            char* header = alloc.translate(to_ref(ref));
+            realm::util::handle_reads(header, Array::header_size);
+            if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
                 subindex.do_update_ref(value, row_ndx, new_row_ndx, offset+4);

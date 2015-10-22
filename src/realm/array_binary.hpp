@@ -235,6 +235,7 @@ inline size_t ArrayBinary::get_size_from_header(const char* header,
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
+    realm::util::handle_reads(offsets_header, Array::header_size);
     return Array::get_size_from_header(offsets_header);
 }
 
