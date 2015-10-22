@@ -184,7 +184,14 @@ void Group::attach(ref_type top_ref)
         m_top.init_from_ref(top_ref);
         size_t top_size = m_top.size();
         static_cast<void>(top_size);
-        REALM_ASSERT(top_size == 3 || top_size == 5 || top_size == 7 || top_size == 8);
+
+        // FIXME: Use a future REALM_ASSERT_EX
+        if (top_size < 8) {
+            REALM_ASSERT_11(top_size, ==, 3, ||, top_size, ==, 5, ||, top_size, ==, 7);
+        }
+        else {
+            REALM_ASSERT_3(top_size, ==, 8);
+        }
 
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
