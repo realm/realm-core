@@ -49,7 +49,7 @@ $ ndk-build V=1
 
 This will create the shared library.
 
-## Building the 
+## Building the app
 
 From the test/android folder:
 
@@ -88,4 +88,3 @@ $ adb logcat
 ```
 $ adb pull /storage/sdcard0/Android/data/com.realm.test/files/unit-test-report.xml .
 ```
-
