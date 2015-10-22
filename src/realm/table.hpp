@@ -190,9 +190,9 @@ public:
     /// \sa has_shared_type()
     /// \sa get_descriptor()
 
-    size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = 0);
+    size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = nullptr);
     void insert_column(size_t column_ndx, DataType type, StringData name, bool nullable = false,
-                       DescriptorRef* subdesc = 0);
+                       DescriptorRef* subdesc = nullptr);
 
     // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error
     // prone (optional arguments and implicit bool to null-ptr conversion)
@@ -520,8 +520,8 @@ public:
     /// attached to a subtable, then `*column_ndx_out` will retain its original
     /// value upon return.
 
-    TableRef get_parent_table(size_t* column_ndx_out = 0) noexcept;
-    ConstTableRef get_parent_table(size_t* column_ndx_out = 0) const noexcept;
+    TableRef get_parent_table(size_t* column_ndx_out = nullptr) noexcept;
+    ConstTableRef get_parent_table(size_t* column_ndx_out = nullptr) const noexcept;
     size_t get_parent_row_index() const noexcept;
 
     //@}
@@ -551,7 +551,7 @@ public:
     int64_t minimum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
     float   minimum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  minimum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
+    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  average_int(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_double(size_t column_ndx, size_t* value_count = nullptr) const;
@@ -1100,8 +1100,8 @@ private:
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
                                          Allocator&) noexcept;
 
-    const Table* get_parent_table_ptr(size_t* column_ndx_out = 0) const noexcept;
-    Table* get_parent_table_ptr(size_t* column_ndx_out = 0) noexcept;
+    const Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) const noexcept;
+    Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) noexcept;
 
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
@@ -1382,7 +1382,7 @@ protected:
     /// If \a column_ndx_out is not null, this function must assign the index of
     /// the column within the parent table to `*column_ndx_out` when , and only
     /// when this table parent is a column in a parent table.
-    virtual Table* get_parent_table(size_t* column_ndx_out = 0) noexcept;
+    virtual Table* get_parent_table(size_t* column_ndx_out = nullptr) noexcept;
 
     /// Must be called whenever a child table accessor is about to be destroyed.
     ///

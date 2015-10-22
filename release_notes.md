@@ -28,6 +28,23 @@
 
 ----------------------------------------------
 
+# 0.94.3 Release notes
+
+### Bugfixes:
+
+* Fixed mremap() fallback on Blackberry.
+
+----------------------------------------------
+
+# 0.94.2 Release notes
+
+### Bugfixes:
+
+* Fixed a bug that lead to SharedGroup::compact failing to attach to the newly
+  written file.
+
+----------------------------------------------
+
 # 0.94.1 Release notes
 
 ### Bugfixes:

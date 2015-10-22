@@ -23,7 +23,7 @@
 
 #include <realm/util/file.hpp>
 
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
 
 #include <vector>
 

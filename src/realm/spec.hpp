@@ -88,7 +88,7 @@ public:
                                 ArrayParent*& keys_parent, size_t& keys_ndx);
     size_t get_enumkeys_ndx(size_t column_ndx) const noexcept;
     ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = 0,
-                              size_t* keys_ndx = 0) noexcept;
+                              size_t* keys_ndx = nullptr) noexcept;
 
     // Links
     size_t get_opposite_link_table_ndx(size_t column_ndx) const noexcept;

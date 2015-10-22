@@ -27,7 +27,7 @@
 
 #include <realm/util/errno.hpp>
 
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
 
 #include "encrypted_file_mapping.hpp"
 
@@ -659,7 +659,7 @@ void* mmap_anon(size_t size)
 namespace realm {
 namespace util {
 
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
 size_t round_up_to_page_size(size_t size) noexcept
 {
     return (size + page_size() - 1) & ~(page_size() - 1);
@@ -668,7 +668,7 @@ size_t round_up_to_page_size(size_t size) noexcept
 
 void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
 {
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
     if (encryption_key) {
         size = round_up_to_page_size(size);
         void* addr = mmap_anon(size);
@@ -701,7 +701,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
 
 void munmap(void* addr, size_t size) noexcept
 {
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
     if(::munmap(addr, size) != 0) {
@@ -713,7 +713,7 @@ void munmap(void* addr, size_t size) noexcept
 void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
              File::AccessMode a, size_t new_size)
 {
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
     {
         SpinLockGuard lock(mapping_lock);
         size_t rounded_old_size = round_up_to_page_size(old_size);
@@ -742,7 +742,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
         if (new_addr != MAP_FAILED)
             return new_addr;
         int err = errno; // Eliminate any risk of clobbering
-        if (err != ENOTSUP)
+        if (err != ENOTSUP && err != ENOSYS)
             throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
     }
     // Fall back to no-mremap case if it's not supported
@@ -758,7 +758,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
 
 void msync(void* addr, size_t size)
 {
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
         SpinLockGuard lock(mapping_lock);
         if (mapping_and_addr* m = find_mapping_for_addr(addr, round_up_to_page_size(size))) {

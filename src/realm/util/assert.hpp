@@ -23,7 +23,7 @@
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
 
-#if defined(REALM_ENABLE_ASSERTIONS) || defined(REALM_DEBUG)
+#if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
 #  define REALM_ASSERTIONS_ENABLED 1
 #endif
 
@@ -45,7 +45,7 @@
 
 // Becase the assert is used in noexcept methods, it's a bad idea to allocate buffer space for the message
 // so therefore we must pass it to terminate which will 'cerr' it for us without needing any buffer
-#if defined(REALM_ENABLE_ASSERTIONS) || defined(REALM_DEBUG)
+#if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
 #  define REALM_ASSERT_3(left, condition, right) \
     (((left) condition (right)) ? static_cast<void>(0) :                \
         realm::util::terminate("Assertion failed: " #left " " #condition " " #right, \

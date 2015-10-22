@@ -913,7 +913,7 @@ public:
     static bool get_hasrefs_from_header(const char*) noexcept;
     static bool get_context_flag_from_header(const char*) noexcept;
     static WidthType get_wtype_from_header(const char*) noexcept;
-    static int get_width_from_header(const char*) noexcept;
+    static size_t get_width_from_header(const char*) noexcept;
     static size_t get_size_from_header(const char*) noexcept;
 
     static Type get_type_from_header(const char*) noexcept;
@@ -993,7 +993,7 @@ protected:
     bool get_hasrefs_from_header() const noexcept;
     bool get_context_flag_from_header() const noexcept;
     WidthType get_wtype_from_header() const noexcept;
-    int get_width_from_header() const noexcept;
+    size_t get_width_from_header() const noexcept;
     size_t get_size_from_header() const noexcept;
 
     // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
@@ -1126,7 +1126,7 @@ private:
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
 protected:
-    unsigned char m_width = 0;  // Size of an element (meaning depend on type of array).
+    uint_least8_t m_width = 0;  // Size of an element (meaning depend on type of array).
     bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
     bool m_has_refs;        // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;    // Meaning depends on context.
@@ -1660,11 +1660,11 @@ inline Array::WidthType Array::get_wtype_from_header(const char* header) noexcep
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return WidthType((int(h[4]) & 0x18) >> 3);
 }
-inline int Array::get_width_from_header(const char* header) noexcept
+inline size_t Array::get_width_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (1 << (int(h[4]) & 0x07)) >> 1;
+    return size_t((1 << (int(h[4]) & 0x07)) >> 1);
 }
 inline size_t Array::get_size_from_header(const char* header) noexcept
 {
@@ -1710,7 +1710,7 @@ inline Array::WidthType Array::get_wtype_from_header() const noexcept
 {
     return get_wtype_from_header(get_header_from_data(m_data));
 }
-inline int Array::get_width_from_header() const noexcept
+inline size_t Array::get_width_from_header() const noexcept
 {
     return get_width_from_header(get_header_from_data(m_data));
 }
@@ -1891,7 +1891,7 @@ inline size_t Array::get_byte_size_from_header(const char* header) noexcept
     size_t size = get_size_from_header(header);
     switch (get_wtype_from_header(header)) {
         case wtype_Bits: {
-            int width = get_width_from_header(header);
+            size_t width = get_width_from_header(header);
             size_t num_bits = (size * width); // FIXME: Prone to overflow
             num_bytes = num_bits / 8;
             if (num_bits & 0x7)
@@ -1899,7 +1899,7 @@ inline size_t Array::get_byte_size_from_header(const char* header) noexcept
             goto found;
         }
         case wtype_Multiply: {
-            int width = get_width_from_header(header);
+            size_t width = get_width_from_header(header);
             num_bytes = size * width;
             goto found;
         }

@@ -81,7 +81,7 @@ public:
 
     /// Equivalent to calling open(const std::string&, const char*, OpenMode)
     /// on an unattached group accessor.
-    explicit Group(const std::string& file, const char* encryption_key = 0, OpenMode = mode_ReadOnly);
+    explicit Group(const std::string& file, const char* encryption_key = nullptr, OpenMode = mode_ReadOnly);
 
     /// Equivalent to calling open(BinaryData, bool) on an unattached
     /// group accessor. Note that if this constructor throws, the
@@ -185,7 +185,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    void open(const std::string& file, const char* encryption_key = 0,
+    void open(const std::string& file, const char* encryption_key = nullptr,
               OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
@@ -331,7 +331,7 @@ public:
 
     TableRef add_table(StringData name, bool require_unique_name = true);
     TableRef insert_table(size_t idx, StringData name, bool require_unique_name = true);
-    TableRef get_or_add_table(StringData name, bool* was_added = 0);
+    TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
     TableRef get_or_insert_table(size_t index, StringData name, bool* was_added = nullptr);
 
     template<class T> BasicTableRef<T> get_table(size_t index);
@@ -343,7 +343,7 @@ public:
     template<class T> BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
     template<class T> BasicTableRef<T> insert_table(size_t index, StringData name,
                                                     bool require_unique_name = true);
-    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
+    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr);
     template<class T> BasicTableRef<T> get_or_insert_table(size_t index, StringData name,
                                                            bool* was_added = nullptr);
 

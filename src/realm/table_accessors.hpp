@@ -858,12 +858,12 @@ public:
         return Base::m_table->get_impl()->sum_int(col_idx);
     }
 
-    int64_t maximum(size_t* return_ndx = 0) const
+    int64_t maximum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->maximum_int(col_idx, return_ndx);
     }
 
-    int64_t minimum(size_t* return_ndx = 0) const
+    int64_t minimum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->minimum_int(col_idx, return_ndx);
     }
@@ -930,12 +930,12 @@ public:
         return Base::m_table->get_impl()->sum_float(col_idx);
     }
 
-    float maximum(size_t* return_ndx = 0) const
+    float maximum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->maximum_float(col_idx, return_ndx);
     }
 
-    float minimum(size_t* return_ndx = 0) const
+    float minimum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->minimum_float(col_idx, return_ndx);
     }
@@ -1008,12 +1008,12 @@ public:
         return Base::m_table->get_impl()->sum_double(col_idx);
     }
 
-    double maximum(size_t* return_ndx = 0) const
+    double maximum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->maximum_double(col_idx, return_ndx);
     }
 
-    double minimum(size_t* return_ndx = 0) const
+    double minimum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->minimum_double(col_idx, return_ndx);
     }
@@ -1113,12 +1113,12 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
-    DateTime maximum(size_t* return_ndx = 0) const
+    DateTime maximum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->maximum_datetime(col_idx, return_ndx);
     }
 
-    DateTime minimum(size_t* return_ndx = 0) const
+    DateTime minimum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->minimum_datetime(col_idx, return_ndx);
     }
@@ -1306,27 +1306,27 @@ public:
         return *Base::m_query;
     };
 
-    int64_t sum(size_t* resultcount = 0, size_t start = 0,
+    int64_t sum(size_t* resultcount = nullptr, size_t start = 0,
                 size_t end = size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_int(col_idx, resultcount, start, end, limit);
     }
 
-    int64_t maximum(size_t* resultcount = 0, size_t start = 0,
+    int64_t maximum(size_t* resultcount = nullptr, size_t start = 0,
                     size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = 0) const
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    int64_t minimum(size_t* resultcount = 0, size_t start = 0,
+    int64_t minimum(size_t* resultcount = nullptr, size_t start = 0,
                     size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = 0) const
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(size_t* resultcount = 0, size_t start = 0,
+    double average(size_t* resultcount = nullptr, size_t start = 0,
                    size_t end=size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.average_int(col_idx, resultcount, start, end, limit);
@@ -1377,27 +1377,27 @@ public:
         return *Base::m_query;
     };
 
-    double sum(size_t* resultcount = 0, size_t start = 0,
+    double sum(size_t* resultcount = nullptr, size_t start = 0,
                size_t end = size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_float(col_idx, resultcount, start, end, limit);
     }
 
-    float maximum(size_t* resultcount = 0, size_t start = 0,
+    float maximum(size_t* resultcount = nullptr, size_t start = 0,
                     size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = 0) const
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    float minimum(size_t* resultcount = 0, size_t start = 0,
+    float minimum(size_t* resultcount = nullptr, size_t start = 0,
                     size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = 0) const
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(size_t* resultcount = 0, size_t start = 0,
+    double average(size_t* resultcount = nullptr, size_t start = 0,
                    size_t end=size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.average_float(col_idx, resultcount, start, end, limit);
@@ -1448,27 +1448,27 @@ public:
         return *Base::m_query;
     };
 
-    double sum(size_t* resultcount = 0, size_t start = 0,
+    double sum(size_t* resultcount = nullptr, size_t start = 0,
                size_t end = size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_double(col_idx, resultcount, start, end, limit);
     }
 
-    double maximum(size_t* resultcount = 0, size_t start = 0,
+    double maximum(size_t* resultcount = nullptr, size_t start = 0,
                     size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = 0) const
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double minimum(size_t* resultcount = 0, size_t start = 0,
+    double minimum(size_t* resultcount = nullptr, size_t start = 0,
                     size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = 0) const
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(size_t* resultcount = 0, size_t start = 0,
+    double average(size_t* resultcount = nullptr, size_t start = 0,
                    size_t end=size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.average_double(col_idx, resultcount, start, end, limit);
@@ -1558,16 +1558,16 @@ public:
         return *Base::m_query;
     };
 
-    DateTime maximum(size_t* resultcount = 0, size_t start = 0,
+    DateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
                  size_t end = size_t(-1), size_t limit=size_t(-1),
-                 size_t* return_ndx = 0) const
+                 size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_datetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    DateTime minimum(size_t* resultcount = 0, size_t start = 0,
+    DateTime minimum(size_t* resultcount = nullptr, size_t start = 0,
                  size_t end = size_t(-1), size_t limit=size_t(-1),
-                 size_t* return_ndx = 0) const
+                 size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_datetime(col_idx, resultcount, start, end, limit, return_ndx);
     }

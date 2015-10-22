@@ -739,7 +739,7 @@ void Group::write(std::ostream& out, TableWriter& table_writer,
     // encryption will pad the file to a multiple of the page, so ensure the
     // footer is aligned to the end of a page
     if (pad_for_encryption) {
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
         size_t unrounded_size = final_file_size + sizeof(SlabAlloc::StreamingFooter);
         size_t rounded_size = round_up_to_page_size(unrounded_size);
         if (rounded_size != unrounded_size) {
@@ -1012,10 +1012,10 @@ public:
 
         if (!m_group.m_table_accessors.empty()) {
             // for end-insertions, table_ndx will be equal to num_tables
-            m_group.m_table_accessors.push_back(0); // Throws
+            m_group.m_table_accessors.push_back(nullptr); // Throws
             size_t last_ndx = num_tables;
             m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
-            m_group.m_table_accessors[table_ndx] = 0;
+            m_group.m_table_accessors[table_ndx] = nullptr;
             if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
                 typedef _impl::TableFriend tf;
                 tf::mark(*moved_table);

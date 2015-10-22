@@ -141,13 +141,13 @@ public:
     /// constructed in the unattached state.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// \brief Same as calling the corrsponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     struct unattached_tag {};
 
@@ -203,12 +203,12 @@ public:
     ///        and an upgrade is required.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel = durability_Full,
-              const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in exixtence for as long as the SharedGroup.
     void open(Replication&, DurabilityLevel = durability_Full,
-              const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -688,7 +688,7 @@ public:
         return get_group().add_table(name, require_unique_name); // Throws
     }
 
-    TableRef get_or_add_table(StringData name, bool* was_added = 0) const
+    TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table(name, was_added); // Throws
     }
@@ -704,7 +704,7 @@ public:
         return get_group().add_table<T>(name, require_unique_name); // Throws
     }
 
-    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0) const
+    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
@@ -1086,7 +1086,7 @@ public:
         bool no_create = true;
         SharedGroup::DurabilityLevel durability = SharedGroup::durability_Async;
         bool is_backend = true;
-        const char* encryption_key = 0;
+        const char* encryption_key = nullptr;
         bool allow_file_format_upgrade = false;
         sg.do_open_1(file, no_create, durability, is_backend, encryption_key,
                      allow_file_format_upgrade); // Throws

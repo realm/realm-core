@@ -29,7 +29,7 @@ const char* crypt_key(bool always=false)
 {
     static const char key[] = "1234567890123456789012345678901123456789012345678901234567890123";
     if (always) {
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
         return key;
 #else
         return 0;

@@ -183,7 +183,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs             = get_hasrefs_from_header(header);
     m_context_flag         = get_context_flag_from_header(header);
-    m_width                = get_width_from_header(header);
+    m_width                = uint_least8_t(get_width_from_header(header));
     m_size                 = get_size_from_header(header);
 
     // Capacity is how many items there are room for
@@ -3074,7 +3074,7 @@ inline std::pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, siz
         // Case 2/2: Offsets array (general form)
         ref_type offsets_ref = to_ref(first_value);
         char* offsets_header = alloc.translate(offsets_ref);
-        int offsets_width = Array::get_width_from_header(offsets_header);
+        size_t offsets_width = Array::get_width_from_header(offsets_header);
         std::pair<size_t, size_t> p;
         REALM_TEMPEX(p = find_child_from_offsets, offsets_width, (offsets_header, ndx));
         child_ndx    = p.first;
@@ -3291,7 +3291,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
         }
 
         const char* data = Array::get_data_from_header(header);
-        int width = Array::get_width_from_header(header);
+        size_t width = Array::get_width_from_header(header);
         size_t ndx = 0;
         std::pair<int_fast64_t, int_fast64_t> p = get_two(data, width, ndx);
         int_fast64_t first_value = p.first;
@@ -3370,7 +3370,7 @@ std::pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const noexcept
     REALM_ASSERT(is_inner_bptree_node());
 
     size_t ndx_2 = ndx;
-    int width = int(m_width);
+    size_t width = m_width;
     const char* data = m_data;
 
     for (;;) {
@@ -3647,7 +3647,7 @@ void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
-    int width = get_width_from_header(header);
+    size_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);
 }
 
@@ -3655,7 +3655,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
-    int width = get_width_from_header(header);
+    size_t width = get_width_from_header(header);
     std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
     return std::make_pair(p.first, p.second);
 }
@@ -3664,6 +3664,6 @@ std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexc
 void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
 {
     const char* data = get_data_from_header(header);
-    int width = get_width_from_header(header);
+    size_t width = get_width_from_header(header);
     ::get_three(data, width, ndx, v0, v1, v2);
 }

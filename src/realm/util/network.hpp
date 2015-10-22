@@ -386,8 +386,8 @@ private:
 protected:
     io_service& m_service;
     protocol m_protocol;
-    io_service::async_oper* m_read_oper  = 0; // Read or accept
-    io_service::async_oper* m_write_oper = 0; // Write or connect
+    io_service::async_oper* m_read_oper  = nullptr; // Read or accept
+    io_service::async_oper* m_write_oper = nullptr; // Write or connect
 
     socket_base(io_service&);
 
@@ -681,7 +681,7 @@ private:
     using clock = io_service::clock;
 
     io_service& m_service;
-    io_service::wait_oper_base* m_wait_oper = 0;
+    io_service::wait_oper_base* m_wait_oper = nullptr;
 };
 
 
@@ -859,7 +859,7 @@ public:
     virtual ~async_oper() noexcept {}
 
 private:
-    async_oper* m_next = 0;
+    async_oper* m_next = nullptr;
     friend class io_service;
 };
 
@@ -1335,7 +1335,7 @@ inline void acceptor::accept(socket& sock, endpoint& ep)
 
 inline std::error_code acceptor::accept(socket& sock, std::error_code& ec)
 {
-    endpoint* ep = 0;
+    endpoint* ep = nullptr;
     return accept(sock, ep, ec); // Throws
 }
 
@@ -1346,7 +1346,7 @@ inline std::error_code acceptor::accept(socket& sock, endpoint& ep, std::error_c
 
 template<class H> inline void acceptor::async_accept(socket& sock, const H& handler)
 {
-    endpoint* ep = 0;
+    endpoint* ep = nullptr;
     async_accept(sock, ep, handler); // Throws
 }
 

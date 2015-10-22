@@ -20,7 +20,7 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/file_mapper.hpp>
 
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
 #include <cstdlib>
 #include <iostream>
 #include <algorithm>

@@ -7484,7 +7484,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #ifndef _WIN32
 
-#ifndef REALM_ENABLE_ENCRYPTION
+#if !REALM_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
 #if !defined(REALM_ANDROID) && !defined(REALM_IOS)
@@ -7583,7 +7583,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 */
 
 #endif // !defined(REALM_ANDROID) && !defined(REALM_IOS)
-#endif // not defined REALM_ENABLE_ENCRYPTION
+#endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
@@ -7599,7 +7599,9 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         sg.end_read();
     }
 
-#ifdef REALM_ENABLE_ENCRYPTION
+    // the miminum filesize (after a commit) is one or two pages, depending on the
+    // page size.
+#if REALM_ENABLE_ENCRYPTION
     if (crypt_key())
         // Encrypted files are always at least a 4096 byte header plus payload
         CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size() + 4096);

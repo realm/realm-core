@@ -1122,7 +1122,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 
 void File::set_encryption_key(const char* key)
 {
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
     if (key) {
         char *buffer = new char[64];
         memcpy(buffer, key, 64);
