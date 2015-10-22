@@ -1049,15 +1049,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		F4CD03731BA2FF640043533A /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				F4CD03801BA2FFE60043533A /* CoreFoundation.framework in Frameworks */,
-				F4CD037F1BA2FFAD0043533A /* librealm.a in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		F4D0FC131B00E0D70040956A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
