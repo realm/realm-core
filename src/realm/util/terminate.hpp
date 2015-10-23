@@ -58,7 +58,7 @@ REALM_NORETURN void terminate_with_info(const char* assert_message, int line, co
     ss << file << ':' << line << ": " REALM_VER_CHUNK " ";
     ss << assert_message << " with " << interesting_names << " = (";
     inspect_all(ss, std::forward<Args>(interesting_values)...);
-    ss << ")";
+    ss << ")\n";
     terminate_internal(ss);
 }
 
