@@ -119,13 +119,34 @@ void BenchmarkResults::submit(const char* ident, double seconds)
 BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
 {
     Result r;
-    r.rep = samples.size();
+
+    std::vector<double> samples = this->samples;
+    // Sort to simplify calculating min/max/median.
+    std::sort(samples.begin(), samples.end());
+
+    // Compute total:
+    r.total = 0;
     for (auto s: samples) {
-        if (r.min > s) r.min = s;
-        if (r.max < s) r.max = s;
         r.total += s;
     }
-    
+
+    // Compute min/max/median
+    r.rep = samples.size();
+    if (r.rep > 0) {
+        r.min = samples.front();
+        r.max = samples.back();
+
+        if (r.rep % 2 == 0) {
+            // Equal number of elements: median is the average of the
+            // two middle elements.
+            r.median = (samples[r.rep / 2] + samples[r.rep / 2 + 1]) / 2;
+        }
+        else {
+            // Odd number of elements: median is the middle element.
+            r.median = samples[r.rep / 2];
+        }
+    }
+
     // Calculate standard deviation
     if (r.rep > 1) {
         double mean = r.avg();
@@ -146,7 +167,7 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
     else {
         r.stddev = 0;
     }
-    
+
     return r;
 }
 
@@ -187,21 +208,41 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
         const Result& br = baseline_iter->second;
         double avg = r.avg();
         double baseline_avg = br.avg();
-        if ((avg - baseline_avg) > r.stddev) {
+
+        if ((r.min - br.min) > r.stddev*2) {
+            out << "* ";
+        }
+        else {
+            out << "  ";
+        }
+        out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << " " << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
+
+        out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " " << pad_right(format_change(br.max, r.max, change_type), 15) << "   ";
+
+        if ((r.median - br.median) > r.stddev*2) {
+            out << "* ";
+        }
+        else {
+            out << "  ";
+        }
+
+        out << "med " << std::setw(time_width) << format_elapsed_time(r.median)   << " " << pad_right(format_change(br.median, r.median, change_type), 15) << "   ";
+
+        if ((avg - baseline_avg) > r.stddev*2) {
             out << "* ";
         }
         else {
             out << "  ";
         }
         out << "avg " << std::setw(time_width) << format_elapsed_time(avg) << " " << pad_right(format_change(baseline_avg, avg, change_type), 15) << "     ";
-        out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << " " << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
-        out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " " << pad_right(format_change(br.max, r.max, change_type), 15) << "     ";
+
         out << "stddev" << std::setw(time_width) << format_elapsed_time(r.stddev) << " " << pad_right(format_change(br.stddev, r.stddev, change_type), 15);
     }
     else {
-        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << "     ";
         out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << "     ";
         out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << "     ";
+        out << "median " << std::setw(time_width) << format_elapsed_time(r.median) << "     ";
+        out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << "     ";
         out << "stddev " << std::setw(time_width) << format_elapsed_time(r.stddev);
     }
     out << std::endl;
@@ -224,8 +265,8 @@ void BenchmarkResults::try_load_baseline_results()
             std::string ident;
             Result r;
             if (line_in >> ident) {
-                double* numbers[] = {&r.min, &r.max, &r.stddev, &r.total};
-                for (size_t i = 0; i < 4; ++i) {
+                double* numbers[] = {&r.min, &r.max, &r.median, &r.stddev, &r.total};
+                for (size_t i = 0; i < 5; ++i) {
                     if (!(line_in >> *numbers[i])) {
                         std::cerr << "Expected number: line " << lineno << "\n";
                         error = true;
@@ -284,7 +325,7 @@ void BenchmarkResults::save_results()
         std::ofstream out(name.c_str());
         std::ofstream csv_out(csv_name.c_str());
 
-        csv_out << "ident,min,max,avg,stddev,reps,total" << '\n';
+        csv_out << "ident,min,max,median,avg,stddev,reps,total" << '\n';
         csv_out.setf(std::ios_base::fixed, std::ios_base::floatfield);
 
         typedef Measurements::const_iterator iter;
@@ -292,10 +333,10 @@ void BenchmarkResults::save_results()
             Result r = it->second.finish();
 
             out << it->first << ' ';
-            out << r.min << " " << r.max << " " << r.stddev << " " << r.total << " " << r.rep << '\n';
+            out << r.min << " " << r.max << " " << r.median << " " << r.stddev << " " << r.total << " " << r.rep << '\n';
 
             csv_out << '"' << it->first << "\",";
-            csv_out << r.min << ',' << r.max << ',' << r.avg() << ',' << r.stddev << ',' << r.rep << ',' << r.total << '\n';
+            csv_out << r.min << ',' << r.max << ',' << r.median << ',' << r.avg() << ',' << r.stddev << ',' << r.rep << ',' << r.total << '\n';
         }
     }
 

@@ -2,6 +2,73 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Queries are no longer limited to 16 levels of grouping.
+* New substring operations (ranged insert, erase on values in string columns).
+* Adds schema change notification handler API to Group.
+
+-----------
+
+### Internals:
+
+* New operations: Swap rows, move rows, move column, move group level table.
+* Changes order of nullify instructions that appeared as a result of erase
+  to occur in the transaction log before the erase instruction that caused
+  them.
+* New utility class: DirScanner.
+* New test utility function: quote.
+
+
+----------------------------------------------
+
+# 0.94.3 Release notes
+
+### Bugfixes:
+
+* Fixed mremap() fallback on Blackberry.
+
+----------------------------------------------
+
+# 0.94.2 Release notes
+
+### Bugfixes:
+
+* Fixed a bug that lead to SharedGroup::compact failing to attach to the newly
+  written file.
+
+----------------------------------------------
+
+# 0.94.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug in SharedGroup::Compact() which could leave the database in an
+  inconsistent state.
+
+### Enhancements:
+
+* Queries are no longer limited to 16 levels of grouping.
+
+-----------
+
+### Internals:
+
+* Obsolete YAML-based documentation removed.
+* Removed `std::` in front integral types (e.g. `size_t`, `int64_t` etc.)
+
+----------------------------------------------
+
+# 0.94.0 Release notes
+
+### Bugfixes:
+
 * Fixed a crash bug that could be triggered if a Realm is rapidly opened and
   closed and reopened many times on multiple threads. The bug caused the
   internal version information structure to overflow, causing an assert or a
@@ -12,12 +79,11 @@
   failure to `open()`.
 * Added the bitcode marker to iOS Simulator builds so that bitcode for device
   builds can actually be used.
+* Build with bitcode both enabled and disabled for iOS for compatibility with
+  Xcode 6.
 
 ### API breaking changes:
-
-* Free-standing functions `util::network::write()` and
-  `util::network::async_write()` converted to members of
-  `util::network::socket`.
+* None.
 
 ### Enhancements:
 * Supports finding non-null links (Link + LinkList) in queries, using
@@ -28,8 +94,6 @@
   `pthread_mutex_lock()`.
 * Termination routines now always display the library's version before the
   error message.
-* New `util::network::socket_base::cancel()`.
-* Added `util::network::deadline_timer` class.
 * Automatically clean up stale MemOnly files which were not deleted on close
   due to the process crashing.
 
@@ -45,13 +109,19 @@
 * Improved documentation in `util::network`.
 * Improved exception safety in `util::network`.
 * `util::network::socket_base::close()` is now `noexcept`.
+* New `util::network::socket_base::cancel()`.
+* Added `util::network::deadline_timer` class.
+* Breaking: Free-standing functions `util::network::write()` and
+  `util::network::async_write()` converted to members of
+  `util::network::socket`.
+
 
 ----------------------------------------------
 
 # 0.93.0 Release notes
 
 ### Bugfixes:
-* Fixed severe bug in Array allocator that could give asserts like 
+* Fixed severe bug in Array allocator that could give asserts like
   `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`, especially
   for BinaryData columns. This bug could be triggered by using binary data
   blobs with a size in the range between 8M and 16M.
@@ -85,7 +155,7 @@
   to another during handover_export() leading to corruption.
 * Query expression operators now give correct results when an argument comes
   from a link.
-* Fixed a bug in the way the new memory mapping machinery interacted with 
+* Fixed a bug in the way the new memory mapping machinery interacted with
   encryption.
 * Query expression comparisons now give correct results when comparing a linked
   column with a column in the base table.

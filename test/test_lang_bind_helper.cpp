@@ -6483,12 +6483,12 @@ class NoOpTransactionLogParser {
 public:
     NoOpTransactionLogParser(TestResults& test_results) : test_results(test_results) { }
 
-    std::size_t get_current_table() const
+    size_t get_current_table() const
     {
         return m_current_table;
     }
 
-    std::pair<std::size_t, std::size_t> get_current_linkview() const
+    std::pair<size_t, size_t> get_current_linkview() const
     {
         return {m_current_linkview_col, m_current_linkview_row};
     }
@@ -6497,9 +6497,9 @@ protected:
     TestResults& test_results;
 
 private:
-    std::size_t m_current_table = realm::npos;
-    std::size_t m_current_linkview_col = realm::npos;
-    std::size_t m_current_linkview_row = realm::npos;
+    size_t m_current_table = realm::npos;
+    size_t m_current_linkview_col = realm::npos;
+    size_t m_current_linkview_row = realm::npos;
 
 public:
     void parse_complete() { }
@@ -6510,7 +6510,7 @@ public:
         return true;
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t)
     {
         m_current_linkview_col = col_ndx;
         m_current_linkview_row = row_ndx;
@@ -6524,11 +6524,13 @@ public:
     bool insert_group_level_table(size_t, size_t, StringData) { return false; }
     bool erase_group_level_table(size_t, size_t) { return false; }
     bool rename_group_level_table(size_t, StringData) { return false; }
+    bool move_group_level_table(size_t, size_t) { return false; }
     bool insert_column(size_t, DataType, StringData, bool) { return false; }
     bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return false; }
     bool erase_column(size_t) { return false; }
     bool erase_link_column(size_t, size_t, size_t) { return false; }
     bool rename_column(size_t, StringData) { return false; }
+    bool move_column(size_t, size_t) { return false; }
     bool add_search_index(size_t) { return false; }
     bool remove_search_index(size_t) { return false; }
     bool add_primary_key(size_t) { return false; }
@@ -6554,9 +6556,11 @@ public:
     bool set_date_time(size_t, size_t, DateTime) { return false; }
     bool set_table(size_t, size_t) { return false; }
     bool set_mixed(size_t, size_t, const Mixed&) { return false; }
-    bool set_link(size_t, size_t, size_t) { return false; }
+    bool set_link(size_t, size_t, size_t, size_t) { return false; }
     bool set_null(size_t, size_t) { return false; }
-    bool nullify_link(size_t, size_t) { return false; }
+    bool nullify_link(size_t, size_t, size_t) { return false; }
+    bool insert_substring(size_t, size_t, size_t, StringData) { return false; }
+    bool erase_substring(size_t, size_t, size_t, size_t) { return false; }
     bool optimize_table() { return false; }
 };
 
@@ -6634,7 +6638,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         struct foo : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            std::size_t expected_table = 0;
+            size_t expected_table = 0;
 
             bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
                                    size_t prior_num_rows, bool unordered)
@@ -6686,7 +6690,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
 
-            bool link_list_nullify(std::size_t ndx)
+            bool link_list_nullify(size_t ndx)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -6696,7 +6700,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
 
-            bool nullify_link(std::size_t col_ndx, std::size_t row_ndx)
+            bool nullify_link(size_t col_ndx, size_t row_ndx, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);
@@ -6728,7 +6732,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool link_list_clear(std::size_t old_list_size) const
+            bool link_list_clear(size_t old_list_size) const
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -7294,7 +7298,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
         struct foo : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            std::size_t expected_table = 1;
+            size_t expected_table = 1;
 
             bool erase_rows(size_t row_ndx, size_t num_rows_to_erase,
                             size_t prior_num_rows, bool unordered)
@@ -7337,7 +7341,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
         struct foo: NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            std::size_t expected_table = 1;
+            size_t expected_table = 1;
             bool link_list_insert_called = false;
             bool set_link_called = false;
 
@@ -7354,7 +7358,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool link_list_insert(std::size_t ndx, std::size_t value)
+            bool link_list_insert(size_t ndx, size_t value)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -7367,7 +7371,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t value)
+            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);
@@ -7404,9 +7408,9 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
         struct foo: NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            std::size_t list_ndx = 0;
+            size_t list_ndx = 0;
 
-            bool link_list_insert(std::size_t ndx, std::size_t)
+            bool link_list_insert(size_t ndx, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -7608,7 +7612,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #ifndef _WIN32
 
-#ifndef REALM_ENABLE_ENCRYPTION
+#if !REALM_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
 #if !defined(REALM_ANDROID) && !defined(REALM_IOS)
@@ -7707,7 +7711,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 */
 
 #endif // !defined(REALM_ANDROID) && !defined(REALM_IOS)
-#endif // not defined REALM_ENABLE_ENCRYPTION
+#endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
@@ -7723,10 +7727,12 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         sg.end_read();
     }
 
-#ifdef REALM_ENABLE_ENCRYPTION
+    // the miminum filesize (after a commit) is one or two pages, depending on the
+    // page size.
+#if REALM_ENABLE_ENCRYPTION
     if (crypt_key())
-        // Encrypted files are always at least a 4096 byte header plus an encrypted page
-        CHECK_LESS_EQUAL(File(path).get_size(), page_size() + 4096);
+        // Encrypted files are always at least a 4096 byte header plus payload
+        CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size() + 4096);
     else
         CHECK_LESS_EQUAL(File(path).get_size(), 2 * page_size());
 #else
@@ -8313,7 +8319,7 @@ void handover_writer(std::string path)
     sg.end_read();
 }
 
-void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control, 
+void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control,
                       TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
@@ -8338,7 +8344,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
-        control->put(sg.export_for_handover(tv, MutableSourcePayload::Move), 
+        control->put(sg.export_for_handover(tv, MutableSourcePayload::Move),
                      sg.get_version_of_current_transaction());
 
         // here we need to allow the reciever to get hold on the proper version before
@@ -8353,7 +8359,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
     writer.join();
 }
 
-void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control, 
+void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control,
                        TestResults* test_results_ptr, std::string path)
 {
     TestResults& test_results = *test_results_ptr;
@@ -8376,7 +8382,7 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         CHECK(tv.is_in_sync());
         CHECK(tv2->is_in_sync());
         CHECK_EQUAL(tv.size(), tv2->size());
-        for (std::size_t k=0; k<tv.size(); ++k)
+        for (size_t k=0; k<tv.size(); ++k)
             CHECK_EQUAL(tv.get_int(0,k), tv2->get_int(0,k));
         if (table->size() > 0 && table->get_int(0,0) == 0)
             break;
@@ -8491,7 +8497,7 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
         CHECK(tv.is_in_sync());
         CHECK(tv2->is_in_sync());
         CHECK(tv.size() == tv2->size());
-        for (std::size_t k=0; k<tv.size(); ++k)
+        for (size_t k=0; k<tv.size(); ++k)
             CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
         // this looks wrong!
         if (table->size() > 0 && table->get_int(0,0) == 0) {
@@ -9095,6 +9101,50 @@ TEST(LangBindHelper_RollbackToInitialState2)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     sg_w.begin_write();
     sg_w.rollback();
+}
+
+TEST(LangBindHelper_Compact)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    size_t N = 100;
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction w(sg_w);
+        TableRef table = w.get_or_add_table("test");
+        table->add_column(type_Int, "int");
+        for (size_t i = 0; i < N; ++i) {
+            table->add_empty_row();
+            table->set_int(0, i, i);
+        }
+        w.commit();
+        sg_w.close();
+    }
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        ReadTransaction r(sg);
+        ConstTableRef table = r.get_table("test");
+        CHECK_EQUAL(N, table->size());
+        sg.close();
+    }
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        CHECK_EQUAL(true, sg.compact());
+        sg.close();
+    }
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        ReadTransaction r(sg);
+        ConstTableRef table = r.get_table("test");
+        CHECK_EQUAL(N, table->size());
+        sg.close();
+    }
 }
 
 #endif

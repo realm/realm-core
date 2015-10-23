@@ -17,13 +17,13 @@ namespace {
 
 const int max_width = 64;
 
-// Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty 
+// Round up to nearest possible block length: 0, 1, 2, 4, 8, 16, 32, 64, 128, 256. We include 1 to store empty
 // strings in as little space as possible, because 0 can only store nulls.
 size_t round_up(size_t size)
 {
     REALM_ASSERT(size <= 256);
 
-    if (size <= 1)
+    if (size <= 2)
         return size;
 
     size--;
@@ -112,7 +112,7 @@ void ArrayString::set(size_t ndx, StringData value)
             }
         }
 
-        m_width = new_width;
+        m_width = uint_least8_t(new_width);
     }
 
     REALM_ASSERT_3(0, <, m_width);
@@ -122,7 +122,7 @@ void ArrayString::set(size_t ndx, StringData value)
     char* end = begin + (m_width - 1);
     begin = std::copy(value.data(), value.data() + value.size(), begin);
     std::fill(begin, end, 0); // Pad with zero bytes
-    REALM_STATIC_ASSERT(max_width <= max_width, "Padding size must fit in 7-bits");
+    static_assert(max_width <= max_width, "Padding size must fit in 7-bits");
 
     if (value.is_null()) {
         REALM_ASSERT_3(m_width, <= , 128);

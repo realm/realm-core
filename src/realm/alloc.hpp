@@ -34,7 +34,7 @@ class Allocator;
 
 class Replication;
 
-typedef std::size_t ref_type;
+using ref_type = size_t;
 
 ref_type to_ref(int64_t) noexcept;
 
@@ -70,14 +70,14 @@ public:
     /// zero.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    MemRef alloc(std::size_t size);
+    MemRef alloc(size_t size);
 
     /// Calls do_realloc().
     ///
     /// Note: The underscore has been added because the name `realloc`
     /// would conflict with a macro on the Windows platform.
-    MemRef realloc_(ref_type, const char* addr, std::size_t old_size,
-                    std::size_t new_size);
+    MemRef realloc_(ref_type, const char* addr, size_t old_size,
+                    size_t new_size);
 
     /// Calls do_free().
     ///
@@ -120,7 +120,7 @@ public:
     Replication* get_replication() noexcept;
 
 protected:
-    std::size_t m_baseline = 0; // Separation line between immutable and mutable refs.
+    size_t m_baseline = 0; // Separation line between immutable and mutable refs.
 
     Replication* m_replication;
 
@@ -132,7 +132,7 @@ protected:
     /// zero.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef do_alloc(std::size_t size) = 0;
+    virtual MemRef do_alloc(size_t size) = 0;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -142,8 +142,8 @@ protected:
     /// the old chunk.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef do_realloc(ref_type, const char* addr, std::size_t old_size,
-                              std::size_t new_size);
+    virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size,
+                              size_t new_size);
 
     /// Release the specified chunk of memory.
     virtual void do_free(ref_type, const char* addr) noexcept = 0;
@@ -237,13 +237,13 @@ inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept:
 }
 
 
-inline MemRef Allocator::alloc(std::size_t size)
+inline MemRef Allocator::alloc(size_t size)
 {
     return do_alloc(size);
 }
 
-inline MemRef Allocator::realloc_(ref_type ref, const char* addr, std::size_t old_size,
-                                  std::size_t new_size)
+inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_size,
+                                  size_t new_size)
 {
 #ifdef REALM_DEBUG
     if (ref == m_watch)

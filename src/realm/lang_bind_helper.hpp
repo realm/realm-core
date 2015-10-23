@@ -71,39 +71,39 @@ public:
     /// construction of a smart-pointer object (TableRef). The table accessor
     /// pointer is bound by the callee before it is returned (bind_table_ptr()).
 
-    static Table* get_table(Group&, std::size_t index_in_group);
-    static const Table* get_table(const Group&, std::size_t index_in_group);
+    static Table* get_table(Group&, size_t index_in_group);
+    static const Table* get_table(const Group&, size_t index_in_group);
 
     static Table* get_table(Group&, StringData name);
     static const Table* get_table(const Group&, StringData name);
 
     static Table* add_table(Group&, StringData name, bool require_unique_name = true);
-    static Table* get_or_add_table(Group&, StringData name, bool* was_added = 0);
+    static Table* get_or_add_table(Group&, StringData name, bool* was_added = nullptr);
 
     //@}
 
-    static Table* get_subtable_ptr(Table*, std::size_t column_ndx, std::size_t row_ndx);
-    static const Table* get_subtable_ptr(const Table*, std::size_t column_ndx,
-                                         std::size_t row_ndx);
+    static Table* get_subtable_ptr(Table*, size_t column_ndx, size_t row_ndx);
+    static const Table* get_subtable_ptr(const Table*, size_t column_ndx,
+                                         size_t row_ndx);
 
     // FIXME: This is an 'oddball', do we really need it? If we do,
     // please provide a comment that explains why it is needed!
-    static Table* get_subtable_ptr_during_insert(Table*, std::size_t col_ndx,
-                                                 std::size_t row_ndx);
+    static Table* get_subtable_ptr_during_insert(Table*, size_t col_ndx,
+                                                 size_t row_ndx);
 
-    static Table* get_subtable_ptr(TableView*, std::size_t column_ndx, std::size_t row_ndx);
-    static const Table* get_subtable_ptr(const TableView*, std::size_t column_ndx,
-                                         std::size_t row_ndx);
-    static const Table* get_subtable_ptr(const ConstTableView*, std::size_t column_ndx,
-                                         std::size_t row_ndx);
+    static Table* get_subtable_ptr(TableView*, size_t column_ndx, size_t row_ndx);
+    static const Table* get_subtable_ptr(const TableView*, size_t column_ndx,
+                                         size_t row_ndx);
+    static const Table* get_subtable_ptr(const ConstTableView*, size_t column_ndx,
+                                         size_t row_ndx);
 
     /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source). Note
     /// that the source table must have a descriptor that is
     /// compatible with the target subtable column.
-    static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
+    static void set_mixed_subtable(Table& parent, size_t col_ndx, size_t row_ndx,
                                    const Table& source);
 
-    static LinkView* get_linklist_ptr(Row&, std::size_t col_ndx);
+    static LinkView* get_linklist_ptr(Row&, size_t col_ndx);
     static void unbind_linklist_ptr(LinkView*);
 
     //@{
@@ -214,11 +214,11 @@ inline Table* LangBindHelper::new_table()
 {
     typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
-    std::size_t ref = tf::create_empty_table(alloc); // Throws
+    size_t ref = tf::create_empty_table(alloc); // Throws
     Table::Parent* parent = nullptr;
-    std::size_t ndx_in_parent = 0;
+    size_t ndx_in_parent = 0;
     Table* table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
-    tf::bind_ref(*table);
+    tf::bind_ptr(*table);
     return table;
 }
 
@@ -226,61 +226,61 @@ inline Table* LangBindHelper::copy_table(const Table& table)
 {
     typedef _impl::TableFriend tf;
     Allocator& alloc = Allocator::get_default();
-    std::size_t ref = tf::clone(table, alloc); // Throws
+    size_t ref = tf::clone(table, alloc); // Throws
     Table::Parent* parent = nullptr;
-    std::size_t ndx_in_parent = 0;
+    size_t ndx_in_parent = 0;
     Table* copy_of_table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
-    tf::bind_ref(*copy_of_table);
+    tf::bind_ptr(*copy_of_table);
     return copy_of_table;
 }
 
-inline Table* LangBindHelper::get_subtable_ptr(Table* t, std::size_t column_ndx,
-                                               std::size_t row_ndx)
+inline Table* LangBindHelper::get_subtable_ptr(Table* t, size_t column_ndx,
+                                               size_t row_ndx)
 {
     Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx); // Throws
-    subtab->bind_ref();
+    subtab->bind_ptr();
     return subtab;
 }
 
-inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, std::size_t column_ndx,
-                                                     std::size_t row_ndx)
+inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, size_t column_ndx,
+                                                     size_t row_ndx)
 {
     const Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx); // Throws
-    subtab->bind_ref();
+    subtab->bind_ptr();
     return subtab;
 }
 
-inline Table* LangBindHelper::get_subtable_ptr(TableView* tv, std::size_t column_ndx,
-                                               std::size_t row_ndx)
+inline Table* LangBindHelper::get_subtable_ptr(TableView* tv, size_t column_ndx,
+                                               size_t row_ndx)
 {
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }
 
-inline const Table* LangBindHelper::get_subtable_ptr(const TableView* tv, std::size_t column_ndx,
-                                                     std::size_t row_ndx)
+inline const Table* LangBindHelper::get_subtable_ptr(const TableView* tv, size_t column_ndx,
+                                                     size_t row_ndx)
 {
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }
 
 inline const Table* LangBindHelper::get_subtable_ptr(const ConstTableView* tv,
-                                                     std::size_t column_ndx, std::size_t row_ndx)
+                                                     size_t column_ndx, size_t row_ndx)
 {
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }
 
-inline Table* LangBindHelper::get_table(Group& group, std::size_t index_in_group)
+inline Table* LangBindHelper::get_table(Group& group, size_t index_in_group)
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::get_table(group, index_in_group); // Throws
-    table->bind_ref();
+    table->bind_ptr();
     return table;
 }
 
-inline const Table* LangBindHelper::get_table(const Group& group, std::size_t index_in_group)
+inline const Table* LangBindHelper::get_table(const Group& group, size_t index_in_group)
 {
     typedef _impl::GroupFriend gf;
     const Table* table = &gf::get_table(group, index_in_group); // Throws
-    table->bind_ref();
+    table->bind_ptr();
     return table;
 }
 
@@ -289,7 +289,7 @@ inline Table* LangBindHelper::get_table(Group& group, StringData name)
     typedef _impl::GroupFriend gf;
     Table* table = gf::get_table(group, name); // Throws
     if (table)
-        table->bind_ref();
+        table->bind_ptr();
     return table;
 }
 
@@ -298,7 +298,7 @@ inline const Table* LangBindHelper::get_table(const Group& group, StringData nam
     typedef _impl::GroupFriend gf;
     const Table* table = gf::get_table(group, name); // Throws
     if (table)
-        table->bind_ref();
+        table->bind_ptr();
     return table;
 }
 
@@ -306,7 +306,7 @@ inline Table* LangBindHelper::add_table(Group& group, StringData name, bool requ
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::add_table(group, name, require_unique_name); // Throws
-    table->bind_ref();
+    table->bind_ptr();
     return table;
 }
 
@@ -314,43 +314,43 @@ inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bo
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::get_or_add_table(group, name, was_added); // Throws
-    table->bind_ref();
+    table->bind_ptr();
     return table;
 }
 
 inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
 {
-   t->unbind_ref();
+   t->unbind_ptr();
 }
 
 inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
 {
-   t->bind_ref();
+   t->bind_ptr();
 }
 
-inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_ndx,
-                                               std::size_t row_ndx, const Table& source)
+inline void LangBindHelper::set_mixed_subtable(Table& parent, size_t col_ndx,
+                                               size_t row_ndx, const Table& source)
 {
     parent.set_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
-inline LinkView* LangBindHelper::get_linklist_ptr(Row& row, std::size_t col_ndx)
+inline LinkView* LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)
 {
     LinkViewRef link_view = row.get_linklist(col_ndx);
-    link_view->bind_ref();
+    link_view->bind_ptr();
     return &*link_view;
 }
 
 inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
 {
-   link_view->unbind_ref();
+   link_view->unbind_ptr();
 }
 
 inline void LangBindHelper::advance_read(SharedGroup& sg, History& history,
                                          SharedGroup::VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::advance_read(sg, history, observer, version);
 }
 
@@ -365,7 +365,7 @@ inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, O&& 
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::promote_to_write(sg, history, observer);
 }
 
@@ -385,7 +385,7 @@ inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::rollback_and_continue_as_read(sg, history, observer);
 }
 

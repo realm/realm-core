@@ -164,20 +164,20 @@ StringData StringColumn::get(size_t ndx) const noexcept
     return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc, m_nullable);
 }
 
-bool StringColumn::is_null(std::size_t ndx) const noexcept
+bool StringColumn::is_null(size_t ndx) const noexcept
 {
     StringData sd = get(ndx);
     REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
     return sd.is_null();
 }
 
-StringData StringColumn::get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
+StringData StringColumn::get_index_data(size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
 {
     return get(ndx);
 }
 
 
-void StringColumn::set_null(std::size_t ndx)
+void StringColumn::set_null(size_t ndx)
 {
     if (!m_nullable) {
         throw LogicError{LogicError::column_not_nullable};
@@ -240,7 +240,7 @@ void StringColumn::set_search_index_allow_duplicate_values(bool allow) noexcept
 }
 
 
-void StringColumn::update_from_parent(std::size_t old_baseline) noexcept
+void StringColumn::update_from_parent(size_t old_baseline) noexcept
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -1364,8 +1364,9 @@ ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
         slice.init_from_mem(mem);
-        size_t pos = slice.write(out); // Throws
-        ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref = slice.write(out, deep, only_if_modified); // Throws
     }
     else {
         SliceHandler handler(get_alloc(), m_nullable);

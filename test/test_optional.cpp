@@ -53,6 +53,66 @@ TEST(Optional_MoveValueConstructor)
     CHECK_EQUAL(a, "");
 }
 
+TEST(Optional_CopyAssignment)
+{
+    Optional<std::string> a { "foo" };
+    Optional<std::string> b;
+    b = a;
+    CHECK(bool(a));
+    CHECK(bool(b));
+    CHECK_EQUAL(*a, "foo");
+    CHECK_EQUAL(*b, "foo");
+
+    Optional<std::string> c { "foo" };
+    Optional<std::string> d { "bar" };
+    d = c;
+    CHECK(bool(c));
+    CHECK(bool(d));
+    CHECK_EQUAL(*c, "foo");
+    CHECK_EQUAL(*d, "foo");
+
+    Optional<std::string> e;
+    Optional<std::string> f { "foo" };
+    f = e;
+    CHECK(!bool(e));
+    CHECK(!bool(f));
+}
+
+TEST(Optional_MoveAssignment)
+{
+    Optional<std::string> a { "foo" };
+    Optional<std::string> b;
+    b = std::move(a);
+    CHECK(bool(a));
+    CHECK(bool(b));
+    CHECK_EQUAL(*b, "foo");
+
+    Optional<std::string> c { "foo" };
+    Optional<std::string> d { "bar" };
+    d = std::move(c);
+    CHECK(bool(c));
+    CHECK(bool(d));
+    CHECK_EQUAL(*d, "foo");
+
+    Optional<std::string> e;
+    Optional<std::string> f { "foo" };
+    f = std::move(e);
+    CHECK(!bool(e));
+    CHECK(!bool(f));
+}
+
+TEST(Optional_ValueAssignment)
+{
+    Optional<std::string> o;
+    o = std::string { "foo" };
+    CHECK(bool(o));
+    CHECK_EQUAL(*o, "foo");
+
+    o = std::string { "bar" };
+    CHECK(bool(o));
+    CHECK_EQUAL(*o, "bar");
+}
+
 struct SetBooleanOnDestroy {
     bool& m_b;
     explicit SetBooleanOnDestroy(bool& b) : m_b(b) {}

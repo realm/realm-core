@@ -147,6 +147,48 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 }
 
 
+void LinkListColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
+
+    // For swap, we have to make sure that we only update backlinks
+    // once per target row. Otherwise, a linklist containing two
+    // references to the same row would be swapped back, cancelling
+    // out the effect of swap.
+    // FIXME: This is ridiculously, unnecessarily slow, because it heap-allocates.
+    std::set<size_t> update_target_backlinks;
+
+    ref_type ref_1 = get_as_ref(row_ndx_1);
+    ref_type ref_2 = get_as_ref(row_ndx_2);
+
+    if (ref_1) {
+        IntegerColumn link_list(get_alloc(), ref_1);
+        size_t n = link_list.size();
+        for (size_t i = 0; i < n; ++i) {
+            size_t target_row_ndx = to_size_t(link_list.get(i));
+            update_target_backlinks.insert(target_row_ndx);
+        }
+    }
+
+    if (ref_2) {
+        IntegerColumn link_list(get_alloc(), ref_2);
+        size_t n = link_list.size();
+        for (size_t i = 0; i < n; ++i) {
+            size_t target_row_ndx = to_size_t(link_list.get(i));
+            update_target_backlinks.insert(target_row_ndx);
+        }
+    }
+
+    for (auto target_row: update_target_backlinks) {
+        m_backlink_column->swap_backlinks(target_row, row_ndx_1, row_ndx_2);
+    }
+
+    IntegerColumn::swap_rows(row_ndx_1, row_ndx_2);
+    const bool fix_ndx_in_parent = true;
+    adj_swap<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
+}
+
+
 void LinkListColumn::clear(size_t, bool broken_reciprocal_backlinks)
 {
     if (!broken_reciprocal_backlinks) {
@@ -284,7 +326,7 @@ bool LinkListColumn::compare_link_list(const LinkListColumn& c) const
 }
 
 
-void LinkListColumn::do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx)
+void LinkListColumn::do_nullify_link(size_t row_ndx, size_t old_target_row_ndx)
 {
     LinkViewRef links = get(row_ndx);
     links->do_nullify_link(old_target_row_ndx);
@@ -395,6 +437,15 @@ void LinkListColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) n
 }
 
 
+void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
+{
+    LinkColumnBase::adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+
+    const bool fix_ndx_in_parent = false;
+    adj_swap<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
+}
+
+
 template<bool fix_ndx_in_parent>
 void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
@@ -458,6 +509,30 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
             }
             ++i;
         }
+    }
+}
+
+
+template<bool fix_ndx_in_parent>
+void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
+{
+    size_t i = 0, n = m_list_accessors.size();
+    while (i < n) {
+        list_entry& e = m_list_accessors[i];
+        if (e.m_row_ndx == row_ndx_1) {
+            e.m_row_ndx = row_ndx_2;
+            if (fix_ndx_in_parent) {
+                e.m_list->set_origin_row_index(row_ndx_2);
+            }
+        }
+        else if (e.m_row_ndx == row_ndx_2) {
+            e.m_row_ndx = row_ndx_1;
+            if (fix_ndx_in_parent) {
+                e.m_list->set_origin_row_index(row_ndx_1);
+            }
+        }
+
+        ++i;
     }
 }
 

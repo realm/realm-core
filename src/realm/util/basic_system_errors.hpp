@@ -39,7 +39,10 @@ enum basic_system_errors {
     no_memory = ENOMEM,
 
     /// Operation cancelled.
-    operation_aborted = ECANCELED
+    operation_aborted = ECANCELED,
+
+    /// Connection aborted.
+    connection_aborted = ECONNABORTED
 };
 
 std::error_code make_error_code(basic_system_errors);

@@ -314,8 +314,8 @@ TEST(TableView_Average)
     TestTableInt::View v = table.column().first.find_all(2);
     CHECK_EQUAL(5, v.size());
 
-    int64_t sum = v.column().first.average();
-    CHECK_EQUAL(2, sum);
+    double sum = v.column().first.average();
+    CHECK_APPROXIMATELY_EQUAL(2., sum, 0.00001);
 }
 
 TEST(TableView_SumNegative)
@@ -604,6 +604,7 @@ TEST(TableView_FindAllString)
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
+namespace {
 
 // primitive C locale comparer. But that's OK since all we want to test is if the callback is invoked
 bool got_called = false;
@@ -612,6 +613,8 @@ bool comparer(const char* s1, const char* s2)
     got_called = true;
     return *s1 < *s2;
 }
+
+} // unnamed namespace
 
 TEST(TableView_StringSort)
 {

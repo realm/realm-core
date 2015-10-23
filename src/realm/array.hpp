@@ -39,7 +39,7 @@ Searching: The main finding function is:
 #define REALM_ARRAY_HPP
 
 #include <cmath>
-#include <cstdlib> // std::size_t
+#include <cstdlib> // size_t
 #include <algorithm>
 #include <utility>
 #include <vector>
@@ -80,13 +80,13 @@ template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 /// Special index value. It has various meanings depending on
 /// context. It is returned by some search functions to indicate 'not
 /// found'. It is similar in function to std::string::npos.
-const std::size_t npos = std::size_t(-1);
+const size_t npos = size_t(-1);
 
 // Maximum number of bytes that the payload of an array can be
 const size_t max_array_payload = 0x00ffffffL;
 
 /// Alias for realm::npos.
-const std::size_t not_found = npos;
+const size_t not_found = npos;
 
  /* wid == 16/32 likely when accessing offsets in B tree */
 #define REALM_TEMPEX(fun, wid, arg) \
@@ -162,9 +162,9 @@ public:
         array_count(0)
     {
     }
-    std::size_t allocated;
-    std::size_t used;
-    std::size_t array_count;
+    size_t allocated;
+    size_t used;
+    size_t array_count;
 };
 #endif
 
@@ -175,13 +175,13 @@ public:
     virtual ~ArrayParent() noexcept {}
 
 protected:
-    virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;
+    virtual void update_child_ref(size_t child_ndx, ref_type new_ref) = 0;
 
-    virtual ref_type get_child_ref(std::size_t child_ndx) const noexcept = 0;
+    virtual ref_type get_child_ref(size_t child_ndx) const noexcept = 0;
 
 #ifdef REALM_DEBUG
     // Used only by Array::to_dot().
-    virtual std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t ndx_in_parent) const = 0;
+    virtual std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const = 0;
 #endif
 
     friend class Array;
@@ -240,7 +240,7 @@ class Array: public ArrayParent {
 public:
 
 //    void state_init(int action, QueryState *state);
-//    bool match(int action, std::size_t index, int64_t value, QueryState *state);
+//    bool match(int action, size_t index, int64_t value, QueryState *state);
 
     /// Create an array accessor in the unattached state.
     explicit Array(Allocator&) noexcept;
@@ -301,7 +301,7 @@ public:
     ///
     /// Returns true if, and only if the array has changed. If the array has not
     /// changed, then its children are guaranteed to also not have changed.
-    bool update_from_parent(std::size_t old_baseline) noexcept;
+    bool update_from_parent(size_t old_baseline) noexcept;
 
     /// Change the type of an already attached array node.
     ///
@@ -329,11 +329,11 @@ public:
     /// Construct a shallow copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will **not** be cloned. See
     /// slice_and_clone_children() for an alternative.
-    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+    MemRef slice(size_t offset, size_t size, Allocator& target_alloc) const;
 
     /// Construct a deep copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will be cloned.
-    MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
+    MemRef slice_and_clone_children(size_t offset, size_t size,
                                     Allocator& target_alloc) const;
 
     // Parent tracking
@@ -345,10 +345,10 @@ public:
     /// originally, then the caller passes ownership to the parent, and vice
     /// versa. This assumes, of course, that the change in parentship reflects a
     /// corresponding change in the list of children in the affected parents.
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept;
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept;
 
-    std::size_t get_ndx_in_parent() const noexcept;
-    void set_ndx_in_parent(std::size_t) noexcept;
+    size_t get_ndx_in_parent() const noexcept;
+    void set_ndx_in_parent(size_t) noexcept;
     void adjust_ndx_in_parent(int diff) noexcept;
 
     /// Get the ref of this array as known to the parent. The caller must ensure
@@ -362,13 +362,13 @@ public:
     /// accessor is currently unattached (idempotency).
     void detach() noexcept;
 
-    std::size_t size() const noexcept;
+    size_t size() const noexcept;
     bool is_empty() const noexcept;
     Type get_type() const noexcept;
 
     static void add_to_column(IntegerColumn* column, int64_t value);
 
-    void insert(std::size_t ndx, int_fast64_t value);
+    void insert(size_t ndx, int_fast64_t value);
     void add(int_fast64_t value);
 
     /// This function is guaranteed to not throw if the current width is
@@ -376,18 +376,18 @@ public:
     /// ensure_minimum_width(value)) and get_alloc().is_read_only(get_ref())
     /// returns false (noexcept:array-set). Note that for a value of zero, the
     /// first criterion is trivially satisfied.
-    void set(std::size_t ndx, int64_t value);
+    void set(size_t ndx, int64_t value);
 
-    void set_as_ref(std::size_t ndx, ref_type ref);
+    void set_as_ref(size_t ndx, ref_type ref);
 
-    template<std::size_t w> void set(std::size_t ndx, int64_t value);
+    template<size_t w> void set(size_t ndx, int64_t value);
 
-    int64_t get(std::size_t ndx) const noexcept;
-    template<std::size_t w> int64_t get(std::size_t ndx) const noexcept;
+    int64_t get(size_t ndx) const noexcept;
+    template<size_t w> int64_t get(size_t ndx) const noexcept;
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
     template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
-    ref_type get_as_ref(std::size_t ndx) const noexcept;
+    ref_type get_as_ref(size_t ndx) const noexcept;
 
     int64_t front() const noexcept;
     int64_t back() const noexcept;
@@ -404,16 +404,16 @@ public:
     /// call. This is automatically guaranteed if the array is used in a
     /// non-transactional context, or if the array has already been successfully
     /// modified within the current write transaction.
-    void erase(std::size_t ndx);
+    void erase(size_t ndx);
 
-    /// Same as erase(std::size_t), but remove all elements in the specified
+    /// Same as erase(size_t), but remove all elements in the specified
     /// range.
     ///
     /// Please note that this function does **not** destroy removed subarrays.
     ///
     /// This function guarantees that no exceptions will be thrown if
     /// get_alloc().is_read_only(get_ref()) would return false before the call.
-    void erase(std::size_t begin, std::size_t end);
+    void erase(size_t begin, size_t end);
 
     /// Reduce the size of this array to the specified number of elements. It is
     /// an error to specify a size that is greater than the current size of this
@@ -425,7 +425,7 @@ public:
     ///
     /// This function guarantees that no exceptions will be thrown if
     /// get_alloc().is_read_only(get_ref()) would return false before the call.
-    void truncate(std::size_t size);
+    void truncate(size_t size);
 
     /// Reduce the size of this array to the specified number of elements. It is
     /// an error to specify a size that is greater than the current size of this
@@ -434,7 +434,7 @@ public:
     ///
     /// This function is guaranteed not to throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
-    void truncate_and_destroy_children(std::size_t size);
+    void truncate_and_destroy_children(size_t size);
 
     /// Remove every element from this array. This is just a shorthand for
     /// calling truncate(0).
@@ -457,9 +457,9 @@ public:
 
     /// If neccessary, expand the representation so that it can store the
     /// specified value.
-    void ensure_minimum_width(int64_t value);
+    void ensure_minimum_width(int_fast64_t value);
 
-    typedef StringData (*StringGetter)(void*, std::size_t, char*); // Pre-declare getter function from string index
+    typedef StringData (*StringGetter)(void*, size_t, char*); // Pre-declare getter function from string index
     size_t index_string_find_first(StringData value, ColumnBase* column) const;
     void   index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
     size_t index_string_count(StringData value, ColumnBase* column) const;
@@ -470,10 +470,10 @@ public:
     void set_all_to_zero();
 
     /// Add \a diff to the element at the specified index.
-    void adjust(std::size_t ndx, int_fast64_t diff);
+    void adjust(size_t ndx, int_fast64_t diff);
 
     /// Add \a diff to all the elements in the specified index range.
-    void adjust(std::size_t begin, std::size_t end, int_fast64_t diff);
+    void adjust(size_t begin, size_t end, int_fast64_t diff);
 
     /// Add signed \a diff to all elements that are greater than, or equal to \a
     /// limit.
@@ -486,9 +486,19 @@ public:
     ///
     /// These functions are guaranteed to not throw if
     /// `get_alloc().is_read_only(get_ref())` returns false.
-    void move(std::size_t begin, std::size_t end, std::size_t dest_begin);
-    void move_backward(std::size_t begin, std::size_t end, std::size_t dest_end);
+    void move(size_t begin, size_t end, size_t dest_begin);
+    void move_backward(size_t begin, size_t end, size_t dest_end);
     //@}
+
+    /// move_rotate moves one element from \a from to be located at index \a to,
+    /// shifting all elements inbetween by one.
+    ///
+    /// If \a from is larger than \a to, the elements inbetween are shifted down.
+    /// If \a to is larger than \a from, the elements inbetween are shifted up.
+    ///
+    /// This function is guaranteed to not throw if
+    /// `get_alloc().is_read_only(get_ref())` returns false.
+    void move_rotate(size_t from, size_t to, size_t num_elems = 1);
 
     //@{
     /// Find the lower/upper bound of the specified value in a sequence of
@@ -521,8 +531,8 @@ public:
     ///
     /// FIXME: It may be worth considering if overall efficiency can be improved
     /// by doing a linear search for short sequences.
-    std::size_t lower_bound_int(int64_t value) const noexcept;
-    std::size_t upper_bound_int(int64_t value) const noexcept;
+    size_t lower_bound_int(int64_t value) const noexcept;
+    size_t upper_bound_int(int64_t value) const noexcept;
     //@}
 
     /// \brief Search the \c Array for a value greater or equal than \a target,
@@ -547,18 +557,18 @@ public:
     /// \param indirection an \c Array containing valid indices of values in
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
-    std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
-    void preset(int64_t min, int64_t max, std::size_t count);
-    void preset(std::size_t bitwidth, std::size_t count);
+    size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
+    void preset(int64_t min, int64_t max, size_t count);
+    void preset(size_t bitwidth, size_t count);
 
-    int64_t sum(std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
-    std::size_t count(int64_t value) const noexcept;
+    int64_t sum(size_t start = 0, size_t end = size_t(-1)) const;
+    size_t count(int64_t value) const noexcept;
 
-    bool maximum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
-                 std::size_t* return_ndx = nullptr) const;
+    bool maximum(int64_t& result, size_t start = 0, size_t end = size_t(-1),
+                 size_t* return_ndx = nullptr) const;
 
-    bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1),
-                 std::size_t* return_ndx = nullptr) const;
+    bool minimum(int64_t& result, size_t start = 0, size_t end = size_t(-1),
+                 size_t* return_ndx = nullptr) const;
 
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const noexcept;
@@ -610,12 +620,20 @@ public:
 
     // Serialization
 
-    /// Returns the position in the target where the first byte of this array
-    /// was written.
+    /// Returns the ref (position in the target stream) of the written copy of
+    /// this array, or the ref of the original array if \a only_if_modified is
+    /// true, and this array is unmodified (Alloc::is_read_only()).
     ///
     /// The number of bytes that will be written by a non-recursive invocation
     /// of this function is exactly the number returned by get_byte_size().
-    size_t write(_impl::ArrayWriterBase& target, bool recurse = true, bool persist = false) const;
+    ///
+    /// \param deep If true, recursively write out subarrays, but still subject
+    /// to \a only_if_modified.
+    ref_type write(_impl::ArrayWriterBase&, bool deep, bool only_if_modified) const;
+
+    /// Same as non-static write() with `deep` set to true. This is for the
+    /// cases where you do not already have an array accessor available.
+    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -662,14 +680,14 @@ public:
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
     template<class cond>
-    std::size_t find_first(int64_t value, std::size_t start = 0,
-                           std::size_t end = std::size_t(-1)) const;
+    size_t find_first(int64_t value, size_t start = 0,
+                           size_t end = size_t(-1)) const;
 
-    void find_all(IntegerColumn* result, int64_t value, std::size_t col_offset = 0,
-                  std::size_t begin = 0, std::size_t end = std::size_t(-1)) const;
+    void find_all(IntegerColumn* result, int64_t value, size_t col_offset = 0,
+                  size_t begin = 0, size_t end = size_t(-1)) const;
 
-    std::size_t find_first(int64_t value, std::size_t begin = 0,
-                           std::size_t end = size_t(-1)) const;
+    size_t find_first(int64_t value, size_t begin = 0,
+                           size_t end = size_t(-1)) const;
 
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
     template<class cond2, Action action, size_t bitwidth, class Callback>
@@ -720,18 +738,18 @@ public:
     template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
     template<bool gt, size_t width>int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
     template<size_t width> inline int64_t lower_bits() const;                   // Return chunk with lower bit set in each element
-    std::size_t first_set_bit(unsigned int v) const;
-    std::size_t first_set_bit64(int64_t v) const;
-    template<std::size_t w> int64_t get_universal(const char* const data, const std::size_t ndx) const;
+    size_t first_set_bit(unsigned int v) const;
+    size_t first_set_bit64(int64_t v) const;
+    template<size_t w> int64_t get_universal(const char* const data, const size_t ndx) const;
 
     // Find value greater/less in 64-bit chunk - only works for positive values
-    template<bool gt, Action action, std::size_t width, class Callback>
-    bool find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, std::size_t baseindex,
+    template<bool gt, Action action, size_t width, class Callback>
+    bool find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex,
                        Callback callback) const;
 
     // Find value greater/less in 64-bit chunk - no constraints
-    template<bool gt, Action action, std::size_t width, class Callback>
-    bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
+    template<bool gt, Action action, size_t width, class Callback>
+    bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex,
                   Callback callback) const;
 
 
@@ -744,10 +762,10 @@ public:
     /// the total number of elements in the subtree. The motivation
     /// for removing it, is that it will significantly improve the
     /// efficiency when inserting after, and erasing the last element.
-    std::size_t get_bptree_size() const noexcept;
+    size_t get_bptree_size() const noexcept;
 
     /// The root must not be a leaf.
-    static std::size_t get_bptree_size_from_header(const char* root_header) noexcept;
+    static size_t get_bptree_size_from_header(const char* root_header) noexcept;
 
 
     /// Find the leaf node corresponding to the specified element
@@ -770,7 +788,7 @@ public:
     /// points to the the header of the located leaf, and
     /// `ndx_in_leaf` is the local index within that leaf
     /// corresponding to the specified element index.
-    std::pair<MemRef, std::size_t> get_bptree_leaf(std::size_t elem_ndx) const noexcept;
+    std::pair<MemRef, size_t> get_bptree_leaf(size_t elem_ndx) const noexcept;
 
 
     class NodeInfo;
@@ -790,7 +808,7 @@ public:
     ///
     /// \return True if, and only if the handler has returned true for
     /// all visited leafs.
-    bool visit_bptree_leaves(std::size_t elem_ndx_offset, std::size_t elems_in_tree,
+    bool visit_bptree_leaves(size_t elem_ndx_offset, size_t elems_in_tree,
                              VisitHandler&);
 
 
@@ -803,7 +821,7 @@ public:
     /// Call the handler for the leaf that contains the element at the
     /// specified index. This function must be called on an inner
     /// B+-tree node, never a leaf.
-    void update_bptree_elem(std::size_t elem_ndx, UpdateHandler&);
+    void update_bptree_elem(size_t elem_ndx, UpdateHandler&);
 
 
     class EraseHandler;
@@ -837,12 +855,12 @@ public:
     /// inner B+-tree nodes always have a bit-width of 64, or allow
     /// the root node to be discarded and the column ref to be set to
     /// zero in Table::m_columns.
-    static void erase_bptree_elem(Array* root, std::size_t elem_ndx, EraseHandler&);
+    static void erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler&);
 
 
     struct TreeInsertBase {
-        std::size_t m_split_offset;
-        std::size_t m_split_size;
+        size_t m_split_offset;
+        size_t m_split_size;
     };
 
     template<class TreeTraits> struct TreeInsert: TreeInsertBase {
@@ -860,26 +878,26 @@ public:
     /// never a leaf. If this inner node had to be split, this
     /// function returns the `ref` of the new sibling.
     template<class TreeTraits>
-    ref_type bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state);
+    ref_type bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state);
 
-    ref_type bptree_leaf_insert(std::size_t ndx, int64_t, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(size_t ndx, int64_t, TreeInsertBase& state);
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static int_fast64_t get(const char* header, std::size_t ndx) noexcept;
+    static int_fast64_t get(const char* header, size_t ndx) noexcept;
 
-    /// Like get(const char*, std::size_t) but gets two consecutive
+    /// Like get(const char*, size_t) but gets two consecutive
     /// elements.
     static std::pair<int64_t, int64_t> get_two(const char* header,
-                                                           std::size_t ndx) noexcept;
+                                                           size_t ndx) noexcept;
 
     static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept;
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
-    std::size_t get_width() const noexcept { return m_width; }
+    size_t get_width() const noexcept { return m_width; }
 
     static char* get_data_from_header(char*) noexcept;
     static char* get_header_from_data(char*) noexcept;
@@ -895,8 +913,8 @@ public:
     static bool get_hasrefs_from_header(const char*) noexcept;
     static bool get_context_flag_from_header(const char*) noexcept;
     static WidthType get_wtype_from_header(const char*) noexcept;
-    static int get_width_from_header(const char*) noexcept;
-    static std::size_t get_size_from_header(const char*) noexcept;
+    static size_t get_width_from_header(const char*) noexcept;
+    static size_t get_size_from_header(const char*) noexcept;
 
     static Type get_type_from_header(const char*) noexcept;
 
@@ -907,25 +925,25 @@ public:
     ///
     /// This number is exactly the number of bytes that will be
     /// written by a non-recursive invocation of write().
-    std::size_t get_byte_size() const noexcept;
+    size_t get_byte_size() const noexcept;
 
     /// Get the maximum number of bytes that can be written by a
     /// non-recursive invocation of write() on an array with the
     /// specified number of elements, that is, the maximum value that
     /// can be returned by get_byte_size().
-    static std::size_t get_max_byte_size(std::size_t num_elems) noexcept;
+    static size_t get_max_byte_size(size_t num_elems) noexcept;
 
     /// FIXME: Belongs in IntegerArray
-    static std::size_t calc_aligned_byte_size(std::size_t size, int width);
+    static size_t calc_aligned_byte_size(size_t size, int width);
 
 #ifdef REALM_DEBUG
     void print() const;
     void verify() const;
-    typedef std::size_t (*LeafVerifier)(MemRef, Allocator&);
+    typedef size_t (*LeafVerifier)(MemRef, Allocator&);
     void verify_bptree(LeafVerifier) const;
     class MemUsageHandler {
     public:
-        virtual void handle(ref_type ref, std::size_t allocated, std::size_t used) = 0;
+        virtual void handle(ref_type ref, size_t allocated, size_t used) = 0;
     };
     void report_memory_usage(MemUsageHandler&) const;
     void stats(MemStats& stats) const;
@@ -934,7 +952,7 @@ public:
     void to_dot(std::ostream&, StringData title = StringData()) const;
     class ToDotHandler {
     public:
-        virtual void to_dot(MemRef leaf_mem, ArrayParent*, std::size_t ndx_in_parent,
+        virtual void to_dot(MemRef leaf_mem, ArrayParent*, size_t ndx_in_parent,
                             std::ostream&) = 0;
         ~ToDotHandler() {}
     };
@@ -951,90 +969,90 @@ protected:
 
     /// Insert a new child after original. If the parent has to be
     /// split, this function returns the `ref` of the new parent node.
-    ref_type insert_bptree_child(Array& offsets, std::size_t orig_child_ndx,
+    ref_type insert_bptree_child(Array& offsets, size_t orig_child_ndx,
                                  ref_type new_sibling_ref, TreeInsertBase& state);
 
     void ensure_bptree_offsets(Array& offsets);
     void create_bptree_offsets(Array& offsets, int_fast64_t first_value);
 
-    bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
+    bool do_erase_bptree_elem(size_t elem_ndx, EraseHandler&);
 
     template <IndexMethod method, class T>
-    std::size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
+    size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                              ColumnBase* column) const;
 protected:
 //    void add_positive_local(int64_t value);
 
     // Includes array header. Not necessarily 8-byte aligned.
-    virtual std::size_t calc_byte_len(std::size_t size, std::size_t width) const;
+    virtual size_t calc_byte_len(size_t size, size_t width) const;
 
-    virtual std::size_t calc_item_count(std::size_t bytes, std::size_t width) const noexcept;
+    virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
     bool get_is_inner_bptree_node_from_header() const noexcept;
     bool get_hasrefs_from_header() const noexcept;
     bool get_context_flag_from_header() const noexcept;
     WidthType get_wtype_from_header() const noexcept;
-    int get_width_from_header() const noexcept;
-    std::size_t get_size_from_header() const noexcept;
+    size_t get_width_from_header() const noexcept;
+    size_t get_size_from_header() const noexcept;
 
     // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
-    std::size_t get_capacity_from_header() const noexcept;
+    size_t get_capacity_from_header() const noexcept;
 
     void set_header_is_inner_bptree_node(bool value) noexcept;
     void set_header_hasrefs(bool value) noexcept;
     void set_header_context_flag(bool value) noexcept;
     void set_header_wtype(WidthType value) noexcept;
     void set_header_width(int value) noexcept;
-    void set_header_size(std::size_t value) noexcept;
-    void set_header_capacity(std::size_t value) noexcept;
+    void set_header_size(size_t value) noexcept;
+    void set_header_capacity(size_t value) noexcept;
 
     static void set_header_is_inner_bptree_node(bool value, char* header) noexcept;
     static void set_header_hasrefs(bool value, char* header) noexcept;
     static void set_header_context_flag(bool value, char* header) noexcept;
     static void set_header_wtype(WidthType value, char* header) noexcept;
     static void set_header_width(int value, char* header) noexcept;
-    static void set_header_size(std::size_t value, char* header) noexcept;
-    static void set_header_capacity(std::size_t value, char* header) noexcept;
+    static void set_header_size(size_t value, char* header) noexcept;
+    static void set_header_capacity(size_t value, char* header) noexcept;
 
     static void init_header(char* header, bool is_inner_bptree_node, bool has_refs,
                             bool context_flag, WidthType width_type, int width,
-                            std::size_t size, std::size_t capacity) noexcept;
+                            size_t size, size_t capacity) noexcept;
 
 
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template <std::size_t width>
+    template <size_t width>
     static int_fast64_t lbound_for_width() noexcept;
-    static int_fast64_t lbound_for_width(std::size_t width) noexcept;
+    static int_fast64_t lbound_for_width(size_t width) noexcept;
 
     // This returns the maximum value ("inclusive upper bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template <std::size_t width>
+    template <size_t width>
     static int_fast64_t ubound_for_width() noexcept;
-    static int_fast64_t ubound_for_width(std::size_t width) noexcept;
+    static int_fast64_t ubound_for_width(size_t width) noexcept;
 
-    template<std::size_t width> void set_width() noexcept;
-    void set_width(std::size_t) noexcept;
-    void alloc(std::size_t count, std::size_t width);
+    template<size_t width> void set_width() noexcept;
+    void set_width(size_t) noexcept;
+    void alloc(size_t count, size_t width);
     void copy_on_write();
 
 private:
 
     template<size_t w> int64_t sum(size_t start, size_t end) const;
-    template<bool max, std::size_t w> bool minmax(int64_t& result, std::size_t start,
-                                                  std::size_t end, std::size_t* return_ndx) const;
-    template<size_t w> std::size_t find_gte(const int64_t target, std::size_t start, Array const* indirection) const;
+    template<bool max, size_t w> bool minmax(int64_t& result, size_t start,
+                                                  size_t end, size_t* return_ndx) const;
+    template<size_t w> size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
 
 protected:
     /// The total size in bytes (including the header) of a new empty
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
-    static const std::size_t initial_capacity = 128;
+    static const size_t initial_capacity = 128;
 
     /// It is an error to specify a non-zero value unless the width
     /// type is wtype_Bits. It is also an error to specify a non-zero
     /// size if the width type is wtype_Ignore.
-    static MemRef create(Type, bool context_flag, WidthType, std::size_t size,
+    static MemRef create(Type, bool context_flag, WidthType, size_t size,
                          int_fast64_t value, Allocator&);
 
     static MemRef clone(MemRef header, Allocator& alloc, Allocator& target_alloc);
@@ -1043,29 +1061,29 @@ protected:
     char* get_header() noexcept;
 
     /// Same as get_byte_size().
-    static std::size_t get_byte_size_from_header(const char*) noexcept;
+    static size_t get_byte_size_from_header(const char*) noexcept;
 
     // Undefined behavior if array is in immutable memory
-    static std::size_t get_capacity_from_header(const char*) noexcept;
+    static size_t get_capacity_from_header(const char*) noexcept;
 
     // Overriding method in ArrayParent
-    void update_child_ref(std::size_t, ref_type) override;
+    void update_child_ref(size_t, ref_type) override;
 
     // Overriding method in ArrayParent
-    ref_type get_child_ref(std::size_t) const noexcept override;
+    ref_type get_child_ref(size_t) const noexcept override;
 
-    void destroy_children(std::size_t offset = 0) noexcept;
+    void destroy_children(size_t offset = 0) noexcept;
 
 #ifdef REALM_DEBUG
-    std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const override;
+    std::pair<ref_type, size_t>
+    get_to_dot_parent(size_t ndx_in_parent) const override;
 #endif
 
 protected:
     // Getters and Setters for adaptive-packed arrays
-    typedef int64_t (Array::*Getter)(std::size_t) const; // Note: getters must not throw
-    typedef void (Array::*Setter)(std::size_t, int64_t);
-    typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t, QueryState<int64_t>*) const;
+    typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
+    typedef void (Array::*Setter)(size_t, int64_t);
+    typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryState<int64_t>*) const;
     typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
     struct VTable {
@@ -1081,7 +1099,7 @@ protected:
     /// Takes a 64-bit value and returns the minimum number of bits needed
     /// to fit the value. For alignment this is rounded up to nearest
     /// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
-    static std::size_t bit_width(int64_t value);
+    static size_t bit_width(int64_t value);
 
 #ifdef REALM_DEBUG
     void report_memory_usage_2(MemUsageHandler&) const;
@@ -1092,27 +1110,30 @@ private:
     const VTable* m_vtable = nullptr;
 
 public:
-    // FIXME: Should not be mutable
     // FIXME: Should not be public
-    mutable char* m_data = nullptr; // Points to first byte after header
+    char* m_data = nullptr; // Points to first byte after header
 
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
 
-    std::size_t m_size = 0;     // Number of elements currently stored.
-    std::size_t m_capacity = 0; // Number of elements that fit inside the allocated memory.
+    size_t m_size = 0;     // Number of elements currently stored.
+    size_t m_capacity = 0; // Number of elements that fit inside the allocated memory.
 
     Allocator& m_alloc;
 private:
-    std::size_t m_ref;
+    size_t m_ref;
     ArrayParent* m_parent = nullptr;
-    std::size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
+    size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
 protected:
-    unsigned char m_width = 0;  // Size of an element (meaning depend on type of array).
+    uint_least8_t m_width = 0;  // Size of an element (meaning depend on type of array).
     bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
     bool m_has_refs;        // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;    // Meaning depends on context.
+
+private:
+    ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
+    ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
 
     friend class SlabAlloc;
     friend class GroupWriter;
@@ -1124,8 +1145,8 @@ class Array::NodeInfo {
 public:
     MemRef m_mem;
     Array* m_parent;
-    std::size_t m_ndx_in_parent;
-    std::size_t m_offset, m_size;
+    size_t m_ndx_in_parent;
+    size_t m_offset, m_size;
 };
 
 class Array::VisitHandler {
@@ -1137,8 +1158,8 @@ public:
 
 class Array::UpdateHandler {
 public:
-    virtual void update(MemRef, ArrayParent*, std::size_t leaf_ndx_in_parent,
-                        std::size_t elem_ndx_in_leaf) = 0;
+    virtual void update(MemRef, ArrayParent*, size_t leaf_ndx_in_parent,
+                        size_t elem_ndx_in_leaf) = 0;
     virtual ~UpdateHandler() noexcept {}
 };
 
@@ -1156,8 +1177,8 @@ public:
     /// and *exactly* once during each *successful* execution of
     /// Array::erase_bptree_elem().
     virtual bool erase_leaf_elem(MemRef, ArrayParent*,
-                                 std::size_t leaf_ndx_in_parent,
-                                 std::size_t elem_ndx_in_leaf) = 0;
+                                 size_t leaf_ndx_in_parent,
+                                 size_t elem_ndx_in_leaf) = 0;
 
     virtual void destroy_leaf(MemRef leaf_mem) noexcept = 0;
 
@@ -1315,7 +1336,8 @@ public:
         if (pattern)
             return false;
 
-        REALM_STATIC_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Count, "Search action not supported");
+        static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
+                      "Search action not supported");
 
         ++m_match_count;
 
@@ -1390,14 +1412,14 @@ inline Array::Type Array::get_type() const noexcept
 }
 
 
-inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const noexcept
+inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_DEBUG(ndx < m_size);
     (this->*(m_vtable->chunk_getter))(ndx, res);
 }
 
 
-inline int64_t Array::get(std::size_t ndx) const noexcept
+inline int64_t Array::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG(ndx < m_size);
@@ -1430,7 +1452,7 @@ inline int64_t Array::back() const noexcept
     return get(m_size - 1);
 }
 
-inline ref_type Array::get_as_ref(std::size_t ndx) const noexcept
+inline ref_type Array::get_as_ref(size_t ndx) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG(m_has_refs);
@@ -1491,13 +1513,40 @@ inline void Array::destroy_deep() noexcept
     m_data = nullptr;
 }
 
+inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
+{
+    REALM_ASSERT(is_attached());
+
+    if (only_if_modified && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!deep || !m_has_refs)
+        return do_write_shallow(out); // Throws
+
+    return do_write_deep(out, only_if_modified); // Throws
+}
+
+inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out,
+                             bool only_if_modified)
+{
+    if (only_if_modified && alloc.is_read_only(ref))
+        return ref;
+
+    Array array(alloc);
+    array.init_from_ref(ref);
+
+    if (!array.m_has_refs)
+        return array.do_write_shallow(out); // Throws
+
+    return array.do_write_deep(out, only_if_modified); // Throws
+}
 
 inline void Array::add(int_fast64_t value)
 {
     insert(m_size, value);
 }
 
-inline void Array::erase(std::size_t ndx)
+inline void Array::erase(size_t ndx)
 {
     // This can throw, but only if array is currently in read-only
     // memory.
@@ -1509,7 +1558,7 @@ inline void Array::erase(std::size_t ndx)
 }
 
 
-inline void Array::erase(std::size_t begin, std::size_t end)
+inline void Array::erase(size_t begin, size_t end)
 {
     if (begin != end) {
         // This can throw, but only if array is currently in read-only memory.
@@ -1558,7 +1607,7 @@ inline void Array::destroy_deep(MemRef mem, Allocator& alloc) noexcept
 }
 
 
-inline void Array::adjust(std::size_t ndx, int_fast64_t diff)
+inline void Array::adjust(size_t ndx, int_fast64_t diff)
 {
     // FIXME: Should be optimized
     REALM_ASSERT_3(ndx, <=, m_size);
@@ -1566,17 +1615,17 @@ inline void Array::adjust(std::size_t ndx, int_fast64_t diff)
     set(ndx, int64_t(v + diff)); // Throws
 }
 
-inline void Array::adjust(std::size_t begin, std::size_t end, int_fast64_t diff)
+inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
 {
     // FIXME: Should be optimized
-    for (std::size_t i = begin; i != end; ++i)
+    for (size_t i = begin; i != end; ++i)
         adjust(i, diff); // Throws
 }
 
 inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
     size_t n = size();
-    for (std::size_t i = 0; i != n; ++i) {
+    for (size_t i = 0; i != n; ++i) {
         int_fast64_t v = get(i);
         if (v >= limit)
             set(i, int64_t(v + diff)); // Throws
@@ -1611,23 +1660,23 @@ inline Array::WidthType Array::get_wtype_from_header(const char* header) noexcep
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return WidthType((int(h[4]) & 0x18) >> 3);
 }
-inline int Array::get_width_from_header(const char* header) noexcept
+inline size_t Array::get_width_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (1 << (int(h[4]) & 0x07)) >> 1;
+    return size_t((1 << (int(h[4]) & 0x07)) >> 1);
 }
-inline std::size_t Array::get_size_from_header(const char* header) noexcept
+inline size_t Array::get_size_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (std::size_t(h[5]) << 16) + (std::size_t(h[6]) << 8) + h[7];
+    return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
 }
-inline std::size_t Array::get_capacity_from_header(const char* header) noexcept
+inline size_t Array::get_capacity_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (std::size_t(h[0]) << 16) + (std::size_t(h[1]) << 8) + h[2];
+    return (size_t(h[0]) << 16) + (size_t(h[1]) << 8) + h[2];
 }
 
 
@@ -1661,15 +1710,15 @@ inline Array::WidthType Array::get_wtype_from_header() const noexcept
 {
     return get_wtype_from_header(get_header_from_data(m_data));
 }
-inline int Array::get_width_from_header() const noexcept
+inline size_t Array::get_width_from_header() const noexcept
 {
     return get_width_from_header(get_header_from_data(m_data));
 }
-inline std::size_t Array::get_size_from_header() const noexcept
+inline size_t Array::get_size_from_header() const noexcept
 {
     return get_size_from_header(get_header_from_data(m_data));
 }
-inline std::size_t Array::get_capacity_from_header() const noexcept
+inline size_t Array::get_capacity_from_header() const noexcept
 {
     return get_capacity_from_header(get_header_from_data(m_data));
 }
@@ -1722,7 +1771,7 @@ inline void Array::set_header_width(int value, char* header) noexcept
     h[4] = uchar((int(h[4]) & ~0x7) | w);
 }
 
-inline void Array::set_header_size(std::size_t value, char* header) noexcept
+inline void Array::set_header_size(size_t value, char* header) noexcept
 {
     REALM_ASSERT_3(value, <=, max_array_payload);
     typedef unsigned char uchar;
@@ -1733,7 +1782,7 @@ inline void Array::set_header_size(std::size_t value, char* header) noexcept
 }
 
 // Note: There is a copy of this function is test_alloc.cpp
-inline void Array::set_header_capacity(std::size_t value, char* header) noexcept
+inline void Array::set_header_capacity(size_t value, char* header) noexcept
 {
     REALM_ASSERT_3(value, <=, max_array_payload);
     typedef unsigned char uchar;
@@ -1765,11 +1814,11 @@ inline void Array::set_header_width(int value) noexcept
 {
     set_header_width(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_size(std::size_t value) noexcept
+inline void Array::set_header_size(size_t value) noexcept
 {
     set_header_size(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_capacity(std::size_t value) noexcept
+inline void Array::set_header_capacity(size_t value) noexcept
 {
     set_header_capacity(value, get_header_from_data(m_data));
 }
@@ -1791,9 +1840,9 @@ inline char* Array::get_header() noexcept
 }
 
 
-inline std::size_t Array::get_byte_size() const noexcept
+inline size_t Array::get_byte_size() const noexcept
 {
-    std::size_t num_bytes = 0;
+    size_t num_bytes = 0;
     const char* header = get_header_from_data(m_data);
     switch (get_wtype_from_header(header)) {
         case wtype_Bits: {
@@ -1806,7 +1855,7 @@ inline std::size_t Array::get_byte_size() const noexcept
             // never overflow, but it potentially involves two slow
             // divisions.
             uint_fast64_t num_bits = uint_fast64_t(m_size) * m_width;
-            num_bytes = std::size_t(num_bits / 8);
+            num_bytes = size_t(num_bits / 8);
             if (num_bits & 0x7)
                 ++num_bytes;
             goto found;
@@ -1823,7 +1872,7 @@ inline std::size_t Array::get_byte_size() const noexcept
 
   found:
     // Ensure 8-byte alignment
-    std::size_t rest = (~num_bytes & 0x7) + 1;
+    size_t rest = (~num_bytes & 0x7) + 1;
     if (rest < 8)
         num_bytes += rest;
 
@@ -1836,21 +1885,21 @@ inline std::size_t Array::get_byte_size() const noexcept
 }
 
 
-inline std::size_t Array::get_byte_size_from_header(const char* header) noexcept
+inline size_t Array::get_byte_size_from_header(const char* header) noexcept
 {
-    std::size_t num_bytes = 0;
-    std::size_t size = get_size_from_header(header);
+    size_t num_bytes = 0;
+    size_t size = get_size_from_header(header);
     switch (get_wtype_from_header(header)) {
         case wtype_Bits: {
-            int width = get_width_from_header(header);
-            std::size_t num_bits = (size * width); // FIXME: Prone to overflow
+            size_t width = get_width_from_header(header);
+            size_t num_bits = (size * width); // FIXME: Prone to overflow
             num_bytes = num_bits / 8;
             if (num_bits & 0x7)
                 ++num_bytes;
             goto found;
         }
         case wtype_Multiply: {
-            int width = get_width_from_header(header);
+            size_t width = get_width_from_header(header);
             num_bytes = size * width;
             goto found;
         }
@@ -1862,7 +1911,7 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) noexcept
 
   found:
     // Ensure 8-byte alignment
-    std::size_t rest = (~num_bytes & 0x7) + 1;
+    size_t rest = (~num_bytes & 0x7) + 1;
     if (rest < 8)
         num_bytes += rest;
 
@@ -1874,7 +1923,7 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) noexcept
 
 inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has_refs,
                                bool context_flag, WidthType width_type, int width,
-                               std::size_t size, std::size_t capacity) noexcept
+                               size_t size, size_t capacity) noexcept
 {
     // Note: Since the header layout contains unallocated bit and/or
     // bytes, it is important that we put the entire header into a
@@ -1937,18 +1986,18 @@ inline ArrayParent* Array::get_parent() const noexcept
     return m_parent;
 }
 
-inline void Array::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept
+inline void Array::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
 {
     m_parent = parent;
     m_ndx_in_parent = ndx_in_parent;
 }
 
-inline std::size_t Array::get_ndx_in_parent() const noexcept
+inline size_t Array::get_ndx_in_parent() const noexcept
 {
     return m_ndx_in_parent;
 }
 
-inline void Array::set_ndx_in_parent(std::size_t ndx) noexcept
+inline void Array::set_ndx_in_parent(size_t ndx) noexcept
 {
     m_ndx_in_parent = ndx;
 }
@@ -1977,7 +2026,7 @@ inline void Array::detach() noexcept
     m_data = nullptr;
 }
 
-inline std::size_t Array::size() const noexcept
+inline size_t Array::size() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_size;
@@ -1988,7 +2037,7 @@ inline bool Array::is_empty() const noexcept
     return size() == 0;
 }
 
-inline std::size_t Array::get_max_byte_size(std::size_t num_elems) noexcept
+inline size_t Array::get_max_byte_size(size_t num_elems) noexcept
 {
     int max_bytes_per_elem = 8;
     return header_size + num_elems * max_bytes_per_elem; // FIXME: Prone to overflow
@@ -2011,14 +2060,14 @@ inline ref_type Array::get_child_ref(size_t child_ndx) const noexcept
     return get_as_ref(child_ndx);
 }
 
-inline std::size_t Array::get_bptree_size() const noexcept
+inline size_t Array::get_bptree_size() const noexcept
 {
     REALM_ASSERT_DEBUG(is_inner_bptree_node());
     int_fast64_t v = back();
-    return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
+    return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
-inline std::size_t Array::get_bptree_size_from_header(const char* root_header) noexcept
+inline size_t Array::get_bptree_size_from_header(const char* root_header) noexcept
 {
     REALM_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(root_header));
     size_t root_size = get_size_from_header(root_header);
@@ -2072,13 +2121,13 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
     REALM_ASSERT_DEBUG(size() >= 1 + 1 + 1); // At least one child
 
     ArrayParent& childs_parent = *this;
-    std::size_t child_ref_ndx = size() - 2;
+    size_t child_ref_ndx = size() - 2;
     ref_type child_ref = get_as_ref(child_ref_ndx), new_sibling_ref;
     char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
 
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
-        std::size_t elem_ndx_in_child = npos; // Append
+        size_t elem_ndx_in_child = npos; // Append
         new_sibling_ref =
             TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
@@ -2109,7 +2158,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
 
 
 template<class TreeTraits>
-ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state)
+ref_type Array::bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state)
 {
     REALM_ASSERT_3(size(), >=, 1 + 1 + 1); // At least one child
 
@@ -2119,7 +2168,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
     Array offsets(m_alloc);
     ensure_bptree_offsets(offsets); // Throws
 
-    std::size_t child_ndx, elem_ndx_in_child;
+    size_t child_ndx, elem_ndx_in_child;
     if (elem_ndx == 0) {
         // Optimization for prepend
         child_ndx = 0;
@@ -2134,12 +2183,12 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
         // when searching through the offsets array.
         child_ndx = offsets.lower_bound_int(elem_ndx);
         REALM_ASSERT_3(child_ndx, <, size() - 2);
-        std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
+        size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
         elem_ndx_in_child = elem_ndx - elem_ndx_offset;
     }
 
     ArrayParent& childs_parent = *this;
-    std::size_t child_ref_ndx = child_ndx + 1;
+    size_t child_ref_ndx = child_ndx + 1;
     ref_type child_ref = get_as_ref(child_ref_ndx), new_sibling_ref;
     char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
@@ -2172,41 +2221,41 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
 // Finding code                                                                       *
 //*************************************************************************************
 
-template<std::size_t w> int64_t Array::get(std::size_t ndx) const noexcept
+template<size_t w> int64_t Array::get(size_t ndx) const noexcept
 {
     return get_universal<w>(m_data, ndx);
 }
 
-template<std::size_t w> int64_t Array::get_universal(const char* data, std::size_t ndx) const
+template<size_t w> int64_t Array::get_universal(const char* data, size_t ndx) const
 {
     if (w == 0) {
         return 0;
     }
     else if (w == 1) {
-        std::size_t offset = ndx >> 3;
+        size_t offset = ndx >> 3;
         return (data[offset] >> (ndx & 7)) & 0x01;
     }
     else if (w == 2) {
-        std::size_t offset = ndx >> 2;
+        size_t offset = ndx >> 2;
         return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
     }
     else if (w == 4) {
-        std::size_t offset = ndx >> 1;
+        size_t offset = ndx >> 1;
         return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
     }
     else if (w == 8) {
         return *reinterpret_cast<const signed char*>(data + ndx);
     }
     else if (w == 16) {
-        std::size_t offset = ndx * 2;
+        size_t offset = ndx * 2;
         return *reinterpret_cast<const int16_t*>(data + offset);
     }
     else if (w == 32) {
-        std::size_t offset = ndx * 4;
+        size_t offset = ndx * 4;
         return *reinterpret_cast<const int32_t*>(data + offset);
     }
     else if (w == 64) {
-        std::size_t offset = ndx * 8;
+        size_t offset = ndx * 8;
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
     else {
@@ -2365,15 +2414,15 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 // Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
 // for each match. Break and return if find_action() returns false or 'end' is reached.
 
-// If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the 
+// If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the
 // first entry and compare correctly against null, etc.
 //
-// If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set, 
+// If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set,
 // then nullable_array must be set too.
 template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool find_null) const
 {
     REALM_ASSERT(!(find_null && !nullable_array));
-    REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
 
     size_t start2 = start;
     cond2 c;
@@ -2382,7 +2431,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         end = nullable_array ? size() - 1 : size();
 
     if (nullable_array) {
-        // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme: 
+        // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme:
         // Huge speed optimizations are possible here! This is a very simple generic method.
         for (; start2 < end; start2++) {
             int64_t v = get<bitwidth>(start2 + 1);
@@ -2429,7 +2478,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if (!(m_size > start2 && start2 < end))
         return true;
 
-    if (end == std::size_t(-1))
+    if (end == size_t(-1))
         end = m_size;
 
     // Return immediately if no items in array can match (such as if cond2 == Greater && value == 100 && m_ubound == 15)
@@ -2476,8 +2525,8 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     REALM_ASSERT_3(m_width, !=, 0);
 
 #if defined(REALM_COMPILER_SSE)
-    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support 
-    // Less-than comparison for 64-bit values. 
+    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support
+    // Less-than comparison for 64-bit values.
     if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start2 >= sizeof(__m128i) && m_width >= 8 &&
         (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
 
@@ -2790,7 +2839,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
 {
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
-    REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
 
     size_t ee = round_up(start, 64 / no0(width));
     ee = ee > end ? end : ee;
@@ -3223,7 +3272,7 @@ template<bool gt, Action action, size_t bitwidth, class Callback>
 bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                             Callback callback) const
 {
-    REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
     uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
 
     size_t ee = round_up(start, 64 / no0(bitwidth));
@@ -3300,7 +3349,7 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
 
 template<class cond> size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    REALM_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
+    REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, nullptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
     Finder finder = m_vtable->finder[cond::condition];

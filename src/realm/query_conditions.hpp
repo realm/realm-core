@@ -137,8 +137,8 @@ struct ContainsIns : public HackClass {
         if (v1.size() == 0 && !v2.is_null())
             return true;
 
-        std::string v1_upper = case_map(v1, true);
-        std::string v1_lower = case_map(v1, false);
+        std::string v1_upper = case_map(v1, true, IgnoreErrors);
+        std::string v1_lower = case_map(v1, false, IgnoreErrors);
         return search_case_fold(v2, v1_upper.c_str(), v1_lower.c_str(), v1.size()) != v2.size();
     }
 
@@ -165,8 +165,8 @@ struct BeginsWithIns : public HackClass {
 
         if (v1.size() > v2.size())
             return false;
-        std::string v1_upper = case_map(v1, true);
-        std::string v1_lower = case_map(v1, false);
+        std::string v1_upper = case_map(v1, true, IgnoreErrors);
+        std::string v1_lower = case_map(v1, false, IgnoreErrors);
         return equal_case_fold(v2.prefix(v1.size()), v1_upper.c_str(), v1_lower.c_str());
     }
 
@@ -194,8 +194,8 @@ struct EndsWithIns : public HackClass {
 
         if (v1.size() > v2.size())
             return false;
-        std::string v1_upper = case_map(v1, true);
-        std::string v1_lower = case_map(v1, false);
+        std::string v1_upper = case_map(v1, true, IgnoreErrors);
+        std::string v1_lower = case_map(v1, false, IgnoreErrors);
         return equal_case_fold(v2.suffix(v1.size()), v1_upper.c_str(), v1_lower.c_str());
     }
 
@@ -222,8 +222,8 @@ struct EqualIns : public HackClass {
 
         if (v1.size() != v2.size())
             return false;
-        std::string v1_upper = case_map(v1, true);
-        std::string v1_lower = case_map(v1, false);
+        std::string v1_upper = case_map(v1, true, IgnoreErrors);
+        std::string v1_lower = case_map(v1, false, IgnoreErrors);
         return equal_case_fold(v2, v1_upper.c_str() , v1_lower.c_str());
     }
 
@@ -249,8 +249,8 @@ struct NotEqualIns : public HackClass {
 
         if (v1.size() != v2.size())
             return true;        
-        std::string v1_upper = case_map(v1, true);
-        std::string v1_lower = case_map(v1, false);
+        std::string v1_upper = case_map(v1, true, IgnoreErrors);
+        std::string v1_lower = case_map(v1, false, IgnoreErrors);
         return !equal_case_fold(v2, v1_upper.c_str(), v1_lower.c_str());
     }
 

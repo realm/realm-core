@@ -1067,6 +1067,7 @@ TEST(ColumnIntNull_Null)
 
 }
 
+
 TEST(ColumnIntNull_MoveLastOverPreservesNull)
 {
     ref_type ref = IntNullColumn::create(Allocator::get_default());
@@ -1083,6 +1084,7 @@ TEST(ColumnIntNull_MoveLastOverPreservesNull)
     CHECK_EQUAL(c.get(0), 456);
     c.destroy();
 }
+
 
 TEST(ColumnIntNull_CompareInts)
 {

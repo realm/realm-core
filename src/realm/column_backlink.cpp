@@ -19,6 +19,7 @@
  **************************************************************************/
 
 #include <algorithm>
+#include <set> // FIXME: Used for swap
 
 #include <realm/column_backlink.hpp>
 #include <realm/column_link.hpp>
@@ -171,9 +172,42 @@ void BacklinkColumn::update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
     backlink_list.set(backlink_ndx, value_3);
 }
 
+void BacklinkColumn::swap_backlinks(size_t row_ndx, size_t origin_row_ndx_1,
+                                    size_t origin_row_ndx_2)
+{
+    uint64_t value = Column::get_uint(row_ndx);
+    REALM_ASSERT_3(value, !=, 0);
+
+    if ((value & 1) != 0) {
+        uint64_t r = value >> 1;
+        if (r == origin_row_ndx_1) {
+            IntegerColumn::set_uint(row_ndx, origin_row_ndx_2 << 1 | 1);
+        }
+        else if (r == origin_row_ndx_2) {
+            IntegerColumn::set_uint(row_ndx, origin_row_ndx_1 << 1 | 1);
+        }
+        return;
+    }
+
+    // Find matches in backlink list and replace
+    ref_type ref = to_ref(value);
+    IntegerColumn backlink_list(get_alloc(), ref); // Throws
+    backlink_list.set_parent(this, row_ndx);
+    size_t num_backlinks = backlink_list.size();
+    for (size_t i = 0; i < num_backlinks; ++i) {
+        uint64_t r = backlink_list.get_uint(i);
+        if (r == origin_row_ndx_1) {
+            backlink_list.set(i, origin_row_ndx_2);
+        }
+        else if (r == origin_row_ndx_2) {
+            backlink_list.set(i, origin_row_ndx_1);
+        }
+    }
+}
+
 
 template<typename Func>
-std::size_t BacklinkColumn::for_each_link(std::size_t row_ndx, bool do_destroy, Func&& func)
+size_t BacklinkColumn::for_each_link(size_t row_ndx, bool do_destroy, Func&& func)
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
     if (value != 0) {
@@ -196,7 +230,7 @@ std::size_t BacklinkColumn::for_each_link(std::size_t row_ndx, bool do_destroy, 
                 backlink_list.destroy();
         }
     }
-    return value;
+    return to_size_t(value);
 }
 
 
@@ -285,21 +319,24 @@ void BacklinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 
 void BacklinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
-    bool do_destroy = false;
-
-    for_each_link(row_ndx_1, do_destroy, [=](size_t origin_row_ndx) {
-        m_origin_column->do_swap_link(origin_row_ndx, row_ndx_1, row_ndx_2);
+    std::set<size_t> unique_origin_rows;
+    const bool do_destroy = false;
+    for_each_link(row_ndx_1, do_destroy, [&](size_t origin_row_ndx) {
+        unique_origin_rows.insert(origin_row_ndx);
+    });
+    for_each_link(row_ndx_2, do_destroy, [&](size_t origin_row_ndx) {
+        unique_origin_rows.insert(origin_row_ndx);
     });
 
-    for_each_link(row_ndx_2, do_destroy, [=](size_t origin_row_ndx) {
-        m_origin_column->do_swap_link(origin_row_ndx, row_ndx_1, row_ndx_2);
-    });
+    for (auto& origin_row: unique_origin_rows) {
+        m_origin_column->do_swap_link(origin_row, row_ndx_1, row_ndx_2);
+    }
 
     IntegerColumn::swap_rows(row_ndx_1, row_ndx_2);
 }
 
 
-void BacklinkColumn::clear(std::size_t num_rows, bool)
+void BacklinkColumn::clear(size_t num_rows, bool)
 {
     for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
         // IntegerColumn::clear() handles the destruction of subtrees

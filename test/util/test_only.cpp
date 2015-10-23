@@ -5,7 +5,7 @@ namespace {
 struct TestOnly {
     const char* m_test_name;
     TestOnly():
-        m_test_name(0)
+        m_test_name(nullptr)
     {
     }
 };

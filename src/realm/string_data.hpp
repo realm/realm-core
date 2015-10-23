@@ -31,8 +31,10 @@
 #include <math.h>
 
 #include <realm/util/features.h>
+#include <realm/util/optional.hpp>
 #include <realm/utilities.hpp>
 #include <realm/exceptions.hpp> // only used by null() class
+#include <realm/owned_data.hpp>
 
 namespace realm {
 
@@ -80,19 +82,21 @@ public:
     StringData() noexcept;
 
     /// If \a data is 'null', \a size must be zero.
-    StringData(const char* data, std::size_t size) noexcept;
+    StringData(const char* data, size_t size) noexcept;
 
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
+
+    template<class T, class A> StringData(const util::Optional<std::basic_string<char, T, A>>&);
 
     /// Initialize from a zero terminated C style string. Pass null to construct
     /// a null reference.
     StringData(const char* c_str) noexcept;
 
-    char operator[](std::size_t i) const noexcept;
+    char operator[](size_t i) const noexcept;
 
     const char* data() const noexcept;
-    std::size_t size() const noexcept;
+    size_t size() const noexcept;
 
     /// Is this a null reference?
     ///
@@ -130,38 +134,32 @@ public:
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
     /// size().
-    StringData prefix(std::size_t n) const noexcept;
-    StringData suffix(std::size_t n) const noexcept;
-    StringData substr(std::size_t i, std::size_t n) const noexcept;
-    StringData substr(std::size_t i) const noexcept;
+    StringData prefix(size_t n) const noexcept;
+    StringData suffix(size_t n) const noexcept;
+    StringData substr(size_t i, size_t n) const noexcept;
+    StringData substr(size_t i) const noexcept;
     //@}
 
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept;
-#else
-    typedef const char* StringData::*unspecified_bool_type;
-    operator unspecified_bool_type() const noexcept;
-#endif
 
 private:
     const char* m_data;
-    std::size_t m_size;
+    size_t m_size;
 };
-
 
 
 // Implementation:
 
 inline StringData::StringData() noexcept:
-    m_data(0),
+    m_data(nullptr),
     m_size(0)
 {
 }
 
-inline StringData::StringData(const char* data, std::size_t size) noexcept:
+inline StringData::StringData(const char* data, size_t size) noexcept:
     m_data(data),
     m_size(size)
 {
@@ -179,6 +177,12 @@ template<class T, class A> inline StringData::operator std::basic_string<char, T
     return std::basic_string<char, T, A>(m_data, m_size);
 }
 
+template<class T, class A> inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s):
+    m_data(s ? s->data() : nullptr),
+    m_size(s ? s->size() : 0)
+{
+}
+
 inline StringData::StringData(const char* c_str) noexcept:
     m_data(c_str),
     m_size(0)
@@ -187,7 +191,7 @@ inline StringData::StringData(const char* c_str) noexcept:
         m_size = std::char_traits<char>::length(c_str);
 }
 
-inline char StringData::operator[](std::size_t i) const noexcept
+inline char StringData::operator[](size_t i) const noexcept
 {
     return m_data[i];
 }
@@ -197,7 +201,7 @@ inline const char* StringData::data() const noexcept
     return m_data;
 }
 
-inline std::size_t StringData::size() const noexcept
+inline size_t StringData::size() const noexcept
 {
     return m_size;
 }
@@ -266,22 +270,22 @@ inline bool StringData::contains(StringData d) const noexcept
         std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
-inline StringData StringData::prefix(std::size_t n) const noexcept
+inline StringData StringData::prefix(size_t n) const noexcept
 {
     return substr(0,n);
 }
 
-inline StringData StringData::suffix(std::size_t n) const noexcept
+inline StringData StringData::suffix(size_t n) const noexcept
 {
     return substr(m_size - n);
 }
 
-inline StringData StringData::substr(std::size_t i, std::size_t n) const noexcept
+inline StringData StringData::substr(size_t i, size_t n) const noexcept
 {
     return StringData(m_data + i, n);
 }
 
-inline StringData StringData::substr(std::size_t i) const noexcept
+inline StringData StringData::substr(size_t i) const noexcept
 {
     return substr(i, m_size - i);
 }
@@ -294,30 +298,23 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const S
     return out;
 }
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 inline StringData::operator bool() const noexcept
 {
     return !is_null();
 }
-#else
-inline StringData::operator unspecified_bool_type() const noexcept
-{
-    return is_null() ? 0 : &StringData::m_data;
-}
-#endif
 
 /*
 Represents null in Query, find(), get(), set(), etc. Todo, maybe move this outside string_data.hpp.
 
-Float/Double: Realm can both store user-given NaNs and null. Any user-given signaling NaN is converted to 
+Float/Double: Realm can both store user-given NaNs and null. Any user-given signaling NaN is converted to
 0x7fa00000 (if float) or 0x7ff4000000000000 (if double). Any user-given quiet NaN is converted to
 0x7fc00000 (if float) or 0x7ff8000000000000 (if double). So Realm does not preserve the optional bits in
-user-given NaNs. 
+user-given NaNs.
 
 However, since both clang and gcc on x64 and ARM, and also Java on x64, return these bit patterns when
 requesting NaNs, these will actually seem to roundtrip bit-exact for the end-user in most cases.
 
-If set_null() is called, a null is stored in form of the bit pattern 0xffffffff (if float) or 
+If set_null() is called, a null is stored in form of the bit pattern 0xffffffff (if float) or
 0xffffffffffffffff (if double). These are quiet NaNs.
 
 Executing a query that involves a float/double column that contains NaNs gives an undefined result. If
@@ -332,7 +329,7 @@ A NaN doubule is the same as above, but for `s eeeeeeeeeee S xxxxxxxxxxxxxxxxxxx
 
 The `S` bit is at position 22 (float) or 51 (double).
 */
- 
+
 struct null {
     null(int) {}
     null() {}
@@ -355,13 +352,14 @@ struct null {
     /// Returns the quiet NaNs that represent null for floats/doubles in Realm in stored payload.
     template <class T> static T get_null_float() {
         typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
-        i = std::is_same<T, float>::value ? 0x7fc000aa : static_cast<decltype(i)>(0x7ff80000000000aa);
+        int64_t double_nan = 0x7ff80000000000aa;
+        i = std::is_same<T, float>::value ? 0x7fc000aa : static_cast<decltype(i)>(double_nan);
         T d = type_punning<T, decltype(i)>(i);
         REALM_ASSERT_DEBUG(isnan(static_cast<double>(d)));
         REALM_ASSERT_DEBUG(!is_signaling(d));
         return d;
     }
-    
+
     /// Takes a NaN as argument and returns whether or not it's signaling
     template <class T> static bool is_signaling(T v) {
         REALM_ASSERT(isnan(static_cast<double>(v)));

@@ -51,7 +51,7 @@ public:
     {
         m_impl.to_string(out, limit);
     }
-    void row_to_string(std::size_t row_ndx, std::ostream& out) const
+    void row_to_string(size_t row_ndx, std::ostream& out) const
     {
         m_impl.row_to_string(row_ndx, out);
     }
@@ -87,23 +87,23 @@ private:
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<View, col_idx, value_type, std::is_const<Tab>::value> type;
     };
-    typedef std::pair<View*, std::size_t> FieldInit;
+    typedef std::pair<View*, size_t> FieldInit;
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
 
     template<int col_idx> struct ConstField {
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<const View, col_idx, value_type, true> type;
     };
-    typedef std::pair<const View*, std::size_t> ConstFieldInit;
+    typedef std::pair<const View*, size_t> ConstFieldInit;
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
 public:
-    RowAccessor operator[](std::size_t row_idx) noexcept
+    RowAccessor operator[](size_t row_idx) noexcept
     {
         return RowAccessor(std::make_pair(static_cast<View*>(this), row_idx));
     }
 
-    ConstRowAccessor operator[](std::size_t row_idx) const noexcept
+    ConstRowAccessor operator[](size_t row_idx) const noexcept
     {
         return ConstRowAccessor(std::make_pair(static_cast<const View*>(this), row_idx));
     }
@@ -116,10 +116,10 @@ protected:
     Impl m_impl;
 
     BasicTableViewBase() {}
-    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch,
                        ConstSourcePayload mode)
         : m_impl(tv.m_impl, patch, mode) { }
-    BasicTableViewBase(BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+    BasicTableViewBase(BasicTableViewBase& tv, typename Impl::Handover_patch& patch,
                        MutableSourcePayload mode)
         : m_impl(tv.m_impl, patch, mode) { }
     BasicTableViewBase(Impl i): m_impl(std::move(i)) {}

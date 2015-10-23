@@ -368,8 +368,10 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     // FIXME: This is far from good enough. See comments above.
     ref_type binary_data_ref = 0;
     if (m_binary_data) {
-        size_t pos = m_binary_data->get_root_array()->write(out); // Throws
-        binary_data_ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        binary_data_ref =
+            m_binary_data->get_root_array()->write(out, deep, only_if_modified); // Throws
     }
 
     // build new top array
@@ -390,8 +392,9 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     }
 
     // Write new top array
-    bool recurse = false;
-    return top.write(out, recurse);
+    bool deep = false; // Shallow
+    bool only_if_modified = false; // Always
+    return top.write(out, deep, only_if_modified); // Throws
 }
 
 

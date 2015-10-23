@@ -20,6 +20,7 @@ util/thread.hpp \
 util/file.hpp \
 util/optional.hpp \
 util/network.hpp \
+util/uri.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/platform_specific_condvar.hpp \
@@ -45,6 +46,7 @@ impl/input_stream.hpp \
 impl/transact_log.hpp \
 binary_data.hpp \
 mixed.hpp \
+owned_data.hpp \
 table.hpp \
 table_ref.hpp \
 table_basic_fwd.hpp \
@@ -122,6 +124,7 @@ util/string_buffer.cpp \
 util/terminate.cpp \
 util/thread.cpp \
 util/network.cpp \
+util/uri.cpp \
 util/platform_specific_condvar.cpp \
 alloc.cpp \
 alloc_slab.cpp \

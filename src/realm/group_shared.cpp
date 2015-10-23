@@ -661,12 +661,12 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             throw std::runtime_error("Lock file too large");
 
         // Compile time validate the alignment of the first three fields in SharedInfo
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
+        static_assert(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
+        static_assert(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
+        static_assert(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
 
         // If this ever triggers we are on a really weird architecture
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
+        static_assert(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
 
         // we need to have the size_of_mutex, size_of_condvar and init_complete
         // fields available before we can check for compatibility
@@ -754,7 +754,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                 uint_fast64_t version;
                 Array top(alloc);
                 if (top_ref) {
-
                     // top_ref is non-zero implying that the database has seen at least one commit,
                     // so we can get the versioning info from the database
                     top.init_from_ref(top_ref);
@@ -765,7 +764,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                     }
                     else {
                         // the database was written by shared group, so it has versioning info
-                        REALM_ASSERT(top.size() == 7);
+                        REALM_ASSERT(top.size() >= 7);
                         version = top.get(6) / 2;
                         // In case this was written by an older version of shared group, it
                         // will have version 0. Version 0 is not a legal initial version, so
@@ -786,7 +785,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
 #ifndef _WIN32
                 if (encryption_key) {
-                    REALM_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+                    static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     info->session_initiator_pid = uint64_t(getpid());
                 }
 #endif

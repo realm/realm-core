@@ -77,24 +77,24 @@ namespace _impl {
 class WriteLogCollector: public ClientHistory {
 public:
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
-    ~WriteLogCollector() noexcept;
     std::string do_get_database_path() override { return m_database_name; }
     void do_initiate_transact(SharedGroup&, version_type) override;
     version_type do_prepare_commit(SharedGroup& sg, version_type orig_version)
         override;
     void do_finalize_commit(SharedGroup&) noexcept override;
     void do_abort_transact(SharedGroup&) noexcept override;
-    BinaryData get_uncommitted_changes() noexcept override;
     void do_interrupt() noexcept override {};
     void do_clear_interrupt() noexcept override {};
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
-    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
+    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
+        override;
     void stop_logging() override;
     void reset_log_management(version_type last_version) override;
     void set_last_version_seen_locally(version_type last_seen_version_number)
         noexcept override;
 
     void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
+    BinaryData get_uncommitted_changes() noexcept override;
 
 protected:
     // file and memory mappings are always multiples of this size
@@ -190,9 +190,6 @@ protected:
     mutable uint_fast64_t m_read_version;
     mutable uint_fast64_t m_read_offset;
 
-    // FIXME: Part of non-persisting temporary implementation
-    std::map<version_type, std::string> m_reciprocal_transforms;
-
 
     // Make sure the header is available and mapped. This is required for any
     // access to metadata.  Calling the method while the mutex is locked will
@@ -264,13 +261,14 @@ inline uint_fast64_t aligned_to(uint_fast64_t alignment, uint_fast64_t value)
     return (value + alignment - 1) & ~(alignment - 1);
 }
 
+namespace {
 
 void recover_from_dead_owner()
 {
     // nothing!
 }
 
-
+} // unnamed namespace
 
 // Header access and manipulation methods:
 
@@ -430,7 +428,6 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
 }
 
 
-// returns the current "from" version
 Replication::version_type
 WriteLogCollector::internal_submit_log(HistoryEntry entry)
 {
@@ -474,7 +471,7 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     version_type orig_version = preamble->end_commit_range;
     preamble->end_commit_range = orig_version+1;
     sync_header();
-    return orig_version;
+    return orig_version + 1;
 }
 
 
@@ -482,16 +479,13 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
 
 // Public methods:
 
-WriteLogCollector::~WriteLogCollector() noexcept
-{
-}
-
 void WriteLogCollector::stop_logging()
 {
     File::try_remove(m_log_a.name);
     File::try_remove(m_log_b.name);
     File::try_remove(m_header_name);
 }
+
 
 void WriteLogCollector::reset_log_management(version_type last_version)
 {
@@ -638,10 +632,8 @@ WriteLogCollector::do_prepare_commit(SharedGroup&, WriteLogCollector::version_ty
     size_t size = write_position() - data;
     HistoryEntry entry;
     entry.changeset = BinaryData { data, size };
-    version_type from_version = internal_submit_log(entry);
-    REALM_ASSERT_3(from_version, == , orig_version);
-    static_cast<void>(from_version);
-    version_type new_version = orig_version + 1;
+    version_type new_version = internal_submit_log(entry);
+    REALM_ASSERT_3(new_version, > , orig_version);
     return new_version;
 }
 
@@ -697,7 +689,7 @@ WriteLogCollector::WriteLogCollector(const std::string& database_name,
     m_log_b.file.set_encryption_key(encryption_key);
 }
 
-} // end _impl
+} // namespace _impl
 
 
 std::unique_ptr<ClientHistory> make_client_history(const std::string& database_name,
