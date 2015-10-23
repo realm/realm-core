@@ -54,7 +54,8 @@
 
 
 #if defined(REALM_PTR_64) && defined(REALM_X86_OR_X64)
-#  define REALM_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+// FIXME: Enable this before merge!
+//#  define REALM_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
 #  define REALM_COMPILER_AVX
 #endif
 

@@ -1594,12 +1594,14 @@ inline bool Array::get_is_inner_bptree_node_from_header(const char* header) noex
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
+    realm::util::handle_reads(h, 4);
     return (int(h[4]) & 0x80) != 0;
 }
 inline bool Array::get_hasrefs_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
+    realm::util::handle_reads(h, 4);
     return (int(h[4]) & 0x40) != 0;
 }
 inline bool Array::get_context_flag_from_header(const char* header) noexcept
@@ -1640,6 +1642,7 @@ inline char* Array::get_data_from_header(char* header) noexcept
 }
 inline char* Array::get_header_from_data(char* data) noexcept
 {
+    realm::util::handle_reads(data - header_size, header_size);
     return data - header_size;
 }
 inline const char* Array::get_data_from_header(const char* header) noexcept
@@ -2187,29 +2190,36 @@ template<size_t w> int64_t Array::get_universal(const char* data, size_t ndx) co
     }
     else if (w == 1) {
         size_t offset = ndx >> 3;
+        realm::util::handle_reads(data + offset, 1);
         return (data[offset] >> (ndx & 7)) & 0x01;
     }
     else if (w == 2) {
         size_t offset = ndx >> 2;
+        realm::util::handle_reads(data + offset, 1);
         return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
     }
     else if (w == 4) {
         size_t offset = ndx >> 1;
+        realm::util::handle_reads(data + offset, 1);
         return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
     }
     else if (w == 8) {
+        realm::util::handle_reads(data + ndx, 1);
         return *reinterpret_cast<const signed char*>(data + ndx);
     }
     else if (w == 16) {
         size_t offset = ndx * 2;
+        realm::util::handle_reads(data + offset, 2);
         return *reinterpret_cast<const int16_t*>(data + offset);
     }
     else if (w == 32) {
         size_t offset = ndx * 4;
+        realm::util::handle_reads(data + offset, 4);
         return *reinterpret_cast<const int32_t*>(data + offset);
     }
     else if (w == 64) {
         size_t offset = ndx * 8;
+        realm::util::handle_reads(data + offset, 8);
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
     else {
@@ -2813,6 +2823,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
         const uint64_t valuemask = ~0ULL / no0(mask) * (value & mask); // the "== ? :" is to avoid division by 0 compiler error
 
         while (p < e) {
+            realm::util::handle_reads(p, 4);
             uint64_t chunk = *p;
             uint64_t v2 = chunk ^ valuemask;
             start = (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(width);
@@ -3256,6 +3267,7 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
             while (p < e) {
                 uint64_t upper = lower_bits<bitwidth>() << (no0(bitwidth) - 1);
 
+                realm::util::handle_reads(p, 4);
                 const int64_t v = *p;
                 size_t idx;
 

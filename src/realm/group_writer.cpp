@@ -528,6 +528,7 @@ void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
     REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = m_file_map.get_addr() + pos;
 
+    realm::util::handle_writes(dest_addr, size);
 #ifdef REALM_DEBUG
     uint_fast32_t dummy_checksum = 0x01010101UL;
     const char* cksum_bytes = reinterpret_cast<const char*>(&dummy_checksum);

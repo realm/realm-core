@@ -532,6 +532,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
+            realm::util::handle_reads(&header, sizeof (Header));
             int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
             m_file_format = header.m_file_format[select_field];
             uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);

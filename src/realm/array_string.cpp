@@ -248,6 +248,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     else {
         for (size_t i = begin; i != end; ++i) {
             const char* data = m_data + (i * m_width);
+            realm::util::handle_reads(data, value.size());
             size_t j = 0;
             for (;;) {
                 if (REALM_LIKELY(data[j] != value[j]))
