@@ -1846,7 +1846,7 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_String:
             return StringColumn::create(alloc, size); // Throws
         case col_type_Binary:
-            return BinaryColumn::create(alloc, size); // Throws
+            return BinaryColumn::create(alloc, size, nullable); // Throws
         case col_type_Table:
             return SubtableColumn::create(alloc, size); // Throws
         case col_type_Mixed:
