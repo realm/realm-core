@@ -74,7 +74,7 @@ template <class T> inline constexpr T&& constexpr_forward(typename std::remove_r
 }
 
 template <class T, class U>
-class TypeIsAssignableToOptional {
+struct TypeIsAssignableToOptional {
     // Constraints from [optional.object.assign.18]
     static const bool value = (std::is_same<typename std::remove_reference<U>::type, T>::value
                                && std::is_constructible<T, U>::value
