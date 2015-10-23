@@ -71,12 +71,7 @@ public:
     /// Write the specified chunk into free space.
     void write(const char* data, size_t size);
 
-    /// Write the specified array data and its checksum into free
-    /// space.
-    ///
-    /// Returns the position in the file where the first byte was
-    /// written.
-    size_t write_array(const char* data, size_t size, uint_fast32_t checksum) override;
+    ref_type write_array(const char*, size_t, uint_fast32_t) override;
 
 #ifdef REALM_DEBUG
     void dump();
@@ -110,7 +105,7 @@ private:
     /// inside a contiguous address range. The specified size does not
     /// need to be 8-byte aligned. Extend the file if required.
     /// The returned chunk is not removed from the amount of remaing
-    /// free space. 
+    /// free space.
     ///
     /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
     /// is the index of a chunk whose size is at least the requestd
@@ -120,8 +115,8 @@ private:
     /// Search only a range of the free list for a block as big as the
     /// specified size. Return a pair with index and size of the found chunk.
     /// \param found indicates whether a suitable block was found.
-    std::pair<size_t, size_t> 
-    search_free_space_in_part_of_freelist(size_t size, size_t begin, 
+    std::pair<size_t, size_t>
+    search_free_space_in_part_of_freelist(size_t size, size_t begin,
                                           size_t end, bool& found);
 
     /// Extend the file to ensure that a chunk of free space of the
@@ -134,9 +129,9 @@ private:
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<size_t, size_t> extend_free_space(size_t requested_size);
 
-    void write_array_at(size_t pos, const char* data, size_t size);
-    size_t split_freelist_chunk(size_t index, size_t start_pos, 
-                                     size_t alloc_pos, size_t chunk_size, bool is_shared);
+    void write_array_at(ref_type, const char* data, size_t size);
+    size_t split_freelist_chunk(size_t index, size_t start_pos,
+                                size_t alloc_pos, size_t chunk_size, bool is_shared);
 };
 
 

@@ -111,6 +111,7 @@ public:
     void erase(size_t row_ndx);
     void erase(size_t row_ndx, bool is_last);
     void move_last_over(size_t row_ndx);
+    void swap_rows(size_t row_ndx_1, size_t row_ndx_2) override;
     void clear();
 
     size_t count(T value) const;
@@ -178,6 +179,7 @@ private:
     class SliceHandler;
 
     void do_move_last_over(size_t row_ndx, size_t last_row_ndx);
+    void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     void do_clear();
 
     bool m_nullable;

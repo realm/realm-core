@@ -116,10 +116,10 @@ protected:
     Impl m_impl;
 
     BasicTableViewBase() {}
-    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+    BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::Handover_patch& patch,
                        ConstSourcePayload mode)
         : m_impl(tv.m_impl, patch, mode) { }
-    BasicTableViewBase(BasicTableViewBase& tv, typename Impl::Handover_patch& patch, 
+    BasicTableViewBase(BasicTableViewBase& tv, typename Impl::Handover_patch& patch,
                        MutableSourcePayload mode)
         : m_impl(tv.m_impl, patch, mode) { }
     BasicTableViewBase(Impl i): m_impl(std::move(i)) {}

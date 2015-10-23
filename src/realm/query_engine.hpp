@@ -764,7 +764,7 @@ public:
         int c = TConditionFunction::condition;
         return this->aggregate_local_impl(st, start, end, local_limit, source_column, c);
     }
-    
+
 
     size_t find_first_local(size_t start, size_t end) override
     {
@@ -777,8 +777,8 @@ public:
                 this->get_leaf(*this->m_condition_column, start);
             }
 
-            // FIXME: Create a fast bypass when you just need to check 1 row, which is used alot from within core. 
-            // It should just call array::get and save the initial overhead of find_first() which has become quite 
+            // FIXME: Create a fast bypass when you just need to check 1 row, which is used alot from within core.
+            // It should just call array::get and save the initial overhead of find_first() which has become quite
             // big. Do this when we have cleaned up core a bit more.
 
             size_t end2;
@@ -892,7 +892,7 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
-        
+
         auto find = [&](bool nullability)   {
             bool m_value_nan = nullability ? null::is_null_float(m_value) : false;
             for (size_t s = start; s < end; ++s) {

@@ -6,6 +6,7 @@ mem.cpp \
 timer.cpp \
 random.cpp \
 benchmark_results.cpp \
+quote.cpp \
 wildcard.cpp \
 unit_test.cpp \
 test_path.cpp \

@@ -2,6 +2,7 @@
 #include <limits>
 #include <iostream>
 #include <iomanip>
+#include <array>
 
 #ifdef _MSC_VER
 #  include <intrin.h>
@@ -346,69 +347,43 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
-size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) const
+
+ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
-    REALM_ASSERT(is_attached());
+    // FIXME: Replace capacity with checksum
 
-    // Ignore un-changed arrays when persisting
-    if (persist && m_alloc.is_read_only(m_ref))
-        return m_ref;
+    // Write flat array
+    const char* header = get_header_from_data(m_data);
+    size_t size = get_byte_size();
+    uint_fast32_t dummy_checksum = 0x01010101UL;
+    ref_type new_ref = out.write_array(header, size, dummy_checksum); // Throws
+    REALM_ASSERT_3(new_ref % 8, ==, 0); // 8-byte alignment
+    return new_ref;
+}
 
-    if (!recurse || !m_has_refs) {
-        // FIXME: Replace capacity with checksum
 
-        // Write flat array
-        const char* header = get_header_from_data(m_data);
-        size_t size = get_byte_size();
-        uint_fast32_t dummy_checksum = 0x01010101UL;
-        size_t array_pos = out.write_array(header, size, dummy_checksum);
-        REALM_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
-
-        return array_pos;
-    }
-
+ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
+{
     // Temp array for updated refs
-    ArrayInteger new_refs(Allocator::get_default());
+    Array new_array(Allocator::get_default());
     Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
-    new_refs.create(type, m_context_flag); // Throws
+    new_array.create(type, m_context_flag); // Throws
+    _impl::ShallowArrayDestroyGuard dg(&new_array);
 
-    try {
-        // First write out all sub-arrays
-        size_t n = size();
-        for (size_t i = 0; i != n; ++i) {
-            int_fast64_t value = get(i);
-            if (value == 0 || value % 2 != 0) {
-                // Zero-refs and values that are not 8-byte aligned do
-                // not point to subarrays.
-                new_refs.add(value); // Throws
-            }
-            else if (persist && m_alloc.is_read_only(to_ref(value))) {
-                // Ignore un-changed arrays when persisting
-                new_refs.add(value); // Throws
-            }
-            else {
-                Array sub(get_alloc());
-                sub.init_from_ref(to_ref(value));
-                bool subrecurse = true;
-                size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
-                REALM_ASSERT_3(sub_pos % 8, ==, 0); // 8-byte alignment
-                new_refs.add(sub_pos); // Throws
-            }
+    // First write out all sub-arrays
+    size_t n = size();
+    for (size_t i = 0; i < n; ++i) {
+        int_fast64_t value = get(i);
+        bool is_ref = (value != 0 && value % 2 == 0);
+        if (is_ref) {
+            ref_type subref = to_ref(value);
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
+            value = int_fast64_t(new_subref); // FIXME: Problematic unsigned -> signed conversion
         }
-
-        // Write out the replacement array
-        // (but don't write sub-tree as it has alredy been written)
-        bool subrecurse = false;
-        size_t refs_pos = new_refs.write(out, subrecurse, persist); // Throws
-
-        new_refs.destroy(); // Shallow
-
-        return refs_pos; // Return position
+        new_array.add(value); // Throws
     }
-    catch (...) {
-        new_refs.destroy(); // Shallow
-        throw;
-    }
+
+    return new_array.do_write_shallow(out); // Throws
 }
 
 
@@ -423,7 +398,13 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    if (m_width < 8) {
+    size_t bits_per_elem = m_width;
+    const char* header = get_header_from_data(m_data);
+    if (get_wtype_from_header(header) == wtype_Multiply) {
+        bits_per_elem *= 8;
+    }
+
+    if (bits_per_elem < 8) {
         // FIXME: Should be optimized
         for (size_t i = begin; i != end; ++i) {
             int_fast64_t v = (this->*m_getter)(i);
@@ -432,7 +413,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
         return;
     }
 
-    size_t bytes_per_elem = m_width / 8;
+    size_t bytes_per_elem = bits_per_elem / 8;
     const char* begin_2 = m_data + begin      * bytes_per_elem;
     const char* end_2   = m_data + end        * bytes_per_elem;
     char* dest_begin_2  = m_data + dest_begin * bytes_per_elem;
@@ -450,7 +431,13 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    if (m_width < 8) {
+    size_t bits_per_elem = m_width;
+    const char* header = get_header_from_data(m_data);
+    if (get_wtype_from_header(header) == wtype_Multiply) {
+        bits_per_elem *= 8;
+    }
+
+    if (bits_per_elem < 8) {
         // FIXME: Should be optimized
         for (size_t i = end; i != begin; --i) {
             int_fast64_t v = (this->*m_getter)(i-1);
@@ -459,12 +446,80 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
         return;
     }
 
-    size_t bytes_per_elem = m_width / 8;
+    size_t bytes_per_elem = bits_per_elem / 8;
     const char* begin_2 = m_data + begin    * bytes_per_elem;
     const char* end_2   = m_data + end      * bytes_per_elem;
     char* dest_end_2    = m_data + dest_end * bytes_per_elem;
     std::copy_backward(begin_2, end_2, dest_end_2);
 }
+
+
+void Array::move_rotate(size_t from, size_t to, size_t num_elems)
+{
+    if (from == to)
+        return;
+
+    copy_on_write(); // Throws
+
+    size_t bits_per_elem = m_width;
+    const char* header = get_header_from_data(m_data);
+    if (get_wtype_from_header(header) == wtype_Multiply) {
+        bits_per_elem *= 8;
+    }
+
+    if (bits_per_elem < 8) {
+        // Allocate some space for saving the moved elements.
+        // FIXME: Optimize this.
+        // FIXME: Support larger numbers of elements.
+        static const size_t small_save_limit = 32;
+        std::array<int64_t, small_save_limit> small_save;
+        std::unique_ptr<int64_t[]> big_save;
+        int64_t* save;
+        if (num_elems < small_save_limit) {
+            save = small_save.data();
+        }
+        else {
+            big_save.reset(new int64_t[num_elems]);
+            save = big_save.get();
+        }
+
+        // Save elements that should be moved.=
+        for (size_t i = 0; i < num_elems; ++i) {
+            save[i] = get(from + i);
+        }
+
+        // Shift elements in between up or down.
+        if (from < to) {
+            // Shift down.
+            move(from + num_elems, to + num_elems, from);
+        }
+        else { // from > to
+               // Shift up.
+            move_backward(to, from, from + num_elems);
+        }
+
+        // Restore saved elements at new location.
+        for (size_t i = 0; i < num_elems; ++i) {
+            set(to + i, save[i]);
+        }
+    }
+    else {
+        size_t bytes_per_elem = bits_per_elem / 8;
+        char *first, *new_first, *last;
+        if (from < to) {
+            first     = m_data + (from * bytes_per_elem);
+            new_first = m_data + ((from + num_elems) * bytes_per_elem);
+            last      = m_data + ((to   + num_elems) * bytes_per_elem);
+        }
+        else {
+            first     = m_data + (to * bytes_per_elem);
+            new_first = m_data + (from * bytes_per_elem);
+            last      = m_data + ((from + num_elems) * bytes_per_elem);
+        }
+        std::rotate(first, new_first, last);
+    }
+}
+
 
 void Array::add_to_column(IntegerColumn* column, int64_t value)
 {
@@ -648,7 +703,7 @@ void Array::truncate_and_destroy_children(size_t size)
 }
 
 
-void Array::ensure_minimum_width(int64_t value)
+void Array::ensure_minimum_width(int_fast64_t value)
 {
     if (value >= m_lbound && value <= m_ubound)
         return;
@@ -1678,7 +1733,7 @@ void Array::alloc(size_t size, size_t width)
             if (new_capacity_bytes > max_array_payload) // cap at max allowed allocation
                 new_capacity_bytes = max_array_payload;
             capacity_bytes = new_capacity_bytes;
-            
+
             // If doubling is not enough, expand enough to fit
             if (capacity_bytes < needed_bytes) {
                 size_t rest = (~needed_bytes & 0x7) + 1;

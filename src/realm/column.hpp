@@ -141,6 +141,14 @@ public:
     /// should ignore this argument.
     virtual void clear(size_t num_rows, bool broken_reciprocal_backlinks) = 0;
 
+    /// \brief Swap the elements at the specified indices.
+    ///
+    /// Behaviour is undefined if:
+    /// - \a row_ndx_1 or \a row_ndx_2 point to an invalid element (out-of
+    /// bounds)
+    /// - \a row_ndx_1 and \a row_ndx_2 point to the same value
+    virtual void swap_rows(size_t row_ndx_1, size_t row_ndx_2) = 0;
+
     virtual void destroy() noexcept = 0;
     void move_assign(ColumnBase& col) noexcept;
 
@@ -226,6 +234,7 @@ public:
     /// See Table::adj_acc_move_over()
     virtual void adj_acc_move_over(size_t from_row_ndx,
                                    size_t to_row_ndx) noexcept;
+    virtual void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
     virtual void adj_acc_clear_root_table() noexcept;
 
     enum {
@@ -336,6 +345,7 @@ public:
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept final { m_array->set_ndx_in_parent(ndx_in_parent); }
     void update_from_parent(size_t old_baseline) noexcept override { m_array->update_from_parent(old_baseline); }
     MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
+
 protected:
     ColumnBaseSimple() {}
     ColumnBaseSimple(Array* root) : m_array(root) {}
@@ -518,6 +528,17 @@ public:
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
+
+    /// \brief Swap the elements at the specified indices.
+    ///
+    /// If this \c TColumn has a search index defined, it will be updated to
+    /// reflect the changes induced by the swap.
+    ///
+    /// Behaviour is undefined if:
+    /// - \a row_ndx_1 or \a row_ndx_2 point to an invalid element (out-of
+    /// bounds)
+    /// - \a row_ndx_1 and \a row_ndx_2 point to the same value
+    void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
@@ -548,6 +569,7 @@ protected:
     void set_without_updating_index(size_t row_ndx, T value);
     void erase_without_updating_index(size_t row_ndx, bool is_last);
     void move_last_over_without_updating_index(size_t row_ndx, size_t last_row_ndx);
+    void swap_rows_without_updating_index(size_t row_ndx_1, size_t row_ndx_2);
 
     /// If any element points to an array node, this function recursively
     /// destroys that array node. Note that the same is **not** true for
@@ -638,6 +660,11 @@ inline void ColumnBase::adj_acc_erase_row(size_t) noexcept
 }
 
 inline void ColumnBase::adj_acc_move_over(size_t, size_t) noexcept
+{
+    // Noop
+}
+
+inline void ColumnBase::adj_acc_swap_rows(size_t, size_t) noexcept
 {
     // Noop
 }
@@ -1179,6 +1206,65 @@ void Column<T,N>::move_last_over(size_t row_ndx, size_t last_row_ndx)
 }
 
 template <class T, bool N>
+void Column<T,N>::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <, size());
+    REALM_ASSERT_3(row_ndx_2, <, size());
+    REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
+
+    if (has_search_index()) {
+        // FIXME: Use Optional to simplify.
+        T value_1 = T{}, value_2 = T{};
+        bool is_null_1 = is_null(row_ndx_1);
+        bool is_null_2 = is_null(row_ndx_2);
+        if (!is_null_1)
+            value_1 = get(row_ndx_1);
+        if (!is_null_2)
+            value_2 = get(row_ndx_2);
+        if (is_null_1) {
+            m_search_index->update_ref(null{}, row_ndx_1, row_ndx_2);
+        }
+        else {
+            m_search_index->update_ref(value_1, row_ndx_1, row_ndx_2);
+        }
+        if (is_null_2) {
+            m_search_index->update_ref(null{}, row_ndx_2, row_ndx_1);
+        }
+        else {
+            m_search_index->update_ref(value_2, row_ndx_2, row_ndx_2);
+        }
+    }
+
+    swap_rows_without_updating_index(row_ndx_1, row_ndx_2);
+}
+
+template <class T, bool N>
+void Column<T,N>::swap_rows_without_updating_index(size_t row_ndx_1, size_t row_ndx_2)
+{
+    // FIXME: This can be optimized with direct getters and setters.
+    // FIXME: Use Optional to simplify.
+    T value_1 = T{}, value_2 = {};
+    bool is_null_1 = is_null(row_ndx_1);
+    bool is_null_2 = is_null(row_ndx_2);
+    if (!is_null_1)
+        value_1 = get(row_ndx_1);
+    if (!is_null_2)
+        value_2 = get(row_ndx_2);
+    if (is_null_1) {
+        m_tree.set_null(row_ndx_2);
+    }
+    else {
+        m_tree.set(row_ndx_2, value_1);
+    }
+    if (is_null_2) {
+        m_tree.set_null(row_ndx_1);
+    }
+    else {
+        m_tree.set(row_ndx_1, value_2);
+    }
+}
+
+template <class T, bool N>
 void Column<T,N>::clear_without_updating_index()
 {
     m_tree.clear(); // Throws
@@ -1248,8 +1334,7 @@ void Column<T,N>::clear(size_t, bool)
 template <class T, bool N>
 size_t Column<T,N>::lower_bound_int(T value) const noexcept
 {
-    static_assert(std::is_same<T, int64_t>::value && !N,
-                  "lower_bound_int only works for non-nullable integer columns.");
+    static_assert(std::is_same<T, int64_t>::value && !N, "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->lower_bound_int(value);
     }
@@ -1259,8 +1344,7 @@ size_t Column<T,N>::lower_bound_int(T value) const noexcept
 template <class T, bool N>
 size_t Column<T,N>::upper_bound_int(T value) const noexcept
 {
-    static_assert(std::is_same<T, int64_t>::value && !N,
-                  "upper_bound_int only works for non-nullable integer columns.");
+    static_assert(std::is_same<T, int64_t>::value && !N, "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
         return get_root_array()->upper_bound_int(value);
     }

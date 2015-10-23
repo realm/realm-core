@@ -68,6 +68,7 @@ public:
     void insert(size_t ndx, StringData value);
     void erase(size_t row_ndx);
     void move_last_over(size_t row_ndx);
+    void swap_rows(size_t row_ndx_1, size_t row_ndx_2) override;
     void clear();
 
     size_t count(StringData value) const;
@@ -184,6 +185,7 @@ private:
 
     void do_erase(size_t row_ndx, bool is_last);
     void do_move_last_over(size_t row_ndx, size_t last_row_ndx);
+    void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     void do_clear();
 
     /// Root must be a leaf. Upgrades the root leaf as
@@ -270,6 +272,11 @@ inline void StringColumn::move_last_over(size_t row_ndx)
 {
     size_t last_row_ndx = size() - 1; // Note that size() is slow
     do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+inline void StringColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    do_swap_rows(row_ndx_1, row_ndx_2); // Throws
 }
 
 inline void StringColumn::clear()

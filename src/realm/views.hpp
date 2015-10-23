@@ -60,7 +60,7 @@ public:
     struct Sorter
     {
         Sorter(){}
-        Sorter(const std::vector<size_t>& columns, const std::vector<bool>& ascending) 
+        Sorter(const std::vector<size_t>& columns, const std::vector<bool>& ascending)
             : m_column_indexes(columns), m_ascending(ascending) {}
         bool operator()(size_t i, size_t j) const
         {

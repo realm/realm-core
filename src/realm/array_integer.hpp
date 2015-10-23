@@ -591,8 +591,8 @@ bool ArrayIntNull::minimum(int64_t& result, size_t start, size_t end, size_t* re
 inline
 bool ArrayIntNull::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
-    return Array::find(cond, action, value, start, end, baseindex, state, 
-                       true /*treat as nullable array*/, 
+    return Array::find(cond, action, value, start, end, baseindex, state,
+                       true /*treat as nullable array*/,
                        false /*search parameter given in 'value' argument*/);
 }
 
@@ -634,7 +634,7 @@ bool ArrayIntNull::find(int64_t value, size_t start, size_t end, size_t baseinde
 template<class cond, Action action, class Callback>
 bool ArrayIntNull::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    return Array::find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback), 
+    return Array::find<cond, action>(value, start, end, baseindex, state, std::forward<Callback>(callback),
                                      true /*treat as nullable array*/,
                                      false /*search parameter given in 'value' argument*/);
 }
@@ -642,7 +642,7 @@ bool ArrayIntNull::find(int64_t value, size_t start, size_t end, size_t baseinde
 template<class cond, Action action, class Callback>
 bool ArrayIntNull::find(null, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    return Array::find<cond, action>(0 /*ignored*/, start, end, baseindex, state, std::forward<Callback>(callback), 
+    return Array::find<cond, action>(0 /*ignored*/, start, end, baseindex, state, std::forward<Callback>(callback),
                                      true /*treat as nullable array*/,
                                      true /*search for null, ignore value argument*/);
 }

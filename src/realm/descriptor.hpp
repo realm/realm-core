@@ -88,6 +88,16 @@ public:
     /// returns `not_found`.
     size_t get_column_index(StringData name) const noexcept;
 
+    /// Get the index of the column to which links in the column at the specified
+    /// index refer.
+    ///
+    /// The consequences of specifying a column index that is out of
+    /// range, are undefined.
+    ///
+    /// The consequences of specifying a column index that does not refer
+    /// to a link column, are undefined.
+    size_t get_column_link_target(size_t column_ndx) const noexcept;
+
     /// Get whether or not the specified column is nullable.
     ///
     /// The consequences of specifying a column index that is out of
@@ -427,8 +437,8 @@ private:
 
     Descriptor() noexcept;
 
-    void bind_ref() const noexcept;
-    void unbind_ref() const noexcept;
+    void bind_ptr() const noexcept;
+    void unbind_ptr() const noexcept;
 
     // Called by the root table if this becomes the root
     // descriptor. Otherwise it is called by the descriptor that
@@ -491,8 +501,11 @@ private:
     // return null.
     Descriptor* get_subdesc_accessor(size_t column_ndx) noexcept;
 
+    void move_column(size_t from_ndx, size_t to_ndx);
+
     void adj_insert_column(size_t col_ndx) noexcept;
     void adj_erase_column(size_t col_ndx) noexcept;
+    void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
 
     friend class util::bind_ptr<Descriptor>;
     friend class util::bind_ptr<const Descriptor>;
@@ -532,6 +545,12 @@ inline size_t Descriptor::get_column_index(StringData name) const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_spec->get_column_index(name);
+}
+
+inline size_t Descriptor::get_column_link_target(size_t column_ndx) const noexcept
+{
+    REALM_ASSERT(is_attached());
+    return m_spec->get_opposite_link_table_ndx(column_ndx);
 }
 
 inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc,
@@ -621,6 +640,14 @@ inline void Descriptor::rename_column(size_t col_ndx, StringData name)
     tf::rename_column(*this, col_ndx, name); // Throws
 }
 
+inline void Descriptor::move_column(size_t from_ndx, size_t to_ndx)
+{
+    REALM_ASSERT(is_attached());
+    typedef _impl::TableFriend tf;
+    tf::move_column(*this, from_ndx, to_ndx); // Throws
+    adj_move_column(from_ndx, to_ndx);
+}
+
 inline void Descriptor::set_link_type(size_t col_ndx, LinkType link_type)
 {
     typedef _impl::TableFriend tf;
@@ -683,12 +710,12 @@ inline Descriptor::Descriptor() noexcept: m_ref_count(0)
 {
 }
 
-inline void Descriptor::bind_ref() const noexcept
+inline void Descriptor::bind_ptr() const noexcept
 {
     ++m_ref_count;
 }
 
-inline void Descriptor::unbind_ref() const noexcept
+inline void Descriptor::unbind_ptr() const noexcept
 {
     if (--m_ref_count == 0)
         delete this;
@@ -778,6 +805,11 @@ public:
         return desc.get_subdesc_accessor(column_ndx);
     }
 
+    static void move_column(Descriptor& desc, size_t from_ndx, size_t to_ndx)
+    {
+        return desc.move_column(from_ndx, to_ndx);
+    }
+
     static void adj_insert_column(Descriptor& desc, size_t col_ndx) noexcept
     {
         desc.adj_insert_column(col_ndx);
@@ -786,6 +818,12 @@ public:
     static void adj_erase_column(Descriptor& desc, size_t col_ndx) noexcept
     {
         desc.adj_erase_column(col_ndx);
+    }
+
+    static void adj_move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2)
+        noexcept
+    {
+        desc.adj_move_column(col_ndx_1, col_ndx_2);
     }
 };
 

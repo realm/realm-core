@@ -113,6 +113,7 @@ public:
         table_index_out_of_range,
         row_index_out_of_range,
         column_index_out_of_range,
+        string_position_out_of_range,
         link_index_out_of_range,
         bad_version,
         illegal_type,

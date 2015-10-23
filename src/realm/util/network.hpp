@@ -248,6 +248,12 @@ public:
     /// called before post() returns. If post() is called from another
     /// completion handler, the submitted handler is guaranteed to not be called
     /// during the execution of post().
+    ///
+    /// Completion handlers added through post() will be executed in the order
+    /// that they are added. More precisely, if post() is called twice to add
+    /// two handlers, A and B, and the execution of post(A) ands before the
+    /// beginning of the execution of post(B), then A is guaranteed to execute
+    /// before B.
     template<class H> void post(const H& handler);
 
 private:

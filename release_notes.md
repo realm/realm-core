@@ -10,13 +10,21 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Queries are no longer limited to 16 levels of grouping.
+* New substring operations (ranged insert, erase on values in string columns).
+* Adds schema change notification handler API to Group.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* New operations: Swap rows, move rows, move column, move group level table.
+* Changes order of nullify instructions that appeared as a result of erase
+  to occur in the transaction log before the erase instruction that caused
+  them.
+* New utility class: DirScanner.
+* New test utility function: quote.
+
 
 ----------------------------------------------
 
@@ -113,7 +121,7 @@
 # 0.93.0 Release notes
 
 ### Bugfixes:
-* Fixed severe bug in Array allocator that could give asserts like 
+* Fixed severe bug in Array allocator that could give asserts like
   `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`, especially
   for BinaryData columns. This bug could be triggered by using binary data
   blobs with a size in the range between 8M and 16M.
@@ -147,7 +155,7 @@
   to another during handover_export() leading to corruption.
 * Query expression operators now give correct results when an argument comes
   from a link.
-* Fixed a bug in the way the new memory mapping machinery interacted with 
+* Fixed a bug in the way the new memory mapping machinery interacted with
   encryption.
 * Query expression comparisons now give correct results when comparing a linked
   column with a column in the base table.

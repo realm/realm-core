@@ -241,6 +241,7 @@ public:
             LockGuard l(m_mutex);
             if (m_stopped)
                 return;
+            // Note: Order of post operations must be preserved.
             m_completed_operations.push_back(m_post_operations);
 
             if (m_completed_operations.empty())
@@ -643,7 +644,7 @@ void io_service::stop() noexcept
 
 void io_service::reset() noexcept
 {
-    m_impl->reset();
+    m_impl->reset(); // Throws
 }
 
 void io_service::add_io_oper(int fd, std::unique_ptr<async_oper> op, io_op type)

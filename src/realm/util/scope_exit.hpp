@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2014] Realm Inc
+ *  [2011] - [2012] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -16,29 +16,35 @@
  * is strictly forbidden unless prior written permission is obtained
  * from Realm Incorporated.
  *
-***************************************************************************/
-
-#ifndef REALM_ARRAY_WRITER_HPP
-#define REALM_ARRAY_WRITER_HPP
-
-#include <realm/alloc.hpp>
+ **************************************************************************/
+#ifndef REALM_UTIL_SCOPE_EXIT_HPP
+#define REALM_UTIL_SCOPE_EXIT_HPP
 
 namespace realm {
-namespace _impl {
+namespace util {
 
-class ArrayWriterBase {
+template<class H> class ScopeExit {
 public:
-    virtual ~ArrayWriterBase() {}
-
-    /// Write the specified array data and its checksum into free
-    /// space.
-    ///
-    /// Returns the ref (position in the target stream) of the written copy of
-    /// the specified array data.
-    virtual ref_type write_array(const char* data, size_t size, uint_fast32_t checksum) = 0;
+    ScopeExit(const H& handler) noexcept(noexcept(H(handler))):
+        m_handler(handler)
+    {
+    }
+    ScopeExit(ScopeExit&&) noexcept = default;
+    ~ScopeExit()
+    {
+        m_handler();
+    }
+private:
+    H m_handler;
+    static_assert(noexcept(m_handler()), "Handler must not throw");
 };
 
-} // namespace impl_
+template<class H> ScopeExit<H> make_scope_exit(const H& handler)
+{
+    return ScopeExit<H>(handler);
+}
+
+} // namespace util
 } // namespace realm
 
-#endif // REALM_ARRAY_WRITER_HPP
+#endif // REALM_UTIL_SCOPE_EXIT_HPP

@@ -50,7 +50,7 @@ private:
     T* m_ptr;
 };
 
-typedef DestroyGuard<Array> ShallowArrayDestroyGuard;
+using ShallowArrayDestroyGuard = DestroyGuard<Array>;
 
 
 /// Calls `ptr->destroy_deep()` if the guarded Array pointer (`ptr`)

@@ -388,14 +388,14 @@ protected:
         Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
 
     typedef Query_Handover_patch Handover_patch;
-    Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode) : 
-        Spec::template ColNames<QueryCol, Query*>(this), 
+    Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode) :
+        Spec::template ColNames<QueryCol, Query*>(this),
         m_impl(source.m_impl, patch, mode)
     {
     }
 
-    Query(Query& source, Handover_patch& patch, MutableSourcePayload mode) : 
-        Spec::template ColNames<QueryCol, Query*>(this), 
+    Query(Query& source, Handover_patch& patch, MutableSourcePayload mode) :
+        Spec::template ColNames<QueryCol, Query*>(this),
         m_impl(source.m_impl, patch, mode)
     {
     }
@@ -405,7 +405,7 @@ protected:
         m_impl.apply_patch(patch, group);
     }
 
-    virtual std::unique_ptr<Query> 
+    virtual std::unique_ptr<Query>
     clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const
     {
         patch.reset(new Handover_patch);
@@ -413,7 +413,7 @@ protected:
         return retval;
     }
 
-    virtual std::unique_ptr<Query> 
+    virtual std::unique_ptr<Query>
     clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode)
     {
         patch.reset(new Handover_patch);

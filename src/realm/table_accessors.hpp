@@ -1313,7 +1313,7 @@ public:
     }
 
     int64_t maximum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit=size_t(-1), 
+                    size_t end = size_t(-1), size_t limit=size_t(-1),
                     size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit, return_ndx);

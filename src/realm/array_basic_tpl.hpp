@@ -256,7 +256,7 @@ void BasicArray<T>::find_all(IntegerColumn* result, T value, size_t add_offset,
     for (;;) {
         first = this->find(value, first + 1, end);
         if (first == not_found)
-            break;            
+            break;
 
         Array::add_to_column(result, first + add_offset);
     }

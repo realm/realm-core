@@ -457,7 +457,7 @@ public:
 
     /// If neccessary, expand the representation so that it can store the
     /// specified value.
-    void ensure_minimum_width(int64_t value);
+    void ensure_minimum_width(int_fast64_t value);
 
     typedef StringData (*StringGetter)(void*, size_t, char*); // Pre-declare getter function from string index
     size_t index_string_find_first(StringData value, ColumnBase* column) const;
@@ -489,6 +489,16 @@ public:
     void move(size_t begin, size_t end, size_t dest_begin);
     void move_backward(size_t begin, size_t end, size_t dest_end);
     //@}
+
+    /// move_rotate moves one element from \a from to be located at index \a to,
+    /// shifting all elements inbetween by one.
+    ///
+    /// If \a from is larger than \a to, the elements inbetween are shifted down.
+    /// If \a to is larger than \a from, the elements inbetween are shifted up.
+    ///
+    /// This function is guaranteed to not throw if
+    /// `get_alloc().is_read_only(get_ref())` returns false.
+    void move_rotate(size_t from, size_t to, size_t num_elems = 1);
 
     //@{
     /// Find the lower/upper bound of the specified value in a sequence of
@@ -610,12 +620,20 @@ public:
 
     // Serialization
 
-    /// Returns the position in the target where the first byte of this array
-    /// was written.
+    /// Returns the ref (position in the target stream) of the written copy of
+    /// this array, or the ref of the original array if \a only_if_modified is
+    /// true, and this array is unmodified (Alloc::is_read_only()).
     ///
     /// The number of bytes that will be written by a non-recursive invocation
     /// of this function is exactly the number returned by get_byte_size().
-    size_t write(_impl::ArrayWriterBase& target, bool recurse = true, bool persist = false) const;
+    ///
+    /// \param deep If true, recursively write out subarrays, but still subject
+    /// to \a only_if_modified.
+    ref_type write(_impl::ArrayWriterBase&, bool deep, bool only_if_modified) const;
+
+    /// Same as non-static write() with `deep` set to true. This is for the
+    /// cases where you do not already have an array accessor available.
+    static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -1113,6 +1131,10 @@ protected:
     bool m_has_refs;        // Elements whose first bit is zero are refs to subarrays.
     bool m_context_flag;    // Meaning depends on context.
 
+private:
+    ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
+    ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class StringColumn;
@@ -1491,6 +1513,33 @@ inline void Array::destroy_deep() noexcept
     m_data = nullptr;
 }
 
+inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
+{
+    REALM_ASSERT(is_attached());
+
+    if (only_if_modified && m_alloc.is_read_only(m_ref))
+        return m_ref;
+
+    if (!deep || !m_has_refs)
+        return do_write_shallow(out); // Throws
+
+    return do_write_deep(out, only_if_modified); // Throws
+}
+
+inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out,
+                             bool only_if_modified)
+{
+    if (only_if_modified && alloc.is_read_only(ref))
+        return ref;
+
+    Array array(alloc);
+    array.init_from_ref(ref);
+
+    if (!array.m_has_refs)
+        return array.do_write_shallow(out); // Throws
+
+    return array.do_write_deep(out, only_if_modified); // Throws
+}
 
 inline void Array::add(int_fast64_t value)
 {
@@ -2365,10 +2414,10 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 // Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
 // for each match. Break and return if find_action() returns false or 'end' is reached.
 
-// If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the 
+// If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the
 // first entry and compare correctly against null, etc.
 //
-// If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set, 
+// If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set,
 // then nullable_array must be set too.
 template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool find_null) const
 {
@@ -2382,7 +2431,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         end = nullable_array ? size() - 1 : size();
 
     if (nullable_array) {
-        // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme: 
+        // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme:
         // Huge speed optimizations are possible here! This is a very simple generic method.
         for (; start2 < end; start2++) {
             int64_t v = get<bitwidth>(start2 + 1);
@@ -2476,8 +2525,8 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     REALM_ASSERT_3(m_width, !=, 0);
 
 #if defined(REALM_COMPILER_SSE)
-    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support 
-    // Less-than comparison for 64-bit values. 
+    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support
+    // Less-than comparison for 64-bit values.
     if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start2 >= sizeof(__m128i) && m_width >= 8 &&
         (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
 

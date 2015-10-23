@@ -306,15 +306,15 @@ inline StringData::operator bool() const noexcept
 /*
 Represents null in Query, find(), get(), set(), etc. Todo, maybe move this outside string_data.hpp.
 
-Float/Double: Realm can both store user-given NaNs and null. Any user-given signaling NaN is converted to 
+Float/Double: Realm can both store user-given NaNs and null. Any user-given signaling NaN is converted to
 0x7fa00000 (if float) or 0x7ff4000000000000 (if double). Any user-given quiet NaN is converted to
 0x7fc00000 (if float) or 0x7ff8000000000000 (if double). So Realm does not preserve the optional bits in
-user-given NaNs. 
+user-given NaNs.
 
 However, since both clang and gcc on x64 and ARM, and also Java on x64, return these bit patterns when
 requesting NaNs, these will actually seem to roundtrip bit-exact for the end-user in most cases.
 
-If set_null() is called, a null is stored in form of the bit pattern 0xffffffff (if float) or 
+If set_null() is called, a null is stored in form of the bit pattern 0xffffffff (if float) or
 0xffffffffffffffff (if double). These are quiet NaNs.
 
 Executing a query that involves a float/double column that contains NaNs gives an undefined result. If
@@ -329,7 +329,7 @@ A NaN doubule is the same as above, but for `s eeeeeeeeeee S xxxxxxxxxxxxxxxxxxx
 
 The `S` bit is at position 22 (float) or 51 (double).
 */
- 
+
 struct null {
     null(int) {}
     null() {}
@@ -359,7 +359,7 @@ struct null {
         REALM_ASSERT_DEBUG(!is_signaling(d));
         return d;
     }
-    
+
     /// Takes a NaN as argument and returns whether or not it's signaling
     template <class T> static bool is_signaling(T v) {
         REALM_ASSERT(isnan(static_cast<double>(v)));

@@ -92,7 +92,7 @@ public:
 template<class T>
 void BasicColumn<T>::set(size_t ndx, T value)
 {
-    // Convert any NaN to a Realm NaN bit pattern; see to_realm() for details on this. 
+    // Convert any NaN to a Realm NaN bit pattern; see to_realm() for details on this.
     T normalized = null::to_realm(value);
     if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array.get())->set(ndx, normalized); // Throws
@@ -132,6 +132,11 @@ template<class T> inline void BasicColumn<T>::move_last_over(size_t row_ndx)
 {
     size_t last_row_ndx = size() - 1; // Note that size() is slow
     do_move_last_over(row_ndx, last_row_ndx); // Throws
+}
+
+template<class T> inline void BasicColumn<T>::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    do_swap_rows(row_ndx_1, row_ndx_2);
 }
 
 template<class T> inline void BasicColumn<T>::clear()
@@ -227,6 +232,18 @@ void BasicColumn<T>::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     erase(last_row_ndx, is_last); // Throws
 }
 
+template<class T>
+void BasicColumn<T>::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <=, size());
+    REALM_ASSERT_3(row_ndx_2, <=, size());
+
+    T value_1 = get(row_ndx_1);
+    T value_2 = get(row_ndx_2);
+    set(row_ndx_1, value_2);
+    set(row_ndx_2, value_1);
+}
+
 template<class T> void BasicColumn<T>::do_clear()
 {
     if (!m_array->is_inner_bptree_node()) {
@@ -293,13 +310,14 @@ template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t sli
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
         slice.init_from_mem(mem);
-        size_t pos = slice.write(out); // Throws
-        ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref = slice.write(out, deep, only_if_modified); // Throws
     }
     else {
         SliceHandler handler(get_alloc());
         ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
+                                      table_size, handler, out); // Throws
     }
     return ref;
 }
@@ -567,7 +585,7 @@ double BasicColumn<T>::average(size_t begin, size_t end, size_t limit, size_t* r
     if (end == size_t(-1))
         end = size();
     size_t size = end - begin;
-    
+
     // fixme, doesn't look correct
     if (limit < size)
         size = limit;
@@ -584,7 +602,7 @@ template<class T> void BasicColumn<T>::do_insert(size_t row_ndx, T value, size_t
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
 
-    // Convert any NaN to a Realm NaN bit pattern; see to_realm() for details on this. 
+    // Convert any NaN to a Realm NaN bit pattern; see to_realm() for details on this.
     T normalized = null::to_realm(value);
 
     ref_type new_sibling_ref;

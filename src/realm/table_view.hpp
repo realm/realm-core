@@ -637,7 +637,7 @@ public:
         return retval;
     }
 
-    std::unique_ptr<TableViewBase> 
+    std::unique_ptr<TableViewBase>
     clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode) override
     {
         patch.reset(new Handover_patch);
@@ -734,7 +734,7 @@ inline TableViewBase::TableViewBase():
 }
 
 inline TableViewBase::TableViewBase(Table* parent):
-    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), 
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
     m_last_seen_version(m_table ? m_table->m_version : 0),
     m_distinct_column_source(npos),

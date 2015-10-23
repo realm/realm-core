@@ -621,6 +621,78 @@ TEST(Column_LowerUpperBound)
     col.destroy();
 }
 
+TEST(Column_SwapRows)
+{
+    // Normal case
+    {
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn c(Allocator::get_default(), col_ref);
+
+        c.add(-21);
+        c.add(30);
+        c.add(10);
+        c.add(5);
+
+        CHECK_EQUAL(c.get(1), 30);
+        CHECK_EQUAL(c.get(2), 10);
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), 10);
+        CHECK_EQUAL(c.get(2), 30);
+        CHECK_EQUAL(c.size(), 4);
+    }
+
+    // First two elements
+    {
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn c(Allocator::get_default(), col_ref);
+
+        c.add(30);
+        c.add(10);
+        c.add(5);
+
+        c.swap_rows(0, 1);
+
+        CHECK_EQUAL(c.get(0), 10);
+        CHECK_EQUAL(c.get(1), 30);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Last two elements
+    {
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn c(Allocator::get_default(), col_ref);
+
+        c.add(5);
+        c.add(30);
+        c.add(10);
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), 10);
+        CHECK_EQUAL(c.get(2), 30);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Indices in wrong order
+    {
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn c(Allocator::get_default(), col_ref);
+
+        c.add(5);
+        c.add(30);
+        c.add(10);
+
+        c.swap_rows(2, 1);
+
+        CHECK_EQUAL(c.get(1), 10);
+        CHECK_EQUAL(c.get(2), 30);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+}
+
 
 TEST_TYPES(Column_Average, IntegerColumn, IntNullColumn)
 {
@@ -987,6 +1059,7 @@ TEST(ColumnIntNull_Null)
 
 }
 
+
 TEST(ColumnIntNull_MoveLastOverPreservesNull)
 {
     ref_type ref = IntNullColumn::create(Allocator::get_default());
@@ -1003,6 +1076,7 @@ TEST(ColumnIntNull_MoveLastOverPreservesNull)
     CHECK_EQUAL(c.get(0), 456);
     c.destroy();
 }
+
 
 TEST(ColumnIntNull_CompareInts)
 {
