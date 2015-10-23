@@ -73,6 +73,14 @@ template <class T> inline constexpr T&& constexpr_forward(typename std::remove_r
     return static_cast<T&&>(t);
 }
 
+template <class T, class U>
+struct TypeIsAssignableToOptional {
+    // Constraints from [optional.object.assign.18]
+    static const bool value = (std::is_same<typename std::remove_reference<U>::type, T>::value
+                               && std::is_constructible<T, U>::value
+                               && std::is_assignable<T&, U>::value);
+};
+
 } // namespace _impl
 
 namespace util {
@@ -98,7 +106,8 @@ public:
     Optional<T>& operator=(None);
     Optional<T>& operator=(Optional<T>&& other);
     Optional<T>& operator=(const Optional<T>& other);
-    template <class U>
+
+    template <class U, class = typename std::enable_if<_impl::TypeIsAssignableToOptional<T, U>::value>::type>
     Optional<T>& operator=(U&& value);
 
     explicit constexpr operator bool() const;
@@ -291,6 +300,7 @@ Optional<T>& Optional<T>::operator=(Optional<T>&& other)
     else {
         if (other.m_engaged) {
             new(&m_value) T(std::move(other.m_value));
+            m_engaged = true;
         }
     }
     return *this;
@@ -310,13 +320,14 @@ Optional<T>& Optional<T>::operator=(const Optional<T>& other)
     else {
         if (other.m_engaged) {
             new(&m_value) T(other.m_value);
+            m_engaged = true;
         }
     }
     return *this;
 }
 
 template <class T>
-template <class U>
+template <class U, class>
 Optional<T>& Optional<T>::operator=(U&& value)
 {
     if (m_engaged) {
