@@ -1325,7 +1325,7 @@ TEST(Table_IndexStringTwice)
 }
 
 
-// Tests Table part of index on Int, DateTime and Bool columns. For a more exhaustive 
+// Tests Table part of index on Int, DateTime and Bool columns. For a more exhaustive
 // test of the integer index (bypassing Table), see test_index_string.cpp)
 TEST(Table_IndexInteger)
 {
@@ -2342,6 +2342,111 @@ TEST(Table_SpecDeleteColumns)
     table->verify();
 #endif
 }
+
+
+TEST(Table_SpecMoveColumns)
+{
+    using df = _impl::DescriptorFriend;
+
+    Group group;
+    TableRef foo = group.add_table("foo");
+    foo->add_column(type_Int, "a");
+    foo->add_column(type_Float, "b");
+    foo->add_column(type_Table, "c");
+    DescriptorRef foo_descriptor = foo->get_descriptor();
+    DescriptorRef c_descriptor = foo_descriptor->get_subdescriptor(2);
+    c_descriptor->add_column(type_Int, "c_a");
+    c_descriptor->add_column(type_Float, "c_b");
+
+    foo->add_empty_row();
+    foo->add_empty_row();
+
+    TableRef subtable0 = foo->get_subtable(2, 0);
+    subtable0->add_empty_row();
+    subtable0->set_int(0, 0, 123);
+
+    df::move_column(*foo_descriptor, 0, 2);
+    CHECK_EQUAL(foo_descriptor->get_column_type(1), type_Table);
+    CHECK_EQUAL(foo_descriptor->get_column_name(1), "c");
+    CHECK(c_descriptor->is_attached());
+    CHECK(subtable0->is_attached());
+    CHECK_EQUAL(123, subtable0->get_int(0, 0));
+
+    TableRef subtable1 = foo->get_subtable(1, 1);
+    subtable1->add_empty_row();
+    subtable1->set_int(0, 0, 456);
+
+    df::move_column(*c_descriptor, 0, 1);
+    CHECK(subtable0->is_attached());
+    CHECK(subtable1->is_attached());
+    CHECK_EQUAL(subtable0->get_int(1, 0), 123);
+    CHECK_EQUAL(subtable1->get_int(1, 0), 456);
+}
+
+
+TEST(Table_SpecMoveColumnsWithIndexes)
+{
+    using df = _impl::DescriptorFriend;
+    using tf = _impl::TableFriend;
+
+    Group group;
+
+    TableRef foo = group.add_table("foo");
+    DescriptorRef desc = foo->get_descriptor();
+    foo->add_column(type_Int, "a");
+    foo->add_search_index(0);
+    foo->add_column(type_Int, "b");
+    StringIndex* a_index = tf::get_column(*foo, 0).get_search_index();
+    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
+
+    df::move_column(*desc, 0, 1);
+
+    CHECK_EQUAL(2, a_index->get_ndx_in_parent());
+
+    auto& spec = df::get_spec(*desc);
+
+    CHECK(foo->has_search_index(1));
+    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
+    CHECK(!foo->has_search_index(0));
+    CHECK(!(spec.get_column_attr(0) & col_attr_Indexed));
+
+    foo->add_column(type_Int, "c");
+    foo->add_search_index(0);
+    StringIndex* b_index = tf::get_column(*foo, 0).get_search_index();
+    CHECK_EQUAL(1, b_index->get_ndx_in_parent());
+    CHECK_EQUAL(3, a_index->get_ndx_in_parent());
+
+    df::move_column(*desc, 0, 1);
+    CHECK(foo->has_search_index(0));
+    CHECK((spec.get_column_attr(0) & col_attr_Indexed));
+    CHECK(foo->has_search_index(1));
+    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
+    CHECK(!foo->has_search_index(2));
+    CHECK(!(spec.get_column_attr(2) & col_attr_Indexed));
+    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
+    CHECK_EQUAL(3, b_index->get_ndx_in_parent());
+
+    df::move_column(*desc, 2, 0);
+    CHECK(!foo->has_search_index(0));
+    CHECK(!(spec.get_column_attr(0) & col_attr_Indexed));
+    CHECK(foo->has_search_index(1));
+    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
+    CHECK(foo->has_search_index(2));
+    CHECK((spec.get_column_attr(2) & col_attr_Indexed));
+    CHECK_EQUAL(2, a_index->get_ndx_in_parent());
+    CHECK_EQUAL(4, b_index->get_ndx_in_parent());
+
+    df::move_column(*desc, 1, 0);
+    CHECK(foo->has_search_index(0));
+    CHECK((spec.get_column_attr(0) & col_attr_Indexed));
+    CHECK(!foo->has_search_index(1));
+    CHECK(!(spec.get_column_attr(1) & col_attr_Indexed));
+    CHECK(foo->has_search_index(2));
+    CHECK((spec.get_column_attr(2) & col_attr_Indexed));
+    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
+    CHECK_EQUAL(4, b_index->get_ndx_in_parent());
+}
+
 
 TEST(Table_NullInEnum)
 {
@@ -6204,6 +6309,123 @@ TEST(Table_Nulls)
 }
 
 
+TEST(Table_InsertSubstring)
+{
+    struct Fixture {
+        Table table;
+        Fixture()
+        {
+            table.add_column(type_String, "");
+            table.add_empty_row();
+            table.set_string(0, 0, "0123456789");
+        }
+    };
+    {
+        Fixture f;
+        f.table.insert_substring(0, 0, 0, "x");
+        CHECK_EQUAL("x0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.insert_substring(0, 0, 5, "x");
+        CHECK_EQUAL("01234x56789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.insert_substring(0, 0, 10, "x");
+        CHECK_EQUAL("0123456789x", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.insert_substring(0, 0, 5, "");
+        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.insert_substring(1, 0, 5, "x"),
+                          LogicError::column_index_out_of_range);
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.insert_substring(0, 1, 5, "x"),
+                          LogicError::row_index_out_of_range);
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.insert_substring(0, 0, 11, "x"),
+                          LogicError::string_position_out_of_range);
+    }
+}
+
+
+TEST(Table_RemoveSubstring)
+{
+    struct Fixture {
+        Table table;
+        Fixture()
+        {
+            table.add_column(type_String, "");
+            table.add_empty_row();
+            table.set_string(0, 0, "0123456789");
+        }
+    };
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 0, 1);
+        CHECK_EQUAL("123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 9, 1);
+        CHECK_EQUAL("012345678", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 0);
+        CHECK_EQUAL("", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 5);
+        CHECK_EQUAL("01234", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 10);
+        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 5, 1000);
+        CHECK_EQUAL("01234", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 10, 0);
+        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 10, 1);
+        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.remove_substring(1, 0, 5, 1),
+                          LogicError::column_index_out_of_range);
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.remove_substring(0, 1, 5, 1),
+                          LogicError::row_index_out_of_range);
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.remove_substring(0, 0, 11, 1),
+                          LogicError::string_position_out_of_range);
+    }
+}
+
 TEST(Table_RowAccessor_Null)
 {
     Table table;
@@ -6211,7 +6433,7 @@ TEST(Table_RowAccessor_Null)
     size_t col_int    = table.add_column(type_Int,      "int",    true);
     size_t col_string = table.add_column(type_String,   "string", true);
     size_t col_float  = table.add_column(type_Float,    "float",  true);
-    size_t col_double = table.add_column(type_Double,   "double", true);    
+    size_t col_double = table.add_column(type_Double,   "double", true);
     size_t col_date   = table.add_column(type_DateTime, "date",   true);
     size_t col_binary = table.add_column(type_Binary,   "binary", true);
 

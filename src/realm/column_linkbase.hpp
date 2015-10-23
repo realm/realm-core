@@ -165,8 +165,7 @@ inline void LinkColumnBase::adj_acc_move_over(size_t from_row_ndx,
     tf::mark(*m_target_table);
 }
 
-inline void LinkColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
-    noexcept
+inline void LinkColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     IntegerColumn::adj_acc_swap_rows(row_ndx_1, row_ndx_2);
 

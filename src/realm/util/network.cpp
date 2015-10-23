@@ -241,6 +241,7 @@ public:
             LockGuard l(m_mutex);
             if (m_stopped)
                 return;
+            // Note: Order of post operations must be preserved.
             m_completed_operations.push_back(m_post_operations);
 
             if (m_completed_operations.empty())

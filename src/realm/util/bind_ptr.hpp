@@ -115,8 +115,8 @@ protected:
 private:
     T* m_ptr;
 
-    void bind(T* p) noexcept { if (p) p->bind_ref(); m_ptr = p; }
-    void unbind() noexcept { if (m_ptr) m_ptr->unbind_ref(); }
+    void bind(T* p) noexcept { if (p) p->bind_ptr(); m_ptr = p; }
+    void unbind() noexcept { if (m_ptr) m_ptr->unbind_ptr(); }
 
     T* release() noexcept { T* const p = m_ptr; m_ptr = nullptr; return p; }
 
@@ -156,8 +156,8 @@ public:
     virtual ~RefCountBase() noexcept {}
 
 protected:
-    void bind_ref() const noexcept { ++m_ref_count; }
-    void unbind_ref() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept { ++m_ref_count; }
+    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
 
 private:
     mutable unsigned long m_ref_count;
@@ -181,8 +181,8 @@ protected:
     // std::memory_order_seq_cst. I'm not sure whether this is the
     // choice that leads to maximum efficiency, but at least it is
     // safe.
-    void bind_ref() const noexcept { ++m_ref_count; }
-    void unbind_ref() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept { ++m_ref_count; }
+    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
 
 private:
     mutable std::atomic<unsigned long> m_ref_count;

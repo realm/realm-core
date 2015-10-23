@@ -331,7 +331,7 @@ public:
 
     TableRef add_table(StringData name, bool require_unique_name = true);
     TableRef insert_table(size_t idx, StringData name, bool require_unique_name = true);
-    TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
+    TableRef get_or_add_table(StringData name, bool* was_added = 0);
     TableRef get_or_insert_table(size_t index, StringData name, bool* was_added = nullptr);
 
     template<class T> BasicTableRef<T> get_table(size_t index);
@@ -343,7 +343,7 @@ public:
     template<class T> BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
     template<class T> BasicTableRef<T> insert_table(size_t index, StringData name,
                                                     bool require_unique_name = true);
-    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr);
+    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0);
     template<class T> BasicTableRef<T> get_or_insert_table(size_t index, StringData name,
                                                            bool* was_added = nullptr);
 

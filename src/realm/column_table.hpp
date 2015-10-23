@@ -264,7 +264,7 @@ inline void SubtableColumnBase::erase_rows(size_t row_ndx, size_t num_rows_to_er
         m_subtable_map.adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_erase);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
-        tf::unbind_ref(*m_table);
+        tf::unbind_ptr(*m_table);
 }
 
 // Overriding virtual method of Column.
@@ -279,7 +279,7 @@ inline void SubtableColumnBase::move_last_row_over(size_t row_ndx, size_t prior_
         m_subtable_map.adj_move_over<fix_ndx_in_parent>(last_row_ndx, row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
-        tf::unbind_ref(*m_table);
+        tf::unbind_ptr(*m_table);
 }
 
 inline void SubtableColumnBase::clear(size_t, bool)
@@ -327,7 +327,7 @@ inline void SubtableColumnBase::adj_acc_erase_row(size_t row_ndx) noexcept
         m_subtable_map.adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_erased);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
-        tf::unbind_ref(*m_table);
+        tf::unbind_ptr(*m_table);
 }
 
 inline void SubtableColumnBase::adj_acc_move_over(size_t from_row_ndx,
@@ -342,7 +342,7 @@ inline void SubtableColumnBase::adj_acc_move_over(size_t from_row_ndx,
         m_subtable_map.adj_move_over<fix_ndx_in_parent>(from_row_ndx, to_row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
-        tf::unbind_ref(*m_table);
+        tf::unbind_ptr(*m_table);
 }
 
 inline void SubtableColumnBase::adj_acc_clear_root_table() noexcept
@@ -375,7 +375,7 @@ inline void SubtableColumnBase::discard_subtable_accessor(size_t row_ndx) noexce
     bool last_entry_removed = m_subtable_map.detach_and_remove(row_ndx);
     typedef _impl::TableFriend tf;
     if (last_entry_removed)
-        tf::unbind_ref(*m_table);
+        tf::unbind_ptr(*m_table);
 }
 
 inline void SubtableColumnBase::SubtableMap::add(size_t subtable_ndx, Table* table)
@@ -492,7 +492,7 @@ inline void SubtableColumnBase::discard_child_accessors() noexcept
 {
     bool last_entry_removed = m_subtable_map.detach_and_remove_all();
     if (last_entry_removed && m_table)
-        _impl::TableFriend::unbind_ref(*m_table);
+        _impl::TableFriend::unbind_ptr(*m_table);
 }
 
 inline SubtableColumnBase::~SubtableColumnBase() noexcept

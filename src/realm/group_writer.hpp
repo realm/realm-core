@@ -129,9 +129,9 @@ private:
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<size_t, size_t> extend_free_space(size_t requested_size);
 
-    void write_array_at(ref_type ref, const char* data, size_t size);
+    void write_array_at(ref_type, const char* data, size_t size);
     size_t split_freelist_chunk(size_t index, size_t start_pos,
-                                     size_t alloc_pos, size_t chunk_size, bool is_shared);
+                                size_t alloc_pos, size_t chunk_size, bool is_shared);
 };
 
 

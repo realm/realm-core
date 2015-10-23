@@ -437,8 +437,8 @@ private:
 
     Descriptor() noexcept;
 
-    void bind_ref() const noexcept;
-    void unbind_ref() const noexcept;
+    void bind_ptr() const noexcept;
+    void unbind_ptr() const noexcept;
 
     // Called by the root table if this becomes the root
     // descriptor. Otherwise it is called by the descriptor that
@@ -710,12 +710,12 @@ inline Descriptor::Descriptor() noexcept: m_ref_count(0)
 {
 }
 
-inline void Descriptor::bind_ref() const noexcept
+inline void Descriptor::bind_ptr() const noexcept
 {
     ++m_ref_count;
 }
 
-inline void Descriptor::unbind_ref() const noexcept
+inline void Descriptor::unbind_ptr() const noexcept
 {
     if (--m_ref_count == 0)
         delete this;

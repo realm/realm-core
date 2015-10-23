@@ -31,7 +31,9 @@ public:
 };
 
 Initialization initialization;
+
 } // anonymous namespace
+
 
 void Group::upgrade_file_format()
 {
@@ -239,7 +241,7 @@ void Group::detach_table_accessors() noexcept
         if (Table* t = *i) {
             typedef _impl::TableFriend tf;
             tf::detach(*t);
-            tf::unbind_ref(*t);
+            tf::unbind_ptr(*t);
         }
     }
 }
@@ -408,7 +410,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
     // Increase reference count from 0 to 1 to make the group accessor keep
     // the table accessor alive. This extra reference count will be revoked
     // during destruction of the group accessor.
-    tf::bind_ref(*table);
+    tf::bind_ptr(*table);
 
     tf::mark(*table);
     m_table_accessors[table_ndx] = table;
@@ -480,7 +482,7 @@ void Group::remove_table(size_t table_ndx)
     }
 
     tf::detach(*table);
-    tf::unbind_ref(*table);
+    tf::unbind_ptr(*table);
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
@@ -1040,7 +1042,7 @@ public:
             if (Table* table = m_group.m_table_accessors[table_ndx]) {
                 typedef _impl::TableFriend tf;
                 tf::detach(*table);
-                tf::unbind_ref(*table);
+                tf::unbind_ptr(*table);
             }
 
             size_t last_ndx = num_tables - 1;

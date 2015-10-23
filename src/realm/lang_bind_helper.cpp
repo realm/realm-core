@@ -10,7 +10,7 @@ Table* LangBindHelper::get_subtable_ptr_during_insert(Table* t, size_t col_ndx, 
     SubtableColumn& subtables =  t->get_column_table(col_ndx);
     REALM_ASSERT(row_ndx < subtables.size());
     Table* subtab = subtables.get_subtable_ptr(row_ndx);
-    subtab->bind_ref();
+    subtab->bind_ptr();
     return subtab;
 }
 

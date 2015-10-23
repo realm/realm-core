@@ -13,7 +13,7 @@ ifneq ($(REALM_ENABLE_FAT_BINARIES),)
 endif
 
 ifeq ($(OS),Darwin)
-  CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++
+  CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++ -Wno-nested-anon-types
   VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
 endif
 

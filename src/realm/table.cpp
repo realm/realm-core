@@ -680,7 +680,9 @@ void Table::do_insert_column_unless_exists(Descriptor& desc, size_t col_ndx, Dat
             if (existing_is_nullable != nullable) {
                 throw LogicError(LogicError::type_mismatch);
             }
-            if (tf::is_link_type(ColumnType(type)) && spec.get_opposite_link_table_ndx(col_ndx) != link_target_table->get_index_in_group()) {
+            if (tf::is_link_type(ColumnType(type)) &&
+                spec.get_opposite_link_table_ndx(col_ndx) !=
+                link_target_table->get_index_in_group()) {
                 throw LogicError(LogicError::type_mismatch);
             }
 

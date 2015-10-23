@@ -1040,8 +1040,8 @@ private:
     // Detach the type descriptor accessor if it exists.
     void discard_desc_accessor() noexcept;
 
-    void bind_ref() const noexcept { ++m_ref_count; }
-    void unbind_ref() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept { ++m_ref_count; }
+    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
 
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) noexcept;
@@ -1549,7 +1549,7 @@ public:
     ~UnbindGuard() noexcept
     {
         if (m_table)
-            m_table->unbind_ref();
+            m_table->unbind_ptr();
     }
 
     Table& operator*() const noexcept
@@ -2011,14 +2011,14 @@ public:
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
 
-    static void bind_ref(Table& table) noexcept
+    static void bind_ptr(Table& table) noexcept
     {
-        table.bind_ref();
+        table.bind_ptr();
     }
 
-    static void unbind_ref(Table& table) noexcept
+    static void unbind_ptr(Table& table) noexcept
     {
-        table.unbind_ref();
+        table.unbind_ptr();
     }
 
     static bool compare_rows(const Table& a, const Table& b)
