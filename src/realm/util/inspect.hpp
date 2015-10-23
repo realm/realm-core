@@ -50,6 +50,7 @@ void inspect_all(OS&)
     // No-op
 }
 
+/// Convert all arguments to strings, and quote string arguments.
 template<class OS, class First, class... Args>
 void inspect_all(OS& os, First&& first, Args&&... args)
 {
