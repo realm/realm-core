@@ -47,7 +47,8 @@
 
 #define REALM_ASSERT_RELEASE_EX(condition, ...) \
     ((condition) ? static_cast<void>(0) : \
-    terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
+    realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
+                                     REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
 #ifdef REALM_DEBUG
 #  define REALM_ASSERT_DEBUG_EX REALM_ASSERT_RELEASE_EX

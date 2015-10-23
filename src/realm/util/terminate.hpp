@@ -55,10 +55,11 @@ REALM_NORETURN void terminate_with_info(const char* assert_message, int line, co
                                         Args&&... interesting_values) noexcept
 {
     std::stringstream ss;
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " ";
     ss << assert_message << " with " << interesting_names << " = (";
     inspect_all(ss, std::forward<Args>(interesting_values)...);
     ss << ")";
-    terminate(ss.str().c_str(), file, line);
+    terminate_internal(ss);
 }
 
 } // namespace util
