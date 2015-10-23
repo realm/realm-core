@@ -37,7 +37,7 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line) 
 
 template<class... Ts>
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
-                              Ts&&... infos) noexcept
+                              Ts... infos) noexcept
 {
     std::stringstream ss;
     static_assert(sizeof...(infos) == 2 || sizeof...(infos) == 4 || sizeof...(infos) == 6,
