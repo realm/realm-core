@@ -52,7 +52,7 @@ public:
 /// ownership of the writelog collector and must destroy it, but only AFTER
 /// destruction of the shared group using it.
 std::unique_ptr<ClientHistory>
-make_client_history(const std::string& path, const char* encryption_key = 0);
+make_client_history(const std::string& path, const char* encryption_key = nullptr);
 
 } // namespace realm
 
