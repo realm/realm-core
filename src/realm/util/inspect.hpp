@@ -61,7 +61,7 @@ void inspect_all(OS& os, First&& first, Args&&... args)
     inspect_all(os, std::forward<Args>(args)...);
 }
 
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_UTIL_INSPECT_HPP
