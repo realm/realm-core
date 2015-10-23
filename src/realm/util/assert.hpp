@@ -43,9 +43,24 @@
 #  define REALM_ASSERT_DEBUG(condition) static_cast<void>(0)
 #endif
 
+#define REALM_STRINGIFY(X) #X
+
+#define REALM_ASSERT_RELEASE_EX(condition, ...) \
+    ((condition) ? static_cast<void>(0) : \
+    terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
+
+#ifdef REALM_DEBUG
+#  define REALM_ASSERT_DEBUG_EX REALM_ASSERT_RELEASE_EX
+#else
+#  define REALM_ASSERT_DEBUG_EX(...) static_cast<void>(0)
+#endif
+
 // Becase the assert is used in noexcept methods, it's a bad idea to allocate buffer space for the message
 // so therefore we must pass it to terminate which will 'cerr' it for us without needing any buffer
 #if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
+
+#  define REALM_ASSERT_EX REALM_ASSERT_RELEASE_EX
+
 #  define REALM_ASSERT_3(left, condition, right) \
     (((left) condition (right)) ? static_cast<void>(0) :                \
         realm::util::terminate("Assertion failed: " #left " " #condition " " #right, \
@@ -61,6 +76,7 @@
         realm::util::terminate("Assertion failed: " #left1 " " #condition1 " " #right1 " " #logical1 " " #left2 " " #condition2 " " #right2 " " #logical2 " " #left3 " " #condition3 " " #right3, \
                                __FILE__, __LINE__, left1, right1, left2, right2, left3, right3))
 #else
+#  define REALM_ASSERT_EX(...) static_cast<void>(0)
 #  define REALM_ASSERT_3(left, condition, right) static_cast<void>(0)
 #  define REALM_ASSERT_7(left1, condition1, right1, logical, left2, condition2, right2) static_cast<void>(0)
 #  define REALM_ASSERT_11(left1, condition1, right1, logical1, left2, condition2, right2, logical3, left3, condition3, right3) static_cast<void>(0)
