@@ -329,7 +329,7 @@ void File::close() noexcept
 
     BOOL r = CloseHandle(m_handle);
     REALM_ASSERT_RELEASE(r);
-    m_handle = 0;
+    m_handle = nullptr;
 
 #else // POSIX version
 

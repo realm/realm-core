@@ -8854,7 +8854,7 @@ struct HandoverControl {
     {
         LockGuard lg(m_lock);
         //std::cout << "put " << h << std::endl;
-        while (m_handover != 0) m_changed.wait(lg);
+        while (m_handover != nullptr) m_changed.wait(lg);
         //std::cout << " -- put " << h << std::endl;
         m_handover = move(h);
         m_version = v;
@@ -8864,20 +8864,20 @@ struct HandoverControl {
     {
         LockGuard lg(m_lock);
         //std::cout << "get " << std::endl;
-        while (m_handover == 0) m_changed.wait(lg);
+        while (m_handover == nullptr) m_changed.wait(lg);
         //std::cout << " -- get " << m_handover << std::endl;
         h = move(m_handover);
         v = m_version;
-        m_handover = 0;
+        m_handover = nullptr;
         m_changed.notify_all();
     }
     bool try_get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
     {
         LockGuard lg(m_lock);
-        if (m_handover == 0) return false;
+        if (m_handover == nullptr) return false;
         h = move(m_handover);
         v = m_version;
-        m_handover = 0;
+        m_handover = nullptr;
         m_changed.notify_all();
         return true;
     }

@@ -200,7 +200,7 @@ void remove_mapping(void* addr, size_t size)
 
 void* mmap_anon(size_t size)
 {
-    void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
@@ -253,7 +253,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
                 break;
         }
 
-        void* addr = ::mmap(0, size, prot, MAP_SHARED, fd, offset);
+        void* addr = ::mmap(nullptr, size, prot, MAP_SHARED, fd, offset);
         if (addr != MAP_FAILED)
             return addr;
     }

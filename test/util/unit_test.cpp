@@ -323,7 +323,7 @@ void TestList::ExecContext::run()
             test->test_results.test_failed(message);
         }
 
-        test->test_results.m_context = 0;
+        test->test_results.m_context = nullptr;
         if (m_errors_seen)
             ++m_num_failed_tests;
     }

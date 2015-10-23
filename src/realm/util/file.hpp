@@ -641,7 +641,7 @@ class File::CloseGuard {
 public:
     CloseGuard(File& f) noexcept: m_file(&f) {}
     ~CloseGuard() noexcept { if (m_file) m_file->close(); }
-    void release() noexcept { m_file = 0; }
+    void release() noexcept { m_file = nullptr; }
 private:
     File* m_file;
 };
@@ -651,7 +651,7 @@ class File::UnlockGuard {
 public:
     UnlockGuard(File& f) noexcept: m_file(&f) {}
     ~UnlockGuard() noexcept { if (m_file) m_file->unlock(); }
-    void release() noexcept { m_file = 0; }
+    void release() noexcept { m_file = nullptr; }
 private:
     File* m_file;
 };
@@ -662,7 +662,7 @@ public:
     template<class T>
     UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
     ~UnmapGuard() noexcept { if (m_map) m_map->unmap(); }
-    void release() noexcept { m_map = 0; }
+    void release() noexcept { m_map = nullptr; }
 private:
     MapBase* m_map;
 };
@@ -753,7 +753,7 @@ private:
 inline File::File(const std::string& path, Mode m)
 {
 #ifdef _WIN32
-    m_handle = 0;
+    m_handle = nullptr;
 #else
     m_fd = -1;
 #endif
@@ -764,7 +764,7 @@ inline File::File(const std::string& path, Mode m)
 inline File::File() noexcept
 {
 #ifdef _WIN32
-    m_handle = 0;
+    m_handle = nullptr;
 #else
     m_fd = -1;
 #endif

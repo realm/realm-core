@@ -1086,7 +1086,7 @@ void Table::discard_row_accessors() noexcept
     LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
         row->m_table.reset(); // Detach
-    m_row_accessors = 0;
+    m_row_accessors = nullptr;
 }
 
 

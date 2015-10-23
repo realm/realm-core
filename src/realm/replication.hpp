@@ -206,7 +206,7 @@ public:
     /// \throw BadTransactLog If the transaction log could not be successfully
     /// parsed, or ended prematurely.
     static void apply_changeset(InputStream& transact_log, Group& target,
-                                util::Logger* logger = 0);
+                                util::Logger* logger = nullptr);
 
     virtual ~Replication() noexcept {}
 
@@ -291,7 +291,7 @@ protected:
     virtual void finalize_changeset() noexcept = 0;
 
     static void apply_changeset(const char* data, size_t size, SharedGroup& target,
-                                util::Logger* logger = 0);
+                                util::Logger* logger = nullptr);
 
 private:
     const std::string m_database_file;

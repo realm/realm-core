@@ -735,7 +735,7 @@ public:
 
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string,
-                 std::string>* renames = 0) const;
+                 std::string>* renames = nullptr) const;
     void to_string(std::ostream& out, size_t limit = 500) const;
     void row_to_string(size_t row_ndx, std::ostream& out) const;
 
@@ -1581,7 +1581,7 @@ public:
     Table* release() noexcept
     {
         Table* table = m_table;
-        m_table = 0;
+        m_table = nullptr;
         return table;
     }
 

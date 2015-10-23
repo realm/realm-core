@@ -87,7 +87,7 @@ public:
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
                                 ArrayParent*& keys_parent, size_t& keys_ndx);
     size_t get_enumkeys_ndx(size_t column_ndx) const noexcept;
-    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = 0,
+    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = nullptr,
                               size_t* keys_ndx = nullptr) noexcept;
 
     // Links
