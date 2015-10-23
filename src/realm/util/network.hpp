@@ -248,6 +248,12 @@ public:
     /// called before post() returns. If post() is called from another
     /// completion handler, the submitted handler is guaranteed to not be called
     /// during the execution of post().
+    ///
+    /// Completion handlers added through post() will be executed in the order
+    /// that they are added. More precisely, if post() is called twice to add
+    /// two handlers, A and B, and the execution of post(A) ands before the
+    /// beginning of the execution of post(B), then A is guaranteed to execute
+    /// before B.
     template<class H> void post(const H& handler);
 
 private:
@@ -386,8 +392,8 @@ private:
 protected:
     io_service& m_service;
     protocol m_protocol;
-    io_service::async_oper* m_read_oper  = 0; // Read or accept
-    io_service::async_oper* m_write_oper = 0; // Write or connect
+    io_service::async_oper* m_read_oper  = nullptr; // Read or accept
+    io_service::async_oper* m_write_oper = nullptr; // Write or connect
 
     socket_base(io_service&);
 
@@ -395,8 +401,8 @@ protected:
     virtual void do_open(const protocol&, std::error_code&);
     void do_close() noexcept;
 
-    void get_option(opt_enum, void* value_data, std::size_t& value_size, std::error_code&) const;
-    void set_option(opt_enum, const void* value_data, std::size_t value_size, std::error_code&);
+    void get_option(opt_enum, void* value_data, size_t& value_size, std::error_code&) const;
+    void set_option(opt_enum, const void* value_data, size_t value_size, std::error_code&);
     void map_option(opt_enum, int& level, int& option_name) const;
 
     friend class acceptor;
@@ -449,10 +455,10 @@ public:
     /// \param ep The remote endpoint of the connection to be established.
     template<class H> void async_connect(const endpoint& ep, const H& handler);
 
-    void write(const char* data, std::size_t size);
-    std::error_code write(const char* data, std::size_t size, std::error_code&) noexcept;
+    void write(const char* data, size_t size);
+    std::error_code write(const char* data, size_t size, std::error_code&) noexcept;
 
-    template<class H> void async_write(const char* data, std::size_t size, const H& handler);
+    template<class H> void async_write(const char* data, size_t size, const H& handler);
 
     /// @{ \brief Read at least one byte from this socket.
     ///
@@ -469,12 +475,12 @@ public:
     /// The two argument version always return a value greater than zero, and
     /// the three argument version returns a value greather than zero if, and
     /// only if `ec` is set to indicate success (no error, and no end of input).
-    std::size_t read_some(char* buffer, std::size_t size);
-    std::size_t read_some(char* buffer, std::size_t size, std::error_code& ec) noexcept;
+    size_t read_some(char* buffer, size_t size);
+    size_t read_some(char* buffer, size_t size, std::error_code& ec) noexcept;
     /// @}
 
-    std::size_t write_some(const char* data, std::size_t size);
-    std::size_t write_some(const char* data, std::size_t size, std::error_code&) noexcept;
+    size_t write_some(const char* data, size_t size);
+    size_t write_some(const char* data, size_t size, std::error_code&) noexcept;
 
 protected:
     void do_open(const protocol&, std::error_code&) override;
@@ -553,11 +559,11 @@ public:
     buffered_input_stream(socket&);
     ~buffered_input_stream() noexcept {}
 
-    std::size_t read(char* buffer, std::size_t size);
-    std::size_t read(char* buffer, std::size_t size, std::error_code&) noexcept;
+    size_t read(char* buffer, size_t size);
+    size_t read(char* buffer, size_t size, std::error_code&) noexcept;
 
-    std::size_t read_until(char* buffer, std::size_t size, char delim);
-    std::size_t read_until(char* buffer, std::size_t size, char delim,
+    size_t read_until(char* buffer, size_t size, char delim);
+    size_t read_until(char* buffer, size_t size, char delim,
                            std::error_code&) noexcept;
 
     /// @{ \brief Perform an asynchronous read operation.
@@ -603,10 +609,10 @@ public:
     ///
     ///  - The asynchronous operation is canceled (the socket is closed).
     template<class H>
-    void async_read(char* buffer, std::size_t size, const H& handler);
+    void async_read(char* buffer, size_t size, const H& handler);
 
     template<class H>
-    void async_read_until(char* buffer, std::size_t size, char delim, const H& handler);
+    void async_read_until(char* buffer, size_t size, char delim, const H& handler);
     /// @}
 
 private:
@@ -614,15 +620,15 @@ private:
     template<class H> class read_oper;
 
     socket& m_socket;
-    static const std::size_t s_buffer_size = 1024;
+    static const size_t s_buffer_size = 1024;
     std::unique_ptr<char[]> m_buffer;
     char* m_begin;
     char* m_end;
 
-    std::size_t do_read(char* buffer, std::size_t size, int delim, std::error_code&) noexcept;
+    size_t do_read(char* buffer, size_t size, int delim, std::error_code&) noexcept;
 
     template<class H>
-    void async_read(char* buffer, std::size_t size, int delim, const H& handler);
+    void async_read(char* buffer, size_t size, int delim, const H& handler);
     void do_async_read(std::unique_ptr<read_oper_base>);
 };
 
@@ -681,7 +687,7 @@ private:
     using clock = io_service::clock;
 
     io_service& m_service;
-    io_service::wait_oper_base* m_wait_oper = 0;
+    io_service::wait_oper_base* m_wait_oper = nullptr;
 };
 
 
@@ -859,7 +865,7 @@ public:
     virtual ~async_oper() noexcept {}
 
 private:
-    async_oper* m_next = 0;
+    async_oper* m_next = nullptr;
     friend class io_service;
 };
 
@@ -1149,7 +1155,7 @@ private:
 };
 template<class H> class socket::write_oper: public io_service::async_oper {
 public:
-    write_oper(socket& s, const char* data, std::size_t size, const H& handler):
+    write_oper(socket& s, const char* data, size_t size, const H& handler):
         m_socket(s),
         m_begin(data),
         m_end(data + size),
@@ -1163,8 +1169,8 @@ public:
         REALM_ASSERT(!canceled);
         REALM_ASSERT(!m_error_code);
         REALM_ASSERT(m_curr <= m_end);
-        std::size_t n_1 = std::size_t(m_end - m_curr);
-        std::size_t n_2 = m_socket.write_some(m_curr, n_1, m_error_code);
+        size_t n_1 = size_t(m_end - m_curr);
+        size_t n_2 = m_socket.write_some(m_curr, n_1, m_error_code);
         REALM_ASSERT(n_2 <= n_1);
         m_curr += n_2;
         complete = (m_error_code || m_curr == m_end);
@@ -1174,7 +1180,7 @@ public:
         REALM_ASSERT(complete || canceled);
         REALM_ASSERT(complete == (m_error_code || m_curr == m_end));
         REALM_ASSERT(m_curr >= m_begin);
-        std::size_t num_bytes_transferred = std::size_t(m_curr - m_begin);
+        size_t num_bytes_transferred = size_t(m_curr - m_begin);
         std::error_code ec;
         if (canceled) {
             ec = error::operation_aborted;
@@ -1217,7 +1223,7 @@ template<class H> inline void socket::async_connect(const endpoint& ep, const H&
     m_write_oper = op_2;
 }
 
-inline void socket::write(const char* data, std::size_t size)
+inline void socket::write(const char* data, size_t size)
 {
     std::error_code ec;
     if (write(data, size, ec))
@@ -1225,7 +1231,7 @@ inline void socket::write(const char* data, std::size_t size)
 }
 
 template<class H>
-inline void socket::async_write(const char* data, std::size_t size, const H& handler)
+inline void socket::async_write(const char* data, size_t size, const H& handler)
 {
     REALM_ASSERT(!m_write_oper);
     std::unique_ptr<write_oper<H>> op;
@@ -1235,19 +1241,19 @@ inline void socket::async_write(const char* data, std::size_t size, const H& han
     m_write_oper = op_2;
 }
 
-inline std::size_t socket::read_some(char* buffer, std::size_t size)
+inline size_t socket::read_some(char* buffer, size_t size)
 {
     std::error_code ec;
-    std::size_t n = read_some(buffer, size, ec);
+    size_t n = read_some(buffer, size, ec);
     if (ec)
         throw std::system_error(ec);
     return n;
 }
 
-inline std::size_t socket::write_some(const char* data, std::size_t size)
+inline size_t socket::write_some(const char* data, size_t size)
 {
     std::error_code ec;
-    std::size_t n = write_some(data, size, ec);
+    size_t n = write_some(data, size, ec);
     if (ec)
         throw std::system_error(ec);
     return n;
@@ -1335,7 +1341,7 @@ inline void acceptor::accept(socket& sock, endpoint& ep)
 
 inline std::error_code acceptor::accept(socket& sock, std::error_code& ec)
 {
-    endpoint* ep = 0;
+    endpoint* ep = nullptr;
     return accept(sock, ep, ec); // Throws
 }
 
@@ -1346,7 +1352,7 @@ inline std::error_code acceptor::accept(socket& sock, endpoint& ep, std::error_c
 
 template<class H> inline void acceptor::async_accept(socket& sock, const H& handler)
 {
-    endpoint* ep = 0;
+    endpoint* ep = nullptr;
     async_accept(sock, ep, handler); // Throws
 }
 
@@ -1380,7 +1386,7 @@ template<class H> inline void acceptor::async_accept(socket& sock, endpoint* ep,
 class buffered_input_stream::read_oper_base:
         public io_service::async_oper {
 public:
-    read_oper_base(buffered_input_stream& s, char* buffer, std::size_t size, int delim):
+    read_oper_base(buffered_input_stream& s, char* buffer, size_t size, int delim):
         m_stream(s),
         m_out_begin(buffer),
         m_out_end(buffer + size),
@@ -1403,7 +1409,7 @@ template<class H>
 class buffered_input_stream::read_oper:
         public read_oper_base {
 public:
-    read_oper(buffered_input_stream& s, char* buffer, std::size_t size, int delim, const H& h):
+    read_oper(buffered_input_stream& s, char* buffer, size_t size, int delim, const H& h):
         read_oper_base(s, buffer, size, delim),
         m_handler(h)
     {
@@ -1416,7 +1422,7 @@ public:
                                                    std::char_traits<char>::to_char_type(m_delim) :
                                                    m_out_curr == m_out_end)));
         REALM_ASSERT(m_out_curr >= m_out_begin);
-        std::size_t num_bytes_transferred = std::size_t(m_out_curr - m_out_begin);
+        size_t num_bytes_transferred = size_t(m_out_curr - m_out_begin);
         std::error_code ec;
         if (canceled) {
             ec = error::operation_aborted;
@@ -1440,51 +1446,51 @@ inline buffered_input_stream::buffered_input_stream(socket& sock):
 {
 }
 
-inline std::size_t buffered_input_stream::read(char* buffer, std::size_t size)
+inline size_t buffered_input_stream::read(char* buffer, size_t size)
 {
     std::error_code ec;
-    std::size_t n = read(buffer, size, ec);
+    size_t n = read(buffer, size, ec);
     if (ec)
         throw std::system_error(ec);
     return n;
 }
 
-inline std::size_t buffered_input_stream::read(char* buffer, std::size_t size,
+inline size_t buffered_input_stream::read(char* buffer, size_t size,
                                                std::error_code& ec) noexcept
 {
     return do_read(buffer, size, std::char_traits<char>::eof(), ec);
 }
 
-inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t size, char delim)
+inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim)
 {
     std::error_code ec;
-    std::size_t n = read_until(buffer, size, delim, ec);
+    size_t n = read_until(buffer, size, delim, ec);
     if (ec)
         throw std::system_error(ec);
     return n;
 }
 
-inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t size, char delim,
+inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim,
                                                      std::error_code& ec) noexcept
 {
     return do_read(buffer, size, std::char_traits<char>::to_int_type(delim), ec);
 }
 
 template<class H>
-inline void buffered_input_stream::async_read(char* buffer, std::size_t size, const H& handler)
+inline void buffered_input_stream::async_read(char* buffer, size_t size, const H& handler)
 {
     async_read(buffer, size, std::char_traits<char>::eof(), handler);
 }
 
 template<class H>
-inline void buffered_input_stream::async_read_until(char* buffer, std::size_t size, char delim,
+inline void buffered_input_stream::async_read_until(char* buffer, size_t size, char delim,
                                                     const H& handler)
 {
     async_read(buffer, size, std::char_traits<char>::to_int_type(delim), handler);
 }
 
 template<class H>
-inline void buffered_input_stream::async_read(char* buffer, std::size_t size, int delim,
+inline void buffered_input_stream::async_read(char* buffer, size_t size, int delim,
                                               const H& handler)
 {
     REALM_ASSERT(!m_socket.m_read_oper);

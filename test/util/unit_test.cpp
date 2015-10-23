@@ -250,7 +250,7 @@ public:
     bool m_errors_seen;
 
     ExecContext():
-        m_shared(0),
+        m_shared(nullptr),
         m_num_checks(0),
         m_num_failed_checks(0),
         m_num_failed_tests(0)
@@ -403,9 +403,9 @@ TestList& get_default_test_list()
 
 
 TestResults::TestResults():
-    m_test(0),
-    m_list(0),
-    m_context(0)
+    m_test(nullptr),
+    m_list(nullptr),
+    m_context(nullptr)
 {
 }
 

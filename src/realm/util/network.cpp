@@ -156,20 +156,20 @@ public:
         if (m_back)
             std::swap(m_back->m_next, q.m_back->m_next);
         m_back = q.m_back;
-        q.m_back = 0;
+        q.m_back = nullptr;
     }
     std::unique_ptr<async_oper> pop_front() noexcept
     {
-        async_oper* op = 0;
+        async_oper* op = nullptr;
         if (m_back) {
             op = m_back->m_next;
             if (op != m_back) {
                 m_back->m_next = op->m_next;
             }
             else {
-                m_back = 0;
+                m_back = nullptr;
             }
-            op->m_next = 0;
+            op->m_next = nullptr;
         }
         return std::unique_ptr<async_oper>(op);
     }
@@ -187,7 +187,7 @@ public:
         }
     }
 private:
-    async_oper* m_back = 0;
+    async_oper* m_back = nullptr;
 };
 
 
@@ -241,6 +241,7 @@ public:
             LockGuard l(m_mutex);
             if (m_stopped)
                 return;
+            // Note: Order of post operations must be preserved.
             m_completed_operations.push_back(m_post_operations);
 
             if (m_completed_operations.empty())
@@ -459,13 +460,13 @@ private:
     {
         size_t num_ready_descriptors = 0;
         {
-            wait_oper_base* next_wait_op = 0;
+            wait_oper_base* next_wait_op = nullptr;
             if (!m_wait_operations.empty())
                 next_wait_op = m_wait_operations.top().get();
 
             // std::vector guarantees contiguous storage
             pollfd* fds = &m_pollfd_slots.front();
-            nfds_t nfds = m_pollfd_slots.size();
+            nfds_t nfds = nfds_t(m_pollfd_slots.size());
             for (;;) {
                 int max_wait_millis = -1; // Wait indefinitely
                 if (next_wait_op) {
@@ -643,7 +644,7 @@ void io_service::stop() noexcept
 
 void io_service::reset() noexcept
 {
-    m_impl->reset();
+    m_impl->reset(); // Throws
 }
 
 void io_service::add_io_oper(int fd, std::unique_ptr<async_oper> op, io_op type)
@@ -870,7 +871,7 @@ void socket_base::set_option(opt_enum opt, const void* value_data, size_t value_
     int option_name = 0;
     map_option(opt, level, option_name);
 
-    int ret = ::setsockopt(m_sock_fd, level, option_name, value_data, value_size);
+    int ret = ::setsockopt(m_sock_fd, level, option_name, value_data, socklen_t(value_size));
     if (REALM_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
         return;

@@ -141,13 +141,13 @@ public:
     /// constructed in the unattached state.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// \brief Same as calling the corrsponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     struct unattached_tag {};
 
@@ -203,12 +203,12 @@ public:
     ///        and an upgrade is required.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel = durability_Full,
-              const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in exixtence for as long as the SharedGroup.
     void open(Replication&, DurabilityLevel = durability_Full,
-              const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -238,7 +238,7 @@ public:
     ///
     /// It is an error to call this function on an unattached shared
     /// group. Doing so will result in undefined behavior.
-    void reserve(std::size_t size_in_bytes);
+    void reserve(size_t size_in_bytes);
 
     /// Querying for changes:
     ///
@@ -290,7 +290,7 @@ public:
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
 
-    using version_type = uint_fast64_t;
+    using version_type = History::version_type;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
@@ -505,8 +505,8 @@ private:
         uint_fast32_t   m_reader_idx;
         ref_type        m_top_ref;
         size_t          m_file_size;
-        // FIXME: Bad initialization as std::size_t is not necessarily equal to uint_fast64_t.
-        ReadLockInfo() : m_version(std::numeric_limits<std::size_t>::max()),
+        // FIXME: Bad initialization as size_t is not necessarily equal to uint_fast64_t.
+        ReadLockInfo() : m_version(std::numeric_limits<size_t>::max()),
                          m_reader_idx(0), m_top_ref(0), m_file_size(0) {};
     };
     class ReadLockUnlockGuard;
@@ -543,12 +543,12 @@ private:
 
     // Ring buffer managment
     bool        ringbuf_is_empty() const noexcept;
-    std::size_t ringbuf_size() const noexcept;
-    std::size_t ringbuf_capacity() const noexcept;
-    bool        ringbuf_is_first(std::size_t ndx) const noexcept;
+    size_t ringbuf_size() const noexcept;
+    size_t ringbuf_capacity() const noexcept;
+    bool        ringbuf_is_first(size_t ndx) const noexcept;
     void        ringbuf_remove_first() noexcept;
-    std::size_t ringbuf_find(uint64_t version) const noexcept;
-    ReadCount&  ringbuf_get(std::size_t ndx) noexcept;
+    size_t ringbuf_find(uint64_t version) const noexcept;
+    ReadCount&  ringbuf_get(size_t ndx) noexcept;
     ReadCount&  ringbuf_get_first() noexcept;
     ReadCount&  ringbuf_get_last() noexcept;
     void        ringbuf_put(const ReadCount& v);
@@ -632,7 +632,7 @@ public:
         return get_group().has_table(name);
     }
 
-    ConstTableRef get_table(std::size_t table_ndx) const
+    ConstTableRef get_table(size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
     }
@@ -673,7 +673,7 @@ public:
         return get_group().has_table(name);
     }
 
-    TableRef get_table(std::size_t table_ndx) const
+    TableRef get_table(size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
     }
@@ -688,7 +688,7 @@ public:
         return get_group().add_table(name, require_unique_name); // Throws
     }
 
-    TableRef get_or_add_table(StringData name, bool* was_added = 0) const
+    TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table(name, was_added); // Throws
     }
@@ -704,7 +704,7 @@ public:
         return get_group().add_table<T>(name, require_unique_name); // Throws
     }
 
-    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0) const
+    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
@@ -829,7 +829,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
     std::unique_ptr<Handover<T>> result(new Handover<T>());
     // Implementation note:
     // often, the return value from clone will be T*, BUT it may be ptr to some base of T
-    // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
+    // instead, so we must cast it to T*. This is alway safe, because no matter the type,
     // clone() will clone the actual accessor instance, and hence return an instance of the
     // same type.
     result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
@@ -1086,7 +1086,7 @@ public:
         bool no_create = true;
         SharedGroup::DurabilityLevel durability = SharedGroup::durability_Async;
         bool is_backend = true;
-        const char* encryption_key = 0;
+        const char* encryption_key = nullptr;
         bool allow_file_format_upgrade = false;
         sg.do_open_1(file, no_create, durability, is_backend, encryption_key,
                      allow_file_format_upgrade); // Throws

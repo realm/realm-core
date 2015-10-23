@@ -137,7 +137,7 @@ public:
     void set_double(double) noexcept;
     void set_string(StringData) noexcept;
     void set_binary(BinaryData) noexcept;
-    void set_binary(const char* data, std::size_t size) noexcept;
+    void set_binary(const char* data, size_t size) noexcept;
     void set_datetime(DateTime) noexcept;
 
     template<class Ch, class Tr>
@@ -153,7 +153,7 @@ private:
         const char*  m_data;
         int_fast64_t m_date;
     };
-    std::size_t m_size = 0;
+    size_t m_size = 0;
 };
 
 // Note: We cannot compare two mixed values, since when the type of
@@ -350,7 +350,7 @@ inline void Mixed::set_binary(BinaryData v) noexcept
     set_binary(v.data(), v.size());
 }
 
-inline void Mixed::set_binary(const char* data, std::size_t size) noexcept
+inline void Mixed::set_binary(const char* data, size_t size) noexcept
 {
     m_type = type_Binary;
     m_data = data;

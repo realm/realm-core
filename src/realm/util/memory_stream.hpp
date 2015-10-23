@@ -57,7 +57,7 @@ public:
     void set_buffer(char* begin, char* end) noexcept;
 
     /// Returns the amount of data written to the buffer.
-    std::size_t size() const noexcept;
+    size_t size() const noexcept;
 };
 
 
@@ -84,10 +84,10 @@ public:
 
     void set_buffer(char *begin, char *end) noexcept;
 
-    template<std::size_t N> void set_buffer(char (&buffer)[N]) noexcept;
+    template<size_t N> void set_buffer(char (&buffer)[N]) noexcept;
 
     /// Returns the amount of data written to the underlying buffer.
-    std::size_t size() const noexcept;
+    size_t size() const noexcept;
 
 private:
     MemoryOutputStreambuf m_streambuf;
@@ -100,9 +100,9 @@ private:
 // Implementation
 
 inline MemoryInputStreambuf::MemoryInputStreambuf():
-    m_begin(0),
-    m_end(0),
-    m_curr(0)
+    m_begin(nullptr),
+    m_end(nullptr),
+    m_curr(nullptr)
 {
 }
 
@@ -131,7 +131,7 @@ inline void MemoryOutputStreambuf::set_buffer(char* begin, char* end) noexcept
     setp(begin, end);
 }
 
-inline std::size_t MemoryOutputStreambuf::size() const noexcept
+inline size_t MemoryOutputStreambuf::size() const noexcept
 {
     return pptr() - pbase();
 }
@@ -182,13 +182,13 @@ inline void MemoryOutputStream::set_buffer(char *begin, char *end) noexcept
     clear();
 }
 
-template<std::size_t N>
+template<size_t N>
 inline void MemoryOutputStream::set_buffer(char (&buffer)[N]) noexcept
 {
     set_buffer(buffer, buffer+N);
 }
 
-inline std::size_t MemoryOutputStream::size() const noexcept
+inline size_t MemoryOutputStream::size() const noexcept
 {
     return m_streambuf.size();
 }

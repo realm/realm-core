@@ -34,13 +34,16 @@
 
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
+// prototype here to silence warning
+extern "C" REALM_NORETURN REALM_NOINLINE
+void please_report_this_error_to_help_at_realm_dot_io();
+
 extern "C" REALM_NORETURN REALM_NOINLINE
 void please_report_this_error_to_help_at_realm_dot_io() {
     std::abort();
 }
 
-namespace realm {
-namespace util {
+namespace {
 
 #ifdef __APPLE__
 void nslog(const char *message) {
@@ -57,6 +60,11 @@ void nslog(const char *message) {
     CFRelease(str);
 }
 #endif
+
+} // unnamed namespace
+
+namespace realm {
+namespace util {
 
 REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
 {

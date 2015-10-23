@@ -33,15 +33,6 @@ namespace realm {
 class ClientHistory: public Replication, public History {
 public:
     using version_type = History::version_type;
-
-    /// Implements History::get_changesets().
-    ///
-    /// See get_history_entries() for information about the period of validity
-    /// of the referenced changeset memory.
-    virtual void get_changesets(version_type begin_version, version_type end_version,
-                                BinaryData* buffer) const noexcept override = 0;
-
-    virtual ~ClientHistory() noexcept {}
 };
 
 
@@ -60,8 +51,8 @@ public:
 /// writelog collectors associated with said filepath.  The caller assumes
 /// ownership of the writelog collector and must destroy it, but only AFTER
 /// destruction of the shared group using it.
-std::unique_ptr<ClientHistory> make_client_history(const std::string& path,
-                                                   const char* encryption_key = 0);
+std::unique_ptr<ClientHistory>
+make_client_history(const std::string& path, const char* encryption_key = nullptr);
 
 } // namespace realm
 

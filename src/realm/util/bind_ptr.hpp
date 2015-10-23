@@ -21,17 +21,11 @@
 #define REALM_UTIL_BIND_PTR_HPP
 
 #include <algorithm>
+#include <atomic>
 #include <ostream>
+#include <utility>
 
 #include <realm/util/features.h>
-
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
-#  include <utility>
-#endif
-
-#ifdef REALM_HAVE_CXX11_ATOMIC
-#  include <atomic>
-#endif
 
 
 namespace realm {
@@ -56,12 +50,10 @@ namespace util {
 /// destructor never throws.
 template<class T> class bind_ptr {
 public:
-    constexpr bind_ptr() noexcept: m_ptr(0) {}
+    constexpr bind_ptr() noexcept: m_ptr(nullptr) {}
     explicit bind_ptr(T* p) noexcept { bind(p); }
     template<class U> explicit bind_ptr(U* p) noexcept { bind(p); }
     ~bind_ptr() noexcept { unbind(); }
-
-#ifdef REALM_HAVE_CXX11_RVALUE_REFERENCE
 
     // Copy construct
     bind_ptr(const bind_ptr& p) noexcept { bind(p.m_ptr); }
@@ -78,18 +70,6 @@ public:
     // Move assign
     bind_ptr& operator=(bind_ptr&& p) noexcept { bind_ptr(std::move(p)).swap(*this); return *this; }
     template<class U> bind_ptr& operator=(bind_ptr<U>&& p) noexcept { bind_ptr(std::move(p)).swap(*this); return *this; }
-
-#else // !REALM_HAVE_CXX11_RVALUE_REFERENCE
-
-    // Copy construct
-    bind_ptr(const bind_ptr& p) noexcept { bind(p.m_ptr); }
-    template<class U> bind_ptr(bind_ptr<U> p) noexcept: m_ptr(p.release()) {}
-
-    // Copy assign
-    bind_ptr& operator=(bind_ptr p) noexcept { p.swap(*this); return *this; }
-    template<class U> bind_ptr& operator=(bind_ptr<U> p) noexcept { bind_ptr(move(p)).swap(*this); return *this; }
-
-#endif // !REALM_HAVE_CXX11_RVALUE_REFERENCE
 
     // Replacement for std::move() in C++11
     friend bind_ptr move(bind_ptr& p) noexcept { return bind_ptr(&p, move_tag()); }
@@ -114,12 +94,7 @@ public:
     T& operator*() const noexcept { return *m_ptr; }
     T* operator->() const noexcept { return m_ptr; }
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept { return m_ptr != 0; }
-#else
-    typedef T* bind_ptr::*unspecified_bool_type;
-    operator unspecified_bool_type() const noexcept { return m_ptr ? &bind_ptr::m_ptr : 0; }
-#endif
 
     T* get() const noexcept { return m_ptr; }
     void reset() noexcept { bind_ptr().swap(*this); }
@@ -140,8 +115,8 @@ protected:
 private:
     T* m_ptr;
 
-    void bind(T* p) noexcept { if (p) p->bind_ref(); m_ptr = p; }
-    void unbind() noexcept { if (m_ptr) m_ptr->unbind_ref(); }
+    void bind(T* p) noexcept { if (p) p->bind_ptr(); m_ptr = p; }
+    void unbind() noexcept { if (m_ptr) m_ptr->unbind_ptr(); }
 
     T* release() noexcept { T* const p = m_ptr; m_ptr = nullptr; return p; }
 
@@ -181,8 +156,8 @@ public:
     virtual ~RefCountBase() noexcept {}
 
 protected:
-    void bind_ref() const noexcept { ++m_ref_count; }
-    void unbind_ref() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept { ++m_ref_count; }
+    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
 
 private:
     mutable unsigned long m_ref_count;
@@ -191,7 +166,6 @@ private:
 };
 
 
-#ifdef REALM_HAVE_CXX11_ATOMIC
 /// Same as RefCountBase, but this one makes the copying of, and the
 /// destruction of counted references thread-safe.
 ///
@@ -207,15 +181,14 @@ protected:
     // std::memory_order_seq_cst. I'm not sure whether this is the
     // choice that leads to maximum efficiency, but at least it is
     // safe.
-    void bind_ref() const noexcept { ++m_ref_count; }
-    void unbind_ref() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept { ++m_ref_count; }
+    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
 
 private:
     mutable std::atomic<unsigned long> m_ref_count;
 
     template<class> friend class bind_ptr;
 };
-#endif // REALM_HAVE_CXX11_ATOMIC
 
 
 

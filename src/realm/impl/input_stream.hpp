@@ -51,7 +51,7 @@ public:
 
 class SimpleInputStream: public InputStream {
 public:
-    SimpleInputStream(const char* data, std::size_t size) noexcept:
+    SimpleInputStream(const char* data, size_t size) noexcept:
         m_ptr(data),
         m_end(data + size)
     {
@@ -108,17 +108,17 @@ private:
 
 class SimpleNoCopyInputStream: public NoCopyInputStream {
 public:
-    SimpleNoCopyInputStream(const char* data, std::size_t size):
+    SimpleNoCopyInputStream(const char* data, size_t size):
         m_data(data),
         m_size(size)
     {
     }
 
-    std::size_t next_block(const char*& begin, const char*& end) override
+    size_t next_block(const char*& begin, const char*& end) override
     {
         if (m_size == 0)
             return 0;
-        std::size_t size = m_size;
+        size_t size = m_size;
         begin = m_data;
         end = m_data + size;
         m_size = 0;
@@ -127,7 +127,7 @@ public:
 
 private:
     const char* m_data;
-    std::size_t m_size;
+    size_t m_size;
 };
 
 class MultiLogNoCopyInputStream: public NoCopyInputStream {

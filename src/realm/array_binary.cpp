@@ -16,13 +16,13 @@ void ArrayBinary::init_from_mem(MemRef mem) noexcept
     Array::init_from_mem(mem);
     ref_type offsets_ref = get_as_ref(0);
     ref_type blob_ref = get_as_ref(1);
-    
+
     m_offsets.init_from_ref(offsets_ref);
     m_blob.init_from_ref(blob_ref);
 
     if (!legacy_array_type()) {
         ref_type nulls_ref = get_as_ref(2);
-        m_nulls.init_from_ref(nulls_ref);        
+        m_nulls.init_from_ref(nulls_ref);
     }
 }
 
@@ -40,7 +40,7 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
         ++stored_size;
     size_t offset = stored_size;
     if (!m_offsets.is_empty())
-        offset += m_offsets.back();//fixme:32bit:src\realm\array_binary.cpp(61): warning C4244: '+=' : conversion from 'int64_t' to 'size_t', possible loss of data
+        offset += to_size_t(m_offsets.back());
     m_offsets.add(offset);
 
     if (!legacy_array_type())

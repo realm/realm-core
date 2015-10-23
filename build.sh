@@ -64,6 +64,7 @@ Available modes are:
     config:                             
     clean:                              
     build:                              
+    build-arm-benchmark:
     build-config-progs:                 
     build-osx:                          
     build-iphone:                       
@@ -78,7 +79,6 @@ Available modes are:
     check-debug:                        
     memcheck:                           
     memcheck-debug:                     
-    check-doc-examples:                 
     check-testcase:                     
     check-testcase-debug:               
     memcheck-testcase:                  
@@ -282,23 +282,28 @@ build_apple()
         if [ "$platform" = "$bitcode_platform" ]; then
             word_list_append "cflags_arch" "-mstrict-align" || exit 1
             word_list_append "cflags_arch" "-m$os_name-version-min=$min_version" || exit 1
-            word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
+            if [ "$enable_bitcode" = "yes" ]; then
+                word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
+            fi
         else
             word_list_append "cflags_arch" "-m$simulator_name-simulator-version-min=$min_version" || exit 1
-            word_list_append "cflags_arch" "-fembed-bitcode-marker" || exit 1
+            if [ "$enable_bitcode" = "yes" ]; then
+                word_list_append "cflags_arch" "-fembed-bitcode-marker" || exit 1
+            fi
         fi
         sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-        $MAKE -C "src/realm" "librealm-$platform.a" "librealm-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
-        mkdir "$temp_dir/platforms/$platform" || exit 1
-        cp "src/realm/librealm-$platform.a"     "$temp_dir/platforms/$platform/librealm.a"     || exit 1
-        cp "src/realm/librealm-$platform-dbg.a" "$temp_dir/platforms/$platform/librealm-dbg.a" || exit 1
+        tag="$platform$platform_suffix"
+        $MAKE -C "src/realm" "librealm-$tag.a" "librealm-$tag-dbg.a" BASE_DENOM="$tag" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
+        mkdir "$temp_dir/platforms/$tag" || exit 1
+        cp "src/realm/librealm-$tag.a"     "$temp_dir/platforms/$tag/librealm.a"     || exit 1
+        cp "src/realm/librealm-$tag-dbg.a" "$temp_dir/platforms/$tag/librealm-dbg.a" || exit 1
     done
     REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-$simulator_name" "realm-config-$simulator_name-dbg" BASE_DENOM="$simulator_name" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_$all_caps_name" AR="libtool" ARFLAGS="-o" || exit 1
     mkdir -p "$dir" || exit 1
-    echo "Creating '$dir/librealm-$simulator_name.a'"
-    libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$dir/librealm-$simulator_name.a"     || exit 1
+    echo "Creating '$dir/librealm-$simulator_name$platform_suffix.a'"
+    libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$dir/librealm-$simulator_name$platform_suffix.a"     || exit 1
     echo "Creating '$dir/librealm-$simulator_name-dbg.a'"
-    libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$dir/librealm-$simulator_name-dbg.a" || exit 1
+    libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$dir/librealm-$simulator_name$platform_suffix-dbg.a" || exit 1
     echo "Copying headers to '$dir/include'"
     mkdir -p "$dir/include" || exit 1
     cp "src/realm.hpp" "$dir/include/" || exit 1
@@ -311,6 +316,7 @@ build_apple()
         y="$(printf "%s\n" "$x" | sed "s/realm-config/realm-config-$simulator_name/")" || exit 1
         cp "src/realm/$y" "$REALM_HOME/$dir/$x" || exit 1
     done
+    rm -rf "$temp_dir"
     echo "Done building"
     return 0
 }
@@ -764,6 +770,12 @@ EOF
         export sdks_config_key='IPHONE_SDKS'
         export dir="$IPHONE_DIR"
         export all_caps_name='IOS'
+        export platform_suffix='-bitcode'
+        export enable_bitcode='yes'
+        build_apple
+
+        export platform_suffix='-no-bitcode'
+        export enable_bitcode='no'
         build_apple
         ;;
 
@@ -778,6 +790,8 @@ EOF
         export sdks_config_key='WATCHOS_SDKS'
         export dir="$WATCHOS_DIR"
         export all_caps_name='WATCHOS'
+        export platform_suffix=''
+        export enable_bitcode='yes'
         build_apple
         ;;
 
@@ -792,6 +806,8 @@ EOF
         export sdks_config_key='TVOS_SDKS'
         export dir="$TVOS_DIR"
         export all_caps_name='TVOS'
+        export platform_suffix=''
+        export enable_bitcode='yes'
         build_apple
         ;;
 
@@ -951,11 +967,9 @@ EOF
         rm -f "$REALM_HOME/$file_name" || exit 1
         (cd "$REALM_HOME/$ANDROID_DIR" && tar czf "$REALM_HOME/$file_name" include $tar_files) || exit 1
 
-        echo "Unpacking in ../realm_java/$dir_name"
-        mkdir -p ../realm_java/realm-jni/build || exit 1 # to help Mr. Jenkins
-        cp "$REALM_HOME/$file_name" ../realm_java/realm-jni/build
-        (cd ../realm_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
-        (cd ../realm_java/$dir_name && tar xzf "$REALM_HOME/$file_name") || exit 1
+        echo "Copying to ../realm-java/"
+        mkdir -p ../realm-java/ || exit 1 # to help Mr. Jenkins
+        cp "$REALM_HOME/$file_name" "../realm-java/core-android-$realm_version.tar.gz"
         ;;
 
     "build-cocoa")
@@ -981,14 +995,7 @@ EOF
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
-        for original in "$IPHONE_DIR/librealm-ios.a" "$IPHONE_DIR/librealm-ios-dbg.a" "$WATCHOS_DIR/librealm-watchos.a" "$WATCHOS_DIR/librealm-watchos-dbg.a" "src/realm/librealm.a" "src/realm/librealm-dbg.a"; do
-            cp "$original" "$tmpdir/$BASENAME" || exit 1
-        done
-        for sdk in $iphone_sdks $watchos_sdks; do
-            platform="$(printf "%s\n" "$sdk" | cut -d: -f1)" || exit 1
-            cp "src/realm/librealm-$platform.a" "$tmpdir/$BASENAME" || exit 1
-            cp "src/realm/librealm-$platform-dbg.a" "$tmpdir/$BASENAME" || exit 1
-        done
+        cp "$IPHONE_DIR"/*.a "$WATCHOS_DIR"/*.a "src/realm/librealm.a" "src/realm/librealm-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
@@ -1046,7 +1053,6 @@ EOF
     "test"|"test-debug"|\
     "check"|"check-debug"|\
     "memcheck"|"memcheck-debug"|\
-    "check-doc-examples"|\
     "check-testcase"|"check-testcase-debug"|\
     "memcheck-testcase"|"memcheck-testcase-debug")
         auto_configure || exit 1
@@ -2883,6 +2889,10 @@ EOF
         exit 0
         ;;
 
+    "build-arm-benchmark")
+        CC=arm-linux-gnueabihf-gcc AR=arm-linux-gnueabihf-ar LD=arm-linux-gnueabihf-g++ make benchmark-common-tasks COMPILER_IS_GCC_LIKE=1 LD_IS_GCC_LIKE=1 EXTRA_CFLAGS=-mthumb
+        ;;
+
     "jenkins-pull-request")
         # Run by Jenkins for each pull request whenever it changes
         if ! [ -d "$WORKSPACE" ]; then
@@ -2904,7 +2914,6 @@ EOF
         sh build.sh build || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
         sh build.sh install || exit 1
-        sh build.sh check-doc-examples || exit 1
         (
             cd "examples" || exit 1
             make || exit 1

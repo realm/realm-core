@@ -68,6 +68,8 @@ const char* legend =
     "  csv -t=ssdbi Name Email Height Gender Age file.csv -s=1 file.realm\n"
     "  csv -stdin file.realm < cat file.csv";
 
+namespace {
+
 void abort2(bool b, const char* fmt, ...)
 {
     if(b) {
@@ -91,6 +93,8 @@ FILE* open_files(char* in)
         return f;
     }
 }
+
+} // unnamed namespace
 
 int main(int argc, char* argv[])
 {

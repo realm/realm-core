@@ -59,7 +59,7 @@ struct FindInLeaf {
     using LeafType = typename ColType::LeafType;
 
     template <Action action, class Condition, class T, class R>
-    static bool find(const LeafType& leaf, T target, std::size_t local_start, std::size_t local_end, std::size_t leaf_start, QueryState<R>& state)
+    static bool find(const LeafType& leaf, T target, size_t local_start, size_t local_end, size_t leaf_start, QueryState<R>& state)
     {
         Condition cond;
         bool cont = true;
@@ -80,7 +80,7 @@ struct FindInLeaf<Column<int64_t, Nullable>> {
     using LeafType = typename Column<int64_t, Nullable>::LeafType;
 
     template <Action action, class Condition, class T, class R>
-    static bool find(const LeafType& leaf, T target, std::size_t local_start, std::size_t local_end, std::size_t leaf_start, QueryState<R>& state)
+    static bool find(const LeafType& leaf, T target, size_t local_start, size_t local_end, size_t leaf_start, QueryState<R>& state)
     {
         const int c = Condition::condition;
         return leaf.find(c, action, target, local_start, local_end, leaf_start, &state);
@@ -90,8 +90,8 @@ struct FindInLeaf<Column<int64_t, Nullable>> {
 } // namespace _impl
 
 template <class T, class R, Action action, class Condition, class ColType>
-R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
-            std::size_t limit, std::size_t* return_ndx)
+R aggregate(const ColType& column, T target, size_t start, size_t end,
+            size_t limit, size_t* return_ndx)
 {
     if (end == npos)
         end = column.size();
@@ -101,10 +101,10 @@ R aggregate(const ColType& column, T target, std::size_t start, std::size_t end,
     SequentialGetter<ColType> sg { &column };
 
     bool cont = true;
-    for (std::size_t s = start; cont && s < end; ) {
+    for (size_t s = start; cont && s < end; ) {
         sg.cache_next(s);
-        std::size_t start2 = s - sg.m_leaf_start;
-        std::size_t end2 = sg.local_end(end);
+        size_t start2 = s - sg.m_leaf_start;
+        size_t end2 = sg.local_end(end);
         cont = _impl::FindInLeaf<ColType>::template find<action, Condition>(*sg.m_leaf_ptr, target, start2, end2, sg.m_leaf_start, state);
         s = sg.m_leaf_start + end2;
     }

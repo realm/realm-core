@@ -17,9 +17,10 @@
 * from Realm Incorporated.
 *
 **************************************************************************/
-#ifndef REALM_UTIL_UNICODE_HPP
-#define REALM_UTIL_UNICODE_HPP
+#ifndef REALM_UNICODE_HPP
+#define REALM_UNICODE_HPP
 
+#include <locale>
 #include <stdint.h>
 #include <string>
 
@@ -28,9 +29,6 @@
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
 
-#if REALM_HAVE_CXX11
-    #include <locale>
-#endif
 
 namespace realm {
 
@@ -41,34 +39,34 @@ namespace realm {
 
     // Description for set_string_compare_method():
     //
-    // Short summary: iOS language binding: call 
+    // Short summary: iOS language binding: call
     //     set_string_compare_method() for fast but slightly inaccurate sort in some countries, or
     //     set_string_compare_method(2, callbackptr) for slow but precise sort (see callbackptr below)
     //
-    // Different countries ('locales') have different sorting order for strings and letters. Because there unfortunatly 
+    // Different countries ('locales') have different sorting order for strings and letters. Because there unfortunatly
     // doesn't exist any unified standardized way to compare strings in C++ on multiple platforms, we need this method.
     //
     // It determins how sorting a TableView by a String column must take place. The 'method' argument can be:
     //
-    // 0: Fast core-only compare (no OS/framework calls). LIMITATIONS: Works only upto 'Latin Extended 2' (unicodes 
+    // 0: Fast core-only compare (no OS/framework calls). LIMITATIONS: Works only upto 'Latin Extended 2' (unicodes
     // 0...591). Also, sorting order is according to 'en_US' so it may be slightly inaccurate for some countries.
-    // 'callback' argument is ignored. 
+    // 'callback' argument is ignored.
     //
     // Return value: Always 'true'
     //
-    // 1: Native C++11 method if core is compiled as C++11. Gives precise sorting according 
-    // to user's current locale. LIMITATIONS: Currently works only on Windows and on Linux with clang. Does NOT work on 
-    // iOS (due to only 'C' locale being available in CoreFoundation, which puts 'Z' before 'a'). Unknown if works on 
-    // Windows Phone / Android. Furthermore it does NOT work on Linux with gcc 4.7 or 4.8 (lack of c++11 feature that 
-    // can convert utf8->wstring without calls to setlocale()). 
+    // 1: Native C++11 method if core is compiled as C++11. Gives precise sorting according
+    // to user's current locale. LIMITATIONS: Currently works only on Windows and on Linux with clang. Does NOT work on
+    // iOS (due to only 'C' locale being available in CoreFoundation, which puts 'Z' before 'a'). Unknown if works on
+    // Windows Phone / Android. Furthermore it does NOT work on Linux with gcc 4.7 or 4.8 (lack of c++11 feature that
+    // can convert utf8->wstring without calls to setlocale()).
     //
     // Return value: 'true' if supported, otherwise 'false' (if so, then previous setting, if any, is preserved).
     //
-    // 2: Callback method. Language binding / C++ user must provide a utf-8 callback method of prototype: 
+    // 2: Callback method. Language binding / C++ user must provide a utf-8 callback method of prototype:
     // bool callback(const char* string1, const char* string2) where 'callback' must return bool(string1 < string2).
     //
     // Return value: Always 'true'
-    // 
+    //
     // Default is method = 0 if the function is never called
     //
     // NOT THREAD SAFE! Call once during initialization or make sure it's not called simultaneously with different arguments
@@ -99,7 +97,7 @@ namespace realm {
     // Return bool(string1 < string2)
     bool utf8_compare(StringData string1, StringData string2);
 
-    // Return unicode value of character. 
+    // Return unicode value of character.
     uint32_t utf8value(const char* character);
 
     inline bool equal_sequence(const char*& begin, const char* end, const char* begin2);
@@ -131,11 +129,12 @@ namespace realm {
     // The case folded form would probably be using UTF-32 or UTF-16.
 
 
-    /// If successfull, writes a string to \a target of the same size as
-    /// \a source, and returns true. Returns false if invalid UTF-8
-    /// encoding was encountered.
-    bool case_map(StringData source, char* target, bool upper);
-    std::string case_map(StringData source, bool upper);
+    /// If successful, returns a string of the same size as \a source.
+    /// Returns none if invalid UTF-8 encoding was encountered.
+    util::Optional<std::string> case_map(StringData source, bool upper);
+
+    enum IgnoreErrorsTag { IgnoreErrors };
+    std::string case_map(StringData source, bool upper, IgnoreErrorsTag);
 
     /// Assumes that the sizes of \a needle_upper and \a needle_lower are
     /// identical to the size of \a haystack. Returns false if the needle
@@ -145,10 +144,10 @@ namespace realm {
     /// Assumes that the sizes of \a needle_upper and \a needle_lower are
     /// both equal to \a needle_size. Returns haystack.size() if the
     /// needle was not found.
-    std::size_t search_case_fold(StringData haystack, const char* needle_upper,
-        const char* needle_lower, std::size_t needle_size);
+    size_t search_case_fold(StringData haystack, const char* needle_upper,
+        const char* needle_lower, size_t needle_size);
 
 
 } // namespace realm
 
-#endif // REALM_UTIL_UTF8_HPP
+#endif // REALM_UNICODE_HPP

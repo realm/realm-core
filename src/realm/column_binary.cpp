@@ -25,7 +25,8 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable) : m_nullable(nullable)
+BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable):
+    m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -480,8 +481,9 @@ ref_type BinaryColumn::write(size_t slice_offset, size_t slice_size,
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
         slice.init_from_mem(mem);
-        size_t pos = slice.write(out); // Throws
-        ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref = slice.write(out, deep, only_if_modified); // Throws
     }
     else {
         SliceHandler handler(get_alloc());

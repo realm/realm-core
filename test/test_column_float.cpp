@@ -328,10 +328,10 @@ TEST(FloatColumn_SwapRows)
         bool nullable = false;
         FloatColumn c(Allocator::get_default(), ref, nullable);
 
-        c.add(-21.389);
-        c.add(30.221);
-        c.add(10.93);
-        c.add(5.0099);
+        c.add(-21.389f);
+        c.add(30.221f);
+        c.add(10.93f);
+        c.add(5.0099f);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
@@ -350,9 +350,9 @@ TEST(FloatColumn_SwapRows)
         bool nullable = false;
         FloatColumn c(Allocator::get_default(), ref, nullable);
 
-        c.add(30.221);
-        c.add(10.93);
-        c.add(5.0099);
+        c.add(30.221f);
+        c.add(10.93f);
+        c.add(5.0099f);
 
         c.swap_rows(0, 1);
 
@@ -367,9 +367,9 @@ TEST(FloatColumn_SwapRows)
         bool nullable = false;
         FloatColumn c(Allocator::get_default(), ref, nullable);
 
-        c.add(5.0099);
-        c.add(30.221);
-        c.add(10.93);
+        c.add(5.0099f);
+        c.add(30.221f);
+        c.add(10.93f);
 
         c.swap_rows(1, 2);
 
@@ -384,9 +384,9 @@ TEST(FloatColumn_SwapRows)
         bool nullable = false;
         FloatColumn c(Allocator::get_default(), ref, nullable);
 
-        c.add(5.0099);
-        c.add(30.221);
-        c.add(10.93);
+        c.add(5.0099f);
+        c.add(30.221f);
+        c.add(10.93f);
 
         c.swap_rows(2, 1);
 

@@ -98,7 +98,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                         a.set(match, v[w] - 1);
                         state.init(act_ReturnFirst, &accu, size_t(-1));
                         a.find(cond_Less, act_ReturnFirst, v[w], from, to, 0, &state);
-                        size_t f = state.m_state;
+                        size_t f = to_size_t(state.m_state);
                         a.set(match, v[w]);
                         if (match >= from && match < to) {
                             CHECK(match == f);
@@ -113,7 +113,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                         a.set(match, v[w] + 1);
                         state.init(act_ReturnFirst, &accu, size_t(-1));
                         a.find(cond_Greater, act_ReturnFirst, v[w], from, to, 0, &state);
-                        size_t f = state.m_state;
+                        size_t f = to_size_t(state.m_state);
                         a.set(match, v[w]);
                         if (match >= from && match < to) {
                             CHECK(match == f);

@@ -44,8 +44,8 @@ private:
     std::string m_text;
 
     struct card {
-        std::size_t m_offset, m_size;
-        card(std::size_t begin, std::size_t end) noexcept;
+        size_t m_offset, m_size;
+        card(size_t begin, size_t end) noexcept;
     };
 
     // Must contain at least one card. The first, and the last card
@@ -68,7 +68,7 @@ inline bool wildcard_pattern::match(const char* c_str) const noexcept
     return match(begin, end);
 }
 
-inline wildcard_pattern::card::card(std::size_t begin, std::size_t end) noexcept
+inline wildcard_pattern::card::card(size_t begin, size_t end) noexcept
 {
     m_offset = begin;
     m_size   = end - begin;

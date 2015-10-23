@@ -50,7 +50,7 @@ private:
     T* m_ptr;
 };
 
-typedef DestroyGuard<Array> ShallowArrayDestroyGuard;
+using ShallowArrayDestroyGuard = DestroyGuard<Array>;
 
 
 /// Calls `ptr->destroy_deep()` if the guarded Array pointer (`ptr`)
@@ -104,7 +104,7 @@ private:
 // DestroyGuard<T>
 
 template<class T> inline DestroyGuard<T>::DestroyGuard() noexcept:
-    m_ptr(0)
+    m_ptr(nullptr)
 {
 }
 
@@ -142,7 +142,7 @@ template<class T> inline T* DestroyGuard<T>::release() noexcept
 // DeepArrayDestroyGuard
 
 inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() noexcept:
-    m_ptr(0)
+    m_ptr(nullptr)
 {
 }
 

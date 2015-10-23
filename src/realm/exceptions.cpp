@@ -20,6 +20,8 @@ const char* LogicError::what() const noexcept
             return "Row index out of range";
         case column_index_out_of_range:
             return "Column index out of range";
+        case string_position_out_of_range:
+            return "String position out of range";
         case link_index_out_of_range:
             return "Link index out of range";
         case bad_version:

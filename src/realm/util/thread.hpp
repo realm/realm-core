@@ -37,9 +37,7 @@
 #include <memory>
 #include <realm/util/meta.hpp>
 
-#ifdef REALM_HAVE_CXX11_ATOMIC
-#  include <atomic>
-#endif
+#include <atomic>
 
 namespace realm {
 namespace util {
@@ -281,7 +279,7 @@ public:
     /// Wait for another thread to call notify() or notify_all().
     void wait(LockGuard& l) noexcept;
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = nullptr);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.

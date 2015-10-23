@@ -434,7 +434,7 @@ TEST(MixedColumn_SwapRows)
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
-        c.insert_float(2, 391.931);
+        c.insert_float(2, 391.931f);
         c.insert_binary(3, BinaryData("foo"));
 
         c.swap_rows(1, 2);
@@ -453,7 +453,7 @@ TEST(MixedColumn_SwapRows)
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
-        c.insert_float(2, 391.931);
+        c.insert_float(2, 391.931f);
 
         c.swap_rows(0, 1);
 
@@ -471,7 +471,7 @@ TEST(MixedColumn_SwapRows)
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
-        c.insert_float(2, 391.931);
+        c.insert_float(2, 391.931f);
 
         c.swap_rows(1, 2);
 
@@ -489,7 +489,7 @@ TEST(MixedColumn_SwapRows)
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
-        c.insert_float(2, 391.931);
+        c.insert_float(2, 391.931f);
 
         c.swap_rows(2, 1);
 
