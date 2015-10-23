@@ -1137,6 +1137,7 @@
     <ClInclude Include="..\..\src\realm\util\errno.hpp" />
     <ClInclude Include="..\..\src\realm\util\file.hpp" />
     <ClInclude Include="..\..\src\realm\util\file_mapper.hpp" />
+    <ClInclude Include="..\..\src\realm\util\inspect.hpp" />
     <ClInclude Include="..\..\src\realm\util\logger.hpp" />
     <ClInclude Include="..\..\src\realm\util\memory_stream.hpp" />
     <ClInclude Include="..\..\src\realm\util\misc_errors.hpp" />

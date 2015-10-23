@@ -462,7 +462,7 @@ void TestResults::compare_failed(const char* file, long line, const char* macro_
                                  const char* a_text, const char* b_text,
                                  const std::string& a_val, const std::string& b_val)
 {
-    std::string msg = std::string(macro_name)+"("+a_text+", "+b_text+") failed with ("+a_val+", "+b_val+")";
+    std::string msg = std::string(macro_name)+"("+a_text+", "+b_text+") failed with ("+a_val+", "+b_val+"). ";
     check_failed(file, line, msg);
 }
 
