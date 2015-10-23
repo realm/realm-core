@@ -74,11 +74,11 @@ template <class T> inline constexpr T&& constexpr_forward(typename std::remove_r
 }
 
 template <class T, class U>
-class type_is_assignable_to_optional {
-    // Constraints from [optional.object.assign.11]
-    bool value = (std::is_same<typename std::remove_reference<U>::type, T>::value
-                  && std::is_constructible<T, U>::value
-                  && std::is_assignable<T&, U>::value);
+class TypeIsAssignableToOptional {
+    // Constraints from [optional.object.assign.18]
+    static const bool value = (std::is_same<typename std::remove_reference<U>::type, T>::value
+                               && std::is_constructible<T, U>::value
+                               && std::is_assignable<T&, U>::value);
 };
 
 } // namespace _impl
@@ -107,7 +107,7 @@ public:
     Optional<T>& operator=(Optional<T>&& other);
     Optional<T>& operator=(const Optional<T>& other);
 
-    template <class U, class = typename std::enable_if<_impl::type_is_assignable_to_optional<T, U>::value>::type>
+    template <class U, class = typename std::enable_if<_impl::TypeIsAssignableToOptional<T, U>::value>::type>
     Optional<T>& operator=(U&& value);
 
     explicit constexpr operator bool() const;
