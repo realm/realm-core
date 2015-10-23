@@ -527,22 +527,6 @@ void EncryptedFileMapping::sync() noexcept
     // for a discussion of this related to core data.
 }
 
-void EncryptedFileMapping::handle_access(void* addr) noexcept
-{
-    size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
-
-    size_t idx = accessed_page - m_first_page;
-    if (!m_read_pages[idx]) {
-        read_page(idx);
-    }
-    else if (m_access == File::access_ReadWrite) {
-        write_page(idx);
-    }
-    else {
-        REALM_TERMINATE("Attempt to write to read-only memory");
-    }
-}
-
 void EncryptedFileMapping::handle_reads(const void* addr, size_t size) noexcept
 {
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
