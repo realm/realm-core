@@ -1665,7 +1665,7 @@ void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) noexc
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size,
                      int_fast64_t value, Allocator& alloc)
 {
-    REALM_ASSERT_EX(value == 0 || width_type != wtype_Bits, value);
+    REALM_ASSERT_7(value, ==, 0, ||, width_type, ==, wtype_Bits);
     REALM_ASSERT_7(size, ==, 0, ||, width_type, !=, wtype_Ignore);
 
     bool is_inner_bptree_node = false, has_refs = false;
