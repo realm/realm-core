@@ -387,9 +387,12 @@ public:
     void set(size_t ndx, int64_t value);
 
     int64_t get(size_t ndx) const noexcept;
+
     template<size_t w>
     int64_t get(size_t ndx) const noexcept;
+
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
+
     template<size_t w>
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
@@ -741,16 +744,22 @@ public:
 
     template<size_t width>
     inline bool test_zero(uint64_t value) const; // Tests value for 0-elements
+
     template<bool eq, size_t width>
     size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
+
     template<size_t width, bool zero>
     uint64_t cascade(uint64_t a) const;          // Sets lowermost bits of zero or non-zero elements
+
     template<bool gt, size_t width>
     int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
+
     template<size_t width>
     inline int64_t lower_bits() const;           // Return chunk with lower bit set in each element
+
     size_t first_set_bit(unsigned int v) const;
     size_t first_set_bit64(int64_t v) const;
+
     template<size_t w>
     int64_t get_universal(const char* const data, const size_t ndx) const;
 
@@ -1037,12 +1046,14 @@ protected:
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
     template<size_t width>
     static int_fast64_t lbound_for_width() noexcept;
+
     static int_fast64_t lbound_for_width(size_t width) noexcept;
 
     // This returns the maximum value ("inclusive upper bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
     template<size_t width>
     static int_fast64_t ubound_for_width() noexcept;
+
     static int_fast64_t ubound_for_width(size_t width) noexcept;
 
     template<size_t width>
