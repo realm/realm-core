@@ -504,8 +504,6 @@
 		F47B5FB11B55B183001F3018 /* simulated_failure.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F47B5FAF1B55B183001F3018 /* simulated_failure.hpp */; };
 		F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
-		F4CD037F1BA2FFAD0043533A /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
-		F4CD03801BA2FFE60043533A /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */; };
 		F4D0FC1D1B00E0E40040956A /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
 		F4D0FC1E1B00E0E40040956A /* test-util.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 52D6E04E175BD9BC00B423E5 /* test-util.a */; };
 		F4D0FC201B00E1020040956A /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4D0FC1F1B00E1020040956A /* main.cpp */; };
@@ -906,6 +904,7 @@
 		651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_1.realm; sourceTree = "<group>"; };
 		651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_2.realm; sourceTree = "<group>"; };
 		651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_3.realm; sourceTree = "<group>"; };
+		6546AB4A1BDE41E700F74CF1 /* query_expression.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = query_expression.hpp; path = realm/query_expression.hpp; sourceTree = "<group>"; };
 		6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = disable_sync_to_disk.cpp; path = realm/disable_sync_to_disk.cpp; sourceTree = "<group>"; };
 		6579EEB81B4E898B004DE3D8 /* disable_sync_to_disk.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = disable_sync_to_disk.hpp; path = realm/disable_sync_to_disk.hpp; sourceTree = "<group>"; };
 		65BB22FF1AD80E870097170F /* test_upgrade_database.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_upgrade_database.cpp; sourceTree = "<group>"; };
@@ -1193,6 +1192,7 @@
 				365CCE1D157CC37D00172BF8 /* query_conditions.hpp */,
 				F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */,
 				365CCE1E157CC37D00172BF8 /* query_engine.hpp */,
+				6546AB4A1BDE41E700F74CF1 /* query_expression.hpp */,
 				365CCE77157CC3A100172BF8 /* realm.hpp */,
 				36AD7FA117FB959A00F046FC /* realmd.cpp */,
 				4222F2FC19640B8400EC86A5 /* replication.cpp */,
