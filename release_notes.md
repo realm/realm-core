@@ -24,6 +24,7 @@
   them.
 * New utility class: DirScanner.
 * New test utility function: quote.
+* New assertion macro: REALM_ASSERT_EX, replacing REALM_ASSERT_n macros.
 
 
 ----------------------------------------------
