@@ -90,8 +90,8 @@ struct FindInLeaf<Column<int64_t, Nullable>> {
     template<Action action, class Condition, class T, class R>
     static bool find(const LeafType& leaf, T target, size_t local_start, size_t local_end, size_t leaf_start, QueryState<R>& state)
     {
-        const int c = Condition::condition;
-        return leaf.find(c, action, target, local_start, local_end, leaf_start, &state);
+        constexpr int cond = Condition::condition;
+        return leaf.find(cond, action, target, local_start, local_end, leaf_start, &state);
     }
 };
 

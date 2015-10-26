@@ -766,8 +766,8 @@ public:
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column) override
     {
-        int c = TConditionFunction::condition;
-        return this->aggregate_local_impl(st, start, end, local_limit, source_column, c);
+        constexpr int cond = TConditionFunction::condition;
+        return this->aggregate_local_impl(st, start, end, local_limit, source_column, cond);
     }
 
 
