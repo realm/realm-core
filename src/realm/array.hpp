@@ -977,7 +977,7 @@ protected:
 
     bool do_erase_bptree_elem(size_t elem_ndx, EraseHandler&);
 
-    template <IndexMethod method, class T>
+    template<IndexMethod method, class T>
     size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                              ColumnBase* column) const;
 protected:
@@ -1022,13 +1022,13 @@ protected:
 
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template <size_t width>
+    template<size_t width>
     static int_fast64_t lbound_for_width() noexcept;
     static int_fast64_t lbound_for_width(size_t width) noexcept;
 
     // This returns the maximum value ("inclusive upper bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template <size_t width>
+    template<size_t width>
     static int_fast64_t ubound_for_width() noexcept;
     static int_fast64_t ubound_for_width(size_t width) noexcept;
 
@@ -1092,7 +1092,7 @@ protected:
         Setter setter;
         Finder finder[cond_Count]; // one for each COND_XXX enum
     };
-    template <size_t w> struct VTableForWidth;
+    template<size_t w> struct VTableForWidth;
 
 protected:
 
@@ -1246,7 +1246,7 @@ public:
         }
     }
 
-    template <Action action, bool pattern>
+    template<Action action, bool pattern>
     inline bool match(size_t index, uint64_t indexpattern, int64_t value)
     {
         if (pattern) {

@@ -1,7 +1,7 @@
 Idea
 ********************************************************************************************************
 Create ArrayFloat::find() and ArrayDouble::find() that utilize SSE and then create a specialized Node
-template <class Equal, class TConditionFunction> class FloatDoubleNode: public ParentNode
+template<class Equal, class TConditionFunction> class FloatDoubleNode: public ParentNode
 to integrate it into query system
 
 
@@ -27,7 +27,7 @@ Idea
 ********************************************************************************************************												 
 The methods of QueryState (which consumes matches) are templated by Action (find, findall, count, etc):
 
-    template <Action action, bool pattern> inline bool match(...)
+    template<Action action, bool pattern> inline bool match(...)
 
 I think it could be a simplification (I'm not sure though) to template the QueryState class instead.
 	

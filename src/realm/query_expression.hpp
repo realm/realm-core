@@ -142,7 +142,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 
 namespace realm {
 
-template <class T> T minimum(T a, T b)
+template<class T> T minimum(T a, T b)
 {
     return a < b ? a : b;
 }
@@ -307,24 +307,24 @@ public:
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
 
-template <typename T, typename... Args>
+template<typename T, typename... Args>
 std::unique_ptr<Subexpr> make_subexpr(Args&&... args)
 {
     return std::unique_ptr<Subexpr>(new T(std::forward<Args>(args)...));
 }
 
-template <class T> class Columns;
-template <class T> class Value;
-template <class T> class Subexpr2;
-template <class oper, class TLeft = Subexpr, class TRight = Subexpr> class Operator;
-template <class oper, class TLeft = Subexpr> class UnaryOperator;
-template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
-template <bool has_links> class UnaryLinkCompare;
+template<class T> class Columns;
+template<class T> class Value;
+template<class T> class Subexpr2;
+template<class oper, class TLeft = Subexpr, class TRight = Subexpr> class Operator;
+template<class oper, class TLeft = Subexpr> class UnaryOperator;
+template<class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
+template<bool has_links> class UnaryLinkCompare;
 class ColumnAccessorBase;
 
 
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
-template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& right)
+template<class L, class Cond, class R> Query create(L left, const Subexpr2<R>& right)
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
@@ -402,7 +402,7 @@ template <class L, class Cond, class R> Query create(L left, const Subexpr2<R>& 
 // Subexpr2<L>          +, -, *, /, <, >, ==, !=, <=, >=      R, Subexpr2<R>
 //
 // For L = R = {int, int64_t, float, double, StringData}:
-template <class L, class R> class Overloads
+template<class L, class R> class Overloads
 {
     typedef typename Common<L, R>::type CommonType;
 
@@ -480,7 +480,7 @@ public:
     // query_expression.hpp node.
     //
     // This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
-    template <class Cond> Query create2 (const Subexpr2<R>& right)
+    template<class Cond> Query create2 (const Subexpr2<R>& right)
     {
 #ifdef REALM_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
         // Test if expressions are of type Columns. Other possibilities are Value and Operator.
@@ -588,7 +588,7 @@ public:
 
 // With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 5 * 20 = 100. Todo: We can
 // consider if it's simpler/better to remove this class completely and just list all 100 overloads manually anyway.
-template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
+template<class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
 Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
 public Overloads<T, bool>, public Overloads<T, DateTime>, public Overloads<T, null>
 {
@@ -630,7 +630,7 @@ The query system will then construct a NullableVector of type `null` (NullableVe
 time optimizations for these cases.
 */
 
-template <class T, size_t prealloc = 8> struct NullableVector
+template<class T, size_t prealloc = 8> struct NullableVector
 {
     typedef typename std::conditional<std::is_same<T, bool>::value
         || std::is_same<T, int>::value, int64_t, T>::type t_storage;
@@ -847,9 +847,9 @@ template<> inline void NullableVector<BinaryData>::set_null(size_t index)
     m_first[index] = BinaryData();
 }
 
-template <typename Operator>
+template<typename Operator>
 struct OperatorOptionalAdapter {
-    template <typename L, typename R>
+    template<typename L, typename R>
     util::Optional<typename Operator::type> operator()(const util::Optional<L>& left, const util::Optional<R>& right)
     {
         if (!left || !right)
@@ -857,7 +857,7 @@ struct OperatorOptionalAdapter {
         return Operator()(*left, *right);
     }
 
-    template <typename T>
+    template<typename T>
     util::Optional<typename Operator::type> operator()(const util::Optional<T>& arg)
     {
         if (!arg)
@@ -910,7 +910,7 @@ public:
     }
 
 
-    template <class TOperator> REALM_FORCEINLINE void fun(const Value* left, const Value* right)
+    template<class TOperator> REALM_FORCEINLINE void fun(const Value* left, const Value* right)
     {
         OperatorOptionalAdapter<TOperator> o;
 
@@ -949,7 +949,7 @@ public:
         }
     }
 
-    template <class TOperator> REALM_FORCEINLINE void fun(const Value* value)
+    template<class TOperator> REALM_FORCEINLINE void fun(const Value* value)
     {
         init(value->m_from_link_list, value->m_values);
 
@@ -1046,7 +1046,7 @@ public:
     }
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
-    template <class TCond> REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
+    template<class TCond> REALM_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
     {
         TCond c;
 
@@ -1100,131 +1100,131 @@ public:
 //
 // For L = R = {int, int64_t, float, double}:
 // Compare numeric values
-template <class R> Query operator > (double left, const Subexpr2<R>& right) {
+template<class R> Query operator > (double left, const Subexpr2<R>& right) {
     return create<double, Greater, R>(left, right);
 }
-template <class R> Query operator > (float left, const Subexpr2<R>& right) {
+template<class R> Query operator > (float left, const Subexpr2<R>& right) {
     return create<float, Greater, R>(left, right);
 }
-template <class R> Query operator > (int left, const Subexpr2<R>& right) {
+template<class R> Query operator > (int left, const Subexpr2<R>& right) {
     return create<int, Greater, R>(left, right);
 }
-template <class R> Query operator > (int64_t left, const Subexpr2<R>& right) {
+template<class R> Query operator > (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, Greater, R>(left, right);
 }
-template <class R> Query operator < (double left, const Subexpr2<R>& right) {
+template<class R> Query operator < (double left, const Subexpr2<R>& right) {
     return create<float, Less, R>(left, right);
 }
-template <class R> Query operator < (float left, const Subexpr2<R>& right) {
+template<class R> Query operator < (float left, const Subexpr2<R>& right) {
     return create<int, Less, R>(left, right);
 }
-template <class R> Query operator < (int left, const Subexpr2<R>& right) {
+template<class R> Query operator < (int left, const Subexpr2<R>& right) {
     return create<int, Less, R>(left, right);
 }
-template <class R> Query operator < (int64_t left, const Subexpr2<R>& right) {
+template<class R> Query operator < (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, Less, R>(left, right);
 }
-template <class R> Query operator == (double left, const Subexpr2<R>& right) {
+template<class R> Query operator == (double left, const Subexpr2<R>& right) {
     return create<double, Equal, R>(left, right);
 }
-template <class R> Query operator == (float left, const Subexpr2<R>& right) {
+template<class R> Query operator == (float left, const Subexpr2<R>& right) {
     return create<float, Equal, R>(left, right);
 }
-template <class R> Query operator == (int left, const Subexpr2<R>& right) {
+template<class R> Query operator == (int left, const Subexpr2<R>& right) {
     return create<int, Equal, R>(left, right);
 }
-template <class R> Query operator == (int64_t left, const Subexpr2<R>& right) {
+template<class R> Query operator == (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, Equal, R>(left, right);
 }
-template <class R> Query operator >= (double left, const Subexpr2<R>& right) {
+template<class R> Query operator >= (double left, const Subexpr2<R>& right) {
     return create<double, GreaterEqual, R>(left, right);
 }
-template <class R> Query operator >= (float left, const Subexpr2<R>& right) {
+template<class R> Query operator >= (float left, const Subexpr2<R>& right) {
     return create<float, GreaterEqual, R>(left, right);
 }
-template <class R> Query operator >= (int left, const Subexpr2<R>& right) {
+template<class R> Query operator >= (int left, const Subexpr2<R>& right) {
     return create<int, GreaterEqual, R>(left, right);
 }
-template <class R> Query operator >= (int64_t left, const Subexpr2<R>& right) {
+template<class R> Query operator >= (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, GreaterEqual, R>(left, right);
 }
-template <class R> Query operator <= (double left, const Subexpr2<R>& right) {
+template<class R> Query operator <= (double left, const Subexpr2<R>& right) {
     return create<double, LessEqual, R>(left, right);
 }
-template <class R> Query operator <= (float left, const Subexpr2<R>& right) {
+template<class R> Query operator <= (float left, const Subexpr2<R>& right) {
     return create<float, LessEqual, R>(left, right);
 }
-template <class R> Query operator <= (int left, const Subexpr2<R>& right) {
+template<class R> Query operator <= (int left, const Subexpr2<R>& right) {
     return create<int, LessEqual, R>(left, right);
 }
-template <class R> Query operator <= (int64_t left, const Subexpr2<R>& right) {
+template<class R> Query operator <= (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, LessEqual, R>(left, right);
 }
-template <class R> Query operator != (double left, const Subexpr2<R>& right) {
+template<class R> Query operator != (double left, const Subexpr2<R>& right) {
     return create<double, NotEqual, R>(left, right);
 }
-template <class R> Query operator != (float left, const Subexpr2<R>& right) {
+template<class R> Query operator != (float left, const Subexpr2<R>& right) {
     return create<float, NotEqual, R>(left, right);
 }
-template <class R> Query operator != (int left, const Subexpr2<R>& right) {
+template<class R> Query operator != (int left, const Subexpr2<R>& right) {
     return create<int, NotEqual, R>(left, right);
 }
-template <class R> Query operator != (int64_t left, const Subexpr2<R>& right) {
+template<class R> Query operator != (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, NotEqual, R>(left, right);
 }
 
 // Arithmetic
-template <class R> Operator<Plus<typename Common<R, double>::type>> operator + (double left, const Subexpr2<R>& right) {
+template<class R> Operator<Plus<typename Common<R, double>::type>> operator + (double left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<double>>(left), right.clone() };
 }
-template <class R> Operator<Plus<typename Common<R, float>::type>> operator + (float left, const Subexpr2<R>& right) {
+template<class R> Operator<Plus<typename Common<R, float>::type>> operator + (float left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<float>>(left), right.clone() };
 }
-template <class R> Operator<Plus<typename Common<R, int>::type>> operator + (int left, const Subexpr2<R>& right) {
+template<class R> Operator<Plus<typename Common<R, int>::type>> operator + (int left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<int>>(left), right.clone() };
 }
-template <class R> Operator<Plus<typename Common<R, int64_t>::type>> operator + (int64_t left, const Subexpr2<R>& right) {
+template<class R> Operator<Plus<typename Common<R, int64_t>::type>> operator + (int64_t left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
-template <class R> Operator<Minus<typename Common<R, double>::type>> operator - (double left, const Subexpr2<R>& right) {
+template<class R> Operator<Minus<typename Common<R, double>::type>> operator - (double left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<double>>(left), right.clone() };
 }
-template <class R> Operator<Minus<typename Common<R, float>::type>> operator - (float left, const Subexpr2<R>& right) {
+template<class R> Operator<Minus<typename Common<R, float>::type>> operator - (float left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<float>>(left), right.clone() };
 }
-template <class R> Operator<Minus<typename Common<R, int>::type>> operator - (int left, const Subexpr2<R>& right) {
+template<class R> Operator<Minus<typename Common<R, int>::type>> operator - (int left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<int>>(left), right.clone() };
 }
-template <class R> Operator<Minus<typename Common<R, int64_t>::type>> operator - (int64_t left, const Subexpr2<R>& right) {
+template<class R> Operator<Minus<typename Common<R, int64_t>::type>> operator - (int64_t left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
-template <class R> Operator<Mul<typename Common<R, double>::type>> operator * (double left, const Subexpr2<R>& right) {
+template<class R> Operator<Mul<typename Common<R, double>::type>> operator * (double left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<double>>(left), right.clone() };
 }
-template <class R> Operator<Mul<typename Common<R, float>::type>> operator * (float left, const Subexpr2<R>& right) {
+template<class R> Operator<Mul<typename Common<R, float>::type>> operator * (float left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<float>>(left), right.clone() };
 }
-template <class R> Operator<Mul<typename Common<R, int>::type>> operator * (int left, const Subexpr2<R>& right) {
+template<class R> Operator<Mul<typename Common<R, int>::type>> operator * (int left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<int>>(left), right.clone() };
 }
-template <class R> Operator<Mul<typename Common<R, int64_t>::type>> operator * (int64_t left, const Subexpr2<R>& right) {
+template<class R> Operator<Mul<typename Common<R, int64_t>::type>> operator * (int64_t left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
-template <class R> Operator<Div<typename Common<R, double>::type>> operator / (double left, const Subexpr2<R>& right) {
+template<class R> Operator<Div<typename Common<R, double>::type>> operator / (double left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<double>>(left), right.clone() };
 }
-template <class R> Operator<Div<typename Common<R, float>::type>> operator / (float left, const Subexpr2<R>& right) {
+template<class R> Operator<Div<typename Common<R, float>::type>> operator / (float left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<float>>(left), right.clone() };
 }
-template <class R> Operator<Div<typename Common<R, int>::type>> operator / (int left, const Subexpr2<R>& right) {
+template<class R> Operator<Div<typename Common<R, int>::type>> operator / (int left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<int>>(left), right.clone() };
 }
-template <class R> Operator<Div<typename Common<R, int64_t>::type>> operator / (int64_t left, const Subexpr2<R>& right) {
+template<class R> Operator<Div<typename Common<R, int64_t>::type>> operator / (int64_t left, const Subexpr2<R>& right) {
     return { make_subexpr<Value<int64_t>>(left), right.clone() };
 }
 
 // Unary operators
-template <class T> UnaryOperator<Pow<T>> power (const Subexpr2<T>& left) {
+template<class T> UnaryOperator<Pow<T>> power (const Subexpr2<T>& left) {
     return { left.clone() };
 }
 
@@ -1394,8 +1394,8 @@ private:
     std::vector<realm::DataType> m_link_types;
 };
 
-template <class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_insensitive);
-template <class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_insensitive);
+template<class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_insensitive);
+template<class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_insensitive);
 
 template<class T>
 Value<T> make_value_for_link(bool only_unary_links, size_t size)
@@ -1530,7 +1530,7 @@ public:
 };
 
 
-template <class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_sensitive)
+template<class T, class S, class I> Query string_compare(const Columns<StringData>& left, T right, bool case_sensitive)
 {
     StringData sd(right);
     if (case_sensitive)
@@ -1539,7 +1539,7 @@ template <class T, class S, class I> Query string_compare(const Columns<StringDa
         return create<StringData, I, StringData>(sd, left);
 }
 
-template <class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_sensitive)
+template<class S, class I> Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_sensitive)
 {
     if (case_sensitive)
         return new Compare<S, StringData>(right.clone(), left.clone());
@@ -1558,22 +1558,22 @@ inline Query operator != (const Columns<StringData>& left, const Columns<StringD
 }
 
 // String == Columns<String>
-template <class T> Query operator == (T left, const Columns<StringData>& right) {
+template<class T> Query operator == (T left, const Columns<StringData>& right) {
     return operator==(right, left);
 }
 
 // String != Columns<String>
-template <class T> Query operator != (T left, const Columns<StringData>& right) {
+template<class T> Query operator != (T left, const Columns<StringData>& right) {
     return operator!=(right, left);
 }
 
 // Columns<String> == String
-template <class T> Query operator == (const Columns<StringData>& left, T right) {
+template<class T> Query operator == (const Columns<StringData>& left, T right) {
     return string_compare<T, Equal, EqualIns>(left, right, true);
 }
 
 // Columns<String> != String
-template <class T> Query operator != (const Columns<StringData>& left, T right) {
+template<class T> Query operator != (const Columns<StringData>& left, T right) {
     return string_compare<T, NotEqual, NotEqualIns>(left, right, true);
 }
 
@@ -1668,7 +1668,7 @@ inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
 // only "find first null link" and "find first non-null link" is supported. More will be added later. When we add
 // more, I propose to remove the <bool has_links> template argument from this class and instead template it by 
 // a criteria-class (like the FindNullLinks class below in find_first()) in some generalized fashion.
-template <bool has_links> class UnaryLinkCompare : public Expression
+template<bool has_links> class UnaryLinkCompare : public Expression
 {
 public:
     UnaryLinkCompare(LinkMap lm) : m_link_map(lm)
@@ -1733,7 +1733,7 @@ private:
     LinkMap m_link_map;
 };
 
-template <typename T> class SubColumns;
+template<typename T> class SubColumns;
 
 // This is for LinkList too because we have 'typedef List LinkList'
 template <> class Columns<Link> : public Subexpr2<Link>
@@ -1758,7 +1758,7 @@ public:
         return LinkCount(m_link_map);
     }
 
-    template <typename C>
+    template<typename C>
     SubColumns<C> column(size_t column) const
     {
         return SubColumns<C>(Columns<C>(column, m_link_map.m_table), m_link_map);
@@ -1806,7 +1806,7 @@ private:
 };
 
 
-template <class T> class Columns : public Subexpr2<T>
+template<class T> class Columns : public Subexpr2<T>
 {
 public:
     using ColType = typename ColumnTypeTraits<T, false>::column_type;
@@ -1978,15 +1978,15 @@ public:
     bool m_nullable = false;
 };
 
-template <typename T, typename Operation> class SubColumnAggregate;
+template<typename T, typename Operation> class SubColumnAggregate;
 namespace aggregate_operations {
-    template <typename T> class Minimum;
-    template <typename T> class Maximum;
-    template <typename T> class Sum;
-    template <typename T> class Average;
+    template<typename T> class Minimum;
+    template<typename T> class Maximum;
+    template<typename T> class Sum;
+    template<typename T> class Average;
 }
 
-template <typename T>
+template<typename T>
 class SubColumns : public Subexpr {
 public:
     SubColumns(Columns<T> column, LinkMap link_map)
@@ -2041,7 +2041,7 @@ private:
     LinkMap m_link_map;
 };
 
-template <typename T, typename Operation>
+template<typename T, typename Operation>
 class SubColumnAggregate : public Subexpr2<typename Operation::ResultType>
 {
 public:
@@ -2106,7 +2106,7 @@ private:
 };
 
 namespace aggregate_operations {
-    template <typename T, typename Derived, typename R=T>
+    template<typename T, typename Derived, typename R=T>
     class BaseAggregateOperation {
         static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value,
                       "Numeric aggregates can only be used with subcolumns of numeric types");
@@ -2127,21 +2127,21 @@ namespace aggregate_operations {
         ResultType m_result = Derived::initial_value();
     };
 
-    template <typename T>
+    template<typename T>
     class Minimum : public BaseAggregateOperation<T, Minimum<T>> {
     public:
         static T initial_value() { return std::numeric_limits<T>::max(); }
         static T apply(T a, T b) { return std::min(a, b); }
     };
 
-    template <typename T>
+    template<typename T>
     class Maximum : public BaseAggregateOperation<T, Maximum<T>> {
     public:
         static T initial_value() { return std::numeric_limits<T>::min(); }
         static T apply(T a, T b) { return std::max(a, b); }
     };
 
-    template <typename T>
+    template<typename T>
     class Sum : public BaseAggregateOperation<T, Sum<T>> {
     public:
         static T initial_value() { return T(); }
@@ -2149,7 +2149,7 @@ namespace aggregate_operations {
         bool is_null() const { return false; }
     };
 
-    template <typename T>
+    template<typename T>
     class Average : public BaseAggregateOperation<T, Average<T>, double> {
         using Base = BaseAggregateOperation<T, Average<T>, double>;
     public:
@@ -2159,7 +2159,7 @@ namespace aggregate_operations {
     };
 }
 
-template <class oper, class TLeft> class UnaryOperator : public Subexpr2<typename oper::type>
+template<class oper, class TLeft> class UnaryOperator : public Subexpr2<typename oper::type>
 {
 public:
     UnaryOperator(std::unique_ptr<TLeft> left) : m_left(std::move(left)) {}
@@ -2210,7 +2210,7 @@ private:
 };
 
 
-template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
+template<class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
 {
 public:
     Operator(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right) :
@@ -2276,7 +2276,7 @@ private:
 };
 
 
-template <class TCond, class T, class TLeft, class TRight> class Compare : public Expression
+template<class TCond, class T, class TLeft, class TRight> class Compare : public Expression
 {
 public:
     Compare(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right, const char* compare_string = nullptr) :

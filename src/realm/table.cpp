@@ -3474,7 +3474,7 @@ size_t Table::find_first_null(size_t column_ndx) const
     return where().equal(column_ndx, null{}).find();
 }
 
-template <class T> TableView Table::find_all(size_t col_ndx, T value)
+template<class T> TableView Table::find_all(size_t col_ndx, T value)
 {
     return where().equal(col_ndx, value).find_all();
 }

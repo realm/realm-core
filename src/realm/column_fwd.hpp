@@ -35,7 +35,7 @@ class LinkColumn;
 class LinkListColumn;
 
 // Templated classes
-template <class T, bool Nullable = false> class Column;
+template<class T, bool Nullable = false> class Column;
 template<class T> class BasicColumn;
 
 // Shortcuts, aka typedefs.

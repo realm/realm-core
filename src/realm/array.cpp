@@ -1774,7 +1774,7 @@ int_fast64_t Array::lbound_for_width(size_t width) noexcept
     REALM_TEMPEX(return lbound_for_width, width, ());
 }
 
-template <size_t width>
+template<size_t width>
 int_fast64_t Array::lbound_for_width() noexcept
 {
     if (width == 0) {
@@ -1811,7 +1811,7 @@ int_fast64_t Array::ubound_for_width(size_t width) noexcept
     REALM_TEMPEX(return ubound_for_width, width, ());
 }
 
-template <size_t width>
+template<size_t width>
 int_fast64_t Array::ubound_for_width() noexcept
 {
     if (width == 0) {
@@ -1845,7 +1845,7 @@ int_fast64_t Array::ubound_for_width() noexcept
 
 
 
-template <size_t width>
+template<size_t width>
 struct Array::VTableForWidth {
     struct PopulatedVTable : Array::VTable {
         PopulatedVTable() {
@@ -1861,7 +1861,7 @@ struct Array::VTableForWidth {
     static const PopulatedVTable vtable;
 };
 
-template <size_t width>
+template<size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
 void Array::set_width(size_t width) noexcept
@@ -2851,7 +2851,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-template <IndexMethod method, class T> size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
+template<IndexMethod method, class T> size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
 {
     bool first(method == index_FindFirst);
     bool count(method == index_Count);

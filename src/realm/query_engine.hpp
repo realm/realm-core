@@ -142,7 +142,7 @@ public:
     virtual ~SequentialGetterBase() noexcept {}
 };
 
-template <class ColType>
+template<class ColType>
 class SequentialGetter : public SequentialGetterBase {
 public:
     using T = typename ColType::value_type;
@@ -490,14 +490,14 @@ public:
 
 namespace _impl {
 
-template <class ColType> struct CostHeuristic;
+template<class ColType> struct CostHeuristic;
 
-template <> struct CostHeuristic<IntegerColumn> {
+template<> struct CostHeuristic<IntegerColumn> {
     static const double dD;
     static const double dT;
 };
 
-template <> struct CostHeuristic<IntNullColumn> {
+template<> struct CostHeuristic<IntNullColumn> {
     static const double dD;
     static const double dT;
 };
@@ -516,7 +516,7 @@ protected:
 
     ColumnNodeBase(const ColumnNodeBase&) = default;
 
-    template <Action TAction, class ColType>
+    template<Action TAction, class ColType>
     bool match_callback(int64_t v)
     {
         using TSourceValue = typename ColType::value_type;
@@ -559,7 +559,7 @@ protected:
     SequentialGetterBase* m_source_column = nullptr; // Column of values used in aggregate (act_FindAll, actReturnFirst, act_Sum, etc)
 };
 
-template <class ColType>
+template<class ColType>
 class IntegerNodeBase : public ColumnNodeBase
 {
     using ThisType = IntegerNodeBase<ColType>;
@@ -567,7 +567,7 @@ public:
     using TConditionValue = typename ColType::value_type;
     static const bool nullable = ColType::nullable;
 
-    template <class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
+    template<class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
     bool find_callback_specialization(size_t s, size_t end_in_leaf)
     {
         using AggregateColumnType = typename GetColumnType<TDataType, Nullable>::type;
@@ -733,7 +733,7 @@ protected:
 };
 
 // FIXME: Add specialization that uses index for TConditionFunction = Equal
-template <class ColType, class TConditionFunction>
+template<class ColType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<ColType> {
     using BaseType = IntegerNodeBase<ColType>;
     using ThisType = IntegerNode<ColType, TConditionFunction>;
@@ -827,7 +827,7 @@ protected:
         return nullptr;
     }
 
-    template <Action TAction>
+    template<Action TAction>
     static TFind_callback_specialized get_specialized_callback_2(DataType col_id, bool nullable)
     {
         switch (col_id) {
@@ -840,7 +840,7 @@ protected:
         return nullptr;
     }
 
-    template <Action TAction>
+    template<Action TAction>
     static TFind_callback_specialized get_specialized_callback_2_int(DataType col_id, bool nullable)
     {
         if (col_id == type_Int) {
@@ -850,7 +850,7 @@ protected:
         return nullptr;
     }
 
-    template <Action TAction, DataType TDataType>
+    template<Action TAction, DataType TDataType>
     static TFind_callback_specialized get_specialized_callback_3(bool nullable)
     {
         if (nullable) {
@@ -863,7 +863,7 @@ protected:
 
 
 // This node is currently used for floats and doubles only
-template <class ColType, class TConditionFunction> class FloatDoubleNode: public ParentNode {
+template<class ColType, class TConditionFunction> class FloatDoubleNode: public ParentNode {
 public:
     using TConditionValue = typename ColType::value_type;
     static const bool special_null_node = false;
@@ -928,12 +928,12 @@ protected:
 };
 
 
-template <class TConditionFunction> class BinaryNode: public ParentNode {
+template<class TConditionFunction> class BinaryNode: public ParentNode {
 public:
     using TConditionValue = BinaryData;
     static const bool special_null_node = false;
 
-    template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
+    template<Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     BinaryNode(BinaryData v, size_t column) : m_value(v)
     {
@@ -987,7 +987,7 @@ public:
     using TConditionValue = StringData;
     static const bool special_null_node = true;
 
-    template <Action TAction>
+    template<Action TAction>
     int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
@@ -1040,7 +1040,7 @@ protected:
 };
 
 // Conditions for strings. Note that Equal is specialized later in this file!
-template <class TConditionFunction> class StringNode: public StringNodeBase {
+template<class TConditionFunction> class StringNode: public StringNodeBase {
 public:
     StringNode(StringData v, size_t column) : StringNodeBase(v, column)
     {
@@ -1345,7 +1345,7 @@ private:
 // also set to next AND condition (if any exists) following the OR.
 class OrNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
+    template<Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
@@ -1465,7 +1465,7 @@ private:
 
 class NotNode: public ParentNode {
 public:
-    template <Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
+    template<Action TAction> int64_t find_all(IntegerColumn*, size_t, size_t, size_t, size_t)
     {
         REALM_ASSERT(false);
         return 0;
@@ -1549,11 +1549,11 @@ private:
 
 
 // Compare two columns with eachother row-by-row
-template <class ColType, class TConditionFunction> class TwoColumnsNode: public ParentNode {
+template<class ColType, class TConditionFunction> class TwoColumnsNode: public ParentNode {
 public:
     using TConditionValue = typename ColType::value_type;
 
-    template <Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
+    template<Action TAction> int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {REALM_ASSERT(false); return 0;}
 
     TwoColumnsNode(size_t column1, size_t column2)
     {

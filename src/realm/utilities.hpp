@@ -190,7 +190,7 @@ enum IndexMethod {
 
 
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
-template <class InputIterator1, class InputIterator2>
+template<class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
 {
 #if defined(_MSC_VER) && defined(_DEBUG)
@@ -216,7 +216,7 @@ private:
 // PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
 // placement new. It simply calls the object's destructor without freeing the memory.
 struct PlacementDelete {
-    template <class T>
+    template<class T>
     void operator()(T* v) const
     {
         v->~T();

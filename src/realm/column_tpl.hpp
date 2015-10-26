@@ -29,7 +29,7 @@
 namespace realm {
 
 template<class T, class cond> class FloatDoubleNode;
-template <class ColType, class Cond> class IntegerNode;
+template<class ColType, class Cond> class IntegerNode;
 template<class T> class SequentialGetter;
 
 template<class cond, class T> struct ColumnTypeTraits2;
@@ -54,11 +54,11 @@ template<class cond> struct ColumnTypeTraits2<cond, double> {
 
 namespace _impl {
 
-template <class ColType>
+template<class ColType>
 struct FindInLeaf {
     using LeafType = typename ColType::LeafType;
 
-    template <Action action, class Condition, class T, class R>
+    template<Action action, class Condition, class T, class R>
     static bool find(const LeafType& leaf, T target, size_t local_start, size_t local_end, size_t leaf_start, QueryState<R>& state)
     {
         Condition cond;
@@ -75,11 +75,11 @@ struct FindInLeaf {
     }
 };
 
-template <bool Nullable>
+template<bool Nullable>
 struct FindInLeaf<Column<int64_t, Nullable>> {
     using LeafType = typename Column<int64_t, Nullable>::LeafType;
 
-    template <Action action, class Condition, class T, class R>
+    template<Action action, class Condition, class T, class R>
     static bool find(const LeafType& leaf, T target, size_t local_start, size_t local_end, size_t leaf_start, QueryState<R>& state)
     {
         const int c = Condition::condition;
@@ -89,7 +89,7 @@ struct FindInLeaf<Column<int64_t, Nullable>> {
 
 } // namespace _impl
 
-template <class T, class R, Action action, class Condition, class ColType>
+template<class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, size_t start, size_t end,
             size_t limit, size_t* return_ndx)
 {

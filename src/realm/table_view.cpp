@@ -174,7 +174,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
-template <int function, typename T, typename R, class ColType>
+template<int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx, T count_target, size_t* return_ndx) const
 {
     check_cookie();
