@@ -323,7 +323,8 @@ Query& Query::add_condition(size_t column_ndx, T value)
 }
 
 
-template<class ColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2));
     add_node(std::move(node));
@@ -331,31 +332,36 @@ template<class ColumnType> Query& Query::equal(size_t column_ndx1, size_t column
 }
 
 // Two column methods, any type
-template<class ColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::less(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));

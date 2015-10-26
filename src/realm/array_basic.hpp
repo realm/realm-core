@@ -26,7 +26,8 @@ namespace realm {
 
 /// A BasicArray can currently only be used for simple unstructured
 /// types like float, double.
-template<class T> class BasicArray: public Array {
+template<class T>
+class BasicArray: public Array {
 public:
     explicit BasicArray(Allocator&) noexcept;
     explicit BasicArray(no_prealloc_tag) noexcept;
@@ -90,7 +91,8 @@ private:
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept override;
     virtual WidthType GetWidthType() const override { return wtype_Multiply; }
 
-    template<bool find_max> bool minmax(T& result, size_t begin, size_t end) const;
+    template<bool find_max>
+    bool minmax(T& result, size_t begin, size_t end) const;
 
     /// Calculate the total number of bytes needed for a basic array
     /// with the specified number of elements. This includes the size

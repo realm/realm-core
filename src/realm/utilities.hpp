@@ -65,7 +65,8 @@ typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
 extern signed char sse_support;
 extern signed char avx_support;
 
-template<int version> REALM_FORCEINLINE bool sseavx()
+template<int version>
+REALM_FORCEINLINE bool sseavx()
 {
 /*
     Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
@@ -206,7 +207,8 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 }
 
 
-template<class T> struct Wrap {
+template<class T>
+struct Wrap {
     Wrap(const T& v): m_value(v) {}
     operator T() const { return m_value; }
 private:

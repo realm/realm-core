@@ -28,25 +28,33 @@
 
 namespace realm {
 
-template<class T, class cond> class FloatDoubleNode;
-template<class ColType, class Cond> class IntegerNode;
-template<class T> class SequentialGetter;
+template<class T, class cond>
+class FloatDoubleNode;
+template<class ColType, class Cond>
+class IntegerNode;
+template<class T>
+class SequentialGetter;
 
-template<class cond, class T> struct ColumnTypeTraits2;
+template<class cond, class T>
+struct ColumnTypeTraits2;
 
-template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
+template<class cond>
+struct ColumnTypeTraits2<cond, int64_t> {
     typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
 };
-template<class cond> struct ColumnTypeTraits2<cond, bool> {
+template<class cond>
+struct ColumnTypeTraits2<cond, bool> {
     typedef IntegerColumn column_type;
     typedef ArrayInteger array_type;
 };
-template<class cond> struct ColumnTypeTraits2<cond, float> {
+template<class cond>
+struct ColumnTypeTraits2<cond, float> {
     typedef FloatColumn column_type;
     typedef ArrayFloat array_type;
 };
-template<class cond> struct ColumnTypeTraits2<cond, double> {
+template<class cond>
+struct ColumnTypeTraits2<cond, double> {
     typedef DoubleColumn column_type;
     typedef ArrayDouble array_type;
 };

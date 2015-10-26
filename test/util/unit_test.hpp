@@ -238,7 +238,8 @@ public:
     /// underlying order (TestDetails::test_index) as secondary
     /// criterium. See the class PatternBasedFileOrder for a slightly
     /// more advanced alternative.
-    template<class Compare> void sort(Compare);
+    template<class Compare>
+    void sort(Compare);
 
     /// Run all the tests in this list (or a filtered subset of them).
     bool run(Reporter* = 0, Filter* = 0, int num_threads = 1, bool shuffle = false);
@@ -249,7 +250,8 @@ public:
 
 private:
     class ExecContext;
-    template<class Compare> class CompareAdaptor;
+    template<class Compare>
+    class CompareAdaptor;
 
     std::vector<Test*> m_tests;
 
@@ -265,7 +267,8 @@ TestList& get_default_test_list();
 struct PatternBasedFileOrder {
     PatternBasedFileOrder(const char** patterns_begin, const char** patterns_end);
 
-    template<size_t N> PatternBasedFileOrder(const char* (&patterns)[N]);
+    template<size_t N>
+    PatternBasedFileOrder(const char* (&patterns)[N]);
 
     bool operator()(TestDetails*, TestDetails*);
 
@@ -454,7 +457,8 @@ struct RegisterTest {
 };
 
 
-template<class Compare> class TestList::CompareAdaptor {
+template<class Compare>
+class TestList::CompareAdaptor {
 public:
     CompareAdaptor(const Compare& compare):
         m_compare(compare)
@@ -470,7 +474,8 @@ private:
     Compare m_compare;
 };
 
-template<class Compare> inline void TestList::sort(Compare compare)
+template<class Compare>
+inline void TestList::sort(Compare compare)
 {
     std::sort(m_tests.begin(), m_tests.end(), CompareAdaptor<Compare>(compare));
     reassign_indexes();
@@ -490,7 +495,8 @@ inline PatternBasedFileOrder::PatternBasedFileOrder(const char* (&patterns)[N]):
 }
 
 
-template<class A, class B, bool both_are_integral> struct Compare {
+template<class A, class B, bool both_are_integral>
+struct Compare {
     static bool equal(const A& a, const B& b)
     {
         return a == b;
@@ -501,7 +507,8 @@ template<class A, class B, bool both_are_integral> struct Compare {
     }
 };
 
-template<class A, class B> struct Compare<A, B, true> {
+template<class A, class B>
+struct Compare<A, B, true> {
     static bool equal(const A& a, const B& b)
     {
         return util::int_equal_to(a,b);
@@ -513,13 +520,15 @@ template<class A, class B> struct Compare<A, B, true> {
 };
 
 
-template<class A, class B> inline bool equal(const A& a, const B& b)
+template<class A, class B>
+inline bool equal(const A& a, const B& b)
 {
     const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
     return Compare<A, B, both_are_integral>::equal(a,b);
 }
 
-template<class A, class B> inline bool less(const A& a, const B& b)
+template<class A, class B>
+inline bool less(const A& a, const B& b)
 {
     const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
     return Compare<A, B, both_are_integral>::less(a,b);
@@ -559,18 +568,21 @@ inline bool definitely_less(long double a, long double b, long double epsilon)
 }
 
 
-template<class T, bool is_float> struct SetPrecision {
+template<class T, bool is_float>
+struct SetPrecision {
     static void exec(std::ostream&) {}
 };
 
-template<class T> struct SetPrecision<T, true> {
+template<class T>
+struct SetPrecision<T, true> {
     static void exec(std::ostream& out)
     {
         out.precision(std::numeric_limits<T>::digits10 + 1);
     }
 };
 
-template<class T> void to_string(const T& value, std::string& str)
+template<class T>
+void to_string(const T& value, std::string& str)
 {
     // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
     std::ostringstream out;

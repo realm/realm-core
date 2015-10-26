@@ -118,13 +118,15 @@ struct GetSizeFromRef {
     Allocator& m_alloc;
     size_t m_size;
     GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
-    template<class Col> void call() noexcept
+    template<class Col>
+    void call() noexcept
     {
         m_size = Col::get_size_from_ref(m_ref, m_alloc);
     }
 };
 
-template<class Op> void col_type_deleg(Op& op, ColumnType type)
+template<class Op>
+void col_type_deleg(Op& op, ColumnType type)
 {
     switch (type) {
         case col_type_Int:

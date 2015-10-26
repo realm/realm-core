@@ -20,7 +20,8 @@
 
 /*
 Searching: The main finding function is:
-    template<class cond, Action action, size_t bitwidth, class Callback> void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState *state, Callback callback) const
+    template<class cond, Action action, size_t bitwidth, class Callback>
+    void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState *state, Callback callback) const
 
     cond:       One of Equal, NotEqual, Greater, etc. classes
     Action:     One of act_ReturnFirst, act_FindAll, act_Max, act_CallbackIdx, etc, constants
@@ -75,7 +76,8 @@ namespace realm {
 enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx,
              act_CallbackVal, act_CallbackNone, act_CallbackBoth, act_Average};
 
-template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
+template<class T>
+inline T no0(T v) { return v == 0 ? 1 : v; }
 
 /// Special index value. It has various meanings depending on
 /// context. It is returned by some search functions to indicate 'not
@@ -149,7 +151,8 @@ const size_t not_found = npos;
 class Array;
 class StringColumn;
 class GroupWriter;
-template<class T> class QueryState;
+template<class T>
+class QueryState;
 namespace _impl { class ArrayWriterBase; }
 
 
@@ -380,12 +383,15 @@ public:
 
     void set_as_ref(size_t ndx, ref_type ref);
 
-    template<size_t w> void set(size_t ndx, int64_t value);
+    template<size_t w>
+    void set(size_t ndx, int64_t value);
 
     int64_t get(size_t ndx) const noexcept;
-    template<size_t w> int64_t get(size_t ndx) const noexcept;
+    template<size_t w>
+    int64_t get(size_t ndx) const noexcept;
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
-    template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
+    template<size_t w>
+    void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
     ref_type get_as_ref(size_t ndx) const noexcept;
 
@@ -733,24 +739,30 @@ public:
 
 #endif
 
-    template<size_t width> inline bool test_zero(uint64_t value) const;         // Tests value for 0-elements
-    template<bool eq, size_t width>size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
-    template<size_t width, bool zero> uint64_t cascade(uint64_t a) const;      // Sets lowermost bits of zero or non-zero elements
-    template<bool gt, size_t width>int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
-    template<size_t width> inline int64_t lower_bits() const;                   // Return chunk with lower bit set in each element
+    template<size_t width>
+    inline bool test_zero(uint64_t value) const; // Tests value for 0-elements
+    template<bool eq, size_t width>
+    size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
+    template<size_t width, bool zero>
+    uint64_t cascade(uint64_t a) const;          // Sets lowermost bits of zero or non-zero elements
+    template<bool gt, size_t width>
+    int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
+    template<size_t width>
+    inline int64_t lower_bits() const;           // Return chunk with lower bit set in each element
     size_t first_set_bit(unsigned int v) const;
     size_t first_set_bit64(int64_t v) const;
-    template<size_t w> int64_t get_universal(const char* const data, const size_t ndx) const;
+    template<size_t w>
+    int64_t get_universal(const char* const data, const size_t ndx) const;
 
     // Find value greater/less in 64-bit chunk - only works for positive values
     template<bool gt, Action action, size_t width, class Callback>
     bool find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex,
-                       Callback callback) const;
+                        Callback callback) const;
 
     // Find value greater/less in 64-bit chunk - no constraints
     template<bool gt, Action action, size_t width, class Callback>
     bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex,
-                  Callback callback) const;
+                   Callback callback) const;
 
 
     /// Get the number of elements in the B+-tree rooted at this array
@@ -863,7 +875,8 @@ public:
         size_t m_split_size;
     };
 
-    template<class TreeTraits> struct TreeInsert: TreeInsertBase {
+    template<class TreeTraits>
+    struct TreeInsert: TreeInsertBase {
         typename TreeTraits::value_type m_value;
         bool m_nullable;
     };
@@ -1032,17 +1045,20 @@ protected:
     static int_fast64_t ubound_for_width() noexcept;
     static int_fast64_t ubound_for_width(size_t width) noexcept;
 
-    template<size_t width> void set_width() noexcept;
+    template<size_t width>
+    void set_width() noexcept;
     void set_width(size_t) noexcept;
     void alloc(size_t count, size_t width);
     void copy_on_write();
 
 private:
 
-    template<size_t w> int64_t sum(size_t start, size_t end) const;
-    template<bool max, size_t w> bool minmax(int64_t& result, size_t start,
-                                                  size_t end, size_t* return_ndx) const;
-    template<size_t w> size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
+    template<size_t w>
+    int64_t sum(size_t start, size_t end) const;
+    template<bool max, size_t w>
+    bool minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const;
+    template<size_t w>
+    size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
 
 protected:
     /// The total size in bytes (including the header) of a new empty
@@ -1092,7 +1108,8 @@ protected:
         Setter setter;
         Finder finder[cond_Count]; // one for each COND_XXX enum
     };
-    template<size_t w> struct VTableForWidth;
+    template<size_t w>
+    struct VTableForWidth;
 
 protected:
 
@@ -1206,14 +1223,16 @@ public:
 
 class QueryStateBase { virtual void dyncast(){} };
 
-template<> class QueryState<int64_t>: public QueryStateBase {
+template<>
+class QueryState<int64_t>: public QueryStateBase {
 public:
     int64_t m_state;
     size_t m_match_count;
     size_t m_limit;
     size_t m_minmax_index; // used only for min/max, to save index of current min/max value
 
-    template<Action action> bool uses_val()
+    template<Action action>
+    bool uses_val()
     {
         if (action == act_Max || action == act_Min || action == act_Sum)
             return true;
@@ -1299,14 +1318,16 @@ public:
 };
 
 // Used only for Basic-types: currently float and double
-template<class R> class QueryState : public QueryStateBase {
+template<class R>
+class QueryState : public QueryStateBase {
 public:
     R m_state;
     size_t m_match_count;
     size_t m_limit;
     size_t m_minmax_index; // used only for min/max, to save index of current min/max value
 
-    template<Action action> bool uses_val()
+    template<Action action>
+    bool uses_val()
     {
         return (action == act_Max || action == act_Min || action == act_Sum || action == act_Count);
     }
@@ -2221,12 +2242,14 @@ ref_type Array::bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state)
 // Finding code                                                                       *
 //*************************************************************************************
 
-template<size_t w> int64_t Array::get(size_t ndx) const noexcept
+template<size_t w>
+int64_t Array::get(size_t ndx) const noexcept
 {
     return get_universal<w>(m_data, ndx);
 }
 
-template<size_t w> int64_t Array::get_universal(const char* data, size_t ndx) const
+template<size_t w>
+int64_t Array::get_universal(const char* data, size_t ndx) const
 {
     if (w == 0) {
         return 0;
@@ -2303,7 +2326,8 @@ bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64
 }
 
 
-template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
+template<size_t width, bool zero>
+uint64_t Array::cascade(uint64_t a) const
 {
     // Takes a chunk of values as argument and sets the least significant bit for each
     // element which is zero or non-zero, depending on the template parameter.
@@ -2419,7 +2443,8 @@ template<size_t width, bool zero> uint64_t Array::cascade(uint64_t a) const
 //
 // If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set,
 // then nullable_array must be set too.
-template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool find_null) const
+template<class cond2, Action action, size_t bitwidth, class Callback>
+bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool find_null) const
 {
     REALM_ASSERT(!(find_null && !nullable_array));
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
@@ -2564,7 +2589,8 @@ return compare<cond2, action, bitwidth, Callback>(value, start2, end, baseindex,
 #endif
 }
 
-template<size_t width> inline int64_t Array::lower_bits() const
+template<size_t width>
+inline int64_t Array::lower_bits() const
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -2587,7 +2613,8 @@ template<size_t width> inline int64_t Array::lower_bits() const
 }
 
 // Tests if any chunk in 'value' is 0
-template<size_t width> inline bool Array::test_zero(uint64_t value) const
+template<size_t width>
+inline bool Array::test_zero(uint64_t value) const
 {
     uint64_t hasZeroByte;
     uint64_t lower = lower_bits<width>();
@@ -2598,7 +2625,8 @@ template<size_t width> inline bool Array::test_zero(uint64_t value) const
 
 // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position.
 // IMPORTANT: This function assumes that at least 1 item matches (test this with test_zero() or other means first)!
-template<bool eq, size_t width>size_t Array::find_zero(uint64_t v) const
+template<bool eq, size_t width>
+size_t Array::find_zero(uint64_t v) const
 {
     size_t start = 0;
     uint64_t hasZeroByte;
@@ -2647,7 +2675,8 @@ template<bool eq, size_t width>size_t Array::find_zero(uint64_t v) const
 }
 
 // Generate a magic constant used for later bithacks
-template<bool gt, size_t width>int64_t Array::find_gtlt_magic(int64_t v) const
+template<bool gt, size_t width>
+int64_t Array::find_gtlt_magic(int64_t v) const
 {
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
@@ -2655,7 +2684,8 @@ template<bool gt, size_t width>int64_t Array::find_gtlt_magic(int64_t v) const
     return magic;
 }
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback>
+bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v.
     // Fast, but limited to work when all values in the chunk are positive.
@@ -2684,7 +2714,8 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::find_
 }
 
 
-template<bool gt, Action action, size_t width, class Callback> bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template<bool gt, Action action, size_t width, class Callback>
+bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if (width == 1) {
@@ -2835,7 +2866,8 @@ template<bool gt, Action action, size_t width, class Callback> bool Array::find_
 }
 
 
-template<bool eq, Action action, size_t width, class Callback> inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<bool eq, Action action, size_t width, class Callback>
+inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 
@@ -3077,7 +3109,8 @@ bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t
 }
 
 
-template<class cond, Action action, size_t width, class Callback> bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template<class cond, Action action, size_t width, class Callback>
+bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     size_t fw = foreign->m_width;
     bool r;
@@ -3347,7 +3380,8 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
 
 }
 
-template<class cond> size_t Array::find_first(int64_t value, size_t start, size_t end) const
+template<class cond>
+size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
     QueryState<int64_t> state;

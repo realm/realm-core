@@ -352,10 +352,14 @@ protected:
     TableViewBase& operator=(const TableViewBase&) noexcept;
     TableViewBase& operator=(TableViewBase&&) noexcept;
 
-    template<class R, class V> static R find_all_integer(V*, size_t, int64_t);
-    template<class R, class V> static R find_all_float(V*, size_t, float);
-    template<class R, class V> static R find_all_double(V*, size_t, double);
-    template<class R, class V> static R find_all_string(V*, size_t, StringData);
+    template<class R, class V>
+    static R find_all_integer(V*, size_t, int64_t);
+    template<class R, class V>
+    static R find_all_float(V*, size_t, float);
+    template<class R, class V>
+    static R find_all_double(V*, size_t, double);
+    template<class R, class V>
+    static R find_all_string(V*, size_t, StringData);
 
     typedef TableView_Handover_patch Handover_patch;
 
@@ -396,14 +400,16 @@ private:
     friend class Table;
     friend class Query;
     friend class SharedGroup;
-    template<class Tab, class View, class Impl> friend class BasicTableViewBase;
+    template<class Tab, class View, class Impl>
+    friend class BasicTableViewBase;
 
     // Called by table to adjust any row references:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
 
-    template<typename Tab> friend class BasicTableView;
+    template<typename Tab>
+    friend class BasicTableView;
 };
 
 
@@ -453,7 +459,8 @@ public:
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
-    template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
+    template<class E>
+    void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
@@ -576,7 +583,8 @@ private:
     friend class TableViewBase;
     friend class ListviewNode;
     friend class LinkView;
-    template<typename, typename, typename> friend class BasicTableViewBase;
+    template<typename, typename, typename>
+    friend class BasicTableViewBase;
 };
 
 
@@ -1494,7 +1502,8 @@ inline void TableView::set_double(size_t column_ndx, size_t row_ndx, double valu
     m_table->set_double(column_ndx, real_ndx, value);
 }
 
-template<class E> inline void TableView::set_enum(size_t column_ndx, size_t row_ndx, E value)
+template<class E>
+inline void TableView::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     REALM_ASSERT(real_ndx != detached_ref);

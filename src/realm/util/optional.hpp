@@ -30,11 +30,14 @@
 namespace realm {
 namespace util {
 
-template<class T> class Optional;
+template<class T>
+class Optional;
 
 // some() should be the equivalent of the proposed C++17 `make_optional`.
-template<class T, class... Args> Optional<T> some(Args&&...);
-template<class T> struct Some;
+template<class T, class... Args>
+Optional<T> some(Args&&...);
+template<class T>
+struct Some;
 
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
 struct None { constexpr explicit None(int) {} };
@@ -52,22 +55,26 @@ struct BadOptionalAccess : std::logic_error {
 
 namespace _impl {
 
-template<class T, bool=std::is_trivially_destructible<T>::value> struct OptionalStorage;
+template<class T, bool=std::is_trivially_destructible<T>::value>
+struct OptionalStorage;
 
 // FIXME: Callers should switch to std::move when we adopt C++14
-template<class T> inline constexpr typename std::remove_reference<T>::type&& constexpr_move(T&& t) noexcept
+template<class T>
+inline constexpr typename std::remove_reference<T>::type&& constexpr_move(T&& t) noexcept
 {
     return static_cast<typename std::remove_reference<T>::type&&>(t);
 }
 
 // FIXME: Callers should switch to std::forward when we adopt C++14
-template<class T> inline constexpr T&& constexpr_forward(typename std::remove_reference<T>::type& t) noexcept
+template<class T>
+inline constexpr T&& constexpr_forward(typename std::remove_reference<T>::type& t) noexcept
 {
     return static_cast<T&&>(t);
 }
 
 // FIXME: Callers should switch to std::forward when we adopt C++14
-template<class T> inline constexpr T&& constexpr_forward(typename std::remove_reference<T>::type&& t) noexcept
+template<class T>
+inline constexpr T&& constexpr_forward(typename std::remove_reference<T>::type&& t) noexcept
 {
     static_assert(!std::is_lvalue_reference<T>::value, "Can't forward rvalue as lvalue.");
     return static_cast<T&&>(t);
@@ -194,7 +201,8 @@ public:
 private:
     T* m_ptr = nullptr;
 
-    template<class U> friend class Optional;
+    template<class U>
+    friend class Optional;
 };
 
 /// Implementation:

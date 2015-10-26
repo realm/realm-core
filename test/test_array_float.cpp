@@ -42,7 +42,8 @@ using test_util::unit_test::TestResults;
 
 namespace {
 
-template<class T, size_t N> inline size_t size_of_array(T(&)[N])
+template<class T, size_t N>
+inline size_t size_of_array(T(&)[N])
 {
     return N;
 }

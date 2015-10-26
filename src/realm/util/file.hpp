@@ -175,10 +175,12 @@ public:
     void write(const std::string& s) { write(s.data(), s.size()); }
 
     /// Calls read(data, N).
-    template<size_t N> size_t read(char (&data)[N]) { return read(data, N); }
+    template<size_t N>
+    size_t read(char (&data)[N]) { return read(data, N); }
 
     /// Calls write(data(), N).
-    template<size_t N> void write(const char (&data)[N]) { write(data, N); }
+    template<size_t N>
+    void write(const char (&data)[N]) { write(data, N); }
 
     /// Plays the same role as off_t in POSIX
     typedef int_fast64_t SizeType;
@@ -443,7 +445,8 @@ public:
     class ExclusiveLock;
     class SharedLock;
 
-    template<class> class Map;
+    template<class>
+    class Map;
 
     class CloseGuard;
     class UnlockGuard;
@@ -519,7 +522,8 @@ private:
 ///
 /// A single Map instance must never be accessed concurrently by
 /// multiple threads.
-template<class T> class File::Map: private MapBase {
+template<class T>
+class File::Map: private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
     explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof (T),
@@ -620,7 +624,8 @@ private:
 
 class File::UnmapGuard {
 public:
-    template<class T> UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
+    template<class T>
+    UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
     ~UnmapGuard()  noexcept { if (m_map) m_map->unmap(); }
     void release() noexcept { m_map = 0; }
 private:
@@ -853,9 +858,11 @@ inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size
     map(f, a, size, map_flags, offset);
 }
 
-template<class T> inline File::Map<T>::Map() noexcept {}
+template<class T>
+inline File::Map<T>::Map() noexcept {}
 
-template<class T> inline File::Map<T>::~Map() noexcept {}
+template<class T>
+inline File::Map<T>::~Map() noexcept {}
 
 template<class T>
 inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
@@ -864,7 +871,8 @@ inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_fl
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::unmap() noexcept
+template<class T>
+inline void File::Map<T>::unmap() noexcept
 {
     MapBase::unmap();
 }
@@ -876,27 +884,32 @@ inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::sync()
+template<class T>
+inline void File::Map<T>::sync()
 {
     MapBase::sync();
 }
 
-template<class T> inline bool File::Map<T>::is_attached() const noexcept
+template<class T>
+inline bool File::Map<T>::is_attached() const noexcept
 {
     return (m_addr != nullptr);
 }
 
-template<class T> inline T* File::Map<T>::get_addr() const noexcept
+template<class T>
+inline T* File::Map<T>::get_addr() const noexcept
 {
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline size_t File::Map<T>::get_size() const noexcept
+template<class T>
+inline size_t File::Map<T>::get_size() const noexcept
 {
     return m_addr ? m_size : 0;
 }
 
-template<class T> inline T* File::Map<T>::release() noexcept
+template<class T>
+inline T* File::Map<T>::release() noexcept
 {
     T* addr = static_cast<T*>(m_addr);
     m_addr = nullptr;

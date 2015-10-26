@@ -26,10 +26,13 @@
 
 namespace realm {
 
-template<class T> struct AggReturnType {
+template<class T>
+struct AggReturnType {
     typedef T sum_type;
 };
-template<> struct AggReturnType<float> {
+template<>
+struct AggReturnType<float>
+{
     typedef double sum_type;
 };
 

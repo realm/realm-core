@@ -43,10 +43,13 @@ public:
     static const int digits = val_lim::digits;
 
     super_int() noexcept;
-    template<class T> explicit super_int(T value) noexcept;
+    template<class T>
+    explicit super_int(T value) noexcept;
 
-    template<class T> bool cast_has_overflow() const noexcept;
-    template<class T> bool get_as(T&) const noexcept;
+    template<class T>
+    bool cast_has_overflow() const noexcept;
+    template<class T>
+    bool get_as(T&) const noexcept;
 
     //@{
 
@@ -95,7 +98,8 @@ inline super_int::super_int() noexcept
     m_sign_bit = false;
 }
 
-template<class T> inline super_int::super_int(T value) noexcept
+template<class T>
+inline super_int::super_int(T value) noexcept
 {
     typedef std::numeric_limits<T> lim_t;
     // C++11 (through its inclusion of C99) guarantees that the
@@ -108,7 +112,8 @@ template<class T> inline super_int::super_int(T value) noexcept
     m_sign_bit = lim_t::is_signed && util::is_negative(value);
 }
 
-template<class T> inline bool super_int::cast_has_overflow() const noexcept
+template<class T>
+inline bool super_int::cast_has_overflow() const noexcept
 {
     typedef std::numeric_limits<T> lim_t;
     if (*this < super_int(lim_t::min()))
@@ -118,7 +123,8 @@ template<class T> inline bool super_int::cast_has_overflow() const noexcept
     return false;
 }
 
-template<class T> bool super_int::get_as(T& v) const noexcept
+template<class T>
+bool super_int::get_as(T& v) const noexcept
 {
     // Ensure that the value represented by `*this` is also be
     // representable in T.

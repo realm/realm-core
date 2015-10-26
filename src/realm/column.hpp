@@ -43,10 +43,14 @@ namespace realm {
 struct CascadeState;
 class StringIndex;
 
-template<> struct GetLeafType<int64_t, false> {
+template<>
+struct GetLeafType<int64_t, false>
+{
     using type = ArrayInteger;
 };
-template<> struct GetLeafType<int64_t, true> {
+template<>
+struct GetLeafType<int64_t, true>
+{
     using type = ArrayIntNull;
 };
 
@@ -59,7 +63,8 @@ template<class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, size_t start, size_t end,
                 size_t limit, size_t* return_ndx);
 
-template<class T> struct ColumnTemplate : public ColumnTemplateBase
+template<class T>
+struct ColumnTemplate : public ColumnTemplateBase
 {
     // Overridden in column_string.* because == operator of StringData isn't yet locale aware; todo
     virtual int compare_values(size_t row1, size_t row2) const

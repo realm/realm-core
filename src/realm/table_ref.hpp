@@ -29,7 +29,8 @@ namespace realm {
 
 
 class Table;
-template<class> class BasicTable;
+template<class>
+class BasicTable;
 
 
 /// A reference-counting "smart pointer" for referring to table
@@ -131,28 +132,33 @@ template<class> class BasicTable;
 ///
 /// \sa Table
 /// \sa TableRef
-template<class T> class BasicTableRef: util::bind_ptr<T> {
+template<class T>
+class BasicTableRef: util::bind_ptr<T> {
 public:
     constexpr BasicTableRef() noexcept {}
     ~BasicTableRef() noexcept {}
 
     // Copy construct
     BasicTableRef(const BasicTableRef& r) noexcept: util::bind_ptr<T>(r) {}
-    template<class U> BasicTableRef(const BasicTableRef<U>& r) noexcept:
+    template<class U>
+    BasicTableRef(const BasicTableRef<U>& r) noexcept:
         util::bind_ptr<T>(r) {}
 
     // Copy assign
     BasicTableRef& operator=(const BasicTableRef&) noexcept;
-    template<class U> BasicTableRef& operator=(const BasicTableRef<U>&) noexcept;
+    template<class U>
+    BasicTableRef& operator=(const BasicTableRef<U>&) noexcept;
 
     // Move construct
     BasicTableRef(BasicTableRef&& r) noexcept: util::bind_ptr<T>(std::move(r)) {}
-    template<class U> BasicTableRef(BasicTableRef<U>&& r) noexcept:
+    template<class U>
+    BasicTableRef(BasicTableRef<U>&& r) noexcept:
         util::bind_ptr<T>(std::move(r)) {}
 
     // Move assign
     BasicTableRef& operator=(BasicTableRef&&) noexcept;
-    template<class U> BasicTableRef& operator=(BasicTableRef<U>&&) noexcept;
+    template<class U>
+    BasicTableRef& operator=(BasicTableRef<U>&&) noexcept;
 
     // Replacement for std::move() in C++03
     friend BasicTableRef move(BasicTableRef& r) noexcept
@@ -162,18 +168,30 @@ public:
 
     //@{
     /// Comparison
-    template<class U> bool operator==(const BasicTableRef<U>&) const noexcept;
-    template<class U> bool operator==(U*) const noexcept;
-    template<class U> bool operator!=(const BasicTableRef<U>&) const noexcept;
-    template<class U> bool operator!=(U*) const noexcept;
-    template<class U> bool operator<(const BasicTableRef<U>&) const noexcept;
-    template<class U> bool operator<(U*) const noexcept;
-    template<class U> bool operator>(const BasicTableRef<U>&) const noexcept;
-    template<class U> bool operator>(U*) const noexcept;
-    template<class U> bool operator<=(const BasicTableRef<U>&) const noexcept;
-    template<class U> bool operator<=(U*) const noexcept;
-    template<class U> bool operator>=(const BasicTableRef<U>&) const noexcept;
-    template<class U> bool operator>=(U*) const noexcept;
+    template<class U>
+    bool operator==(const BasicTableRef<U>&) const noexcept;
+    template<class U>
+    bool operator==(U*) const noexcept;
+    template<class U>
+    bool operator!=(const BasicTableRef<U>&) const noexcept;
+    template<class U>
+    bool operator!=(U*) const noexcept;
+    template<class U>
+    bool operator<(const BasicTableRef<U>&) const noexcept;
+    template<class U>
+    bool operator<(U*) const noexcept;
+    template<class U>
+    bool operator>(const BasicTableRef<U>&) const noexcept;
+    template<class U>
+    bool operator>(U*) const noexcept;
+    template<class U>
+    bool operator<=(const BasicTableRef<U>&) const noexcept;
+    template<class U>
+    bool operator<=(U*) const noexcept;
+    template<class U>
+    bool operator>=(const BasicTableRef<U>&) const noexcept;
+    template<class U>
+    bool operator>=(U*) const noexcept;
     //@}
 
     // Dereference
@@ -200,11 +218,14 @@ public:
     friend BasicTableRef<const U> unchecked_cast(BasicTableRef<const Table>) noexcept;
 
 private:
-    template<class> struct GetRowAccType { typedef void type; };
-    template<class Spec> struct GetRowAccType<BasicTable<Spec>> {
+    template<class>
+    struct GetRowAccType { typedef void type; };
+    template<class Spec>
+    struct GetRowAccType<BasicTable<Spec>> {
         typedef typename BasicTable<Spec>::RowAccessor type;
     };
-    template<class Spec> struct GetRowAccType<const BasicTable<Spec>> {
+    template<class Spec>
+    struct GetRowAccType<const BasicTable<Spec>> {
         typedef typename BasicTable<Spec>::ConstRowAccessor type;
     };
     typedef typename GetRowAccType<T>::type RowAccessor;
@@ -217,8 +238,10 @@ private:
     friend class SubtableColumnBase;
     friend class Table;
     friend class Group;
-    template<class> friend class BasicTable;
-    template<class> friend class BasicTableRef;
+    template<class>
+    friend class BasicTable;
+    template<class>
+    friend class BasicTableRef;
 
     explicit BasicTableRef(T* t) noexcept: util::bind_ptr<T>(t) {}
 
@@ -227,7 +250,8 @@ private:
         util::bind_ptr<T>(r, move_tag()) {}
 
     typedef typename util::bind_ptr<T>::casting_move_tag casting_move_tag;
-    template<class U> BasicTableRef(BasicTableRef<U>* r, casting_move_tag) noexcept:
+    template<class U>
+    BasicTableRef(BasicTableRef<U>* r, casting_move_tag) noexcept:
         util::bind_ptr<T>(r, casting_move_tag()) {}
 };
 
@@ -243,12 +267,14 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const B
     return out;
 }
 
-template<class T> inline BasicTableRef<T> unchecked_cast(TableRef t) noexcept
+template<class T>
+inline BasicTableRef<T> unchecked_cast(TableRef t) noexcept
 {
     return BasicTableRef<T>(&t, typename BasicTableRef<T>::casting_move_tag());
 }
 
-template<class T> inline BasicTableRef<const T> unchecked_cast(ConstTableRef t) noexcept
+template<class T>
+inline BasicTableRef<const T> unchecked_cast(ConstTableRef t) noexcept
 {
     return BasicTableRef<const T>(&t, typename BasicTableRef<T>::casting_move_tag());
 }
@@ -256,12 +282,18 @@ template<class T> inline BasicTableRef<const T> unchecked_cast(ConstTableRef t) 
 
 //@{
 /// Comparison
-template<class T, class U> bool operator==(T*, const BasicTableRef<U>&) noexcept;
-template<class T, class U> bool operator!=(T*, const BasicTableRef<U>&) noexcept;
-template<class T, class U> bool operator<(T*, const BasicTableRef<U>&) noexcept;
-template<class T, class U> bool operator>(T*, const BasicTableRef<U>&) noexcept;
-template<class T, class U> bool operator<=(T*, const BasicTableRef<U>&) noexcept;
-template<class T, class U> bool operator>=(T*, const BasicTableRef<U>&) noexcept;
+template<class T, class U>
+bool operator==(T*, const BasicTableRef<U>&) noexcept;
+template<class T, class U>
+bool operator!=(T*, const BasicTableRef<U>&) noexcept;
+template<class T, class U>
+bool operator<(T*, const BasicTableRef<U>&) noexcept;
+template<class T, class U>
+bool operator>(T*, const BasicTableRef<U>&) noexcept;
+template<class T, class U>
+bool operator<=(T*, const BasicTableRef<U>&) noexcept;
+template<class T, class U>
+bool operator>=(T*, const BasicTableRef<U>&) noexcept;
 //@}
 
 
@@ -277,7 +309,8 @@ inline BasicTableRef<T>& BasicTableRef<T>::operator=(const BasicTableRef& r) noe
     return *this;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 inline BasicTableRef<T>& BasicTableRef<T>::operator=(const BasicTableRef<U>& r) noexcept
 {
     this->util::bind_ptr<T>::operator=(r);
@@ -291,105 +324,130 @@ inline BasicTableRef<T>& BasicTableRef<T>::operator=(BasicTableRef&& r) noexcept
     return *this;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 inline BasicTableRef<T>& BasicTableRef<T>::operator=(BasicTableRef<U>&& r) noexcept
 {
     this->util::bind_ptr<T>::operator=(std::move(r));
     return *this;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 bool BasicTableRef<T>::operator==(const BasicTableRef<U>& p) const noexcept
 {
     return get() == p.get();
 }
 
-template<class T> template<class U> bool BasicTableRef<T>::operator==(U* p) const noexcept
+template<class T>
+template<class U>
+bool BasicTableRef<T>::operator==(U* p) const noexcept
 {
     return get() == p;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 bool BasicTableRef<T>::operator!=(const BasicTableRef<U>& p) const noexcept
 {
     return get() != p.get();
 }
 
-template<class T> template<class U> bool BasicTableRef<T>::operator!=(U* p) const noexcept
+template<class T>
+template<class U>
+bool BasicTableRef<T>::operator!=(U* p) const noexcept
 {
     return get() != p;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 bool BasicTableRef<T>::operator<(const BasicTableRef<U>& p) const noexcept
 {
     return get() < p.get();
 }
 
-template<class T> template<class U> bool BasicTableRef<T>::operator<(U* p) const noexcept
+template<class T>
+template<class U>
+bool BasicTableRef<T>::operator<(U* p) const noexcept
 {
     return get() < p;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 bool BasicTableRef<T>::operator>(const BasicTableRef<U>& p) const noexcept
 {
     return get() > p.get();
 }
 
-template<class T> template<class U> bool BasicTableRef<T>::operator>(U* p) const noexcept
+template<class T>
+template<class U>
+bool BasicTableRef<T>::operator>(U* p) const noexcept
 {
     return get() > p;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 bool BasicTableRef<T>::operator<=(const BasicTableRef<U>& p) const noexcept
 {
     return get() <= p.get();
 }
 
-template<class T> template<class U> bool BasicTableRef<T>::operator<=(U* p) const noexcept
+template<class T>
+template<class U>
+bool BasicTableRef<T>::operator<=(U* p) const noexcept
 {
     return get() <= p;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 bool BasicTableRef<T>::operator>=(const BasicTableRef<U>& p) const noexcept
 {
     return get() >= p.get();
 }
 
-template<class T> template<class U> bool BasicTableRef<T>::operator>=(U* p) const noexcept
+template<class T>
+template<class U>
+bool BasicTableRef<T>::operator>=(U* p) const noexcept
 {
     return get() >= p;
 }
 
-template<class T, class U> bool operator==(T* a, const BasicTableRef<U>& b) noexcept
+template<class T, class U>
+bool operator==(T* a, const BasicTableRef<U>& b) noexcept
 {
     return b == a;
 }
 
-template<class T, class U> bool operator!=(T* a, const BasicTableRef<U>& b) noexcept
+template<class T, class U>
+bool operator!=(T* a, const BasicTableRef<U>& b) noexcept
 {
     return b != a;
 }
 
-template<class T, class U> bool operator<(T* a, const BasicTableRef<U>& b) noexcept
+template<class T, class U>
+bool operator<(T* a, const BasicTableRef<U>& b) noexcept
 {
     return b > a;
 }
 
-template<class T, class U> bool operator>(T* a, const BasicTableRef<U>& b) noexcept
+template<class T, class U>
+bool operator>(T* a, const BasicTableRef<U>& b) noexcept
 {
     return b < a;
 }
 
-template<class T, class U> bool operator<=(T* a, const BasicTableRef<U>& b) noexcept
+template<class T, class U>
+bool operator<=(T* a, const BasicTableRef<U>& b) noexcept
 {
     return b >= a;
 }
 
-template<class T, class U> bool operator>=(T* a, const BasicTableRef<U>& b) noexcept
+template<class T, class U>
+bool operator>=(T* a, const BasicTableRef<U>& b) noexcept
 {
     return b <= a;
 }

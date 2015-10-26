@@ -82,7 +82,8 @@ private:
     // FIXME: Move B+Tree functionality from Array to this class.
 };
 
-template<class T, bool Nullable> struct GetLeafType;
+template<class T, bool Nullable>
+struct GetLeafType;
 
 // Default implementation of BpTree. This should work for all types that have monomorphic
 // leaves (i.e. all leaves are of the same type).
@@ -379,7 +380,8 @@ namespace _impl {
 // don't have to implement is_null/set_null but BpTree can still
 // support the interface (and return false / assert when null
 // is not supported).
-template<class Leaf, bool Nullable> struct NullableOrNothing;
+template<class Leaf, bool Nullable>
+struct NullableOrNothing;
 template<class Leaf>
 struct NullableOrNothing<Leaf, true> {
     static bool is_null(const Leaf& leaf, size_t ndx)

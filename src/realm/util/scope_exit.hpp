@@ -23,7 +23,8 @@
 namespace realm {
 namespace util {
 
-template<class H> class ScopeExit {
+template<class H>
+class ScopeExit {
 public:
     ScopeExit(const H& handler) noexcept(noexcept(H(handler))):
         m_handler(handler)
@@ -39,7 +40,8 @@ private:
     static_assert(noexcept(m_handler()), "Handler must not throw");
 };
 
-template<class H> ScopeExit<H> make_scope_exit(const H& handler)
+template<class H>
+ScopeExit<H> make_scope_exit(const H& handler)
 {
     return ScopeExit<H>(handler);
 }

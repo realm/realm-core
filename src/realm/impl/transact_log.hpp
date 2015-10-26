@@ -290,7 +290,8 @@ private:
     static char* encode_int(char*, T value);
     static char* encode_float(char*, float value);
     static char* encode_double(char*, double value);
-    template<class> struct EncodeNumber;
+    template<class>
+    struct EncodeNumber;
 };
 
 class TransactLogConvenientEncoder {
@@ -403,9 +404,11 @@ public:
     /// parse() promises that the path passed by reference to
     /// InstructionHandler::select_descriptor() will remain valid
     /// during subsequent calls to all descriptor modifying functions.
-    template<class InstructionHandler> void parse(InputStream&, InstructionHandler&);
+    template<class InstructionHandler>
+    void parse(InputStream&, InstructionHandler&);
 
-    template<class InstructionHandler> void parse(NoCopyInputStream&, InstructionHandler&);
+    template<class InstructionHandler>
+    void parse(NoCopyInputStream&, InstructionHandler&);
 
 private:
     util::Buffer<char> m_input_buffer;
@@ -427,10 +430,12 @@ private:
 
     REALM_NORETURN void parser_error() const;
 
-    template<class InstructionHandler> void parse_one(InstructionHandler&);
+    template<class InstructionHandler>
+    void parse_one(InstructionHandler&);
     bool has_next() noexcept;
 
-    template<class T> T read_int();
+    template<class T>
+    T read_int();
 
     void read_bytes(char* data, size_t size);
 
@@ -1815,7 +1820,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
 }
 
 
-template<class T> T TransactLogParser::read_int()
+template<class T>
+T TransactLogParser::read_int()
 {
     T value = 0;
     int part = 0;

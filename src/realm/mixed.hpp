@@ -166,10 +166,14 @@ private:
 // of Mixed are not explicit.
 
 // Compare mixed with integer
-template<class T> bool operator==(Wrap<Mixed>, const T&) noexcept;
-template<class T> bool operator!=(Wrap<Mixed>, const T&) noexcept;
-template<class T> bool operator==(const T&, Wrap<Mixed>) noexcept;
-template<class T> bool operator!=(const T&, Wrap<Mixed>) noexcept;
+template<class T>
+bool operator==(Wrap<Mixed>, const T&) noexcept;
+template<class T>
+bool operator!=(Wrap<Mixed>, const T&) noexcept;
+template<class T>
+bool operator==(const T&, Wrap<Mixed>) noexcept;
+template<class T>
+bool operator!=(const T&, Wrap<Mixed>) noexcept;
 
 // Compare mixed with boolean
 bool operator==(Wrap<Mixed>, bool) noexcept;
@@ -389,22 +393,26 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 
 // Compare mixed with integer
 
-template<class T> inline bool operator==(Wrap<Mixed> a, const T& b) noexcept
+template<class T>
+inline bool operator==(Wrap<Mixed> a, const T& b) noexcept
 {
     return Mixed(a).get_type() == type_Int && Mixed(a).get_int() == b;
 }
 
-template<class T> inline bool operator!=(Wrap<Mixed> a, const T& b) noexcept
+template<class T>
+inline bool operator!=(Wrap<Mixed> a, const T& b) noexcept
 {
     return Mixed(a).get_type() != type_Int || Mixed(a).get_int() != b;
 }
 
-template<class T> inline bool operator==(const T& a, Wrap<Mixed> b) noexcept
+template<class T>
+inline bool operator==(const T& a, Wrap<Mixed> b) noexcept
 {
     return type_Int == Mixed(b).get_type() && a == Mixed(b).get_int();
 }
 
-template<class T> inline bool operator!=(const T& a, Wrap<Mixed> b) noexcept
+template<class T>
+inline bool operator!=(const T& a, Wrap<Mixed> b) noexcept
 {
     return type_Int != Mixed(b).get_type() || a != Mixed(b).get_int();
 }

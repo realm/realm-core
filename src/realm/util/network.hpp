@@ -254,12 +254,14 @@ public:
     /// two handlers, A and B, and the execution of post(A) ands before the
     /// beginning of the execution of post(B), then A is guaranteed to execute
     /// before B.
-    template<class H> void post(const H& handler);
+    template<class H>
+    void post(const H& handler);
 
 private:
     class async_oper;
     class wait_oper_base;
-    template<class H> class post_oper;
+    template<class H>
+    class post_oper;
     class oper_queue;
 
     using clock = std::chrono::steady_clock;
@@ -364,11 +366,15 @@ public:
     /// of cancel().
     void cancel() noexcept;
 
-    template<class O> void get_option(O& option) const;
-    template<class O> std::error_code get_option(O& option, std::error_code&) const;
+    template<class O>
+    void get_option(O& option) const;
+    template<class O>
+    std::error_code get_option(O& option, std::error_code&) const;
 
-    template<class O> void set_option(const O& option);
-    template<class O> std::error_code set_option(const O& option, std::error_code&);
+    template<class O>
+    void set_option(const O& option);
+    template<class O>
+    std::error_code set_option(const O& option, std::error_code&);
 
     void bind(const endpoint&);
     std::error_code bind(const endpoint&, std::error_code&);
@@ -381,7 +387,8 @@ private:
         opt_ReuseAddr ///< `SOL_SOCKET`, `SO_REUSEADDR`
     };
 
-    template<class, int, class> class option;
+    template<class, int, class>
+    class option;
 
 public:
     typedef option<bool, opt_ReuseAddr, int> reuse_address;
@@ -409,7 +416,8 @@ protected:
 };
 
 
-template<class T, int opt, class U> class socket_base::option {
+template<class T, int opt, class U>
+class socket_base::option {
 public:
     option(T value = T());
     T value() const;
@@ -453,12 +461,14 @@ public:
     /// handler will always be called, as long as the event loop is running.
     ///
     /// \param ep The remote endpoint of the connection to be established.
-    template<class H> void async_connect(const endpoint& ep, const H& handler);
+    template<class H>
+    void async_connect(const endpoint& ep, const H& handler);
 
     void write(const char* data, size_t size);
     std::error_code write(const char* data, size_t size, std::error_code&) noexcept;
 
-    template<class H> void async_write(const char* data, size_t size, const H& handler);
+    template<class H>
+    void async_write(const char* data, size_t size, const H& handler);
 
     /// @{ \brief Read at least one byte from this socket.
     ///
@@ -487,8 +497,10 @@ protected:
 
 private:
     class connect_oper_base;
-    template<class H> class connect_oper;
-    template<class H> class write_oper;
+    template<class H>
+    class connect_oper;
+    template<class H>
+    class write_oper;
 
     void do_async_connect(std::unique_ptr<connect_oper_base>);
     bool initiate_connect(const endpoint&, std::error_code&) noexcept;
@@ -542,15 +554,19 @@ public:
     ///
     /// \param ep Upon completion, the remote peer endpoint will have been
     /// assigned to this variable.
-    template<class H> void async_accept(socket& sock, const H& handler);
-    template<class H> void async_accept(socket& sock, endpoint& ep, const H& handler);
+    template<class H>
+    void async_accept(socket& sock, const H& handler);
+    template<class H>
+    void async_accept(socket& sock, endpoint& ep, const H& handler);
     /// @}
 
 private:
     std::error_code accept(socket&, endpoint*, std::error_code&);
     std::error_code do_accept(socket&, endpoint*, std::error_code&) noexcept;
-    template<class H> class accept_oper;
-    template<class H> void async_accept(socket&, endpoint*, const H&);
+    template<class H>
+    class accept_oper;
+    template<class H>
+    void async_accept(socket&, endpoint*, const H&);
 };
 
 
@@ -617,7 +633,8 @@ public:
 
 private:
     class read_oper_base;
-    template<class H> class read_oper;
+    template<class H>
+    class read_oper;
 
     socket& m_socket;
     static const size_t s_buffer_size = 1024;
@@ -682,7 +699,8 @@ public:
     void cancel() noexcept;
 
 private:
-    template<class H> class wait_oper;
+    template<class H>
+    class wait_oper;
 
     using clock = io_service::clock;
 
@@ -725,7 +743,9 @@ std::error_code make_error_code(errors);
 
 namespace std {
 
-template<> struct is_error_code_enum<realm::util::network::errors> {
+template<>
+struct is_error_code_enum<realm::util::network::errors>
+{
 public:
     static const bool value = true;
 };
@@ -885,7 +905,8 @@ private:
     friend class io_service;
 };
 
-template<class H> class io_service::post_oper:
+template<class H>
+class io_service::post_oper:
         public async_oper {
 public:
     post_oper(const H& handler):
@@ -904,7 +925,8 @@ private:
     const H m_handler;
 };
 
-template<class H> inline void io_service::post(const H& handler)
+template<class H>
+inline void io_service::post(const H& handler)
 {
     std::unique_ptr<io_service::post_oper<H>> op;
     op.reset(new io_service::post_oper<H>(handler)); // Throws
@@ -1023,7 +1045,8 @@ inline void socket_base::close() noexcept
     do_close();
 }
 
-template<class O> inline void socket_base::get_option(O& option) const
+template<class O>
+inline void socket_base::get_option(O& option) const
 {
     std::error_code ec;
     if (get_option(option, ec))
@@ -1037,7 +1060,8 @@ inline std::error_code socket_base::get_option(O& option, std::error_code& ec) c
     return ec;
 }
 
-template<class O> inline void socket_base::set_option(const O& option)
+template<class O>
+inline void socket_base::set_option(const O& option)
 {
     std::error_code ec;
     if (set_option(option, ec))
@@ -1072,12 +1096,14 @@ inline int socket_base::get_sock_fd() noexcept
     return m_sock_fd;
 }
 
-template<class T, int opt, class U> inline socket_base::option<T, opt, U>::option(T value):
+template<class T, int opt, class U>
+inline socket_base::option<T, opt, U>::option(T value):
     m_value(value)
 {
 }
 
-template<class T, int opt, class U> inline T socket_base::option<T, opt, U>::value() const
+template<class T, int opt, class U>
+inline T socket_base::option<T, opt, U>::value() const
 {
     return m_value;
 }
@@ -1128,7 +1154,8 @@ protected:
     std::error_code m_error_code;
 };
 
-template<class H> class socket::connect_oper:
+template<class H>
+class socket::connect_oper:
         public connect_oper_base {
 public:
     connect_oper(socket& sock, const endpoint& ep, const H& handler):
@@ -1153,7 +1180,8 @@ public:
 private:
     const H m_handler;
 };
-template<class H> class socket::write_oper: public io_service::async_oper {
+template<class H>
+class socket::write_oper: public io_service::async_oper {
 public:
     write_oper(socket& s, const char* data, size_t size, const H& handler):
         m_socket(s),
@@ -1213,7 +1241,8 @@ inline void socket::connect(const endpoint& ep)
         throw std::system_error(ec);
 }
 
-template<class H> inline void socket::async_connect(const endpoint& ep, const H& handler)
+template<class H>
+inline void socket::async_connect(const endpoint& ep, const H& handler)
 {
     REALM_ASSERT(!m_write_oper);
     std::unique_ptr<connect_oper<H>> op;
@@ -1271,7 +1300,8 @@ inline void socket::do_async_connect(std::unique_ptr<connect_oper_base> op)
 
 // ---------------- acceptor ----------------
 
-template<class H> class acceptor::accept_oper:
+template<class H>
+class acceptor::accept_oper:
         public io_service::async_oper {
 public:
     accept_oper(acceptor& a, socket& s, endpoint* e, const H& handler):
@@ -1350,13 +1380,15 @@ inline std::error_code acceptor::accept(socket& sock, endpoint& ep, std::error_c
     return accept(sock, &ep, ec); // Throws
 }
 
-template<class H> inline void acceptor::async_accept(socket& sock, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, const H& handler)
 {
     endpoint* ep = nullptr;
     async_accept(sock, ep, handler); // Throws
 }
 
-template<class H> inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
 {
     async_accept(sock, &ep, handler); // Throws
 }
@@ -1369,7 +1401,8 @@ inline std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_c
     return do_accept(sock, ep, ec);
 }
 
-template<class H> inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
 {
     REALM_ASSERT(!m_read_oper);
     if (REALM_UNLIKELY(sock.is_open()))
@@ -1515,7 +1548,8 @@ inline void buffered_input_stream::do_async_read(std::unique_ptr<read_oper_base>
 
 // ---------------- deadline_timer ----------------
 
-template<class H> class deadline_timer::wait_oper:
+template<class H>
+class deadline_timer::wait_oper:
         public io_service::wait_oper_base {
 public:
     wait_oper(deadline_timer& timer, clock::time_point expiration_time, const H& handler):

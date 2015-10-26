@@ -29,8 +29,10 @@ namespace realm {
 
 // Predeclarations from query_engine.hpp
 class ParentNode;
-template<class T, class F> class FloatDoubleNode;
-template<class T> class SequentialGetter;
+template<class T, class F>
+class FloatDoubleNode;
+template<class T>
+class SequentialGetter;
 
 
 template<class T>
@@ -103,14 +105,16 @@ void BasicColumn<T>::set(size_t ndx, T value)
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
-template<class T> inline void BasicColumn<T>::add(T value)
+template<class T>
+inline void BasicColumn<T>::add(T value)
 {
     size_t row_ndx = realm::npos;
     size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
 
-template<class T> inline void BasicColumn<T>::insert(size_t row_ndx, T value)
+template<class T>
+inline void BasicColumn<T>::insert(size_t row_ndx, T value)
 {
     REALM_ASSERT((std::is_same<T, float>::value || std::is_same<T, double>::value));
 
@@ -121,25 +125,29 @@ template<class T> inline void BasicColumn<T>::insert(size_t row_ndx, T value)
     do_insert(row_ndx_2, value, num_rows); // Throws
 }
 
-template<class T> inline void BasicColumn<T>::erase(size_t row_ndx)
+template<class T>
+inline void BasicColumn<T>::erase(size_t row_ndx)
 {
     size_t last_row_ndx = size() - 1; // Note that size() is slow
     bool is_last = row_ndx == last_row_ndx;
     erase(row_ndx, is_last); // Throws
 }
 
-template<class T> inline void BasicColumn<T>::move_last_over(size_t row_ndx)
+template<class T>
+inline void BasicColumn<T>::move_last_over(size_t row_ndx)
 {
     size_t last_row_ndx = size() - 1; // Note that size() is slow
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
-template<class T> inline void BasicColumn<T>::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+template<class T>
+inline void BasicColumn<T>::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     do_swap_rows(row_ndx_1, row_ndx_2);
 }
 
-template<class T> inline void BasicColumn<T>::clear()
+template<class T>
+inline void BasicColumn<T>::clear()
 {
     do_clear(); // Throws
 }
@@ -244,7 +252,8 @@ void BasicColumn<T>::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     set(row_ndx_2, value_1);
 }
 
-template<class T> void BasicColumn<T>::do_clear()
+template<class T>
+void BasicColumn<T>::do_clear()
 {
     if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array.get())->clear(); // Throws
@@ -265,7 +274,8 @@ template<class T> void BasicColumn<T>::do_clear()
 }
 
 
-template<class T> class BasicColumn<T>::CreateHandler: public ColumnBase::CreateHandler {
+template<class T>
+class BasicColumn<T>::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
     ref_type create_leaf(size_t size) override
@@ -279,14 +289,16 @@ private:
     Allocator& m_alloc;
 };
 
-template<class T> ref_type BasicColumn<T>::create(Allocator& alloc, size_t size)
+template<class T>
+ref_type BasicColumn<T>::create(Allocator& alloc, size_t size)
 {
     CreateHandler handler(alloc);
     return ColumnBase::create(alloc, size, handler);
 }
 
 
-template<class T> class BasicColumn<T>::SliceHandler: public ColumnBase::SliceHandler {
+template<class T>
+class BasicColumn<T>::SliceHandler: public ColumnBase::SliceHandler {
 public:
     SliceHandler(Allocator& alloc): m_leaf(alloc) {}
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
@@ -299,8 +311,9 @@ private:
     BasicArray<T> m_leaf;
 };
 
-template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t slice_size,
-                                                 size_t table_size, _impl::OutputStream& out) const
+template<class T>
+ref_type BasicColumn<T>::write(size_t slice_offset, size_t slice_size, size_t table_size,
+                               _impl::OutputStream& out) const
 {
     ref_type ref;
     if (root_is_leaf()) {
@@ -372,13 +385,15 @@ void BasicColumn<T>::move_last_row_over(size_t row_ndx, size_t prior_num_rows, b
 }
 
 // Implementing pure virtual method of ColumnBase.
-template<class T> void BasicColumn<T>::clear(size_t, bool)
+template<class T>
+void BasicColumn<T>::clear(size_t, bool)
 {
     do_clear(); // Throws
 }
 
 
-template<class T> void BasicColumn<T>::refresh_accessor_tree(size_t, const Spec&)
+template<class T>
+void BasicColumn<T>::refresh_accessor_tree(size_t, const Spec&)
 {
     // The type of the cached root array accessor may no longer match the
     // underlying root node. In that case we need to replace it. Note that when
@@ -556,7 +571,8 @@ void BasicColumn<T>::find_all(IntegerColumn &result, T value, size_t begin, size
     }
 }
 
-template<class T> size_t BasicColumn<T>::count(T target) const
+template<class T>
+size_t BasicColumn<T>::count(T target) const
 {
     return size_t(aggregate<T, int64_t, act_Count, Equal>(*this, target, 0, size(), npos, nullptr));
 }
@@ -598,7 +614,8 @@ double BasicColumn<T>::average(size_t begin, size_t end, size_t limit, size_t* r
     return avg;
 }
 
-template<class T> void BasicColumn<T>::do_insert(size_t row_ndx, T value, size_t num_rows)
+template<class T>
+void BasicColumn<T>::do_insert(size_t row_ndx, T value, size_t num_rows)
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
 
@@ -630,7 +647,8 @@ template<class T> void BasicColumn<T>::do_insert(size_t row_ndx, T value, size_t
     }
 }
 
-template<class T> REALM_FORCEINLINE
+template<class T>
+REALM_FORCEINLINE
 ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
                                      size_t ndx_in_parent,
                                      Allocator& alloc, size_t insert_ndx,
@@ -643,7 +661,8 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 }
 
 
-template<class T> inline size_t BasicColumn<T>::lower_bound(T value) const noexcept
+template<class T>
+inline size_t BasicColumn<T>::lower_bound(T value) const noexcept
 {
     if (root_is_leaf()) {
         return static_cast<const BasicArray<T>*>(m_array.get())->lower_bound(value);
@@ -651,7 +670,8 @@ template<class T> inline size_t BasicColumn<T>::lower_bound(T value) const noexc
     return ColumnBase::lower_bound(*this, value);
 }
 
-template<class T> inline size_t BasicColumn<T>::upper_bound(T value) const noexcept
+template<class T>
+inline size_t BasicColumn<T>::upper_bound(T value) const noexcept
 {
     if (root_is_leaf()) {
         return static_cast<const BasicArray<T>*>(m_array.get())->upper_bound(value);

@@ -318,22 +318,30 @@ private:
 
     void add_expression_node(Expression*);
 
-    template<class ColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
-    template<class ColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
-    template<class ColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
-    template<class ColumnType> Query& greater(size_t column_ndx1, size_t column_ndx2);
-    template<class ColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
-    template<class ColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& equal(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& less(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& less_equal(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& greater(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
+    template<class ColumnType>
+    Query& not_equal(size_t column_ndx1, size_t column_ndx2);
 
-    template<typename TConditionFunction, class T> Query& add_condition(size_t column_ndx, T value);
+    template<typename TConditionFunction, class T>
+    Query& add_condition(size_t column_ndx, T value);
 
-    template<typename T, bool Nullable> double average(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0,
-                                        size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    template<typename T, bool Nullable>
+    double average(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0,
+                   size_t end=size_t(-1), size_t limit = size_t(-1)) const;
 
     template<Action action, typename T, typename R, class ColClass>
-        R aggregate(R (ColClass::*method)(size_t, size_t, size_t, size_t*) const,
-                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
-                    size_t* return_ndx = nullptr) const;
+    R aggregate(R (ColClass::*method)(size_t, size_t, size_t, size_t*) const,
+                size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                size_t* return_ndx = nullptr) const;
 
     void aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable,
                             ParentNode* pn, QueryStateBase* st, 

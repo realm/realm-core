@@ -3384,7 +3384,8 @@ size_t Table::do_find_pkey_string(StringData value) const
 }
 
 
-template<class T, bool Nullable> size_t Table::find_first(size_t col_ndx, T value) const
+template<class T, bool Nullable>
+size_t Table::find_first(size_t col_ndx, T value) const
 {
     using type_traits = ColumnTypeTraits<T, Nullable>;
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
@@ -3474,7 +3475,8 @@ size_t Table::find_first_null(size_t column_ndx) const
     return where().equal(column_ndx, null{}).find();
 }
 
-template<class T> TableView Table::find_all(size_t col_ndx, T value)
+template<class T>
+TableView Table::find_all(size_t col_ndx, T value)
 {
     return where().equal(col_ndx, value).find_all();
 }
@@ -4294,7 +4296,8 @@ inline void out_binary(std::ostream& out, const BinaryData bin)
         out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
 }
 
-template<class T> void out_floats(std::ostream& out, T value)
+template<class T>
+void out_floats(std::ostream& out, T value)
 {
     std::streamsize old = out.precision();
     out.precision(std::numeric_limits<T>::digits10 + 1);
