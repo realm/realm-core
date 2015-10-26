@@ -648,6 +648,35 @@ public:
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, bool nullable_array = false, bool find_null = false) const;
 
+    // Templated find function to avoid conversion to and from integer represenation of condition
+    template <class cond>
+    bool find(Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state, bool nullable_array = false, bool find_null = false) const {
+        if (action == act_ReturnFirst) {
+            REALM_TEMPEX3(return find, cond, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_Sum) {
+            REALM_TEMPEX3(return find, cond, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_Min) {
+            REALM_TEMPEX3(return find, cond, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_Max) {
+            REALM_TEMPEX3(return find, cond, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_Count) {
+            REALM_TEMPEX3(return find, cond, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_FindAll) {
+            REALM_TEMPEX3(return find, cond, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_CallbackIdx) {
+            REALM_TEMPEX3(return find, cond, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        REALM_ASSERT_DEBUG(false);
+        return false;
+    }
+
+
 /*
     bool find(int cond, Action action, null, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
