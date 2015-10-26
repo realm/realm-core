@@ -516,8 +516,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             Header& header = *writable_map.get_addr();
-            realm::util::handle_writes(writable_map, 0);
+            realm::util::handle_reads(writable_map, 0);
             header.m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
+            realm::util::handle_writes(writable_map, 0);
         }
         else {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
@@ -583,12 +584,14 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             File::Map<Header> writable_map(m_file, File::access_ReadWrite,
                                            sizeof (Header)); // Throws
             Header& writable_header = *writable_map.get_addr();
-            realm::util::handle_writes(writable_map, 0);
+            realm::util::handle_reads(writable_map, 0);
             writable_header.m_top_ref[1] = footer.m_top_ref;
+            realm::util::handle_writes(writable_map, 0);
             writable_map.sync();
             // keep bit 1 used for server sync mode unchanged
-            realm::util::handle_writes(writable_map, 0);
+            realm::util::handle_reads(writable_map, 0);
             writable_header.m_flags |= flags_SelectBit;
+            realm::util::handle_writes(writable_map, 0);
             m_file_on_streaming_form = false;
             writable_map.sync();
         }

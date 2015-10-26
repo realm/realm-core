@@ -461,13 +461,14 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
 
     // append data from write pointer and onwards:
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-    realm::util::handle_writes(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
+    realm::util::handle_reads(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
     EntryHeader hdr;
     hdr.size = entry.changeset.size();
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
     write_ptr += sizeof(EntryHeader);
     std::copy(entry.changeset.data(), entry.changeset.data() + entry.changeset.size(), write_ptr);
     bool disable_sync = get_disable_sync_to_disk();
+    realm::util::handle_writes(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
     if (!disable_sync)
         active_log->map.sync(); // Throws
 

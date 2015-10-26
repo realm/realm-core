@@ -203,6 +203,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_data = get_data_from_header(header);
 
     set_width(m_width);
+    realm::util::handle_reads(header, get_byte_size());
 }
 
 void Array::set_type(Type type)

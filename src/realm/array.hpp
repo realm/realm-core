@@ -1370,7 +1370,6 @@ inline void Array::init_from_ref(ref_type ref) noexcept
     char* header = m_alloc.translate(ref);
     realm::util::handle_reads(header, header_size);
     init_from_mem(MemRef(header, ref));
-    realm::util::handle_reads(header, get_byte_size());
 }
 
 
