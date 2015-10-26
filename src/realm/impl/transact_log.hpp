@@ -1852,6 +1852,7 @@ inline bool TransactLogParser::read_char(char& c)
 {
     if (m_input_begin == m_input_end && !next_input_buffer())
         return false;
+    realm::util::handle_reads(m_input_begin, 1);
     c = *m_input_begin++;
     return true;
 }

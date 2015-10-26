@@ -175,11 +175,14 @@ inline StringData ArrayString::get(const char* header, size_t ndx, bool nullable
     if (width == 0)
         return nullable ? realm::null() : StringData("");
 
+    realm::util::handle_reads(data + width - 1, 1);
     size_t size = (width-1) - data[width-1];
 
     if (size == static_cast<size_t>(-1))
         return nullable ? realm::null() : StringData("");
 
+    // "+1" for the terminator.
+    realm::util::handle_reads(data, size + 1);
     return StringData(data, size);
 }
 

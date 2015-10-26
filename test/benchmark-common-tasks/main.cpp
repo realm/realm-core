@@ -8,6 +8,7 @@
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 #include "../util/test_path.hpp"
+#include "../crypt_key.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -321,6 +322,7 @@ const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
         case SharedGroup::durability_Async: return "Async";
 #endif
     }
+    return "Error";
 }
 
 void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
@@ -342,37 +344,42 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 template <typename B>
 void run_benchmark(BenchmarkResults& results)
 {
-#ifdef _WIN32
-    const size_t num_durabilities = 2;
-#else
-    const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.
+    typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
+    std::vector<config_pair> configs;
+    configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
+    configs.push_back(config_pair(SharedGroup::durability_MemOnly, nullptr));
+#if REALM_ENABLE_ENCRYPTION
+    configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
 #endif
-    
-    static long test_counter = 0;
 
+    static long test_counter = 0;
     Timer timer(Timer::type_UserTime);
-    for (size_t i = 0; i < num_durabilities; ++i) {
-        SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
+
+    for (auto it = configs.begin(); it != configs.end(); ++it) {
+        SharedGroup::DurabilityLevel level = it->first;
+        const char* key = it->second;
         B benchmark;
-        
+
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
-        lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ")";
-        ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level);
+        lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) <<
+            ", " << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
+        ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level) <<
+            (key == nullptr ? "_EncrytpionOff" : "_EncrytpionOn");
         std::string ident = ident_ss.str();
-        
+
         realm::test_util::unit_test::TestDetails test_details;
         test_details.test_index = test_counter++;
         test_details.suite_name = "BenchmarkCommonTasks";
         test_details.test_name = ident.c_str();
         test_details.file_name = __FILE__;
         test_details.line_number = __LINE__;
-        
+
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
         std::unique_ptr<SharedGroup> group;
-        group.reset(new SharedGroup(realm_path, false, level));
+        group.reset(new SharedGroup(realm_path, false, level, key));
 
         // Warm-up and initial measuring:
         Timer t_unused(Timer::type_UserTime);

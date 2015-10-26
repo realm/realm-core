@@ -532,6 +532,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
+            realm::util::handle_reads(&header, sizeof (Header));
             int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
             m_file_format = header.m_file_format[select_field];
             uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
@@ -583,8 +584,20 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             File::Map<Header> writable_map(m_file, File::access_ReadWrite,
                                            sizeof (Header)); // Throws
             Header& writable_header = *writable_map.get_addr();
-            realm::util::handle_writes(writable_map, 0);
-            writable_header.m_top_ref[1] = footer.m_top_ref;
+
+            realm::util::handle_reads(&footer, sizeof (StreamingFooter));
+            uint64_t tmp_ref = footer.m_top_ref;
+            realm::util::handle_writes(&writable_header, sizeof (Header));
+            writable_header.m_top_ref[1] = tmp_ref;
+            // FIXME: writable_header and footer could be the same block but mapped
+            // to different mappings (Case Shared_CompactingOnTheFly). When handle_writes
+            // called, the same block in other mapping will be marked as unreadable. When
+            // handle_reads called, the same block in other mapping will be marked as
+            // unwritable. So put them in one line won't never work. When mprotect check
+            // enabled in the encrypted_file_mapping, here is the only case we have this
+            // problem.
+            //writable_header.m_top_ref[1] = footer.m_top_ref;
+
             writable_map.sync();
             // keep bit 1 used for server sync mode unchanged
             realm::util::handle_writes(writable_map, 0);

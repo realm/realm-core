@@ -203,6 +203,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_data = get_data_from_header(header);
 
     set_width(m_width);
+    realm::util::handle_reads(m_data, get_byte_size());
 }
 
 void Array::set_type(Type type)
@@ -361,6 +362,7 @@ size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) con
         const char* header = get_header_from_data(m_data);
         size_t size = get_byte_size();
         uint_fast32_t dummy_checksum = 0x01010101UL;
+        realm::util::handle_reads(header, size);
         size_t array_pos = out.write_array(header, size, dummy_checksum);
         REALM_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
 
