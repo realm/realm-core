@@ -170,26 +170,37 @@ public:
     /// Comparison
     template<class U>
     bool operator==(const BasicTableRef<U>&) const noexcept;
+
     template<class U>
     bool operator==(U*) const noexcept;
+
     template<class U>
     bool operator!=(const BasicTableRef<U>&) const noexcept;
+
     template<class U>
     bool operator!=(U*) const noexcept;
+
     template<class U>
     bool operator<(const BasicTableRef<U>&) const noexcept;
+
     template<class U>
     bool operator<(U*) const noexcept;
+
     template<class U>
     bool operator>(const BasicTableRef<U>&) const noexcept;
+
     template<class U>
     bool operator>(U*) const noexcept;
+
     template<class U>
     bool operator<=(const BasicTableRef<U>&) const noexcept;
+
     template<class U>
     bool operator<=(U*) const noexcept;
+
     template<class U>
     bool operator>=(const BasicTableRef<U>&) const noexcept;
+
     template<class U>
     bool operator>=(U*) const noexcept;
     //@}
@@ -214,12 +225,14 @@ public:
 
     template<class U>
     friend BasicTableRef<U> unchecked_cast(BasicTableRef<Table>) noexcept;
+
     template<class U>
     friend BasicTableRef<const U> unchecked_cast(BasicTableRef<const Table>) noexcept;
 
 private:
     template<class>
     struct GetRowAccType { typedef void type; };
+
     template<class Spec>
     struct GetRowAccType<BasicTable<Spec>> {
         typedef typename BasicTable<Spec>::RowAccessor type;
@@ -238,8 +251,10 @@ private:
     friend class SubtableColumnBase;
     friend class Table;
     friend class Group;
+
     template<class>
     friend class BasicTable;
+
     template<class>
     friend class BasicTableRef;
 

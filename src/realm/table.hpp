@@ -1068,10 +1068,13 @@ private:
 
     const ColumnBase& get_column_base(size_t column_ndx) const noexcept;
     ColumnBase& get_column_base(size_t column_ndx);
+
     template<class T, ColumnType col_type>
     T& get_column(size_t ndx);
+
     template<class T, ColumnType col_type>
     const T& get_column(size_t ndx) const noexcept;
+
     IntegerColumn& get_column(size_t column_ndx);
     const IntegerColumn& get_column(size_t column_ndx) const noexcept;
     IntNullColumn& get_column_int_null(size_t column_ndx);

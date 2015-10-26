@@ -299,6 +299,7 @@ protected:
     /// and %get() members.
     template<class L, class T>
     size_t lower_bound(const L& list, T value) const noexcept;
+
     template<class L, class T>
     size_t upper_bound(const L& list, T value) const noexcept;
     //@}
@@ -482,8 +483,10 @@ public:
 
     template<class U>
     void adjust(size_t ndx, U diff);
+
     template<class U>
     void adjust(U diff);
+
     template<class U>
     void adjust_ge(T limit, U diff);
 

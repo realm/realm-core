@@ -86,6 +86,7 @@ public:
 
     template<class T, class A>
     StringData(const std::basic_string<char, T, A>&);
+
     template<class T, class A>
     operator std::basic_string<char, T, A>() const;
 

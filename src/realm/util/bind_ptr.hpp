@@ -84,26 +84,37 @@ public:
     // Comparison
     template<class U>
     bool operator==(const bind_ptr<U>&) const noexcept;
+
     template<class U>
     bool operator==(U*) const noexcept;
+
     template<class U>
     bool operator!=(const bind_ptr<U>&) const noexcept;
+
     template<class U>
     bool operator!=(U*) const noexcept;
+
     template<class U>
     bool operator<(const bind_ptr<U>&) const noexcept;
+
     template<class U>
     bool operator<(U*) const noexcept;
+
     template<class U>
     bool operator>(const bind_ptr<U>&) const noexcept;
+
     template<class U>
     bool operator>(U*) const noexcept;
+
     template<class U>
     bool operator<=(const bind_ptr<U>&) const noexcept;
+
     template<class U>
     bool operator<=(U*) const noexcept;
+
     template<class U>
     bool operator>=(const bind_ptr<U>&) const noexcept;
+
     template<class U>
     bool operator>=(U*) const noexcept;
     //@}

@@ -354,10 +354,13 @@ protected:
 
     template<class R, class V>
     static R find_all_integer(V*, size_t, int64_t);
+
     template<class R, class V>
     static R find_all_float(V*, size_t, float);
+
     template<class R, class V>
     static R find_all_double(V*, size_t, double);
+
     template<class R, class V>
     static R find_all_string(V*, size_t, StringData);
 

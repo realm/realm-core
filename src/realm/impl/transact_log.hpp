@@ -278,10 +278,13 @@ private:
 
     template<class L>
     void append_simple_instr(Instruction, const util::Tuple<L>& numbers);
+
     template<class L>
     void append_string_instr(Instruction, const util::Tuple<L>& numbers, StringData);
+
     template<class L>
     void append_mixed_instr(Instruction, const util::Tuple<L>& numbers, const Mixed&);
+
     template<class L, class I>
     bool append_variable_size_instr(Instruction instr, const util::Tuple<L>& numbers,
                                     I var_begin, I var_end);

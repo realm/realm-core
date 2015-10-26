@@ -600,6 +600,7 @@ private:
     /// See LangBindHelper.
     template<class O>
     void advance_read(History&, O* observer, VersionID);
+
     template<class O>
     void promote_to_write(History&, O* observer);
     void commit_and_continue_as_read();

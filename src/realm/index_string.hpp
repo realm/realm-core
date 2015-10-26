@@ -87,8 +87,10 @@ public:
 
     template<class T>
     void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
+
     template<class T>
     void set(size_t row_ndx, T new_value);
+
     template<class T>
     void erase(size_t row_ndx, bool is_last);
 

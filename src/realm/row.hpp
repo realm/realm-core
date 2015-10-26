@@ -277,13 +277,18 @@ public:
 
     template<class U>
     BasicRow(BasicRowExpr<U>) noexcept;
+
     BasicRow(const BasicRow<T>&) noexcept;
+
     template<class U>
     BasicRow(const BasicRow<U>&) noexcept;
+
     template<class U>
     BasicRow& operator=(BasicRowExpr<U>) noexcept;
+
     template<class U>
     BasicRow& operator=(BasicRow<U>) noexcept;
+
     BasicRow& operator=(const BasicRow<T>&) noexcept;
 
     ~BasicRow() noexcept;

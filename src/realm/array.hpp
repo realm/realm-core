@@ -1055,8 +1055,10 @@ private:
 
     template<size_t w>
     int64_t sum(size_t start, size_t end) const;
+
     template<bool max, size_t w>
     bool minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const;
+
     template<size_t w>
     size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
 

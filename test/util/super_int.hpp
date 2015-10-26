@@ -48,6 +48,7 @@ public:
 
     template<class T>
     bool cast_has_overflow() const noexcept;
+
     template<class T>
     bool get_as(T&) const noexcept;
 

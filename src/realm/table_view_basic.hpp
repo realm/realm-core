@@ -116,8 +116,10 @@ public:
 protected:
     template<class, int, class, bool>
     friend class _impl::FieldAccessor;
+
     template<class, int, class>
     friend class _impl::MixedFieldAccessorBase;
+
     template<class Spec>
     friend class BasicTable;
 
@@ -261,14 +263,19 @@ private:
     }
 
     friend class BasicTableView<const Tab>;
+
     template<class, int, class, bool>
     friend class _impl::FieldAccessor;
+
     template<class, int, class>
     friend class _impl::MixedFieldAccessorBase;
+
     template<class, int, class>
     friend class _impl::ColumnAccessorBase;
+
     template<class, int, class>
     friend class _impl::ColumnAccessor;
+
     friend class Tab::Query;
 };
 
@@ -318,12 +325,16 @@ private:
 
     template<class, int, class, bool>
     friend class _impl::FieldAccessor;
+
     template<class, int, class>
     friend class _impl::MixedFieldAccessorBase;
+
     template<class, int, class>
     friend class _impl::ColumnAccessorBase;
+
     template<class, int, class>
     friend class _impl::ColumnAccessor;
+
     friend class Tab::Query;
 };
 

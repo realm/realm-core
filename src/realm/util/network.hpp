@@ -368,11 +368,13 @@ public:
 
     template<class O>
     void get_option(O& option) const;
+
     template<class O>
     std::error_code get_option(O& option, std::error_code&) const;
 
     template<class O>
     void set_option(const O& option);
+
     template<class O>
     std::error_code set_option(const O& option, std::error_code&);
 
@@ -497,8 +499,10 @@ protected:
 
 private:
     class connect_oper_base;
+
     template<class H>
     class connect_oper;
+
     template<class H>
     class write_oper;
 
@@ -556,6 +560,7 @@ public:
     /// assigned to this variable.
     template<class H>
     void async_accept(socket& sock, const H& handler);
+
     template<class H>
     void async_accept(socket& sock, endpoint& ep, const H& handler);
     /// @}
@@ -563,8 +568,10 @@ public:
 private:
     std::error_code accept(socket&, endpoint*, std::error_code&);
     std::error_code do_accept(socket&, endpoint*, std::error_code&) noexcept;
+
     template<class H>
     class accept_oper;
+
     template<class H>
     void async_accept(socket&, endpoint*, const H&);
 };

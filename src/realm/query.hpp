@@ -320,14 +320,19 @@ private:
 
     template<class ColumnType>
     Query& equal(size_t column_ndx1, size_t column_ndx2);
+
     template<class ColumnType>
     Query& less(size_t column_ndx1, size_t column_ndx2);
+
     template<class ColumnType>
     Query& less_equal(size_t column_ndx1, size_t column_ndx2);
+
     template<class ColumnType>
     Query& greater(size_t column_ndx1, size_t column_ndx2);
+
     template<class ColumnType>
     Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
+
     template<class ColumnType>
     Query& not_equal(size_t column_ndx1, size_t column_ndx2);
 

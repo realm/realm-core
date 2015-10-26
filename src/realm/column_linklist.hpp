@@ -126,10 +126,13 @@ private:
 
     template<bool fix_ndx_in_parent>
     void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept;
+
     template<bool fix_ndx_in_parent>
     void adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept;
+
     template<bool fix_ndx_in_parent>
     void adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
+
     template<bool fix_ndx_in_parent>
     void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
 

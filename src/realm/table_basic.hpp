@@ -263,6 +263,7 @@ public:
     /// compatible with the specified table type.
     template<class T>
     friend BasicTableRef<T> checked_cast(TableRef) noexcept;
+
     template<class T>
     friend BasicTableRef<const T> checked_cast(ConstTableRef) noexcept;
     //@}
@@ -338,16 +339,22 @@ private:
 
     template<class, int>
     friend struct _impl::CmpColType;
+
     template<class, int, class, bool>
     friend class _impl::FieldAccessor;
+
     template<class, int, class>
     friend class _impl::MixedFieldAccessorBase;
+
     template<class, int, class>
     friend class _impl::ColumnAccessorBase;
+
     template<class, int, class>
     friend class _impl::ColumnAccessor;
+
     template<class, int, class>
     friend class _impl::QueryColumn;
+
     friend class Group;
 };
 
@@ -458,8 +465,10 @@ private:
 
     friend class BasicTable;
     friend class SharedGroup;
+
     template<class, int, class>
     friend class _impl::QueryColumnBase;
+
     template<class, int, class>
     friend class _impl::QueryColumn;
 };
