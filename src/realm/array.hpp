@@ -2985,7 +2985,7 @@ bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int6
     else if (width == 32)
         search = _mm_set1_epi32(static_cast<int>(value));
     else if (width == 64) {
-        if (cond2::condition == cond_Less)
+        if (std::is_same<cond2, Less>::value)
             REALM_ASSERT(false);
         else
             search = _mm_set_epi64x(value, value);
@@ -3000,7 +3000,6 @@ template<class cond2, Action action, size_t width, class Callback>
 REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
-    int cond = cond2::condition;
     size_t i = 0;
     __m128i compare = {0};
     unsigned int resmask;
@@ -3008,7 +3007,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
     // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
     for (i = 0; i < items; ++i) {
         // equal / not-equal
-        if (cond == cond_Equal || cond == cond_NotEqual) {
+        if (std::is_same<cond2, Equal>::value || std::is_same<cond2, NotEqual>::value) {
             if (width == 8)
                 compare = _mm_cmpeq_epi8(action_data[i], *data);
             if (width == 16)
@@ -3021,7 +3020,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
         }
 
         // greater
-        else if (cond == cond_Greater) {
+        else if (std::is_same<cond2, Greater>::value) {
             if (width == 8)
                 compare = _mm_cmpgt_epi8(action_data[i], *data);
             if (width == 16)
@@ -3032,7 +3031,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
                 compare = _mm_cmpgt_epi64(action_data[i], *data);
         }
         // less
-        else if (cond == cond_Less) {
+        else if (std::is_same<cond2, Less>::value) {
             if (width == 8)
                 compare = _mm_cmplt_epi8(action_data[i], *data);
             else if (width == 16)
@@ -3045,7 +3044,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 
         resmask = _mm_movemask_epi8(compare);
 
-        if (cond == cond_NotEqual)
+        if (std::is_same<cond2, NotEqual>::value)
             resmask = ~resmask & 0x0000ffff;
 
 //        if (resmask != 0)
@@ -3297,16 +3296,15 @@ template<class cond2, Action action, size_t bitwidth, class Callback>
 bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                     Callback callback) const
 {
-    int cond = cond2::condition;
     bool ret = false;
 
-    if (cond == cond_Equal)
+    if (std::is_same<cond2, Equal>::value)
         ret = compare_equality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == cond_NotEqual)
+    else if (std::is_same<cond2, NotEqual>::value)
         ret = compare_equality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == cond_Greater)
+    else if (std::is_same<cond2, Greater>::value)
         ret = compare_relation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == cond_Less)
+    else if (std::is_same<cond2, Less>::value)
         ret = compare_relation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else
         REALM_ASSERT_DEBUG(false);
