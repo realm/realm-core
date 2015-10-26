@@ -172,8 +172,10 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
 }
 
 
-MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, bool nullable)
+MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData values)
 {
+    // Only null and zero-length non-null allowed as initialization value
+    REALM_ASSERT(values.size() == 0);
     Array top(alloc);
     _impl::DeepArrayDestroyGuard dg(&top);
     top.create(type_HasRefs); // Throws
@@ -202,7 +204,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, bool nullable)
         // must thus check if this array exists before trying to access it. If it doesn't, it must be interpreted as if its 
         // column isn't nullable.
         bool context_flag = false;
-        int64_t value = nullable ? 1 : 0;
+        int64_t value = values.is_null() ? 1 : 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.m_ref);
         int64_t v = from_ref(mem.m_ref);
