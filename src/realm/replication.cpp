@@ -330,7 +330,7 @@ public:
 
     bool clear_table()
     {
-        if (REALM_LIKELY(m_table)) {
+        if (REALM_LIKELY(m_table && m_table->is_attached())) {
 #ifdef REALM_DEBUG
             if (m_log)
                 *m_log << "table->clear()\n";
@@ -344,7 +344,7 @@ public:
 
     bool add_search_index(size_t col_ndx)
     {
-        if (REALM_LIKELY(m_table)) {
+        if (REALM_LIKELY(m_table && m_table->is_attached())) {
             if (REALM_LIKELY(!m_table->has_shared_type())) {
                 if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
 #ifdef REALM_DEBUG
@@ -361,7 +361,7 @@ public:
 
     bool remove_search_index(size_t col_ndx)
     {
-        if (REALM_LIKELY(m_table)) {
+        if (REALM_LIKELY(m_table && m_table->is_attached())) {
             if (REALM_LIKELY(!m_table->has_shared_type())) {
                 if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
 #ifdef REALM_DEBUG
@@ -378,17 +378,19 @@ public:
 
     bool add_primary_key(size_t col_ndx)
     {
-        if (REALM_LIKELY(m_table)) {
+        if (REALM_LIKELY(m_table && m_table->is_attached())) {
             if (REALM_LIKELY(!m_table->has_shared_type())) {
                 if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
+                    if (REALM_LIKELY(m_table->has_search_index(col_ndx))) {
 #ifdef REALM_DEBUG
-                    if (m_log)
-                        *m_log << "table->add_primary_key("<<col_ndx<<")\n";
+                        if (m_log)
+                            *m_log << "table->add_primary_key("<<col_ndx<<")\n";
 #endif
-                    // Fails if there are duplicate values, but given valid
-                    // transaction logs, there never will be.
-                    bool success = m_table->try_add_primary_key(col_ndx); // Throws
-                    return success;
+                        // Fails if there are duplicate values, but given valid
+                        // transaction logs, there never will be.
+                        bool success = m_table->try_add_primary_key(col_ndx); // Throws
+                        return success;
+                    }
                 }
             }
         }
@@ -397,7 +399,7 @@ public:
 
     bool remove_primary_key()
     {
-        if (REALM_LIKELY(m_table)) {
+        if (REALM_LIKELY(m_table && m_table->is_attached())) {
             if (REALM_LIKELY(!m_table->has_shared_type() && m_table->has_primary_key())) {
 #ifdef REALM_DEBUG
                 if (m_log)
@@ -412,14 +414,17 @@ public:
 
     bool set_link_type(size_t col_ndx, LinkType link_type)
     {
+        using tf = _impl::TableFriend;
         if (REALM_LIKELY(m_table && m_desc)) {
             if (REALM_LIKELY(col_ndx < m_desc->get_column_count())) {
+                if (REALM_UNLIKELY(!tf::is_link_type(ColumnType(m_table->get_column_type(col_ndx))))) {
+                    return false;
+                }
 #ifdef REALM_DEBUG
                 if (m_log)
                     *m_log << "table->set_link_type("<<col_ndx<<", "
                         "\""<<link_type_to_str(link_type)<<"\")\n";
 #endif
-                typedef _impl::TableFriend tf;
                 tf::set_link_type(*m_table, col_ndx, link_type); // Throws
                 return true;
             }
@@ -429,9 +434,25 @@ public:
 
     bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
     {
+        using tf = _impl::TableFriend;
+        if (REALM_UNLIKELY(type != type_Int &&
+                           type != type_Bool &&
+                           type != type_Float &&
+                           type != type_Double &&
+                           type != type_String &&
+                           type != type_Binary &&
+                           type != type_DateTime &&
+                           type != type_Table &&
+                           type != type_Mixed))
+            return false;
+        if (nullable) {
+            // Nullability not supported for Table and Mixed columns.
+            if (REALM_UNLIKELY(type == type_Table || type == type_Mixed)) {
+                return false;
+            }
+        }
         if (REALM_LIKELY(m_desc)) {
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
-                typedef _impl::TableFriend tf;
 #ifdef REALM_DEBUG
                 if (m_log) {
                     *m_log << "desc->insert_column("<<col_ndx<<", "<<data_type_to_str(type)<<", "
@@ -449,9 +470,11 @@ public:
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
                        size_t link_target_table_ndx, size_t)
     {
+        using tf = _impl::TableFriend;
+        if (REALM_UNLIKELY(type != type_Link && type != type_LinkList))
+            return false;
         if (REALM_LIKELY(m_desc)) {
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
-                typedef _impl::TableFriend tf;
 #ifdef REALM_DEBUG
                 if (m_log) {
                     *m_log << "desc->insert_column_link("<<col_ndx<<", "
@@ -537,6 +560,8 @@ public:
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
+        if (REALM_UNLIKELY(!m_table->is_attached()))
+            return false;
         if (REALM_UNLIKELY(m_table->has_shared_type()))
             return false;
 #ifdef REALM_DEBUG
@@ -547,6 +572,8 @@ public:
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[i];
             if (REALM_UNLIKELY(col_ndx >= m_desc->get_column_count()))
+                return false;
+            if (REALM_UNLIKELY(m_desc->get_column_type(col_ndx) != type_Table))
                 return false;
 #ifdef REALM_DEBUG
             if (m_log)
@@ -562,6 +589,8 @@ public:
         if (REALM_UNLIKELY(prior_num_tables != m_group.size()))
             return false;
         if (REALM_UNLIKELY(table_ndx > m_group.size()))
+            return false;
+        if (REALM_UNLIKELY(name.size() >= ArrayString::max_width))
             return false;
 #ifdef REALM_DEBUG
         if (m_log)
@@ -591,6 +620,10 @@ public:
     {
         if (REALM_UNLIKELY(table_ndx >= m_group.size()))
             return false;
+        if (REALM_UNLIKELY(m_group.has_table(new_name)))
+            return false;
+        if (REALM_UNLIKELY(new_name.size() >= ArrayString::max_width))
+            return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "group->rename_table("<<table_ndx<<", \""<<new_name<<"\")\n";
@@ -617,7 +650,7 @@ public:
 
     bool optimize_table()
     {
-        if (REALM_LIKELY(m_table)) {
+        if (REALM_LIKELY(m_table && m_table->is_attached())) {
             if (REALM_LIKELY(!m_table->has_shared_type())) {
 #ifdef REALM_DEBUG
                 if (m_log)
@@ -633,6 +666,8 @@ public:
     bool select_link_list(size_t col_ndx, size_t row_ndx, size_t)
     {
         if (REALM_UNLIKELY(!m_table))
+            return false;
+        if (REALM_UNLIKELY(!m_table->is_attached()))
             return false;
         if (REALM_UNLIKELY(col_ndx >= m_table->get_column_count()))
             return false;
@@ -757,7 +792,7 @@ private:
 
     bool check_set_cell(size_t col_ndx, size_t row_ndx) noexcept
     {
-        if (REALM_LIKELY(m_table)) {
+        if (REALM_LIKELY(m_table && m_table->is_attached())) {
             if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
                 if (REALM_LIKELY(row_ndx < m_table->size()))
                     return true;
