@@ -9,14 +9,14 @@ using namespace realm;
 using namespace realm::util;
 
 struct InputStreamAdapter : _impl::InputStream {
-    InputStreamAdapter(std::ifstream& s) : stream_(s) {}
+    InputStreamAdapter(std::ifstream& s) : m_stream(s) {}
 
     size_t read(char* buffer, size_t size) final
     {
-        return stream_.read(buffer, size).gcount();
+        return m_stream.read(buffer, size).gcount();
     }
 
-    std::ifstream& stream_;
+    std::ifstream& m_stream;
 };
 
 int main(int argc, char const *argv[])
