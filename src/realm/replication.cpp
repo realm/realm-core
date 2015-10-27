@@ -597,6 +597,12 @@ public:
 
     bool move_group_level_table(size_t table_ndx_1, size_t table_ndx_2) noexcept
     {
+        if (REALM_UNLIKELY(table_ndx_1 == table_ndx_2))
+            return false;
+        if (REALM_UNLIKELY(table_ndx_1 >= m_group.size()))
+            return false;
+        if (REALM_UNLIKELY(table_ndx_2 >= m_group.size()))
+            return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "group->move_table("<<table_ndx_1<<", "<<table_ndx_2<<")\n";
