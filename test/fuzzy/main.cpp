@@ -19,7 +19,7 @@ struct InputStreamAdapter : _impl::InputStream {
     std::ifstream& m_stream;
 };
 
-int main(int argc, char const *argv[])
+int main(int argc, const char* argv[])
 {
     if (argc == 1) {
         fprintf(stderr, "Usage: %s <LOGFILE>\n(where <LOGFILE> is a transaction log file that will be replayed.)", argv[0]);
