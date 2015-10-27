@@ -581,6 +581,8 @@ public:
 
     bool rename_group_level_table(size_t table_ndx, StringData new_name) noexcept
     {
+        if (REALM_UNLIKELY(table_ndx >= m_group.size()))
+            return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "group->rename_table("<<table_ndx<<", \""<<new_name<<"\")\n";
