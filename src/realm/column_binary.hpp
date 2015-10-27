@@ -351,7 +351,6 @@ inline size_t BinaryColumn::get_size_from_ref(ref_type root_ref,
                                                    Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
-    realm::util::encryption_read_barrier(root_header, Array::header_size);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
     if (root_is_leaf) {
         bool is_big = Array::get_context_flag_from_header(root_header);

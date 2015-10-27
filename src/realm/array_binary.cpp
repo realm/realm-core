@@ -114,7 +114,6 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
     if (siz == 3) {
         std::pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
-        // calls to encryption_read_barrier should be in ArrayInteger::get (which class Array::get)
         int64_t n = ArrayInteger::get(nulls_header, ndx);
         // 0 or 1 is all that is ever written to m_nulls; any other content would be a bug
         REALM_ASSERT_3(n == 1, ||, n == 0);
@@ -138,7 +137,6 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
         begin = 0;
         end   = to_size_t(Array::get(offsets_header, ndx));
     }
-    // encryption_read_barrier should happen in ArrayBlob::get!
     BinaryData bd = BinaryData(ArrayBlob::get(blob_header, begin), end - begin);
     return bd;
 }

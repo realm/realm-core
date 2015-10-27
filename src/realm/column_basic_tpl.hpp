@@ -37,7 +37,6 @@ template<class T>
 BasicColumn<T>::BasicColumn(Allocator& alloc, ref_type ref, bool nullable) : m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
-    realm::util::encryption_read_barrier(header, Array::header_size);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {
         BasicArray<T>* root = new BasicArray<T>(alloc); // Throws

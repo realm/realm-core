@@ -58,7 +58,6 @@ StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable):
     m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
-    realm::util::encryption_read_barrier(header, Array::header_size);
     MemRef mem(header, ref);
 
     // Within an StringColumn the leaves can be of different
