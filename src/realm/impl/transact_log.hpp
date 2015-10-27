@@ -1985,7 +1985,6 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
         case type_Link:
         case type_LinkList:
             // FIXME: Need to handle new link types here
-            REALM_ASSERT(false);
             break;
     }
     throw BadTransactLog();
