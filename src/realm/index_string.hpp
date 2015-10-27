@@ -209,7 +209,6 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
     m_deny_duplicate_values(deny_duplicate_values)
 {
     char* header = alloc.translate(ref);
-    realm::util::encryption_read_barrier(header, Array::header_size);
     REALM_ASSERT(Array::get_context_flag_from_header(header));
     m_array->init_from_ref(ref);
     set_parent(parent, ndx_in_parent);

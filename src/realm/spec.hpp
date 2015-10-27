@@ -409,7 +409,6 @@ inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& al
     const char* top_header = alloc.translate(top_ref);
     ref_type types_ref = to_ref(Array::get(top_header, 0));
     const char* types_header = alloc.translate(types_ref);
-    realm::util::encryption_read_barrier(types_header, Array::header_size);
     if (Array::get_size_from_header(types_header) == 0)
         return false;
     type = ColumnType(Array::get(types_header, 0));
