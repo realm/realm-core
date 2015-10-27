@@ -414,9 +414,9 @@ public:
 
     bool set_link_type(size_t col_ndx, LinkType link_type)
     {
-        using tf = _impl::TableFriend;
         if (REALM_LIKELY(m_table && m_desc)) {
             if (REALM_LIKELY(col_ndx < m_desc->get_column_count())) {
+                using tf = _impl::TableFriend;
                 if (REALM_UNLIKELY(!tf::is_link_type(ColumnType(m_table->get_column_type(col_ndx))))) {
                     return false;
                 }
@@ -434,7 +434,6 @@ public:
 
     bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
     {
-        using tf = _impl::TableFriend;
         if (REALM_UNLIKELY(type != type_Int &&
                            type != type_Bool &&
                            type != type_Float &&
@@ -460,6 +459,7 @@ public:
                 }
 #endif
                 Table* link_target_table = nullptr;
+                using tf = _impl::TableFriend;
                 tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
                 return true;
             }
@@ -470,7 +470,6 @@ public:
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
                        size_t link_target_table_ndx, size_t)
     {
-        using tf = _impl::TableFriend;
         if (REALM_UNLIKELY(type != type_Link && type != type_LinkList))
             return false;
         if (REALM_LIKELY(m_desc)) {
@@ -482,7 +481,8 @@ public:
                         "group->get_table("<<link_target_table_ndx<<"))\n";
                 }
 #endif
-                typedef _impl::GroupFriend gf;
+                using gf = _impl::GroupFriend;
+                using tf = _impl::TableFriend;
                 Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
                 tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
                 return true;
