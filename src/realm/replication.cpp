@@ -557,6 +557,8 @@ public:
     {
         if (REALM_UNLIKELY(prior_num_tables != m_group.size()))
             return false;
+        if (REALM_UNLIKELY(table_ndx > m_group.size()))
+            return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "group->add_table(\""<<name<<"\", false)\n";
