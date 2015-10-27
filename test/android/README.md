@@ -72,7 +72,13 @@ Of course make sure the device is set to developer mode and connected.
 You can of course tap the app icon. Alternatively you can do it from the command line:
 
 ```
-$ adb shell am start -a android.intent.action.MAIN -n com.realm.test/android.app.NativeActivity
+$ adb shell am start -a android.intent.action.MAIN -n io.realm.test/android.app.NativeActivity
+```
+
+It is possible to stop the app using the command:
+
+```
+$ adb shell am force-stop io.realm.test
 ```
 
 ## See the logs
