@@ -394,7 +394,7 @@ public:
     bool remove_primary_key()
     {
         if (REALM_LIKELY(m_table)) {
-            if (REALM_LIKELY(!m_table->has_shared_type())) {
+            if (REALM_LIKELY(!m_table->has_shared_type() && m_table->has_primary_key())) {
 #ifdef REALM_DEBUG
                 if (m_log)
                     *m_log << "table->remove_primary_key()\n";
