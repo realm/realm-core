@@ -1,1 +1,5 @@
 findings/*
+fuzzy-tests*
+generate-fuzzy-input*
+*.d
+*.o
