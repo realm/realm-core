@@ -197,6 +197,8 @@ public:
 
     bool insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
     {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "table->insert_substring("<<col_ndx<<", "<<row_ndx<<", "<<pos<<", "
@@ -213,6 +215,8 @@ public:
 
     bool erase_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size)
     {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "table->remove_substring("<<col_ndx<<", "<<row_ndx<<", "<<pos<<", "
