@@ -1714,8 +1714,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             int type = read_int<int>(); // Throws
             if (!is_valid_data_type(type))
                 parser_error();
+            if (REALM_UNLIKELY(type == type_Link || type == type_LinkList))
+                parser_error();
             StringData name = read_string(m_string_buffer); // Throws
             bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
+            if (REALM_UNLIKELY(nullable && (type == type_Table || type == type_Mixed))) {
+                // Nullability not supported for Table and Mixed columns.
+                parser_error();
+            }
             if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
                 parser_error();
             return;
@@ -1724,6 +1730,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t col_ndx = read_int<size_t>(); // Throws
             int type = read_int<int>(); // Throws
             if (!is_valid_data_type(type))
+                parser_error();
+            if (REALM_UNLIKELY(type != type_Link && type != type_LinkList))
                 parser_error();
             size_t link_target_table_ndx = read_int<size_t>(); // Throws
             size_t backlink_col_ndx = read_int<size_t>(); // Throws

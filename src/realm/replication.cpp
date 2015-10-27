@@ -434,22 +434,6 @@ public:
 
     bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
     {
-        if (REALM_UNLIKELY(type != type_Int &&
-                           type != type_Bool &&
-                           type != type_Float &&
-                           type != type_Double &&
-                           type != type_String &&
-                           type != type_Binary &&
-                           type != type_DateTime &&
-                           type != type_Table &&
-                           type != type_Mixed))
-            return false;
-        if (nullable) {
-            // Nullability not supported for Table and Mixed columns.
-            if (REALM_UNLIKELY(type == type_Table || type == type_Mixed)) {
-                return false;
-            }
-        }
         if (REALM_LIKELY(m_desc)) {
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
 #ifdef REALM_DEBUG
@@ -470,8 +454,6 @@ public:
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
                        size_t link_target_table_ndx, size_t)
     {
-        if (REALM_UNLIKELY(type != type_Link && type != type_LinkList))
-            return false;
         if (REALM_LIKELY(m_desc)) {
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
 #ifdef REALM_DEBUG
