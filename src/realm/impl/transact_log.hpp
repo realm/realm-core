@@ -433,6 +433,7 @@ private:
     template<class T> T read_int();
 
     void read_bytes(char* data, size_t size);
+    BinaryData read_buffer(util::StringBuffer&, size_t size);
 
     float read_float();
     double read_double();
@@ -1872,6 +1873,21 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
 }
 
 
+inline BinaryData TransactLogParser::read_buffer(util::StringBuffer& buf, size_t size)
+{
+    const size_t avail = m_input_end - m_input_begin;
+    if (avail >= size) {
+        m_input_begin += size;
+        return BinaryData(m_input_begin - size, size);
+    }
+
+    buf.clear();
+    buf.resize(size); // Throws
+    read_bytes(buf.data(), size);
+    return BinaryData(buf.data(), size);
+}
+
+
 inline float TransactLogParser::read_float()
 {
     static_assert(std::numeric_limits<float>::is_iec559 &&
@@ -1901,16 +1917,8 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
     if (size > Table::max_string_size)
         parser_error();
 
-    const size_t avail = m_input_end - m_input_begin;
-    if (avail >= size) {
-        m_input_begin += size;
-        return StringData(m_input_begin - size, size);
-    }
-
-    buf.clear();
-    buf.resize(size); // Throws
-    read_bytes(buf.data(), size);
-    return StringData(buf.data(), size);
+    BinaryData buffer = read_buffer(buf, size);
+    return StringData{buffer.data(), size};
 }
 
 
@@ -1921,16 +1929,7 @@ inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
     if (size > Table::max_binary_size)
         parser_error();
 
-    const size_t avail = m_input_end - m_input_begin;
-    if (avail >= size) {
-        m_input_begin += size;
-        return BinaryData(m_input_begin - size, size);
-    }
-
-    buf.clear();
-    buf.resize(size); // Throws
-    read_bytes(buf.data(), size);
-    return BinaryData(buf.data(), size);
+    return read_buffer(buf, size);
 }
 
 
