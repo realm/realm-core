@@ -84,10 +84,14 @@ public:
     /// If \a data is 'null', \a size must be zero.
     StringData(const char* data, size_t size) noexcept;
 
-    template<class T, class A> StringData(const std::basic_string<char, T, A>&);
-    template<class T, class A> operator std::basic_string<char, T, A>() const;
+    template<class T, class A>
+    StringData(const std::basic_string<char, T, A>&);
 
-    template<class T, class A> StringData(const util::Optional<std::basic_string<char, T, A>>&);
+    template<class T, class A>
+    operator std::basic_string<char, T, A>() const;
+
+    template<class T, class A>
+    StringData(const util::Optional<std::basic_string<char, T, A>>&);
 
     /// Initialize from a zero terminated C style string. Pass null to construct
     /// a null reference.
@@ -166,18 +170,21 @@ inline StringData::StringData(const char* data, size_t size) noexcept:
     REALM_ASSERT_DEBUG(data || size == 0);
 }
 
-template<class T, class A> inline StringData::StringData(const std::basic_string<char, T, A>& s):
+template<class T, class A>
+inline StringData::StringData(const std::basic_string<char, T, A>& s):
     m_data(s.data()),
     m_size(s.size())
 {
 }
 
-template<class T, class A> inline StringData::operator std::basic_string<char, T, A>() const
+template<class T, class A>
+inline StringData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
 }
 
-template<class T, class A> inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s):
+template<class T, class A>
+inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s):
     m_data(s ? s->data() : nullptr),
     m_size(s ? s->size() : 0)
 {
@@ -336,21 +343,29 @@ struct null {
     operator StringData() { return StringData(0, 0); }
     operator int64_t() { throw(LogicError::type_mismatch); }
 
-    template <class T> bool operator == (const T&) const { REALM_ASSERT(false); return false; }
-    template <class T> bool operator != (const T&) const { REALM_ASSERT(false); return false; }
-    template <class T> bool operator > (const T&) const { REALM_ASSERT(false); return false; }
-    template <class T> bool operator >= (const T&) const { REALM_ASSERT(false); return false; }
-    template <class T> bool operator <= (const T&) const { REALM_ASSERT(false); return false; }
-    template <class T> bool operator < (const T&) const { REALM_ASSERT(false); return false; }
+    template<class T>
+    bool operator == (const T&) const { REALM_ASSERT(false); return false; }
+    template<class T>
+    bool operator != (const T&) const { REALM_ASSERT(false); return false; }
+    template<class T>
+    bool operator > (const T&) const { REALM_ASSERT(false); return false; }
+    template<class T>
+    bool operator >= (const T&) const { REALM_ASSERT(false); return false; }
+    template<class T>
+    bool operator <= (const T&) const { REALM_ASSERT(false); return false; }
+    template<class T>
+    bool operator < (const T&) const { REALM_ASSERT(false); return false; }
 
     /// Returns whether `v` bitwise equals the null bit-pattern
-    template <class T> static bool is_null_float(T v) {
+    template<class T>
+    static bool is_null_float(T v) {
         T i = null::get_null_float<T>();
         return std::memcmp(&i, &v, sizeof(T)) == 0;
     }
 
     /// Returns the quiet NaNs that represent null for floats/doubles in Realm in stored payload.
-    template <class T> static T get_null_float() {
+    template<class T>
+    static T get_null_float() {
         typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
         int64_t double_nan = 0x7ff80000000000aa;
         i = std::is_same<T, float>::value ? 0x7fc000aa : static_cast<decltype(i)>(double_nan);
@@ -361,7 +376,8 @@ struct null {
     }
 
     /// Takes a NaN as argument and returns whether or not it's signaling
-    template <class T> static bool is_signaling(T v) {
+    template<class T>
+    static bool is_signaling(T v) {
         REALM_ASSERT(isnan(static_cast<double>(v)));
         typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
         size_t signal_bit = std::is_same<T, float>::value ? 22 : 51; // If this bit is set, it's quiet
@@ -371,7 +387,8 @@ struct null {
 
     /// Converts any signaling or quiet NaN to their their respective bit patterns that are used on x64 gcc+clang,
     /// ARM clang and x64 Java.
-    template <class T> static T to_realm(T v) {
+    template<class T>
+    static T to_realm(T v) {
         if (isnan(static_cast<double>(v))) {
             typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
             if (std::is_same<T, float>::value) {

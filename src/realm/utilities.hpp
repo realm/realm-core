@@ -65,7 +65,8 @@ typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
 extern signed char sse_support;
 extern signed char avx_support;
 
-template<int version> REALM_FORCEINLINE bool sseavx()
+template<int version>
+REALM_FORCEINLINE bool sseavx()
 {
 /*
     Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
@@ -190,7 +191,7 @@ enum IndexMethod {
 
 
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
-template <class InputIterator1, class InputIterator2>
+template<class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
 {
 #if defined(_MSC_VER) && defined(_DEBUG)
@@ -206,7 +207,8 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 }
 
 
-template<class T> struct Wrap {
+template<class T>
+struct Wrap {
     Wrap(const T& v): m_value(v) {}
     operator T() const { return m_value; }
 private:
@@ -216,7 +218,7 @@ private:
 // PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
 // placement new. It simply calls the object's destructor without freeing the memory.
 struct PlacementDelete {
-    template <class T>
+    template<class T>
     void operator()(T* v) const
     {
         v->~T();

@@ -51,7 +51,8 @@ class LinkColumnBase;
 class LinkColumn;
 class LinkListColumn;
 class BacklinkColumn;
-template<class> class Columns;
+template<class>
+class Columns;
 
 struct Link {};
 typedef Link LinkList;
@@ -339,7 +340,8 @@ public:
     bool has_shared_type() const noexcept;
 
 
-    template<class T> Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
+    template<class T>
+    Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
 
     // Table size and deletion
     bool is_empty() const noexcept;
@@ -460,7 +462,8 @@ public:
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
-    template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
+    template<class E>
+    void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
@@ -633,8 +636,10 @@ public:
 
 
 private:
-    template <class T, bool Nullable> size_t find_first(size_t column_ndx, T value) const; // called by above methods
-    template <class T> TableView find_all(size_t column_ndx, T value);
+    template<class T, bool Nullable>
+    size_t find_first(size_t column_ndx, T value) const; // called by above methods
+    template<class T>
+    TableView find_all(size_t column_ndx, T value);
 public:
 
 
@@ -1063,8 +1068,13 @@ private:
 
     const ColumnBase& get_column_base(size_t column_ndx) const noexcept;
     ColumnBase& get_column_base(size_t column_ndx);
-    template <class T, ColumnType col_type> T& get_column(size_t ndx);
-    template <class T, ColumnType col_type> const T& get_column(size_t ndx) const noexcept;
+
+    template<class T, ColumnType col_type>
+    T& get_column(size_t ndx);
+
+    template<class T, ColumnType col_type>
+    const T& get_column(size_t ndx) const noexcept;
+
     IntegerColumn& get_column(size_t column_ndx);
     const IntegerColumn& get_column(size_t column_ndx) const noexcept;
     IntNullColumn& get_column_int_null(size_t column_ndx);
@@ -1349,13 +1359,16 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
-    template<class> friend class util::bind_ptr;
+    template<class>
+    friend class util::bind_ptr;
     friend class LangBindHelper;
     friend class TableViewBase;
-    template<class T> friend class Columns;
+    template<class T>
+    friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
-    template<class> friend class SequentialGetter;
+    template<class>
+    friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;
@@ -1512,7 +1525,8 @@ inline DataType Table::get_column_type(size_t ndx) const noexcept
     return m_spec.get_public_column_type(ndx);
 }
 
-template<class Col, ColumnType col_type> inline Col& Table::get_column(size_t ndx)
+template<class Col, ColumnType col_type>
+inline Col& Table::get_column(size_t ndx)
 {
     ColumnBase& col = get_column_base(ndx);
 #ifdef REALM_DEBUG
@@ -1642,7 +1656,8 @@ inline TableRef Table::copy(Allocator& alloc) const
 }
 
 // For use by queries
-template<class T> inline Columns<T> Table::column(size_t column)
+template<class T>
+inline Columns<T> Table::column(size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {

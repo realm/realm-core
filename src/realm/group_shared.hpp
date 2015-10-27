@@ -470,7 +470,8 @@ public:
     /// of all other accessors (if any) being created as part of the import.
 
     /// Type used to support handover of accessors between shared groups.
-    template<typename T> struct Handover;
+    template<typename T>
+    struct Handover;
 
     /// thread-safe/const export (mode is Stay or Copy)
     /// during export, the following operations on the shared group is locked:
@@ -597,10 +598,14 @@ private:
 
     //@{
     /// See LangBindHelper.
-    template<class O> void advance_read(History&, O* observer, VersionID);
-    template<class O> void promote_to_write(History&, O* observer);
+    template<class O>
+    void advance_read(History&, O* observer, VersionID);
+
+    template<class O>
+    void promote_to_write(History&, O* observer);
     void commit_and_continue_as_read();
-    template<class O> void rollback_and_continue_as_read(History&, O* observer);
+    template<class O>
+    void rollback_and_continue_as_read(History&, O* observer);
     //@}
 
     // Advance the readlock to the given version and return the transaction logs
@@ -642,7 +647,8 @@ public:
         return get_group().get_table(name); // Throws
     }
 
-    template<class T> BasicTableRef<const T> get_table(StringData name) const
+    template<class T>
+    BasicTableRef<const T> get_table(StringData name) const
     {
         return get_group().get_table<T>(name); // Throws
     }
@@ -693,7 +699,8 @@ public:
         return get_group().get_or_add_table(name, was_added); // Throws
     }
 
-    template<class T> BasicTableRef<T> get_table(StringData name) const
+    template<class T>
+    BasicTableRef<T> get_table(StringData name) const
     {
         return get_group().get_table<T>(name); // Throws
     }
@@ -704,7 +711,8 @@ public:
         return get_group().add_table<T>(name, require_unique_name); // Throws
     }
 
-    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
+    template<class T>
+    BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
@@ -814,7 +822,8 @@ private:
 };
 
 
-template<typename T> struct SharedGroup::Handover {
+template<typename T>
+struct SharedGroup::Handover {
     std::unique_ptr<typename T::Handover_patch> patch;
     std::unique_ptr<T> clone;
     VersionID version;
@@ -906,7 +915,8 @@ inline void SharedGroup::advance_read(History& history, O* observer, VersionID v
     gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size, in); // Throws
 }
 
-template<class O> inline void SharedGroup::promote_to_write(History& history, O* observer)
+template<class O>
+inline void SharedGroup::promote_to_write(History& history, O* observer)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
@@ -1065,7 +1075,8 @@ public:
         sg.advance_read(hist, obs, ver); // Throws
     }
 
-    template<class O> static void promote_to_write(SharedGroup& sg, History& hist, O* obs)
+    template<class O>
+    static void promote_to_write(SharedGroup& sg, History& hist, O* obs)
     {
         sg.promote_to_write(hist, obs); // Throws
     }

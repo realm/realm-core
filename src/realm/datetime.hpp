@@ -76,7 +76,8 @@ public:
 private:
     int_fast64_t m_time; // Seconds since Jan 1 00:00:00 UTC 1970.
     static std::time_t assemble(int year, int month, int day, int hours, int minutes, int seconds);
-    template <typename T> friend class Value;
+    template<typename T>
+    friend class Value;
 };
 
 

@@ -26,24 +26,27 @@
 
 namespace realm {
 
-template<class T> struct AggReturnType {
+template<class T>
+struct AggReturnType {
     typedef T sum_type;
 };
-template<> struct AggReturnType<float> {
+template<>
+struct AggReturnType<float>
+{
     typedef double sum_type;
 };
 
-template <>
+template<>
 struct GetLeafType<float, false> {
     using type = BasicArray<float>;
 };
-template <>
+template<>
 struct GetLeafType<double, false> {
     using type = BasicArray<double>;
 };
 
 // FIXME: Remove this - it's unused except in tests.
-template <>
+template<>
 struct GetLeafType<int, false> {
     using type = ArrayInteger;
 };
@@ -195,7 +198,7 @@ private:
     friend class ColumnBase;
 };
 
-template <class T>
+template<class T>
 void BasicColumn<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
                                          LeafInfo& leaf) const noexcept
 {
@@ -210,7 +213,7 @@ void BasicColumn<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
     ndx_in_leaf = p.second;
 }
 
-template <class T>
+template<class T>
 StringData BasicColumn<T>::get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not supported for floating-point columns yet.");

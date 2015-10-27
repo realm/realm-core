@@ -49,7 +49,8 @@ struct SpecBase {
     typedef realm::BinaryData Binary;
     typedef realm::Mixed      Mixed;
 
-    template<class E> class Enum {
+    template<class E>
+    class Enum {
     public:
         typedef E enum_type;
         Enum(E v): m_value(v) {}
@@ -58,7 +59,8 @@ struct SpecBase {
         E m_value;
     };
 
-    template<class T> class Subtable {
+    template<class T>
+    class Subtable {
     public:
         typedef T table_type;
         Subtable(T* t): m_table(t) {}
@@ -76,7 +78,9 @@ struct SpecBase {
     ///     typedef TypeAppend<void, int>::type Columns1;
     ///     typedef TypeAppend<Columns1, bool>::type Columns;
     ///
-    ///     template<template<int> class Col, class Init> struct ColNames {
+    ///     template<template<int>
+    ///     class Col, class Init>
+    ///     struct ColNames {
     ///       typename Col<0>::type foo;
     ///       typename Col<1>::type bar;
     ///       ColNames(Init i) noexcept: foo(i), bar(i) {}
@@ -89,7 +93,8 @@ struct SpecBase {
     /// particular column index. You may specify the column names in
     /// any order. Multiple names may refer to the same column, and
     /// you do not have to specify a name for every column.
-    template<template<int> class Col, class Init> struct ColNames {
+    template<template<int>
+    class Col, class Init> struct ColNames {
         ColNames(Init) noexcept {}
     };
 
@@ -134,8 +139,10 @@ struct SpecBase {
 };
 
 
-template<class> class BasicTable;
-template<class> class BasicTableView;
+template<class>
+class BasicTable;
+template<class>
+class BasicTableView;
 
 
 namespace _impl {
@@ -145,9 +152,12 @@ namespace _impl {
 ///
 /// If T matches 'BasicTableView<T2>' or 'const BasicTableView<T2>',
 /// then return T2, else simply return T.
-template<class Tab> struct GetTableFromView { typedef Tab type; };
-template<class Tab> struct GetTableFromView<BasicTableView<Tab>> { typedef Tab type; };
-template<class Tab> struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
+template<class Tab>
+struct GetTableFromView { typedef Tab type; };
+template<class Tab>
+struct GetTableFromView<BasicTableView<Tab>> { typedef Tab type; };
+template<class Tab>
+struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
 
 
 /// Determine whether an accessor has const-only access to a table, so
@@ -157,9 +167,12 @@ template<class Tab> struct GetTableFromView<const BasicTableView<Tab>> { typedef
 /// Note that for Taboid = 'BasicTableView<const Tab>', a column
 /// accessor is still allowed to reorder the rows of the view, as long
 /// as it does not modify the contents of the table.
-template<class Taboid> struct TableIsConst { static const bool value = false; };
-template<class Taboid> struct TableIsConst<const Taboid> { static const bool value = true; };
-template<class Tab> struct TableIsConst<BasicTableView<const Tab>> {
+template<class Taboid>
+struct TableIsConst { static const bool value = false; };
+template<class Taboid>
+struct TableIsConst<const Taboid> { static const bool value = true; };
+template<class Tab>
+struct TableIsConst<BasicTableView<const Tab>> {
     static const bool value = true;
 };
 
@@ -179,11 +192,13 @@ template<class Tab> struct TableIsConst<BasicTableView<const Tab>> {
 /// \tparam const_tab Indicates whether the accessor has const-only
 /// access to the field, that is, if, and only if Taboid matches
 /// 'const T' or 'BasicTableView<const T>' for any T.
-template<class Taboid, int col_idx, class Type, bool const_tab> class FieldAccessor;
+template<class Taboid, int col_idx, class Type, bool const_tab>
+class FieldAccessor;
 
 
 /// Commmon base class for all field accessor specializations.
-template<class Taboid> class FieldAccessorBase {
+template<class Taboid>
+class FieldAccessorBase {
 protected:
     typedef std::pair<Taboid*, size_t> Init;
     Taboid* const m_table;
@@ -617,7 +632,8 @@ public:
     /// redundant, and it is inefficient if you want to also get a
     /// reference to the table, or if you want to check for multiple
     /// table types.
-    template<class T> bool is_subtable() const
+    template<class T>
+    bool is_subtable() const
     {
         // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
         ConstTableRef t = static_cast<const FieldAccessor*>(this)->get_subtable();
@@ -630,22 +646,26 @@ public:
         return Base::m_table->get_impl()->get_subtable_size(col_idx, Base::m_row_idx);
     }
 
-    template<class T> friend bool operator==(const FieldAccessor& a, const T& b) noexcept
+    template<class T>
+    friend bool operator==(const FieldAccessor& a, const T& b) noexcept
     {
         return a.get() == b;
     }
 
-    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b) noexcept
+    template<class T>
+    friend bool operator!=(const FieldAccessor& a, const T& b) noexcept
     {
         return a.get() != b;
     }
 
-    template<class T> friend bool operator==(const T& a, const FieldAccessor& b) noexcept
+    template<class T>
+    friend bool operator==(const T& a, const FieldAccessor& b) noexcept
     {
         return a == b.get();
     }
 
-    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b) noexcept
+    template<class T>
+    friend bool operator!=(const T& a, const FieldAccessor& b) noexcept
     {
         return a != b.get();
     }
@@ -717,7 +737,8 @@ public:
     ///
     /// FIXME: Consider deleting this function, since it is both
     /// unsafe and superfluous.
-    template<class T> BasicTableRef<T> get_subtable() const
+    template<class T>
+    BasicTableRef<T> get_subtable() const
     {
         REALM_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
         return unchecked_cast<T>(get_subtable());
@@ -727,7 +748,8 @@ public:
     /// returns a reference to it.
     ///
     /// \tparam T The subtable type. It must not be const-qualified.
-    template<class T> BasicTableRef<T> set_subtable() const
+    template<class T>
+    BasicTableRef<T> set_subtable() const
     {
         BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
         T::set_dynamic_type(*t);
@@ -736,7 +758,8 @@ public:
 
     /// Overwrites the current value with a copy of the specified
     /// table and returns a reference to the copy.
-    template<class T> typename T::Ref set_subtable(const T& t) const
+    template<class T>
+    typename T::Ref set_subtable(const T& t) const
     {
         t.set_into_mixed(Base::m_table->get_impl(), col_idx, Base::m_row_idx);
         return unchecked_cast<T>(get_subtable());
@@ -763,7 +786,8 @@ public:
 
     /// FIXME: Consider deleting this function, since it is both
     /// unsafe and superfluous.
-    template<class T> BasicTableRef<const T> get_subtable() const
+    template<class T>
+    BasicTableRef<const T> get_subtable() const
     {
         REALM_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
         return unchecked_cast<const T>(get_subtable());
@@ -780,11 +804,13 @@ public:
 ///
 /// \tparam Taboid Either a table or a table view. Constness of access
 /// is controlled by what is allowed to be done with/on a 'Taboid*'.
-template<class Taboid, int col_idx, class Type> class ColumnAccessor;
+template<class Taboid, int col_idx, class Type>
+class ColumnAccessor;
 
 
 /// Commmon base class for all column accessor specializations.
-template<class Taboid, int col_idx, class Type> class ColumnAccessorBase {
+template<class Taboid, int col_idx, class Type>
+class ColumnAccessorBase {
 protected:
     typedef typename GetTableFromView<Taboid>::type RealTable;
     typedef FieldAccessor<Taboid, col_idx, Type, TableIsConst<Taboid>::value> Field;
@@ -1238,11 +1264,13 @@ public:
 /// 'BasicTableView<Tab>'. Neither may be const-qualified.
 ///
 /// FIXME: These do not belong in this file!
-template<class Taboid, int col_idx, class Type> class QueryColumn;
+template<class Taboid, int col_idx, class Type>
+class QueryColumn;
 
 
 /// Commmon base class for all query column specializations.
-template<class Taboid, int col_idx, class Type> class QueryColumnBase {
+template<class Taboid, int col_idx, class Type>
+class QueryColumnBase {
 protected:
     typedef typename Taboid::Query Query;
     Query* const m_query;
@@ -1679,7 +1707,8 @@ public:
 
 
 /// QueryColumn specialization for mixed type.
-template<class Taboid, int col_idx> class QueryColumn<Taboid, col_idx, Mixed> {
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, Mixed> {
 private:
     typedef typename Taboid::Query Query;
 

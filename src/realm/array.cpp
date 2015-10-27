@@ -914,7 +914,8 @@ size_t Array::first_set_bit64(int64_t v) const
 
 namespace {
 
-template<size_t width> inline int64_t lower_bits()
+template<size_t width>
+inline int64_t lower_bits()
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -937,7 +938,8 @@ template<size_t width> inline int64_t lower_bits()
 }
 
 // Return true if 'value' has an element (of bit-width 'width') which is 0
-template<size_t width> inline bool has_zero_element(uint64_t value) {
+template<size_t width>
+inline bool has_zero_element(uint64_t value) {
     uint64_t hasZeroByte;
     uint64_t lower = lower_bits<width>();
     uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -947,7 +949,8 @@ template<size_t width> inline bool has_zero_element(uint64_t value) {
 
 
 // Finds zero element of bit width 'width'
-template<bool eq, size_t width> size_t find_zero(uint64_t v)
+template<bool eq, size_t width>
+size_t find_zero(uint64_t v)
 {
     size_t start = 0;
     uint64_t hasZeroByte;
@@ -991,7 +994,8 @@ template<bool eq, size_t width> size_t find_zero(uint64_t v)
 } // anonymous namesapce
 
 
-template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
+template<bool find_max, size_t w>
+bool Array::minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
     size_t best_index = 0;
 
@@ -1088,7 +1092,8 @@ int64_t Array::sum(size_t start, size_t end) const
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
-template<size_t w> int64_t Array::sum(size_t start, size_t end) const
+template<size_t w>
+int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
@@ -1774,7 +1779,7 @@ int_fast64_t Array::lbound_for_width(size_t width) noexcept
     REALM_TEMPEX(return lbound_for_width, width, ());
 }
 
-template <size_t width>
+template<size_t width>
 int_fast64_t Array::lbound_for_width() noexcept
 {
     if (width == 0) {
@@ -1811,7 +1816,7 @@ int_fast64_t Array::ubound_for_width(size_t width) noexcept
     REALM_TEMPEX(return ubound_for_width, width, ());
 }
 
-template <size_t width>
+template<size_t width>
 int_fast64_t Array::ubound_for_width() noexcept
 {
     if (width == 0) {
@@ -1845,7 +1850,7 @@ int_fast64_t Array::ubound_for_width() noexcept
 
 
 
-template <size_t width>
+template<size_t width>
 struct Array::VTableForWidth {
     struct PopulatedVTable : Array::VTable {
         PopulatedVTable() {
@@ -1861,7 +1866,7 @@ struct Array::VTableForWidth {
     static const PopulatedVTable vtable;
 };
 
-template <size_t width>
+template<size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
 void Array::set_width(size_t width) noexcept
@@ -1869,7 +1874,8 @@ void Array::set_width(size_t width) noexcept
     REALM_TEMPEX(set_width, width, ());
 }
 
-template<size_t width> void Array::set_width() noexcept
+template<size_t width>
+void Array::set_width() noexcept
 {
     m_lbound = lbound_for_width<width>();
     m_ubound = ubound_for_width<width>();
@@ -1882,7 +1888,8 @@ template<size_t width> void Array::set_width() noexcept
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
 // exceed array length; in this case, remainder of res[8] will be left untouched.
-template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
+template<size_t w>
+void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
 
@@ -1938,7 +1945,8 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const noexc
 }
 
 
-template<size_t width> void Array::set(size_t ndx, int64_t value)
+template<size_t width>
+void Array::set(size_t ndx, int64_t value)
 {
     set_direct<width>(m_data, ndx, value);
 }
@@ -2447,7 +2455,8 @@ namespace {
 
 // Direct access methods
 
-template<int w> int64_t get_direct(const char* data, size_t ndx) noexcept
+template<int w>
+int64_t get_direct(const char* data, size_t ndx) noexcept
 {
     if (w == 0) {
         return 0;
@@ -2489,7 +2498,8 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
 }
 
 
-template<int width> inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
+template<int width>
+inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
 {
     return std::make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
                      to_size_t(get_direct<width>(data, ndx + 1)));
@@ -2851,7 +2861,8 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-template <IndexMethod method, class T> size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
+template<IndexMethod method, class T>
+size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
 {
     bool first(method == index_FindFirst);
     bool count(method == index_Count);
@@ -3042,7 +3053,8 @@ namespace {
 // the specified 'offsets' array.
 //
 // Returns (child_ndx, ndx_in_child).
-template<int width> inline std::pair<size_t, size_t>
+template<int width>
+inline std::pair<size_t, size_t>
 find_child_from_offsets(const char* offsets_header, size_t elem_ndx) noexcept
 {
     const char* offsets_data = Array::get_data_from_header(offsets_header);
@@ -3228,7 +3240,8 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
 // `Array::NodeInfo::m_offset` and `Array::NodeInfo::m_size` are not
 // calculated. With these simplification it is possible to avoid any
 // access to the `offsets` array.
-template<class Handler> void simplified_foreach_bptree_leaf(Array& node, Handler handler)
+template<class Handler>
+void simplified_foreach_bptree_leaf(Array& node, Handler handler)
     noexcept(noexcept(handler(Array::NodeInfo())))
 {
     REALM_ASSERT(node.is_inner_bptree_node());

@@ -84,7 +84,8 @@ public:
 
     void set_buffer(char *begin, char *end) noexcept;
 
-    template<size_t N> void set_buffer(char (&buffer)[N]) noexcept;
+    template<size_t N>
+    void set_buffer(char (&buffer)[N]) noexcept;
 
     /// Returns the amount of data written to the underlying buffer.
     size_t size() const noexcept;

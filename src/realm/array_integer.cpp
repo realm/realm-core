@@ -8,7 +8,7 @@ using namespace realm;
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
-template <size_t w>
+template<size_t w>
 bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) const
 {
     int64_t min2;
@@ -214,7 +214,7 @@ namespace {
 
 // FIXME: Move this logic to BpTree.
 struct ArrayIntNullLeafInserter {
-    template <class T>
+    template<class T>
     static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, size_t ndx, T value, Array::TreeInsertBase& state)
     {
         size_t leaf_size = self.size();

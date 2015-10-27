@@ -43,7 +43,8 @@ using test_util::unit_test::TestResults;
 
 namespace {
 
-template<class T, size_t N> inline size_t size_of_array(T(&)[N])
+template<class T, size_t N>
+inline size_t size_of_array(T(&)[N])
 {
     return N;
 }
@@ -72,7 +73,7 @@ const size_t num_double_values = size_of_array(double_values);
 } // anonymous namespace
 
 
-template <class C>
+template<class C>
 void BasicColumn_IsEmpty(TestResults& test_results)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -92,7 +93,7 @@ TEST(DoubleColumn_IsEmpty)
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -119,7 +120,7 @@ TEST(DoubleColumn_AddGet)
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Clear(TestResults& test_results)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -146,7 +147,7 @@ TEST(DoubleColumn_Clear)
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -179,7 +180,7 @@ TEST(DoubleColumn_Set)
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values)
 {
     static_cast<void>(num_values);
@@ -234,7 +235,7 @@ TEST(DoubleColumn_Insert)
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_values)
 {
     static_cast<void>(test_results);
@@ -262,7 +263,7 @@ TEST(DoubleColumn_Aggregates)
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
