@@ -408,7 +408,7 @@ public:
 
     bool set_link_type(size_t col_ndx, LinkType link_type)
     {
-        if (REALM_LIKELY(m_table)) {
+        if (REALM_LIKELY(m_table && m_desc)) {
             if (REALM_LIKELY(col_ndx < m_desc->get_column_count())) {
 #ifdef REALM_DEBUG
                 if (m_log)
