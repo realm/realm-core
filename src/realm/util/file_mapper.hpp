@@ -31,26 +31,26 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::
 void msync(void *addr, size_t size);
 
 #if REALM_ENABLE_ENCRYPTION
-void handle_reads(const void* addr, size_t size);
-void handle_writes(const void* addr, size_t size);
+void encryption_read_barrier(const void* addr, size_t size);
+void encryption_write_barrier(const void* addr, size_t size);
 #else
-void inline handle_reads(const void*, size_t) {}
-void inline handle_writes(const void*, size_t) {}
+void inline encryption_read_barrier(const void*, size_t) {}
+void inline encryption_write_barrier(const void*, size_t) {}
 #endif
 
 // helpers for encrypted Maps
 template<typename T>
-void handle_reads(File::Map<T>& map, size_t index, size_t num_elements = 1)
+void encryption_read_barrier(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-    handle_reads(addr+index, sizeof(T)*num_elements);
+    encryption_read_barrier(addr+index, sizeof(T)*num_elements);
 }
 
 template<typename T>
-void handle_writes(File::Map<T>& map, size_t index, size_t num_elements = 1)
+void encryption_write_barrier(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-    handle_writes(addr+index, sizeof(T)*num_elements);
+    encryption_write_barrier(addr+index, sizeof(T)*num_elements);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;

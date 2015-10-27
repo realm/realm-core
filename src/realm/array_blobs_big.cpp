@@ -122,7 +122,7 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
             ref_type ref = get_as_ref(i);
             if (ref) {
                 const char* blob_header = get_alloc().translate(ref);
-                realm::util::handle_reads(blob_header, Array::header_size);
+                realm::util::encryption_read_barrier(blob_header, Array::header_size);
                 size_t blob_size = get_size_from_header(blob_header);
                 if (blob_size == full_size) {
                     const char* blob_value = ArrayBlob::get(blob_header, 0);

@@ -286,6 +286,8 @@ std::unique_ptr<Array> BpTree<T,N>::create_root_from_mem(Allocator& alloc, MemRe
 {
     const char* header = mem.m_addr;
     std::unique_ptr<Array> new_root;
+    size_t header_size = Array::header_size;
+    realm::util::encryption_read_barrier(header, header_size);
     if (Array::get_is_inner_bptree_node_from_header(header)) {
         new_root.reset(new Array{alloc});
         new_root->init_from_mem(mem);
@@ -303,7 +305,7 @@ std::unique_ptr<Array> BpTree<T,N>::create_root_from_ref(Allocator& alloc, ref_t
 {
     const char* header = alloc.translate(ref);
     size_t header_size = Array::header_size;
-    realm::util::handle_reads(header, header_size);
+    realm::util::encryption_read_barrier(header, header_size);
     std::unique_ptr<Array> new_root;
     if (Array::get_is_inner_bptree_node_from_header(header)) {
         new_root.reset(new Array{alloc});

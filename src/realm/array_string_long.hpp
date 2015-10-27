@@ -127,9 +127,9 @@ inline void ArrayStringLong::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
-    realm::util::handle_reads(header, header_size);
+    realm::util::encryption_read_barrier(header, header_size);
     init_from_mem(MemRef(header, ref));
-    realm::util::handle_reads(header, get_byte_size());
+    realm::util::encryption_read_barrier(header, get_byte_size());
     m_nullable = (Array::size() == 3);
 }
 
@@ -219,7 +219,7 @@ inline size_t ArrayStringLong::get_size_from_header(const char* header,
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
-    realm::util::handle_reads(offsets_header, Array::header_size);
+    realm::util::encryption_read_barrier(offsets_header, Array::header_size);
     return Array::get_size_from_header(offsets_header);
 }
 

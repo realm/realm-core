@@ -203,7 +203,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_data = get_data_from_header(header);
 
     set_width(m_width);
-    realm::util::handle_reads(header, get_byte_size());
+    realm::util::encryption_read_barrier(header, get_byte_size());
 }
 
 void Array::set_type(Type type)
@@ -2096,7 +2096,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
     for (size_t i = 0; i < num_children; ++i) {
         ref_type child_ref = node.get_as_ref(1 + i);
         char* child_header = alloc.translate(child_ref);
-        realm::util::handle_reads(child_header, Array::header_size);
+        realm::util::encryption_read_barrier(child_header, Array::header_size);
         bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         size_t elems_in_child;
         int leaf_level_of_child;
@@ -2365,7 +2365,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         size_t used;
         ref_type ref = to_ref(value);
         char* header = m_alloc.translate(ref);
-        realm::util::handle_reads(header, header_size);
+        realm::util::encryption_read_barrier(header, header_size);
         bool has_refs = get_hasrefs_from_header(header);
         if (has_refs) {
             MemRef mem(header, ref);
@@ -2402,36 +2402,36 @@ template<int w> int64_t get_direct(const char* data, size_t ndx) noexcept
     }
     if (w == 1) {
         size_t offset = ndx >> 3;
-        realm::util::handle_reads(data + offset, 1);
+        realm::util::encryption_read_barrier(data + offset, 1);
         return (data[offset] >> (ndx & 7)) & 0x01;
     }
     if (w == 2) {
         size_t offset = ndx >> 2;
-        realm::util::handle_reads(data + offset, 1);
+        realm::util::encryption_read_barrier(data + offset, 1);
         return (data[offset] >> ((ndx & 3) << 1)) & 0x03;
     }
     if (w == 4) {
         size_t offset = ndx >> 1;
-        realm::util::handle_reads(data + offset, 1);
+        realm::util::encryption_read_barrier(data + offset, 1);
         return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
     }
     if (w == 8) {
-        realm::util::handle_reads(data + ndx, 1);
+        realm::util::encryption_read_barrier(data + ndx, 1);
         return *reinterpret_cast<const signed char*>(data + ndx); // FIXME: Lasse, should this not be a cast to 'const int8_t*'?
     }
     if (w == 16) {
         size_t offset = ndx * 2;
-        realm::util::handle_reads(data + offset, 2);
+        realm::util::encryption_read_barrier(data + offset, 2);
         return *reinterpret_cast<const int16_t*>(data + offset);
     }
     if (w == 32) {
         size_t offset = ndx * 4;
-        realm::util::handle_reads(data + offset, 4);
+        realm::util::encryption_read_barrier(data + offset, 4);
         return *reinterpret_cast<const int32_t*>(data + offset);
     }
     if (w == 64) {
         size_t offset = ndx * 8;
-        realm::util::handle_reads(data + offset, 8);
+        realm::util::encryption_read_barrier(data + offset, 8);
         return *reinterpret_cast<const int64_t*>(data + offset);
     }
     REALM_ASSERT_DEBUG(false);
@@ -2831,7 +2831,7 @@ top:
 
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
-        realm::util::handle_reads(offsets_header, header_size);
+        realm::util::encryption_read_barrier(offsets_header, header_size);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t offsets_size = get_size_from_header(offsets_header);
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
@@ -2847,7 +2847,7 @@ top:
         if (is_inner_node) {
             // Set vars for next iteration
             header = m_alloc.translate(to_ref(ref));
-            realm::util::handle_reads(header, header_size);
+            realm::util::encryption_read_barrier(header, header_size);
             data = get_data_from_header(header);
             width = get_width_from_header(header);
             is_inner_node = get_is_inner_bptree_node_from_header(header);
@@ -2877,7 +2877,7 @@ top:
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
-        realm::util::handle_reads(sub_header, header_size);
+        realm::util::encryption_read_barrier(sub_header, header_size);
         const bool sub_isindex = get_context_flag_from_header(sub_header);
 
         // List of matching row indexes
@@ -3032,7 +3032,7 @@ inline std::pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, siz
         // Case 2/2: Offsets array (general form)
         ref_type offsets_ref = to_ref(first_value);
         char* offsets_header = alloc.translate(offsets_ref);
-        realm::util::handle_reads(offsets_header, Array::header_size);
+        realm::util::encryption_read_barrier(offsets_header, Array::header_size);
         int offsets_width = Array::get_width_from_header(offsets_header);
         std::pair<size_t, size_t> p;
         REALM_TEMPEX(p = find_child_from_offsets, offsets_width, (offsets_header, ndx));
@@ -3245,7 +3245,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
     MemRef mem_2 = mem;
     for (;;) {
         const char* header = mem_2.m_addr;
-        realm::util::handle_reads(header, Array::header_size);
+        realm::util::encryption_read_barrier(header, Array::header_size);
         bool is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
         if (is_leaf) {
             handler.destroy_leaf(mem_2);
@@ -3273,7 +3273,7 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
 {
     Allocator& alloc = root->get_alloc();
     char* child_header = alloc.translate(child_ref);
-    realm::util::handle_reads(child_header, Array::header_size);
+    realm::util::encryption_read_barrier(child_header, Array::header_size);
     MemRef child_mem(child_header, child_ref);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
@@ -3343,10 +3343,11 @@ std::pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const noexcept
         ref_type child_ref  = p.first;
         size_t ndx_in_child = p.second;
         char* child_header = m_alloc.translate(child_ref);
-        realm::util::handle_reads(child_header, header_size);
+        realm::util::encryption_read_barrier(child_header, header_size);
         bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
             MemRef mem(child_header, child_ref);
+            realm::util::encryption_read_barrier(child_header, get_byte_size_from_header(child_header));
             return std::make_pair(mem, ndx_in_child);
         }
         ndx_2 = ndx_in_child;
@@ -3423,7 +3424,7 @@ void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
     size_t child_ref_ndx = 1 + child_ndx;
     ref_type child_ref = get_as_ref(child_ref_ndx);
     char* child_header = m_alloc.translate(child_ref);
-    realm::util::handle_reads(child_header, header_size);
+    realm::util::encryption_read_barrier(child_header, header_size);
     MemRef child_mem(child_header, child_ref);
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
@@ -3536,7 +3537,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
     size_t child_ref_ndx = 1 + child_ndx;
     ref_type child_ref = get_as_ref(child_ref_ndx);
     char* child_header = m_alloc.translate(child_ref);
-    realm::util::handle_reads(child_header, header_size);
+    realm::util::encryption_read_barrier(child_header, header_size);
     MemRef child_mem(child_header, child_ref);
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     bool destroy_child;
@@ -3615,7 +3616,7 @@ void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
-    realm::util::handle_reads(header, header_size);
+    realm::util::encryption_read_barrier(header, header_size);
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
     return get_direct(data, width, ndx);
@@ -3624,7 +3625,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
-    realm::util::handle_reads(header, header_size);
+    realm::util::encryption_read_barrier(header, header_size);
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
     std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
@@ -3634,7 +3635,7 @@ std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexc
 
 void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
 {
-    realm::util::handle_reads(header, header_size);
+    realm::util::encryption_read_barrier(header, header_size);
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
     ::get_three(data, width, ndx, v0, v1, v2);

@@ -106,10 +106,10 @@ inline BinaryData ArrayBigBlobs::get(size_t ndx) const noexcept
         return BinaryData(); // realm::null();
 
     const char* blob_header = get_alloc().translate(ref);
-    realm::util::handle_reads(blob_header, Array::header_size);
+    realm::util::encryption_read_barrier(blob_header, Array::header_size);
     const char* value = ArrayBlob::get(blob_header, 0);
     size_t size = get_size_from_header(blob_header);
-    realm::util::handle_reads(value, size);
+    realm::util::encryption_read_barrier(value, size);
     return BinaryData(value, size);
 }
 
@@ -121,10 +121,10 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
         return BinaryData();
 
     const char* blob_header = alloc.translate(blob_ref);
-    realm::util::handle_reads(blob_header, Array::header_size);
+    realm::util::encryption_read_barrier(blob_header, Array::header_size);
     const char* blob_data = Array::get_data_from_header(blob_header);
     size_t blob_size = Array::get_size_from_header(blob_header);
-    realm::util::handle_reads(blob_data, blob_size);
+    realm::util::encryption_read_barrier(blob_data, blob_size);
     return BinaryData(blob_data, blob_size);
 }
 

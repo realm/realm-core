@@ -28,7 +28,7 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable) : m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
-    realm::util::handle_reads(header, Array::header_size);
+    realm::util::encryption_read_barrier(header, Array::header_size);
     MemRef mem(header, ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {

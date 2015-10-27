@@ -1810,7 +1810,7 @@ inline void Table::set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx)
 inline size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) noexcept
 {
     const char* top_header = alloc.translate(top_ref);
-    realm::util::handle_reads(top_header, Array::header_size);
+    realm::util::encryption_read_barrier(top_header, Array::header_size);
     std::pair<int_least64_t, int_least64_t> p = Array::get_two(top_header, 0);
     ref_type spec_ref = to_ref(p.first), columns_ref = to_ref(p.second);
     return get_size_from_ref(spec_ref, columns_ref, alloc);

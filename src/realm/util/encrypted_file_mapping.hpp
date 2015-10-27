@@ -110,13 +110,13 @@ public:
     // object's mapping
     void handle_access(void* addr) noexcept;
 
-    // Open for read access to all blocks touched by an address range,
-    // nop if range is already readable
-    void handle_reads(const void* addr, size_t size) noexcept;
+    // Make sure that memory in the specified range is synchronized with any
+    // changes made globally visible through call to write_barrier
+    void read_barrier(const void* addr, size_t size) noexcept;
 
-    // Open for write access to all blocks touched by an address range,
-    // nop if range is already writable
-    void handle_writes(const void* addr, size_t size) noexcept;
+    // Ensures that any changes made to memory in the specified range
+    // becomes visible to any later calls to read_barrier()
+    void write_barrier(const void* addr, size_t size) noexcept;
 
     // Set this mapping to a new address and size
     // Flushes any remaining dirty pages from the old mapping

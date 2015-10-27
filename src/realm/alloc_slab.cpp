@@ -270,7 +270,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     bool read_only = is_read_only(ref);
     chunks& free_space = read_only ? m_free_read_only : m_free_space;
     if (read_only)
-        realm::util::handle_reads(addr, Array::header_size);
+        realm::util::encryption_read_barrier(addr, Array::header_size);
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
     free(malloc_debug_map[ref]);
@@ -505,8 +505,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
         // we'll read header and (potentially) footer
-        realm::util::handle_reads(map, 0, sizeof(Header));
-        realm::util::handle_reads(map, size - sizeof(Header), sizeof(Header));
+        realm::util::encryption_read_barrier(map, 0, sizeof(Header));
+        realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
 
         if (!cfg.skip_validate) {
             // Verify the data structures
@@ -516,9 +516,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             Header& header = *writable_map.get_addr();
-            realm::util::handle_reads(writable_map, 0);
+            realm::util::encryption_read_barrier(writable_map, 0);
             header.m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
-            realm::util::handle_writes(writable_map, 0);
+            realm::util::encryption_write_barrier(writable_map, 0);
         }
         else {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
@@ -584,14 +584,14 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             File::Map<Header> writable_map(m_file, File::access_ReadWrite,
                                            sizeof (Header)); // Throws
             Header& writable_header = *writable_map.get_addr();
-            realm::util::handle_reads(writable_map, 0);
+            realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_top_ref[1] = footer.m_top_ref;
-            realm::util::handle_writes(writable_map, 0);
+            realm::util::encryption_write_barrier(writable_map, 0);
             writable_map.sync();
             // keep bit 1 used for server sync mode unchanged
-            realm::util::handle_reads(writable_map, 0);
+            realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_flags |= flags_SelectBit;
-            realm::util::handle_writes(writable_map, 0);
+            realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
             writable_map.sync();
         }

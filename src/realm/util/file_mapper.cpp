@@ -664,13 +664,13 @@ namespace util {
 
 
 #if REALM_ENABLE_ENCRYPTION
-// handle_reads() and handle_writes():
+// encryption_read_barrier() and encryption_write_barrier()
 // FIXME: This approach is not performant enough. It uses locking and it requires traversing
 // an inefficient datastructure merely for administrative purposes. It is ok to be expensive
 // when encryption is actually triggered, but most calls to these methods are not expected
 // to actually trigger any encryption activities. A performant solution is needed before
 // we can release it (except, possibly, for investigation purposes).
-void handle_reads(const void* addr, size_t size)
+void encryption_read_barrier(const void* addr, size_t size)
 {
     SpinLockGuard lock(mapping_lock);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
@@ -684,14 +684,14 @@ void handle_reads(const void* addr, size_t size)
             (static_cast<const char*>(addr) - static_cast<const char*>(m.addr)) / page_size() * page_size();
         REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ | PROT_WRITE) == 0);
 #endif
-        m.mapping->handle_reads(addr, size);
+        m.mapping->read_barrier(addr, size);
 #ifdef REALM_DEBUG_WITH_MPROTECT
         REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ) == 0);
 #endif
     }
 }
 
-void handle_writes(const void* addr, size_t size)
+void encryption_write_barrier(const void* addr, size_t size)
 {
     SpinLockGuard lock(mapping_lock);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
@@ -706,7 +706,7 @@ void handle_writes(const void* addr, size_t size)
             (static_cast<const char*>(addr) - static_cast<const char*>(m.addr)) / page_size() * page_size();
         REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ | PROT_WRITE) == 0);
 #endif
-        m.mapping->handle_writes(addr, size);
+        m.mapping->write_barrier(addr, size);
     }
 }
 

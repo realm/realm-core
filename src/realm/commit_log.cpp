@@ -461,14 +461,14 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
 
     // append data from write pointer and onwards:
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-    realm::util::handle_reads(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
+    realm::util::encryption_read_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
     EntryHeader hdr;
     hdr.size = entry.changeset.size();
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
     write_ptr += sizeof(EntryHeader);
     std::copy(entry.changeset.data(), entry.changeset.data() + entry.changeset.size(), write_ptr);
     bool disable_sync = get_disable_sync_to_disk();
-    realm::util::handle_writes(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
+    realm::util::encryption_write_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
     if (!disable_sync)
         active_log->map.sync(); // Throws
 
@@ -601,12 +601,12 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
 
         // follow buffer layout
         const EntryHeader* hdr = reinterpret_cast<const EntryHeader*>(buffer + m_read_offset);
-        realm::util::handle_reads(hdr, sizeof(EntryHeader));
+        realm::util::encryption_read_barrier(hdr, sizeof(EntryHeader));
         uint_fast64_t size = aligned_to(sizeof (uint64_t), hdr->size);
         uint_fast64_t tmp_offset = m_read_offset + sizeof(EntryHeader);
         if (m_read_version >= from_version) {
             // std::cerr << "  --at: " << m_read_offset << ", " << size << "\n";
-            realm::util::handle_reads(hdr, size + sizeof(EntryHeader));
+            realm::util::encryption_read_barrier(hdr, size + sizeof(EntryHeader));
             set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
             ++logs_buffer;
         }

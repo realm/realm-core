@@ -515,7 +515,7 @@ void EncryptedFileMapping::handle_access(void* addr) noexcept
     }
 }
 
-void EncryptedFileMapping::handle_reads(const void* addr, size_t size) noexcept
+void EncryptedFileMapping::read_barrier(const void* addr, size_t size) noexcept
 {
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
     size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) / m_page_size;
@@ -530,7 +530,7 @@ void EncryptedFileMapping::handle_reads(const void* addr, size_t size) noexcept
 }
 
 
-void EncryptedFileMapping::handle_writes(const void* addr, size_t size) noexcept
+void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 {
     REALM_ASSERT(m_access == File::access_ReadWrite);
 
@@ -541,10 +541,10 @@ void EncryptedFileMapping::handle_writes(const void* addr, size_t size) noexcept
     size_t last_idx = last_accessed_page - m_first_page;
 
     for (size_t idx = first_idx; idx <= last_idx; ++idx) {
-        if (!m_read_pages[idx])
-            read_page(idx);
-        if (!m_write_pages[idx])
-            write_page(idx);
+        // Pages written must earlier on have been decrypted
+        // by a call to read_barrier().
+        REALM_ASSERT(m_read_pages[idx]);
+        write_page(idx);
     }
 }
 
