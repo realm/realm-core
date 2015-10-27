@@ -177,7 +177,7 @@ size_t Array::bit_width(int64_t v)
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.m_addr;
-
+    realm::util::encryption_read_barrier(header, header_size);
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs             = get_hasrefs_from_header(header);
@@ -1511,6 +1511,7 @@ void Array::copy_on_write()
     const char* old_begin = get_header_from_data(m_data);
     const char* old_end   = get_header_from_data(m_data) + size;
     char* new_begin = mref.m_addr;
+    realm::util::encryption_read_barrier(old_begin, size);
     std::copy(old_begin, old_end, new_begin);
 
     ref_type old_ref = m_ref;

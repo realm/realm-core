@@ -238,9 +238,9 @@ TEST(File_MultipleWriters)
             realm::util::encryption_read_barrier(map1, i);
             ++map1.get_addr()[i];
             realm::util::encryption_write_barrier(map1, i);
-            realm::util::encryption_read_barrier(map1, i);
+            realm::util::encryption_read_barrier(map2, i);
             ++map2.get_addr()[i];
-            realm::util::encryption_write_barrier(map1, i);
+            realm::util::encryption_write_barrier(map2, i);
         }
     }
 

@@ -379,8 +379,13 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     REALM_ASSERT_DEBUG(is_attached());
 
     // fast path if reference is inside the initial mapping:
-    if (ref < m_initial_mapping_size)
-        return m_data + ref;
+    if (ref < m_initial_mapping_size) {
+        char* addr = m_data + ref;
+        realm::util::encryption_read_barrier(addr, Array::header_size);
+        size_t size = Array::get_byte_size_from_header(addr);
+        realm::util::encryption_read_barrier(addr, size);
+        return addr;
+    }
 
     if (ref < m_baseline) {
 
@@ -390,7 +395,11 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
         size_t section_offset = ref - get_section_base(section_index);
         REALM_ASSERT_DEBUG(m_additional_mappings);
         REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
-        return m_additional_mappings[mapping_index].get_addr() + section_offset;
+        char* addr = m_additional_mappings[mapping_index].get_addr() + section_offset;
+        realm::util::encryption_read_barrier(addr, Array::header_size);
+        size_t size = Array::get_byte_size_from_header(addr);
+        realm::util::encryption_read_barrier(addr, size);
+        return addr;
     }
 
     typedef slabs::const_iterator iter;
