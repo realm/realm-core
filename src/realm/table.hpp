@@ -128,11 +128,11 @@ public:
     ///
     /// A table accessor of a free-standing table never becomes detached (except
     /// during its eventual destruction). A group-level table accessor becomes
-    /// detached if the underlying table is removed from the group (not
-    /// currently possible), or when the group accessor is destroyed. A subtable
-    /// accessor becomes detached if the underlying subtable is removed, or if
-    /// the parent table accessor is detached. A table accessor does not become
-    /// detached for any other reason than those mentioned here.
+    /// detached if the underlying table is removed from the group, or when the
+    /// group accessor is destroyed. A subtable accessor becomes detached if the
+    /// underlying subtable is removed, or if the parent table accessor is
+    /// detached. A table accessor does not become detached for any other reason
+    /// than those mentioned here.
     ///
     /// FIXME: High level language bindings will probably want to be able to
     /// explicitely detach a group and all tables of that group if any modifying
