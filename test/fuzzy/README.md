@@ -5,13 +5,13 @@
    On Linux:
 
    ```
-   $ CXX=afl-g++ make check-debug-norun
+   $ CXX=afl-g++ make check-debug-norun COMPILER_IS_GCC_LIKE=yes
    ```
 
    Or on Mac OS X:
 
    ```
-   $ CXX=afl-clang++ make check-debug-norun
+   $ CXX=afl-clang++ make check-debug-norun COMPILER_IS_GCC_LIKE=yes
    ```
 
 2. Execute the fuzz tester:
