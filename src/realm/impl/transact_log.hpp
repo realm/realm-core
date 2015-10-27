@@ -1898,6 +1898,9 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 {
     size_t size = read_int<size_t>(); // Throws
 
+    if (size > Table::max_string_size)
+        parser_error();
+
     const size_t avail = m_input_end - m_input_begin;
     if (avail >= size) {
         m_input_begin += size;
@@ -1913,8 +1916,21 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 
 inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
 {
-    StringData str = read_string(buf); // Throws;
-    return BinaryData(str.data(), str.size());
+    size_t size = read_int<size_t>(); // Throws
+
+    if (size > Table::max_binary_size)
+        parser_error();
+
+    const size_t avail = m_input_end - m_input_begin;
+    if (avail >= size) {
+        m_input_begin += size;
+        return BinaryData(m_input_begin - size, size);
+    }
+
+    buf.clear();
+    buf.resize(size); // Throws
+    read_bytes(buf.data(), size);
+    return BinaryData(buf.data(), size);
 }
 
 
