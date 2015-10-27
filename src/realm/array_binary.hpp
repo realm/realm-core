@@ -148,9 +148,7 @@ inline void ArrayBinary::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
-    realm::util::encryption_read_barrier(header, header_size);
     init_from_mem(MemRef(header, ref));
-    realm::util::encryption_read_barrier(header, get_byte_size());
 }
 
 inline void ArrayBinary::init_from_parent() noexcept
@@ -235,7 +233,6 @@ inline size_t ArrayBinary::get_size_from_header(const char* header,
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
-    realm::util::encryption_read_barrier(offsets_header, Array::header_size);
     return Array::get_size_from_header(offsets_header);
 }
 

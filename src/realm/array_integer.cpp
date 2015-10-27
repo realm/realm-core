@@ -76,13 +76,7 @@ void ArrayIntNull::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
-    realm::util::encryption_read_barrier(header, header_size);
     init_from_mem(MemRef{header, ref});
-    // it should be ok to do the encryption_read_barrier here instead of inside
-    // init_from_mem, because if init_from_mem wants to actually touch
-    // the payload, it must be a slab allocated array (not a memory
-    // mapped one) so the encryption systemt need not be informed
-    realm::util::encryption_read_barrier(header, get_byte_size());
 }
 
 void ArrayIntNull::init_from_mem(MemRef mem) noexcept
