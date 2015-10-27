@@ -573,6 +573,8 @@ public:
     {
         if (REALM_UNLIKELY(num_tables != m_group.size()))
             return false;
+        if (REALM_UNLIKELY(table_ndx >= m_group.size()))
+            return false;
 #ifdef REALM_DEBUG
         if (m_log)
             *m_log << "group->remove_table("<<table_ndx<<")\n";
