@@ -7762,7 +7762,7 @@ TEST(Query_CompareThroughUnaryLinks)
     CHECK_EQUAL(not_found, match);
 }
 
-ONLY(Query_DeepLink)
+TEST(Query_DeepLink)
 {
 
     //
