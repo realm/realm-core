@@ -60,22 +60,6 @@ using namespace realm::util;
 
 namespace {
 
-class SpinLockGuard {
-public:
-    SpinLockGuard(std::atomic<bool>& lock) : m_lock(lock)
-    {
-        while (m_lock.exchange(true, std::memory_order_acquire)) ;
-    }
-
-    ~SpinLockGuard()
-    {
-        m_lock.store(false, std::memory_order_release);
-    }
-
-private:
-    std::atomic<bool>& m_lock;
-};
-
 // A list of all of the active encrypted mappings for a single file
 struct mappings_for_file {
     dev_t device;
@@ -92,9 +76,9 @@ struct mapping_and_addr {
     size_t size;
 };
 
-std::atomic<bool> mapping_lock;
-std::vector<mapping_and_addr> mappings_by_addr;
-std::vector<mappings_for_file> mappings_by_file;
+static util::Mutex mapping_mutex;
+static std::vector<mapping_and_addr> mappings_by_addr;
+static std::vector<mappings_for_file> mappings_by_file;
 
 // If there's any active mappings when the program exits, deliberately leak them
 // to avoid flushing things that were in the middle of being modified on a different thrad
@@ -131,7 +115,7 @@ void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
     if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size())
         throw DecryptionFailed();
 
-    SpinLockGuard lock(mapping_lock);
+    LockGuard lock(mapping_mutex);
 
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
@@ -185,7 +169,7 @@ void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
 void remove_mapping(void* addr, size_t size)
 {
     size = round_up_to_page_size(size);
-    SpinLockGuard lock(mapping_lock);
+    LockGuard lock(mapping_mutex);
     mapping_and_addr* m = find_mapping_for_addr(addr, size);
     if (!m)
         return;
@@ -234,7 +218,7 @@ namespace util {
 // we can release it (except, possibly, for investigation purposes).
 void encryption_read_barrier(const void* addr, size_t size)
 {
-    SpinLockGuard lock(mapping_lock);
+    LockGuard lock(mapping_mutex);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
         mapping_and_addr& m = mappings_by_addr[i];
         if (m.addr >= static_cast<const char*>(addr) + size 
@@ -255,7 +239,7 @@ void encryption_read_barrier(const void* addr, size_t size)
 
 void encryption_write_barrier(const void* addr, size_t size)
 {
-    SpinLockGuard lock(mapping_lock);
+    LockGuard lock(mapping_mutex);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
         mapping_and_addr& m = mappings_by_addr[i];
         if (m.addr >= static_cast<const char*>(addr) + size 
@@ -327,7 +311,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
 {
 #if REALM_ENABLE_ENCRYPTION
     {
-        SpinLockGuard lock(mapping_lock);
+        LockGuard lock(mapping_mutex);
         size_t rounded_old_size = round_up_to_page_size(old_size);
         if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
             size_t rounded_new_size = round_up_to_page_size(new_size);
@@ -372,7 +356,7 @@ void msync(void* addr, size_t size)
 {
 #if REALM_ENABLE_ENCRYPTION
     { // first check the encrypted mappings
-        SpinLockGuard lock(mapping_lock);
+        LockGuard lock(mapping_mutex);
         if (mapping_and_addr* m = find_mapping_for_addr(addr, round_up_to_page_size(size))) {
             m->mapping->flush();
             m->mapping->sync();
