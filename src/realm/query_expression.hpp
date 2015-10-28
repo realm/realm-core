@@ -749,7 +749,7 @@ struct NullableVector
         m_size = size;
         if (m_size > 0) {
             if (m_size > prealloc)
-                m_first = reinterpret_cast<t_storage*>(new T[m_size]);
+                m_first = reinterpret_cast<t_storage*>(new t_storage[m_size]);
             else
                 m_first = m_cache;
         }
