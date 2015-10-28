@@ -51,7 +51,8 @@ class LinkColumnBase;
 class LinkColumn;
 class LinkListColumn;
 class BacklinkColumn;
-template<class> class Columns;
+template<class>
+class Columns;
 
 struct Link {};
 typedef Link LinkList;
@@ -127,11 +128,11 @@ public:
     ///
     /// A table accessor of a free-standing table never becomes detached (except
     /// during its eventual destruction). A group-level table accessor becomes
-    /// detached if the underlying table is removed from the group (not
-    /// currently possible), or when the group accessor is destroyed. A subtable
-    /// accessor becomes detached if the underlying subtable is removed, or if
-    /// the parent table accessor is detached. A table accessor does not become
-    /// detached for any other reason than those mentioned here.
+    /// detached if the underlying table is removed from the group, or when the
+    /// group accessor is destroyed. A subtable accessor becomes detached if the
+    /// underlying subtable is removed, or if the parent table accessor is
+    /// detached. A table accessor does not become detached for any other reason
+    /// than those mentioned here.
     ///
     /// FIXME: High level language bindings will probably want to be able to
     /// explicitely detach a group and all tables of that group if any modifying
@@ -190,9 +191,9 @@ public:
     /// \sa has_shared_type()
     /// \sa get_descriptor()
 
-    size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = 0);
+    size_t add_column(DataType type, StringData name, bool nullable = false, DescriptorRef* subdesc = nullptr);
     void insert_column(size_t column_ndx, DataType type, StringData name, bool nullable = false,
-                       DescriptorRef* subdesc = 0);
+                       DescriptorRef* subdesc = nullptr);
 
     // Todo, these prototypes only exist for backwards compatibility. We should remove them because they are error
     // prone (optional arguments and implicit bool to null-ptr conversion)
@@ -339,7 +340,8 @@ public:
     bool has_shared_type() const noexcept;
 
 
-    template<class T> Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
+    template<class T>
+    Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
 
     // Table size and deletion
     bool is_empty() const noexcept;
@@ -423,15 +425,36 @@ public:
 
     /// Set cell values.
     ///
+    /// It is an error to specify a column index, row index, or string position
+    /// that is out of range.
+    ///
     /// The number of bytes in a string value must not exceed `max_string_size`,
     /// and the number of bytes in a binary data value must not exceed
-    /// `max_binary_size`. String must also be valid UTF-8 encodings. These
-    /// requirements also apply when calling set_mixed(). Passing an oversized
-    /// string or binary data value will cause an exception to be thrown.
+    /// `max_binary_size`. String must also contain valid UTF-8 encodings. These
+    /// requirements also apply when modifying a string with insert_substring()
+    /// and remove_substring(), and for strings in a mixed columnt. Passing, or
+    /// producing an oversized string or binary data value will cause an
+    /// exception to be thrown.
     ///
-    /// It is an error to assign a value to a column that is part of a primary
-    /// key, if that would result in a violation the implied *unique constraint*
-    /// of that primary key. The consequenses of doing so are unspecified.
+    /// It is an error to modify a value in a column that participates in a
+    /// primary key, if that would result in a violation the implied *unique
+    /// constraint* of that primary key. The consequenses of doing so are
+    /// unspecified.
+    ///
+    /// insert_substring() inserts the specified string into the currently
+    /// stored string at the specified position. The position must be less than
+    /// or equal to the size of the currently stored string.
+    ///
+    /// remove_substring() removes the specified byte range from the currently
+    /// stored string. The beginning of the range (\a pos) must be less than or
+    /// equal to the size of the currently stored string. If the specified range
+    /// cextends beyond the end of the currently stored string, it will be
+    /// silently clamped.
+    ///
+    /// String level modifications performed via insert_substring() and
+    /// remove_substring() are mergable and subject to operational
+    /// trsnaformation. That is, the effect of two causally unrelated
+    /// modifications will in general both be retained during synchronization.
 
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
@@ -439,7 +462,8 @@ public:
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
-    template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
+    template<class E>
+    void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
@@ -448,6 +472,9 @@ public:
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
     void nullify_link(size_t column_ndx, size_t row_ndx);
     void set_null(size_t column_ndx, size_t row_ndx);
+
+    void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
+    void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size = realm::npos);
 
     //@}
 
@@ -496,8 +523,8 @@ public:
     /// attached to a subtable, then `*column_ndx_out` will retain its original
     /// value upon return.
 
-    TableRef get_parent_table(size_t* column_ndx_out = 0) noexcept;
-    ConstTableRef get_parent_table(size_t* column_ndx_out = 0) const noexcept;
+    TableRef get_parent_table(size_t* column_ndx_out = nullptr) noexcept;
+    ConstTableRef get_parent_table(size_t* column_ndx_out = nullptr) const noexcept;
     size_t get_parent_row_index() const noexcept;
 
     //@}
@@ -527,7 +554,7 @@ public:
     int64_t minimum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
     float   minimum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  minimum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = 0) const;
+    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  average_int(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_double(size_t column_ndx, size_t* value_count = nullptr) const;
@@ -609,8 +636,10 @@ public:
 
 
 private:
-    template <class T, bool Nullable> size_t find_first(size_t column_ndx, T value) const; // called by above methods
-    template <class T> TableView find_all(size_t column_ndx, T value);
+    template<class T, bool Nullable>
+    size_t find_first(size_t column_ndx, T value) const; // called by above methods
+    template<class T>
+    TableView find_all(size_t column_ndx, T value);
 public:
 
 
@@ -862,6 +891,7 @@ private:
     void batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over);
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
+    void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
 
@@ -918,22 +948,30 @@ private:
 
     static void do_insert_column(Descriptor&, size_t col_ndx, DataType type,
                                  StringData name, Table* link_target_table, bool nullable = false);
+    static void do_insert_column_unless_exists(Descriptor&, size_t col_ndx, DataType type,
+                                               StringData name, Table* link_target_table, bool nullable = false,
+                                               bool* was_inserted = nullptr);
     static void do_erase_column(Descriptor&, size_t col_ndx);
     static void do_rename_column(Descriptor&, size_t col_ndx, StringData name);
+    static void do_move_column(Descriptor&, size_t col_ndx_1, size_t col_ndx_2);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
+    struct MoveSubtableColumns;
 
     void insert_root_column(size_t col_ndx, DataType type, StringData name,
                             Table* link_target_table, bool nullable = false);
     void erase_root_column(size_t col_ndx);
+    void move_root_column(size_t from, size_t to);
     void do_insert_root_column(size_t col_ndx, ColumnType, StringData name, bool nullable = false);
     void do_erase_root_column(size_t col_ndx);
+    void do_move_root_column(size_t from, size_t to);
     void do_set_link_type(size_t col_ndx, LinkType);
     void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
     void erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
     void update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_ndx_begin);
+    void update_link_target_tables_after_column_move(size_t moved_from, size_t moved_to);
 
     struct SubtableUpdater {
         virtual void update(const SubtableColumn&, Array& subcolumns) = 0;
@@ -1007,8 +1045,8 @@ private:
     // Detach the type descriptor accessor if it exists.
     void discard_desc_accessor() noexcept;
 
-    void bind_ref() const noexcept { ++m_ref_count; }
-    void unbind_ref() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept { ++m_ref_count; }
+    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
 
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) noexcept;
@@ -1030,8 +1068,13 @@ private:
 
     const ColumnBase& get_column_base(size_t column_ndx) const noexcept;
     ColumnBase& get_column_base(size_t column_ndx);
-    template <class T, ColumnType col_type> T& get_column(size_t ndx);
-    template <class T, ColumnType col_type> const T& get_column(size_t ndx) const noexcept;
+
+    template<class T, ColumnType col_type>
+    T& get_column(size_t ndx);
+
+    template<class T, ColumnType col_type>
+    const T& get_column(size_t ndx) const noexcept;
+
     IntegerColumn& get_column(size_t column_ndx);
     const IntegerColumn& get_column(size_t column_ndx) const noexcept;
     IntNullColumn& get_column_int_null(size_t column_ndx);
@@ -1067,8 +1110,8 @@ private:
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
                                          Allocator&) noexcept;
 
-    const Table* get_parent_table_ptr(size_t* column_ndx_out = 0) const noexcept;
-    Table* get_parent_table_ptr(size_t* column_ndx_out = 0) noexcept;
+    const Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) const noexcept;
+    Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) noexcept;
 
     /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
@@ -1211,6 +1254,7 @@ private:
 
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
+    void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -1249,12 +1293,14 @@ private:
     void adj_acc_clear_nonroot_table() noexcept;
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
+    void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
 
     void adj_insert_column(size_t col_ndx);
     void adj_erase_column(size_t col_ndx) noexcept;
+    void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
 
     bool is_marked() const noexcept;
     void mark() noexcept;
@@ -1313,13 +1359,16 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
-    template<class> friend class util::bind_ptr;
+    template<class>
+    friend class util::bind_ptr;
     friend class LangBindHelper;
     friend class TableViewBase;
-    template<class T> friend class Columns;
+    template<class T>
+    friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
-    template<class> friend class SequentialGetter;
+    template<class>
+    friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;
@@ -1346,7 +1395,7 @@ protected:
     /// If \a column_ndx_out is not null, this function must assign the index of
     /// the column within the parent table to `*column_ndx_out` when , and only
     /// when this table parent is a column in a parent table.
-    virtual Table* get_parent_table(size_t* column_ndx_out = 0) noexcept;
+    virtual Table* get_parent_table(size_t* column_ndx_out = nullptr) noexcept;
 
     /// Must be called whenever a child table accessor is about to be destroyed.
     ///
@@ -1476,7 +1525,8 @@ inline DataType Table::get_column_type(size_t ndx) const noexcept
     return m_spec.get_public_column_type(ndx);
 }
 
-template<class Col, ColumnType col_type> inline Col& Table::get_column(size_t ndx)
+template<class Col, ColumnType col_type>
+inline Col& Table::get_column(size_t ndx)
 {
     ColumnBase& col = get_column_base(ndx);
 #ifdef REALM_DEBUG
@@ -1513,7 +1563,7 @@ public:
     ~UnbindGuard() noexcept
     {
         if (m_table)
-            m_table->unbind_ref();
+            m_table->unbind_ptr();
     }
 
     Table& operator*() const noexcept
@@ -1606,14 +1656,15 @@ inline TableRef Table::copy(Allocator& alloc) const
 }
 
 // For use by queries
-template<class T> inline Columns<T> Table::column(size_t column)
+template<class T>
+inline Columns<T> Table::column(size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
         tmp.push_back(column);
     }
 
-    // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our 
+    // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
     const Table* table = get_link_chain_target(m_link_chain);
 
@@ -1975,14 +2026,14 @@ public:
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
 
-    static void bind_ref(Table& table) noexcept
+    static void bind_ptr(Table& table) noexcept
     {
-        table.bind_ref();
+        table.bind_ptr();
     }
 
-    static void unbind_ref(Table& table) noexcept
+    static void unbind_ptr(Table& table) noexcept
     {
-        table.unbind_ref();
+        table.unbind_ptr();
     }
 
     static bool compare_rows(const Table& a, const Table& b)
@@ -2028,6 +2079,11 @@ public:
         table.do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
     }
 
+    static void do_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2)
+    {
+        table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
+    }
+
     static void do_clear(Table& table)
     {
         bool broken_reciprocal_backlinks = false;
@@ -2069,6 +2125,13 @@ public:
         Table::do_insert_column(desc, column_ndx, type, name, link_target_table, nullable); // Throws
     }
 
+    static void insert_column_unless_exists(Descriptor& desc, size_t column_ndx, DataType type,
+                                            StringData name, Table* link_target_table, bool nullable = false,
+                                            bool* was_inserted = nullptr)
+    {
+        Table::do_insert_column_unless_exists(desc, column_ndx, type, name, link_target_table, nullable, was_inserted); // Throws
+    }
+
     static void erase_column(Descriptor& desc, size_t column_ndx)
     {
         Table::do_erase_column(desc, column_ndx); // Throws
@@ -2077,6 +2140,11 @@ public:
     static void rename_column(Descriptor& desc, size_t column_ndx, StringData name)
     {
         Table::do_rename_column(desc, column_ndx, name); // Throws
+    }
+
+    static void move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2)
+    {
+        Table::do_move_column(desc, col_ndx_1, col_ndx_2); // Throws
     }
 
     static void set_link_type(Table& table, size_t column_ndx, LinkType link_type)
@@ -2129,6 +2197,11 @@ public:
         table.adj_acc_erase_row(row_ndx);
     }
 
+    static void adj_acc_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
+    {
+        table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
+
     static void adj_acc_move_over(Table& table, size_t from_row_ndx,
                                   size_t to_row_ndx) noexcept
     {
@@ -2159,6 +2232,12 @@ public:
     static void adj_erase_column(Table& table, size_t col_ndx) noexcept
     {
         table.adj_erase_column(col_ndx);
+    }
+
+    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2)
+        noexcept
+    {
+        table.adj_move_column(col_ndx_1, col_ndx_2);
     }
 
     static bool is_marked(const Table& table) noexcept

@@ -39,12 +39,15 @@ namespace realm {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() noexcept : m_data(0), m_size(0) {}
+    BinaryData() noexcept : m_data(nullptr), m_size(0) {}
     BinaryData(const char* data, size_t size) noexcept: m_data(data), m_size(size) {}
-    template<size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
-    template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);
+    template<size_t N>
+    explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
+    template<class T, class A>
+    explicit BinaryData(const std::basic_string<char, T, A>&);
 
-    template<class T, class A> explicit operator std::basic_string<char, T, A>() const;
+    template<class T, class A>
+    explicit operator std::basic_string<char, T, A>() const;
 
     char operator[](size_t i) const noexcept { return m_data[i]; }
 
@@ -118,13 +121,15 @@ public:
 
 // Implementation:
 
-template<class T, class A> inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s):
+template<class T, class A>
+inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s):
     m_data(s.data()),
     m_size(s.size())
 {
 }
 
-template<class T, class A> inline BinaryData::operator std::basic_string<char, T, A>() const
+template<class T, class A>
+inline BinaryData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
 }

@@ -62,17 +62,17 @@ GroupWriter::GroupWriter(Group& group):
             // m_free_versions
             top.add(0); // Throws
             // Transaction number / version
-            int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
-            top.add(1 + 2*value); // Throws
+            top.add(0); // Throws
         }
 
         if (ref_type ref = m_free_versions.get_ref_from_parent()) {
             m_free_versions.init_from_ref(ref);
         }
         else {
+            int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
+            top.set(6, 1 + 2*value); // Throws
             size_t n = m_free_positions.size();
             bool context_flag = false;
-            int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
             m_free_versions.create(Array::type_Normal, context_flag, n, value); // Throws
             _impl::DestroyGuard<ArrayInteger> dg(&m_free_versions);
             m_free_versions.update_parent(); // Throws
@@ -90,7 +90,7 @@ GroupWriter::GroupWriter(Group& group):
 }
 
 
-size_t GroupWriter::write_group()
+ref_type GroupWriter::write_group()
 {
     merge_free_space(); // Throws
 
@@ -106,9 +106,24 @@ size_t GroupWriter::write_group()
     // that has been release during the current transaction (or since the last
     // commit), as that would lead to clobbering of the previous database
     // version.
-    bool recurse = true, persist = true;
-    size_t names_pos  = m_group.m_table_names.write(*this, recurse, persist); // Throws
-    size_t tables_pos = m_group.m_tables.write(*this, recurse, persist); // Throws
+    bool deep = true, only_if_modified = true;
+    ref_type names_ref  = m_group.m_table_names.write(*this, deep, only_if_modified); // Throws
+    ref_type tables_ref = m_group.m_tables.write(*this, deep, only_if_modified); // Throws
+
+    int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
+    int_fast64_t value_2 = int_fast64_t(tables_ref); // FIXME: Problematic unsigned -> signed conversion
+    top.set(0, value_1); // Throws
+    top.set(1, value_2); // Throws
+
+    if (top.size() >= 8) {
+        if (ref_type sync_history_ref = top.get_as_ref(7)) {
+            Allocator& alloc = top.get_alloc();
+            ref_type new_sync_history_ref =
+                Array::write(sync_history_ref, alloc, *this, only_if_modified); // Throws
+            int_fast64_t value_3 = int_fast64_t(new_sync_history_ref); // FIXME: Problematic unsigned -> signed conversion
+            top.set(7, value_3); // Throws
+        }
+    }
 
     // We now have a bit of a chicken-and-egg problem. We need to write the
     // free-lists to the file, but the act of writing them will consume free
@@ -196,7 +211,8 @@ size_t GroupWriter::write_group()
     // change the byte-size of those arrays.
     size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
-    m_free_positions.ensure_minimum_width(reserve_pos + max_free_space_needed); // Throws
+    int_fast64_t value_4 = int_fast64_t(reserve_pos + max_free_space_needed); // FIXME: Problematic unsigned -> signed conversion
+    m_free_positions.ensure_minimum_width(value_4); // Throws
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();
@@ -207,56 +223,59 @@ size_t GroupWriter::write_group()
                  Array::wtype_Bits);
 
     // Calculate write positions
-    size_t free_positions_pos = reserve_pos;
-    size_t free_sizes_pos     = free_positions_pos + free_positions_size;
-    size_t free_versions_pos  = free_sizes_pos     + free_sizes_size;
-    size_t top_pos            = free_versions_pos  + free_versions_size;
+    ref_type reserve_ref        = to_ref(reserve_pos);
+    ref_type free_positions_ref = reserve_ref;
+    ref_type free_sizes_ref     = free_positions_ref + free_positions_size;
+    ref_type free_versions_ref  = free_sizes_ref     + free_sizes_size;
+    ref_type top_ref            = free_versions_ref  + free_versions_size;
 
     // Update top to point to the calculated positions
-    top.set(0, names_pos); // Throws
-    top.set(1, tables_pos); // Throws
-    // Third slot holds the logical file size
-    top.set(3, free_positions_pos); // Throws
-    top.set(4, free_sizes_pos); // Throws
+    int_fast64_t value_5 = int_fast64_t(free_positions_ref); // FIXME: Problematic unsigned -> signed conversion
+    int_fast64_t value_6 = int_fast64_t(free_sizes_ref); // FIXME: Problematic unsigned -> signed conversion
+    top.set(3, value_5); // Throws
+    top.set(4, value_6); // Throws
     if (is_shared) {
-        top.set(5, free_versions_pos); // Throws
-        // Seventh slot holds the database version (a.k.a. transaction number)
-        top.set(6, m_current_version * 2 +1); // Throws
+        int_fast64_t value_7 = int_fast64_t(free_versions_ref); // FIXME: Problematic unsigned -> signed conversion
+        int_fast64_t value_8 = 1 + 2 * int_fast64_t(m_current_version); // FIXME: Problematic unsigned -> signed conversion
+        top.set(5, value_7); // Throws
+        top.set(6, value_8); // Throws
     }
 
     // Get final sizes
     size_t top_byte_size = top.get_byte_size();
-    size_t end_pos = top_pos + top_byte_size;
-    REALM_ASSERT_3(end_pos, <=, reserve_pos + max_free_space_needed);
+    ref_type end_ref = top_ref + top_byte_size;
+    REALM_ASSERT_3(size_t(end_ref), <=, reserve_pos + max_free_space_needed);
 
     // Deduct the used space from the reserved chunk. Note that we have made
     // sure that the remaining size is never zero. Also, by the call to
     // m_free_positions.ensure_minimum_width() above, we have made sure that
     // m_free_positions has the capacity to store the new larger value without
     // reallocation.
-    size_t rest = reserve_pos + reserve_size - end_pos;
+    size_t rest = reserve_pos + reserve_size - size_t(end_ref);
     REALM_ASSERT_3(rest, >, 0);
-    m_free_positions.set(reserve_ndx, end_pos); // Throws
-    m_free_lengths.set(reserve_ndx, rest); // Throws
+    int_fast64_t value_8 = int_fast64_t(end_ref); // FIXME: Problematic unsigned -> signed conversion
+    int_fast64_t value_9 = int_fast64_t(rest); // FIXME: Problematic unsigned -> signed conversion
+    m_free_positions.set(reserve_ndx, value_8); // Throws
+    m_free_lengths.set(reserve_ndx, value_9); // Throws
 
     // The free-list now have their final form, so we can write them to the file
-    char* start_addr = m_file_map.get_addr() + reserve_pos;
+    char* start_addr = m_file_map.get_addr() + reserve_ref;
     realm::util::encryption_read_barrier(start_addr, reserve_size);
-    write_array_at(free_positions_pos, m_free_positions.get_header(),
+    write_array_at(free_positions_ref, m_free_positions.get_header(),
                    free_positions_size); // Throws
-    write_array_at(free_sizes_pos, m_free_lengths.get_header(),
+    write_array_at(free_sizes_ref, m_free_lengths.get_header(),
                    free_sizes_size); // Throws
     if (is_shared) {
-        write_array_at(free_versions_pos, m_free_versions.get_header(),
+        write_array_at(free_versions_ref, m_free_versions.get_header(),
                        free_versions_size); // Throws
     }
 
     // Write top
-    write_array_at(top_pos, top.get_header(), top_byte_size); // Throws
+    write_array_at(top_ref, top.get_header(), top_byte_size); // Throws
     realm::util::encryption_write_barrier(start_addr, reserve_size);
 
-    // Return top_pos so that it can be saved in lock file used for coordination
-    return top_pos;
+    // Return top_ref so that it can be saved in lock file used for coordination
+    return top_ref;
 }
 
 
@@ -342,8 +361,8 @@ size_t GroupWriter::get_free_space(size_t size)
 }
 
 
-inline size_t GroupWriter::split_freelist_chunk(size_t index, size_t start_pos, 
-                                                     size_t alloc_pos, size_t chunk_size, 
+inline size_t GroupWriter::split_freelist_chunk(size_t index, size_t start_pos,
+                                                     size_t alloc_pos, size_t chunk_size,
                                                      bool is_shared)
 {
     m_free_positions.insert(index, start_pos);
@@ -358,8 +377,8 @@ inline size_t GroupWriter::split_freelist_chunk(size_t index, size_t start_pos,
 }
 
 
-std::pair<size_t, size_t> 
-GroupWriter::search_free_space_in_part_of_freelist(size_t size, size_t begin, 
+std::pair<size_t, size_t>
+GroupWriter::search_free_space_in_part_of_freelist(size_t size, size_t begin,
                                                    size_t end, bool& found)
 {
     bool is_shared = m_group.m_is_shared;
@@ -431,7 +450,7 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
         // so search that particular entry
         end = m_free_lengths.size();
         chunk = search_free_space_in_part_of_freelist(size, end-1, end, found);
-    } 
+    }
     while (!found);
     return chunk;
 }
@@ -501,7 +520,7 @@ void GroupWriter::write(const char* data, size_t size)
 }
 
 
-size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t checksum)
+ref_type GroupWriter::write_array(const char* data, size_t size, uint_fast32_t checksum)
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
@@ -520,13 +539,16 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
 #endif
 
     realm::util::encryption_write_barrier(dest_addr, size);
-    // return the position it was written
-    return pos;
+    // return ref of the written array
+    ref_type ref = to_ref(pos);
+    return ref;
 }
 
 
-void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
+void GroupWriter::write_array_at(ref_type ref, const char* data, size_t size)
 {
+    size_t pos = size_t(ref);
+
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
     REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = m_file_map.get_addr() + pos;

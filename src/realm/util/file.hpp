@@ -22,13 +22,17 @@
 
 #include <cstddef>
 #include <stdint.h>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <streambuf>
 
+#ifndef _WIN32
+#  include <dirent.h> // POSIX.1-2001
+#endif
+
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
-#include <memory>
 #include <realm/util/safe_int_ops.hpp>
 
 namespace realm {
@@ -171,10 +175,12 @@ public:
     void write(const std::string& s) { write(s.data(), s.size()); }
 
     /// Calls read(data, N).
-    template<size_t N> size_t read(char (&data)[N]) { return read(data, N); }
+    template<size_t N>
+    size_t read(char (&data)[N]) { return read(data, N); }
 
     /// Calls write(data(), N).
-    template<size_t N> void write(const char (&data)[N]) { write(data, N); }
+    template<size_t N>
+    void write(const char (&data)[N]) { write(data, N); }
 
     /// Plays the same role as off_t in POSIX
     typedef int_fast64_t SizeType;
@@ -353,6 +359,11 @@ public:
     /// as not existing.
     static bool exists(const std::string& path);
 
+    /// Check whether the specified path exists and refers to a directory. If
+    /// the referenced file system object resides in an inaccessible directory,
+    /// this function returns false.
+    static bool is_dir(const std::string& path);
+
     /// Remove the specified file path from the file system. If the
     /// specified path is not a directory, this function is equivalent
     /// to std::remove(const char*).
@@ -401,10 +412,41 @@ public:
     // FIXME: Can we get rid of this one please!!!
     bool is_removed() const;
 
+    /// Resolve the specified path against the specified base directory.
+    ///
+    /// If \a path is absolute, or if \a base_dir is empty, \p path is returned
+    /// unmodified, otherwise \a path is resolved against \a base_dir.
+    ///
+    /// Examples (assuming POSIX):
+    ///
+    ///    resolve("/foo/bar", "../baz") -> "/foo/baz"
+    ///    resolve(".", "foo")           -> "./foo"
+    ///    resolve("/foo/", ".")         -> "/foo"
+    ///    resolve("foo", "..")          -> "."
+    ///    resolve("foo", "../..")       -> ".."
+    ///    resolve("..", "..")           -> "../.."
+    ///    resolve("", "")               -> "."
+    ///    resolve("/", "")              -> "/."
+    ///    resolve("/", "..")            -> "/."
+    ///    resolve("foo//bar", "..")     -> "foo"
+    ///
+    /// This function does not access the file system.
+    ///
+    /// \param path The path to be resolved. An empty string produces the same
+    /// result as as if "." was passed. The result has a trailing directory
+    /// separator (`/`) if, and only if this path has a trailing directory
+    /// separator.
+    ///
+    /// \param base_dir The base directory path, which may be relative or
+    /// absolute. A final directory separator (`/`) is optional. The empty
+    /// string is interpreted as a relative path.
+    static std::string resolve(const std::string& path, const std::string& base_dir);
+
     class ExclusiveLock;
     class SharedLock;
 
-    template<class> class Map;
+    template<class>
+    class Map;
 
     class CloseGuard;
     class UnlockGuard;
@@ -480,7 +522,8 @@ private:
 ///
 /// A single Map instance must never be accessed concurrently by
 /// multiple threads.
-template<class T> class File::Map: private MapBase {
+template<class T>
+class File::Map: private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
     explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof (T),
@@ -496,7 +539,7 @@ public:
     ~Map() noexcept;
 
     /// Move the mapping from another Map object to this Map object
-    File::Map<T>& operator=(File::Map<T>&& other) 
+    File::Map<T>& operator=(File::Map<T>&& other)
     {
         if (m_addr) unmap();
         m_addr = other.m_addr;
@@ -581,7 +624,8 @@ private:
 
 class File::UnmapGuard {
 public:
-    template<class T> UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
+    template<class T>
+    UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
     ~UnmapGuard()  noexcept { if (m_map) m_map->unmap(); }
     void release() noexcept { m_map = 0; }
 private:
@@ -653,6 +697,17 @@ public:
     Exists(const std::string& msg, const std::string& path);
 };
 
+
+class DirScanner {
+public:
+    DirScanner(const std::string& path);
+    ~DirScanner() noexcept;
+    bool next(std::string& name);
+private:
+#ifndef _WIN32
+    DIR* m_dirp;
+#endif
+};
 
 
 
@@ -803,9 +858,11 @@ inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size
     map(f, a, size, map_flags, offset);
 }
 
-template<class T> inline File::Map<T>::Map() noexcept {}
+template<class T>
+inline File::Map<T>::Map() noexcept {}
 
-template<class T> inline File::Map<T>::~Map() noexcept {}
+template<class T>
+inline File::Map<T>::~Map() noexcept {}
 
 template<class T>
 inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
@@ -814,7 +871,8 @@ inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_fl
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::unmap() noexcept
+template<class T>
+inline void File::Map<T>::unmap() noexcept
 {
     MapBase::unmap();
 }
@@ -826,27 +884,32 @@ inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::sync()
+template<class T>
+inline void File::Map<T>::sync()
 {
     MapBase::sync();
 }
 
-template<class T> inline bool File::Map<T>::is_attached() const noexcept
+template<class T>
+inline bool File::Map<T>::is_attached() const noexcept
 {
     return (m_addr != nullptr);
 }
 
-template<class T> inline T* File::Map<T>::get_addr() const noexcept
+template<class T>
+inline T* File::Map<T>::get_addr() const noexcept
 {
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline size_t File::Map<T>::get_size() const noexcept
+template<class T>
+inline size_t File::Map<T>::get_size() const noexcept
 {
     return m_addr ? m_size : 0;
 }
 
-template<class T> inline T* File::Map<T>::release() noexcept
+template<class T>
+inline T* File::Map<T>::release() noexcept
 {
     T* addr = static_cast<T*>(m_addr);
     m_addr = nullptr;

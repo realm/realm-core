@@ -78,7 +78,7 @@ public:
     static const Table* get_table(const Group&, StringData name);
 
     static Table* add_table(Group&, StringData name, bool require_unique_name = true);
-    static Table* get_or_add_table(Group&, StringData name, bool* was_added = 0);
+    static Table* get_or_add_table(Group&, StringData name, bool* was_added = nullptr);
 
     //@}
 
@@ -218,7 +218,7 @@ inline Table* LangBindHelper::new_table()
     Table::Parent* parent = nullptr;
     size_t ndx_in_parent = 0;
     Table* table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
-    tf::bind_ref(*table);
+    tf::bind_ptr(*table);
     return table;
 }
 
@@ -230,7 +230,7 @@ inline Table* LangBindHelper::copy_table(const Table& table)
     Table::Parent* parent = nullptr;
     size_t ndx_in_parent = 0;
     Table* copy_of_table = tf::create_accessor(alloc, ref, parent, ndx_in_parent); // Throws
-    tf::bind_ref(*copy_of_table);
+    tf::bind_ptr(*copy_of_table);
     return copy_of_table;
 }
 
@@ -238,7 +238,7 @@ inline Table* LangBindHelper::get_subtable_ptr(Table* t, size_t column_ndx,
                                                size_t row_ndx)
 {
     Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx); // Throws
-    subtab->bind_ref();
+    subtab->bind_ptr();
     return subtab;
 }
 
@@ -246,7 +246,7 @@ inline const Table* LangBindHelper::get_subtable_ptr(const Table* t, size_t colu
                                                      size_t row_ndx)
 {
     const Table* subtab = t->get_subtable_ptr(column_ndx, row_ndx); // Throws
-    subtab->bind_ref();
+    subtab->bind_ptr();
     return subtab;
 }
 
@@ -272,7 +272,7 @@ inline Table* LangBindHelper::get_table(Group& group, size_t index_in_group)
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::get_table(group, index_in_group); // Throws
-    table->bind_ref();
+    table->bind_ptr();
     return table;
 }
 
@@ -280,7 +280,7 @@ inline const Table* LangBindHelper::get_table(const Group& group, size_t index_i
 {
     typedef _impl::GroupFriend gf;
     const Table* table = &gf::get_table(group, index_in_group); // Throws
-    table->bind_ref();
+    table->bind_ptr();
     return table;
 }
 
@@ -289,7 +289,7 @@ inline Table* LangBindHelper::get_table(Group& group, StringData name)
     typedef _impl::GroupFriend gf;
     Table* table = gf::get_table(group, name); // Throws
     if (table)
-        table->bind_ref();
+        table->bind_ptr();
     return table;
 }
 
@@ -298,7 +298,7 @@ inline const Table* LangBindHelper::get_table(const Group& group, StringData nam
     typedef _impl::GroupFriend gf;
     const Table* table = gf::get_table(group, name); // Throws
     if (table)
-        table->bind_ref();
+        table->bind_ptr();
     return table;
 }
 
@@ -306,7 +306,7 @@ inline Table* LangBindHelper::add_table(Group& group, StringData name, bool requ
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::add_table(group, name, require_unique_name); // Throws
-    table->bind_ref();
+    table->bind_ptr();
     return table;
 }
 
@@ -314,18 +314,18 @@ inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bo
 {
     typedef _impl::GroupFriend gf;
     Table* table = &gf::get_or_add_table(group, name, was_added); // Throws
-    table->bind_ref();
+    table->bind_ptr();
     return table;
 }
 
 inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
 {
-   t->unbind_ref();
+   t->unbind_ptr();
 }
 
 inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
 {
-   t->bind_ref();
+   t->bind_ptr();
 }
 
 inline void LangBindHelper::set_mixed_subtable(Table& parent, size_t col_ndx,
@@ -337,20 +337,20 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, size_t col_ndx,
 inline LinkView* LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)
 {
     LinkViewRef link_view = row.get_linklist(col_ndx);
-    link_view->bind_ref();
+    link_view->bind_ptr();
     return &*link_view;
 }
 
 inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
 {
-   link_view->unbind_ref();
+   link_view->unbind_ptr();
 }
 
 inline void LangBindHelper::advance_read(SharedGroup& sg, History& history,
                                          SharedGroup::VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::advance_read(sg, history, observer, version);
 }
 
@@ -365,7 +365,7 @@ inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, O&& 
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::promote_to_write(sg, history, observer);
 }
 
@@ -385,7 +385,7 @@ inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history)
 {
     using sgf = _impl::SharedGroupFriend;
-    _impl::NullInstructionObserver* observer = 0;
+    _impl::NullInstructionObserver* observer = nullptr;
     sgf::rollback_and_continue_as_read(sg, history, observer);
 }
 

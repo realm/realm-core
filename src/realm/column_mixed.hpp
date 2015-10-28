@@ -134,6 +134,7 @@ public:
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
+    void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
     void update_from_parent(size_t) noexcept override;
     void adj_acc_insert_rows(size_t, size_t) noexcept override;
@@ -189,6 +190,7 @@ private:
 
     void do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows);
     void do_move_last_over(size_t row_ndx, size_t prior_num_rows);
+    void do_swap_rows(size_t, size_t);
     void do_clear(size_t num_rows);
 
     void create(Allocator&, ref_type, Table*, size_t column_ndx);

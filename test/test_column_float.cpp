@@ -43,7 +43,8 @@ using test_util::unit_test::TestResults;
 
 namespace {
 
-template<class T, size_t N> inline size_t size_of_array(T(&)[N])
+template<class T, size_t N>
+inline size_t size_of_array(T(&)[N])
 {
     return N;
 }
@@ -72,7 +73,7 @@ const size_t num_double_values = size_of_array(double_values);
 } // anonymous namespace
 
 
-template <class C>
+template<class C>
 void BasicColumn_IsEmpty(TestResults& test_results)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -82,17 +83,17 @@ void BasicColumn_IsEmpty(TestResults& test_results)
     CHECK_EQUAL(0U, c.size());
     c.destroy();
 }
-TEST(ColumnFloat_IsEmpty)
+TEST(FloatColumn_IsEmpty)
 {
     BasicColumn_IsEmpty<FloatColumn>(test_results);
 }
-TEST(ColumnDouble_IsEmpty)
+TEST(DoubleColumn_IsEmpty)
 {
     BasicColumn_IsEmpty<DoubleColumn>(test_results);
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -109,17 +110,17 @@ void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values
 
     c.destroy();
 }
-TEST(ColumnFloat_AddGet)
+TEST(FloatColumn_AddGet)
 {
     BasicColumn_AddGet<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_AddGet)
+TEST(DoubleColumn_AddGet)
 {
     BasicColumn_AddGet<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Clear(TestResults& test_results)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -136,17 +137,17 @@ void BasicColumn_Clear(TestResults& test_results)
 
     c.destroy();
 }
-TEST(ColumnFloat_Clear)
+TEST(FloatColumn_Clear)
 {
     BasicColumn_Clear<FloatColumn, float>(test_results);
 }
-TEST(ColumnDouble_Clear)
+TEST(DoubleColumn_Clear)
 {
     BasicColumn_Clear<DoubleColumn, double>(test_results);
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -169,17 +170,17 @@ void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 
     c.destroy();
 }
-TEST(ColumnFloat_Set)
+TEST(FloatColumn_Set)
 {
     BasicColumn_Set<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_Set)
+TEST(DoubleColumn_Set)
 {
     BasicColumn_Set<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values)
 {
     static_cast<void>(num_values);
@@ -224,17 +225,17 @@ void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values
 
     c.destroy();
 }
-TEST(ColumnFloat_Insert)
+TEST(FloatColumn_Insert)
 {
     BasicColumn_Insert<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_Insert)
+TEST(DoubleColumn_Insert)
 {
     BasicColumn_Insert<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_values)
 {
     static_cast<void>(test_results);
@@ -252,17 +253,17 @@ void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_va
 
    c.destroy();
 }
-TEST(ColumnFloat_Aggregates)
+TEST(FloatColumn_Aggregates)
 {
     BasicColumn_Aggregates<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_Aggregates)
+TEST(DoubleColumn_Aggregates)
 {
     BasicColumn_Aggregates<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
 
-template <class C, typename T>
+template<class C, typename T>
 void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -309,16 +310,172 @@ void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values
 
     c.destroy();
 }
-TEST(ColumnFloat_Delete)
+TEST(FloatColumn_Delete)
 {
     BasicColumn_Delete<FloatColumn, float>(test_results, float_values, num_float_values);
 }
-TEST(ColumnDouble_Delete)
+TEST(DoubleColumn_Delete)
 {
     BasicColumn_Delete<DoubleColumn, double>(test_results, double_values, num_double_values);
 }
 
-TEST(ColumnDouble_InitOfEmptyColumn)
+TEST(FloatColumn_SwapRows)
+{
+    auto epsilon = std::numeric_limits<float>::epsilon();
+
+    // Normal case
+    {
+        ref_type ref = FloatColumn::create(Allocator::get_default());
+        bool nullable = false;
+        FloatColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(-21.389f);
+        c.add(30.221f);
+        c.add(10.93f);
+        c.add(5.0099f);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        c.swap_rows(1, 2);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 4);
+    }
+
+    // First two elements
+    {
+        ref_type ref = FloatColumn::create(Allocator::get_default());
+        bool nullable = false;
+        FloatColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(30.221f);
+        c.add(10.93f);
+        c.add(5.0099f);
+
+        c.swap_rows(0, 1);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Last two elements
+    {
+        ref_type ref = FloatColumn::create(Allocator::get_default());
+        bool nullable = false;
+        FloatColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(5.0099f);
+        c.add(30.221f);
+        c.add(10.93f);
+
+        c.swap_rows(1, 2);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = FloatColumn::create(Allocator::get_default());
+        bool nullable = false;
+        FloatColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(5.0099f);
+        c.add(30.221f);
+        c.add(10.93f);
+
+        c.swap_rows(2, 1);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+}
+
+TEST(DoubleColumn_SwapRows)
+{
+    auto epsilon = std::numeric_limits<double>::epsilon();
+
+    // Normal case
+    {
+        ref_type ref = DoubleColumn::create(Allocator::get_default());
+        bool nullable = false;
+        DoubleColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(-21.389);
+        c.add(30.221);
+        c.add(10.93);
+        c.add(5.0099);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        c.swap_rows(1, 2);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 4);
+    }
+
+    // First two elements
+    {
+        ref_type ref = DoubleColumn::create(Allocator::get_default());
+        bool nullable = false;
+        DoubleColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(30.221);
+        c.add(10.93);
+        c.add(5.0099);
+
+        c.swap_rows(0, 1);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Last two elements
+    {
+        ref_type ref = DoubleColumn::create(Allocator::get_default());
+        bool nullable = false;
+        DoubleColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(5.0099);
+        c.add(30.221);
+        c.add(10.93);
+
+        c.swap_rows(1, 2);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = DoubleColumn::create(Allocator::get_default());
+        bool nullable = false;
+        DoubleColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(5.0099);
+        c.add(30.221);
+        c.add(10.93);
+
+        c.swap_rows(2, 1);
+
+        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
+        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.size(), 3); // size should not change
+    }
+}
+
+TEST(DoubleColumn_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Double, "works");
@@ -332,7 +489,7 @@ TEST(ColumnDouble_InitOfEmptyColumn)
     CHECK_EQUAL(0.0, t.get_double(1,0));
 }
 
-TEST(ColumnFloat_InitOfEmptyColumn)
+TEST(FloatColumn_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Float, "works");

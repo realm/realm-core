@@ -833,6 +833,126 @@ TEST(Links_LinkListInsert_AccessorUpdates)
     CHECK_EQUAL(3, links2->get_origin_row_index());
 }
 
+TEST(Links_LinkList_SwapRows)
+{
+    Group group;
+
+    TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
+    target->add("test1", 1, true,  Mon);
+    target->add("test2", 2, false, Tue);
+    target->add("test3", 3, true,  Wed);
+
+    // create table with links to target table
+    TableRef origin = group.add_table("origin");
+    size_t col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    CHECK_EQUAL(target, origin->get_link_target(col_link));
+
+    origin->insert_empty_row(0);
+    origin->insert_empty_row(1);
+    origin->insert_empty_row(2);
+
+    LinkViewRef links0 = origin->get_linklist(col_link, 0);
+    links0->add(2);
+    links0->add(1);
+    links0->add(0);
+
+    LinkViewRef links1 = origin->get_linklist(col_link, 1);
+    links1->add(2);
+    links1->add(1);
+    links1->add(0);
+
+    LinkViewRef links2 = origin->get_linklist(col_link, 2);
+    links2->add(2);
+    links2->add(1);
+    links2->add(0);
+
+    CHECK_EQUAL(0, links0->get_origin_row_index());
+    CHECK_EQUAL(1, links1->get_origin_row_index());
+    CHECK_EQUAL(2, links2->get_origin_row_index());
+
+    // FIXME: Table::swap_rows does not currently exist, so call through the
+    // private API for now.
+    _impl::TableFriend::do_swap_rows(*origin, 1, 2);
+
+    // Check that accessors were updated
+    CHECK_EQUAL(0, links0->get_origin_row_index());
+    CHECK_EQUAL(2, links1->get_origin_row_index());
+    CHECK_EQUAL(1, links2->get_origin_row_index());
+
+    // verify that backlinks was updated correctly
+    CHECK_EQUAL(3, target->get_backlink_count(0, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(0, *origin, col_link, 0));
+    CHECK_EQUAL(2, target->get_backlink(0, *origin, col_link, 1));
+    CHECK_EQUAL(1, target->get_backlink(0, *origin, col_link, 2));
+    CHECK_EQUAL(3, target->get_backlink_count(1, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(1, *origin, col_link, 0));
+    CHECK_EQUAL(2, target->get_backlink(1, *origin, col_link, 1));
+    CHECK_EQUAL(1, target->get_backlink(1, *origin, col_link, 2));
+    CHECK_EQUAL(3, target->get_backlink_count(2, *origin, col_link));
+    CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
+    CHECK_EQUAL(2, target->get_backlink(2, *origin, col_link, 1));
+    CHECK_EQUAL(1, target->get_backlink(2, *origin, col_link, 2));
+}
+
+TEST(Links_LinkList_TargetSwapRows)
+{
+    Group group;
+
+    TableRef target = group.add_table("target");
+    target->add_column(type_String, "string");
+    target->add_empty_row(3);
+    target->set_string(0, 0, "test1");
+    target->set_string(0, 1, "test2");
+    target->set_string(0, 2, "test3");
+
+    // create table with links to target table
+    TableRef origin = group.add_table("origin");
+    size_t col_link = origin->add_column_link(type_LinkList, "links", *target);
+    CHECK_EQUAL(target, origin->get_link_target(col_link));
+
+    origin->insert_empty_row(0);
+    origin->insert_empty_row(1);
+    origin->insert_empty_row(2);
+
+    LinkViewRef links0 = origin->get_linklist(col_link, 0);
+    links0->add(2);
+    links0->add(1);
+    links0->add(0);
+
+    LinkViewRef links1 = origin->get_linklist(col_link, 1);
+    links1->add(2);
+    links1->add(1);
+    links1->add(1);
+
+    LinkViewRef links2 = origin->get_linklist(col_link, 2);
+    links2->add(2);
+    links2->add(2);
+    links2->add(0);
+
+    CHECK_EQUAL(0, links0->get_origin_row_index());
+    CHECK_EQUAL(1, links1->get_origin_row_index());
+    CHECK_EQUAL(2, links2->get_origin_row_index());
+
+    // FIXME: Table::swap_rows does not currently exist, so call through the
+    // private API for now.
+    _impl::TableFriend::do_swap_rows(*target, 1, 2);
+
+    // Check that the String column did the swap
+    CHECK_EQUAL(target->get_string(0, 1), "test3");
+    CHECK_EQUAL(target->get_string(0, 2), "test2");
+
+    // Check that links in the linklist were updated
+    CHECK_EQUAL(links0->get(0).get_index(), 1);
+    CHECK_EQUAL(links0->get(1).get_index(), 2);
+    CHECK_EQUAL(links0->get(2).get_index(), 0);
+    CHECK_EQUAL(links1->get(0).get_index(), 1);
+    CHECK_EQUAL(links1->get(1).get_index(), 2);
+    CHECK_EQUAL(links1->get(2).get_index(), 2);
+    CHECK_EQUAL(links2->get(0).get_index(), 1);
+    CHECK_EQUAL(links2->get(1).get_index(), 1);
+    CHECK_EQUAL(links2->get(2).get_index(), 0);
+}
+
 TEST(Links_LinkList_FindByOrigin)
 {
     Group group;

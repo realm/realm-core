@@ -68,7 +68,7 @@ Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
     bool was_empty = m_subtable_map.empty();
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
     if (was_empty && m_table)
-        tf::bind_ref(*m_table);
+        tf::bind_ptr(*m_table);
     return subtable.release();
 }
 
@@ -92,7 +92,7 @@ Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
     bool was_empty = m_subtable_map.empty();
     m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
     if (was_empty && m_table)
-        tf::bind_ref(*m_table);
+        tf::bind_ptr(*m_table);
     return subtable.release();
 }
 
@@ -109,11 +109,11 @@ void SubtableColumnBase::child_accessor_destroyed(Table* child) noexcept
     bool last_entry_removed = m_subtable_map.remove(child);
 
     // Note that this column instance may be destroyed upon return
-    // from Table::unbind_ref(), i.e., a so-called suicide is
+    // from Table::unbind_ptr(), i.e., a so-called suicide is
     // possible.
     typedef _impl::TableFriend tf;
     if (last_entry_removed && m_table)
-        tf::unbind_ref(*m_table);
+        tf::unbind_ptr(*m_table);
 }
 
 

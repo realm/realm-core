@@ -63,6 +63,7 @@ public:
     void insert_rows(size_t, size_t, size_t) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
+    void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
     void cascade_break_backlinks_to(size_t, CascadeState&) override;
     void cascade_break_backlinks_to_all_rows(size_t, CascadeState&) override;
@@ -76,6 +77,8 @@ protected:
     void do_nullify_link(size_t row_ndx, size_t old_target_row_ndx) override;
     void do_update_link(size_t row_ndx, size_t old_target_row_ndx,
                         size_t new_target_row_ndx) override;
+    void do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
+                      size_t target_row_ndx_2) override;
 
 private:
     void remove_backlinks(size_t row_ndx);
@@ -160,6 +163,22 @@ inline void LinkColumn::do_update_link(size_t row_ndx, size_t,
 {
     // Row pos is offset by one, to allow null refs
     LinkColumnBase::set(row_ndx, new_target_row_ndx + 1);
+}
+
+inline void LinkColumn::do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
+                                     size_t target_row_ndx_2)
+{
+    // Row pos is offset by one, to allow null refs
+    ++target_row_ndx_1;
+    ++target_row_ndx_2;
+
+    size_t value = LinkColumnBase::get(row_ndx);
+    if (value == target_row_ndx_1) {
+        LinkColumnBase::set(row_ndx, target_row_ndx_2);
+    }
+    else if (value == target_row_ndx_2) {
+        LinkColumnBase::set(row_ndx, target_row_ndx_1);
+    }
 }
 
 } //namespace realm

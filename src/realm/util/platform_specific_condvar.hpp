@@ -42,8 +42,8 @@ namespace util {
 /// Condition variable for use in synchronization monitors.
 /// This condition variable uses emulation based on semaphores
 /// for the inter-process case, if enabled by REALM_CONDVAR_EMULATION.
-/// Compared to a good pthread implemenation, the emulation carries an 
-/// overhead of at most 2 task switches for every waiter notified during 
+/// Compared to a good pthread implemenation, the emulation carries an
+/// overhead of at most 2 task switches for every waiter notified during
 /// notify() or notify_all().
 ///
 /// When a semaphore is allocated to a condvar, its name is formed
@@ -78,14 +78,14 @@ public:
     typedef CondVar SharedPart;
 #endif
 
-    /// You need to bind the emulation to a SharedPart in shared/mmapped memory. 
-    /// The SharedPart is assumed to have been initialized (possibly by another process) 
+    /// You need to bind the emulation to a SharedPart in shared/mmapped memory.
+    /// The SharedPart is assumed to have been initialized (possibly by another process)
     /// earlier through a call to init_shared_part.
     void set_shared_part(SharedPart& shared_part, std::string path, size_t offset_of_condvar);
 
     /// Initialize the shared part of a process shared condition variable.
     /// A process shared condition variables may be represented by any number of
-    /// PlatformSpecificCondVar instances in any number of different processes, 
+    /// PlatformSpecificCondVar instances in any number of different processes,
     /// all sharing a common SharedPart instance, which must be in shared memory.
     static void init_shared_part(SharedPart& shared_part);
 
@@ -100,7 +100,7 @@ public:
     /// Wake up every thread that is currently waiting on this condition.
     void notify_all() noexcept;
 
-    /// Cleanup and release system resources if possible. 
+    /// Cleanup and release system resources if possible.
     void close() noexcept;
 
     /// For platforms imposing naming restrictions on system resources,
@@ -110,10 +110,10 @@ private:
     sem_t* get_semaphore(std::string path, size_t offset_of_condvar);
 
     // non-zero if a shared part has been registered (always 0 on process local instances)
-    SharedPart* m_shared_part; 
+    SharedPart* m_shared_part;
 
     // semaphore used for emulation, zero if emulation is not used
-    sem_t* m_sem; 
+    sem_t* m_sem;
 
     // name of the semaphore - FIXME: generate a name based on inode, device and offset of
     // the file used for memory mapping.
@@ -179,7 +179,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
             r = sem_timedwait(m_sem, tp);
             if (r == ETIMEDOUT) return;
         }
-        else 
+        else
 #endif
         {
             r = sem_wait(m_sem);

@@ -1,6 +1,7 @@
 nobase_subinclude_HEADERS = \
 util/features.h \
 util/meta.hpp \
+util/inspect.hpp \
 util/assert.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
@@ -19,6 +20,7 @@ util/thread.hpp \
 util/file.hpp \
 util/optional.hpp \
 util/network.hpp \
+util/uri.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/platform_specific_condvar.hpp \
@@ -123,6 +125,7 @@ util/string_buffer.cpp \
 util/terminate.cpp \
 util/thread.cpp \
 util/network.cpp \
+util/uri.cpp \
 util/platform_specific_condvar.cpp \
 alloc.cpp \
 alloc_slab.cpp \

@@ -27,10 +27,10 @@
 
 namespace realm {
 
-/* 
+/*
 STORAGE FORMAT
 ---------------------------------------------------------------------------------------
-ArrayBinary stores binary elements using two ArrayInteger and one ArrayBlob. The ArrayBlob can only store one 
+ArrayBinary stores binary elements using two ArrayInteger and one ArrayBlob. The ArrayBlob can only store one
 single concecutive array of bytes (contrary to its 'Array' name that misleadingly indicates it could store multiple
 elements).
 
@@ -38,19 +38,19 @@ Assume we have the strings "a", "", "abc", null, "ab". Then the three arrays wil
 
 ArrayInteger    m_offsets   1, 1, 5, 5, 6
 ArrayBlob       m_blob      aabcab
-ArrayInteger    m_nulls     0, 0, 0, 1, 0 // 1 indicates null, 0 indicates non-null 
+ArrayInteger    m_nulls     0, 0, 0, 1, 0 // 1 indicates null, 0 indicates non-null
 
 So for each element the ArrayInteger, the ArrayInteger points into the ArrayBlob at the position of the first
 byte of the next element.
 
-m_nulls is always present (except for old database files; see below), so any ArrayBinary is always nullable! 
-The nullable property (such as throwing exception upon set(null) on non-nullable column, etc) is handled on 
+m_nulls is always present (except for old database files; see below), so any ArrayBinary is always nullable!
+The nullable property (such as throwing exception upon set(null) on non-nullable column, etc) is handled on
 column level only.
 
 DATABASE FILE VERSION CHANGES
 ---------------------------------------------------------------------------------------
-Old database files do not have any m_nulls array. To be backwardscompatible, many methods will have tests like 
-`if(Array::size() == 3)` and have a backwards compatible code paths for these (e.g. avoid writing to m_nulls 
+Old database files do not have any m_nulls array. To be backwardscompatible, many methods will have tests like
+`if(Array::size() == 3)` and have a backwards compatible code paths for these (e.g. avoid writing to m_nulls
 in set(), etc). This way no file format upgrade is needed to support nulls for BinaryData.
 */
 
@@ -129,7 +129,7 @@ private:
 // Implementation:
 
 inline ArrayBinary::ArrayBinary(Allocator& alloc) noexcept:
-    Array(alloc), m_offsets(alloc), m_blob(alloc), 
+    Array(alloc), m_offsets(alloc), m_blob(alloc),
     m_nulls(alloc)
 {
     m_offsets.set_parent(this, 0);

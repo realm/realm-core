@@ -81,7 +81,7 @@ public:
         bool server_sync_mode = false;
         bool session_initiator = false;
         bool clear_file = false;
-        const char* encryption_key = 0;
+        const char* encryption_key = nullptr;
     };
 
     /// Attach this allocator to the specified file.
@@ -349,7 +349,7 @@ private:
     int m_section_shifts = 0;
     std::unique_ptr<util::File::Map<char>[]> m_additional_mappings;
     std::unique_ptr<size_t[]> m_section_bases;
-    int m_num_section_bases = 0;
+    size_t m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
 
     /// If a file or buffer is currently attached and validation was

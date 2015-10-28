@@ -233,15 +233,56 @@ void Spec::erase_column(size_t column_ndx)
 }
 
 
+void Spec::move_column(size_t from_ndx, size_t to_ndx)
+{
+    REALM_ASSERT_3(from_ndx, <, m_types.size());
+    REALM_ASSERT_3(to_ndx,   <, m_types.size());
+    using tf = _impl::TableFriend;
+
+    // If the moved column is a column type that has a subspec,
+    // we have to move the corresponding subspec as well.
+    //
+    // The m_subspecs array is sparse, so order must be preserved.
+    // Observe that the order among columns that have subspecs can
+    // only change if the moved column has one or more subspecs.
+    //
+    // The same goes for m_enumkeys.
+
+    ColumnType type = ColumnType(m_types.get(from_ndx));
+
+    REALM_ASSERT_3(type, !=, col_type_BackLink);
+
+    if (type == col_type_Table || tf::is_link_type(type)) {
+        // Table columns and link type columns have a single subspec.
+        size_t old_subspec_ndx = get_subspec_ndx(from_ndx);
+        size_t new_subspec_ndx = get_subspec_ndx_after(to_ndx);
+        if (old_subspec_ndx != new_subspec_ndx) {
+            m_subspecs.move_rotate(old_subspec_ndx, new_subspec_ndx);
+        }
+    }
+
+    if (type != col_type_BackLink)
+        m_names.move_rotate(from_ndx, to_ndx);
+    m_types.move_rotate(from_ndx, to_ndx);
+    m_attr.move_rotate(from_ndx, to_ndx);
+}
+
+
 size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
-    REALM_ASSERT(column_ndx <= get_column_count());
     REALM_ASSERT(column_ndx == get_column_count() ||
                    get_column_type(column_ndx) == col_type_Table    ||
                    get_column_type(column_ndx) == col_type_Link     ||
                    get_column_type(column_ndx) == col_type_LinkList ||
                    get_column_type(column_ndx) == col_type_BackLink );
 
+    return get_subspec_ndx_after(column_ndx);
+}
+
+
+size_t Spec::get_subspec_ndx_after(size_t column_ndx) const noexcept
+{
+    REALM_ASSERT(column_ndx <= get_column_count());
     // The m_subspecs array only keep info for subtables so we need to
     // count up to it's position
     size_t subspec_ndx = 0;

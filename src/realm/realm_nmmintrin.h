@@ -33,7 +33,8 @@ const int _CMP_GE_OQ = 0x1d; // Greater-than-or-equal (ordered, non-signaling)
 const int _CMP_GT_OQ = 0x1e; // Greater-than (ordered, non-signaling)
 
 
-template <int op> static int movemask_cmp_ps(__m256* y1, __m256* y2)
+template<int op>
+static int movemask_cmp_ps(__m256* y1, __m256* y2)
 {
     int ret;
     __asm__("vmovaps %0, %%ymm0"                    :                   : "m"(*y1)                      : "%xmm0"   );
@@ -43,7 +44,8 @@ template <int op> static int movemask_cmp_ps(__m256* y1, __m256* y2)
     return ret;
 }
 
-template <int op> static inline int movemask_cmp_pd(__m256d* y1, __m256d* y2)
+template<int op>
+static inline int movemask_cmp_pd(__m256d* y1, __m256d* y2)
 {
     int ret;
     __asm__("vmovapd %0, %%ymm0"                    :                   : "m"(*y1)                      : "%xmm0"   );

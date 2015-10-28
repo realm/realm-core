@@ -45,6 +45,7 @@ public:
     void insert_column(size_t column_ndx, ColumnType type, StringData name,
                        ColumnAttr attr = col_attr_None);
     void rename_column(size_t column_ndx, StringData new_name);
+    void move_column(size_t from, size_t to);
 
     /// Erase the column at the specified index, and move columns at
     /// succeeding indexes to the next lower index.
@@ -87,7 +88,7 @@ public:
                                 ArrayParent*& keys_parent, size_t& keys_ndx);
     size_t get_enumkeys_ndx(size_t column_ndx) const noexcept;
     ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = 0,
-                              size_t* keys_ndx = 0) noexcept;
+                              size_t* keys_ndx = nullptr) noexcept;
 
     // Links
     size_t get_opposite_link_table_ndx(size_t column_ndx) const noexcept;
@@ -174,13 +175,15 @@ private:
 
     ColumnInfo get_column_info(size_t column_ndx) const noexcept;
 
+    size_t get_subspec_ndx_after(size_t column_ndx) const noexcept;
+
     // Returns false if the spec has no columns, otherwise it returns
     // true and sets `type` to the type of the first column.
     static bool get_first_column_type_from_ref(ref_type, Allocator&,
                                                ColumnType& type) noexcept;
 
     friend class Replication;
-
+    friend class Group;
     friend class Table;
 };
 

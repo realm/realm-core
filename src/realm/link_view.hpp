@@ -124,9 +124,10 @@ private:
 
     void do_nullify_link(size_t old_target_row_ndx);
     void do_update_link(size_t old_target_row_ndx, size_t new_target_row_ndx);
+    void do_swap_link(size_t target_row_ndx_1, size_t target_row_ndx_2);
 
-    void bind_ref() const noexcept;
-    void unbind_ref() const noexcept;
+    void bind_ptr() const noexcept;
+    void unbind_ptr() const noexcept;
 
     void refresh_accessor_tree(size_t new_row_ndx) noexcept;
 
@@ -173,12 +174,12 @@ inline LinkView::~LinkView() noexcept
     }
 }
 
-inline void LinkView::bind_ref() const noexcept
+inline void LinkView::bind_ptr() const noexcept
 {
     ++m_ref_count;
 }
 
-inline void LinkView::unbind_ref() const noexcept
+inline void LinkView::unbind_ptr() const noexcept
 {
     if (--m_ref_count > 0)
         return;

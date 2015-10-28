@@ -34,7 +34,8 @@
 namespace realm {
 namespace util {
 
-template<class From, class To> struct CopyConst {
+template<class From, class To>
+struct CopyConst {
 private:
     typedef typename std::remove_const<To>::type type_1;
 public:
@@ -47,7 +48,8 @@ public:
 ///
 /// \note Enum types are supported only when the compiler supports the
 /// C++11 'decltype' feature.
-template<class T> struct Promote;
+template<class T>
+struct Promote;
 
 
 /// Member `type` is the type of the result of a binary arithmetic (or
@@ -61,40 +63,47 @@ template<class T> struct Promote;
 ///
 /// \note Enum types are supported only when the compiler supports the
 /// C++11 'decltype' feature.
-template<class A, class B> struct ArithBinOpType;
+template<class A, class B>
+struct ArithBinOpType;
 
 
 /// Member `type` is `B` if `B` has more value bits than `A`,
 /// otherwise is is `A`.
-template<class A, class B> struct ChooseWidestInt;
+template<class A, class B>
+struct ChooseWidestInt;
 
 
 /// Member `type` is the first of `unsigned char`, `unsigned short`,
 /// `unsigned int`, `unsigned long`, and `unsigned long long` that has
 /// at least `bits` value bits.
-template<int bits> struct LeastUnsigned;
+template<int bits>
+struct LeastUnsigned;
 
 
 /// Member `type` is `unsigned` if `unsigned` has at least `bits`
 /// value bits, otherwise it is the same as
 /// `LeastUnsigned<bits>::type`.
-template<int bits> struct FastestUnsigned;
+template<int bits>
+struct FastestUnsigned;
 
 
 // Implementation
 
 
-template<class T> struct Promote {
+template<class T>
+struct Promote {
     typedef decltype(+T()) type; // FIXME: This is not performing floating-point promotion.
 };
 
 
-template<class A, class B> struct ArithBinOpType {
+template<class A, class B>
+struct ArithBinOpType {
     typedef decltype(A()+B()) type;
 };
 
 
-template<class A, class B> struct ChooseWidestInt {
+template<class A, class B>
+struct ChooseWidestInt {
 private:
     typedef std::numeric_limits<A> lim_a;
     typedef std::numeric_limits<B> lim_b;
@@ -107,7 +116,8 @@ public:
 };
 
 
-template<int bits> struct LeastUnsigned {
+template<int bits>
+struct LeastUnsigned {
 private:
     typedef void                                          types_0;
     typedef TypeAppend<types_0, unsigned char>::type      types_1;
@@ -122,8 +132,10 @@ private:
     // attempt to instantiate `FindType<type, pred>` before the
     // instantiation of `LeastUnsigned<>` which obviously fails
     // because `pred` depends on `bits`.
-    template<int> struct dummy {
-        template<class T> struct pred {
+    template<int>
+    struct dummy {
+        template<class T>
+    struct pred {
             static const bool value = std::numeric_limits<T>::digits >= bits;
         };
     };
@@ -133,7 +145,8 @@ public:
 };
 
 
-template<int bits> struct FastestUnsigned {
+template<int bits>
+struct FastestUnsigned {
 private:
     typedef typename util::LeastUnsigned<bits>::type least_unsigned;
 public:

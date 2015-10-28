@@ -31,7 +31,8 @@
     TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, __VA_ARGS__)
 
 #define TEST_TYPES_EX(name, list, enabled, ...) \
-    template<class> struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
+    template<class> \
+    struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
         bool test_enabled() const { return bool(enabled); } \
         void test_run(); \
     }; \
@@ -39,7 +40,8 @@
     realm::test_util::unit_test::RegisterTests \
         realm_unit_test_reg__##name((list), realm_unit_test__##name, \
                                     "DefaultSuite", #name, __FILE__, __LINE__); \
-    template<class TEST_TYPE> void Realm_UnitTest__##name<TEST_TYPE>::test_run()
+    template<class TEST_TYPE> \
+    void Realm_UnitTest__##name<TEST_TYPE>::test_run()
 
 
 namespace realm {
@@ -47,7 +49,8 @@ namespace test_util {
 namespace unit_test {
 
 
-template<template<class> class Test, class...> class TestCons;
+template<template<class> class Test, class...>
+class TestCons;
 
 template<template<class> class Test, class Type, class... Types>
 class TestCons<Test, Type, Types...> {
@@ -55,7 +58,8 @@ public:
     Test<Type> head;
     TestCons<Test, Types...> tail;
 };
-template<template<class> class Test> class TestCons<Test> {};
+template<template<class> class Test>
+class TestCons<Test> {};
 
 
 struct RegisterTests {

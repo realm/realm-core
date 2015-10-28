@@ -100,7 +100,8 @@ inline void BasicArray<T>::add(T value)
 }
 
 
-template<class T> inline T BasicArray<T>::get(size_t ndx) const noexcept
+template<class T>
+inline T BasicArray<T>::get(size_t ndx) const noexcept
 {
     return *(reinterpret_cast<const T*>(m_data) + ndx);
 }
@@ -180,7 +181,8 @@ void BasicArray<T>::erase(size_t ndx)
     set_header_size(m_size);
 }
 
-template<class T> void BasicArray<T>::truncate(size_t size)
+template<class T>
+void BasicArray<T>::truncate(size_t size)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(size, <=, m_size);
@@ -193,7 +195,8 @@ template<class T> void BasicArray<T>::truncate(size_t size)
     set_header_size(size);
 }
 
-template<class T> inline void BasicArray<T>::clear()
+template<class T>
+inline void BasicArray<T>::clear()
 {
     truncate(0); // Throws
 }
@@ -256,7 +259,7 @@ void BasicArray<T>::find_all(IntegerColumn* result, T value, size_t add_offset,
     for (;;) {
         first = this->find(value, first + 1, end);
         if (first == not_found)
-            break;            
+            break;
 
         Array::add_to_column(result, first + add_offset);
     }
@@ -285,7 +288,8 @@ double BasicArray<T>::sum(size_t begin, size_t end) const
 }
 #endif
 
-template<class T> template<bool find_max>
+template<class T>
+template<bool find_max>
 bool BasicArray<T>::minmax(T& result, size_t begin, size_t end) const
 {
     if (end == npos)

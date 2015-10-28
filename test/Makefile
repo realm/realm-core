@@ -10,7 +10,9 @@ benchmark-prealloc \
 benchmark-index \
 benchmark-transaction \
 benchmark-row-accessor \
-experiments
+experiments \
+fuzzy \
+
 
 RESOURCES=expect_json.json expect_string.txt
 
@@ -84,6 +86,10 @@ benchmark-row-accessor: check-norun/subdir/util
 .PHONY: benchmark-common-tasks
 benchmark-common-tasks: check-norun/subdir/util
 	@$(MAKE) -C benchmark-common-tasks check
+
+.PHONY: fuzzy
+fuzzy: check-norun/subdir/util
+	@$(MAKE) -C fuzzy check
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug

@@ -15,15 +15,13 @@ using namespace realm;
 
 namespace {
 
-const int max_width = 64;
-
-// Round up to nearest possible block length: 0, 1, 4, 8, 16, 32, 64, 128, ... We include 1 to store empty 
+// Round up to nearest possible block length: 0, 1, 2, 4, 8, 16, 32, 64, 128, 256. We include 1 to store empty
 // strings in as little space as possible, because 0 can only store nulls.
 size_t round_up(size_t size)
 {
     REALM_ASSERT(size <= 256);
 
-    if (size <= 1)
+    if (size <= 2)
         return size;
 
     size--;
@@ -53,7 +51,7 @@ void ArrayString::set_null(size_t ndx)
 void ArrayString::set(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
-    REALM_ASSERT_3(value.size(), <, size_t(max_width)); // otherwise we have to use another column type
+    REALM_ASSERT_3(value.size(), <, max_width); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -103,7 +101,7 @@ void ArrayString::set(size_t ndx, StringData value)
             // m_width == 0. Expand to new width.
             while (new_end != base) {
                 REALM_ASSERT_3(new_width, <= , max_width);
-                *--new_end = static_cast<char>(new_width); 
+                *--new_end = static_cast<char>(new_width);
                 {
                     char* new_begin = new_end - (new_width - 1);
                     std::fill(new_begin, new_end, 0); // Fill with zero bytes
@@ -112,7 +110,7 @@ void ArrayString::set(size_t ndx, StringData value)
             }
         }
 
-        m_width = new_width;
+        m_width = uint_least8_t(new_width);
     }
 
     REALM_ASSERT_3(0, <, m_width);
@@ -138,7 +136,7 @@ void ArrayString::set(size_t ndx, StringData value)
 void ArrayString::insert(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <=, m_size);
-    REALM_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
+    REALM_ASSERT(value.size() < max_width); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws

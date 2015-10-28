@@ -57,14 +57,15 @@ private:
         double max;
         double total;
         double stddev;
+        double median;
         size_t rep;
 
         double avg() const;
     };
-    
+
     struct Measurement {
         std::vector<double> samples;
-        
+
         Result finish() const;
     };
 

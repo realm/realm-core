@@ -52,7 +52,8 @@ public:
     Thread();
     ~Thread() noexcept;
 
-    template<class F> explicit Thread(F func);
+    template<class F>
+    explicit Thread(F func);
 
     /// This method is an extension of the API provided by
     /// std::thread. This method exists because proper move semantics
@@ -60,7 +61,8 @@ public:
     /// calling `start(func)` would have been equivalent to `*this =
     /// Thread(func)`. Please see std::thread::operator=() for
     /// details.
-    template<class F> void start(F func);
+    template<class F>
+    void start(F func);
 
     bool joinable() noexcept;
 
@@ -74,7 +76,8 @@ private:
 
     void start(entry_func_type, void* arg);
 
-    template<class> static void* entry_point(void*) noexcept;
+    template<class>
+    static void* entry_point(void*) noexcept;
 
     REALM_NORETURN static void create_failed(int);
     REALM_NORETURN static void join_failed(int);
@@ -188,7 +191,8 @@ public:
     /// function, or if the mutex has entered the 'unrecoverable'
     /// state due to a different thread throwing from its recover
     /// function.
-    template<class Func> void lock(Func recover_func);
+    template<class Func>
+    void lock(Func recover_func);
 
     void unlock() noexcept;
 
@@ -279,7 +283,7 @@ public:
     /// Wait for another thread to call notify() or notify_all().
     void wait(LockGuard& l) noexcept;
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = nullptr);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -311,14 +315,16 @@ inline Thread::Thread(): m_joinable(false)
 {
 }
 
-template<class F> inline Thread::Thread(F func): m_joinable(true)
+template<class F>
+inline Thread::Thread(F func): m_joinable(true)
 {
     std::unique_ptr<F> func2(new F(func)); // Throws
     start(&Thread::entry_point<F>, func2.get()); // Throws
     func2.release();
 }
 
-template<class F> inline void Thread::start(F func)
+template<class F>
+inline void Thread::start(F func)
 {
     if (m_joinable)
         std::terminate();
@@ -347,7 +353,8 @@ inline void Thread::start(entry_func_type entry_func, void* arg)
         create_failed(r); // Throws
 }
 
-template<class F> inline void* Thread::entry_point(void* cookie) noexcept
+template<class F>
+inline void* Thread::entry_point(void* cookie) noexcept
 {
     std::unique_ptr<F> func(static_cast<F*>(cookie));
     try {
@@ -469,7 +476,8 @@ inline RobustMutex::~RobustMutex() noexcept
 {
 }
 
-template<class Func> inline void RobustMutex::lock(Func recover_func)
+template<class Func>
+inline void RobustMutex::lock(Func recover_func)
 {
     bool no_thread_has_died = low_level_lock(); // Throws
     if (REALM_LIKELY(no_thread_has_died))

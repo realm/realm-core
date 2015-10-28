@@ -30,7 +30,8 @@
 
 namespace realm {
 
-template<class> class BasicRow;
+template<class>
+class BasicRow;
 
 
 /// This class is a "mixin" and contains the common set of functions for several
@@ -59,7 +60,8 @@ template<class> class BasicRow;
 ///
 /// \sa Table
 /// \sa BasicRow
-template<class T, class R> class RowFuncs {
+template<class T, class R>
+class RowFuncs {
 public:
     typedef T table_type;
 
@@ -103,6 +105,9 @@ public:
     void set_mixed(size_t col_ndx, Mixed value);
     void set_mixed_subtable(size_t col_ndx, const Table* value);
     void set_null(size_t col_ndx);
+
+    void insert_substring(size_t col_ndx, size_t pos, StringData);
+    void remove_substring(size_t col_ndx, size_t pos, size_t size);
 
     //@{
     /// Note that these operations will cause the row accessor to be detached.
@@ -173,10 +178,12 @@ private:
 /// row insertions and row removals like real row accessors are.
 ///
 /// \sa BasicRow
-template<class T> class BasicRowExpr:
+template<class T>
+class BasicRowExpr:
         public RowFuncs<T, BasicRowExpr<T>> {
 public:
-    template<class U> BasicRowExpr(const BasicRowExpr<U>&) noexcept;
+    template<class U>
+    BasicRowExpr(const BasicRowExpr<U>&) noexcept;
 
 private:
     T* m_table; // nullptr if detached.
@@ -194,11 +201,13 @@ private:
 
     // Make m_table and m_col_ndx accessible from BasicRowExpr(const
     // BasicRowExpr<U>&) for any U.
-    template<class> friend class BasicRowExpr;
+    template<class>
+    friend class BasicRowExpr;
 
     // Make m_table and m_col_ndx accessible from
     // BasicRow::BaicRow(BasicRowExpr<U>) for any U.
-    template<class> friend class BasicRow;
+    template<class>
+    friend class BasicRow;
 
     // Make BasicRowExpr(T*, size_t) accessible from Table.
     friend class Table;
@@ -259,17 +268,27 @@ private:
 ///     size_t i = row.get_index(); // The current row index
 ///
 /// \sa RowFuncs
-template<class T> class BasicRow:
+template<class T>
+class BasicRow:
         private RowBase,
         public RowFuncs<T, BasicRow<T>> {
 public:
     BasicRow() noexcept;
 
-    template<class U> BasicRow(BasicRowExpr<U>) noexcept;
+    template<class U>
+    BasicRow(BasicRowExpr<U>) noexcept;
+
     BasicRow(const BasicRow<T>&) noexcept;
-    template<class U> BasicRow(const BasicRow<U>&) noexcept;
-    template<class U> BasicRow& operator=(BasicRowExpr<U>) noexcept;
-    template<class U> BasicRow& operator=(BasicRow<U>) noexcept;
+
+    template<class U>
+    BasicRow(const BasicRow<U>&) noexcept;
+
+    template<class U>
+    BasicRow& operator=(BasicRowExpr<U>) noexcept;
+
+    template<class U>
+    BasicRow& operator=(BasicRow<U>) noexcept;
+
     BasicRow& operator=(const BasicRow<T>&) noexcept;
 
     ~BasicRow() noexcept;
@@ -284,7 +303,8 @@ private:
 
     // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
     // for any U.
-    template<class> friend class BasicRow;
+    template<class>
+    friend class BasicRow;
 
     std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<Handover_patch>& patch) const
     {
@@ -397,7 +417,8 @@ inline bool RowFuncs<T,R>::is_null(size_t col_ndx) const noexcept
     return table()->is_null(col_ndx, row_ndx());
 }
 
-template<class T, class R> inline typename RowFuncs<T,R>::ConstLinkViewRef
+template<class T, class R>
+inline typename RowFuncs<T,R>::ConstLinkViewRef
 RowFuncs<T,R>::get_linklist(size_t col_ndx) const
 {
     return table()->get_linklist(col_ndx, row_ndx()); // Throws
@@ -511,17 +532,32 @@ inline void RowFuncs<T,R>::set_null(size_t col_ndx)
     table()->set_null(col_ndx, row_ndx()); // Throws
 }
 
-template<class T, class R> inline void RowFuncs<T,R>::remove()
+template<class T, class R>
+inline void RowFuncs<T,R>::insert_substring(size_t col_ndx, size_t pos, StringData value)
+{
+    table()->insert_substring(col_ndx, row_ndx(), pos, value); // Throws
+}
+
+template<class T, class R>
+inline void RowFuncs<T,R>::remove_substring(size_t col_ndx, size_t pos, size_t size)
+{
+    table()->remove_substring(col_ndx, row_ndx(), pos, size); // Throws
+}
+
+template<class T, class R>
+inline void RowFuncs<T,R>::remove()
 {
     table()->remove(row_ndx()); // Throws
 }
 
-template<class T, class R> inline void RowFuncs<T,R>::move_last_over()
+template<class T, class R>
+inline void RowFuncs<T,R>::move_last_over()
 {
     table()->move_last_over(row_ndx()); // Throws
 }
 
-template<class T, class R> inline size_t
+template<class T, class R>
+inline size_t
 RowFuncs<T,R>::get_backlink_count(const Table& src_table, size_t src_col_ndx) const
     noexcept
 {
@@ -559,53 +595,63 @@ inline size_t RowFuncs<T,R>::get_column_index(StringData name) const noexcept
     return table()->get_column_index(name);
 }
 
-template<class T, class R> inline bool RowFuncs<T,R>::is_attached() const noexcept
+template<class T, class R>
+inline bool RowFuncs<T,R>::is_attached() const noexcept
 {
     return static_cast<const R*>(this)->impl_get_table();
 }
 
-template<class T, class R> inline void RowFuncs<T,R>::detach() noexcept
+template<class T, class R>
+inline void RowFuncs<T,R>::detach() noexcept
 {
     static_cast<R*>(this)->impl_detach();
 }
 
-template<class T, class R> inline const T* RowFuncs<T,R>::get_table() const noexcept
+template<class T, class R>
+inline const T* RowFuncs<T,R>::get_table() const noexcept
 {
     return table();
 }
 
-template<class T, class R> inline T* RowFuncs<T,R>::get_table() noexcept
+template<class T, class R>
+inline T* RowFuncs<T,R>::get_table() noexcept
 {
     return table();
 }
 
-template<class T, class R> inline size_t RowFuncs<T,R>::get_index() const noexcept
+template<class T, class R>
+inline size_t RowFuncs<T,R>::get_index() const noexcept
 {
     return row_ndx();
 }
 
-template<class T, class R> inline RowFuncs<T,R>::operator bool() const noexcept
+template<class T, class R>
+inline RowFuncs<T,R>::operator bool() const noexcept
 {
     return is_attached();
 }
 
-template<class T, class R> inline const T* RowFuncs<T,R>::table() const noexcept
+template<class T, class R>
+inline const T* RowFuncs<T,R>::table() const noexcept
 {
     return static_cast<const R*>(this)->impl_get_table();
 }
 
-template<class T, class R> inline T* RowFuncs<T,R>::table() noexcept
+template<class T, class R>
+inline T* RowFuncs<T,R>::table() noexcept
 {
     return static_cast<R*>(this)->impl_get_table();
 }
 
-template<class T, class R> inline size_t RowFuncs<T,R>::row_ndx() const noexcept
+template<class T, class R>
+inline size_t RowFuncs<T,R>::row_ndx() const noexcept
 {
     return static_cast<const R*>(this)->impl_get_row_ndx();
 }
 
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) noexcept:
     m_table(expr.m_table),
     m_row_ndx(expr.m_row_ndx)
@@ -619,45 +665,55 @@ inline BasicRowExpr<T>::BasicRowExpr(T* table, size_t row_ndx) noexcept:
 {
 }
 
-template<class T> inline T* BasicRowExpr<T>::impl_get_table() const noexcept
+template<class T>
+inline T* BasicRowExpr<T>::impl_get_table() const noexcept
 {
     return m_table;
 }
 
-template<class T> inline size_t BasicRowExpr<T>::impl_get_row_ndx() const noexcept
+template<class T>
+inline size_t BasicRowExpr<T>::impl_get_row_ndx() const noexcept
 {
     return m_row_ndx;
 }
 
-template<class T> inline void BasicRowExpr<T>::impl_detach() noexcept
+template<class T>
+inline void BasicRowExpr<T>::impl_detach() noexcept
 {
     m_table = nullptr;
 }
 
 
-template<class T> inline BasicRow<T>::BasicRow() noexcept
+template<class T>
+inline BasicRow<T>::BasicRow() noexcept
 {
 }
 
-template<class T> inline BasicRow<T>::BasicRow(const BasicRow<T>& row) noexcept:
+template<class T>
+inline BasicRow<T>::BasicRow(const BasicRow<T>& row) noexcept:
     RowBase(row)
 {
     attach(const_cast<Table*>(row.m_table.get()), row.m_row_ndx);
 }
 
-template<class T> template<class U> inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr) noexcept
+template<class T>
+template<class U>
+inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr) noexcept
 {
     T* table = expr.m_table; // Check that pointer types are compatible
     attach(const_cast<Table*>(table), expr.m_row_ndx);
 }
 
-template<class T> template<class U> inline BasicRow<T>::BasicRow(const BasicRow<U>& row) noexcept
+template<class T>
+template<class U>
+inline BasicRow<T>::BasicRow(const BasicRow<U>& row) noexcept
 {
     T* table = row.m_table.get(); // Check that pointer types are compatible
     attach(const_cast<Table*>(table), row.m_row_ndx);
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr) noexcept
 {
     T* table = expr.m_table; // Check that pointer types are compatible
@@ -665,7 +721,8 @@ inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr) noexcept
     return *this;
 }
 
-template<class T> template<class U>
+template<class T>
+template<class U>
 inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row) noexcept
 {
     T* table = row.m_table.get(); // Check that pointer types are compatible
@@ -680,17 +737,20 @@ inline BasicRow<T>& BasicRow<T>::operator=(const BasicRow<T>& row) noexcept
     return *this;
 }
 
-template<class T> inline BasicRow<T>::~BasicRow() noexcept
+template<class T>
+inline BasicRow<T>::~BasicRow() noexcept
 {
     RowBase::impl_detach();
 }
 
-template<class T> inline T* BasicRow<T>::impl_get_table() const noexcept
+template<class T>
+inline T* BasicRow<T>::impl_get_table() const noexcept
 {
     return m_table.get();
 }
 
-template<class T> inline size_t BasicRow<T>::impl_get_row_ndx() const noexcept
+template<class T>
+inline size_t BasicRow<T>::impl_get_row_ndx() const noexcept
 {
     return m_row_ndx;
 }

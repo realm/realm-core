@@ -52,6 +52,7 @@ public:
     void erase(size_t row_ndx);
     void erase(size_t row_ndx, bool is_last);
     void move_last_over(size_t row_ndx);
+    void swap_rows(size_t row_ndx_1, size_t row_ndx_2) override;
     void clear();
     size_t find_first(BinaryData value) const;
 

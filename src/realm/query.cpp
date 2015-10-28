@@ -12,7 +12,7 @@
 
 using namespace realm;
 
-Query::Query() : m_view(nullptr), m_source_table_view(0), m_owns_source_table_view(false)
+Query::Query() : m_view(nullptr), m_source_table_view(nullptr), m_owns_source_table_view(false)
 {
     create();
 }
@@ -27,7 +27,7 @@ Query::Query(Table& table, TableViewBase* tv)
 Query::Query(const Table& table, const LinkViewRef& lv):
     m_table((const_cast<Table&>(table)).get_table_ref()),
     m_view(lv.get()),
-    m_source_link_view(lv), m_source_table_view(0), m_owns_source_table_view(false)
+    m_source_link_view(lv), m_source_table_view(nullptr), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
     create();
@@ -93,7 +93,7 @@ Query::~Query() noexcept
 }
 
 Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(0)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
 {
     patch.m_has_table = bool(source.m_table);
     if (patch.m_has_table) {
@@ -105,7 +105,7 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
         m_owns_source_table_view = true;
     }
     else { 
-        patch.table_view_data = 0;
+        patch.table_view_data = nullptr;
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
@@ -115,7 +115,7 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
 }
 
 Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(0)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
 {
     patch.m_has_table = bool(source.m_table);
     if (patch.m_has_table) {
@@ -127,7 +127,7 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
         m_owns_source_table_view = true;
     }
     else {
-        patch.table_view_data = 0;
+        patch.table_view_data = nullptr;
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
@@ -216,14 +216,14 @@ struct MakeConditionNode {
     // Regardless of nullability, it throws a LogicError if trying to query for a value of type T on 
     // a column of a different type.
 
-    template <class Node>
+    template<class Node>
     static typename std::enable_if<Node::special_null_node, std::unique_ptr<ParentNode>>::type
     make(size_t col_ndx, typename Node::TConditionValue value)
     {
         return std::unique_ptr<ParentNode>(new Node(std::move(value), col_ndx));
     }
 
-    template <class Node, class T>
+    template<class Node, class T>
     static typename std::enable_if<
         Node::special_null_node
         && !std::is_same<T, typename Node::TConditionValue>::value
@@ -234,7 +234,7 @@ struct MakeConditionNode {
         throw LogicError{LogicError::type_mismatch};
     }
 
-    template <class Node, class T>
+    template<class Node, class T>
     static typename std::enable_if<
         !Node::special_null_node
         && std::is_same<T, null>::value
@@ -245,7 +245,7 @@ struct MakeConditionNode {
         return std::unique_ptr<ParentNode>(new Node(value, col_ndx));
     }
 
-    template <class Node, class T>
+    template<class Node, class T>
     static typename std::enable_if<
         !Node::special_null_node
         && std::is_same<T, typename Node::TConditionValue>::value
@@ -255,7 +255,7 @@ struct MakeConditionNode {
         return std::unique_ptr<ParentNode>(new Node(value, col_ndx));
     }
 
-    template <class Node, class T>
+    template<class Node, class T>
     static typename std::enable_if<
         !Node::special_null_node
         && !std::is_same<T, null>::value
@@ -267,7 +267,7 @@ struct MakeConditionNode {
     }
 };
 
-template <class Cond, class T>
+template<class Cond, class T>
 std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, size_t column_ndx, T value)
 {
     DataType type = descriptor.get_column_type(column_ndx);
@@ -313,7 +313,7 @@ void Query::fetch_descriptor()
 }
 
 
-template <typename TConditionFunction, class T>
+template<typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
     REALM_ASSERT_DEBUG(m_current_descriptor);
@@ -323,7 +323,8 @@ Query& Query::add_condition(size_t column_ndx, T value)
 }
 
 
-template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2));
     add_node(std::move(node));
@@ -331,31 +332,36 @@ template <class ColumnType> Query& Query::equal(size_t column_ndx1, size_t colum
 }
 
 // Two column methods, any type
-template <class ColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::less(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
+template<class ColumnType>
+Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
@@ -685,7 +691,7 @@ size_t Query::peek_tableview(size_t tv_index) const
     return tablerow;
 }
 
-template <Action action, typename T, typename R, class ColType>
+template<Action action, typename T, typename R, class ColType>
     R Query::aggregate(R(ColType::*aggregateMethod)(size_t start, size_t end, size_t limit,
                                                     size_t* return_ndx) const,
                        size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
@@ -887,7 +893,7 @@ DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t 
 
 // Average
 
-template <typename T, bool Nullable>
+template<typename T, bool Nullable>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if(limit == 0 || m_table->is_degenerate()) {

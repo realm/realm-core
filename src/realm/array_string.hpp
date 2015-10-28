@@ -25,7 +25,7 @@
 namespace realm {
 
 /*
-ArrayString stores strings as a concecutive list of fixed-length blocks of m_width bytes. The 
+ArrayString stores strings as a concecutive list of fixed-length blocks of m_width bytes. The
 longest string it can store is (m_width - 1) bytes before it needs to expand.
 
 An example of the format for m_width = 4 is following sequence of bytes, where x is payload:
@@ -42,6 +42,8 @@ New: StringData is null() if-and-only-if StringData::data() == 0.
 
 class ArrayString: public Array {
 public:
+    static const size_t max_width = 64;
+
     typedef StringData value_type;
     // Constructor defaults to non-nullable because we use non-nullable ArrayString so many places internally in core
     // (data which isn't user payload) where null isn't needed.
