@@ -1148,7 +1148,7 @@ protected:
         Getter getter;
         ChunkGetter chunk_getter;
         Setter setter;
-        Finder finder[cond_Count]; // one for each COND_XXX enum
+        Finder finder[cond_VTABLE_FINDER_COUNT]; // one for each active function pointer
     };
     template<size_t w>
     struct VTableForWidth;

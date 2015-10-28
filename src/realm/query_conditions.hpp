@@ -28,7 +28,8 @@
 
 namespace realm {
 
-enum {cond_Equal, cond_NotEqual, cond_Greater, cond_Less, cond_None, cond_Count, cond_LeftNotNull };
+// Array::VTable only uses the first 4 conditions (enums) in an array of function pointers
+enum {cond_Equal, cond_NotEqual, cond_Greater, cond_Less, cond_VTABLE_FINDER_COUNT, cond_None, cond_LeftNotNull };
 
 // Quick hack to make "Queries with Integer null columns" able to compile in Visual Studio 2015 which doesn't full support sfinae
 // (real cause hasn't been investigated yet, cannot exclude that we don't obey c++11 standard)
