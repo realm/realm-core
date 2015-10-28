@@ -2725,21 +2725,21 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
         CHECK_EQUAL(row_1.get_index(), 3);
         CHECK_EQUAL(row_4.get_index(), 0);
 
-        CHECK_EQUAL(regular_0->get_int(0, 0), 14);
-        CHECK_EQUAL(regular_1->get_int(0, 0), 13);
-        CHECK_EQUAL(regular_4->get_int(0, 0), 10);
+        CHECK_EQUAL(regular_0->get_int(0, 0), 10);
+        CHECK_EQUAL(regular_1->get_int(0, 0), 11);
+        CHECK_EQUAL(regular_4->get_int(0, 0), 14);
 
-        CHECK_EQUAL(regular_0, table->get_subtable(0, 0));
-        CHECK_EQUAL(regular_1, table->get_subtable(0, 1));
-        CHECK_EQUAL(regular_4, table->get_subtable(0, 4));
+        CHECK_EQUAL(regular_0, table->get_subtable(0, 4));
+        CHECK_EQUAL(regular_1, table->get_subtable(0, 3));
+        CHECK_EQUAL(regular_4, table->get_subtable(0, 0));
 
-        CHECK_EQUAL(mixed_0->get_int(0, 0), 24);
-        CHECK_EQUAL(mixed_1->get_int(0, 0), 23);
-        CHECK_EQUAL(mixed_4->get_int(0, 0), 20);
+        CHECK_EQUAL(mixed_0->get_int(0, 0), 20);
+        CHECK_EQUAL(mixed_1->get_int(0, 0), 21);
+        CHECK_EQUAL(mixed_4->get_int(0, 0), 24);
 
-        CHECK_EQUAL(mixed_0, table->get_subtable(1, 0));
-        CHECK_EQUAL(mixed_1, table->get_subtable(1, 1));
-        CHECK_EQUAL(mixed_4, table->get_subtable(1, 4));
+        CHECK_EQUAL(mixed_0, table->get_subtable(1, 4));
+        CHECK_EQUAL(mixed_1, table->get_subtable(1, 3));
+        CHECK_EQUAL(mixed_4, table->get_subtable(1, 0));
     }
 }
 
