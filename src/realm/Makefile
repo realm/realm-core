@@ -23,6 +23,7 @@ util/network.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/platform_specific_condvar.hpp \
+util/file_mapper.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
