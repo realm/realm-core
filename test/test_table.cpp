@@ -132,8 +132,9 @@ TEST(Table_Null)
         TableRef table = group.add_table("test");
 
         table->add_column(type_String, "name");
-        table->add_empty_row();
+        CHECK(!table->is_nullable(0));
 
+        table->add_empty_row();
         CHECK(!table->get_string(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
@@ -145,6 +146,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("table");
         table->add_column(type_Int, "name", true /*nullable*/);
+        CHECK(table->is_nullable(0));
         table->add_empty_row();
         CHECK(table->is_null(0, 0));
     }
@@ -154,6 +156,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
         table->add_column(type_Int, "name");
+        CHECK(!table->is_nullable(0));
         table->add_empty_row();
         CHECK(!table->is_null(0, 0));
         CHECK_EQUAL(0, table->get_int(0, 0));
@@ -168,8 +171,9 @@ TEST(Table_Null)
         TableRef table = group.add_table("test");
 
         table->add_column(type_Binary, "name", true /*nullable*/);
-        table->add_empty_row();
+        CHECK(table->is_nullable(0));
 
+        table->add_empty_row();
         CHECK(table->get_binary(0, 0).is_null());
     }
 
@@ -179,12 +183,37 @@ TEST(Table_Null)
         TableRef table = group.add_table("test");
 
         table->add_column(type_Binary, "name");
-        table->add_empty_row();
+        CHECK(!table->is_nullable(0));
 
+        table->add_empty_row();
         CHECK(!table->get_binary(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
         CHECK_THROW_ANY(table->set_binary(0, 0, BinaryData()));
+    }
+
+    {
+        // Check that link columns are nullable.
+        Group group;
+        TableRef target = group.add_table("target");
+        TableRef table  = group.add_table("table");
+
+        target->add_column(type_Int, "int");
+        table->add_column_link(type_Link, "link", *target);
+        CHECK(table->is_nullable(0));
+        CHECK(!target->is_nullable(0));
+    }
+
+    {
+        // Check that linklist columns are not nullable.
+        Group group;
+        TableRef target = group.add_table("target");
+        TableRef table  = group.add_table("table");
+
+        target->add_column(type_Int, "int");
+        table->add_column_link(type_LinkList, "link", *target);
+        CHECK(!table->is_nullable(0));
+        CHECK(!target->is_nullable(0));
     }
 
 }
@@ -3503,7 +3532,7 @@ TEST(Table_Aggregates2)
 TEST(Table_Aggregates3)
 {
     bool nullable = false;
-    
+
     for (int i = 0; i < 2; i++) {
         // First we test everything with columns being nullable and with each column having at least 1 null
         // Then we test everything with non-nullable columns where the null entries will instead be just
@@ -6513,7 +6542,7 @@ TEST(Table_AllocatorCapacityBug)
                 t.add_empty_row();
             }
             else if (t.size() > 0 && t.size() < 5) {
-                // Set only if there are no more than 4 rows, else it takes up too much space on devices (4 * 16 MB 
+                // Set only if there are no more than 4 rows, else it takes up too much space on devices (4 * 16 MB
                 // worst case now)
                 size_t row = (j * 123456789 + 123456789) % t.size();
                 size_t len = (j * 123456789 + 123456789) % 16000000;
