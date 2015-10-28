@@ -28,7 +28,7 @@
 
 namespace realm {
 
-enum {cond_Equal, cond_NotEqual, cond_Greater, cond_GreaterEqual, cond_Less, cond_LessEqual, cond_None, cond_Count, cond_LeftNotNull };
+enum {cond_Equal, cond_NotEqual, cond_Greater, cond_Less, cond_None, cond_Count, cond_LeftNotNull };
 
 // Quick hack to make "Queries with Integer null columns" able to compile in Visual Studio 2015 which doesn't full support sfinae
 // (real cause hasn't been investigated yet, cannot exclude that we don't obey c++11 standard)
@@ -342,7 +342,7 @@ struct LessEqual : public HackClass {
     }
     template<class A, class B, class C, class D>
     bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
-    static const int condition = cond_LessEqual;
+    static const int condition = -1;
 };
 
 struct GreaterEqual : public HackClass {
@@ -356,7 +356,7 @@ struct GreaterEqual : public HackClass {
     }
     template<class A, class B, class C, class D>
     bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
-    static const int condition = cond_GreaterEqual;
+    static const int condition = -1;
 };
 
 
