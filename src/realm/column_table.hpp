@@ -53,7 +53,7 @@ public:
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;
     void adj_acc_clear_root_table() noexcept override;
-    void adj_acc_swap_rows(std::size_t, std::size_t) noexcept override;
+    void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
@@ -296,7 +296,7 @@ inline void SubtableColumnBase::clear(size_t, bool)
     get_root_array()->set_type(Array::type_HasRefs);
 }
 
-inline void SubtableColumnBase::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+inline void SubtableColumnBase::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     IntegerColumn::swap_rows(row_ndx_1, row_ndx_2); // Throws
 

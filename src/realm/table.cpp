@@ -2360,7 +2360,7 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
     bump_version();
 }
 
-void Table::swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2)
+void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);

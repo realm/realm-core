@@ -392,7 +392,7 @@ public:
     void remove_last();
     void move_last_over(size_t row_ndx);
     void clear();
-    void swap_rows(std::size_t row_ndx_1, std::size_t row_ndx_2);
+    void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
 
     //@}
 
