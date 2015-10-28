@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed crash in find_all()
 
 ### API breaking changes:
 
