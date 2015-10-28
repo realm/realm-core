@@ -433,8 +433,9 @@ void File::write(const char* data, size_t size)
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         // FIXME: Expect this to fail du to assert asking for a read first!
-        realm::util::encryption_write_barrier(map, pos, size);
+        realm::util::encryption_read_barrier(map, pos, size);
         memcpy(map.get_addr() + pos, data, size);
+        realm::util::encryption_write_barrier(map, pos, size);
         lseek(m_fd, size, SEEK_CUR);
         return;
     }
