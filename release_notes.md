@@ -1,12 +1,8 @@
-# NEXT RELEASE
+# 0.94.4 Release notes
 
 ### Bugfixes:
 
 * Fixed crash in find_all()
-
-### API breaking changes:
-
-* Lorem ipsum.
 
 ### Enhancements:
 
