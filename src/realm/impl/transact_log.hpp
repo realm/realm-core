@@ -441,6 +441,7 @@ private:
     T read_int();
 
     void read_bytes(char* data, size_t size);
+    BinaryData read_buffer(util::StringBuffer&, size_t size);
 
     float read_float();
     double read_double();
@@ -1721,8 +1722,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             int type = read_int<int>(); // Throws
             if (!is_valid_data_type(type))
                 parser_error();
+            if (REALM_UNLIKELY(type == type_Link || type == type_LinkList))
+                parser_error();
             StringData name = read_string(m_string_buffer); // Throws
             bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
+            if (REALM_UNLIKELY(nullable && (type == type_Table || type == type_Mixed))) {
+                // Nullability not supported for Table and Mixed columns.
+                parser_error();
+            }
             if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
                 parser_error();
             return;
@@ -1731,6 +1738,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t col_ndx = read_int<size_t>(); // Throws
             int type = read_int<int>(); // Throws
             if (!is_valid_data_type(type))
+                parser_error();
+            if (REALM_UNLIKELY(type != type_Link && type != type_LinkList))
                 parser_error();
             size_t link_target_table_ndx = read_int<size_t>(); // Throws
             size_t backlink_col_ndx = read_int<size_t>(); // Throws
@@ -1881,6 +1890,21 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
 }
 
 
+inline BinaryData TransactLogParser::read_buffer(util::StringBuffer& buf, size_t size)
+{
+    const size_t avail = m_input_end - m_input_begin;
+    if (avail >= size) {
+        m_input_begin += size;
+        return BinaryData(m_input_begin - size, size);
+    }
+
+    buf.clear();
+    buf.resize(size); // Throws
+    read_bytes(buf.data(), size);
+    return BinaryData(buf.data(), size);
+}
+
+
 inline float TransactLogParser::read_float()
 {
     static_assert(std::numeric_limits<float>::is_iec559 &&
@@ -1907,23 +1931,22 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 {
     size_t size = read_int<size_t>(); // Throws
 
-    const size_t avail = m_input_end - m_input_begin;
-    if (avail >= size) {
-        m_input_begin += size;
-        return StringData(m_input_begin - size, size);
-    }
+    if (size > Table::max_string_size)
+        parser_error();
 
-    buf.clear();
-    buf.resize(size); // Throws
-    read_bytes(buf.data(), size);
-    return StringData(buf.data(), size);
+    BinaryData buffer = read_buffer(buf, size);
+    return StringData{buffer.data(), size};
 }
 
 
 inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
 {
-    StringData str = read_string(buf); // Throws;
-    return BinaryData(str.data(), str.size());
+    size_t size = read_int<size_t>(); // Throws
+
+    if (size > Table::max_binary_size)
+        parser_error();
+
+    return read_buffer(buf, size);
 }
 
 
@@ -1978,7 +2001,6 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
         case type_Link:
         case type_LinkList:
             // FIXME: Need to handle new link types here
-            REALM_ASSERT(false);
             break;
     }
     throw BadTransactLog();
