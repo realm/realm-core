@@ -354,47 +354,39 @@ char* EncryptedFileMapping::page_addr(size_t i) const noexcept
     return reinterpret_cast<char*>((m_first_page + i) * m_page_size);
 }
 
-void EncryptedFileMapping::mark_unreadable(size_t i) noexcept
+void EncryptedFileMapping::mark_outdated(size_t i) noexcept
 {
     if (i >= m_page_count)
         return;
 
+    // Is this ever needed? (perhaps for the commitlogs?)
+    // the database itself has only single-threaded changes,
+    // and the mapping used for writes is removed once the
+    // writes are done.
     if (m_dirty_pages[i])
         flush();
 
-    if (m_read_pages[i]) {
-        m_read_pages[i] = false;
+    if (m_up_to_date_pages[i]) {
+        m_up_to_date_pages[i] = false;
     }
 }
 
-void EncryptedFileMapping::mark_readable(size_t i) noexcept
+void EncryptedFileMapping::mark_up_to_date(size_t i) noexcept
 {
-    if (i >= m_read_pages.size() || (m_read_pages[i] && !m_write_pages[i]))
+    if (i >= m_up_to_date_pages.size() || m_up_to_date_pages[i])
         return;
 
-    m_read_pages[i] = true;
-    m_write_pages[i] = false;
+    m_up_to_date_pages[i] = true;
 }
 
-void EncryptedFileMapping::mark_unwritable(size_t i) noexcept
-{
-    if (i >= m_write_pages.size() || !m_write_pages[i])
-        return;
-
-    REALM_ASSERT(m_read_pages[i]);
-    m_write_pages[i] = false;
-    // leave dirty bit set
-}
-
-bool EncryptedFileMapping::copy_read_page(size_t page) noexcept
+bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
 {
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m == this || page >= m->m_page_count)
             continue;
 
-        m->mark_unwritable(page);
-        if (m->m_read_pages[page]) {
+        if (m->m_up_to_date_pages[page]) {
             memcpy(page_addr(page), m->page_addr(page), m_page_size);
             return true;
         }
@@ -402,33 +394,33 @@ bool EncryptedFileMapping::copy_read_page(size_t page) noexcept
     return false;
 }
 
-void EncryptedFileMapping::read_page(size_t i) noexcept
+void EncryptedFileMapping::refresh_page(size_t i) noexcept
 {
     char* addr = page_addr(i);
 
-    if (!copy_read_page(i))
+    if (!copy_up_to_date_page(i))
         m_file.cryptor.read(m_file.fd, i * m_page_size, addr, m_page_size);
 
-    m_read_pages[i] = true;
-    m_write_pages[i] = false;
+    m_up_to_date_pages[i] = true;
 }
 
 void EncryptedFileMapping::write_page(size_t page) noexcept
 {
+    // Go through all other mappings of this file and mark
+    // the page outdated in those mappings:
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m != this)
-            m->mark_unreadable(page);
+            m->mark_outdated(page);
     }
 
-    m_write_pages[page] = true;
     m_dirty_pages[page] = true;
 }
 
 void EncryptedFileMapping::validate_page(size_t page) noexcept
 {
 #ifdef REALM_DEBUG
-    if (!m_read_pages[page])
+    if (!m_up_to_date_pages[page])
         return;
 
     if (!m_file.cryptor.read(m_file.fd, page * m_page_size,
@@ -464,14 +456,7 @@ void EncryptedFileMapping::validate() noexcept
 
 void EncryptedFileMapping::flush() noexcept
 {
-    size_t start = 0;
     for (size_t i = 0; i < m_page_count; ++i) {
-        if (!m_read_pages[i]) {
-            start = i + 1;
-        }
-        else if (start == i && !m_write_pages[i])
-            start = i + 1;
-
         if (!m_dirty_pages[i]) {
             validate_page(i);
             continue;
@@ -479,7 +464,6 @@ void EncryptedFileMapping::flush() noexcept
 
         m_file.cryptor.write(m_file.fd, i * m_page_size, page_addr(i), m_page_size);
         m_dirty_pages[i] = false;
-        m_write_pages[i] = false;
     }
 
     validate();
@@ -499,22 +483,6 @@ void EncryptedFileMapping::sync() noexcept
     // for a discussion of this related to core data.
 }
 
-void EncryptedFileMapping::handle_access(void* addr) noexcept
-{
-    size_t accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
-
-    size_t idx = accessed_page - m_first_page;
-    if (!m_read_pages[idx]) {
-        read_page(idx);
-    }
-    else if (m_access == File::access_ReadWrite) {
-        write_page(idx);
-    }
-    else {
-        REALM_TERMINATE("Attempt to write to read-only memory");
-    }
-}
-
 void EncryptedFileMapping::read_barrier(const void* addr, size_t size) noexcept
 {
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
@@ -524,8 +492,8 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size) noexcept
     size_t last_idx = last_accessed_page - m_first_page;
 
     for (size_t idx = first_idx; idx <= last_idx; ++idx) {
-        if (!m_read_pages[idx])
-            read_page(idx);
+        if (!m_up_to_date_pages[idx])
+            refresh_page(idx);
     }
 }
 
@@ -543,7 +511,7 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
     for (size_t idx = first_idx; idx <= last_idx; ++idx) {
         // Pages written must earlier on have been decrypted
         // by a call to read_barrier().
-        REALM_ASSERT(m_read_pages[idx]);
+        REALM_ASSERT(m_up_to_date_pages[idx]);
         write_page(idx);
     }
 }
@@ -565,12 +533,10 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_first_page = (reinterpret_cast<uintptr_t>(m_addr) - m_file_offset) / m_page_size;
     m_page_count = (new_size + m_file_offset) / m_page_size;
 
-    m_read_pages.clear();
-    m_write_pages.clear();
+    m_up_to_date_pages.clear();
     m_dirty_pages.clear();
 
-    m_read_pages.resize(m_page_count, false);
-    m_write_pages.resize(m_page_count, false);
+    m_up_to_date_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
 
 // FIXME: Check if we still need to read the first block every time.
@@ -578,14 +544,14 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 #ifdef REALM_DEBUG_WITH_MPROTECT
         mprotect(page_addr(0), m_page_size, PROT_READ | PROT_WRITE);
 #endif
-        if (!copy_read_page(0)) {
+        if (!copy_up_to_date_page(0)) {
             m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
 #ifdef REALM_DEBUG_WITH_MPROTECT
         mprotect(page_addr(0), m_page_size,
                 m_access == File::access_ReadOnly ? PROT_READ : PROT_READ | PROT_WRITE);
 #endif
         }
-        mark_readable(0);
+        mark_up_to_date(0);
     }
 }
 

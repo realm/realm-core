@@ -106,10 +106,6 @@ public:
     // Sync this file to disk
     void sync() noexcept;
 
-    // Handle a SEGV or BUS at the given address, which must be within this
-    // object's mapping
-    void handle_access(void* addr) noexcept;
-
     // Make sure that memory in the specified range is synchronized with any
     // changes made globally visible through call to write_barrier
     void read_barrier(const void* addr, size_t size) noexcept;
@@ -134,8 +130,7 @@ private:
     uintptr_t m_first_page;
     size_t m_page_count = 0;
 
-    std::vector<bool> m_read_pages;
-    std::vector<bool> m_write_pages;
+    std::vector<bool> m_up_to_date_pages;
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;
@@ -146,12 +141,12 @@ private:
 
     char* page_addr(size_t i) const noexcept;
 
-    void mark_unreadable(size_t i) noexcept;
-    void mark_readable(size_t i) noexcept;
+    void mark_outdated(size_t i) noexcept;
+    void mark_up_to_date(size_t i) noexcept;
     void mark_unwritable(size_t i) noexcept;
 
-    bool copy_read_page(size_t i) noexcept;
-    void read_page(size_t i) noexcept;
+    bool copy_up_to_date_page(size_t i) noexcept;
+    void refresh_page(size_t i) noexcept;
     void write_page(size_t i) noexcept;
 
     void validate_page(size_t i) noexcept;
