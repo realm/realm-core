@@ -30,9 +30,6 @@
 namespace realm {
 
 /// Specialize BpTree to implement column types.
-// FIXME: Instead of the Nullable parameter, templates could specialize on an
-// "Optional<T>" type instead. It would also remove the need for separate
-// is_null/set_null methods.
 template<class T>
 class BpTree;
 
