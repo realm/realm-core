@@ -219,7 +219,7 @@ struct TestingReferenceBinding {
 };
 }
 
-TEST_IF(Optional_ReferenceBinding, false)
+TEST(Optional_ReferenceBinding)
 {
     const int& iref = global_i;
     CHECK_EQUAL(&iref, &global_i);
