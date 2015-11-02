@@ -172,27 +172,6 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 
 // Aggregates ----------------------------------------------------
 
-namespace {
-
-template<class T, class U>
-bool unpack(const T& value, U& out_unpacked)
-{
-    out_unpacked = value;
-    return true;
-}
-
-template<class T, class U>
-bool unpack(const util::Optional<T>& value, U& out_unpacked)
-{
-    if (value) {
-        out_unpacked = static_cast<T>(*value);
-        return true;
-    }
-    return false;
-}
-
-}
-
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
 template<int function, typename T, typename R, class ColType>
