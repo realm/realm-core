@@ -2569,7 +2569,7 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx);
+        return column.get(ndx).value_or(0);
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -2607,7 +2607,7 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx) != 0;
+        return column.get(ndx).value_or(0) != 0;
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -2645,7 +2645,7 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx);
+        return column.get(ndx).value_or(0);
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -3385,10 +3385,32 @@ size_t Table::do_find_pkey_string(StringData value) const
 }
 
 
-template<class T, bool Nullable>
+namespace {
+
+util::Optional<int64_t> upgrade_optional_int(util::Optional<bool> value)
+{
+    return value ? some<int64_t>(*value ? 1 : 0) : none;
+}
+
+util::Optional<int64_t> upgrade_optional_int(util::Optional<DateTime> value)
+{
+    return value ? some<int64_t>(value->get_datetime()) : none;
+}
+
+template<class T>
+T upgrade_optional_int(T value)
+{
+    // No conversion
+    return value;
+}
+
+}
+
+
+template<class T>
 size_t Table::find_first(size_t col_ndx, T value) const
 {
-    using type_traits = ColumnTypeTraits<T, Nullable>;
+    using type_traits = ColumnTypeTraits<T>;
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, type_traits::column_id);
 
@@ -3397,7 +3419,7 @@ size_t Table::find_first(size_t col_ndx, T value) const
 
     typedef typename type_traits::column_type ColType;
     const ColType& column = get_column<ColType, type_traits::column_id>(col_ndx);
-    return column.find_first(value);
+    return column.find_first(upgrade_optional_int(value));
 }
 
 size_t Table::find_first_link(size_t target_row_index) const
@@ -3410,41 +3432,35 @@ size_t Table::find_first_link(size_t target_row_index) const
 size_t Table::find_first_int(size_t col_ndx, int64_t value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<int64_t, true>(col_ndx, value);
+        return find_first<util::Optional<int64_t>>(col_ndx, value);
     else
-        return find_first<int64_t, false>(col_ndx, value);
+        return find_first<int64_t>(col_ndx, value);
 }
 
 size_t Table::find_first_bool(size_t col_ndx, bool value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<bool, true>(col_ndx, value);
+        return find_first<util::Optional<bool>>(col_ndx, value);
     else
-        return find_first<bool, false>(col_ndx, value);
+        return find_first<bool>(col_ndx, value);
 }
 
 size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<DateTime, true>(col_ndx, value);
+        return find_first<util::Optional<DateTime>>(col_ndx, value);
     else
-        return find_first<DateTime, false>(col_ndx, value);
+        return find_first<DateTime>(col_ndx, value);
 }
 
 size_t Table::find_first_float(size_t col_ndx, float value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<Float, true>(col_ndx, value);
-    else
-        return find_first<Float, false>(col_ndx, value);
+    return find_first<Float>(col_ndx, value);
 }
 
 size_t Table::find_first_double(size_t col_ndx, double value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<Double, true>(col_ndx, value);
-    else
-        return find_first<Double, false>(col_ndx, value);
+    return find_first<Double>(col_ndx, value);
 }
 
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
@@ -3465,10 +3481,7 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
 
 size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<BinaryData, true>(col_ndx, value);
-    else
-        return find_first<BinaryData, false>(col_ndx, value);
+    return find_first<BinaryData>(col_ndx, value);
 }
 
 size_t Table::find_first_null(size_t column_ndx) const

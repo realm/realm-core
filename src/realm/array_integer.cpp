@@ -55,18 +55,21 @@ std::vector<int64_t> ArrayInteger::to_vector() const
     return v;
 }
 
-MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, int_fast64_t value, Allocator& alloc)
+MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, value_type value, Allocator& alloc)
 {
-    MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, value, alloc); // Throws
+    int64_t val = value.value_or(0);
+    MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, val, alloc); // Throws
     ArrayIntNull arr(alloc);
     _impl::DestroyGuard<ArrayIntNull> dg(&arr);
     arr.Array::init_from_mem(r);
-    if (arr.m_width == 64) {
-        int_fast64_t null_value = value ^ 1; // Just anything different from value.
-        arr.Array::set(0, null_value); // Throws
-    }
-    else {
-        arr.Array::set(0, arr.m_ubound); // Throws
+    if (value) {
+        if (arr.m_width == 64) {
+            int_fast64_t null_value = val ^ 1; // Just anything different from value.
+            arr.Array::set(0, null_value); // Throws
+        }
+        else {
+            arr.Array::set(0, arr.m_ubound); // Throws
+        }
     }
     dg.release();
     return r;

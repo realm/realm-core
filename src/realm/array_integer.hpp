@@ -79,7 +79,7 @@ public:
     /// Construct an array of the specified type and size, and return just the
     /// reference to the underlying memory. All elements will be initialized to
     /// the specified value.
-    static MemRef create_array(Type, bool context_flag, size_t size, int_fast64_t value,
+    static MemRef create_array(Type, bool context_flag, size_t size, value_type value,
                                Allocator&);
     void create(Type, bool context_flag = false);
 

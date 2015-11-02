@@ -184,7 +184,7 @@ TEST(Optional_RvalueReferences)
     Optional<const int&> x{foo};
     static_cast<void>(x);
 
-    
+
     static_cast<void>(make_rvalue);
     // Should not compile (would generate references to temporaries):
     // Optional<const int&> y{1};
@@ -219,7 +219,7 @@ struct TestingReferenceBinding {
 };
 }
 
-TEST(Optional_ReferenceBinding)
+TEST_IF(Optional_ReferenceBinding, false)
 {
     const int& iref = global_i;
     CHECK_EQUAL(&iref, &global_i);

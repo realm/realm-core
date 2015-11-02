@@ -636,7 +636,7 @@ public:
 
 
 private:
-    template<class T, bool Nullable>
+    template<class T>
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
     template<class T>
     TableView find_all(size_t column_ndx, T value);

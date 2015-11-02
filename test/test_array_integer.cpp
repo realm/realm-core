@@ -10,6 +10,8 @@
 using namespace realm;
 using namespace realm::test_util;
 
+using realm::util::unwrap;
+
 TEST_TYPES(ArrayInteger_Sum0, ArrayInteger, ArrayIntNull)
 {
     TEST_TYPE a(Allocator::get_default());
@@ -33,12 +35,12 @@ TEST_TYPES(ArrayInteger_Sum1, ArrayInteger, ArrayIntNull)
 
     s1 = 0;
     for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
+        s1 += unwrap(a.get(i));
     CHECK_EQUAL(s1, a.sum(0, a.size()));
 
     s1 = 0;
     for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
+        s1 += unwrap(a.get(i));
     CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.destroy();
@@ -55,12 +57,12 @@ TEST_TYPES(ArrayInteger_Sum2, ArrayInteger, ArrayIntNull)
 
     s1 = 0;
     for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
+        s1 += unwrap(a.get(i));
     CHECK_EQUAL(s1, a.sum(0, a.size()));
 
     s1 = 0;
     for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
+        s1 += unwrap(a.get(i));
     CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.destroy();
@@ -78,12 +80,12 @@ TEST_TYPES(ArrayInteger_Sum4, ArrayInteger, ArrayIntNull)
 
     s1 = 0;
     for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
+        s1 += unwrap(a.get(i));
     CHECK_EQUAL(s1, a.sum(0, a.size()));
 
     s1 = 0;
     for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
+        s1 += unwrap(a.get(i));
     CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.destroy();
@@ -100,12 +102,12 @@ TEST_TYPES(ArrayInteger_Sum16, ArrayInteger, ArrayIntNull)
 
     s1 = 0;
     for (int i = 0; i < 256 + 7; ++i)
-        s1 += a.get(i);
+        s1 += unwrap(a.get(i));
     CHECK_EQUAL(s1, a.sum(0, a.size()));
 
     s1 = 0;
     for (int i = 3; i < 100; ++i)
-        s1 += a.get(i);
+        s1 += unwrap(a.get(i));
     CHECK_EQUAL(s1, a.sum(3, 100));
 
     a.destroy();
@@ -260,25 +262,6 @@ TEST(ArrayIntNull_Boundaries) {
     a.add(std::numeric_limits<int_fast64_t>::min());
     CHECK_EQUAL(std::numeric_limits<int_fast64_t>::min(), a.back());
     CHECK(a.is_null(0));
-    a.add(std::numeric_limits<uint_fast64_t>::max());
-    CHECK_EQUAL(std::numeric_limits<uint_fast64_t>::max(), a.get_uint(a.size()-1));
-    CHECK(a.is_null(0));
-
-
-    a.destroy();
-}
-
-TEST(ArrayIntNull_SetUint0) {
-    ArrayIntNull a(Allocator::get_default());
-    a.create(Array::type_Normal);
-    a.add(0);
-    a.add(0);
-
-    a.set_uint(0, 0);
-    a.set_null(1);
-
-    CHECK(!a.is_null(0));
-    CHECK(a.is_null(1));
 
     a.destroy();
 }
