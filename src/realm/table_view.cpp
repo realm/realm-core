@@ -255,12 +255,12 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
             if (function == act_Sum || function == act_Average) {
                 res += unpacked;
             }
-            else if (function == act_Max && unpacked > res) {
+            else if (function == act_Max && static_cast<R>(unpacked) > res) {
                 res = unpacked;
                 if (return_ndx)
                     *return_ndx = ss;
             }
-            else if (function == act_Min && unpacked < res) {
+            else if (function == act_Min && static_cast<R>(unpacked) < res) {
                 res = unpacked;
                 if (return_ndx)
                     *return_ndx = ss;
