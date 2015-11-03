@@ -410,8 +410,13 @@ void EncryptedFileMapping::write_page(size_t page) noexcept
     // the page outdated in those mappings:
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
-        if (m != this)
-            m->mark_outdated(page);
+        if (m != this && page < m->m_page_count) {
+            //    m->mark_outdated(page);
+            if (m->m_up_to_date_pages[page]) {
+                // keep the page up to date:
+                memcpy(m->page_addr(page),page_addr(page), m_page_size);
+            }
+        }
     }
 
     m_dirty_pages[page] = true;
