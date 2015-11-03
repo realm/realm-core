@@ -12,6 +12,7 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/priority_queue.hpp>
 #include <realm/util/network.hpp>
+#include <realm/util/features.h>
 
 
 using namespace realm::util;
@@ -815,7 +816,7 @@ void socket_base::do_open(const protocol& prot, std::error_code& ec)
         return;
     }
 
-#if defined(__MACH__) && defined(__APPLE__) || defined(__FreeBSD__)
+#if REALM_PLATFORM_APPLE
     {
         int optval = 1;
         int ret = setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
@@ -1099,7 +1100,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     if (REALM_UNLIKELY(addr_len != expected_addr_len))
         REALM_TERMINATE("Unexpected peer address length");
 
-#if defined(__MACH__) && defined(__APPLE__) || defined(__FreeBSD__)
+#if REALM_PLATFORM_APPLE
     int optval = 1;
     int ret = ::setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
     if (REALM_UNLIKELY(ret == -1)) {

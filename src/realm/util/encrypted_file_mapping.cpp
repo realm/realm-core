@@ -126,7 +126,7 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len)
 AESCryptor::AESCryptor(const uint8_t* key)
 : m_rw_buffer(new char[block_size])
 {
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
 #else
@@ -137,7 +137,7 @@ AESCryptor::AESCryptor(const uint8_t* key)
 }
 
 AESCryptor::~AESCryptor() noexcept {
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
     CCCryptorRelease(m_encr);
     CCCryptorRelease(m_decr);
 #endif
@@ -281,7 +281,7 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
     memcpy(iv, stored_iv, 4);
     memcpy(iv + 4, &pos, sizeof(pos));
 
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
     CCCryptorRef cryptor = mode == mode_Encrypt ? m_encr : m_decr;
     CCCryptorReset(cryptor, iv);
 
@@ -299,7 +299,7 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
 
 void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const
 {
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
     CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
 #else
     SHA256_CTX ctx;

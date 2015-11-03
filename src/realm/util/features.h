@@ -143,8 +143,10 @@
 #  define REALM_ANDROID 1
 #endif
 
-
+// Some documentation of the defines provided by Apple:
+// http://developer.apple.com/library/mac/documentation/Porting/Conceptual/PortingUnix/compiling/compiling.html#//apple_ref/doc/uid/TP40002850-SW13
 #if defined __APPLE__ && defined __MACH__
+#  define REALM_PLATFORM_APPLE 1
 /* Apple OSX and iOS (Darwin). */
 #  include <TargetConditionals.h>
 #  if TARGET_OS_IPHONE == 1
@@ -165,6 +167,8 @@
 #    undef  REALM_ENABLE_ENCRYPTION
 #    define REALM_ENABLE_ENCRYPTION 0
 #  endif
+#else
+#  define REALM_PLATFORM_APPLE 0
 #endif
 
 
