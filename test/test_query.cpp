@@ -7762,4 +7762,42 @@ TEST(Query_CompareThroughUnaryLinks)
     CHECK_EQUAL(not_found, match);
 }
 
+TEST(Query_DeepLink)
+{
+
+    //
+    // +---------+--------+------------+
+    // | int     | bool   | list       |
+    // +---------+--------+------------+
+    // |       0 | true   | null       |
+    // |       1 | false  | 0          |
+    // |       2 | true   | 0, 1       |
+    // |       N | even(N)| 0, .., N-1 |
+    // +---------+--------+-------------+
+
+    const size_t N = 10;
+
+    Group group;
+    TableRef table = group.add_table("test");
+    size_t col_int = table->add_column(type_Int, "int");
+    size_t col_bool = table->add_column(type_Bool, "bool");
+    size_t col_linklist = table->add_column_link(type_LinkList, "list", *table);
+
+    for(size_t j = 0; j < N; ++j) {
+        table->add_empty_row();
+        table->set_int(col_int, j, j);
+        table->set_bool(col_bool, j, (j % 2) == 0);
+
+        LinkViewRef links = table->get_linklist(col_linklist, j);
+        TableView view = table->where().find_all();
+        for(size_t i = 0; i < view.size(); ++i) {
+            links->add(i);
+        }
+    }
+
+    Query query = table->link(col_linklist).column<Bool>(col_bool) == true;
+    TableView view = query.find_all();
+    CHECK_EQUAL(N, view.size());
+}
+
 #endif // TEST_QUERY

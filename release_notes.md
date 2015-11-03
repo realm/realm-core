@@ -10,6 +10,24 @@
 
 ### Enhancements:
 
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.94.4 Release notes
+
+### Bugfixes:
+
+* Fixed crash in find_all()
+
+### Enhancements:
+
 * Queries are no longer limited to 16 levels of grouping.
 * New substring operations (ranged insert, erase on values in string columns).
 * Adds schema change notification handler API to Group.
