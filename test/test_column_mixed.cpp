@@ -444,6 +444,8 @@ TEST(MixedColumn_SwapRows)
         CHECK_EQUAL(type_String, c.get_type(2));
         CHECK_EQUAL(c.get_string(2), "a");
         CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
     }
 
     // First two elements
@@ -462,6 +464,8 @@ TEST(MixedColumn_SwapRows)
         CHECK_EQUAL(type_Bool, c.get_type(1));
         CHECK_EQUAL(c.get_bool(1), false);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Last two elements
@@ -480,6 +484,8 @@ TEST(MixedColumn_SwapRows)
         CHECK_EQUAL(type_String, c.get_type(2));
         CHECK_EQUAL(c.get_string(2), "a");
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Indices in wrong order
@@ -498,6 +504,8 @@ TEST(MixedColumn_SwapRows)
         CHECK_EQUAL(type_String, c.get_type(2));
         CHECK_EQUAL(c.get_string(2), "a");
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 }
 
