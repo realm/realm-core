@@ -75,9 +75,9 @@ struct mapping_and_addr {
     size_t size;
 };
 
-static util::Mutex mapping_mutex;
-static std::vector<mapping_and_addr> mappings_by_addr;
-static std::vector<mappings_for_file> mappings_by_file;
+util::Mutex mapping_mutex;
+std::vector<mapping_and_addr> mappings_by_addr;
+std::vector<mappings_for_file> mappings_by_file;
 
 // If there's any active mappings when the program exits, deliberately leak them
 // to avoid flushing things that were in the middle of being modified on a different thrad

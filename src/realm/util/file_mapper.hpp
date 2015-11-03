@@ -30,10 +30,11 @@ void munmap(void *addr, size_t size) noexcept;
 void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
 void msync(void *addr, size_t size);
 
+typedef size_t (*Header_to_size)(const char* addr);
+
 #if REALM_ENABLE_ENCRYPTION
 
 extern bool encryption_is_in_use;
-typedef size_t (*Header_to_size)(const char* addr);
 
 void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size);
 void do_encryption_write_barrier(const void* addr, size_t size);
@@ -51,7 +52,10 @@ void inline encryption_write_barrier(const void* addr, size_t size)
 }
 
 #else
-void inline encryption_read_barrier(const void*, size_t, Header_to_size header_to_size = nullptr) {}
+void inline encryption_read_barrier(const void*, size_t, Header_to_size header_to_size = nullptr) 
+{
+    static_cast<void>(header_to_size);
+}
 void inline encryption_write_barrier(const void*, size_t) {}
 #endif
 
