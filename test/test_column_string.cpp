@@ -1156,6 +1156,8 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
         CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
     }
 
     // First two elements
@@ -1172,6 +1174,8 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(0), "b");
         CHECK_EQUAL(c.get(1), "a");
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Last two elements
@@ -1188,6 +1192,8 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Indices in wrong order
@@ -1204,6 +1210,8 @@ TEST(ColumnString_SwapRows)
         CHECK_EQUAL(c.get(1), "c");
         CHECK_EQUAL(c.get(2), "b");
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Column with duplicate values
@@ -1219,6 +1227,8 @@ TEST(ColumnString_SwapRows)
 
         CHECK_EQUAL(c.get(0), "a");
         CHECK_EQUAL(c.get(1), "a");
+
+        c.destroy();
     }
 
     // Null values
@@ -1236,6 +1246,8 @@ TEST(ColumnString_SwapRows)
 
         CHECK(c.get(1).is_null()); // fails
         CHECK_EQUAL(c.get(2), "b"); // passes
+
+        c.destroy();
     }
 }
 
