@@ -3404,7 +3404,7 @@ T upgrade_optional_int(T value)
     return value;
 }
 
-}
+} // anonymous namespace
 
 
 template<class T>
