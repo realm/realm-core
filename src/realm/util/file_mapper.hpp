@@ -31,8 +31,24 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::
 void msync(void *addr, size_t size);
 
 #if REALM_ENABLE_ENCRYPTION
-void encryption_read_barrier(const void* addr, size_t size);
-void encryption_write_barrier(const void* addr, size_t size);
+
+extern bool encryption_is_in_use;
+
+void do_encryption_read_barrier(const void* addr, size_t size);
+void do_encryption_write_barrier(const void* addr, size_t size);
+
+void inline encryption_read_barrier(const void* addr, size_t size)
+{
+    if (encryption_is_in_use)
+        do_encryption_read_barrier(addr, size);
+}
+
+void inline encryption_write_barrier(const void* addr, size_t size)
+{
+    if (encryption_is_in_use)
+        do_encryption_write_barrier(addr, size);
+}
+
 #else
 void inline encryption_read_barrier(const void*, size_t) {}
 void inline encryption_write_barrier(const void*, size_t) {}

@@ -116,6 +116,7 @@ void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
 
     LockGuard lock(mapping_mutex);
 
+    encryption_is_in_use = true;
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->inode == st.st_ino && it->device == st.st_dev)
@@ -174,6 +175,9 @@ void remove_mapping(void* addr, size_t size)
         return;
 
     mappings_by_addr.erase(mappings_by_addr.begin() + (m - &mappings_by_addr[0]));
+    if (mappings_by_addr.size() == 0)
+        encryption_is_in_use = false;
+
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
             if (::close(it->info->fd) != 0) {
@@ -215,7 +219,9 @@ namespace util {
 // when encryption is actually triggered, but most calls to these methods are not expected
 // to actually trigger any encryption activities. A performant solution is needed before
 // we can release it (except, possibly, for investigation purposes).
-void encryption_read_barrier(const void* addr, size_t size)
+bool encryption_is_in_use = false;
+
+void do_encryption_read_barrier(const void* addr, size_t size)
 {
     LockGuard lock(mapping_mutex);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
@@ -236,7 +242,7 @@ void encryption_read_barrier(const void* addr, size_t size)
     }
 }
 
-void encryption_write_barrier(const void* addr, size_t size)
+void do_encryption_write_barrier(const void* addr, size_t size)
 {
     LockGuard lock(mapping_mutex);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
