@@ -46,12 +46,14 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;
+    void swap_rows(size_t, size_t) override;
     void discard_subtable_accessor(size_t) noexcept override;
     void update_from_parent(size_t) noexcept override;
     void adj_acc_insert_rows(size_t, size_t) noexcept override;
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;
     void adj_acc_clear_root_table() noexcept override;
+    void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
@@ -93,8 +95,10 @@ protected:
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
         template<bool fix_ndx_in_parent>
-        bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx)
-            noexcept;
+        bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
+        template<bool fix_ndx_in_parent>
+        void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
         void recursive_mark() noexcept;
@@ -292,6 +296,14 @@ inline void SubtableColumnBase::clear(size_t, bool)
     get_root_array()->set_type(Array::type_HasRefs);
 }
 
+inline void SubtableColumnBase::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    IntegerColumn::swap_rows(row_ndx_1, row_ndx_2); // Throws
+
+    const bool fix_ndx_in_parent = true;
+    m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
+}
+
 inline void SubtableColumnBase::mark(int type) noexcept
 {
     if (type & mark_Recursive)
@@ -355,8 +367,13 @@ inline void SubtableColumnBase::adj_acc_clear_root_table() noexcept
     discard_child_accessors();
 }
 
-inline Table* SubtableColumnBase::get_subtable_accessor(size_t row_ndx) const
-    noexcept
+inline void SubtableColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
+{
+    const bool fix_ndx_in_parent = false;
+    m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
+}
+
+inline Table* SubtableColumnBase::get_subtable_accessor(size_t row_ndx) const noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -444,7 +461,7 @@ bool SubtableColumnBase::SubtableMap::adj_move_over(size_t from_row_ndx,
     // need special handling for the case, where the set of entries are already
     // empty, otherwise the final return statement would return true in this
     // case, even though we didn't actually remove an entry.
-    if (i == n)
+    if (n == 0)
         return false;
 
     while (i < n) {
@@ -468,6 +485,25 @@ bool SubtableColumnBase::SubtableMap::adj_move_over(size_t from_row_ndx,
         }
     }
     return m_entries.empty();
+}
+
+template<bool fix_ndx_in_parent>
+void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
+{
+    using tf = _impl::TableFriend;
+    for (size_t i = 0; i < m_entries.size(); ++i) {
+        entry& e = m_entries[i];
+        if (REALM_UNLIKELY(e.m_subtable_ndx == row_ndx_1)) {
+            e.m_subtable_ndx = row_ndx_2;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+        }
+        else if (REALM_UNLIKELY(e.m_subtable_ndx == row_ndx_2)) {
+            e.m_subtable_ndx = row_ndx_1;
+            if (fix_ndx_in_parent)
+                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+        }
+    }
 }
 
 inline SubtableColumnBase::SubtableColumnBase(Allocator& alloc, ref_type ref,
@@ -515,8 +551,7 @@ inline ref_type SubtableColumnBase::create(Allocator& alloc, size_t size)
     return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
 
-inline size_t* SubtableColumnBase::record_subtable_path(size_t* begin,
-                                                             size_t* end) noexcept
+inline size_t* SubtableColumnBase::record_subtable_path(size_t* begin, size_t* end) noexcept
 {
     if (end == begin)
         return 0; // Error, not enough space in buffer
@@ -537,8 +572,7 @@ update_table_accessors(const size_t* col_path_begin, const size_t* col_path_end,
     m_subtable_map.update_accessors(col_path_begin, col_path_end, updater); // Throws
 }
 
-inline void SubtableColumnBase::do_insert(size_t row_ndx, int_fast64_t value,
-                                          size_t num_rows)
+inline void SubtableColumnBase::do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows)
 {
     IntegerColumn::insert_without_updating_index(row_ndx, value, num_rows); // Throws
     bool is_append = row_ndx == realm::npos;
