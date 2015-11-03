@@ -34,8 +34,8 @@ namespace {
 
 const size_t min_repetitions = 10;
 const size_t max_repetitions = 1000;
-const double min_duration_s = 0.05;
-const double min_warmup_time_s = 0.01;
+const double min_duration_s = 0.1;
+const double min_warmup_time_s = 0.05;
 
 struct Benchmark
 {
@@ -321,10 +321,10 @@ struct BenchmarkQueryNot : Benchmark {
 const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
 {
     switch (level) {
-        case SharedGroup::durability_Full: return "Full";
+        case SharedGroup::durability_Full:    return "Full   ";
         case SharedGroup::durability_MemOnly: return "MemOnly";
 #ifndef _WIN32
-        case SharedGroup::durability_Async: return "Async";
+        case SharedGroup::durability_Async:   return "Async  ";
 #endif
     }
     return nullptr;
@@ -351,8 +351,11 @@ void run_benchmark(BenchmarkResults& results)
 {
     typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
     std::vector<config_pair> configs;
-    configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
     configs.push_back(config_pair(SharedGroup::durability_MemOnly, nullptr));
+#if REALM_ENABLE_ENCRYPTION
+    configs.push_back(config_pair(SharedGroup::durability_MemOnly, crypt_key(true)));
+#endif
+    configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
 #if REALM_ENABLE_ENCRYPTION
     configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
 #endif
@@ -420,6 +423,7 @@ void run_benchmark(BenchmarkResults& results)
 
         results.finish(ident, lead_text_ss.str());
     }
+    std::cout << std::endl;
 }
 
 } // anonymous namespace
