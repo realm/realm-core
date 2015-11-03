@@ -25,17 +25,15 @@
 #include <memory>
 #include <exception>
 #include <string>
-#include <ostream>
 
 #include <realm/util/assert.hpp>
 #include <realm/util/tuple.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/history.hpp>
 #include <realm/impl/transact_log.hpp>
-
-#include <iostream>
 
 namespace realm {
 
@@ -202,14 +200,14 @@ public:
     /// Called by the local coordinator to apply a transaction log received from
     /// another local coordinator.
     ///
-    /// \param apply_log If specified, and the library was compiled in debug
-    /// mode, then a line describing each individual operation is writted to the
-    /// specified stream.
+    /// \param logger If specified, and the library was compiled in debug mode,
+    /// then a line describing each individual operation is writted to the
+    /// specified logger.
     ///
     /// \throw BadTransactLog If the transaction log could not be successfully
     /// parsed, or ended prematurely.
     static void apply_changeset(InputStream& transact_log, Group& target,
-                                std::ostream* apply_log = nullptr);
+                                util::Logger* logger = 0);
 
     virtual ~Replication() noexcept {}
 
@@ -294,7 +292,7 @@ protected:
     virtual void finalize_changeset() noexcept = 0;
 
     static void apply_changeset(const char* data, size_t size, SharedGroup& target,
-                                std::ostream* apply_log = nullptr);
+                                util::Logger* logger = 0);
 
 private:
     const std::string m_database_file;

@@ -330,7 +330,7 @@ public:
     ConstTableRef get_table(StringData name) const;
 
     TableRef add_table(StringData name, bool require_unique_name = true);
-    TableRef insert_table(size_t idx, StringData name, bool require_unique_name = true);
+    TableRef insert_table(size_t index, StringData name, bool require_unique_name = true);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
     TableRef get_or_insert_table(size_t index, StringData name, bool* was_added = nullptr);
 
@@ -364,9 +364,9 @@ public:
     void rename_table(size_t index, StringData new_name, bool require_unique_name = true);
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
-    void move_table(size_t index_1, size_t index_2);
-
     //@}
+
+    void move_table(size_t index_1, size_t index_2);
 
     // Serialization
 
