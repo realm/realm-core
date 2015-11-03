@@ -193,11 +193,7 @@ void remove_mapping(void* addr, size_t size)
 
 void* mmap_anon(size_t size)
 {
-#ifdef REALM_DEBUG_WITH_MPROTECT
-    void* addr = ::mmap(0, size, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
-#else
     void* addr = ::mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-#endif
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
@@ -221,7 +217,7 @@ namespace util {
 // we can release it (except, possibly, for investigation purposes).
 bool encryption_is_in_use = false;
 
-void do_encryption_read_barrier(const void* addr, size_t size)
+void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size)
 {
     LockGuard lock(mapping_mutex);
     for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
@@ -229,16 +225,7 @@ void do_encryption_read_barrier(const void* addr, size_t size)
         if (m.addr >= static_cast<const char*>(addr) + size 
             || static_cast<const char*>(m.addr) + m.size <= addr)
             continue;
-#ifdef REALM_DEBUG_WITH_MPROTECT
-        size_t mapped_size = round_up_to_page_size(size);
-        void* mapped_start_addr = m.addr +
-            (static_cast<const char*>(addr) - static_cast<const char*>(m.addr)) / page_size() * page_size();
-        REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ | PROT_WRITE) == 0);
-#endif
-        m.mapping->read_barrier(addr, size);
-#ifdef REALM_DEBUG_WITH_MPROTECT
-        REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ) == 0);
-#endif
+        m.mapping->read_barrier(addr, size, header_to_size);
     }
 }
 
@@ -251,12 +238,6 @@ void do_encryption_write_barrier(const void* addr, size_t size)
             || static_cast<const char*>(m.addr) + m.size <= addr)
             continue;
 
-#ifdef REALM_DEBUG_WITH_MPROTECT
-        size_t mapped_size = round_up_to_page_size(size);
-        void* mapped_start_addr = m.addr +
-            (static_cast<const char*>(addr) - static_cast<const char*>(m.addr)) / page_size() * page_size();
-        REALM_ASSERT(mprotect(mapped_start_addr, mapped_size, PROT_READ | PROT_WRITE) == 0);
-#endif
         m.mapping->write_barrier(addr, size);
     }
 }

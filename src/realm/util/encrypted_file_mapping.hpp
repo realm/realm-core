@@ -25,6 +25,8 @@
 
 #if REALM_ENABLE_ENCRYPTION
 
+typedef size_t (*Header_to_size)(const char* addr);
+
 #include <vector>
 
 #ifdef __APPLE__
@@ -108,7 +110,7 @@ public:
 
     // Make sure that memory in the specified range is synchronized with any
     // changes made globally visible through call to write_barrier
-    void read_barrier(const void* addr, size_t size) noexcept;
+    void read_barrier(const void* addr, size_t size, Header_to_size header_to_size) noexcept;
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()

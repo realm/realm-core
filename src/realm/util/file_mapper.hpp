@@ -33,14 +33,15 @@ void msync(void *addr, size_t size);
 #if REALM_ENABLE_ENCRYPTION
 
 extern bool encryption_is_in_use;
+typedef size_t (*Header_to_size)(const char* addr);
 
-void do_encryption_read_barrier(const void* addr, size_t size);
+void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size);
 void do_encryption_write_barrier(const void* addr, size_t size);
 
-void inline encryption_read_barrier(const void* addr, size_t size)
+void inline encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size = nullptr)
 {
     if (encryption_is_in_use)
-        do_encryption_read_barrier(addr, size);
+        do_encryption_read_barrier(addr, size, header_to_size);
 }
 
 void inline encryption_write_barrier(const void* addr, size_t size)

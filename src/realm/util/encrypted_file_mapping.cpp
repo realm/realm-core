@@ -483,7 +483,7 @@ void EncryptedFileMapping::sync() noexcept
     // for a discussion of this related to core data.
 }
 
-void EncryptedFileMapping::read_barrier(const void* addr, size_t size) noexcept
+void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size) noexcept
 {
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
     size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) / m_page_size;
@@ -494,6 +494,11 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size) noexcept
     for (size_t idx = first_idx; idx <= last_idx; ++idx) {
         if (!m_up_to_date_pages[idx])
             refresh_page(idx);
+    }
+
+    if (header_to_size) {
+        size_t fullsize = header_to_size((const char*)addr);
+        read_barrier(addr, fullsize, nullptr);
     }
 }
 
@@ -541,15 +546,8 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 
 // FIXME: Check if we still need to read the first block every time.
     if (first_init && m_file_offset == 0) {
-#ifdef REALM_DEBUG_WITH_MPROTECT
-        mprotect(page_addr(0), m_page_size, PROT_READ | PROT_WRITE);
-#endif
         if (!copy_up_to_date_page(0)) {
             m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
-#ifdef REALM_DEBUG_WITH_MPROTECT
-        mprotect(page_addr(0), m_page_size,
-                m_access == File::access_ReadOnly ? PROT_READ : PROT_READ | PROT_WRITE);
-#endif
         }
         mark_up_to_date(0);
     }
