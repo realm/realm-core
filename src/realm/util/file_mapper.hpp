@@ -51,7 +51,7 @@ void inline encryption_write_barrier(const void* addr, size_t size)
 }
 
 #else
-void inline encryption_read_barrier(const void*, size_t) {}
+void inline encryption_read_barrier(const void*, size_t, Header_to_size header_to_size = nullptr) {}
 void inline encryption_write_barrier(const void*, size_t) {}
 #endif
 
