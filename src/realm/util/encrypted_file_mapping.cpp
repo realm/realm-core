@@ -359,10 +359,6 @@ void EncryptedFileMapping::mark_outdated(size_t i) noexcept
     if (i >= m_page_count)
         return;
 
-    // Is this ever needed? (perhaps for the commitlogs?)
-    // the database itself has only single-threaded changes,
-    // and the mapping used for writes is removed once the
-    // writes are done.
     if (m_dirty_pages[i])
         flush();
 
@@ -411,11 +407,9 @@ void EncryptedFileMapping::write_page(size_t page) noexcept
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m != this && page < m->m_page_count) {
-            //    m->mark_outdated(page);
-            if (m->m_up_to_date_pages[page]) {
-                // keep the page up to date:
-                memcpy(m->page_addr(page),page_addr(page), m_page_size);
-            }
+            m->mark_outdated(page);
+            //if (m->m_up_to_date_pages[page])
+            //    memcpy(m->page_addr(page), page_addr(page), m_page_size);
         }
     }
 
@@ -549,7 +543,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_up_to_date_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
 
-// FIXME: Check if we still need to read the first block every time.
+    // provoke an error early on if encryption doesn't work.
     if (first_init && m_file_offset == 0) {
         if (!copy_up_to_date_page(0)) {
             m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
