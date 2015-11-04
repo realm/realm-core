@@ -135,7 +135,7 @@ inline StringData BinaryColumn::get_index_data(size_t, StringIndex::StringConver
     REALM_UNREACHABLE();
 }
 
-inline size_t BinaryColumn::size() const  noexcept
+inline size_t BinaryColumn::size() const noexcept
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();

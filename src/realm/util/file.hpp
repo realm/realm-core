@@ -640,7 +640,7 @@ public:
 class File::CloseGuard {
 public:
     CloseGuard(File& f) noexcept: m_file(&f) {}
-    ~CloseGuard()  noexcept { if (m_file) m_file->close(); }
+    ~CloseGuard() noexcept { if (m_file) m_file->close(); }
     void release() noexcept { m_file = 0; }
 private:
     File* m_file;
@@ -650,7 +650,7 @@ private:
 class File::UnlockGuard {
 public:
     UnlockGuard(File& f) noexcept: m_file(&f) {}
-    ~UnlockGuard()  noexcept { if (m_file) m_file->unlock(); }
+    ~UnlockGuard() noexcept { if (m_file) m_file->unlock(); }
     void release() noexcept { m_file = 0; }
 private:
     File* m_file;
@@ -661,7 +661,7 @@ class File::UnmapGuard {
 public:
     template<class T>
     UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
-    ~UnmapGuard()  noexcept { if (m_map) m_map->unmap(); }
+    ~UnmapGuard() noexcept { if (m_map) m_map->unmap(); }
     void release() noexcept { m_map = 0; }
 private:
     MapBase* m_map;

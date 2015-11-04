@@ -202,9 +202,9 @@ void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline) co
 }
 
 
-void SubtableColumnBase::SubtableMap::
-update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
-                 _impl::TableFriend::AccessorUpdater& updater)
+void SubtableColumnBase::SubtableMap::update_accessors(const size_t* col_path_begin,
+                                                       const size_t* col_path_end,
+                                                       _impl::TableFriend::AccessorUpdater& updater)
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();

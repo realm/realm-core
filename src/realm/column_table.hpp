@@ -560,9 +560,9 @@ inline size_t* SubtableColumnBase::record_subtable_path(size_t* begin, size_t* e
     return _impl::TableFriend::record_subtable_path(*m_table, begin, end);
 }
 
-inline void SubtableColumnBase::
-update_table_accessors(const size_t* col_path_begin, const size_t* col_path_end,
-                       _impl::TableFriend::AccessorUpdater& updater)
+inline void SubtableColumnBase::update_table_accessors(const size_t* col_path_begin,
+                                                       const size_t* col_path_end,
+                                                       _impl::TableFriend::AccessorUpdater& updater)
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
