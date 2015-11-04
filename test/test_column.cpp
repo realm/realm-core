@@ -61,7 +61,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_Add0)
 
     c.add(0);
-    CHECK_EQUAL(INT64_C(0), c.get(0));
+    CHECK_EQUAL(0LL, c.get(0));
     CHECK_EQUAL(1U, c.size());
     CHECK(!c.is_empty());
 
@@ -69,92 +69,92 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_Add1)
 
     c.add(1);
-    CHECK_EQUAL(INT64_C(0), c.get(0));
-    CHECK_EQUAL(INT64_C(1), c.get(1));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
     CHECK_EQUAL(2U, c.size());
 
 
     // TEST(Column_Add2)
 
     c.add(2);
-    CHECK_EQUAL(INT64_C(0), c.get(0));
-    CHECK_EQUAL(INT64_C(1), c.get(1));
-    CHECK_EQUAL(INT64_C(2), c.get(2));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
     CHECK_EQUAL(3U, c.size());
 
 
     // TEST(Column_Add3)
 
     c.add(3);
-    CHECK_EQUAL(INT64_C(0), c.get(0));
-    CHECK_EQUAL(INT64_C(1), c.get(1));
-    CHECK_EQUAL(INT64_C(2), c.get(2));
-    CHECK_EQUAL(INT64_C(3), c.get(3));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
     CHECK_EQUAL(4U, c.size());
 
 
     // TEST(Column_Add4)
 
     c.add(4);
-    CHECK_EQUAL(INT64_C(0), c.get(0));
-    CHECK_EQUAL(INT64_C(1), c.get(1));
-    CHECK_EQUAL(INT64_C(2), c.get(2));
-    CHECK_EQUAL(INT64_C(3), c.get(3));
-    CHECK_EQUAL(INT64_C(4), c.get(4));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
+    CHECK_EQUAL(4LL, c.get(4));
     CHECK_EQUAL(5U, c.size());
 
 
     // TEST(Column_Add5)
 
     c.add(16);
-    CHECK_EQUAL(INT64_C(0),  c.get(0));
-    CHECK_EQUAL(INT64_C(1),  c.get(1));
-    CHECK_EQUAL(INT64_C(2),  c.get(2));
-    CHECK_EQUAL(INT64_C(3),  c.get(3));
-    CHECK_EQUAL(INT64_C(4),  c.get(4));
-    CHECK_EQUAL(INT64_C(16), c.get(5));
+    CHECK_EQUAL(0LL,  c.get(0));
+    CHECK_EQUAL(1LL,  c.get(1));
+    CHECK_EQUAL(2LL,  c.get(2));
+    CHECK_EQUAL(3LL,  c.get(3));
+    CHECK_EQUAL(4LL,  c.get(4));
+    CHECK_EQUAL(16LL, c.get(5));
     CHECK_EQUAL(6U, c.size());
 
 
     // TEST(Column_Add6)
 
     c.add(256);
-    CHECK_EQUAL(INT64_C(0),   c.get(0));
-    CHECK_EQUAL(INT64_C(1),   c.get(1));
-    CHECK_EQUAL(INT64_C(2),   c.get(2));
-    CHECK_EQUAL(INT64_C(3),   c.get(3));
-    CHECK_EQUAL(INT64_C(4),   c.get(4));
-    CHECK_EQUAL(INT64_C(16),  c.get(5));
-    CHECK_EQUAL(INT64_C(256), c.get(6));
+    CHECK_EQUAL(0LL,   c.get(0));
+    CHECK_EQUAL(1LL,   c.get(1));
+    CHECK_EQUAL(2LL,   c.get(2));
+    CHECK_EQUAL(3LL,   c.get(3));
+    CHECK_EQUAL(4LL,   c.get(4));
+    CHECK_EQUAL(16LL,  c.get(5));
+    CHECK_EQUAL(256LL, c.get(6));
     CHECK_EQUAL(7U, c.size());
 
 
     // TEST(Column_Add7)
 
     c.add(65536);
-    CHECK_EQUAL(INT64_C(0),     c.get(0));
-    CHECK_EQUAL(INT64_C(1),     c.get(1));
-    CHECK_EQUAL(INT64_C(2),     c.get(2));
-    CHECK_EQUAL(INT64_C(3),     c.get(3));
-    CHECK_EQUAL(INT64_C(4),     c.get(4));
-    CHECK_EQUAL(INT64_C(16),    c.get(5));
-    CHECK_EQUAL(INT64_C(256),   c.get(6));
-    CHECK_EQUAL(INT64_C(65536), c.get(7));
+    CHECK_EQUAL(0LL,     c.get(0));
+    CHECK_EQUAL(1LL,     c.get(1));
+    CHECK_EQUAL(2LL,     c.get(2));
+    CHECK_EQUAL(3LL,     c.get(3));
+    CHECK_EQUAL(4LL,     c.get(4));
+    CHECK_EQUAL(16LL,    c.get(5));
+    CHECK_EQUAL(256LL,   c.get(6));
+    CHECK_EQUAL(65536LL, c.get(7));
     CHECK_EQUAL(8U, c.size());
 
 
     // TEST(Column_Add8)
 
     c.add(4294967296LL);
-    CHECK_EQUAL(INT64_C(0),            c.get(0));
-    CHECK_EQUAL(INT64_C(1),            c.get(1));
-    CHECK_EQUAL(INT64_C(2),            c.get(2));
-    CHECK_EQUAL(INT64_C(3),            c.get(3));
-    CHECK_EQUAL(INT64_C(4),            c.get(4));
-    CHECK_EQUAL(INT64_C(16),           c.get(5));
-    CHECK_EQUAL(INT64_C(256),          c.get(6));
-    CHECK_EQUAL(INT64_C(65536),        c.get(7));
-    CHECK_EQUAL(INT64_C(4294967296), c.get(8));
+    CHECK_EQUAL(0LL,            c.get(0));
+    CHECK_EQUAL(1LL,            c.get(1));
+    CHECK_EQUAL(2LL,            c.get(2));
+    CHECK_EQUAL(3LL,            c.get(3));
+    CHECK_EQUAL(4LL,            c.get(4));
+    CHECK_EQUAL(16LL,           c.get(5));
+    CHECK_EQUAL(256LL,          c.get(6));
+    CHECK_EQUAL(65536LL,        c.get(7));
+    CHECK_EQUAL(4294967296LL, c.get(8));
     CHECK_EQUAL(9U, c.size());
 
 
@@ -165,7 +165,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-1);
 
     CHECK_EQUAL(1U, c.size());
-    CHECK_EQUAL(-INT64_C(1), c.get(0));
+    CHECK_EQUAL(-1LL, c.get(0));
 
 
     // TEST(Column_AddNeg2)
@@ -173,8 +173,8 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-256);
 
     CHECK_EQUAL(2U, c.size());
-    CHECK_EQUAL(INT64_C(-1),   c.get(0));
-    CHECK_EQUAL(INT64_C(-256), c.get(1));
+    CHECK_EQUAL(-1LL,   c.get(0));
+    CHECK_EQUAL(-256LL, c.get(1));
 
 
     // TEST(Column_AddNeg3)
@@ -182,9 +182,9 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-65536);
 
     CHECK_EQUAL(3U, c.size());
-    CHECK_EQUAL(INT64_C(-1),     c.get(0));
-    CHECK_EQUAL(INT64_C(-256),   c.get(1));
-    CHECK_EQUAL(INT64_C(-65536), c.get(2));
+    CHECK_EQUAL(-1LL,     c.get(0));
+    CHECK_EQUAL(-256LL,   c.get(1));
+    CHECK_EQUAL(-65536LL, c.get(2));
 
 
     // TEST(Column_AddNeg4)
@@ -192,10 +192,10 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-4294967296LL);
 
     CHECK_EQUAL(4U, c.size());
-    CHECK_EQUAL(INT64_C(-1),            c.get(0));
-    CHECK_EQUAL(INT64_C(-256),          c.get(1));
-    CHECK_EQUAL(INT64_C(-65536),        c.get(2));
-    CHECK_EQUAL(INT64_C(-4294967296),   c.get(3));
+    CHECK_EQUAL(-1LL,            c.get(0));
+    CHECK_EQUAL(-256LL,          c.get(1));
+    CHECK_EQUAL(-65536LL,        c.get(2));
+    CHECK_EQUAL(-4294967296LL,   c.get(3));
 
 
     // TEST(Column_Set)
@@ -206,10 +206,10 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.set(3, 0);
 
     CHECK_EQUAL(4U, c.size());
-    CHECK_EQUAL(INT64_C(3), c.get(0));
-    CHECK_EQUAL(INT64_C(2), c.get(1));
-    CHECK_EQUAL(INT64_C(1), c.get(2));
-    CHECK_EQUAL(INT64_C(0), c.get(3));
+    CHECK_EQUAL(3LL, c.get(0));
+    CHECK_EQUAL(2LL, c.get(1));
+    CHECK_EQUAL(1LL, c.get(2));
+    CHECK_EQUAL(0LL, c.get(3));
 
 
     // TEST(Column_Insert1)
@@ -225,11 +225,11 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.insert(2, 16);
 
     CHECK_EQUAL(5U, c.size());
-    CHECK_EQUAL(INT64_C(0),  c.get(0));
-    CHECK_EQUAL(INT64_C(1),  c.get(1));
-    CHECK_EQUAL(INT64_C(16), c.get(2));
-    CHECK_EQUAL(INT64_C(2),  c.get(3));
-    CHECK_EQUAL(INT64_C(3),  c.get(4));
+    CHECK_EQUAL(0LL,  c.get(0));
+    CHECK_EQUAL(1LL,  c.get(1));
+    CHECK_EQUAL(16LL, c.get(2));
+    CHECK_EQUAL(2LL,  c.get(3));
+    CHECK_EQUAL(3LL,  c.get(4));
 
 
     // TEST(Column_Insert2)
@@ -238,12 +238,12 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.insert(0, 256);
 
     CHECK_EQUAL(6U, c.size());
-    CHECK_EQUAL(INT64_C(256), c.get(0));
-    CHECK_EQUAL(INT64_C(0),   c.get(1));
-    CHECK_EQUAL(INT64_C(1),   c.get(2));
-    CHECK_EQUAL(INT64_C(16),  c.get(3));
-    CHECK_EQUAL(INT64_C(2),   c.get(4));
-    CHECK_EQUAL(INT64_C(3),   c.get(5));
+    CHECK_EQUAL(256LL, c.get(0));
+    CHECK_EQUAL(0LL,   c.get(1));
+    CHECK_EQUAL(1LL,   c.get(2));
+    CHECK_EQUAL(16LL,  c.get(3));
+    CHECK_EQUAL(2LL,   c.get(4));
+    CHECK_EQUAL(3LL,   c.get(5));
 
 
     // TEST(Column_Insert3)
@@ -252,13 +252,13 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.insert(6, 65536);
 
     CHECK_EQUAL(7U,    c.size());
-    CHECK_EQUAL(INT64_C(256),   c.get(0));
-    CHECK_EQUAL(INT64_C(0),     c.get(1));
-    CHECK_EQUAL(INT64_C(1),     c.get(2));
-    CHECK_EQUAL(INT64_C(16),    c.get(3));
-    CHECK_EQUAL(INT64_C(2),     c.get(4));
-    CHECK_EQUAL(INT64_C(3),     c.get(5));
-    CHECK_EQUAL(INT64_C(65536), c.get(6));
+    CHECK_EQUAL(256LL,   c.get(0));
+    CHECK_EQUAL(0LL,     c.get(1));
+    CHECK_EQUAL(1LL,     c.get(2));
+    CHECK_EQUAL(16LL,    c.get(3));
+    CHECK_EQUAL(2LL,     c.get(4));
+    CHECK_EQUAL(3LL,     c.get(5));
+    CHECK_EQUAL(65536LL, c.get(6));
 
 
     // TEST(Column_Delete1)
@@ -267,12 +267,12 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.erase(3);
 
     CHECK_EQUAL(6U, c.size());
-    CHECK_EQUAL(INT64_C(256),   c.get(0));
-    CHECK_EQUAL(INT64_C(0),     c.get(1));
-    CHECK_EQUAL(INT64_C(1),     c.get(2));
-    CHECK_EQUAL(INT64_C(2),     c.get(3));
-    CHECK_EQUAL(INT64_C(3),     c.get(4));
-    CHECK_EQUAL(INT64_C(65536), c.get(5));
+    CHECK_EQUAL(256LL,   c.get(0));
+    CHECK_EQUAL(0LL,     c.get(1));
+    CHECK_EQUAL(1LL,     c.get(2));
+    CHECK_EQUAL(2LL,     c.get(3));
+    CHECK_EQUAL(3LL,     c.get(4));
+    CHECK_EQUAL(65536LL, c.get(5));
 
 
     // TEST(Column_Delete2)
@@ -281,11 +281,11 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.erase(0);
 
     CHECK_EQUAL(5U, c.size());
-    CHECK_EQUAL(INT64_C(0),     c.get(0));
-    CHECK_EQUAL(INT64_C(1),     c.get(1));
-    CHECK_EQUAL(INT64_C(2),     c.get(2));
-    CHECK_EQUAL(INT64_C(3),     c.get(3));
-    CHECK_EQUAL(INT64_C(65536), c.get(4));
+    CHECK_EQUAL(0LL,     c.get(0));
+    CHECK_EQUAL(1LL,     c.get(1));
+    CHECK_EQUAL(2LL,     c.get(2));
+    CHECK_EQUAL(3LL,     c.get(3));
+    CHECK_EQUAL(65536LL, c.get(4));
 
 
     // TEST(Column_Delete3)
@@ -294,10 +294,10 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.erase(4);
 
     CHECK_EQUAL(4U, c.size());
-    CHECK_EQUAL(INT64_C(0), c.get(0));
-    CHECK_EQUAL(INT64_C(1), c.get(1));
-    CHECK_EQUAL(INT64_C(2), c.get(2));
-    CHECK_EQUAL(INT64_C(3), c.get(3));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
 
 
     // TEST(Column_DeleteAll)

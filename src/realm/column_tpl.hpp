@@ -85,7 +85,7 @@ struct FindInLeaf {
 
 template<>
 struct FindInLeaf<IntegerColumn> {
-    using LeafType = typename IntegerColumn::LeafType;
+    using LeafType = IntegerColumn::LeafType;
 
     template<Action action, class Condition, class T, class R>
     static bool find(const LeafType& leaf, T target, size_t local_start, size_t local_end, size_t leaf_start, QueryState<R>& state)
@@ -97,7 +97,7 @@ struct FindInLeaf<IntegerColumn> {
 
 template<>
 struct FindInLeaf<IntNullColumn> {
-    using LeafType = typename IntNullColumn::LeafType;
+    using LeafType = IntNullColumn::LeafType;
 
     template<Action action, class Condition, class T, class R>
     static bool find(const LeafType& leaf, T target, size_t local_start, size_t local_end, size_t leaf_start, QueryState<R>& state)
