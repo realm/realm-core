@@ -405,8 +405,7 @@ inline void SubtableColumnBase::SubtableMap::add(size_t subtable_ndx, Table* tab
 }
 
 template<bool fix_ndx_in_parent>
-void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted)
-    noexcept
+void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
     typedef entries::iterator iter;
     iter end = m_entries.end();
@@ -421,8 +420,7 @@ void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num
 }
 
 template<bool fix_ndx_in_parent>
-bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased)
-    noexcept
+bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept
 {
     if (m_entries.empty())
         return false;

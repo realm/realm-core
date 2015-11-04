@@ -557,9 +557,7 @@ inline void RowFuncs<T,R>::move_last_over()
 }
 
 template<class T, class R>
-inline size_t
-RowFuncs<T,R>::get_backlink_count(const Table& src_table, size_t src_col_ndx) const
-    noexcept
+inline size_t RowFuncs<T,R>::get_backlink_count(const Table& src_table, size_t src_col_ndx) const noexcept
 {
     return table()->get_backlink_count(row_ndx(), src_table, src_col_ndx);
 }

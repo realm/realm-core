@@ -495,16 +495,14 @@ public:
     // and clear_subtable() replaces the value with an empty table.)
     TableRef get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
-    size_t get_subtable_size(size_t column_ndx, size_t row_ndx)
-        const noexcept;
+    size_t get_subtable_size(size_t column_ndx, size_t row_ndx) const noexcept;
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
     size_t get_backlink_count(size_t row_ndx, const Table& origin,
                                    size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin,
-                             size_t origin_col_ndx, size_t backlink_ndx) const
-        noexcept;
+                        size_t origin_col_ndx, size_t backlink_ndx) const noexcept;
 
 
     //@{
@@ -2021,8 +2019,7 @@ public:
         table.discard_child_accessors();
     }
 
-    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx)
-        noexcept
+    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
     {
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
@@ -2235,8 +2232,7 @@ public:
         table.adj_erase_column(col_ndx);
     }
 
-    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2)
-        noexcept
+    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2) noexcept
     {
         table.adj_move_column(col_ndx_1, col_ndx_2);
     }
@@ -2293,8 +2289,7 @@ public:
         table.set_ndx_in_parent(ndx_in_parent);
     }
 
-    static void set_shared_subspec_ndx_in_parent(Table& table, size_t spec_ndx_in_parent)
-        noexcept
+    static void set_shared_subspec_ndx_in_parent(Table& table, size_t spec_ndx_in_parent) noexcept
     {
         table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }

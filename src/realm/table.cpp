@@ -5031,8 +5031,7 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
-    noexcept
+void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the

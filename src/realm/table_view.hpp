@@ -948,8 +948,7 @@ inline DataType TableViewBase::get_column_type(size_t column_ndx) const noexcept
 // Getters
 
 
-inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX(column_ndx, row_ndx);
 
@@ -958,8 +957,7 @@ inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const
     return m_table->get_int(column_ndx, real_ndx);
 }
 
-inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Bool);
 
@@ -968,8 +966,7 @@ inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
     return m_table->get_bool(column_ndx, real_ndx);
 }
 
-inline DateTime TableViewBase::get_datetime(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline DateTime TableViewBase::get_datetime(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
@@ -978,8 +975,7 @@ inline DateTime TableViewBase::get_datetime(size_t column_ndx, size_t row_ndx) c
     return m_table->get_datetime(column_ndx, real_ndx);
 }
 
-inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Float);
 
@@ -988,8 +984,7 @@ inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const
     return m_table->get_float(column_ndx, real_ndx);
 }
 
-inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Double);
 
@@ -998,8 +993,7 @@ inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const
     return m_table->get_double(column_ndx, real_ndx);
 }
 
-inline StringData TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline StringData TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
 
@@ -1008,8 +1002,7 @@ inline StringData TableViewBase::get_string(size_t column_ndx, size_t row_ndx) c
     return m_table->get_string(column_ndx, real_ndx);
 }
 
-inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Binary);
 
@@ -1018,8 +1011,7 @@ inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) c
     return m_table->get_binary(column_ndx, real_ndx); // Throws
 }
 
-inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
@@ -1028,8 +1020,7 @@ inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
     return m_table->get_mixed(column_ndx, real_ndx); // Throws
 }
 
-inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
@@ -1038,8 +1029,7 @@ inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx)
     return m_table->get_mixed_type(column_ndx, real_ndx);
 }
 
-inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
@@ -1048,8 +1038,7 @@ inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx
     return m_table->get_subtable_size(column_ndx, real_ndx);
 }
 
-inline size_t TableViewBase::get_link(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline size_t TableViewBase::get_link(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
 
@@ -1073,8 +1062,7 @@ inline ConstTableRef ConstTableView::get_link_target(size_t column_ndx) const no
     return m_table->get_link_target(column_ndx);
 }
 
-inline bool TableViewBase::is_null_link(size_t column_ndx, size_t row_ndx) const
-    noexcept
+inline bool TableViewBase::is_null_link(size_t column_ndx, size_t row_ndx) const noexcept
 {
     REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Link);
 
