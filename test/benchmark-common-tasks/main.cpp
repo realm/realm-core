@@ -183,6 +183,17 @@ struct BenchmarkSort : BenchmarkWithStrings {
     }
 };
 
+struct BenchmarkEmptyCommit : Benchmark {
+    const char* name() const { return "EmptyCommit"; }
+
+    void operator()(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        tr.commit();
+    }
+
+};
+
 struct BenchmarkSortInt : BenchmarkWithInts {
     const char* name() const { return "SortInt"; }
 
@@ -435,6 +446,7 @@ int benchmark_common_tasks_main()
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
+    run_benchmark<BenchmarkEmptyCommit>(results);
     run_benchmark<AddTable>(results);
     run_benchmark<BenchmarkQuery>(results);
     run_benchmark<BenchmarkQueryNot>(results);
