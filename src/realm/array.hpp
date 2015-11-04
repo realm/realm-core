@@ -648,6 +648,35 @@ public:
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, bool nullable_array = false, bool find_null = false) const;
 
+    // Templated find function to avoid conversion to and from integer represenation of condition
+    template <class cond>
+    bool find(Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state, bool nullable_array = false, bool find_null = false) const {
+        if (action == act_ReturnFirst) {
+            REALM_TEMPEX3(return find, cond, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_Sum) {
+            REALM_TEMPEX3(return find, cond, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_Min) {
+            REALM_TEMPEX3(return find, cond, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_Max) {
+            REALM_TEMPEX3(return find, cond, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_Count) {
+            REALM_TEMPEX3(return find, cond, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_FindAll) {
+            REALM_TEMPEX3(return find, cond, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        else if (action == act_CallbackIdx) {
+            REALM_TEMPEX3(return find, cond, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
+        }
+        REALM_ASSERT_DEBUG(false);
+        return false;
+    }
+
+
 /*
     bool find(int cond, Action action, null, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
@@ -673,7 +702,7 @@ public:
 */
 
     // Optimized implementation for release mode
-    template<class cond2, Action action, size_t bitwidth, class Callback>
+    template<class cond, Action action, size_t bitwidth, class Callback>
     bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex,
                         QueryState<int64_t>* state, Callback callback, bool nullable_array = false, bool find_null = false) const;
 
@@ -699,7 +728,7 @@ public:
                            size_t end = size_t(-1)) const;
 
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
-    template<class cond2, Action action, size_t bitwidth, class Callback>
+    template<class cond, Action action, size_t bitwidth, class Callback>
     bool compare(int64_t value, size_t start, size_t end, size_t baseindex,
                  QueryState<int64_t>* state, Callback callback) const;
 
@@ -731,11 +760,11 @@ public:
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef REALM_COMPILER_SSE
-    template<class cond2, Action action, size_t width, class Callback>
+    template<class cond, Action action, size_t width, class Callback>
     bool find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
                  size_t baseindex, Callback callback) const;
 
-    template<class cond2, Action action, size_t width, class Callback>
+    template<class cond, Action action, size_t width, class Callback>
     REALM_FORCEINLINE bool find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                             QueryState<int64_t>* state, size_t baseindex,
                                             Callback callback) const;
@@ -1119,7 +1148,7 @@ protected:
         Getter getter;
         ChunkGetter chunk_getter;
         Setter setter;
-        Finder finder[cond_Count]; // one for each COND_XXX enum
+        Finder finder[cond_VTABLE_FINDER_COUNT]; // one for each active function pointer
     };
     template<size_t w>
     struct VTableForWidth;
@@ -2474,7 +2503,7 @@ uint64_t Array::cascade(uint64_t a) const
 }
 
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
-// Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
+// Search for 'value' using condition cond (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
 // for each match. Break and return if find_action() returns false or 'end' is reached.
 
 // If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the
@@ -2482,14 +2511,14 @@ uint64_t Array::cascade(uint64_t a) const
 //
 // If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set,
 // then nullable_array must be set too.
-template<class cond2, Action action, size_t bitwidth, class Callback>
+template<class cond, Action action, size_t bitwidth, class Callback>
 bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool find_null) const
 {
     REALM_ASSERT(!(find_null && !nullable_array));
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
 
     size_t start2 = start;
-    cond2 c;
+    cond c;
 
     if (end == npos)
         end = nullable_array ? size() - 1 : size();
@@ -2545,11 +2574,11 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
     if (end == size_t(-1))
         end = m_size;
 
-    // Return immediately if no items in array can match (such as if cond2 == Greater && value == 100 && m_ubound == 15)
+    // Return immediately if no items in array can match (such as if cond == Greater && value == 100 && m_ubound == 15)
     if (!c.can_match(value, m_lbound, m_ubound))
         return true;
 
-    // optimization if all items are guaranteed to match (such as cond2 == NotEqual && value == 100 && m_ubound == 15)
+    // optimization if all items are guaranteed to match (such as cond == NotEqual && value == 100 && m_ubound == 15)
     if (c.will_match(value, m_lbound, m_ubound)) {
         size_t end2;
 
@@ -2591,20 +2620,20 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
 #if defined(REALM_COMPILER_SSE)
     // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support
     // Less-than comparison for 64-bit values.
-    if ((!(std::is_same<cond2, Less>::value && m_width == 64)) && end - start2 >= sizeof(__m128i) && m_width >= 8 &&
-        (sseavx<42>() || (sseavx<30>() && std::is_same<cond2, Equal>::value && m_width < 64))) {
+    if ((!(std::is_same<cond, Less>::value && m_width == 64)) && end - start2 >= sizeof(__m128i) && m_width >= 8 &&
+        (sseavx<42>() || (sseavx<30>() && std::is_same<cond, Equal>::value && m_width < 64))) {
 
         // find_sse() must start2 at 16-byte boundary, so search area before that using compare_equality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start2 * bitwidth / 8, sizeof (__m128i)));
         __m128i* const b = reinterpret_cast<__m128i*>(round_down(m_data + end * bitwidth / 8, sizeof (__m128i)));
 
-        if (!compare<cond2, action, bitwidth, Callback>(value, start2, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
+        if (!compare<cond, action, bitwidth, Callback>(value, start2, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
             return false;
 
         // Search aligned area with SSE
         if (b > a) {
             if (sseavx<42>()) {
-                if (!find_sse<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
+                if (!find_sse<cond, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
                 }
                 else if (sseavx<30>()) {
@@ -2615,16 +2644,16 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
         }
 
         // Search remainder with compare_equality()
-        if (!compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
+        if (!compare<cond, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
             return false;
 
         return true;
     }
     else {
-        return compare<cond2, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
+        return compare<cond, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
     }
 #else
-return compare<cond2, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
+return compare<cond, action, bitwidth, Callback>(value, start2, end, baseindex, state, callback);
 #endif
 }
 
@@ -2997,7 +3026,7 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 
 #ifdef REALM_COMPILER_SSE
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
-template<class cond2, Action action, size_t width, class Callback>
+template<class cond, Action action, size_t width, class Callback>
 bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
                     Callback callback) const
 {
@@ -3011,22 +3040,21 @@ bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int6
     else if (width == 32)
         search = _mm_set1_epi32(static_cast<int>(value));
     else if (width == 64) {
-        if (cond2::condition == cond_Less)
+        if (std::is_same<cond, Less>::value)
             REALM_ASSERT(false);
         else
             search = _mm_set_epi64x(value, value);
     }
 
-    return find_sse_intern<cond2, action, width, Callback>(data, &search, items, state, baseindex, callback);
+    return find_sse_intern<cond, action, width, Callback>(data, &search, items, state, baseindex, callback);
 }
 
 // Compares packed action_data with packed data (equal, less, etc) and performs aggregate action (max, min, sum,
 // find_all, etc) on value inside action_data for first match, if any
-template<class cond2, Action action, size_t width, class Callback>
+template<class cond, Action action, size_t width, class Callback>
 REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
-    int cond = cond2::condition;
     size_t i = 0;
     __m128i compare = {0};
     unsigned int resmask;
@@ -3034,7 +3062,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
     // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
     for (i = 0; i < items; ++i) {
         // equal / not-equal
-        if (cond == cond_Equal || cond == cond_NotEqual) {
+        if (std::is_same<cond, Equal>::value || std::is_same<cond, NotEqual>::value) {
             if (width == 8)
                 compare = _mm_cmpeq_epi8(action_data[i], *data);
             if (width == 16)
@@ -3047,7 +3075,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
         }
 
         // greater
-        else if (cond == cond_Greater) {
+        else if (std::is_same<cond, Greater>::value) {
             if (width == 8)
                 compare = _mm_cmpgt_epi8(action_data[i], *data);
             if (width == 16)
@@ -3058,7 +3086,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
                 compare = _mm_cmpgt_epi64(action_data[i], *data);
         }
         // less
-        else if (cond == cond_Less) {
+        else if (std::is_same<cond, Less>::value) {
             if (width == 8)
                 compare = _mm_cmplt_epi8(action_data[i], *data);
             else if (width == 16)
@@ -3071,7 +3099,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 
         resmask = _mm_movemask_epi8(compare);
 
-        if (cond == cond_NotEqual)
+        if (std::is_same<cond, NotEqual>::value)
             resmask = ~resmask & 0x0000ffff;
 
 //        if (resmask != 0)
@@ -3319,20 +3347,19 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
 }
 
 
-template<class cond2, Action action, size_t bitwidth, class Callback>
+template<class cond, Action action, size_t bitwidth, class Callback>
 bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                     Callback callback) const
 {
-    int cond = cond2::condition;
     bool ret = false;
 
-    if (cond == cond_Equal)
+    if (std::is_same<cond, Equal>::value)
         ret = compare_equality<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == cond_NotEqual)
+    else if (std::is_same<cond, NotEqual>::value)
         ret = compare_equality<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == cond_Greater)
+    else if (std::is_same<cond, Greater>::value)
         ret = compare_relation<true, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-    else if (cond == cond_Less)
+    else if (std::is_same<cond, Less>::value)
         ret = compare_relation<false, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     else
         REALM_ASSERT_DEBUG(false);

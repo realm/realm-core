@@ -22,18 +22,19 @@
 #define REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
 
 #include <realm/util/file.hpp>
+#include <realm/util/features.h>
 
 #if REALM_ENABLE_ENCRYPTION
 
 #include <vector>
 
-#ifdef __APPLE__
-#include <CommonCrypto/CommonCrypto.h>
+#if REALM_PLATFORM_APPLE
+#  include <CommonCrypto/CommonCrypto.h>
 #elif !defined(_WIN32)
-#include <openssl/aes.h>
-#include <openssl/sha.h>
+#  include <openssl/aes.h>
+#  include <openssl/sha.h>
 #else
-#error Encryption is not yet implemented for this platform.
+#  error Encryption is not yet implemented for this platform.
 #endif
 
 namespace realm {
@@ -54,7 +55,7 @@ public:
 
 private:
     enum EncryptionMode {
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
         mode_Encrypt = kCCEncrypt,
         mode_Decrypt = kCCDecrypt
 #else
@@ -63,7 +64,7 @@ private:
 #endif
     };
 
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
     CCCryptorRef m_encr;
     CCCryptorRef m_decr;
 #else

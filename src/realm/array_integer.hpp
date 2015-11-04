@@ -139,7 +139,7 @@ public:
               QueryState<int64_t>* state, Callback callback) const;
 
     // Optimized implementation for release mode
-    template<class cond2, Action action, size_t bitwidth, class Callback>
+    template<class cond, Action action, size_t bitwidth, class Callback>
     bool find_optimized(value_type value, size_t start, size_t end, size_t baseindex,
                         QueryState<int64_t>* state, Callback callback) const;
 

@@ -1191,6 +1191,7 @@ inline bool TransactLogEncoder::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
 inline void TransactLogConvenientEncoder::swap_rows(const Table* t, size_t row_ndx_1, size_t row_ndx_2)
 {
+    REALM_ASSERT(row_ndx_1 < row_ndx_2);
     select_table(t); // Throws
     m_encoder.swap_rows(row_ndx_1, row_ndx_2);
 }

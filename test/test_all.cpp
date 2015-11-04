@@ -141,8 +141,6 @@ void display_build_config()
 {
     const char* with_debug =
         Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
-    const char* with_replication =
-        Version::has_feature(feature_Replication) ? "Enabled" : "Disabled";
 
 #ifdef REALM_COMPILER_SSE
     const char* compiler_sse = "Yes";
@@ -165,7 +163,6 @@ void display_build_config()
         "\n"
         "Realm version: "<<Version::get_version()<<"\n"
         "  with Debug "<<with_debug<<"\n"
-        "  with Replication "<<with_replication<<"\n"
         "\n"
         "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
         "\n"

@@ -374,6 +374,8 @@ TEST(BinaryColumn_SwapRows)
         CHECK_EQUAL(c.get(1), BinaryData("baz"));
         CHECK_EQUAL(c.get(2), BinaryData("bar"));
         CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
     }
 
     // First two elements
@@ -390,6 +392,8 @@ TEST(BinaryColumn_SwapRows)
         CHECK_EQUAL(c.get(0), BinaryData("baz"));
         CHECK_EQUAL(c.get(1), BinaryData("bar"));
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Last two elements
@@ -406,6 +410,8 @@ TEST(BinaryColumn_SwapRows)
         CHECK_EQUAL(c.get(1), BinaryData("quux"));
         CHECK_EQUAL(c.get(2), BinaryData("baz"));
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Indices in wrong order
@@ -422,6 +428,8 @@ TEST(BinaryColumn_SwapRows)
         CHECK_EQUAL(c.get(1), BinaryData("quux"));
         CHECK_EQUAL(c.get(2), BinaryData("baz"));
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Null values
@@ -441,6 +449,8 @@ TEST(BinaryColumn_SwapRows)
         CHECK(c.get(1).is_null());
         CHECK_EQUAL(c.get(2).data(), BinaryData("bar").data());
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 }
 

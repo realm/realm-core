@@ -541,7 +541,7 @@ public:
 
     /// \brief Swap the elements at the specified indices.
     ///
-    /// If this \c TColumn has a search index defined, it will be updated to
+    /// If this \c Column has a search index defined, it will be updated to
     /// reflect the changes induced by the swap.
     ///
     /// Behaviour is undefined if:

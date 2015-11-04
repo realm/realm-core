@@ -6,7 +6,8 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Use `util::Logger` instead of `std::ostream` for logging during changeset
+  replay (`Replication::apply_changeset()`).
 
 ### Enhancements:
 

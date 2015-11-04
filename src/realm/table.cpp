@@ -2302,6 +2302,8 @@ void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
 
 void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
+    REALM_ASSERT(row_ndx_1 < row_ndx_2);
+
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
@@ -2359,6 +2361,26 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
     bump_version();
 }
 
+void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(row_ndx_1 >= m_size || row_ndx_2 >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+
+    // Internally, core requires that the first row index is strictly less than
+    // the second one. The changeset merge mechanism is written to take
+    // advantage of it, and it requires it.
+    if (row_ndx_1 == row_ndx_2)
+        return;
+    if (row_ndx_1 > row_ndx_2)
+        std::swap(row_ndx_1, row_ndx_2);
+
+    do_swap_rows(row_ndx_1, row_ndx_2);
+
+    if (Replication* repl = get_repl())
+        repl->swap_rows(this, row_ndx_1, row_ndx_2);
+}
 
 void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
