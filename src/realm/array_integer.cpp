@@ -210,6 +210,7 @@ void ArrayIntNull::find_all(IntegerColumn* result, value_type value, size_t col_
 
 void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
 {
+    // FIXME: Optimize this
     int64_t tmp[8];
     Array::get_chunk(ndx + 1, tmp);
     int64_t null = null_value();
