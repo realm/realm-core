@@ -593,8 +593,6 @@ void GroupWriter::commit(ref_type new_top_ref)
     if (!disable_sync)
         m_file_map.sync(); // Throws
 
-    realm::util::encryption_read_barrier(file_header, sizeof(SlabAlloc::Header));
-
     // update selector - must happen after write of all data and top pointer
     file_header[16+7] = char(select_field); // swap
 
