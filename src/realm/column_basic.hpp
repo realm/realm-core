@@ -36,20 +36,17 @@ struct AggReturnType<float>
     typedef double sum_type;
 };
 
-template<>
-struct GetLeafType<float, false> {
-    using type = BasicArray<float>;
-};
-template<>
-struct GetLeafType<double, false> {
-    using type = BasicArray<double>;
-};
-
 // FIXME: Remove this - it's unused except in tests.
 template<>
-struct GetLeafType<int, false> {
-    using type = ArrayInteger;
+struct ColumnTypeTraits<int> {
+    using column_type = BasicColumn<int>;
+    using leaf_type = ArrayInteger;
+    using sum_type = int;
+    static const DataType id = type_Int;
+    static const ColumnType column_id = col_type_Int;
+    static const ColumnType real_column_type = col_type_Int;
 };
+
 
 
 /// A basic column (BasicColumn<T>) is a single B+-tree, and the root
@@ -61,7 +58,7 @@ struct GetLeafType<int, false> {
 template<class T>
 class BasicColumn : public ColumnBaseSimple, public ColumnTemplate<T> {
 public:
-    using LeafType = typename GetLeafType<T, false>::type;
+    using LeafType = typename ColumnTypeTraits<T>::leaf_type;
     using value_type = T;
 
     // The FloatColumn and DoubleColumn only exists as class types that support

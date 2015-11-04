@@ -342,6 +342,8 @@ struct null {
     null() {}
     operator StringData() { return StringData(0, 0); }
     operator int64_t() { throw(LogicError::type_mismatch); }
+    template<class T>
+    operator util::Optional<T>() { return util::none; }
 
     template<class T>
     bool operator == (const T&) const { REALM_ASSERT(false); return false; }

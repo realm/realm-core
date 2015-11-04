@@ -205,6 +205,15 @@ private:
     friend class Optional;
 };
 
+
+template<class T> struct RemoveOptional {
+    using type = T;
+};
+template<class T> struct RemoveOptional<Optional<T>> {
+    using type = typename RemoveOptional<T>::type; // Remove recursively
+};
+
+
 /// Implementation:
 
 template<class T>
@@ -467,6 +476,12 @@ bool operator==(const Optional<T>& lhs, const Optional<T>& rhs)
 }
 
 template<class T>
+bool operator!=(const Optional<T>& lhs, const Optional<T>& rhs)
+{
+    return !(lhs == rhs);
+}
+
+template<class T>
 bool operator<(const Optional<T>& lhs, const Optional<T>& rhs)
 {
     if (!rhs) { return false; }
@@ -475,9 +490,23 @@ bool operator<(const Optional<T>& lhs, const Optional<T>& rhs)
 }
 
 template<class T>
+bool operator>(const util::Optional<T>& lhs, const util::Optional<T>& rhs)
+{
+    if (!lhs) { return false; }
+    if (!rhs) { return true; }
+    return std::greater<T>{}(*lhs, *rhs);
+}
+
+template<class T>
 bool operator==(const Optional<T>& lhs, None)
 {
     return !bool(lhs);
+}
+
+template<class T>
+bool operator!=(const Optional<T>& lhs, None)
+{
+    return bool(lhs);
 }
 
 template<class T>
@@ -494,13 +523,19 @@ bool operator==(None, const Optional<T>& rhs)
 }
 
 template<class T>
-bool operator<(None, const Optional<T>& rhs)
+bool operator!=(None, const Optional<T>& rhs)
 {
     return bool(rhs);
 }
 
 template<class T>
-bool operator==(const Optional<T>& lhs, const T& rhs)
+bool operator<(None, const Optional<T>& rhs)
+{
+    return bool(rhs);
+}
+
+template<class T, class U>
+bool operator==(const Optional<T>& lhs, const U& rhs)
 {
     return lhs ? *lhs == rhs : false;
 }
@@ -511,8 +546,8 @@ bool operator<(const Optional<T>& lhs, const T& rhs)
     return lhs ? std::less<T>{}(*lhs, rhs) : true;
 }
 
-template<class T>
-bool operator==(const T& lhs, const Optional<T>& rhs)
+template<class T, class U>
+bool operator==(const T& lhs, const Optional<U>& rhs)
 {
     return rhs ? lhs == *rhs : false;
 }
@@ -527,6 +562,42 @@ template<class T, class F>
 auto operator>>(Optional<T> lhs, F&& rhs) -> decltype(fmap(lhs, std::forward<F>(rhs)))
 {
     return fmap(lhs, std::forward<F>(rhs));
+}
+
+template<class OS, class T>
+OS& operator<<(OS& os, const Optional<T>& rhs)
+{
+    if (rhs) {
+        os << "some(" << *rhs << ")";
+    }
+    else {
+        os << "none";
+    }
+    return os;
+}
+
+template<class T>
+T unwrap(T&& value)
+{
+    return value;
+}
+
+template<class T>
+T unwrap(util::Optional<T>&& value)
+{
+    return *value;
+}
+
+template<class T>
+T unwrap(const util::Optional<T>& value)
+{
+    return *value;
+}
+
+template<class T>
+T unwrap(util::Optional<T>& value)
+{
+    return *value;
 }
 
 } // namespace util

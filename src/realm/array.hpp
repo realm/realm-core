@@ -1357,6 +1357,32 @@ public:
         }
         return (m_limit > m_match_count);
     }
+
+    template<Action action, bool pattern>
+    inline bool match(size_t index, uint64_t indexpattern, util::Optional<int64_t> value)
+    {
+        // FIXME: This is a temporary hack for nullable integers.
+        if (value) {
+            return match<action, pattern>(index, indexpattern, *value);
+        }
+
+        ++m_match_count;
+
+        // If value is null, the only sensible actions are count, find_all, and return first.
+        // Max, min, and sum should all have no effect.
+        if (action == act_Count) {
+            m_state++;
+            m_match_count = size_t(m_state);
+        }
+        else if (action == act_FindAll) {
+            Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
+        }
+        else if (action == act_ReturnFirst) {
+            m_state = index;
+            return false;
+        }
+        return m_limit > m_match_count;
+    }
 };
 
 // Used only for Basic-types: currently float and double
