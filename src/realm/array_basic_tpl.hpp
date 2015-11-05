@@ -118,6 +118,14 @@ MemRef BasicArray<T>::slice(size_t offset, size_t size, Allocator& target_alloc)
     return slice.get_mem();
 }
 
+template<class T>
+MemRef BasicArray<T>::slice_and_clone_children(size_t offset, size_t size,
+                                               Allocator& target_alloc) const
+{
+    // BasicArray<T> never contains refs, so never has children.
+    return slice(offset, size, target_alloc);
+}
+
 
 template<class T>
 inline void BasicArray<T>::add(T value)

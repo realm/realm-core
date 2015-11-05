@@ -86,6 +86,7 @@ public:
     /// Construct a copy of the specified slice of this basic array
     /// using the specified target allocator.
     MemRef slice(size_t offset, size_t size, Allocator& target_alloc) const;
+    MemRef slice_and_clone_children(size_t offset, size_t size, Allocator& target_alloc) const;
 
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
