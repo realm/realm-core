@@ -1453,7 +1453,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
     char instr;
     if (!read_char(instr))
         parser_error();
-//    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << "\n";
+//    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << std::dec << "\n";
     switch (Instruction(instr)) {
         case instr_SetInt: {
             size_t col_ndx = read_int<size_t>(); // Throws
