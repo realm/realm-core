@@ -35,6 +35,7 @@ REALM_NORETURN void terminate_internal(std::stringstream&) noexcept;
 
 REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept;
 
+// LCOV_EXCL_START
 template<class... Ts>
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
                               Ts... infos) noexcept
@@ -48,6 +49,7 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line,
 
     terminate_internal(ss);
 }
+// LCOV_EXCL_STOP
 
 template<class... Args>
 REALM_NORETURN void terminate_with_info(const char* assert_message, int line, const char* file,
