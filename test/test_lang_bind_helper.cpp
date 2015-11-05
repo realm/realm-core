@@ -717,7 +717,245 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 
 TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 {
-    // FIXME: Exercise the mixed column
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 3 mixed columns and 3 rows
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_Mixed, "a");
+        table_w->add_column(type_Mixed, "b");
+        table_w->add_column(type_Mixed, "c");
+        table_w->add_empty_row(3);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    // Every cell must have integer type and be zero by default
+    ConstTableRef table = group.get_table("t");
+    for (size_t row_ndx = 0; row_ndx < 3; ++row_ndx) {
+        for (size_t col_ndx = 0; col_ndx < 3; ++col_ndx) {
+            CHECK_EQUAL(type_Int, table->get_mixed_type(col_ndx, row_ndx)) &&
+                CHECK_EQUAL(0, table->get_mixed(col_ndx, row_ndx).get_int());
+        }
+    }
+
+    using int_type = decltype (Mixed().get_int());
+
+    auto set_subtab = [this](TableRef table_w, size_t col_ndx, size_t row_ndx, int_type value) {
+        table_w->set_mixed(col_ndx, row_ndx, Mixed(Mixed::subtable_tag()));
+        TableRef subtab_w = table_w->get_subtable(col_ndx, row_ndx);
+        subtab_w->add_column(type_Int, "");
+        subtab_w->add_empty_row();
+        subtab_w->set_int(0, 0, value);
+    };
+
+    auto check_subtab = [this](ConstTableRef table, size_t col_ndx, size_t row_ndx, int_type value) {
+        ConstTableRef subtab = table->get_subtable(col_ndx, row_ndx);
+        return CHECK_EQUAL(1, subtab->get_column_count()) &&
+            CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
+            CHECK_EQUAL(1, subtab->size()) &&
+            CHECK_EQUAL(value, subtab->get_int(0, 0));
+    };
+
+    // Change value types (round 1 of 2)
+    char bin_1[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->set_mixed(0, 0, Mixed(int_type(2)));
+        table_w->set_mixed(0, 1, Mixed(true));
+        table_w->set_mixed(0, 2, Mixed(DateTime(3)));
+        table_w->set_mixed(1, 0, Mixed(4.0f));
+//        table_w->set_mixed(1, 1, Mixed(5.0));
+        wt.get_group().verify();
+        table_w->set_mixed(1, 2, Mixed(StringData("Hadamard")));
+        table_w->set_mixed(2, 0, Mixed(BinaryData(bin_1)));
+        set_subtab(table_w, 2, 1, 6);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1)) &&
+        CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(DateTime(3), table->get_mixed(0, 2).get_datetime());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) &&
+        CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
+//        CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_1), table->get_mixed(2, 0).get_binary());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(2, 1)) &&
+        check_subtab(table, 2, 1, 6);
+    CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
+
+    // Change value types (round 2 of 2)
+    char bin_2[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->set_mixed(0, 1, Mixed(20.0f));
+        table_w->set_mixed(0, 2, Mixed(false));
+        set_subtab(table_w, 1, 0, 30);
+        table_w->set_mixed(1, 1, Mixed(BinaryData(bin_2)));
+        table_w->set_mixed(1, 2, Mixed(int_type(40)));
+//        table_w->set_mixed(2, 0, Mixed(50.0));
+        table_w->set_mixed(2, 1, Mixed(StringData("Banach")));
+        table_w->set_mixed(2, 2, Mixed(DateTime(60)));
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) &&
+        check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 2).get_datetime());
+
+    // Insert rows before
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->insert_empty_row(0, 8);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8+0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 8+0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 8+1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 8+1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 8+2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 8+2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 8+0)) &&
+        check_subtab(table, 1, 8+0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 8+1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 8+1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 8+2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 8+2).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 8+0)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 8+0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 8+1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 8+1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 8+2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 8+2).get_datetime());
+
+    // Remove rows (ordered)
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->remove(4);
+        table_w->remove(2);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6+0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 6+0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 6+1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 6+1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 6+2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 6+2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 6+0)) &&
+        check_subtab(table, 1, 6+0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 6+1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 6+1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 6+2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 6+2).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 6+0)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 6+0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 6+1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 6+1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 6+2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 6+2).get_datetime());
+
+    // Remove rows (unordered)
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->move_last_over(2); // 8 -> 2
+        table_w->move_last_over(4); // 7 -> 4
+        table_w->move_last_over(0); // 6 -> 0
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 4)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 4).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) &&
+        check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 4)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 4).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 4)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 2).get_datetime());
+
+    // Swap rows
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->swap_rows(4, 0);
+        table_w->swap_rows(2, 5);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 4)) &&
+        check_subtab(table, 1, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 5).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 4)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 5).get_datetime());
+
+    // FIXME: Column insertion, removal, moval, and swapping
 }
 
 
