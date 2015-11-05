@@ -4,6 +4,7 @@
 #include <realm/alloc_slab.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/shared_ptr.hpp>
+#include <realm/util/string_buffer.hpp>
 #include <realm/util/uri.hpp>
 
 #include "test.hpp"
@@ -249,6 +250,121 @@ TEST(Utils_Uri)
         CHECK_EQUAL(u.get_path(), "/");
     }
 
+}
+
+TEST(Utils_StringBuffer)
+{
+    // str() on empty sb
+    {
+        StringBuffer sb;
+
+        std::string s = sb.str();
+        CHECK_EQUAL(s.size(), 0);
+    }
+
+    // str() on sb with data
+    {
+        StringBuffer sb;
+        sb.append("foo");
+
+        std::string s = sb.str();
+        CHECK_EQUAL(s.size(), 3);
+        CHECK_EQUAL(s.size(), sb.size());
+        CHECK_EQUAL(s, "foo");
+    }
+
+    // data() on empty sb
+    {
+        StringBuffer sb;
+
+        CHECK(sb.data() == nullptr);
+    }
+
+    // data() on sb with data
+    {
+        StringBuffer sb;
+        sb.append("foo");
+
+        CHECK(sb.data() != nullptr);
+    }
+
+    // c_str() on empty sb
+    {
+        StringBuffer sb;
+
+        CHECK(sb.c_str() != nullptr);
+        CHECK(sb.c_str() == sb.c_str());
+        CHECK_EQUAL(strlen(sb.c_str()), 0);
+    }
+
+    // c_str() on sb with data
+    {
+        StringBuffer sb;
+        sb.append("foo");
+
+        CHECK(sb.c_str() != nullptr);
+        CHECK(sb.c_str() == sb.c_str());
+        CHECK_EQUAL(strlen(sb.c_str()), 3);
+    }
+
+    // append_c_str()
+    {
+        StringBuffer sb;
+        sb.append_c_str("foo");
+
+        CHECK(sb.size() == 3);
+        CHECK(sb.str().size() == 3);
+        CHECK(sb.str() == "foo");
+    }
+
+    // clear()
+    {
+        StringBuffer sb;
+
+        sb.clear();
+        CHECK(sb.size() == 0);
+
+        sb.append_c_str("foo");
+
+        CHECK(sb.size() == 3);
+
+        sb.clear();
+
+        CHECK(sb.size() == 0);
+        CHECK(sb.str().size() == 0);
+        CHECK(sb.str() == "");
+    }
+
+    // resize()
+    {
+        // size reduction
+        {
+            StringBuffer sb;
+            sb.append_c_str("foo");
+            sb.resize(1);
+
+            CHECK(sb.size() == 1);
+            CHECK(sb.str() == "f");
+        }
+
+        // size increase
+        {
+            StringBuffer sb;
+            sb.append_c_str("foo");
+            sb.resize(10);
+
+            CHECK(sb.size() == 10);
+            CHECK(sb.str().size() == 10);
+        }
+    }
+
+    // overflow detection
+    {
+        StringBuffer sb;
+        sb.append("foo");
+        CHECK_THROW(sb.append("foo", static_cast<size_t>(-1)), BufferSizeOverflow);
+        CHECK_THROW(sb.reserve(static_cast<size_t>(-1)), BufferSizeOverflow);
+    }
 }
 
 #endif
