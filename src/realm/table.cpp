@@ -1572,6 +1572,12 @@ void Table::add_search_index(size_t col_ndx)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
+    if (REALM_UNLIKELY(get_column_type(col_ndx) == type_Float))
+        throw LogicError(LogicError::illegal_combination);
+
+    if (REALM_UNLIKELY(get_column_type(col_ndx) == type_Double))
+        throw LogicError(LogicError::illegal_combination);
+
     if (has_search_index(col_ndx))
         return;
 
