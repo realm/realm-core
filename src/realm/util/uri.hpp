@@ -151,6 +151,10 @@ private:
 
 // Implementation
 
+inline Uri::Uri()
+{
+}
+
 inline std::string Uri::recompose() const
 {
     return m_scheme + m_auth + m_path + m_query + m_frag;
