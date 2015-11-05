@@ -126,6 +126,7 @@ public:
 };
 
 
+// LCOV_EXCL_START (because the NullInstructionObserver is trivial)
 class NullInstructionObserver {
 public:
     /// The following methods are also those that TransactLogParser expects
@@ -185,6 +186,7 @@ public:
 
     void parse_complete() {}
 };
+// LCOV_EXCL_STOP (NullInstructionObserver)
 
 
 /// See TransactLogConvenientEncoder for information about the meaning of the
