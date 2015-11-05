@@ -34,7 +34,7 @@ namespace util {
 /// The decomposition process (as carried out by the constructor) performs a
 /// maximally lenient parsing of the specified URI reference. It does that
 /// according to the following regular expression (taken from
-/// http://tools.ietf.org/html/rfc3986#appendix):
+/// http://tools.ietf.org/html/rfc3986#appendix-B):
 ///
 ///     ^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?
 ///      1             2             3       4           5
