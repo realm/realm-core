@@ -77,7 +77,7 @@ namespace util {
 /// component parts at any time must have values that will be preserved across a
 /// recomposition -> decomposition cycle.
 ///
-/// The actual restructions on each component part is specified for the
+/// The actual restrictions on each component part is specified for the
 /// corresponding setter-method (e.g., set_scheme()).
 ///
 /// Note that component parts resulting from decomposition, canonicalize, or
