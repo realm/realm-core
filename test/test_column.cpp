@@ -408,7 +408,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_HeaderParse)
 
     TEST_TYPE column(Allocator::get_default(), c.get_ref());
-    bool is_equal = c.compare_int(column);
+    bool is_equal = c.compare(column);
     CHECK(is_equal);
 
 
@@ -596,28 +596,28 @@ TEST(Column_LowerUpperBound)
         col.add(i);
 
     // before first entry
-    CHECK_EQUAL(0, col.lower_bound_int(0));
-    CHECK_EQUAL(0, col.upper_bound_int(0));
+    CHECK_EQUAL(0, col.lower_bound(0));
+    CHECK_EQUAL(0, col.upper_bound(0));
 
     // first entry (duplicate)
-    CHECK_EQUAL(0, col.lower_bound_int(5));
-    CHECK_EQUAL(2, col.upper_bound_int(5));
+    CHECK_EQUAL(0, col.lower_bound(5));
+    CHECK_EQUAL(2, col.upper_bound(5));
 
     // middle entry
-    CHECK_EQUAL(10, col.lower_bound_int(50));
-    CHECK_EQUAL(11, col.upper_bound_int(50));
+    CHECK_EQUAL(10, col.lower_bound(50));
+    CHECK_EQUAL(11, col.upper_bound(50));
 
     // non-existent middle entry
-    CHECK_EQUAL(11, col.lower_bound_int(52));
-    CHECK_EQUAL(11, col.upper_bound_int(52));
+    CHECK_EQUAL(11, col.lower_bound(52));
+    CHECK_EQUAL(11, col.upper_bound(52));
 
     // last entry
-    CHECK_EQUAL(19, col.lower_bound_int(95));
-    CHECK_EQUAL(20, col.upper_bound_int(95));
+    CHECK_EQUAL(19, col.lower_bound(95));
+    CHECK_EQUAL(20, col.upper_bound(95));
 
     // beyond last entry
-    CHECK_EQUAL(20, col.lower_bound_int(96));
-    CHECK_EQUAL(20, col.upper_bound_int(96));
+    CHECK_EQUAL(20, col.lower_bound(96));
+    CHECK_EQUAL(20, col.upper_bound(96));
 
     // Clean up
     col.destroy();
@@ -1100,16 +1100,16 @@ TEST(ColumnIntNull_CompareInts)
     CHECK(c1.is_null(0));
     CHECK(c2.is_null(0));
 
-    CHECK(c1.compare_int(c2));
+    CHECK(c1.compare(c2));
 
     c1.set(0, 0);
     CHECK_NOT(c1.is_null(0));
-    CHECK_NOT(c1.compare_int(c2));
+    CHECK_NOT(c1.compare(c2));
     c2.set(0, 0);
-    CHECK(c1.compare_int(c2));
+    CHECK(c1.compare(c2));
 
     c2.set(0, 1);
-    CHECK_NOT(c1.compare_int(c2));
+    CHECK_NOT(c1.compare(c2));
 
     c1.destroy();
     c2.destroy();

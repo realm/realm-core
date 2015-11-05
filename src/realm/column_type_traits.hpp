@@ -79,6 +79,7 @@ struct ColumnTypeTraits<float> {
     using column_type = FloatColumn;
     using leaf_type = BasicArray<float>;
     using sum_type = double;
+    using minmax_type = float;
     static const DataType id = type_Float;
     static const ColumnType column_id = col_type_Float;
     static const ColumnType real_column_type = col_type_Float;
@@ -89,6 +90,7 @@ struct ColumnTypeTraits<double> {
     using column_type = DoubleColumn;
     using leaf_type = BasicArray<double>;
     using sum_type = double;
+    using minmax_type = double;
     static const DataType id = type_Double;
     static const ColumnType column_id = col_type_Double;
     static const ColumnType real_column_type = col_type_Double;

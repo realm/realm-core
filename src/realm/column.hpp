@@ -56,6 +56,16 @@ struct ImplicitNull<int64_t> {
     static constexpr bool value = false;
 };
 
+template<>
+struct ImplicitNull<float> {
+    static constexpr bool value = true;
+};
+
+template<>
+struct ImplicitNull<double> {
+    static constexpr bool value = true;
+};
+
 // FIXME: Add specialization for ImplicitNull for float, double, StringData, BinaryData.
 
 struct ColumnTemplateBase
@@ -517,16 +527,13 @@ public:
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to ordinary integer comparison.
-    // FIXME: Rename
-    size_t lower_bound_int(T value) const noexcept;
-    // FIXME: Rename
-    size_t upper_bound_int(T value) const noexcept;
+    size_t lower_bound(T value) const noexcept;
+    size_t upper_bound(T value) const noexcept;
     //@}
 
     size_t find_gte(T target, size_t start) const;
 
-    // FIXME: Rename
-    bool compare_int(const Column&) const noexcept;
+    bool compare(const Column&) const noexcept;
 
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
                            size_t size = 0, T value = 0);
@@ -1265,21 +1272,21 @@ void Column<T>::clear(size_t, bool)
 
 
 template<class T>
-size_t Column<T>::lower_bound_int(T value) const noexcept
+size_t Column<T>::lower_bound(T value) const noexcept
 {
-    static_assert(std::is_same<T, int64_t>::value, "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
-        return get_root_array()->lower_bound_int(value);
+        auto root = static_cast<const LeafType*>(get_root_array());
+        return root->lower_bound(value);
     }
     return ColumnBase::lower_bound(*this, value);
 }
 
 template<class T>
-size_t Column<T>::upper_bound_int(T value) const noexcept
+size_t Column<T>::upper_bound(T value) const noexcept
 {
-    static_assert(std::is_same<T, int64_t>::value, "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
-        return get_root_array()->upper_bound_int(value);
+        auto root = static_cast<const LeafType*>(get_root_array());
+        return root->upper_bound(value);
     }
     return ColumnBase::upper_bound(*this, value);
 }
@@ -1305,7 +1312,7 @@ size_t Column<T>::find_gte(T target, size_t start) const
 
 
 template<class T>
-bool Column<T>::compare_int(const Column<T>& c) const noexcept
+bool Column<T>::compare(const Column<T>& c) const noexcept
 {
     size_t n = size();
     if (c.size() != n)

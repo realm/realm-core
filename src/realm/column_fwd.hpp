@@ -47,8 +47,8 @@ template <class> class Optional;
 // Shortcuts, aka typedefs.
 using IntegerColumn = Column<int64_t>;
 using IntNullColumn = Column<util::Optional<int64_t>>;
-using DoubleColumn = BasicColumn<double>;
-using FloatColumn = BasicColumn<float>;
+using DoubleColumn = Column<double>;
+using FloatColumn = Column<float>;
 
 } // namespace realm
 

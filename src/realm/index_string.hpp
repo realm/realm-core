@@ -52,6 +52,16 @@ inline StringData to_str(null input)
     return input;
 }
 
+inline StringData to_str(float)
+{
+    REALM_ASSERT(false); // Index on float not supported
+}
+
+inline StringData to_str(double)
+{
+    REALM_ASSERT(false); // Index on double not supported
+}
+
 template<class T>
 inline StringData to_str(const util::Optional<T>& value)
 {

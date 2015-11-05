@@ -64,11 +64,37 @@ inline MemRef BasicArray<T>::create_array(size_t size, Allocator& alloc)
 
 
 template<class T>
+inline MemRef BasicArray<T>::create_array(Array::Type type, bool context_flag, size_t size,
+                                          T value, Allocator& alloc)
+{
+    REALM_ASSERT(type == Array::type_Normal);
+    REALM_ASSERT(!context_flag);
+    MemRef mem = create_array(size, alloc);
+    if (size) {
+        BasicArray<T> tmp(alloc);
+        tmp.init_from_mem(mem);
+        for (size_t i = 0; i < size; ++i) {
+            tmp.set(i, value);
+        }
+    }
+    return mem;
+}
+
+
+template<class T>
 inline void BasicArray<T>::create()
 {
     size_t size = 0;
     MemRef mem = create_array(size, get_alloc()); // Throws
     init_from_mem(mem);
+}
+
+
+template<class T>
+inline void BasicArray<T>::create(Array::Type type)
+{
+    REALM_ASSERT(type == Array::type_Normal);
+    BasicArray<T>::create();
 }
 
 
@@ -108,6 +134,15 @@ inline T BasicArray<T>::get(size_t ndx) const noexcept
 
 
 template<class T>
+inline bool BasicArray<T>::is_null(size_t ndx) const noexcept
+{
+    // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
+    auto x = get(ndx);
+    return null::is_null_float(x);
+}
+
+
+template<class T>
 inline T BasicArray<T>::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
@@ -130,6 +165,13 @@ inline void BasicArray<T>::set(size_t ndx, T value)
     // Set the value
     T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
+}
+
+template<class T>
+inline void BasicArray<T>::set_null(size_t ndx)
+{
+    // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
+    set(ndx, null::get_null_float<T>());
 }
 
 template<class T>

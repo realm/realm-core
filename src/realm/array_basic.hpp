@@ -34,8 +34,10 @@ public:
     ~BasicArray() noexcept override {}
 
     T get(size_t ndx) const noexcept;
+    bool is_null(size_t ndx) const noexcept;
     void add(T value);
     void set(size_t ndx, T value);
+    void set_null(size_t ndx);
     void insert(size_t ndx, T value);
     void erase(size_t ndx);
     void truncate(size_t size);
@@ -68,6 +70,9 @@ public:
     /// initialized to `T()`.
     static MemRef create_array(size_t size, Allocator&);
 
+    static MemRef create_array(Array::Type leaf_type, bool context_flag, size_t size, T value,
+                               Allocator&);
+
     /// Create a new empty array and attach this accessor to it. This
     /// does not modify the parent reference information of this
     /// accessor.
@@ -75,6 +80,8 @@ public:
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.
     void create();
+
+    void create(Array::Type);
 
     /// Construct a copy of the specified slice of this basic array
     /// using the specified target allocator.
