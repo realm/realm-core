@@ -2136,59 +2136,38 @@ public:
         return true;
     }
 
-    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    bool set_int(size_t, size_t, int_fast64_t)
     {
-        // FIXME: Could this not be a no-op?
-        m_encoder.set_int(col_ndx, row_ndx, value);
-        append_instruction();
         return true;
     }
 
-    bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
+    bool set_bool(size_t, size_t, bool)
     {
-        // FIXME: Could this not be a no-op?
-        m_encoder.set_bool(col_ndx, row_ndx, value);
-        append_instruction();
         return true;
     }
 
-    bool set_float(size_t col_ndx, size_t row_ndx, float value)
+    bool set_float(size_t, size_t, float)
     {
-        // FIXME: Could this not be a no-op?
-        m_encoder.set_float(col_ndx, row_ndx, value);
-        append_instruction();
         return true;
     }
 
-    bool set_double(size_t col_ndx, size_t row_ndx, double value)
+    bool set_double(size_t, size_t, double)
     {
-        // FIXME: Could this not be a no-op?
-        m_encoder.set_double(col_ndx, row_ndx, value);
-        append_instruction();
         return true;
     }
 
-    bool set_string(size_t col_ndx, size_t row_ndx, StringData value)
+    bool set_string(size_t, size_t, StringData)
     {
-        // FIXME: Could this not be a no-op?
-        m_encoder.set_string(col_ndx, row_ndx, value);
-        append_instruction();
         return true;
     }
 
-    bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
+    bool set_binary(size_t, size_t, BinaryData)
     {
-        // FIXME: Could this not be a no-op?
-        m_encoder.set_binary(col_ndx, row_ndx, value);
-        append_instruction();
         return true;
     }
 
-    bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
+    bool set_date_time(size_t, size_t, DateTime)
     {
-        // FIXME: Could this not be a no-op?
-        m_encoder.set_date_time(col_ndx, row_ndx, value);
-        append_instruction();
         return true;
     }
 
