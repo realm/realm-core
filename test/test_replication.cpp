@@ -803,6 +803,41 @@ TEST(Replication_NullInteger)
 }
 
 
+TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("foo");
+        TableRef table2 = wt.add_table("foo2");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        wt.get_group().rename_table("foo", "bar");
+        wt.get_group().move_table(1, 0);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef foo = rt.get_table("foo");
+        CHECK(!foo);
+        ConstTableRef bar = rt.get_table("bar");
+        CHECK(bar);
+        CHECK_EQUAL(1, bar->get_index_in_group());
+    }
+}
+
+
 } // anonymous namespace
 
 #endif // TEST_REPLICATION
