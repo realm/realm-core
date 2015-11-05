@@ -220,8 +220,9 @@ bool encryption_is_in_use = false;
 void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size)
 {
     LockGuard lock(mapping_mutex);
-    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
-        mapping_and_addr& m = mappings_by_addr[i];
+    auto limit = mappings_by_addr.end();
+    for (auto it = mappings_by_addr.begin(); it < limit; ++it) {
+        mapping_and_addr& m = *it;
         if (m.addr >= static_cast<const char*>(addr) + size 
             || static_cast<const char*>(m.addr) + m.size <= addr)
             continue;
@@ -232,8 +233,9 @@ void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size he
 void do_encryption_write_barrier(const void* addr, size_t size)
 {
     LockGuard lock(mapping_mutex);
-    for (size_t i = 0; i < mappings_by_addr.size(); ++i) {
-        mapping_and_addr& m = mappings_by_addr[i];
+    auto limit = mappings_by_addr.end();
+    for (auto it = mappings_by_addr.begin(); it < limit; ++it) {
+        mapping_and_addr& m = *it;
         if (m.addr >= static_cast<const char*>(addr) + size 
             || static_cast<const char*>(m.addr) + m.size <= addr)
             continue;

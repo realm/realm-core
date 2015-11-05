@@ -19,6 +19,7 @@
  **************************************************************************/
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/file_mapper.hpp>
+#include <realm/utilities.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
 #include <cstdlib>
