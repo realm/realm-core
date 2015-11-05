@@ -123,7 +123,7 @@ public:
 private:
     SharedFileInfo& m_file;
 
-    size_t m_page_size;
+    size_t m_page_shift;
     size_t m_blocks_per_page;
 
     void* m_addr = nullptr;

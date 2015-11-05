@@ -330,14 +330,14 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, 
                                            File::AccessMode access)
 : m_file(file)
-, m_page_size(realm::util::page_size())
-, m_blocks_per_page(m_page_size / block_size)
+, m_page_shift(log2(realm::util::page_size()))
+, m_blocks_per_page((1<<m_page_shift) / block_size)
 , m_access(access)
 #ifdef REALM_DEBUG
-, m_validate_buffer(new char[m_page_size])
+, m_validate_buffer(new char[1<<m_page_shift])
 #endif
 {
-    REALM_ASSERT(m_blocks_per_page * block_size == m_page_size);
+    REALM_ASSERT(m_blocks_per_page * block_size == (1ULL << m_page_shift));
     set(addr, size, file_offset); // throws
     file.mappings.push_back(this);
 }
@@ -351,7 +351,7 @@ EncryptedFileMapping::~EncryptedFileMapping()
 
 char* EncryptedFileMapping::page_addr(size_t i) const noexcept
 {
-    return reinterpret_cast<char*>((m_first_page + i) * m_page_size);
+    return reinterpret_cast<char*>((m_first_page + i) << m_page_shift);
 }
 
 void EncryptedFileMapping::mark_outdated(size_t i) noexcept
@@ -383,7 +383,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
             continue;
 
         if (m->m_up_to_date_pages[page]) {
-            memcpy(page_addr(page), m->page_addr(page), m_page_size);
+            memcpy(page_addr(page), m->page_addr(page), 1 << m_page_shift);
             return true;
         }
     }
@@ -395,7 +395,7 @@ void EncryptedFileMapping::refresh_page(size_t i) noexcept
     char* addr = page_addr(i);
 
     if (!copy_up_to_date_page(i))
-        m_file.cryptor.read(m_file.fd, i * m_page_size, addr, m_page_size);
+        m_file.cryptor.read(m_file.fd, i << m_page_shift, addr, 1 << m_page_shift);
 
     m_up_to_date_pages[i] = true;
 }
@@ -422,19 +422,19 @@ void EncryptedFileMapping::validate_page(size_t page) noexcept
     if (!m_up_to_date_pages[page])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, page * m_page_size,
-                             m_validate_buffer.get(), m_page_size))
+    if (!m_file.cryptor.read(m_file.fd, page << m_page_shift,
+                             m_validate_buffer.get(), 1 << m_page_shift))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m != this && page < m->m_page_count && m->m_dirty_pages[page]) {
-            memcpy(m_validate_buffer.get(), m->page_addr(page), m_page_size);
+            memcpy(m_validate_buffer.get(), m->page_addr(page), 1 << m_page_shift);
             break;
         }
     }
 
-    if (memcmp(m_validate_buffer.get(), page_addr(page), m_page_size)) {
+    if (memcmp(m_validate_buffer.get(), page_addr(page), 1 << m_page_shift)) {
         std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page("
                   << page << "/" << m_page_count << ") " << m_validate_buffer.get() << " "
                   << page_addr(page) << std::endl;
@@ -461,7 +461,7 @@ void EncryptedFileMapping::flush() noexcept
             continue;
         }
 
-        m_file.cryptor.write(m_file.fd, i * m_page_size, page_addr(i), m_page_size);
+        m_file.cryptor.write(m_file.fd, i << m_page_shift, page_addr(i), 1 << m_page_shift);
         m_dirty_pages[i] = false;
     }
 
@@ -484,8 +484,8 @@ void EncryptedFileMapping::sync() noexcept
 
 void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to_size header_to_size) noexcept
 {
-    size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
-    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) / m_page_size;
+    size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) >> m_page_shift;
+    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) >> m_page_shift;
 
     size_t first_idx = first_accessed_page - m_first_page;
     size_t last_idx = last_accessed_page - m_first_page;
@@ -506,8 +506,8 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 {
     REALM_ASSERT(m_access == File::access_ReadWrite);
 
-    size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) / m_page_size;
-    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) / m_page_size;
+    size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) >> m_page_shift;
+    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) >> m_page_shift;
 
     size_t first_idx = first_accessed_page - m_first_page;
     size_t last_idx = last_accessed_page - m_first_page;
@@ -522,8 +522,8 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 
 void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
 {
-    REALM_ASSERT(new_file_offset % m_page_size == 0);
-    REALM_ASSERT(new_size % m_page_size == 0);
+    REALM_ASSERT(new_file_offset % (1 << m_page_shift) == 0);
+    REALM_ASSERT(new_size % (1 << m_page_shift) == 0);
     REALM_ASSERT(new_size > 0);
 
     m_file.cryptor.set_file_size(new_size + new_file_offset);
@@ -534,8 +534,8 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_addr = new_addr;
     m_file_offset = new_file_offset;
 
-    m_first_page = (reinterpret_cast<uintptr_t>(m_addr) - m_file_offset) / m_page_size;
-    m_page_count = (new_size + m_file_offset) / m_page_size;
+    m_first_page = (reinterpret_cast<uintptr_t>(m_addr) - m_file_offset) >> m_page_shift;
+    m_page_count = (new_size + m_file_offset) >> m_page_shift;
 
     m_up_to_date_pages.clear();
     m_dirty_pages.clear();
@@ -546,7 +546,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     // provoke an error early on if encryption doesn't work.
     if (first_init && m_file_offset == 0) {
         if (!copy_up_to_date_page(0)) {
-            m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), m_page_size);
+            m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), 1 << m_page_shift);
         }
         mark_up_to_date(0);
     }
