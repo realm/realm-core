@@ -5492,7 +5492,7 @@ void Table::print() const
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
         StringData name = m_spec.get_column_name(i);
-        std::cout << std::left << std::setw(10) << name << std::right << " ";
+        std::cout << std::left << std::setw(10) << name.data() << " ";
     }
 
     // Types
