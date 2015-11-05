@@ -17,6 +17,10 @@ using namespace realm;
 // reg-name    = *( unreserved / pct-encoded / sub-delims )
 
 
+util::Uri::Uri()
+{
+}
+
 util::Uri::Uri(const std::string& str)
 {
     const char* b = str.data();
