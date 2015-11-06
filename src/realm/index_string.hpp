@@ -54,12 +54,12 @@ inline StringData to_str(null input)
 
 inline StringData to_str(float)
 {
-    REALM_ASSERT(false); // Index on float not supported
+    REALM_ASSERT(false); // LCOV_EXCL_LINE; Index on float not supported
 }
 
 inline StringData to_str(double)
 {
-    REALM_ASSERT(false); // Index on double not supported
+    REALM_ASSERT(false); // LCOV_EXCL_LINE; Index on double not supported
 }
 
 template<class T>

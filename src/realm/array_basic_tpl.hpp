@@ -82,19 +82,12 @@ inline MemRef BasicArray<T>::create_array(Array::Type type, bool context_flag, s
 
 
 template<class T>
-inline void BasicArray<T>::create()
-{
-    size_t size = 0;
-    MemRef mem = create_array(size, get_alloc()); // Throws
-    init_from_mem(mem);
-}
-
-
-template<class T>
 inline void BasicArray<T>::create(Array::Type type)
 {
     REALM_ASSERT(type == Array::type_Normal);
-    BasicArray<T>::create();
+    size_t size = 0;
+    MemRef mem = create_array(size, get_alloc()); // Throws
+    init_from_mem(mem);
 }
 
 
