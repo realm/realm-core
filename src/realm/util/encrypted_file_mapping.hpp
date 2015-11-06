@@ -22,7 +22,7 @@
 #define REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP
 
 #include <realm/util/file.hpp>
-
+#include <realm/util/thread.hpp>
 #if REALM_ENABLE_ENCRYPTION
 
 typedef size_t (*Header_to_size)(const char* addr);
@@ -110,7 +110,9 @@ public:
 
     // Make sure that memory in the specified range is synchronized with any
     // changes made globally visible through call to write_barrier
-    void read_barrier(const void* addr, size_t size, Header_to_size header_to_size) noexcept;
+    void read_barrier(const void* addr, size_t size, 
+                      UniqueLock& lock,
+                      Header_to_size header_to_size) noexcept;
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()

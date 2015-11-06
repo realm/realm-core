@@ -212,23 +212,18 @@ namespace util {
 
 #if REALM_ENABLE_ENCRYPTION
 // encryption_read_barrier() and encryption_write_barrier()
-// FIXME: This approach is not performant enough. It uses locking and it requires traversing
-// an inefficient datastructure merely for administrative purposes. It is ok to be expensive
-// when encryption is actually triggered, but most calls to these methods are not expected
-// to actually trigger any encryption activities. A performant solution is needed before
-// we can release it (except, possibly, for investigation purposes).
 bool encryption_is_in_use = false;
 
 void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size)
 {
-    LockGuard lock(mapping_mutex);
+    UniqueLock lock(mapping_mutex);
     auto limit = mappings_by_addr.end();
     for (auto it = mappings_by_addr.begin(); it < limit; ++it) {
         mapping_and_addr& m = *it;
         if (m.addr >= static_cast<const char*>(addr) + size 
             || static_cast<const char*>(m.addr) + m.size <= addr)
             continue;
-        m.mapping->read_barrier(addr, size, header_to_size);
+        m.mapping->read_barrier(addr, size, lock, header_to_size);
     }
 }
 
@@ -236,8 +231,8 @@ void do_encryption_read_barrier(const void* addr, size_t size,
                                 Header_to_size header_to_size,
                                 EncryptedFileMapping* mapping)
 {
-    LockGuard lock(mapping_mutex);
-    mapping->read_barrier(addr, size, header_to_size);
+    UniqueLock lock(mapping_mutex, defer_lock_tag());
+    mapping->read_barrier(addr, size, lock, header_to_size);
 }
 
 void do_encryption_write_barrier(const void* addr, size_t size)
