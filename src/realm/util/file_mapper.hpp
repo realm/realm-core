@@ -21,6 +21,8 @@
 #define REALM_UTIL_FILE_MAPPER_HPP
 
 #include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
+#include <realm/util/encrypted_file_mapping.hpp>
 
 namespace realm {
 namespace util {
@@ -68,6 +70,19 @@ void inline encryption_write_barrier(const void* addr, size_t size)
     if (encryption_is_in_use)
         do_encryption_write_barrier(addr, size);
 }
+
+
+extern util::Mutex mapping_mutex;
+
+inline void do_encryption_read_barrier(const void* addr, size_t size, 
+                                       Header_to_size header_to_size,
+                                       EncryptedFileMapping* mapping)
+{
+    UniqueLock lock(mapping_mutex, defer_lock_tag());
+    mapping->read_barrier(addr, size, lock, header_to_size);
+}
+
+
 
 #else
 void inline encryption_read_barrier(const void*, size_t, Header_to_size header_to_size = nullptr) 

@@ -157,6 +157,45 @@ private:
     void validate() noexcept;
 };
 
+
+
+inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, 
+                                               UniqueLock& lock,
+                                               Header_to_size header_to_size) noexcept
+{
+    size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) >> m_page_shift;
+    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) >> m_page_shift;
+
+    size_t first_idx = first_accessed_page - m_first_page;
+    size_t last_idx = last_accessed_page - m_first_page;
+
+    for (size_t idx = first_idx; idx <= last_idx; ++idx) {
+        if (!m_up_to_date_pages[idx]) {
+            if (!lock.holds_lock())
+                lock.lock();
+            refresh_page(idx);
+        }
+    }
+
+    if (header_to_size) {
+        size_t size = header_to_size((const char*)addr);
+        size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) >> m_page_shift;
+
+        size_t last_idx = last_accessed_page - m_first_page;
+
+        for (size_t idx = first_idx; idx <= last_idx; ++idx) {
+            if (!m_up_to_date_pages[idx]) {
+                if (!lock.holds_lock())
+                    lock.lock();
+                refresh_page(idx);
+            }
+        }
+    }
+}
+
+
+
+
 }
 }
 

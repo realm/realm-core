@@ -57,7 +57,9 @@
 using namespace realm;
 using namespace realm::util;
 
-namespace {
+
+namespace realm {
+namespace util {
 
 // A list of all of the active encrypted mappings for a single file
 struct mappings_for_file {
@@ -203,11 +205,7 @@ void* mmap_anon(size_t size)
     return addr;
 }
 
-} // anonymous namespace
 #endif
-
-namespace realm {
-namespace util {
 
 
 #if REALM_ENABLE_ENCRYPTION
@@ -225,14 +223,6 @@ void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size he
             continue;
         m.mapping->read_barrier(addr, size, lock, header_to_size);
     }
-}
-
-void do_encryption_read_barrier(const void* addr, size_t size, 
-                                Header_to_size header_to_size,
-                                EncryptedFileMapping* mapping)
-{
-    UniqueLock lock(mapping_mutex, defer_lock_tag());
-    mapping->read_barrier(addr, size, lock, header_to_size);
 }
 
 void do_encryption_write_barrier(const void* addr, size_t size)
