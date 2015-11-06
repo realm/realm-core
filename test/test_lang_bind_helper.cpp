@@ -1109,8 +1109,136 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
 
 TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
 {
-    // FIXME: Check introduction and modification of search index
-    // FIXME: Check that it is correctly moved when columns are inserted or removed at lower column index.
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 5 columns, and make 3 of them indexed
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_Int,    "i0");
+        table_w->add_column(type_String, "s1");
+        table_w->add_column(type_String, "s2");
+        table_w->add_column(type_Int,    "i3");
+        table_w->add_column(type_Int,    "i4");
+        table_w->add_search_index(0);
+        table_w->add_search_index(2);
+        table_w->add_search_index(4);
+        table_w->add_empty_row(8);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    ConstTableRef table = group.get_table("t");
+    CHECK(table->has_search_index(0));
+    CHECK_NOT(table->has_search_index(1));
+    CHECK(table->has_search_index(2));
+    CHECK_NOT(table->has_search_index(3));
+    CHECK(table->has_search_index(4));
+
+    // Remove the previous search indexes and add 2 new ones
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->add_empty_row(8);
+//        table_w->remove_search_index(2); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+        table_w->add_search_index(3);
+//        table_w->remove_search_index(0); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+        table_w->add_search_index(1);
+//        table_w->remove_search_index(4); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+//    CHECK_NOT(table->has_search_index(0)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK(table->has_search_index(1));
+//    CHECK_NOT(table->has_search_index(2)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK(table->has_search_index(3));
+//    CHECK_NOT(table->has_search_index(4)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+
+    // Add some searchable contents
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        int_fast64_t v = 7;
+        int n = table_w->size();
+        for (int i = 0; i < n; ++i) {
+//            std::cerr << i << " " << v << "\n";
+            std::ostringstream out;
+            out << v;
+            table_w->set_string(1, i, out.str());
+            table_w->set_int(3, i, v);
+            v = (v + 1581757577LL) % 1000;
+        }
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+
+    // Move the indexed columns by insertion
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->insert_column(2, type_Int, "x1");
+        table_w->insert_column(0, type_Int, "x2");
+        table_w->insert_column(3, type_Int, "x3");
+        table_w->insert_column(0, type_Int, "x4");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+//    CHECK_NOT(table->has_search_index(2)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK(table->has_search_index(3));
+//    CHECK_NOT(table->has_search_index(6)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK(table->has_search_index(7));
+//    CHECK_NOT(table->has_search_index(8)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_EQUAL(12, table->find_first_string(3, "931"));
+    CHECK_EQUAL(4,  table->find_first_int(7, 315));
+
+    // Move the indexed columns by removal
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->remove_column(1);
+        table_w->remove_column(4);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+//    CHECK_NOT(table->has_search_index(1)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK(table->has_search_index(2));
+//    CHECK_NOT(table->has_search_index(4)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK(table->has_search_index(5));
+//    CHECK_NOT(table->has_search_index(6)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_EQUAL(3,  table->find_first_string(2, "738"));
+    CHECK_EQUAL(13, table->find_first_int(5, 508));
+
+    // Move the indexed columns directly
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        DescriptorRef desc_w = table_w->get_descriptor();
+        using tf = _impl::TableFriend;
+        tf::move_column(*desc_w, 2, 5); // FIXME: Not yet publicly exposed
+        tf::move_column(*desc_w, 1, 6);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+//    CHECK_NOT(table->has_search_index(6)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK(table->has_search_index(4));
+//    CHECK_NOT(table->has_search_index(2)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK(table->has_search_index(3));
+//    CHECK_NOT(table->has_search_index(5)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_EQUAL(12, table->find_first_string(4, "931"));
+    CHECK_EQUAL(4,  table->find_first_int(3, 315));
 }
 
 
