@@ -5297,6 +5297,14 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
     for (size_t col_ndx = col_ndx_begin; col_ndx != col_ndx_end; ++col_ndx) {
         ColumnBase* col = m_cols[col_ndx];
 
+        // If there is no search index accessor, but the column has been
+        // equipped with a search index, create the accessor now.
+        ColumnAttr attr = m_spec.get_column_attr(col_ndx);
+        bool has_search_index = (attr & col_attr_Indexed) != 0;
+
+        if (!has_search_index && col)
+            col->destroy_search_index();
+
         // If the current column accessor is StringColumn, but the underlying
         // column has been upgraded to an enumerated strings column, then we
         // need to replace the accessor with an instance of StringEnumColumn.
@@ -5331,7 +5339,6 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // of the connection is postponed.
             typedef _impl::GroupFriend gf;
             if (is_link_type(col_type)) {
-                ColumnAttr attr = m_spec.get_column_attr(col_ndx);
                 bool weak_links = (attr & col_attr_StrongLinks) == 0;
                 LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
                 link_col->set_weak_links(weak_links);
@@ -5356,14 +5363,9 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             }
         }
 
-        // If there is no search index accessor, but the column has been
-        // equipped with a search index, create the accessor now.
-        ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-        bool has_search_index = (attr & col_attr_Indexed)    != 0;
-        bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
-
-        REALM_ASSERT(has_search_index || !is_primary_key);
         if (has_search_index) {
+            bool is_primary_key = (attr & col_attr_PrimaryKey) != 0;
+            REALM_ASSERT(has_search_index || !is_primary_key);
             bool allow_duplicate_values = !is_primary_key;
             if (col->has_search_index()) {
                 col->set_search_index_allow_duplicate_values(allow_duplicate_values);
@@ -5374,9 +5376,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                                           allow_duplicate_values); // Throws
             }
         }
-        else {
-            col->destroy_search_index();
-        }
+
         ndx_in_parent += (has_search_index ? 2 : 1);
     }
 
