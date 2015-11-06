@@ -357,7 +357,7 @@ TEST(BinaryColumn_SwapRows)
 {
     // Normal case
     {
-        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref);
 
         c.add(BinaryData("foo"));
@@ -380,7 +380,7 @@ TEST(BinaryColumn_SwapRows)
 
     // First two elements
     {
-        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
@@ -398,7 +398,7 @@ TEST(BinaryColumn_SwapRows)
 
     // Last two elements
     {
-        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
@@ -416,7 +416,7 @@ TEST(BinaryColumn_SwapRows)
 
     // Indices in wrong order
     {
-        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref);
 
         c.add(BinaryData("bar"));
@@ -435,7 +435,7 @@ TEST(BinaryColumn_SwapRows)
     // Null values
     {
         bool nullable = true;
-        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(BinaryData("foo"));
