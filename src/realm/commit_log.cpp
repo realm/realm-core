@@ -213,16 +213,17 @@ protected:
     // log entries are currently appended.
     CommitLogMetadata* get_active_log(CommitLogPreamble*);
 
-    // Get the buffers pointing into the two files in order of their commits.
-    // The first buffer maps the file containing log entries:
+    // Get the maps of the two files in order of their commits.
+    // The first map has the file containing log entries:
     //
     //     [ preamble->begin_oldest_commit_range .. preamble->begin_newest_commit_range [
     //
-    // The second buffer maps the file containing log entries:
+    // The map has the file containing log entries:
     //
     //     [ preamble->begin_newest_commit_range .. preamble->end_commit_range [
-    void get_buffers_in_order(const CommitLogPreamble* preamble,
-                              const char*& first, const char*& second) const;
+    void get_maps_in_order(const CommitLogPreamble* preamble,
+                           const util::File::Map<CommitLogHeader>*& first, 
+                           const util::File::Map<CommitLogHeader>*& second) const;
 
     // Ensure the file is open so that it can be resized or mapped
     void open_if_needed(const CommitLogMetadata& log) const;
@@ -318,16 +319,17 @@ inline void WriteLogCollector::map_header_if_needed() const
 
 // convenience methods for getting to buffers and logs.
 
-void WriteLogCollector::get_buffers_in_order(const CommitLogPreamble* preamble,
-                                             const char*& first, const char*& second) const
+void WriteLogCollector::get_maps_in_order(const CommitLogPreamble* preamble,
+                           const util::File::Map<CommitLogHeader>*& first, 
+                           const util::File::Map<CommitLogHeader>*& second) const
 {
     if (preamble->active_file_is_log_a) {
-        first  = reinterpret_cast<char*>(m_log_b.map.get_addr());
-        second = reinterpret_cast<char*>(m_log_a.map.get_addr());
+        first  = &m_log_b.map;
+        second = &m_log_a.map;
     }
     else {
-        first  = reinterpret_cast<char*>(m_log_a.map.get_addr());
-        second = reinterpret_cast<char*>(m_log_b.map.get_addr());
+        first  = &m_log_a.map;
+        second = &m_log_b.map;
     }
 }
 
@@ -457,7 +459,8 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
 
     // append data from write pointer and onwards:
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
-    realm::util::encryption_read_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
+    realm::util::encryption_read_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size(),
+                                         active_log->map.get_encrypted_mapping());
     EntryHeader hdr;
     hdr.size = entry.changeset.size();
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
@@ -553,9 +556,10 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
     remap_if_needed(m_log_a);
     remap_if_needed(m_log_b);
     // std::cerr << "get_commit_entries(" << from_version << ", " << to_version <<")" << std::endl;
-    const char* buffer;
-    const char* second_buffer;
-    get_buffers_in_order(preamble, buffer, second_buffer);
+    const util::File::Map<CommitLogHeader>* first_map;
+    const util::File::Map<CommitLogHeader>* second_map;
+    get_maps_in_order(preamble, first_map, second_map);
+    const char* buffer = reinterpret_cast<const char*>(first_map->get_addr());
 
     // setup local offset and version tracking variables if needed
     if ((m_read_version != from_version) || (m_read_version < preamble->begin_oldest_commit_range)) {
@@ -566,8 +570,9 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
 
     // switch buffer if we are starting scanning in the second file:
     if (m_read_version >= preamble->begin_newest_commit_range) {
-        buffer = second_buffer;
-        second_buffer = 0;
+        first_map = second_map;
+        second_map = nullptr;
+        buffer = reinterpret_cast<const char*>(first_map->get_addr());
         // std::cerr << "  -- resuming directly in second file" << std::endl;
         // The saved offset (m_read_offset) should still be valid
     }
@@ -580,9 +585,10 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
     for (;;) {
 
         // switch from first to second file if needed (at most once)
-        if (second_buffer && m_read_version >= preamble->begin_newest_commit_range) {
-            buffer = second_buffer;
-            second_buffer = 0;
+        if (second_map && m_read_version >= preamble->begin_newest_commit_range) {
+            first_map = second_map;
+            second_map = nullptr;
+            buffer = reinterpret_cast<const char*>(first_map->get_addr());
             m_read_offset = 0;
             // std::cerr << "  -- switching from first to second file\n";
         }
@@ -594,12 +600,22 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
 
         // follow buffer layout
         const EntryHeader* hdr = reinterpret_cast<const EntryHeader*>(buffer + m_read_offset);
+#if REALM_ENABLE_ENCRYPTION
+        realm::util::encryption_read_barrier(hdr, sizeof(EntryHeader),
+                                             first_map->get_encrypted_mapping());
+#else
         realm::util::encryption_read_barrier(hdr, sizeof(EntryHeader));
+#endif
         uint_fast64_t size = aligned_to(sizeof (uint64_t), hdr->size);
         uint_fast64_t tmp_offset = m_read_offset + sizeof(EntryHeader);
         if (m_read_version >= from_version) {
             // std::cerr << "  --at: " << m_read_offset << ", " << size << "\n";
+#if REALM_ENABLE_ENCRYPTION
+            realm::util::encryption_read_barrier(hdr, size + sizeof(EntryHeader),
+                                                 first_map->get_encrypted_mapping());
+#else
             realm::util::encryption_read_barrier(hdr, size + sizeof(EntryHeader));
+#endif
             set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
             ++logs_buffer;
         }

@@ -82,7 +82,7 @@ template<typename T>
 void encryption_read_barrier(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-    encryption_read_barrier(addr+index, sizeof(T)*num_elements);
+    encryption_read_barrier(addr+index, sizeof(T)*num_elements, map.get_encrypted_mapping());
 }
 
 template<typename T>
