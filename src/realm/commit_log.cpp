@@ -633,6 +633,7 @@ WriteLogCollector::do_prepare_commit(SharedGroup&, WriteLogCollector::version_ty
     HistoryEntry entry;
     entry.changeset = BinaryData { data, size };
     version_type new_version = internal_submit_log(entry);
+    static_cast<void>(orig_version);
     REALM_ASSERT_3(new_version, > , orig_version);
     return new_version;
 }
