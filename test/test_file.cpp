@@ -102,7 +102,7 @@ TEST(File_Map)
     size_t len = strlen(data);
     {
         File f(path, File::mode_Write);
-        f.set_encryption_key(crypt_key(true));
+        f.set_encryption_key(crypt_key());
         f.resize(len);
 
         File::Map<char> map(f, File::access_ReadWrite, len);
@@ -112,7 +112,7 @@ TEST(File_Map)
     }
     {
         File f(path, File::mode_Read);
-        f.set_encryption_key(crypt_key(true));
+        f.set_encryption_key(crypt_key());
         File::Map<char> map(f, File::access_ReadOnly, len);
         realm::util::encryption_read_barrier(map, 0, len);
         CHECK(memcmp(map.get_addr(), data, len) == 0);
@@ -128,7 +128,7 @@ TEST(File_MapMultiplePages)
     TEST_PATH(path);
     {
         File f(path, File::mode_Write);
-        f.set_encryption_key(crypt_key(true));
+        f.set_encryption_key(crypt_key());
         f.resize(count * sizeof(size_t));
 
         File::Map<size_t> map(f, File::access_ReadWrite, count * sizeof(size_t));
@@ -139,7 +139,7 @@ TEST(File_MapMultiplePages)
     }
     {
         File f(path, File::mode_Read);
-        f.set_encryption_key(crypt_key(true));
+        f.set_encryption_key(crypt_key());
         File::Map<size_t> map(f, File::access_ReadOnly, count * sizeof(size_t));
         realm::util::encryption_read_barrier(map, 0, count);
         for (size_t i = 0; i < count; ++i) {
@@ -157,11 +157,11 @@ TEST(File_ReaderAndWriter)
     TEST_PATH(path);
 
     File writer(path, File::mode_Write);
-    writer.set_encryption_key(crypt_key(true));
+    writer.set_encryption_key(crypt_key());
     writer.resize(count * sizeof(size_t));
 
     File reader(path, File::mode_Read);
-    reader.set_encryption_key(crypt_key(true));
+    reader.set_encryption_key(crypt_key());
     CHECK_EQUAL(writer.get_size(), reader.get_size());
 
     File::Map<size_t> write(writer, File::access_ReadWrite, count * sizeof(size_t));
@@ -188,7 +188,7 @@ TEST(File_Offset)
     TEST_PATH(path);
     {
         File f(path, File::mode_Write);
-        f.set_encryption_key(crypt_key(true));
+        f.set_encryption_key(crypt_key());
         f.resize(page_count * size);
 
         for (size_t i = 0; i < page_count; ++i) {
@@ -202,7 +202,7 @@ TEST(File_Offset)
     }
     {
         File f(path, File::mode_Read);
-        f.set_encryption_key(crypt_key(true));
+        f.set_encryption_key(crypt_key());
         for (size_t i = 0; i < page_count; ++i) {
             File::Map<size_t> map(f, i * size, File::access_ReadOnly, size);
             for (size_t j = 0; j < count_per_page; ++j) {
@@ -224,11 +224,11 @@ TEST(File_MultipleWriters)
 
     {
         File w1(path, File::mode_Write);
-        w1.set_encryption_key(crypt_key(true));
+        w1.set_encryption_key(crypt_key());
         w1.resize(count * sizeof(size_t));
 
         File w2(path, File::mode_Write);
-        w2.set_encryption_key(crypt_key(true));
+        w2.set_encryption_key(crypt_key());
         w2.resize(count * sizeof(size_t));
 
         File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
@@ -245,7 +245,7 @@ TEST(File_MultipleWriters)
     }
 
     File reader(path, File::mode_Read);
-    reader.set_encryption_key(crypt_key(true));
+    reader.set_encryption_key(crypt_key());
 
     File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
     realm::util::encryption_read_barrier(read, 0, count);
@@ -277,7 +277,7 @@ TEST(File_ReadWrite)
 {
     TEST_PATH(path);
     File f(path, File::mode_Write);
-    f.set_encryption_key(crypt_key(true));
+    f.set_encryption_key(crypt_key());
     f.resize(100);
 
     for (char i = 0; i < 100; ++i)
@@ -297,7 +297,7 @@ TEST(File_Resize)
 {
     TEST_PATH(path);
     File f(path, File::mode_Write);
-    f.set_encryption_key(crypt_key(true));
+    f.set_encryption_key(crypt_key());
 
     f.resize(page_size() * 2);
     CHECK_EQUAL(page_size() * 2, f.get_size());
