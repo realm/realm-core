@@ -23,9 +23,10 @@
 
 #include <realm/column.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/util/utf8.hpp>
 #include <realm/index_string.hpp>
+#include <realm/column_tpl.hpp>
+#include <realm/impl/sequential_getter.hpp>
 
 using namespace realm;
 

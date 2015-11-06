@@ -2,7 +2,6 @@
 #include <algorithm>
 
 #include <realm/array.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/query.hpp>
 #include <realm/query_engine.hpp>

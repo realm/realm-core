@@ -3,9 +3,9 @@
 
 #include <iostream>
 
-#include <realm/column_basic.hpp>
-
 #include "test.hpp"
+#include <realm/column.hpp>
+#include <realm/table.hpp>
 
 using namespace realm;
 using test_util::unit_test::TestResults;

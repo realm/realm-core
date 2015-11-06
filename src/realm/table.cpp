@@ -13,7 +13,6 @@
 #include <realm/descriptor.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/column.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_binary.hpp>
@@ -26,6 +25,8 @@
 #include <realm/group.hpp>
 #include <realm/link_view.hpp>
 #include <realm/replication.hpp>
+#include <realm/table_view.hpp>
+#include <realm/query_engine.hpp>
 
 /// \page AccessorConsistencyLevels
 ///

@@ -100,7 +100,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_binary.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/array_basic.hpp>
