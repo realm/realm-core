@@ -1055,7 +1055,55 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 
 TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
 {
-    // FIXME: Check introduction and modification of enumerated strings column
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 3 string columns, one primed for conversion to "unique string
+    // enumeration" representation
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_String, "a");
+        table_w->add_column(type_String, "b");
+        table_w->add_column(type_String, "c");
+        table_w->add_empty_row(1000);
+        for (int i = 0; i < 1000; ++i) {
+            std::ostringstream out;
+            out << i;
+            std::string str = out.str();
+            table_w->set_string(0, i, str);
+            table_w->set_string(1, i, "foo"); // Same value in all rows
+            table_w->set_string(2, i, str);
+        }
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    ConstTableRef table = group.get_table("t");
+    ConstDescriptorRef desc = table->get_descriptor();
+    CHECK_EQUAL(0, desc->get_num_unique_values(0));
+    CHECK_EQUAL(0, desc->get_num_unique_values(1)); // Not yet "optimized"
+    CHECK_EQUAL(0, desc->get_num_unique_values(2));
+
+    // Optimize
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->optimize();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(0, desc->get_num_unique_values(0));
+    CHECK_NOT_EQUAL(0, desc->get_num_unique_values(1)); // Must be "optimized" now
+    CHECK_EQUAL(0, desc->get_num_unique_values(2));
 }
 
 
