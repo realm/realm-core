@@ -226,7 +226,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     else {
         // FIXME: This assumes that all non-count aggregates on nullable integer columns run with
         // the NotNull condition.
-        res = util::unwrap(first);
+        res = static_cast<R>(util::unwrap(first));
     }
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
@@ -251,16 +251,16 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         else {
             // FIXME: This assumes that all non-count aggregates on nullable integer columns run with
             // the NotNull condition.
-            auto unpacked = util::unwrap(v);
+            R unpacked = static_cast<R>(util::unwrap(v));
             if (function == act_Sum || function == act_Average) {
                 res += unpacked;
             }
-            else if (function == act_Max && static_cast<R>(unpacked) > res) {
+            else if (function == act_Max && unpacked > res) {
                 res = unpacked;
                 if (return_ndx)
                     *return_ndx = ss;
             }
-            else if (function == act_Min && static_cast<R>(unpacked) < res) {
+            else if (function == act_Min && unpacked < res) {
                 res = unpacked;
                 if (return_ndx)
                     *return_ndx = ss;
