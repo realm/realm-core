@@ -25,11 +25,34 @@
 namespace realm {
 namespace util {
 
-/// Contains a decomposed URI reference. The URI is decomposed into its 5 main
-/// components, scheme, authority, path, query, and fragment identifier.
+
+/// \brief A decomposed URI reference.
 ///
-/// This decomposition allows for efficient resolution of a relative URI agains
-/// a base URI.
+/// A Uri object contains a URI reference decomposed into its 5 main component
+/// parts (scheme, authority, path, query, and fragment identifier).
+///
+/// The decomposition process (as carried out by the constructor) performs a
+/// maximally lenient parsing of the specified URI reference. It does that
+/// according to the following regular expression (taken from
+/// http://tools.ietf.org/html/rfc3986#appendix-B):
+///
+///     ^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?
+///      1             2             3       4           5
+///
+///     Group
+///     ------------------------
+///     1       Scheme part
+///     2       Authority part
+///     3       Path part
+///     4       Query part
+///     5       Fragment identifier part
+///
+/// NOTE: Since this regular expression maches every string, every string is
+/// decomposable.
+///
+/// NOTE: This class does not attempt to perform any level of validation of URI
+/// references against the grammer specified in the RFC. Such validation could
+/// be added later, for example through a new `Uri::validate()`.
 ///
 /// For example, the decomposition of
 /// "http://www.ietf.org/rfc/rfc2396.txt?foo=bar#chp3" is:
@@ -44,16 +67,32 @@ namespace util {
 ///
 /// </pre>
 ///
-/// Optionally, the autority component contains a username, a password, and a
-/// port number.
+/// This class also provides recomposition of a URI references from their
+/// component parts, where the parts can be specified individually, or be a
+/// result of URI resoultion.
+///
+/// It is important to understand, however, that certain restrictions need to
+/// apply to each component part in order that the URI reference as a whole is
+/// self consistent. More concretely, it is necessary to require that the
+/// component parts at any time must have values that will be preserved across a
+/// recomposition -> decomposition cycle.
+///
+/// The actual restrictions on each component part is specified for the
+/// corresponding setter-method (e.g., set_scheme()).
+///
+/// Note that component parts resulting from decomposition, canonicalize, or
+/// from resolution (resolve()) will automatically (by design of the underlying
+/// algorithm) adhere to these rules.
+///
+/// Decomposition, recomposition, conanonicalization, and resolution algorithms
+/// are taken from RFC 3986.
 ///
 /// \sa http://tools.ietf.org/html/rfc3986
 class Uri {
 public:
     Uri();
 
-    /// Decompose the specified URI reference into its five main parts according
-    /// to the rules in RFC 3986.
+    /// Decompose the specified URI reference into its five main parts.
     Uri(const std::string&);
 
     /// Reconstruct a URI reference from its 5 components.
