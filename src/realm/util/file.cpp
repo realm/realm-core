@@ -817,6 +817,19 @@ void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
 #endif
 }
 
+#if REALM_ENABLE_ENCRYPTION
+#ifdef _WIN32
+#error "Encryption is not supported on Windows"
+#else
+void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping,
+                int map_flags, size_t offset) const
+{
+    static_cast<void>(map_flags);
+
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+}
+#endif
+#endif
 
 void File::unmap(void* addr, size_t size) noexcept
 {

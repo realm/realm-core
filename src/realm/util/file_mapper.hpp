@@ -34,15 +34,33 @@ typedef size_t (*Header_to_size)(const char* addr);
 
 #if REALM_ENABLE_ENCRYPTION
 
+class EncryptedFileMapping;
+
+// This variant allows the caller to obtain direct access to the encrypted file mapping
+// for optimization purposes.
+void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key, EncryptedFileMapping*& mapping);
+
 extern bool encryption_is_in_use;
 
 void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size);
+void do_encryption_read_barrier(const void* addr, size_t size, 
+                                Header_to_size header_to_size,
+                                EncryptedFileMapping* mapping);
+
 void do_encryption_write_barrier(const void* addr, size_t size);
 
 void inline encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size = nullptr)
 {
     if (encryption_is_in_use)
         do_encryption_read_barrier(addr, size, header_to_size);
+}
+
+void inline encryption_read_barrier(const void* addr, size_t size, 
+                                    EncryptedFileMapping* mapping,
+                                    Header_to_size header_to_size = nullptr)
+{
+    if (mapping)
+        do_encryption_read_barrier(addr, size, header_to_size, mapping);
 }
 
 void inline encryption_write_barrier(const void* addr, size_t size)

@@ -102,8 +102,8 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
     return 0;
 }
 
-void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
-                 File::AccessMode access, const char* encryption_key)
+EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_offset,
+                                  File::AccessMode access, const char* encryption_key)
 {
     struct stat st;
     if (fstat(fd, &st)) {
@@ -154,8 +154,10 @@ void add_mapping(void* addr, size_t size, int fd, size_t file_offset,
         mapping_and_addr m;
         m.addr = addr;
         m.size = size;
-        m.mapping = new EncryptedFileMapping(*it->info, file_offset, addr, size, access);
+        EncryptedFileMapping* m_ptr = new EncryptedFileMapping(*it->info, file_offset, addr, size, access);
+        m.mapping = m_ptr;
         mappings_by_addr.push_back(m); // can't throw due to reserve() above
+        return m_ptr;
     }
     catch (...) {
         if (it->info->mappings.empty()) {
@@ -230,6 +232,14 @@ void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size he
     }
 }
 
+void do_encryption_read_barrier(const void* addr, size_t size, 
+                                Header_to_size header_to_size,
+                                EncryptedFileMapping* mapping)
+{
+    LockGuard lock(mapping_mutex);
+    mapping->read_barrier(addr, size, header_to_size);
+}
+
 void do_encryption_write_barrier(const void* addr, size_t size)
 {
     LockGuard lock(mapping_mutex);
@@ -248,7 +258,22 @@ size_t round_up_to_page_size(size_t size) noexcept
 {
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
+
+void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key, EncryptedFileMapping*& mapping) {
+    if (encryption_key) {
+        size = round_up_to_page_size(size);
+        void* addr = mmap_anon(size);
+        mapping = add_mapping(addr, size, fd, offset, access, encryption_key);
+        return addr;
+    }
+    else {
+        mapping = nullptr;
+        return mmap(fd, size, access, offset, nullptr);
+    }
+}
+
 #endif
+
 
 void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
 {

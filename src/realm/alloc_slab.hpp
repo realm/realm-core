@@ -336,8 +336,7 @@ private:
     util::File m_file;
 
     // The initial mapping is determined by m_data and m_initial_mapping_size,
-    // we don't use a util::File::Map for that to stay compatible with the uses
-    // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
+    util::File::Map<char> m_initial_mapping;
     char* m_data = nullptr;
     size_t m_initial_mapping_size = 0;
     // additional sections beyond those covered by the initial mapping, are

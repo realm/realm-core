@@ -118,7 +118,8 @@ void SlabAlloc::detach() noexcept
             goto found;
         case attach_SharedFile:
         case attach_UnsharedFile:
-            File::unmap(m_data, m_initial_mapping_size);
+            m_data = 0;
+            m_initial_mapping.unmap();
             // running the destructors on the mappings will cause them to unmap:
             m_additional_mappings = nullptr;
             m_file.close();
@@ -379,7 +380,11 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     // fast path if reference is inside the initial mapping:
     if (ref < m_initial_mapping_size) {
         char* addr = m_data + ref;
-        realm::util::encryption_read_barrier(addr, Array::header_size, Array::get_byte_size_from_header);
+        realm::util::encryption_read_barrier(addr, Array::header_size, 
+#if REALM_ENABLE_ENCRYPTION
+                                             m_initial_mapping.get_encrypted_mapping(),
+#endif
+                                             Array::get_byte_size_from_header);
         return addr;
     }
 
@@ -391,8 +396,13 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
         size_t section_offset = ref - get_section_base(section_index);
         REALM_ASSERT_DEBUG(m_additional_mappings);
         REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
-        char* addr = m_additional_mappings[mapping_index].get_addr() + section_offset;
-        realm::util::encryption_read_barrier(addr, Array::header_size, Array::get_byte_size_from_header);
+        util::File::Map<char>& map = m_additional_mappings[mapping_index];
+        char* addr = map.get_addr() + section_offset;
+        realm::util::encryption_read_barrier(addr, Array::header_size, 
+#if REALM_ENABLE_ENCRYPTION
+                                             map.get_encrypted_mapping(),
+#endif
+                                             Array::get_byte_size_from_header);
         return addr;
     }
 
@@ -550,7 +560,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             }
         }
 
-        m_data        = map.release();
+        m_data        = map.get_addr();
+        m_initial_mapping = std::move(map);
         m_baseline    = size;
         m_initial_mapping_size = size;
         m_first_additional_mapping = get_section_index(m_initial_mapping_size);
