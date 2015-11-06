@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* When inserting a new non-nullable Binary column to a table that had 
+  *existing* rows, then the automatically added values would become null
 
 ### API breaking changes:
 
