@@ -3,6 +3,7 @@
 
 #include <realm/alloc_slab.hpp>
 #include <realm/util/file.hpp>
+#include <realm/util/inspect.hpp>
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/uri.hpp>
@@ -364,6 +365,33 @@ TEST(Utils_StringBuffer)
         sb.append("foo");
         CHECK_THROW(sb.append("foo", static_cast<size_t>(-1)), BufferSizeOverflow);
         CHECK_THROW(sb.reserve(static_cast<size_t>(-1)), BufferSizeOverflow);
+    }
+}
+
+TEST(Utils_Inspect)
+{
+    // inspect_value() for char*
+    {
+        std::stringstream ss;
+        inspect_value(ss, "foo");
+
+        CHECK_EQUAL(ss.str(), "\"foo\"");
+    }
+
+    // inspect_value() for any type
+    {
+        std::stringstream ss;
+        inspect_value(ss, 123);
+
+        CHECK_EQUAL(ss.str(), "123");
+    }
+
+    // inspect_all()
+    {
+        std::stringstream ss;
+        inspect_all(ss, "foo", 123);
+
+        CHECK_EQUAL(ss.str(), "\"foo\", 123");
     }
 }
 
