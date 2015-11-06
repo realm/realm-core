@@ -339,7 +339,7 @@ ref_type BasicColumn<T>::write(size_t slice_offset, size_t slice_size, size_t ta
 // Implementing pure virtual method of ColumnBase.
 template<class T>
 inline void BasicColumn<T>::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                        size_t prior_num_rows)
+                                        size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);

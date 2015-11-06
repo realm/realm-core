@@ -73,7 +73,7 @@ GroupWriter::GroupWriter(Group& group):
             top.set(6, 1 + 2*value); // Throws
             size_t n = m_free_positions.size();
             bool context_flag = false;
-            m_free_versions.create(Array::type_Normal, context_flag, n, value); // Throws
+            m_free_versions.Array::create(Array::type_Normal, context_flag, n, value); // Throws
             _impl::DestroyGuard<ArrayInteger> dg(&m_free_versions);
             m_free_versions.update_parent(); // Throws
             dg.release();

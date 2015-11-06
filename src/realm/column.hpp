@@ -143,7 +143,7 @@ public:
     /// that reciprocal backlinks have already been removed. Non-link columns
     /// should ignore this argument.
 
-    virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows) = 0;
+    virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) = 0;
     virtual void erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                             bool broken_reciprocal_backlinks) = 0;
     virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
@@ -542,7 +542,7 @@ public:
     ref_type write(size_t, size_t, size_t,
                    _impl::OutputStream&) const override;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
 
@@ -780,10 +780,11 @@ template<class T>
 typename ColumnTypeTraits<T>::sum_type
 Column<T>::sum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    if (std::is_same<T, util::Optional<int64_t>>::value)
-        return aggregate<T, int64_t, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
+    using sum_type = typename ColumnTypeTraits<T>::sum_type;
+    if (nullable)
+        return aggregate<T, sum_type, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
     else
-        return aggregate<T, int64_t, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
+        return aggregate<T, sum_type, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
 }
 
 template<class T>
@@ -1071,7 +1072,7 @@ size_t Column<T>::size() const noexcept
 template<class T>
 bool Column<T>::is_nullable() const noexcept
 {
-    return std::is_same<T, util::Optional<int64_t>>::value; // FIXME
+    return nullable;
 }
 
 template<class T>
@@ -1227,15 +1228,46 @@ void Column<T>::clear()
     clear_without_updating_index();
 }
 
+template<class T, class Enable = void> struct NullOrDefaultValue;
+template<class T> struct NullOrDefaultValue<T, typename std::enable_if<std::is_floating_point<T>::value>::type> {
+    static T null_or_default_value(bool is_null)
+    {
+        if (is_null) {
+            return null::get_null_float<T>();
+        }
+        else {
+            return T{};
+        }
+    }
+};
+template<class T> struct NullOrDefaultValue<util::Optional<T>, void> {
+    static util::Optional<T> null_or_default_value(bool is_null)
+    {
+        if (is_null) {
+            return util::none;
+        }
+        else {
+            return util::some<T>(T{});
+        }
+    }
+};
+template<class T> struct NullOrDefaultValue<T, typename std::enable_if<!ImplicitNull<T>::value>::type> {
+    static T null_or_default_value(bool is_null)
+    {
+        REALM_ASSERT(!is_null);
+        return T{};
+    }
+};
+
 // Implementing pure virtual method of ColumnBase.
 template<class T>
-void Column<T>::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
+void Column<T>::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
-    T value{};
+    T value = NullOrDefaultValue<T>::null_or_default_value(insert_nulls);
     insert(row_ndx_2, value, num_rows_to_insert); // Throws
 }
 

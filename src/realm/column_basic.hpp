@@ -149,7 +149,7 @@ public:
     ref_type write(size_t, size_t, size_t,
                    _impl::OutputStream&) const override;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;

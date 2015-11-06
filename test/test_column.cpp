@@ -854,7 +854,7 @@ TEST(Column_IndexCrash)
     IntNullColumn col(Allocator::get_default(), ref);
 
     col.create_search_index();
-    col.insert_rows(0, 1, 0);
+    col.insert_rows(0, 1, 0, true);
     col.set(0, 0);
 
     StringIndex& ndx = *col.get_search_index();

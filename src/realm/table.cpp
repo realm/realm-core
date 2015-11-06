@@ -2121,7 +2121,8 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
-        column.insert_rows(row_ndx, num_rows, m_size); // Throws
+        bool insert_nulls = is_nullable(col_ndx);
+        column.insert_rows(row_ndx, num_rows, m_size, insert_nulls); // Throws
     }
     if (row_ndx < m_size)
         adj_row_acc_insert_rows(row_ndx, num_rows);
@@ -3103,10 +3104,10 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
 
 void Table::set_null(size_t col_ndx, size_t row_ndx)
 {
-    auto& col = get_column_base(col_ndx);
-    if (!col.is_nullable()) {
+    if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
+    ColumnBase& col = get_column_base(col_ndx);
     col.set_null(row_ndx);
 
     if (Replication* repl = get_repl())
