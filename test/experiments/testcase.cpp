@@ -32,16 +32,3 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 using namespace realm::_impl;
-
-
-TEST(Table_Mixed_Double)
-{
-    GROUP_TEST_PATH(path);
-    const char* encryption_key = 0;
-    Group group(path, encryption_key, Group::mode_ReadWrite);
-    TableRef table = group.add_table("t");
-    table->add_column(type_Mixed, "m");
-    table->add_empty_row();
-    table->set_mixed(0, 0, Mixed(2.0)); // Double
-    group.verify();
-}

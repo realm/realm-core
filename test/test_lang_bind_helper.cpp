@@ -1148,20 +1148,20 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
         table_w->add_empty_row(8);
-//        table_w->remove_search_index(2); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+        table_w->remove_search_index(2);
         table_w->add_search_index(3);
-//        table_w->remove_search_index(0); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+        table_w->remove_search_index(0);
         table_w->add_search_index(1);
-//        table_w->remove_search_index(4); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+        table_w->remove_search_index(4);
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);
     group.verify();
-//    CHECK_NOT(table->has_search_index(0)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(0));
     CHECK(table->has_search_index(1));
-//    CHECK_NOT(table->has_search_index(2)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(2));
     CHECK(table->has_search_index(3));
-//    CHECK_NOT(table->has_search_index(4)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(4));
 
     // Add some searchable contents
     {
@@ -1194,11 +1194,11 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     }
     LangBindHelper::advance_read(sg, hist);
     group.verify();
-//    CHECK_NOT(table->has_search_index(2)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(2));
     CHECK(table->has_search_index(3));
-//    CHECK_NOT(table->has_search_index(6)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(6));
     CHECK(table->has_search_index(7));
-//    CHECK_NOT(table->has_search_index(8)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(8));
     CHECK_EQUAL(12, table->find_first_string(3, "931"));
     CHECK_EQUAL(4,  table->find_first_int(7, 315));
 
@@ -1212,11 +1212,11 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     }
     LangBindHelper::advance_read(sg, hist);
     group.verify();
-//    CHECK_NOT(table->has_search_index(1)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(1));
     CHECK(table->has_search_index(2));
-//    CHECK_NOT(table->has_search_index(4)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(4));
     CHECK(table->has_search_index(5));
-//    CHECK_NOT(table->has_search_index(6)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(6));
     CHECK_EQUAL(3,  table->find_first_string(2, "738"));
     CHECK_EQUAL(13, table->find_first_int(5, 508));
 
@@ -1232,11 +1232,11 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     }
     LangBindHelper::advance_read(sg, hist);
     group.verify();
-//    CHECK_NOT(table->has_search_index(6)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(6));
     CHECK(table->has_search_index(4));
-//    CHECK_NOT(table->has_search_index(2)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(2));
     CHECK(table->has_search_index(3));
-//    CHECK_NOT(table->has_search_index(5)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1289
+    CHECK_NOT(table->has_search_index(5));
     CHECK_EQUAL(12, table->find_first_string(4, "931"));
     CHECK_EQUAL(4,  table->find_first_int(3, 315));
 }
