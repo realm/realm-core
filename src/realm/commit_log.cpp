@@ -459,8 +459,12 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
 
     // append data from write pointer and onwards:
     char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
+#if REALM_ENABLE_ENCRYPTION
     realm::util::encryption_read_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size(),
                                          active_log->map.get_encrypted_mapping());
+#else
+    realm::util::encryption_read_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size());
+#endif
     EntryHeader hdr;
     hdr.size = entry.changeset.size();
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;

@@ -40,7 +40,8 @@ class EncryptedFileMapping;
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
-void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key, EncryptedFileMapping*& mapping);
+void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key, 
+           EncryptedFileMapping*& mapping);
 
 extern bool encryption_is_in_use;
 
@@ -97,7 +98,11 @@ template<typename T>
 void encryption_read_barrier(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
+#if REALM_ENABLE_ENCRYPTION
     encryption_read_barrier(addr+index, sizeof(T)*num_elements, map.get_encrypted_mapping());
+#else
+    encryption_read_barrier(addr+index, sizeof(T)*num_elements);
+#endif
 }
 
 template<typename T>

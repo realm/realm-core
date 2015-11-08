@@ -54,12 +54,16 @@
 #include <sys/syscall.h>
 #endif
 
+#endif // enable encryption
+
 using namespace realm;
 using namespace realm::util;
 
 
 namespace realm {
 namespace util {
+
+#if REALM_ENABLE_ENCRYPTION
 
 // A list of all of the active encrypted mappings for a single file
 struct mappings_for_file {
@@ -205,10 +209,6 @@ void* mmap_anon(size_t size)
     return addr;
 }
 
-#endif
-
-
-#if REALM_ENABLE_ENCRYPTION
 // encryption_read_barrier() and encryption_write_barrier()
 bool encryption_is_in_use = false;
 
@@ -257,7 +257,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
     }
 }
 
-#endif
+#endif // enable encryption
 
 
 void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
