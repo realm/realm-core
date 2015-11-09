@@ -1014,6 +1014,8 @@ public:
 
     static const int header_size = 8; // Number of bytes used by header
 
+    // The encryption layer relies on headers always fitting within a single page.
+    static_assert(header_size == 8, "Header must always fit in entirely on a page");
 private:
     Array& operator=(const Array&); // not allowed
 protected:
