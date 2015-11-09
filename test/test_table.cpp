@@ -3993,11 +3993,7 @@ TEST(Table_WriteSlice)
     // Run through a 3-D matrix of table sizes, slice offsets, and
     // slice sizes. Each test involves a table with columns of each
     // possible type.
-#ifdef REALM_DEBUG
-    int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 135 };
-#else
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187, 6561 };
-#endif
     int num_sizes = sizeof table_sizes / sizeof *table_sizes;
     for (int table_size_i = 0; table_size_i != num_sizes; ++table_size_i) {
         int table_size = table_sizes[table_size_i];
@@ -6522,7 +6518,7 @@ TEST(Table_AllocatorCapacityBug)
 
     // First a simple trigger of `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`
     {
-        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref, true);
 
         c.add(BinaryData(buf.get(), 13000000));

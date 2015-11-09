@@ -17,7 +17,7 @@ Query::Query() : m_view(nullptr), m_source_table_view(nullptr), m_owns_source_ta
     create();
 }
 
-Query::Query(Table& table, TableViewBase* tv) 
+Query::Query(Table& table, TableViewBase* tv)
     : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
@@ -33,7 +33,7 @@ Query::Query(const Table& table, const LinkViewRef& lv):
     create();
 }
 
-Query::Query(const Table& table, TableViewBase* tv) 
+Query::Query(const Table& table, TableViewBase* tv)
     : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
@@ -100,11 +100,11 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
         patch.m_table_num = source.m_table.get()->get_index_in_group();
     }
     if (source.m_source_table_view) {
-        m_source_table_view = 
+        m_source_table_view =
             source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
         m_owns_source_table_view = true;
     }
-    else { 
+    else {
         patch.table_view_data = nullptr;
         m_owns_source_table_view = false;
     }
@@ -122,7 +122,7 @@ Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode
         patch.m_table_num = source.m_table.get()->get_index_in_group();
     }
     if (source.m_source_table_view) {
-        m_source_table_view = 
+        m_source_table_view =
             source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
         m_owns_source_table_view = true;
     }
@@ -206,62 +206,60 @@ Query& Query::contains(size_t column_ndx, BinaryData b)
 
 namespace {
 
+template<class Node>
 struct MakeConditionNode {
-    // make() for Node creates a Node* with either a value type
-    // or null.
-    //
-    // Note that some Realm types (such as Integer) has both a nullable and a non-nullable version 
-    // of query nodes, while other Realm types has just a single version that can handle both nullable
-    // and non-nullable columns. The special_null_node must reflect that.
-    // Regardless of nullability, it throws a LogicError if trying to query for a value of type T on 
-    // a column of a different type.
-
-    template<class Node>
-    static typename std::enable_if<Node::special_null_node, std::unique_ptr<ParentNode>>::type
-    make(size_t col_ndx, typename Node::TConditionValue value)
+    static std::unique_ptr<ParentNode> make(size_t col_ndx, typename Node::TConditionValue value)
     {
-        return std::unique_ptr<ParentNode>(new Node(std::move(value), col_ndx));
+        return std::unique_ptr<ParentNode>{new Node(std::move(value), col_ndx)};
     }
 
-    template<class Node, class T>
-    static typename std::enable_if<
-        Node::special_null_node
-        && !std::is_same<T, typename Node::TConditionValue>::value
-        && !std::is_same<T, null>::value
-        , std::unique_ptr<ParentNode>>::type
-    make(size_t, T)
+    static std::unique_ptr<ParentNode> make(size_t col_ndx, null)
+    {
+        return std::unique_ptr<ParentNode>{new Node(null{}, col_ndx)};
+    }
+
+    template<class T = typename Node::TConditionValue>
+    static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value, std::unique_ptr<ParentNode>>::type
+    make(size_t col_ndx, typename util::RemoveOptional<T>::type value)
+    {
+        return std::unique_ptr<ParentNode>{new Node(std::move(value), col_ndx)};
+    }
+
+    template<class T>
+    static std::unique_ptr<ParentNode> make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
     }
+};
 
-    template<class Node, class T>
-    static typename std::enable_if<
-        !Node::special_null_node
-        && std::is_same<T, null>::value
-        , std::unique_ptr<ParentNode>>::type
-    make(size_t col_ndx, T value)
+template<class Cond>
+struct MakeConditionNode<IntegerNode<IntegerColumn, Cond>> {
+    static std::unique_ptr<ParentNode> make(size_t col_ndx, int64_t value)
     {
-        // value is null
-        return std::unique_ptr<ParentNode>(new Node(value, col_ndx));
+        return std::unique_ptr<ParentNode>{new IntegerNode<IntegerColumn, Cond>(std::move(value), col_ndx)};
     }
 
-    template<class Node, class T>
-    static typename std::enable_if<
-        !Node::special_null_node
-        && std::is_same<T, typename Node::TConditionValue>::value
-        , std::unique_ptr<ParentNode>>::type
-    make(size_t col_ndx, T value)
+    template<class T>
+    static std::unique_ptr<ParentNode> make(size_t, T)
     {
-        return std::unique_ptr<ParentNode>(new Node(value, col_ndx));
+        throw LogicError{LogicError::type_mismatch};
+    }
+};
+
+template<class Cond>
+struct MakeConditionNode<StringNode<Cond>> {
+    static std::unique_ptr<ParentNode> make(size_t col_ndx, StringData value)
+    {
+        return std::unique_ptr<ParentNode>{new StringNode<Cond>(std::move(value), col_ndx)};
     }
 
-    template<class Node, class T>
-    static typename std::enable_if<
-        !Node::special_null_node
-        && !std::is_same<T, null>::value
-        && !std::is_same<T, typename Node::TConditionValue>::value
-        , std::unique_ptr<ParentNode>>::type
-    make(size_t, T)
+    static std::unique_ptr<ParentNode> make(size_t col_ndx, null)
+    {
+        return std::unique_ptr<ParentNode>{new StringNode<Cond>(null{}, col_ndx)};
+    }
+
+    template<class T>
+    static std::unique_ptr<ParentNode> make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
     }
@@ -277,23 +275,23 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
         case type_Bool:
         case type_DateTime: {
             if (is_nullable) {
-                return MakeConditionNode::make<IntegerNode<IntNullColumn, Cond>>(column_ndx, value);
+                return MakeConditionNode<IntegerNode<IntNullColumn, Cond>>::make(column_ndx, value);
             }
             else {
-                return MakeConditionNode::make<IntegerNode<IntegerColumn, Cond>>(column_ndx, value);
+                return MakeConditionNode<IntegerNode<IntegerColumn, Cond>>::make(column_ndx, value);
             }
         }
         case type_Float: {
-            return MakeConditionNode::make<FloatDoubleNode<FloatColumn, Cond>>(column_ndx, value);
+            return MakeConditionNode<FloatDoubleNode<FloatColumn, Cond>>::make(column_ndx, value);
         }
         case type_Double: {
-            return MakeConditionNode::make<FloatDoubleNode<DoubleColumn, Cond>>(column_ndx, value);
+            return MakeConditionNode<FloatDoubleNode<DoubleColumn, Cond>>::make(column_ndx, value);
         }
         case type_String: {
-            return MakeConditionNode::make<StringNode<Cond>>(column_ndx, value);
+            return MakeConditionNode<StringNode<Cond>>::make(column_ndx, value);
         }
         case type_Binary: {
-            return MakeConditionNode::make<BinaryNode<Cond>>(column_ndx, value);
+            return MakeConditionNode<BinaryNode<Cond>>::make(column_ndx, value);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};
@@ -694,7 +692,7 @@ size_t Query::peek_tableview(size_t tv_index) const
 template<Action action, typename T, typename R, class ColType>
     R Query::aggregate(R(ColType::*aggregateMethod)(size_t start, size_t end, size_t limit,
                                                     size_t* return_ndx) const,
-                       size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
+                       size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                        size_t* return_ndx) const
 {
     if(limit == 0 || m_table->is_degenerate()) {
@@ -707,7 +705,7 @@ template<Action action, typename T, typename R, class ColType>
         end = m_view ? m_view->size() : m_table->size();
 
     const ColType& column =
-        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T, ColType::nullable>::id)>(column_ndx);
+        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
 
     if (!has_conditions() && !m_view) {
         // No criteria, so call aggregate METHODS directly on columns
@@ -729,7 +727,7 @@ template<Action action, typename T, typename R, class ColType>
         SequentialGetter<ColType> source_column(*m_table, column_ndx);
 
         if (!m_view) {
-            aggregate_internal(action, ColumnTypeTraits<T, ColType::nullable>::id, ColType::nullable, root_node(), &st, start, end, &source_column);
+            aggregate_internal(action, ColumnTypeTraits<T>::id, ColType::nullable, root_node(), &st, start, end, &source_column);
         }
         else {
             for (size_t t = start; t < end && st.m_match_count < limit; t++) {
@@ -824,7 +822,7 @@ double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, s
 
 // Maximum
 
-int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
+int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
@@ -834,7 +832,7 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
-DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
+DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
                                  size_t limit, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
@@ -844,7 +842,7 @@ DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t 
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
-float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
+float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
                            size_t limit, size_t* return_ndx) const
 {
     return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
@@ -859,7 +857,7 @@ double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t star
 
 // Minimum
 
-int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, 
+int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
                            size_t limit, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
@@ -873,10 +871,10 @@ float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start,
 {
     return aggregate<act_Min, float>(&FloatColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
-double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit, 
+double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                              size_t* return_ndx) const
 {
-    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, resultcount, start, end, limit, 
+    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, resultcount, start, end, limit,
                                       return_ndx);
 }
 
@@ -903,8 +901,8 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     }
 
     size_t resultcount2 = 0;
-    typedef typename ColumnTypeTraits<T, Nullable>::column_type ColType;
-    typedef typename ColumnTypeTraits<T, Nullable>::sum_type SumType;
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    typedef typename ColumnTypeTraits<T>::sum_type SumType;
     const SumType sum1 = aggregate<act_Sum, T>(&ColType::sum, column_ndx, &resultcount2, start, end, limit);
     double avg1 = 0;
     if (resultcount2 != 0)
@@ -1100,7 +1098,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
     else {
         QueryState<int64_t> st;
         st.init(act_FindAll, &ret.m_row_indexes, limit);
-        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t, false>::id, false, root_node(), &st, start, end, nullptr);
+        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, start, end, nullptr);
     }
 }
 
@@ -1138,7 +1136,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     else {
         QueryState<int64_t> st;
         st.init(act_Count, nullptr, limit);
-        aggregate_internal(act_Count, ColumnTypeTraits<int64_t, false>::id, false, root_node(), &st, start, end, nullptr);
+        aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, start, end, nullptr);
         cnt = size_t(st.m_state);
     }
 

@@ -879,9 +879,9 @@ void Group::to_string(std::ostream& out) const
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << std::setw(int(index_width)) << std::right << i           << " ";
-        out << std::setw(int(name_width))  << std::left  << name.data() << " ";
-        out << std::setw(int(rows_width))  << std::left  << row_count   << std::endl;
+        out << std::setw(int(index_width)) << std::right << i                 << " ";
+        out << std::setw(int(name_width))  << std::left  << std::string(name) << " ";
+        out << std::setw(int(rows_width))  << std::left  << row_count         << std::endl;
     }
 }
 
@@ -1157,8 +1157,6 @@ public:
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
     {
         if (REALM_UNLIKELY(!m_table))
-            return false;
-        if (REALM_UNLIKELY(row_ndx_1 >= m_table->size() || row_ndx_2 >= m_table->size()))
             return false;
         using tf = _impl::TableFriend;
         tf::adj_acc_swap_rows(*m_table, row_ndx_1, row_ndx_2);

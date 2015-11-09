@@ -394,6 +394,7 @@ public:
     void remove_last();
     void move_last_over(size_t row_ndx);
     void clear();
+    void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
 
     //@}
 
@@ -636,7 +637,7 @@ public:
 
 
 private:
-    template<class T, bool Nullable>
+    template<class T>
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
     template<class T>
     TableView find_all(size_t column_ndx, T value);

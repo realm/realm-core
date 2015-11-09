@@ -1121,6 +1121,7 @@
     <ClInclude Include="..\..\src\realm\impl\destroy_guard.hpp" />
     <ClInclude Include="..\..\src\realm\impl\input_stream.hpp" />
     <ClInclude Include="..\..\src\realm\impl\output_stream.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\sequential_getter.hpp" />
     <ClInclude Include="..\..\src\realm\impl\simulated_failure.hpp" />
     <ClInclude Include="..\..\src\realm\impl\transact_log.hpp" />
     <ClInclude Include="..\..\src\realm\importer.hpp" />

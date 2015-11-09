@@ -27,6 +27,7 @@
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/string_buffer.hpp>
+#include <realm/util/features.h>
 
 using namespace realm;
 using namespace realm::util;
@@ -661,7 +662,7 @@ void File::sync()
         return;
     throw std::runtime_error("FlushFileBuffers() failed");
 
-#elif defined __APPLE__
+#elif REALM_PLATFORM_APPLE
 
     if (::fcntl(m_fd, F_FULLFSYNC) == 0)
         return;

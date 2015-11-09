@@ -66,7 +66,7 @@ public:
     /// Compare two binary columns for equality.
     bool compare_binary(const BinaryColumn&) const;
 
-    static ref_type create(Allocator&, size_t size = 0);
+    static ref_type create(Allocator&, size_t size, bool nullable);
 
     static size_t get_size_from_ref(ref_type root_ref, Allocator&) noexcept;
 
@@ -181,14 +181,20 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
+        BinaryData ret;
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
-            return leaf->get(ndx);
+            ret = leaf->get(ndx);
         }
-        // Big blobs root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-        return leaf->get(ndx);
+        else {
+            // Big blobs root leaf
+            ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
+            ret = leaf->get(ndx);
+        }
+        if (!m_nullable && ret.is_null())
+            return BinaryData("", 0); // return empty string (non-null)
+        return ret;
     }
 
     // Non-leaf root

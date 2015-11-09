@@ -585,6 +585,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             *(reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1);
         // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
+        static_cast<void>(header);
         REALM_ASSERT_3(header.m_flags, == , streaming_header.m_flags);
         REALM_ASSERT_3(header.m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
         REALM_ASSERT_3(header.m_mnemonic[1], == , streaming_header.m_mnemonic[1]);

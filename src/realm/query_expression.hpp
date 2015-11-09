@@ -131,6 +131,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 
 #include <realm/column_type_traits.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/impl/sequential_getter.hpp>
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
@@ -162,7 +163,7 @@ namespace {
 template<class T, class U>
 T only_numeric(U in)
 {
-    return static_cast<T>(in);
+    return static_cast<T>(util::unwrap(in));
 }
 
 template<class T>
@@ -654,8 +655,9 @@ time optimizations for these cases.
 template<class T, size_t prealloc = 8>
 struct NullableVector
 {
-    typedef typename std::conditional<std::is_same<T, bool>::value
-        || std::is_same<T, int>::value, int64_t, T>::type t_storage;
+    using Underlying = typename util::RemoveOptional<T>::type;
+    using t_storage  = typename std::conditional<std::is_same<Underlying, bool>::value
+        || std::is_same<Underlying, int>::value, int64_t, Underlying>::type;
 
     NullableVector() {};
 
@@ -722,7 +724,7 @@ struct NullableVector
         return util::make_optional((*this)[index]);
     }
 
-    inline void set(size_t index, util::Optional<T> value)
+    inline void set(size_t index, util::Optional<Underlying> value)
     {
         if (value)
             set(index, *value);
@@ -1759,7 +1761,7 @@ inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
 // This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload*
 // in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently
 // only "find first null link" and "find first non-null link" is supported. More will be added later. When we add
-// more, I propose to remove the <bool has_links> template argument from this class and instead template it by 
+// more, I propose to remove the <bool has_links> template argument from this class and instead template it by
 // a criteria-class (like the FindNullLinks class below in find_first()) in some generalized fashion.
 template<bool has_links>
 class UnaryLinkCompare : public Expression
@@ -1905,8 +1907,7 @@ template<class T>
 class Columns : public Subexpr2<T>
 {
 public:
-    using ColType = typename ColumnTypeTraits<T, false>::column_type;
-    using ColTypeN = typename ColumnTypeTraits<T, true>::column_type;
+    using ColType = typename ColumnTypeTraits<T>::column_type;
 
     Columns(size_t column, const Table* table, const std::vector<size_t>& links):
         m_link_map(table, links), m_table(table), m_column(column),
@@ -1959,16 +1960,20 @@ public:
         }
 
         if (m_sg == nullptr) {
-            if (m_nullable)
-                m_sg.reset(new SequentialGetter<ColTypeN>());
-            else
+            if (m_nullable && std::is_same<int64_t, T>::value) {
+                m_sg.reset(new SequentialGetter<IntNullColumn>());
+            }
+            else {
                 m_sg.reset(new SequentialGetter<ColType>());
+            }
         }
 
-        if (m_nullable)
-            static_cast<SequentialGetter<ColTypeN>*>(m_sg.get())->init(static_cast<const ColTypeN*>(c));
-        else
-            static_cast<SequentialGetter<ColType>*>(m_sg.get())->init(static_cast<const ColType*>(c));
+        if (m_nullable && std::is_same<int64_t, T>::value) {
+            static_cast<SequentialGetter<IntNullColumn>&>(*m_sg).init(static_cast<const IntNullColumn*>(c));
+        }
+        else {
+            static_cast<SequentialGetter<ColType>&>(*m_sg).init(static_cast<const ColType*>(c));
+        }
     }
 
 
@@ -1979,24 +1984,16 @@ public:
         return m_table;
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        if (m_nullable)
-            evaluate<ColTypeN>(index, destination);
-        else
-            evaluate<ColType>(index, destination);
-    }
-
-    // Load values from Column into destination
-    template<class C>
-    void evaluate(size_t index, ValueBase& destination) {
-        SequentialGetter<C>* sgc = static_cast<SequentialGetter<C>*>(m_sg.get());
+    template<class ColType2 = ColType>
+    void evaluate_internal(size_t index, ValueBase& destination) {
+        using U = typename ColType2::value_type;
+        auto sgc = static_cast<SequentialGetter<ColType2>*>(m_sg.get());
 
         if (links_exist()) {
             // LinkList with more than 0 values. Create Value with payload for all fields
 
             std::vector<size_t> links = m_link_map.get_links(index);
-            Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
+            auto v = make_value_for_link<typename util::RemoveOptional<U>::type>(m_link_map.only_unary_links(), links.size());
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
@@ -2018,17 +2015,15 @@ public:
             // Now load `ValueBase::default_size` rows from from the leaf into m_storage. If it's an integer
             // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
             // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
-            if (std::is_same<T, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
-                Value<T> v;
+            if (std::is_same<U, int64_t>::value && index + ValueBase::default_size <= sgc->m_leaf_end) {
+                Value<int64_t> v;
 
                 // If you want to modify 'default_size' then update Array::get_chunk()
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8);
 
-                sgc->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start,
+                auto sgc_2 = static_cast<SequentialGetter<ColType>*>(m_sg.get());
+                sgc_2->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start,
                     static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
-
-                if (m_nullable)
-                   v.m_storage.m_null = reinterpret_cast<const ArrayIntNull*>(sgc->m_leaf_ptr)->null_value();
 
                 destination.import(v);
             }
@@ -2037,19 +2032,23 @@ public:
                 size_t rows = colsize - index;
                 if (rows > ValueBase::default_size)
                     rows = ValueBase::default_size;
-                Value<T> v(false, rows);
+                Value<typename util::RemoveOptional<U>::type> v(false, rows);
 
                 for (size_t t = 0; t < rows; t++)
                     v.m_storage.set(t, sgc->get_next(index + t));
 
-                if (m_nullable && (std::is_same<T, int64_t>::value ||
-                                   std::is_same<T, bool>::value ||
-                                   std::is_same<T, realm::DateTime>::value)) {
-                    v.m_storage.m_null = reinterpret_cast<const ArrayIntNull*>(sgc->m_leaf_ptr)->null_value();
-                }
-
                 destination.import(v);
             }
+        }
+    }
+
+    // Load values from Column into destination
+    void evaluate(size_t index, ValueBase& destination) override {
+        if (m_nullable && std::is_same<typename ColType::value_type, int64_t>::value) {
+            evaluate_internal<IntNullColumn>(index, destination);
+        }
+        else {
+            evaluate_internal<ColType>(index, destination);
         }
     }
 

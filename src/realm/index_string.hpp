@@ -47,9 +47,20 @@ inline StringData to_str(const StringData& input)
     return input;
 }
 
-inline StringData to_str(null& input)
+inline StringData to_str(null input)
 {
     return input;
+}
+
+template<class T>
+inline StringData to_str(const util::Optional<T>& value)
+{
+    if (value) {
+        return to_str(*value);
+    }
+    else {
+        return to_str(null{});
+    }
 }
 
 // todo, should be removed
@@ -87,9 +98,13 @@ public:
 
     template<class T>
     void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
+    template<class T>
+    void insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append);
 
     template<class T>
     void set(size_t row_ndx, T new_value);
+    template<class T>
+    void set(size_t row_ndx, util::Optional<T> new_value);
 
     template<class T>
     void erase(size_t row_ndx, bool is_last);
@@ -314,6 +329,17 @@ void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_appen
 }
 
 template<class T>
+void StringIndex::insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append)
+{
+    if (value) {
+        insert(row_ndx, *value, num_rows, is_append);
+    }
+    else {
+        insert(row_ndx, null{}, num_rows, is_append);
+    }
+}
+
+template<class T>
 void StringIndex::set(size_t row_ndx, T new_value)
 {
     StringConversionBuffer buffer;
@@ -328,6 +354,17 @@ void StringIndex::set(size_t row_ndx, T new_value)
 
         bool is_last = true; // To avoid updating refs
         erase<T>(row_ndx, is_last); // Throws
+    }
+}
+
+template<class T>
+void StringIndex::set(size_t row_ndx, util::Optional<T> new_value)
+{
+    if (new_value) {
+        set(row_ndx, *new_value);
+    }
+    else {
+        set(row_ndx, null{});
     }
 }
 

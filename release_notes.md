@@ -2,11 +2,13 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* When inserting a new non-nullable Binary column to a table that had 
+  *existing* rows, then the automatically added values would become null
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Use `util::Logger` instead of `std::ostream` for logging during changeset
+  replay (`Replication::apply_changeset()`).
 
 ### Enhancements:
 

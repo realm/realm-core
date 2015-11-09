@@ -18,6 +18,8 @@
  *
  **************************************************************************/
 
+#include <realm/util/features.h>
+
 #ifndef _WIN32
 
 #include "file_mapper.hpp"
@@ -44,7 +46,7 @@
 #include <realm/util/thread.hpp>
 #include <string.h> // for memset
 
-#ifdef __APPLE__
+#if REALM_PLATFORM_APPLE
 #   include <mach/mach.h>
 #   include <mach/exc.h>
 #endif
@@ -58,7 +60,6 @@
 
 using namespace realm;
 using namespace realm::util;
-
 
 namespace realm {
 namespace util {

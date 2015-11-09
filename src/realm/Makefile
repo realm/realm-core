@@ -64,6 +64,7 @@ group_shared.hpp \
 history.hpp \
 handover_defs.hpp \
 replication.hpp \
+impl/sequential_getter.hpp \
 query.hpp \
 query_conditions.hpp \
 lang_bind_helper.hpp \

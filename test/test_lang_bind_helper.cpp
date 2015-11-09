@@ -717,20 +717,528 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 
 TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 {
-    // FIXME: Exercise the mixed column
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 3 mixed columns and 3 rows
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_Mixed, "a");
+        table_w->add_column(type_Mixed, "b");
+        table_w->add_column(type_Mixed, "c");
+        table_w->add_empty_row(3);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    // Every cell must have integer type and be zero by default
+    ConstTableRef table = group.get_table("t");
+    for (size_t row_ndx = 0; row_ndx < 3; ++row_ndx) {
+        for (size_t col_ndx = 0; col_ndx < 3; ++col_ndx) {
+            CHECK_EQUAL(type_Int, table->get_mixed_type(col_ndx, row_ndx)) &&
+                CHECK_EQUAL(0, table->get_mixed(col_ndx, row_ndx).get_int());
+        }
+    }
+
+    using int_type = decltype (Mixed().get_int());
+
+    auto set_subtab = [this](TableRef table_w, size_t col_ndx, size_t row_ndx, int_type value) {
+        table_w->set_mixed(col_ndx, row_ndx, Mixed(Mixed::subtable_tag()));
+        TableRef subtab_w = table_w->get_subtable(col_ndx, row_ndx);
+        subtab_w->add_column(type_Int, "");
+        subtab_w->add_empty_row();
+        subtab_w->set_int(0, 0, value);
+    };
+
+    auto check_subtab = [this](ConstTableRef table, size_t col_ndx, size_t row_ndx, int_type value) {
+        ConstTableRef subtab = table->get_subtable(col_ndx, row_ndx);
+        return CHECK_EQUAL(1, subtab->get_column_count()) &&
+            CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
+            CHECK_EQUAL(1, subtab->size()) &&
+            CHECK_EQUAL(value, subtab->get_int(0, 0));
+    };
+
+    // Change value types (round 1 of 2)
+    char bin_1[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->set_mixed(0, 0, Mixed(int_type(2)));
+        table_w->set_mixed(0, 1, Mixed(true));
+        table_w->set_mixed(0, 2, Mixed(DateTime(3)));
+        table_w->set_mixed(1, 0, Mixed(4.0f));
+//        table_w->set_mixed(1, 1, Mixed(5.0)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+        wt.get_group().verify();
+        table_w->set_mixed(1, 2, Mixed(StringData("Hadamard")));
+        table_w->set_mixed(2, 0, Mixed(BinaryData(bin_1)));
+        set_subtab(table_w, 2, 1, 6);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1)) &&
+        CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(DateTime(3), table->get_mixed(0, 2).get_datetime());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) &&
+        CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
+//        CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_1), table->get_mixed(2, 0).get_binary());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(2, 1)) &&
+        check_subtab(table, 2, 1, 6);
+    CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
+
+    // Change value types (round 2 of 2)
+    char bin_2[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->set_mixed(0, 1, Mixed(20.0f));
+        table_w->set_mixed(0, 2, Mixed(false));
+        set_subtab(table_w, 1, 0, 30);
+        table_w->set_mixed(1, 1, Mixed(BinaryData(bin_2)));
+        table_w->set_mixed(1, 2, Mixed(int_type(40)));
+//        table_w->set_mixed(2, 0, Mixed(50.0)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+        table_w->set_mixed(2, 1, Mixed(StringData("Banach")));
+        table_w->set_mixed(2, 2, Mixed(DateTime(60)));
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) &&
+        check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 2).get_datetime());
+
+    // Insert rows before
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->insert_empty_row(0, 8);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8+0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 8+0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 8+1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 8+1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 8+2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 8+2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 8+0)) &&
+        check_subtab(table, 1, 8+0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 8+1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 8+1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 8+2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 8+2).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 8+0)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 8+0).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 8+1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 8+1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 8+2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 8+2).get_datetime());
+
+    // Move rows by remove() (ordered removal)
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->remove(4);
+        table_w->remove(2);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6+0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 6+0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 6+1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 6+1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 6+2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 6+2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 6+0)) &&
+        check_subtab(table, 1, 6+0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 6+1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 6+1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 6+2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 6+2).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 6+0)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 6+0).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 6+1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 6+1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 6+2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 6+2).get_datetime());
+
+    // Move rows by move_last_over() (unordered removal)
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->move_last_over(2); // 8 -> 2
+        table_w->move_last_over(4); // 7 -> 4
+        table_w->move_last_over(0); // 6 -> 0
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 4)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 4).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) &&
+        check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 4)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 4).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 4)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 2).get_datetime());
+
+    // Swap rows
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->swap_rows(4, 0);
+        table_w->swap_rows(2, 5);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 4)) &&
+        check_subtab(table, 1, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 5).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 4)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 5).get_datetime());
+
+    // Insert columns before
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->insert_column(0, type_Int,      "x1");
+        table_w->insert_column(0, type_DateTime, "x2");
+        table_w->insert_column(1, type_Float,    "x3");
+        table_w->insert_column(0, type_Double,   "x4");
+        table_w->insert_column(2, type_String,   "x5");
+        table_w->insert_column(1, type_Binary,   "x6");
+        table_w->insert_column(3, type_Table,    "x7");
+        table_w->insert_column(2, type_Mixed,    "x8");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0+8, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(0+8, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0+8, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0+8, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0+8, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0+8, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1+8, 4)) &&
+        check_subtab(table, 1+8, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1+8, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1+8, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1+8, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(1+8, 5).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2+8, 4)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2+8, 4).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(2+8, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2+8, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2+8, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2+8, 5).get_datetime());
+
+    // Remove columns before
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->remove_column(4);
+        table_w->remove_column(2);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0+6, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(0+6, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0+6, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0+6, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0+6, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0+6, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1+6, 4)) &&
+        check_subtab(table, 1+6, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1+6, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1+6, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1+6, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(1+6, 5).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(2+6, 4)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(2+6, 4).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(2+6, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2+6, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2+6, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2+6, 5).get_datetime());
+
+    // Move columns around
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        DescriptorRef desc_w = table_w->get_descriptor();
+        using tf = _impl::TableFriend;
+        tf::move_column(*desc_w, 7, 2); // FIXME: Not yet publicly exposed
+        tf::move_column(*desc_w, 8, 4);
+        tf::move_column(*desc_w, 2, 7);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(8, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(8, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(8, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(8, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(7, 4)) &&
+        check_subtab(table, 7, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(7, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(7, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(7, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(7, 5).get_int());
+//    CHECK_EQUAL(type_Double, table->get_mixed_type(3, 4)) &&
+//        CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_String, table->get_mixed_type(3, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(3, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(3, 5).get_datetime());
 }
 
 
 TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
 {
-    // FIXME: Check introduction and modification of enumerated strings column
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 3 string columns, one primed for conversion to "unique string
+    // enumeration" representation
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_String, "a");
+        table_w->add_column(type_String, "b");
+        table_w->add_column(type_String, "c");
+        table_w->add_empty_row(1000);
+        for (int i = 0; i < 1000; ++i) {
+            std::ostringstream out;
+            out << i;
+            std::string str = out.str();
+            table_w->set_string(0, i, str);
+            table_w->set_string(1, i, "foo"); // Same value in all rows
+            table_w->set_string(2, i, str);
+        }
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    ConstTableRef table = group.get_table("t");
+    ConstDescriptorRef desc = table->get_descriptor();
+    CHECK_EQUAL(0, desc->get_num_unique_values(0));
+    CHECK_EQUAL(0, desc->get_num_unique_values(1)); // Not yet "optimized"
+    CHECK_EQUAL(0, desc->get_num_unique_values(2));
+
+    // Optimize
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->optimize();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(0, desc->get_num_unique_values(0));
+    CHECK_NOT_EQUAL(0, desc->get_num_unique_values(1)); // Must be "optimized" now
+    CHECK_EQUAL(0, desc->get_num_unique_values(2));
 }
 
 
 TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
 {
-    // FIXME: Check introduction and modification of search index
-    // FIXME: Check that it is correctly moved when columns are inserted or removed at lower column index.
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 5 columns, and make 3 of them indexed
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_Int,    "i0");
+        table_w->add_column(type_String, "s1");
+        table_w->add_column(type_String, "s2");
+        table_w->add_column(type_Int,    "i3");
+        table_w->add_column(type_Int,    "i4");
+        table_w->add_search_index(0);
+        table_w->add_search_index(2);
+        table_w->add_search_index(4);
+        table_w->add_empty_row(8);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    ConstTableRef table = group.get_table("t");
+    CHECK(table->has_search_index(0));
+    CHECK_NOT(table->has_search_index(1));
+    CHECK(table->has_search_index(2));
+    CHECK_NOT(table->has_search_index(3));
+    CHECK(table->has_search_index(4));
+
+    // Remove the previous search indexes and add 2 new ones
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->add_empty_row(8);
+        table_w->remove_search_index(2);
+        table_w->add_search_index(3);
+        table_w->remove_search_index(0);
+        table_w->add_search_index(1);
+        table_w->remove_search_index(4);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_NOT(table->has_search_index(0));
+    CHECK(table->has_search_index(1));
+    CHECK_NOT(table->has_search_index(2));
+    CHECK(table->has_search_index(3));
+    CHECK_NOT(table->has_search_index(4));
+
+    // Add some searchable contents
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        int_fast64_t v = 7;
+        int n = table_w->size();
+        for (int i = 0; i < n; ++i) {
+//            std::cerr << i << " " << v << "\n";
+            std::ostringstream out;
+            out << v;
+            table_w->set_string(1, i, out.str());
+            table_w->set_int(3, i, v);
+            v = (v + 1581757577LL) % 1000;
+        }
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+
+    // Move the indexed columns by insertion
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->insert_column(2, type_Int, "x1");
+        table_w->insert_column(0, type_Int, "x2");
+        table_w->insert_column(3, type_Int, "x3");
+        table_w->insert_column(0, type_Int, "x4");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_NOT(table->has_search_index(2));
+    CHECK(table->has_search_index(3));
+    CHECK_NOT(table->has_search_index(6));
+    CHECK(table->has_search_index(7));
+    CHECK_NOT(table->has_search_index(8));
+    CHECK_EQUAL(12, table->find_first_string(3, "931"));
+    CHECK_EQUAL(4,  table->find_first_int(7, 315));
+
+    // Move the indexed columns by removal
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->remove_column(1);
+        table_w->remove_column(4);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_NOT(table->has_search_index(1));
+    CHECK(table->has_search_index(2));
+    CHECK_NOT(table->has_search_index(4));
+    CHECK(table->has_search_index(5));
+    CHECK_NOT(table->has_search_index(6));
+    CHECK_EQUAL(3,  table->find_first_string(2, "738"));
+    CHECK_EQUAL(13, table->find_first_int(5, 508));
+
+    // Move the indexed columns directly
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        DescriptorRef desc_w = table_w->get_descriptor();
+        using tf = _impl::TableFriend;
+        tf::move_column(*desc_w, 2, 5); // FIXME: Not yet publicly exposed
+        tf::move_column(*desc_w, 1, 6);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_NOT(table->has_search_index(6));
+    CHECK(table->has_search_index(4));
+    CHECK_NOT(table->has_search_index(2));
+    CHECK(table->has_search_index(3));
+    CHECK_NOT(table->has_search_index(5));
+    CHECK_EQUAL(12, table->find_first_string(4, "931"));
+    CHECK_EQUAL(4,  table->find_first_int(3, 315));
 }
 
 
@@ -2612,6 +3120,134 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         CHECK(!regular_3->is_attached());
         CHECK(!mixed_1->is_attached());
         CHECK(!mixed_3->is_attached());
+    }
+}
+
+TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+
+    // Create three parent tables, each with with 5 rows, and each row
+    // containing one regular and one mixed subtable
+    {
+        WriteTransaction wt(sg_w);
+        for (int i = 0; i < 3; ++i) {
+            const char* table_name = i == 0 ? "parent_1" : i == 1 ? "parent_2" : "parent_3";
+            TableRef parent_w = wt.add_table(table_name);
+            parent_w->add_column(type_Table, "a");
+            parent_w->add_column(type_Mixed, "b");
+            DescriptorRef subdesc = parent_w->get_subdescriptor(0);
+            subdesc->add_column(type_Int, "regular");
+            parent_w->add_empty_row(5);
+            for (int row_ndx = 0; row_ndx < 5; ++row_ndx) {
+                TableRef regular_w = parent_w->get_subtable(0, row_ndx);
+                regular_w->add_empty_row();
+                regular_w->set_int(0, 0, 10 + row_ndx);
+                parent_w->set_mixed(1, row_ndx, Mixed::subtable_tag());
+                TableRef mixed_w = parent_w->get_subtable(1, row_ndx);
+                mixed_w->add_column(type_Int, "mixed");
+                mixed_w->add_empty_row();
+                mixed_w->set_int(0, 0, 20 + row_ndx);
+            }
+        }
+        wt.commit();
+    }
+
+    {
+        // Safety checks, make sure 1 == 1, and the universe didn't
+        // self-destruct.  We only get accessors to row indices 0, 1 and 4;
+        // rows 2 and 3 will be tested later on.
+
+        LangBindHelper::advance_read(sg, hist);
+        group.verify();
+        ConstTableRef table = rt.get_table("parent_1");
+
+        ConstRow row_0 = (*table)[0];
+        ConstRow row_1 = (*table)[1];
+        ConstRow row_4 = (*table)[4];
+
+        ConstTableRef regular_0 = table->get_subtable(0, 0);
+        ConstTableRef regular_1 = table->get_subtable(0, 1);
+        ConstTableRef regular_4 = table->get_subtable(0, 4);
+        ConstTableRef   mixed_0 = table->get_subtable(1, 0);
+        ConstTableRef   mixed_1 = table->get_subtable(1, 1);
+        ConstTableRef   mixed_4 = table->get_subtable(1, 4);
+
+        CHECK(row_0.is_attached());
+        CHECK(row_1.is_attached());
+        CHECK(row_4.is_attached());
+
+        CHECK_EQUAL(row_0.get_index(), 0);
+        CHECK_EQUAL(row_1.get_index(), 1);
+        CHECK_EQUAL(row_4.get_index(), 4);
+
+        CHECK(regular_0->is_attached());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+
+        CHECK_EQUAL(regular_0->get_int(0, 0), 10);
+        CHECK_EQUAL(regular_1->get_int(0, 0), 11);
+        CHECK_EQUAL(regular_4->get_int(0, 0), 14);
+
+        CHECK(mixed_0 && mixed_0->is_attached());
+        CHECK(mixed_1 && mixed_1->is_attached());
+        CHECK(mixed_4 && mixed_4->is_attached());
+
+        CHECK_EQUAL(mixed_0->get_int(0, 0), 20);
+        CHECK_EQUAL(mixed_1->get_int(0, 0), 21);
+        CHECK_EQUAL(mixed_4->get_int(0, 0), 24);
+
+        {
+            // Swap rows 0 and 4 (first and last rows)
+            WriteTransaction wt(sg_w);
+            TableRef table_w = wt.get_table("parent_1");
+            table_w->swap_rows(0, 4);
+            table_w->swap_rows(1, 3);
+            wt.commit();
+        }
+
+        LangBindHelper::advance_read(sg, hist);
+        group.verify();
+
+        // No rows were deleted, so everything should still be attached
+        CHECK(row_0.is_attached());
+        CHECK(row_1.is_attached());
+        CHECK(row_4.is_attached());
+        CHECK(regular_0->is_attached());
+        CHECK(regular_1->is_attached());
+        CHECK(regular_4->is_attached());
+        CHECK(mixed_0->is_attached());
+        CHECK(mixed_1->is_attached());
+        CHECK(mixed_4->is_attached());
+
+        CHECK_EQUAL(row_0.get_index(), 4);
+        CHECK_EQUAL(row_1.get_index(), 3);
+        CHECK_EQUAL(row_4.get_index(), 0);
+
+        CHECK_EQUAL(regular_0->get_int(0, 0), 10);
+        CHECK_EQUAL(regular_1->get_int(0, 0), 11);
+        CHECK_EQUAL(regular_4->get_int(0, 0), 14);
+
+        CHECK_EQUAL(regular_0, table->get_subtable(0, 4));
+        CHECK_EQUAL(regular_1, table->get_subtable(0, 3));
+        CHECK_EQUAL(regular_4, table->get_subtable(0, 0));
+
+        CHECK_EQUAL(mixed_0->get_int(0, 0), 20);
+        CHECK_EQUAL(mixed_1->get_int(0, 0), 21);
+        CHECK_EQUAL(mixed_4->get_int(0, 0), 24);
+
+        CHECK_EQUAL(mixed_0, table->get_subtable(1, 4));
+        CHECK_EQUAL(mixed_1, table->get_subtable(1, 3));
+        CHECK_EQUAL(mixed_4, table->get_subtable(1, 0));
     }
 }
 

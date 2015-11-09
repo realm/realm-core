@@ -343,6 +343,8 @@ TEST(FloatColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
         CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
     }
 
     // First two elements
@@ -360,6 +362,8 @@ TEST(FloatColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Last two elements
@@ -377,6 +381,8 @@ TEST(FloatColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Indices in wrong order
@@ -394,6 +400,8 @@ TEST(FloatColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 }
 
@@ -421,6 +429,8 @@ TEST(DoubleColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
         CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
     }
 
     // First two elements
@@ -438,6 +448,8 @@ TEST(DoubleColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Last two elements
@@ -455,6 +467,8 @@ TEST(DoubleColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Indices in wrong order
@@ -472,6 +486,8 @@ TEST(DoubleColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 }
 
@@ -542,7 +558,7 @@ TEST(ColumnBinary_InitOfEmptyColumn)
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Binary, "doesn't work");
-    CHECK_EQUAL(BinaryData(), t.get_binary(1,0));
+    CHECK_NOT_EQUAL(BinaryData(), t.get_binary(1,0));
 }
 
 TEST(ColumnBool_InitOfEmptyColumn)

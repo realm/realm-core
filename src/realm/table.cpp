@@ -2038,7 +2038,7 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_String:
             return StringColumn::create(alloc, size); // Throws
         case col_type_Binary:
-            return BinaryColumn::create(alloc, size); // Throws
+            return BinaryColumn::create(alloc, size, nullable); // Throws
         case col_type_Table:
             return SubtableColumn::create(alloc, size); // Throws
         case col_type_Mixed:
@@ -2302,6 +2302,8 @@ void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
 
 void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
+    REALM_ASSERT(row_ndx_1 < row_ndx_2);
+
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
@@ -2359,6 +2361,26 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
     bump_version();
 }
 
+void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(row_ndx_1 >= m_size || row_ndx_2 >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+
+    // Internally, core requires that the first row index is strictly less than
+    // the second one. The changeset merge mechanism is written to take
+    // advantage of it, and it requires it.
+    if (row_ndx_1 == row_ndx_2)
+        return;
+    if (row_ndx_1 > row_ndx_2)
+        std::swap(row_ndx_1, row_ndx_2);
+
+    do_swap_rows(row_ndx_1, row_ndx_2);
+
+    if (Replication* repl = get_repl())
+        repl->swap_rows(this, row_ndx_1, row_ndx_2);
+}
 
 void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
@@ -2569,7 +2591,7 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx);
+        return column.get(ndx).value_or(0);
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -2607,7 +2629,7 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx) != 0;
+        return column.get(ndx).value_or(0) != 0;
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -2645,7 +2667,7 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx);
+        return column.get(ndx).value_or(0);
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -3385,10 +3407,32 @@ size_t Table::do_find_pkey_string(StringData value) const
 }
 
 
-template<class T, bool Nullable>
+namespace {
+
+util::Optional<int64_t> upgrade_optional_int(util::Optional<bool> value)
+{
+    return value ? some<int64_t>(*value ? 1 : 0) : none;
+}
+
+util::Optional<int64_t> upgrade_optional_int(util::Optional<DateTime> value)
+{
+    return value ? some<int64_t>(value->get_datetime()) : none;
+}
+
+template<class T>
+T upgrade_optional_int(T value)
+{
+    // No conversion
+    return value;
+}
+
+} // anonymous namespace
+
+
+template<class T>
 size_t Table::find_first(size_t col_ndx, T value) const
 {
-    using type_traits = ColumnTypeTraits<T, Nullable>;
+    using type_traits = ColumnTypeTraits<T>;
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, type_traits::column_id);
 
@@ -3397,7 +3441,7 @@ size_t Table::find_first(size_t col_ndx, T value) const
 
     typedef typename type_traits::column_type ColType;
     const ColType& column = get_column<ColType, type_traits::column_id>(col_ndx);
-    return column.find_first(value);
+    return column.find_first(upgrade_optional_int(value));
 }
 
 size_t Table::find_first_link(size_t target_row_index) const
@@ -3410,41 +3454,35 @@ size_t Table::find_first_link(size_t target_row_index) const
 size_t Table::find_first_int(size_t col_ndx, int64_t value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<int64_t, true>(col_ndx, value);
+        return find_first<util::Optional<int64_t>>(col_ndx, value);
     else
-        return find_first<int64_t, false>(col_ndx, value);
+        return find_first<int64_t>(col_ndx, value);
 }
 
 size_t Table::find_first_bool(size_t col_ndx, bool value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<bool, true>(col_ndx, value);
+        return find_first<util::Optional<bool>>(col_ndx, value);
     else
-        return find_first<bool, false>(col_ndx, value);
+        return find_first<bool>(col_ndx, value);
 }
 
 size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<DateTime, true>(col_ndx, value);
+        return find_first<util::Optional<DateTime>>(col_ndx, value);
     else
-        return find_first<DateTime, false>(col_ndx, value);
+        return find_first<DateTime>(col_ndx, value);
 }
 
 size_t Table::find_first_float(size_t col_ndx, float value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<Float, true>(col_ndx, value);
-    else
-        return find_first<Float, false>(col_ndx, value);
+    return find_first<Float>(col_ndx, value);
 }
 
 size_t Table::find_first_double(size_t col_ndx, double value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<Double, true>(col_ndx, value);
-    else
-        return find_first<Double, false>(col_ndx, value);
+    return find_first<Double>(col_ndx, value);
 }
 
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
@@ -3465,10 +3503,7 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
 
 size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<BinaryData, true>(col_ndx, value);
-    else
-        return find_first<BinaryData, false>(col_ndx, value);
+    return find_first<BinaryData>(col_ndx, value);
 }
 
 size_t Table::find_first_null(size_t column_ndx) const
@@ -5262,6 +5297,14 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
     for (size_t col_ndx = col_ndx_begin; col_ndx != col_ndx_end; ++col_ndx) {
         ColumnBase* col = m_cols[col_ndx];
 
+        // If there is no search index accessor, but the column has been
+        // equipped with a search index, create the accessor now.
+        ColumnAttr attr = m_spec.get_column_attr(col_ndx);
+        bool has_search_index = (attr & col_attr_Indexed) != 0;
+
+        if (!has_search_index && col)
+            col->destroy_search_index();
+
         // If the current column accessor is StringColumn, but the underlying
         // column has been upgraded to an enumerated strings column, then we
         // need to replace the accessor with an instance of StringEnumColumn.
@@ -5296,7 +5339,6 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // of the connection is postponed.
             typedef _impl::GroupFriend gf;
             if (is_link_type(col_type)) {
-                ColumnAttr attr = m_spec.get_column_attr(col_ndx);
                 bool weak_links = (attr & col_attr_StrongLinks) == 0;
                 LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
                 link_col->set_weak_links(weak_links);
@@ -5321,14 +5363,9 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             }
         }
 
-        // If there is no search index accessor, but the column has been
-        // equipped with a search index, create the accessor now.
-        ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-        bool has_search_index = (attr & col_attr_Indexed)    != 0;
-        bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
-
-        REALM_ASSERT(has_search_index || !is_primary_key);
         if (has_search_index) {
+            bool is_primary_key = (attr & col_attr_PrimaryKey) != 0;
+            REALM_ASSERT(has_search_index || !is_primary_key);
             bool allow_duplicate_values = !is_primary_key;
             if (col->has_search_index()) {
                 col->set_search_index_allow_duplicate_values(allow_duplicate_values);
@@ -5339,9 +5376,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                                           allow_duplicate_values); // Throws
             }
         }
-        else {
-            col->destroy_search_index();
-        }
+
         ndx_in_parent += (has_search_index ? 2 : 1);
     }
 
@@ -5457,7 +5492,7 @@ void Table::print() const
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
         StringData name = m_spec.get_column_name(i);
-        std::cout << std::left << std::setw(10) << name << std::right << " ";
+        std::cout << std::left << std::setw(10) << std::string(name).substr(0, 10) << " ";
     }
 
     // Types

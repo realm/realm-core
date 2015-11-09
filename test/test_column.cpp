@@ -14,6 +14,8 @@
 using namespace realm;
 using namespace realm::test_util;
 
+using realm::util::unwrap;
+
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -59,7 +61,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_Add0)
 
     c.add(0);
-    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(0LL, c.get(0));
     CHECK_EQUAL(1U, c.size());
     CHECK(!c.is_empty());
 
@@ -67,91 +69,91 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_Add1)
 
     c.add(1);
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(1, c.get(1));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
     CHECK_EQUAL(2U, c.size());
 
 
     // TEST(Column_Add2)
 
     c.add(2);
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(1, c.get(1));
-    CHECK_EQUAL(2, c.get(2));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
     CHECK_EQUAL(3U, c.size());
 
 
     // TEST(Column_Add3)
 
     c.add(3);
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(1, c.get(1));
-    CHECK_EQUAL(2, c.get(2));
-    CHECK_EQUAL(3, c.get(3));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
     CHECK_EQUAL(4U, c.size());
 
 
     // TEST(Column_Add4)
 
     c.add(4);
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(1, c.get(1));
-    CHECK_EQUAL(2, c.get(2));
-    CHECK_EQUAL(3, c.get(3));
-    CHECK_EQUAL(4, c.get(4));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
+    CHECK_EQUAL(4LL, c.get(4));
     CHECK_EQUAL(5U, c.size());
 
 
     // TEST(Column_Add5)
 
     c.add(16);
-    CHECK_EQUAL(0,  c.get(0));
-    CHECK_EQUAL(1,  c.get(1));
-    CHECK_EQUAL(2,  c.get(2));
-    CHECK_EQUAL(3,  c.get(3));
-    CHECK_EQUAL(4,  c.get(4));
-    CHECK_EQUAL(16, c.get(5));
+    CHECK_EQUAL(0LL,  c.get(0));
+    CHECK_EQUAL(1LL,  c.get(1));
+    CHECK_EQUAL(2LL,  c.get(2));
+    CHECK_EQUAL(3LL,  c.get(3));
+    CHECK_EQUAL(4LL,  c.get(4));
+    CHECK_EQUAL(16LL, c.get(5));
     CHECK_EQUAL(6U, c.size());
 
 
     // TEST(Column_Add6)
 
     c.add(256);
-    CHECK_EQUAL(0,   c.get(0));
-    CHECK_EQUAL(1,   c.get(1));
-    CHECK_EQUAL(2,   c.get(2));
-    CHECK_EQUAL(3,   c.get(3));
-    CHECK_EQUAL(4,   c.get(4));
-    CHECK_EQUAL(16,  c.get(5));
-    CHECK_EQUAL(256, c.get(6));
+    CHECK_EQUAL(0LL,   c.get(0));
+    CHECK_EQUAL(1LL,   c.get(1));
+    CHECK_EQUAL(2LL,   c.get(2));
+    CHECK_EQUAL(3LL,   c.get(3));
+    CHECK_EQUAL(4LL,   c.get(4));
+    CHECK_EQUAL(16LL,  c.get(5));
+    CHECK_EQUAL(256LL, c.get(6));
     CHECK_EQUAL(7U, c.size());
 
 
     // TEST(Column_Add7)
 
     c.add(65536);
-    CHECK_EQUAL(0,     c.get(0));
-    CHECK_EQUAL(1,     c.get(1));
-    CHECK_EQUAL(2,     c.get(2));
-    CHECK_EQUAL(3,     c.get(3));
-    CHECK_EQUAL(4,     c.get(4));
-    CHECK_EQUAL(16,    c.get(5));
-    CHECK_EQUAL(256,   c.get(6));
-    CHECK_EQUAL(65536, c.get(7));
+    CHECK_EQUAL(0LL,     c.get(0));
+    CHECK_EQUAL(1LL,     c.get(1));
+    CHECK_EQUAL(2LL,     c.get(2));
+    CHECK_EQUAL(3LL,     c.get(3));
+    CHECK_EQUAL(4LL,     c.get(4));
+    CHECK_EQUAL(16LL,    c.get(5));
+    CHECK_EQUAL(256LL,   c.get(6));
+    CHECK_EQUAL(65536LL, c.get(7));
     CHECK_EQUAL(8U, c.size());
 
 
     // TEST(Column_Add8)
 
     c.add(4294967296LL);
-    CHECK_EQUAL(0,            c.get(0));
-    CHECK_EQUAL(1,            c.get(1));
-    CHECK_EQUAL(2,            c.get(2));
-    CHECK_EQUAL(3,            c.get(3));
-    CHECK_EQUAL(4,            c.get(4));
-    CHECK_EQUAL(16,           c.get(5));
-    CHECK_EQUAL(256,          c.get(6));
-    CHECK_EQUAL(65536,        c.get(7));
+    CHECK_EQUAL(0LL,            c.get(0));
+    CHECK_EQUAL(1LL,            c.get(1));
+    CHECK_EQUAL(2LL,            c.get(2));
+    CHECK_EQUAL(3LL,            c.get(3));
+    CHECK_EQUAL(4LL,            c.get(4));
+    CHECK_EQUAL(16LL,           c.get(5));
+    CHECK_EQUAL(256LL,          c.get(6));
+    CHECK_EQUAL(65536LL,        c.get(7));
     CHECK_EQUAL(4294967296LL, c.get(8));
     CHECK_EQUAL(9U, c.size());
 
@@ -163,7 +165,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-1);
 
     CHECK_EQUAL(1U, c.size());
-    CHECK_EQUAL(-1, c.get(0));
+    CHECK_EQUAL(-1LL, c.get(0));
 
 
     // TEST(Column_AddNeg2)
@@ -171,8 +173,8 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-256);
 
     CHECK_EQUAL(2U, c.size());
-    CHECK_EQUAL(-1,   c.get(0));
-    CHECK_EQUAL(-256, c.get(1));
+    CHECK_EQUAL(-1LL,   c.get(0));
+    CHECK_EQUAL(-256LL, c.get(1));
 
 
     // TEST(Column_AddNeg3)
@@ -180,9 +182,9 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-65536);
 
     CHECK_EQUAL(3U, c.size());
-    CHECK_EQUAL(-1,     c.get(0));
-    CHECK_EQUAL(-256,   c.get(1));
-    CHECK_EQUAL(-65536, c.get(2));
+    CHECK_EQUAL(-1LL,     c.get(0));
+    CHECK_EQUAL(-256LL,   c.get(1));
+    CHECK_EQUAL(-65536LL, c.get(2));
 
 
     // TEST(Column_AddNeg4)
@@ -190,10 +192,10 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-4294967296LL);
 
     CHECK_EQUAL(4U, c.size());
-    CHECK_EQUAL(-1,            c.get(0));
-    CHECK_EQUAL(-256,          c.get(1));
-    CHECK_EQUAL(-65536,        c.get(2));
-    CHECK_EQUAL(-4294967296LL, c.get(3));
+    CHECK_EQUAL(-1LL,            c.get(0));
+    CHECK_EQUAL(-256LL,          c.get(1));
+    CHECK_EQUAL(-65536LL,        c.get(2));
+    CHECK_EQUAL(-4294967296LL,   c.get(3));
 
 
     // TEST(Column_Set)
@@ -204,10 +206,10 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.set(3, 0);
 
     CHECK_EQUAL(4U, c.size());
-    CHECK_EQUAL(3, c.get(0));
-    CHECK_EQUAL(2, c.get(1));
-    CHECK_EQUAL(1, c.get(2));
-    CHECK_EQUAL(0, c.get(3));
+    CHECK_EQUAL(3LL, c.get(0));
+    CHECK_EQUAL(2LL, c.get(1));
+    CHECK_EQUAL(1LL, c.get(2));
+    CHECK_EQUAL(0LL, c.get(3));
 
 
     // TEST(Column_Insert1)
@@ -223,11 +225,11 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.insert(2, 16);
 
     CHECK_EQUAL(5U, c.size());
-    CHECK_EQUAL(0,  c.get(0));
-    CHECK_EQUAL(1,  c.get(1));
-    CHECK_EQUAL(16, c.get(2));
-    CHECK_EQUAL(2,  c.get(3));
-    CHECK_EQUAL(3,  c.get(4));
+    CHECK_EQUAL(0LL,  c.get(0));
+    CHECK_EQUAL(1LL,  c.get(1));
+    CHECK_EQUAL(16LL, c.get(2));
+    CHECK_EQUAL(2LL,  c.get(3));
+    CHECK_EQUAL(3LL,  c.get(4));
 
 
     // TEST(Column_Insert2)
@@ -236,12 +238,12 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.insert(0, 256);
 
     CHECK_EQUAL(6U, c.size());
-    CHECK_EQUAL(256, c.get(0));
-    CHECK_EQUAL(0,   c.get(1));
-    CHECK_EQUAL(1,   c.get(2));
-    CHECK_EQUAL(16,  c.get(3));
-    CHECK_EQUAL(2,   c.get(4));
-    CHECK_EQUAL(3,   c.get(5));
+    CHECK_EQUAL(256LL, c.get(0));
+    CHECK_EQUAL(0LL,   c.get(1));
+    CHECK_EQUAL(1LL,   c.get(2));
+    CHECK_EQUAL(16LL,  c.get(3));
+    CHECK_EQUAL(2LL,   c.get(4));
+    CHECK_EQUAL(3LL,   c.get(5));
 
 
     // TEST(Column_Insert3)
@@ -250,13 +252,13 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.insert(6, 65536);
 
     CHECK_EQUAL(7U,    c.size());
-    CHECK_EQUAL(256,   c.get(0));
-    CHECK_EQUAL(0,     c.get(1));
-    CHECK_EQUAL(1,     c.get(2));
-    CHECK_EQUAL(16,    c.get(3));
-    CHECK_EQUAL(2,     c.get(4));
-    CHECK_EQUAL(3,     c.get(5));
-    CHECK_EQUAL(65536, c.get(6));
+    CHECK_EQUAL(256LL,   c.get(0));
+    CHECK_EQUAL(0LL,     c.get(1));
+    CHECK_EQUAL(1LL,     c.get(2));
+    CHECK_EQUAL(16LL,    c.get(3));
+    CHECK_EQUAL(2LL,     c.get(4));
+    CHECK_EQUAL(3LL,     c.get(5));
+    CHECK_EQUAL(65536LL, c.get(6));
 
 
     // TEST(Column_Delete1)
@@ -265,12 +267,12 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.erase(3);
 
     CHECK_EQUAL(6U, c.size());
-    CHECK_EQUAL(256,   c.get(0));
-    CHECK_EQUAL(0,     c.get(1));
-    CHECK_EQUAL(1,     c.get(2));
-    CHECK_EQUAL(2,     c.get(3));
-    CHECK_EQUAL(3,     c.get(4));
-    CHECK_EQUAL(65536, c.get(5));
+    CHECK_EQUAL(256LL,   c.get(0));
+    CHECK_EQUAL(0LL,     c.get(1));
+    CHECK_EQUAL(1LL,     c.get(2));
+    CHECK_EQUAL(2LL,     c.get(3));
+    CHECK_EQUAL(3LL,     c.get(4));
+    CHECK_EQUAL(65536LL, c.get(5));
 
 
     // TEST(Column_Delete2)
@@ -279,11 +281,11 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.erase(0);
 
     CHECK_EQUAL(5U, c.size());
-    CHECK_EQUAL(0,     c.get(0));
-    CHECK_EQUAL(1,     c.get(1));
-    CHECK_EQUAL(2,     c.get(2));
-    CHECK_EQUAL(3,     c.get(3));
-    CHECK_EQUAL(65536, c.get(4));
+    CHECK_EQUAL(0LL,     c.get(0));
+    CHECK_EQUAL(1LL,     c.get(1));
+    CHECK_EQUAL(2LL,     c.get(2));
+    CHECK_EQUAL(3LL,     c.get(3));
+    CHECK_EQUAL(65536LL, c.get(4));
 
 
     // TEST(Column_Delete3)
@@ -292,10 +294,10 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.erase(4);
 
     CHECK_EQUAL(4U, c.size());
-    CHECK_EQUAL(0, c.get(0));
-    CHECK_EQUAL(1, c.get(1));
-    CHECK_EQUAL(2, c.get(2));
-    CHECK_EQUAL(3, c.get(3));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
 
 
     // TEST(Column_DeleteAll)
@@ -527,8 +529,8 @@ TEST_TYPES(Column_FindAllIntMin, IntegerColumn, IntNullColumn)
     TEST_TYPE c(Allocator::get_default(), ref_c);
     IntegerColumn r(Allocator::get_default(), ref_r);
 
-    const int value = 0;
-    const int reps = 5;
+    const int64_t value = 0;
+    const int64_t reps = 5;
 
     for (int i = 0; i < reps; i++)
         c.add(0);
@@ -642,6 +644,8 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
         CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
     }
 
     // First two elements
@@ -658,6 +662,8 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.get(0), 10);
         CHECK_EQUAL(c.get(1), 30);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Last two elements
@@ -674,6 +680,8 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 
     // Indices in wrong order
@@ -690,6 +698,8 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.get(1), 10);
         CHECK_EQUAL(c.get(2), 30);
         CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
     }
 }
 
@@ -734,35 +744,35 @@ TEST_TYPES(Column_SumAverage, IntegerColumn, IntNullColumn)
     // Sum of entire range, using default args
     sum = 0;
     for (int i = 0; i < 100; i++)
-        sum += c.get(i);
+        sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum());
     CHECK_EQUAL(sum/100.0, c.average());
 
     // Sum of entire range, given explicit range
     sum = 0;
     for (int i = 0; i < 100; i++)
-        sum += c.get(i);
+        sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum(0, 100));
     CHECK_EQUAL(sum/100.0, c.average(0,100));
 
     // Start to N
     sum = 0;
     for (int i = 0; i < 63; i++)
-        sum += c.get(i);
+        sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum(0, 63));
     CHECK_EQUAL(sum/63.0, c.average(0, 63));
 
     // N to end
     sum = 0;
     for (int i = 47; i < 100; i++)
-        sum += c.get(i);
+        sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum(47, 100));
     CHECK_EQUAL(sum/(100.0-47.0), c.average(47, 100));
 
     // N to M
     sum = 0;
     for (int i = 55; i < 79; i++)
-        sum += c.get(i);
+        sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum(55, 79));
     CHECK_EQUAL(sum/(79.0-55.0), c.average(55, 79));
 
@@ -846,8 +856,8 @@ TEST(Column_IndexCrash)
     col.create_search_index();
     col.insert_rows(0, 1, 0);
     col.set(0, 0);
-    
-    StringIndex& ndx = *col.get_search_index();    
+
+    StringIndex& ndx = *col.get_search_index();
     CHECK_EQUAL(ndx.count(int64_t(0)), 1);
 
     col.destroy();
@@ -927,7 +937,7 @@ TEST(ColumnIntNull_Null)
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
         CHECK_EQUAL(a.is_null(2), true);
-        CHECK(a.get(0) == 123);
+        CHECK(*a.get(0) == 123);
 
         // Test set
         a.set_null(0);
@@ -951,7 +961,7 @@ TEST(ColumnIntNull_Null)
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), false);
         CHECK_EQUAL(a.is_null(2), false);
-        CHECK(a.get(2) == 123);
+        CHECK(*a.get(2) == 123);
 
         // Test insert
         a.insert(0, realm::null());
@@ -979,7 +989,7 @@ TEST(ColumnIntNull_Null)
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), true);
         CHECK_EQUAL(a.is_null(2), false);
-        CHECK(a.get(2) == 123);
+        CHECK(*a.get(2) == 123);
 
         a.erase(0);
         CHECK_EQUAL(a.is_null(0), true);
@@ -1073,7 +1083,7 @@ TEST(ColumnIntNull_MoveLastOverPreservesNull)
     c.move_last_over(0, 2);
     CHECK(c.is_null(0));
     c.move_last_over(0, 1);
-    CHECK_EQUAL(c.get(0), 456);
+    CHECK_EQUAL(*c.get(0), 456);
     c.destroy();
 }
 

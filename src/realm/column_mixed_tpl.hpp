@@ -26,8 +26,7 @@ inline MixedColumn::MixedColumn(Allocator& alloc, ref_type ref,
     create(alloc, ref, table, column_ndx);
 }
 
-inline void MixedColumn::adj_acc_insert_rows(size_t row_ndx,
-                                             size_t num_rows) noexcept
+inline void MixedColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
 {
     m_data->adj_acc_insert_rows(row_ndx, num_rows);
 }
@@ -37,8 +36,12 @@ inline void MixedColumn::adj_acc_erase_row(size_t row_ndx) noexcept
     m_data->adj_acc_erase_row(row_ndx);
 }
 
-inline void MixedColumn::adj_acc_move_over(size_t from_row_ndx,
-                                           size_t to_row_ndx) noexcept
+inline void MixedColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
+{
+    m_data->adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+}
+
+inline void MixedColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     m_data->adj_acc_move_over(from_row_ndx, to_row_ndx);
 }
