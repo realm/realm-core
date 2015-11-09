@@ -79,7 +79,7 @@ public:
     ///
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.
-    void create(Array::Type = type_Normal);
+    void create(Array::Type = type_Normal, bool context_flag = false);
 
     /// Construct a copy of the specified slice of this basic array
     /// using the specified target allocator.

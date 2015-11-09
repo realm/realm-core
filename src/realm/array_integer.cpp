@@ -7,9 +7,9 @@
 using namespace realm;
 
 
-void ArrayInteger::create(Array::Type type) noexcept
+void ArrayInteger::create(Array::Type type, bool context_flag)
 {
-    Array::create(type, false, 0, 0);
+    Array::create(type, context_flag, 0, 0);
 }
 
 

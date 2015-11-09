@@ -35,7 +35,7 @@ public:
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override {}
 
-    void create(Type type = type_Normal) noexcept;
+    void create(Type type = type_Normal, bool context_flag = false);
 
     void add(int64_t value);
     void set(size_t ndx, int64_t value);
