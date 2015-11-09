@@ -249,6 +249,7 @@ TEST(File_SetEncryptionKey)
 #if REALM_ENABLE_ENCRYPTION
     f.set_encryption_key(key); // should not throw
 #else
+    // FIXME: https://ci.realm.io/job/core_android/784/testReport/(root)/DefaultSuite/File_SetEncryptionKey/
     CHECK_THROW(f.set_encryption_key(key), std::runtime_error);
 #endif
 }
