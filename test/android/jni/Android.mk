@@ -15,8 +15,8 @@ TESTS := $(wildcard ../../test_*.cpp ../../large_tests/*.cpp ../../util/*.cpp)
 LOCAL_MODULE     := native-activity
 LOCAL_SRC_FILES  := $(TESTS) main.cpp
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../ ../../../src
-LOCAL_CFLAGS     := -std=c++11
-LOCAL_CPPFLAGS   := -std=c++11
+LOCAL_CFLAGS     := -std=c++11 -DREALM_HAVE_CONFIG
+LOCAL_CPPFLAGS   := -std=c++11 -DREALM_HAVE_CONFIG
 LOCAL_LDLIBS     := -llog -landroid
 LOCAL_LDFLAGS    += -L../../android-lib
 LOCAL_STATIC_LIBRARIES += android_native_app_glue realm-android
