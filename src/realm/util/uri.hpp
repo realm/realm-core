@@ -33,19 +33,19 @@ namespace util {
 ///
 /// The decomposition process (as carried out by the constructor) performs a
 /// maximally lenient parsing of the specified URI reference. It does that
-/// according to the following regular expression (taken from
+/// according to the following regular expression (copied verbatimly from
 /// http://tools.ietf.org/html/rfc3986#appendix-B):
 ///
 ///     ^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?
-///      1             2             3       4           5
+///      12            3  4          5       6  7        8 9
 ///
 ///     Group
 ///     ------------------------
 ///     1       Scheme part
-///     2       Authority part
-///     3       Path part
-///     4       Query part
-///     5       Fragment identifier part
+///     3       Authority part
+///     5       Path part
+///     6       Query part
+///     8       Fragment identifier part
 ///
 /// NOTE: Since this regular expression maches every string, every string is
 /// decomposable.
