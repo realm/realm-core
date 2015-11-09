@@ -3163,12 +3163,10 @@ inline void destroy_inner_bptree_node(MemRef mem, int_fast64_t first_value,
                                       Allocator& alloc) noexcept
 {
     alloc.free_(mem);
-    // we do not inform encryption layer here, free_ takes care of that
     if (first_value % 2 == 0) {
         // Node has offsets array
         ref_type offsets_ref = to_ref(first_value);
         alloc.free_(offsets_ref, alloc.translate(offsets_ref));
-        // we do not inform encryption layer here, free_ takes care of that
     }
 }
 

@@ -439,19 +439,19 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path,crypt_key()));
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path,crypt_key()));
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path,crypt_key()));
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
         WriteTransaction wt(sg_w);

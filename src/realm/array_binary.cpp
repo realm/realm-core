@@ -118,8 +118,6 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
         // 0 or 1 is all that is ever written to m_nulls; any other content would be a bug
         REALM_ASSERT_3(n == 1, ||, n == 0);
         bool null = (n != 0);
-        // FIXME: Why this line?
-        ArrayInteger::get(nulls_header, ndx);
         if (null)
             return BinaryData(0, 0);        
     }

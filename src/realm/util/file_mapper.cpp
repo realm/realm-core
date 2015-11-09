@@ -213,7 +213,7 @@ void* mmap_anon(size_t size)
 // encryption_read_barrier() and encryption_write_barrier()
 bool encryption_is_in_use = false;
 
-void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size)
+void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size)
 {
     UniqueLock lock(mapping_mutex);
     auto limit = mappings_by_addr.end();

@@ -32,7 +32,11 @@ void munmap(void *addr, size_t size) noexcept;
 void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
 void msync(void *addr, size_t size);
 
-typedef size_t (*Header_to_size)(const char* addr);
+// A function which may be given to encryption_read_barrier. If present, the read barrier is a
+// a barrier for a full array. If absent, the read barrier is a barrier only for the address
+// range give as argument. If the barrier is for a full array, it will read the array header
+// and determine the address range from the header.
+using HeaderToSize = size_t (*)(const char* addr);
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -45,14 +49,14 @@ void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
 
 extern bool encryption_is_in_use;
 
-void do_encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size);
+void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size);
 void do_encryption_read_barrier(const void* addr, size_t size, 
-                                Header_to_size header_to_size,
+                                HeaderToSize header_to_size,
                                 EncryptedFileMapping* mapping);
 
 void do_encryption_write_barrier(const void* addr, size_t size);
 
-void inline encryption_read_barrier(const void* addr, size_t size, Header_to_size header_to_size = nullptr)
+void inline encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size = nullptr)
 {
     if (encryption_is_in_use)
         do_encryption_read_barrier(addr, size, header_to_size);
@@ -60,7 +64,7 @@ void inline encryption_read_barrier(const void* addr, size_t size, Header_to_siz
 
 void inline encryption_read_barrier(const void* addr, size_t size, 
                                     EncryptedFileMapping* mapping,
-                                    Header_to_size header_to_size = nullptr)
+                                    HeaderToSize header_to_size = nullptr)
 {
     if (mapping)
         do_encryption_read_barrier(addr, size, header_to_size, mapping);
@@ -76,7 +80,7 @@ void inline encryption_write_barrier(const void* addr, size_t size)
 extern util::Mutex mapping_mutex;
 
 inline void do_encryption_read_barrier(const void* addr, size_t size, 
-                                       Header_to_size header_to_size,
+                                       HeaderToSize header_to_size,
                                        EncryptedFileMapping* mapping)
 {
     UniqueLock lock(mapping_mutex, defer_lock_tag());
@@ -86,7 +90,7 @@ inline void do_encryption_read_barrier(const void* addr, size_t size,
 
 
 #else
-void inline encryption_read_barrier(const void*, size_t, Header_to_size header_to_size = nullptr) 
+void inline encryption_read_barrier(const void*, size_t, HeaderToSize header_to_size = nullptr) 
 {
     static_cast<void>(header_to_size);
 }
