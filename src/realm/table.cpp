@@ -5061,6 +5061,11 @@ void Table::adj_acc_clear_root_table() noexcept
         if (ColumnBase* col = m_cols[i])
             col->adj_acc_clear_root_table();
     }
+
+    // Adjust rows in tableviews after removal of all rows
+    for (auto& view : m_views) {
+        view->adj_row_acc_clear();
+    }
 }
 
 
