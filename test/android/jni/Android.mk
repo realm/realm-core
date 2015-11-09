@@ -14,7 +14,7 @@ TESTS := $(wildcard ../../test_*.cpp ../../large_tests/*.cpp ../../util/*.cpp)
 
 LOCAL_MODULE     := native-activity
 LOCAL_SRC_FILES  := $(TESTS) main.cpp
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../ ../../../src
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../ ../../../src ../../../openssl/include/ # test, src, openssl
 LOCAL_CFLAGS     := -std=c++11 -DREALM_HAVE_CONFIG
 LOCAL_CPPFLAGS   := -std=c++11 -DREALM_HAVE_CONFIG
 LOCAL_LDLIBS     := -llog -landroid
