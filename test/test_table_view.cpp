@@ -1671,4 +1671,26 @@ TEST(TableView_Backlinks)
     }
 }
 
+
+ONLY(TableView_Distinct)
+{
+    Table t;
+    t.add_column(type_String, "s", true);
+    t.add_empty_row(7);
+    t.set_string(0, 0, StringData(""));
+    t.set_string(0, 1, realm::null());
+    t.set_string(0, 2, StringData(""));
+    t.set_string(0, 3, realm::null());
+    t.set_string(0, 4, "foo");
+    t.set_string(0, 5, "foo");
+    t.set_string(0, 6, "bar");
+
+    TableView tv;
+
+    tv = t.where().find_all();
+    tv.distinct(0);
+    CHECK_EQUAL(tv.size(), 4);
+
+}
+
 #endif // TEST_TABLE_VIEW

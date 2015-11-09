@@ -18,9 +18,9 @@
  *
  **************************************************************************/
 
+#include <unordered_set>
+
 #include <realm/table_view.hpp>
-
-
 #include <realm/column.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/column_basic.hpp>
@@ -598,6 +598,57 @@ void TableViewBase::sync_distinct_view(size_t column)
         }
     }
 }
+
+void TableViewBase::distinct(size_t column)
+{
+    std::vector<size_t> v;
+    v.push_back(column);
+    distinct(v);
+}
+
+void TableViewBase::distinct(std::vector<size_t> columns)
+{
+    // User might want a view which is both distinct by some set of columns and sorted according to 
+    // another set of columns, so we need to maintain the original sorting order of the TableView
+
+    std::vector<size_t> original;
+    for (size_t r = 0; r < size(); r++)
+        original.push_back(m_row_indexes.get(r));
+
+    m_distinct_columns = columns;
+    Sorter s(columns, std::vector<bool>{ true });
+    sort(s);
+
+    std::vector<const ColumnTemplateBase*> m_columns;
+
+    for (size_t i = 0; i < columns.size(); i++) {
+        const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
+        const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
+        REALM_ASSERT(ctb);
+        m_columns.push_back(ctb);
+    }
+
+    std::unordered_set<size_t> remove;
+
+    for (size_t r = 1; r < size(); r++) {
+        bool identical = true;
+        for (size_t c = 0; c < m_distinct_columns.size(); c++) {
+            if (m_columns[c]->compare_values(get_source_ndx(r), get_source_ndx(r - 1)) != 0) {
+                identical = false;
+                break;
+            }
+        }
+        if (identical) {
+            remove.insert(get_source_ndx(r));
+        }
+    }
+
+    m_row_indexes.clear();
+
+
+
+}
+
 
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)

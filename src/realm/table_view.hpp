@@ -301,6 +301,9 @@ public:
     // Sort m_row_indexes according to multiple columns
     void sort(std::vector<size_t> columns, std::vector<bool> ascending);
 
+    void distinct(size_t column);
+    void distinct(std::vector<size_t> columns);
+
     // Actual sorting facility is provided by the base class:
     using RowIndexes::sort;
 
@@ -324,6 +327,8 @@ protected:
     size_t m_distinct_column_source;
     Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
     bool m_auto_sort = false;
+
+    std::vector<size_t> m_distinct_columns;
 
     // A valid query holds a reference to its table which must match our m_table.
     // hence we can use a query with a null table reference to indicate that the view
