@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Add `TableView::get_query()`.
 
 -----------
 
