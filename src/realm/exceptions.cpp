@@ -42,6 +42,8 @@ const char* LogicError::what() const noexcept
             return "Wrong kind of table";
         case detached_accessor:
             return "Detached accessor";
+        case target_row_index_out_of_range:
+            return "Target table row index out of range";
         case no_search_index:
             return "Column has no search index";
         case no_primary_key:

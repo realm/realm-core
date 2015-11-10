@@ -348,6 +348,28 @@ TEST(Table_StringOrBinaryTooBig)
 }
 
 
+TEST(Table_SetBinaryLogicErrors)
+{
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column(type_Binary, "a");
+    table->add_column(type_Int, "b");
+    table->add_empty_row();
+
+    BinaryData bd;
+    CHECK_LOGIC_ERROR(table->set_binary(2, 0, bd), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(table->set_binary(0, 1, bd), LogicError::row_index_out_of_range);
+    CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
+
+    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_binary() does not properly check it yet.
+
+    group.remove_table("table");
+    CHECK_LOGIC_ERROR(table->set_binary(0, 0, bd), LogicError::detached_accessor);
+
+    // Logic error LogicError::binary_too_big checked in Table_StringOrBinaryTooBig
+}
+
+
 TEST(Table_Floats)
 {
     Table table;
