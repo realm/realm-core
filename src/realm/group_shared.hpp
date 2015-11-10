@@ -272,16 +272,13 @@ public:
     struct VersionID {
         uint_fast64_t version;
         uint_fast32_t index;
-        VersionID(const VersionID& v)
-        {
-            version = v.version;
-            index = v.index;
-        }
-        VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
+
+        explicit VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
         {
             this->version = version;
             this->index = index;
         }
+
         bool operator==(const VersionID& other) { return version == other.version; }
         bool operator!=(const VersionID& other) { return version != other.version; }
         bool operator<(const VersionID& other) { return version < other.version; }
