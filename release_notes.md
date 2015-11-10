@@ -4,6 +4,7 @@
 
 * When inserting a new non-nullable Binary column to a table that had
   *existing* rows, then the automatically added values would become null
+* Fewer things are copied in TableView's move constructor.
 
 ### API breaking changes:
 
