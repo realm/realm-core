@@ -5488,7 +5488,7 @@ void Table::to_dot_internal(std::ostream& out) const
 void Table::print() const
 {
     // Table header
-    std::cout << "Table: len(" << m_size << ")\n    ";
+    std::cout << "Table (name = \"" << std::string(get_name()) << "\",  size = " << m_size << ")\n    ";
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
         StringData name = m_spec.get_column_name(i);
@@ -5512,6 +5512,13 @@ void Table::print() const
                 std::cout << "String     "; break;
             case col_type_StringEnum:
                 std::cout << "String     "; break;
+            case col_type_Link: {
+                size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(i);
+                ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
+                const StringData target_name = target_table->get_name();
+                std::cout << "->" << std::setw(8) << std::string(target_name).substr(0, 8) << " ";
+                break;
+            }
             default:
                 REALM_ASSERT(false);
         }
@@ -5551,6 +5558,11 @@ void Table::print() const
                 }
                 case col_type_StringEnum: {
                     const StringEnumColumn& column = get_column_string_enum(n);
+                    std::cout << std::setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_Link: {
+                    const LinkColumn& column = get_column_link(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
