@@ -301,6 +301,8 @@ public:
     // Sort m_row_indexes according to multiple columns
     void sort(std::vector<size_t> columns, std::vector<bool> ascending);
 
+    // Remove rows that are duplicated with respect to the column set passed as argument. 
+    // Will keep original sorting order so that you can both have a distinct and sorted view.
     void distinct(size_t column);
     void distinct(std::vector<size_t> columns);
 

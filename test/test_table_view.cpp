@@ -1776,6 +1776,19 @@ TEST(TableView_Distinct)
     CHECK_EQUAL(tv.get_source_ndx(2), 5);
     CHECK_EQUAL(tv.get_source_ndx(3), 1);
     CHECK_EQUAL(tv.get_source_ndx(4), 0);
+
+    // Same as previous test, but with string column being Enum
+    t.optimize(true);
+    tv = t.where().find_all();
+    tv.sort(0, false);
+    tv.distinct(std::vector<size_t>{0, 1});
+
+    CHECK_EQUAL(tv.size(), 5);
+    CHECK_EQUAL(tv.get_source_ndx(0), 3);
+    CHECK_EQUAL(tv.get_source_ndx(1), 4);
+    CHECK_EQUAL(tv.get_source_ndx(2), 5);
+    CHECK_EQUAL(tv.get_source_ndx(3), 1);
+    CHECK_EQUAL(tv.get_source_ndx(4), 0);
 }
 
 #endif // TEST_TABLE_VIEW
