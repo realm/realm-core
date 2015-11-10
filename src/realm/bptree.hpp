@@ -641,13 +641,11 @@ void BpTree<T>::clear()
         }
     }
     else {
-        root().clear_and_destroy_children();
-
-        // Reinitialize the root's memory as a leaf.
         Allocator& alloc = get_alloc();
+        root().destroy_deep();
+
         std::unique_ptr<LeafType> new_root(new LeafType(alloc));
-        new_root->init_from_mem(MemRef{root().get_ref(), alloc});
-        new_root->set_type(Array::type_Normal);
+        new_root->create();
         replace_root(std::move(new_root));
     }
 }

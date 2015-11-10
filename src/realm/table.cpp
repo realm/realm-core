@@ -13,7 +13,6 @@
 #include <realm/descriptor.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/column.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_binary.hpp>
@@ -26,6 +25,8 @@
 #include <realm/group.hpp>
 #include <realm/link_view.hpp>
 #include <realm/replication.hpp>
+#include <realm/table_view.hpp>
+#include <realm/query_engine.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -1377,10 +1378,10 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             }
             break;
         case col_type_Float:
-            col = new FloatColumn(alloc, ref, nullable); // Throws
+            col = new FloatColumn(alloc, ref); // Throws
             break;
         case col_type_Double:
-            col = new DoubleColumn(alloc, ref, nullable); // Throws
+            col = new DoubleColumn(alloc, ref); // Throws
             break;
         case col_type_String:
             col = new StringColumn(alloc, ref, nullable); // Throws
@@ -1571,6 +1572,12 @@ void Table::add_search_index(size_t col_ndx)
 
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
+
+    if (REALM_UNLIKELY(get_column_type(col_ndx) == type_Float))
+        throw LogicError(LogicError::illegal_combination);
+
+    if (REALM_UNLIKELY(get_column_type(col_ndx) == type_Double))
+        throw LogicError(LogicError::illegal_combination);
 
     if (has_search_index(col_ndx))
         return;
@@ -2032,9 +2039,9 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
         case col_type_Float:
-            return FloatColumn::create(alloc, size); // Throws
+            return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Double:
-            return DoubleColumn::create(alloc, size); // Throws
+            return DoubleColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_String:
             return StringColumn::create(alloc, size); // Throws
         case col_type_Binary:
@@ -2115,7 +2122,8 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
-        column.insert_rows(row_ndx, num_rows, m_size); // Throws
+        bool insert_nulls = is_nullable(col_ndx);
+        column.insert_rows(row_ndx, num_rows, m_size, insert_nulls); // Throws
     }
     if (row_ndx < m_size)
         adj_row_acc_insert_rows(row_ndx, num_rows);
@@ -3123,10 +3131,10 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
 
 void Table::set_null(size_t col_ndx, size_t row_ndx)
 {
-    auto& col = get_column_base(col_ndx);
-    if (!col.is_nullable()) {
+    if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
+    ColumnBase& col = get_column_base(col_ndx);
     col.set_null(row_ndx);
 
     if (Replication* repl = get_repl())
@@ -4035,25 +4043,25 @@ TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_
 size_t Table::lower_bound_int(size_t col_ndx, int64_t value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound_int(value);
+    return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound(value);
 }
 
 size_t Table::upper_bound_int(size_t col_ndx, int64_t value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound_int(value);
+    return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound(value);
 }
 
 size_t Table::lower_bound_bool(size_t col_ndx, bool value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound_int(value);
+    return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound(value);
 }
 
 size_t Table::upper_bound_bool(size_t col_ndx, bool value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound_int(value);
+    return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound(value);
 }
 
 size_t Table::lower_bound_float(size_t col_ndx, float value) const noexcept
@@ -4851,14 +4859,14 @@ bool Table::compare_rows(const Table& t) const
                 if (nullable) {
                     const IntNullColumn& c1 = get_column_int_null(i);
                     const IntNullColumn& c2 = t.get_column_int_null(i);
-                    if (!c1.compare_int(c2)) {
+                    if (!c1.compare(c2)) {
                         return false;
                     }
                 }
                 else {
                     const IntegerColumn& c1 = get_column(i);
                     const IntegerColumn& c2 = t.get_column(i);
-                    if (!c1.compare_int(c2))
+                    if (!c1.compare(c2))
                         return false;
                 }
                 continue;
@@ -4933,7 +4941,7 @@ bool Table::compare_rows(const Table& t) const
             case col_type_Link: {
                 const LinkColumn& c1 = get_column_link(i);
                 const LinkColumn& c2 = t.get_column_link(i);
-                if (!c1.compare_int(c2))
+                if (!c1.compare(c2))
                     return false;
                 continue;
             }

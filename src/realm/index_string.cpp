@@ -428,7 +428,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                 sub.add(row_ndx);
             }
             else {
-                size_t pos = sub.lower_bound_int(row_ndx);
+                size_t pos = sub.lower_bound(row_ndx);
                 if (pos == sub.size()) {
                     sub.add(row_ndx);
                 }
@@ -671,7 +671,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 sub.set_parent(m_array.get(), pos_refs);
 
                 size_t old_pos = sub.find_first(row_ndx);
-                size_t new_pos = sub.lower_bound_int(new_row_ndx);
+                size_t new_pos = sub.lower_bound(new_row_ndx);
                 REALM_ASSERT(old_pos != not_found);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
 

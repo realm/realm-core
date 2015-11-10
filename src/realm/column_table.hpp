@@ -42,7 +42,7 @@ public:
 
     Table* get_subtable_accessor(size_t) const noexcept override;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;
@@ -245,10 +245,11 @@ private:
 
 // Overriding virtual method of Column.
 inline void SubtableColumnBase::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                            size_t prior_num_rows)
+                                            size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(!insert_nulls);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     int_fast64_t value = 0;

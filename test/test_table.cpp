@@ -3589,8 +3589,7 @@ TEST(Table_Aggregates3)
 
         size_t count;
         size_t pos;
-        if (i == 1) {
-            // This i == 1 is the NULLABLE case where columns are nullable
+        if (nullable) {
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
@@ -3643,7 +3642,7 @@ TEST(Table_Aggregates3)
             CHECK_EQUAL(table->sum_float(1), 30.f);
             CHECK_APPROXIMATELY_EQUAL(table->sum_double(2), 1.1 + 2.2, 0.01);
         }
-        else {
+        else { // not nullable
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);

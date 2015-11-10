@@ -67,7 +67,7 @@ public:
 
     void to_json_row(size_t row_ndx, std::ostream& out) const;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void swap_rows(size_t, size_t) override;

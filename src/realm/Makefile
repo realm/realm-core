@@ -92,8 +92,6 @@ array_blobs_big.hpp \
 array_string_long.hpp \
 column.hpp \
 column_tpl.hpp \
-column_basic.hpp \
-column_basic_tpl.hpp \
 column_binary.hpp \
 column_string_enum.hpp \
 column_string.hpp \

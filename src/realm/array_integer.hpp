@@ -35,6 +35,8 @@ public:
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override {}
 
+    void create(Type type = type_Normal, bool context_flag = false);
+
     void add(int64_t value);
     void set(size_t ndx, int64_t value);
     void set_uint(size_t ndx, uint64_t value) noexcept;
@@ -81,7 +83,7 @@ public:
     /// the specified value.
     static MemRef create_array(Type, bool context_flag, size_t size, value_type value,
                                Allocator&);
-    void create(Type, bool context_flag = false);
+    void create(Type = type_Normal, bool context_flag = false);
 
     void init_from_ref(ref_type) noexcept;
     void init_from_mem(MemRef) noexcept;
