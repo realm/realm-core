@@ -377,13 +377,14 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
+    char* addr;
+
+    std::size_t cache_index = ((ref>>3) ^ (ref>>11)) & 0xFF;
+    if (cache[cache_index].ref == ref && cache[cache_index].version == version)
+        return cache[cache_index].addr;
 
     if (ref < m_baseline) {
-        std::size_t cache_index = ((ref>>3) ^ (ref>>11)) & 0xFF;
-        if (cache[cache_index].ref == ref && cache[cache_index].version == version)
-            return cache[cache_index].addr;
 
-        char* addr;
         const util::File::Map<char>* map;
 
         // fast path if reference is inside the initial mapping:
@@ -406,17 +407,18 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
                                              map->get_encrypted_mapping(),
                                              Array::get_byte_size_from_header);
 #endif
-        cache[cache_index].addr = addr;
-        cache[cache_index].ref = ref;
-        cache[cache_index].version = version;
-        return addr;
     }
-    typedef slabs::const_iterator iter;
-    iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
-    REALM_ASSERT_DEBUG(i != m_slabs.end());
+    else {
+        typedef slabs::const_iterator iter;
+        iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
+        REALM_ASSERT_DEBUG(i != m_slabs.end());
 
-    ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
-    char* addr = i->addr + (ref - slab_ref);
+        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
+        addr = i->addr + (ref - slab_ref);
+    }
+    cache[cache_index].addr = addr;
+    cache[cache_index].ref = ref;
+    cache[cache_index].version = version;
     return addr;
 }
 
