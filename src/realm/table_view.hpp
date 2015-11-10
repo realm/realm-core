@@ -325,10 +325,10 @@ protected:
 
     // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
     size_t m_distinct_column_source;
+    std::vector<size_t> m_distinct_columns;
     Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
     bool m_auto_sort = false;
 
-    std::vector<size_t> m_distinct_columns;
 
     // A valid query holds a reference to its table which must match our m_table.
     // hence we can use a query with a null table reference to indicate that the view
@@ -816,6 +816,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_linkview_source(tv.m_linkview_source),
     m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
+    m_distinct_columns(tv.m_distinct_columns),
     m_sorting_predicate(tv.m_sorting_predicate),
     m_auto_sort(tv.m_auto_sort),
     m_query(tv.m_query),
@@ -847,6 +848,7 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     // version number so that we can later trigger a sync if needed.
     m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
+    m_distinct_columns(tv.m_distinct_columns),
     m_sorting_predicate(tv.m_sorting_predicate),
     m_auto_sort(tv.m_auto_sort),
     m_query(tv.m_query),
@@ -885,6 +887,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_end = tv.m_end;
     m_limit = tv.m_limit;
     m_linkview_source = tv.m_linkview_source;
+    m_distinct_columns = tv.m_distinct_columns;
     m_sorting_predicate = tv.m_sorting_predicate;
 
     return *this;

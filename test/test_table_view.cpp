@@ -1672,25 +1672,110 @@ TEST(TableView_Backlinks)
 }
 
 
-ONLY(TableView_Distinct)
+TEST(TableView_Distinct)
 {
+    // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
+    // If two rows are indentical for the given set of distinct-columns, then it is *random* which one is removed.
+    // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view
+
+    // distinct() is internally based on the existing sort() method which is well tested. Hence it's not required
+    // to test distinct() with all possible Realm data types.
+
     Table t;
     t.add_column(type_String, "s", true);
+    t.add_column(type_Int, "i", true);
+    t.add_column(type_Float, "f", true);
+
     t.add_empty_row(7);
     t.set_string(0, 0, StringData(""));
+    t.set_int(1, 0, 100);
+    t.set_float(2, 0, 100.);
+
     t.set_string(0, 1, realm::null());
+    t.set_int(1, 1, 200);
+    t.set_float(2, 1, 200.);
+
     t.set_string(0, 2, StringData(""));
+    t.set_int(1, 2, 100);
+    t.set_float(2, 2, 100.);
+
     t.set_string(0, 3, realm::null());
+    t.set_int(1, 3, 200);
+    t.set_float(2, 3, 200.);
+
     t.set_string(0, 4, "foo");
+    t.set_int(1, 4, 300);
+    t.set_float(2, 4, 300.);
+
     t.set_string(0, 5, "foo");
+    t.set_int(1, 5, 400);
+    t.set_float(2, 5, 400.);
+
     t.set_string(0, 6, "bar");
+    t.set_int(1, 6, 500);
+    t.set_float(2, 6, 500.);
+
 
     TableView tv;
-
     tv = t.where().find_all();
     tv.distinct(0);
     CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv.get_source_ndx(0), 0);
+    CHECK_EQUAL(tv.get_source_ndx(1), 1);
+    CHECK_EQUAL(tv.get_source_ndx(2), 4);
+    CHECK_EQUAL(tv.get_source_ndx(3), 6);
 
+    tv = t.where().find_all();
+    tv.sort(0);
+    tv.distinct(0);
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    CHECK_EQUAL(tv.get_source_ndx(1), 0);
+    CHECK_EQUAL(tv.get_source_ndx(2), 6);
+    CHECK_EQUAL(tv.get_source_ndx(3), 4);
+
+    // Note here that our stable sort will sort the two "foo"s like row {4, 5}
+    tv = t.where().find_all();
+    tv.sort(0, false);
+    tv.distinct(std::vector<size_t>{0, 1});
+    CHECK_EQUAL(tv.get_source_ndx(0), 4);
+    CHECK_EQUAL(tv.get_source_ndx(1), 5);
+    CHECK_EQUAL(tv.get_source_ndx(2), 6);
+    CHECK_EQUAL(tv.get_source_ndx(3), 0);
+    CHECK_EQUAL(tv.get_source_ndx(4), 1);
+
+    tv = t.where().find_all();
+    tv.sort(0, false);
+    tv.distinct(std::vector<size_t>{0});
+    CHECK_EQUAL(tv.get_source_ndx(0), 4);
+    CHECK_EQUAL(tv.get_source_ndx(1), 6);
+    CHECK_EQUAL(tv.get_source_ndx(2), 0);
+    CHECK_EQUAL(tv.get_source_ndx(3), 1);
+
+    // NOTE that the distinct() above has removed 3 rows! So following must end up like {"foo", "bar", "", null}
+    t.remove(0);
+    tv.sync_if_needed();
+    tv.sort(0, false);
+    tv.distinct(std::vector<size_t>{0, 1});
+
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv.get_source_ndx(0), 3);
+    CHECK_EQUAL(tv.get_source_ndx(1), 5);
+    CHECK_EQUAL(tv.get_source_ndx(2), 1);
+    CHECK_EQUAL(tv.get_source_ndx(3), 0);
+
+    // Now try the float column. It has same values as the int column. The "foo, 400" row is included again due to
+    // now find_all().
+    tv = t.where().find_all();
+    tv.sort(0, false);
+    tv.distinct(std::vector<size_t>{0, 1});
+
+    CHECK_EQUAL(tv.size(), 5);
+    CHECK_EQUAL(tv.get_source_ndx(0), 3);
+    CHECK_EQUAL(tv.get_source_ndx(1), 4);
+    CHECK_EQUAL(tv.get_source_ndx(2), 5);
+    CHECK_EQUAL(tv.get_source_ndx(3), 1);
+    CHECK_EQUAL(tv.get_source_ndx(4), 0);
 }
 
 #endif // TEST_TABLE_VIEW

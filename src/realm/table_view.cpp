@@ -612,11 +612,14 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     // another set of columns, so we need to maintain the original sorting order of the TableView
 
     std::vector<size_t> original;
-    for (size_t r = 0; r < size(); r++)
+    std::vector<bool> ascending;
+    for (size_t r = 0; r < size(); r++) {
         original.push_back(m_row_indexes.get(r));
+        ascending.push_back(true);
+    }
 
     m_distinct_columns = columns;
-    Sorter s(columns, std::vector<bool>{ true });
+    Sorter s(columns, ascending);
     sort(s);
 
     std::vector<const ColumnTemplateBase*> m_columns;
@@ -633,20 +636,23 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     for (size_t r = 1; r < size(); r++) {
         bool identical = true;
         for (size_t c = 0; c < m_distinct_columns.size(); c++) {
-            if (m_columns[c]->compare_values(get_source_ndx(r), get_source_ndx(r - 1)) != 0) {
+            if (m_columns[c]->compare_values(m_row_indexes.get(r), m_row_indexes.get(r - 1)) != 0) {
                 identical = false;
                 break;
             }
         }
         if (identical) {
-            remove.insert(get_source_ndx(r));
+            remove.insert(m_row_indexes.get(r));
         }
     }
 
     m_row_indexes.clear();
 
-
-
+    for (size_t i = 0; i < original.size(); i++) {
+        if (remove.find(original[i]) == remove.end()) {
+            m_row_indexes.add(original[i]);
+        }
+    }
 }
 
 
@@ -722,6 +728,9 @@ void TableViewBase::do_sync()
     }
     if (m_auto_sort)
         re_sort();
+
+    if (m_distinct_columns.size() > 0)
+        distinct(m_distinct_columns);
 
     m_last_seen_version = outside_version();
 }
