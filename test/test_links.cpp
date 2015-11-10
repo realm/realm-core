@@ -173,6 +173,27 @@ TEST(Links_Basic)
 }
 
 
+TEST(Links_SetLinkLogicErrors)
+{
+    Group group;
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_Link, "a", *target);
+    origin->add_column(type_Int, "b");
+    origin->add_empty_row();
+    target->add_empty_row();
+
+    CHECK_LOGIC_ERROR(origin->set_link(2, 0, 0), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(origin->set_link(0, 1, 0), LogicError::row_index_out_of_range);
+    CHECK_LOGIC_ERROR(origin->set_link(0, 0, 1), LogicError::target_row_index_out_of_range);
+
+    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_link() does not properly check it yet.
+
+    group.remove_table("origin");
+    CHECK_LOGIC_ERROR(origin->set_link(0, 0, 0), LogicError::detached_accessor);
+}
+
+
 TEST(Links_Deletes)
 {
     Group group;

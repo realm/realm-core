@@ -143,6 +143,12 @@ public:
         /// attached to an underlying object.
         detached_accessor,
 
+        /// Indicates that a specified row index of a target table (a link) is
+        /// out of range. This is used for disambiguation in cases such as
+        /// Table::set_link() where one specifies both a row index of the origin
+        /// table, and a row index of the target table.
+        target_row_index_out_of_range,
+
         // Indicates that an involved column lacks a search index.
         no_search_index,
 

@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* When inserting a new non-nullable Binary column to a table that had 
+* When inserting a new non-nullable Binary column to a table that had
   *existing* rows, then the automatically added values would become null
 
 ### API breaking changes:
@@ -18,7 +18,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* More checking and throwing of logical errors in `Table::set_binary()` and
+  `Table::set_link()`.
 
 ----------------------------------------------
 

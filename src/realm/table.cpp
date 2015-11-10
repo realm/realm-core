@@ -2780,16 +2780,14 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
-    // column, however, the previous row index check guarantees that `m_size >
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
+    // columns, however, the previous row index check guarantees that `m_size >
     // 0`, and since `m_size` is also zero for a degenerate subtable, the table
     // cannot be degenerate if we got this far.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
-
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
-
     if (REALM_UNLIKELY(value.size() > max_string_size))
         throw LogicError(LogicError::string_too_big);
 
@@ -2808,13 +2806,14 @@ void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringD
         throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(row_ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
-    // column, however, the previous row index check guarantees that `m_size >
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
+    // columns, however, the previous row index check guarantees that `m_size >
     // 0`, and since `m_size` is also zero for a degenerate subtable, the table
     // cannot be degenerate if we got this far.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
+    // FIXME: Loophole: Assertion violation in Table::get_string() on column type mismatch.
     StringData old_value = get_string(col_ndx, row_ndx);
     if (REALM_UNLIKELY(pos > old_value.size()))
         throw LogicError(LogicError::string_position_out_of_range);
@@ -2839,13 +2838,14 @@ void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t 
         throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(row_ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
-    // column, however, the previous row index check guarantees that `m_size >
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
+    // columns, however, the previous row index check guarantees that `m_size >
     // 0`, and since `m_size` is also zero for a degenerate subtable, the table
     // cannot be degenerate if we got this far.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
+    // FIXME: Loophole: Assertion violation in Table::get_string() on column type mismatch.
     StringData old_value = get_string(col_ndx, row_ndx);
     if (REALM_UNLIKELY(pos > old_value.size()))
         throw LogicError(LogicError::string_position_out_of_range);
@@ -2876,14 +2876,24 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 
 void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 {
-    if (REALM_UNLIKELY(value.size() > max_binary_size))
-        throw LogicError(LogicError::binary_too_big);
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
+    // columns, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
+    if (REALM_UNLIKELY(value.size() > max_binary_size))
+        throw LogicError(LogicError::binary_too_big);
     bump_version();
 
+    // FIXME: Loophole: Assertion violation in Table::get_column_binary() on
+    // column type mismatch.
     BinaryColumn& column = get_column_binary(col_ndx);
     column.set(ndx, value);
 
@@ -2948,32 +2958,32 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
 
     switch (type) {
         case type_Int:
-            column.set_int(ndx, value.get_int());
+            column.set_int(ndx, value.get_int()); // Throws
             break;
         case type_Bool:
-            column.set_bool(ndx, value.get_bool());
+            column.set_bool(ndx, value.get_bool()); // Throws
             break;
         case type_DateTime:
-            column.set_datetime(ndx, value.get_datetime());
+            column.set_datetime(ndx, value.get_datetime()); // Throws
             break;
         case type_Float:
-            column.set_float(ndx, value.get_float());
+            column.set_float(ndx, value.get_float()); // Throws
             break;
         case type_Double:
-            column.set_double(ndx, value.get_double());
+            column.set_double(ndx, value.get_double()); // Throws
             break;
         case type_String:
             if (REALM_UNLIKELY(value.get_string().size() > max_string_size))
                 throw LogicError(LogicError::string_too_big);
-            column.set_string(ndx, value.get_string());
+            column.set_string(ndx, value.get_string()); // Throws
             break;
         case type_Binary:
             if (REALM_UNLIKELY(value.get_binary().size() > max_binary_size))
                 throw LogicError(LogicError::binary_too_big);
-            column.set_binary(ndx, value.get_binary());
+            column.set_binary(ndx, value.get_binary()); // Throws
             break;
         case type_Table:
-            column.set_subtable(ndx, 0);
+            column.set_subtable(ndx, 0); // Throws
             break;
         case type_Mixed:
         case type_Link:
@@ -3004,8 +3014,26 @@ TableRef Table::get_link_target(size_t col_ndx) noexcept
 
 void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(row_ndx, <, m_size);
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(row_ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
+    // column, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    LinkColumn& col = get_column_link(col_ndx);
+    Table& target_table = col.get_target_table();
+    if (REALM_UNLIKELY(target_row_ndx != realm::npos && target_row_ndx >= target_table.size()))
+        throw LogicError(LogicError::target_row_index_out_of_range);
+
+    // FIXME: There is still no proper check for column type mismatch. One
+    // solution would be to go in the direction of set_string() (using
+    // ColumnBase::set_string()), but that works less well here. The ideal
+    // solution seems to be to have a very efficient way of checking the column
+    // type. Idea: Introduce `DataType ColumnBase::m_type`.
 
     if (Replication* repl = get_repl())
         repl->set_link(this, col_ndx, row_ndx, target_row_ndx); // Throws
@@ -3014,11 +3042,9 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     if (old_target_row_ndx == realm::npos)
         return;
 
-    LinkColumn& col = get_column_link(col_ndx);
     if (col.get_weak_links())
         return;
 
-    Table& target_table = col.get_target_table();
     size_t num_remaining = target_table.get_num_strong_backlinks(old_target_row_ndx);
     if (num_remaining > 0)
         return;
