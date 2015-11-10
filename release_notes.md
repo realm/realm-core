@@ -6,6 +6,8 @@
   *existing* rows, then the automatically added values would become null
 * Fixed updating TableViews when applying a transaction log with a table clear.
 * Fewer things are copied in TableView's move constructor.
+* Prevent spurious blocking in networking subsystem (put sockets in nonblocking
+  mode even when used with poll/select).
 
 ### API breaking changes:
 
