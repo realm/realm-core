@@ -536,6 +536,14 @@ void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx
 }
 
 
+void TableViewBase::adj_row_acc_clear() noexcept
+{
+    m_num_detached_refs = m_row_indexes.size();
+    for (size_t i = 0, size = m_row_indexes.size(); i < size; ++i)
+        m_row_indexes.set(i, -1);
+}
+
+
 void TableView::remove(size_t row_ndx, RemoveMode underlying_mode)
 {
     check_cookie();

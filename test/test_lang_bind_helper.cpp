@@ -6983,6 +6983,47 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     t_r->clear();
 }
 
+TEST(LangBindHelper_AdvanceReadTransact_TableClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->add_empty_row();
+        wt.commit();
+    }
+
+    ConstTableRef table = sg.begin_read().get_table("table");
+    TableView tv = table->where().find_all();
+    ConstRow row = table->get(0);
+    CHECK(row.is_attached());
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+        WriteTransaction wt(sg_w);
+        wt.get_table("table")->clear();
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK(!row.is_attached());
+
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK(!tv.is_in_sync());
+    CHECK(!tv.is_row_attached(0));
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+}
+
 namespace {
 // A base class for transaction log parsers so that tests which want to test
 // just a single part of the transaction log handling don't have to implement
