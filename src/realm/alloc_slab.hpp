@@ -23,6 +23,7 @@
 #include <stdint.h> // unint8_t etc
 #include <vector>
 #include <string>
+#include <atomic>
 
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
@@ -273,7 +274,7 @@ protected:
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
-
+    void invalidate_cache() noexcept;
 private:
     enum AttachMode {
         attach_None,        // Nothing is attached
@@ -390,7 +391,13 @@ private:
 #ifdef REALM_DEBUG
     bool m_debug_out = false;
 #endif
-
+    struct hash_entry {
+        ref_type ref;
+        char* addr;
+        size_t version = 0;
+    };
+    mutable hash_entry cache[256];
+    mutable size_t version = 1;
     /// Throws if free-lists are no longer valid.
     const chunks& get_free_read_only() const;
 
@@ -442,6 +449,7 @@ private:
     friend class GroupWriter;
 };
 
+inline void SlabAlloc::invalidate_cache() noexcept { ++version; }
 
 class SlabAlloc::DetachGuard {
 public:

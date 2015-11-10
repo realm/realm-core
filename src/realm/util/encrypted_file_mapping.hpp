@@ -136,7 +136,7 @@ private:
     uintptr_t m_first_page;
     size_t m_page_count = 0;
 
-    std::vector<bool> m_up_to_date_pages;
+    std::vector<char> m_up_to_date_pages;
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;

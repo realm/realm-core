@@ -377,41 +377,47 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
-    // fast path if reference is inside the initial mapping:
-    if (ref < m_initial_mapping_size) {
-        char* addr = m_data + ref;
-        realm::util::encryption_read_barrier(addr, Array::header_size, 
-#if REALM_ENABLE_ENCRYPTION
-                                             m_initial_mapping.get_encrypted_mapping(),
-#endif
-                                             Array::get_byte_size_from_header);
-        return addr;
-    }
 
     if (ref < m_baseline) {
+        std::size_t cache_index = ((ref>>3) ^ (ref>>11)) & 0xFF;
+        if (cache[cache_index].ref == ref && cache[cache_index].version == version)
+            return cache[cache_index].addr;
 
-        // reference must be inside a section mapped later
-        size_t section_index = get_section_index(ref);
-        size_t mapping_index = section_index - m_first_additional_mapping;
-        size_t section_offset = ref - get_section_base(section_index);
-        REALM_ASSERT_DEBUG(m_additional_mappings);
-        REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
-        util::File::Map<char>& map = m_additional_mappings[mapping_index];
-        char* addr = map.get_addr() + section_offset;
-        realm::util::encryption_read_barrier(addr, Array::header_size, 
+        char* addr;
+        const util::File::Map<char>* map;
+
+        // fast path if reference is inside the initial mapping:
+        if (ref < m_initial_mapping_size) {
+            addr = m_data + ref;
+            map = &m_initial_mapping;
+        }
+        else {
+            // reference must be inside a section mapped later
+            size_t section_index = get_section_index(ref);
+            size_t mapping_index = section_index - m_first_additional_mapping;
+            size_t section_offset = ref - get_section_base(section_index);
+            REALM_ASSERT_DEBUG(m_additional_mappings);
+            REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
+            map = &m_additional_mappings[mapping_index];
+            addr = map->get_addr() + section_offset;
+        }
 #if REALM_ENABLE_ENCRYPTION
-                                             map.get_encrypted_mapping(),
-#endif
+        realm::util::encryption_read_barrier(addr, Array::header_size, 
+                                             map->get_encrypted_mapping(),
                                              Array::get_byte_size_from_header);
+#endif
+        cache[cache_index].addr = addr;
+        cache[cache_index].ref = ref;
+        cache[cache_index].version = version;
         return addr;
     }
-
     typedef slabs::const_iterator iter;
     iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
     REALM_ASSERT_DEBUG(i != m_slabs.end());
 
     ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
-    return i->addr + (ref - slab_ref);
+    char* addr = i->addr + (ref - slab_ref);
+    return addr;
 }
 
 int SlabAlloc::get_committed_file_format() const noexcept
