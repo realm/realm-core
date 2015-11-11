@@ -381,7 +381,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     size_t suboffset = offset + 4;
 
     // Single match (lowest bit set indicates literal row_ndx)
-    if (slot_value % 2 != 0) {
+    if (slot_value & 1 != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
         // for integer index, get_func fills out 'buffer' and makes str point at it
         StringConversionBuffer buffer;
@@ -716,7 +716,7 @@ bool has_duplicate_values(const Array& node) noexcept
     // Leaf node
     for (size_t i = 1; i < n; ++i) {
         int_fast64_t value = node.get(i);
-        bool is_single_row_index = value % 2 != 0;
+        bool is_single_row_index = (value & 1) != 0;
         if (is_single_row_index)
             continue;
 
@@ -843,7 +843,7 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
     if (node_is_leaf) {
         for (size_t i = 1; i != node_size; ++i) {
             int_fast64_t value = node.get(i);
-            bool is_single_row_index = value % 2 != 0;
+            bool is_single_row_index = (value & 1) != 0;
             if (is_single_row_index) {
                 out << std::setw(indent) << "" << "  Single row index (value: "<<(value/2)<<")\n";
                 continue;

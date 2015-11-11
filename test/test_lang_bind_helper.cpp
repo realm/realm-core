@@ -775,7 +775,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->set_mixed(0, 1, Mixed(true));
         table_w->set_mixed(0, 2, Mixed(DateTime(3)));
         table_w->set_mixed(1, 0, Mixed(4.0f));
-//        table_w->set_mixed(1, 1, Mixed(5.0)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+        table_w->set_mixed(1, 1, Mixed(5.0));
         wt.get_group().verify();
         table_w->set_mixed(1, 2, Mixed(StringData("Hadamard")));
         table_w->set_mixed(2, 0, Mixed(BinaryData(bin_1)));
@@ -792,8 +792,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(DateTime(3), table->get_mixed(0, 2).get_datetime());
     CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) &&
         CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
-//    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
-//        CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
+        CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(1, 2)) &&
         CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
     CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0)) &&
@@ -813,7 +813,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         set_subtab(table_w, 1, 0, 30);
         table_w->set_mixed(1, 1, Mixed(BinaryData(bin_2)));
         table_w->set_mixed(1, 2, Mixed(int_type(40)));
-//        table_w->set_mixed(2, 0, Mixed(50.0)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+        table_w->set_mixed(2, 0, Mixed(50.0));
         table_w->set_mixed(2, 1, Mixed(StringData("Banach")));
         table_w->set_mixed(2, 2, Mixed(DateTime(60)));
         wt.commit();
@@ -832,8 +832,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
     CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
         CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
-//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
-//        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
     CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
