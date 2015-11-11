@@ -77,6 +77,52 @@ REALM_TABLE_3(TestTableGroup2,
 } // Anonymous namespace
 
 
+ONLY(Group_RemoveColumnCrash)
+{
+    Group g;
+    g.insert_table(0, "hrnetprsafd");
+    {TableRef t = g.get_table(0);
+    t->insert_column(0, DataType(0), "aaa"); }
+    {TableRef t = g.get_table(0);
+    t->insert_column(0, DataType(7), "aaa"); }
+    {TableRef t = g.get_table(0);
+    t->remove_column(0); }
+    {TableRef t = g.get_table(0);
+    t->insert_column(0, DataType(0), "aaa"); }
+    g.insert_table(1, "qrsfdrpnkd");
+    {TableRef t = g.get_table(1);
+    t->insert_column(0, DataType(1), "aaa"); }
+    {TableRef t1 = g.get_table(1);
+    TableRef t2 = g.get_table(0);
+    t1->add_column_link(type_Link, "bbb", *t2); }
+    {TableRef t = g.get_table(1);
+    t->remove_column(0); }
+    {TableRef t1 = g.get_table(1);
+    TableRef t2 = g.get_table(0);
+    t1->add_column_link(type_Link, "bbb", *t2); }
+    {TableRef t1 = g.get_table(0);
+    TableRef t2 = g.get_table(1);
+    t1->add_column_link(type_Link, "bbb", *t2); }
+    {TableRef t1 = g.get_table(0);
+    TableRef t2 = g.get_table(0);
+    t1->add_column_link(type_Link, "bbb", *t2); }
+    {TableRef t = g.get_table(0);
+    t->insert_column(1, DataType(10), "aaa"); }
+    {TableRef t = g.get_table(1);
+    t->insert_column(0, DataType(10), "aaa"); }
+    {TableRef t = g.get_table(1);
+    t->remove_column(1); }
+    {TableRef t = g.get_table(0);
+    t->remove_column(1); }
+    {TableRef t = g.get_table(1);
+    t->remove_column(0); }
+    {TableRef t = g.get_table(0);
+    t->insert_column(1, DataType(0), "aaa"); }
+    {TableRef t = g.get_table(1);
+    t->remove_column(0); }
+}
+
+
 TEST(Group_Unattached)
 {
     Group group((Group::unattached_tag()));
