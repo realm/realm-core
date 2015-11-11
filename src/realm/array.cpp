@@ -339,7 +339,7 @@ void Array::destroy_children(size_t offset) noexcept
         // A ref is always 8-byte aligned, so the lowest bit
         // cannot be set. If it is, it means that it should not be
         // interpreted as a ref.
-        if (value & 1 != 0)
+        if ((value & 1) != 0)
             continue;
 
         ref_type ref = to_ref(value);
@@ -2420,7 +2420,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         int_fast64_t value = get(i);
         // Skip null refs and values that are not refs. Values are not refs when
         // the least significant bit is set.
-        if (value == 0 || value & 1 == 1)
+        if (value == 0 || (value & 1) == 1)
             continue;
 
         size_t used;

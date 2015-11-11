@@ -381,7 +381,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     size_t suboffset = offset + 4;
 
     // Single match (lowest bit set indicates literal row_ndx)
-    if (slot_value & 1 != 0) {
+    if ((slot_value & 1) != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
         // for integer index, get_func fills out 'buffer' and makes str point at it
         StringConversionBuffer buffer;
