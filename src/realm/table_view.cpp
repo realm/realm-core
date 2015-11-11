@@ -601,9 +601,7 @@ void TableViewBase::sync_distinct_view(size_t column)
 
 void TableViewBase::distinct(size_t column)
 {
-    std::vector<size_t> v;
-    v.push_back(column);
-    distinct(v);
+    distinct(std::vector<size_t> { column });
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument. 

@@ -818,7 +818,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_linkview_source(tv.m_linkview_source),
     m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
-    m_distinct_columns(tv.m_distinct_columns),
+    m_distinct_columns(std::move(tv.m_distinct_columns)),
     m_sorting_predicate(tv.m_sorting_predicate),
     m_auto_sort(tv.m_auto_sort),
     m_query(tv.m_query),
@@ -850,7 +850,7 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     // version number so that we can later trigger a sync if needed.
     m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
-    m_distinct_columns(tv.m_distinct_columns),
+    m_distinct_columns(std::move(tv.m_distinct_columns)),
     m_sorting_predicate(tv.m_sorting_predicate),
     m_auto_sort(tv.m_auto_sort),
     m_query(tv.m_query),
