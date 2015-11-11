@@ -1672,7 +1672,7 @@ TEST(TableView_Backlinks)
 }
 
 
-TEST(TableView_Distinct)
+ONLY(TableView_Distinct)
 {
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
     // If two rows are indentical for the given set of distinct-columns, then it is *random* which one is removed.
@@ -1755,9 +1755,9 @@ TEST(TableView_Distinct)
     // NOTE that the distinct() above has removed 3 rows! So following must end up like {"foo", "bar", "", null}
     t.remove(0);
     tv.sync_if_needed();
-    tv.sort(0, false);
     tv.distinct(std::vector<size_t>{0, 1});
 
+    // Note that we still have the sort(0, false) clause active
     CHECK_EQUAL(tv.size(), 4);
     CHECK_EQUAL(tv.get_source_ndx(0), 3);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
