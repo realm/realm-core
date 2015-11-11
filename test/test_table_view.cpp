@@ -1672,7 +1672,7 @@ TEST(TableView_Backlinks)
 }
 
 
-ONLY(TableView_Distinct)
+TEST(TableView_Distinct)
 {
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
     // If two rows are indentical for the given set of distinct-columns, then it is *random* which one is removed.
