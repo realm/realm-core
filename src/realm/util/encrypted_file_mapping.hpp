@@ -31,70 +31,11 @@ typedef size_t (*Header_to_size)(const char* addr);
 
 #include <vector>
 
-#if REALM_PLATFORM_APPLE
-#  include <CommonCrypto/CommonCrypto.h>
-#elif !defined(_WIN32)
-#  include <openssl/aes.h>
-#  include <openssl/sha.h>
-#else
-#  error Encryption is not yet implemented for this platform.
-#endif
-
 namespace realm {
 namespace util {
 
-struct iv_table;
-
-class AESCryptor {
-public:
-    AESCryptor(const uint8_t* key);
-    ~AESCryptor() noexcept;
-
-    void set_file_size(off_t new_size);
-
-    bool try_read(int fd, off_t pos, char* dst, size_t size);
-    bool read(int fd, off_t pos, char* dst, size_t size) noexcept;
-    void write(int fd, off_t pos, const char* src, size_t size) noexcept;
-
-private:
-    enum EncryptionMode {
-#if REALM_PLATFORM_APPLE
-        mode_Encrypt = kCCEncrypt,
-        mode_Decrypt = kCCDecrypt
-#else
-        mode_Encrypt = AES_ENCRYPT,
-        mode_Decrypt = AES_DECRYPT
-#endif
-    };
-
-#if REALM_PLATFORM_APPLE
-    CCCryptorRef m_encr;
-    CCCryptorRef m_decr;
-#else
-    AES_KEY m_ectx;
-    AES_KEY m_dctx;
-#endif
-
-    uint8_t m_hmacKey[32];
-    std::vector<iv_table> m_iv_buffer;
-    std::unique_ptr<char[]> m_rw_buffer;
-
-    void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
-    bool check_hmac(const void *data, size_t len, const uint8_t *hmac) const;
-    void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
-               const char* stored_iv) noexcept;
-    iv_table& get_iv_table(int fd, off_t data_pos) noexcept;
-};
-
+struct SharedFileInfo;
 class EncryptedFileMapping;
-
-struct SharedFileInfo {
-    int fd;
-    AESCryptor cryptor;
-    std::vector<EncryptedFileMapping*> mappings;
-
-    SharedFileInfo(const uint8_t* key, int fd);
-};
 
 class EncryptedFileMapping {
 public:
