@@ -645,6 +645,7 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
         return e.m_list == nullptr;
     });
     m_list_accessors.erase(remove_from, m_list_accessors.end());
+    m_list_accessors_contains_tombstones = false;
 }
 
 
