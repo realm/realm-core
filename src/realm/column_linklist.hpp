@@ -94,8 +94,10 @@ private:
     struct list_entry {
         size_t m_row_ndx;
         LinkView* m_list;
+        bool operator<(const list_entry& other) const { return m_row_ndx < other.m_row_ndx; }
     };
     mutable std::vector<list_entry> m_list_accessors;
+    mutable bool m_list_accessors_contains_tombstones = false;
 
     LinkView* get_ptr(size_t row_ndx) const;
 
@@ -135,6 +137,9 @@ private:
 
     template<bool fix_ndx_in_parent>
     void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+
+    void prune_list_accessor_tombstones() noexcept;
+    void validate_list_accessors() const noexcept;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
@@ -205,17 +210,6 @@ inline void LinkListColumn::set_null(size_t)
 inline void LinkListColumn::do_discard_child_accessors() noexcept
 {
     discard_child_accessors();
-}
-
-inline void LinkListColumn::unregister_linkview(const LinkView& list)
-{
-    auto end = m_list_accessors.end();
-    for (auto i = m_list_accessors.begin(); i != end; ++i) {
-        if (i->m_list == &list) {
-            m_list_accessors.erase(i);
-            return;
-        }
-    }
 }
 
 inline ref_type LinkListColumn::get_row_ref(size_t row_ndx) const noexcept
