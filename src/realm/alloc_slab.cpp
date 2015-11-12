@@ -402,11 +402,9 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
             map = &m_additional_mappings[mapping_index];
             addr = map->get_addr() + section_offset;
         }
-#if REALM_ENABLE_ENCRYPTION
         realm::util::encryption_read_barrier(addr, Array::header_size, 
                                              map->get_encrypted_mapping(),
                                              Array::get_byte_size_from_header);
-#endif
     }
     else {
         typedef slabs::const_iterator iter;

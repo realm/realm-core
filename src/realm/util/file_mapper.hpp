@@ -37,30 +37,21 @@ void msync(void *addr, size_t size);
 // range give as argument. If the barrier is for a full array, it will read the array header
 // and determine the address range from the header.
 using HeaderToSize = size_t (*)(const char* addr);
+class EncryptedFileMapping;
 
 #if REALM_ENABLE_ENCRYPTION
 
-class EncryptedFileMapping;
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
 void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key, 
            EncryptedFileMapping*& mapping);
 
-extern bool encryption_is_in_use;
-
-void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size);
 void do_encryption_read_barrier(const void* addr, size_t size, 
                                 HeaderToSize header_to_size,
                                 EncryptedFileMapping* mapping);
 
-void do_encryption_write_barrier(const void* addr, size_t size);
-
-void inline encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size = nullptr)
-{
-    if (encryption_is_in_use)
-        do_encryption_read_barrier(addr, size, header_to_size);
-}
+void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping);
 
 void inline encryption_read_barrier(const void* addr, size_t size, 
                                     EncryptedFileMapping* mapping,
@@ -70,10 +61,10 @@ void inline encryption_read_barrier(const void* addr, size_t size,
         do_encryption_read_barrier(addr, size, header_to_size, mapping);
 }
 
-void inline encryption_write_barrier(const void* addr, size_t size)
+void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
 {
-    if (encryption_is_in_use)
-        do_encryption_write_barrier(addr, size);
+    if (mapping)
+        do_encryption_write_barrier(addr, size, mapping);
 }
 
 
@@ -87,14 +78,24 @@ inline void do_encryption_read_barrier(const void* addr, size_t size,
     mapping->read_barrier(addr, size, lock, header_to_size);
 }
 
+inline void do_encryption_write_barrier(const void* addr, size_t size, 
+                                        EncryptedFileMapping* mapping)
+{
+    LockGuard lock(mapping_mutex);
+    mapping->write_barrier(addr, size);
+}
+
 
 
 #else
-void inline encryption_read_barrier(const void*, size_t, HeaderToSize header_to_size = nullptr) 
+void inline encryption_read_barrier(const void*, size_t, 
+                                    EncryptedFileMapping*,
+                                    HeaderToSize header_to_size = nullptr) 
 {
     static_cast<void>(header_to_size);
 }
 void inline encryption_write_barrier(const void*, size_t) {}
+void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*) {}
 #endif
 
 // helpers for encrypted Maps
@@ -102,18 +103,14 @@ template<typename T>
 void encryption_read_barrier(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-#if REALM_ENABLE_ENCRYPTION
     encryption_read_barrier(addr+index, sizeof(T)*num_elements, map.get_encrypted_mapping());
-#else
-    encryption_read_barrier(addr+index, sizeof(T)*num_elements);
-#endif
 }
 
 template<typename T>
 void encryption_write_barrier(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-    encryption_write_barrier(addr+index, sizeof(T)*num_elements);
+    encryption_write_barrier(addr+index, sizeof(T)*num_elements, map.get_encrypted_mapping());
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;

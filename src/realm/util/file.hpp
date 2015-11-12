@@ -39,9 +39,7 @@
 namespace realm {
 namespace util {
 
-#if REALM_ENABLE_ENCRYPTION
 class EncryptedFileMapping;
-#endif
 
 /// Create the specified directory in the file system.
 ///
@@ -498,6 +496,11 @@ private:
         {
             return m_encrypted_mapping;
         }
+#else
+        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        {
+            return nullptr;
+        }
 #endif
     };
 };
@@ -622,6 +625,11 @@ public:
     inline EncryptedFileMapping* get_encrypted_mapping() const
     {
         return m_encrypted_mapping;
+    }
+#else
+    inline EncryptedFileMapping* get_encrypted_mapping() const
+    {
+        return nullptr;
     }
 #endif
 

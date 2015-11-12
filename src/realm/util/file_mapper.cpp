@@ -123,7 +123,6 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_o
 
     LockGuard lock(mapping_mutex);
 
-    encryption_is_in_use = true;
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->inode == st.st_ino && it->device == st.st_dev)
@@ -184,8 +183,6 @@ void remove_mapping(void* addr, size_t size)
         return;
 
     mappings_by_addr.erase(mappings_by_addr.begin() + (m - &mappings_by_addr[0]));
-    if (mappings_by_addr.size() == 0)
-        encryption_is_in_use = false;
 
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
@@ -208,36 +205,6 @@ void* mmap_anon(size_t size)
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
     }
     return addr;
-}
-
-// encryption_read_barrier() and encryption_write_barrier()
-bool encryption_is_in_use = false;
-
-void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size)
-{
-    UniqueLock lock(mapping_mutex);
-    auto limit = mappings_by_addr.end();
-    for (auto it = mappings_by_addr.begin(); it < limit; ++it) {
-        mapping_and_addr& m = *it;
-        if (m.addr >= static_cast<const char*>(addr) + size 
-            || static_cast<const char*>(m.addr) + m.size <= addr)
-            continue;
-        m.mapping->read_barrier(addr, size, lock, header_to_size);
-    }
-}
-
-void do_encryption_write_barrier(const void* addr, size_t size)
-{
-    LockGuard lock(mapping_mutex);
-    auto limit = mappings_by_addr.end();
-    for (auto it = mappings_by_addr.begin(); it < limit; ++it) {
-        mapping_and_addr& m = *it;
-        if (m.addr >= static_cast<const char*>(addr) + size 
-            || static_cast<const char*>(m.addr) + m.size <= addr)
-            continue;
-
-        m.mapping->write_barrier(addr, size);
-    }
 }
 
 size_t round_up_to_page_size(size_t size) noexcept
