@@ -90,6 +90,7 @@ using ASIO = network::io_service;
 
 template<>
 class EventLoop<ASIO>: public EventLoopBase {
+public:
     EventLoop();
     ~EventLoop();
 
