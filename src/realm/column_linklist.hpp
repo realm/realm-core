@@ -96,6 +96,11 @@ private:
         LinkView* m_list;
         bool operator<(const list_entry& other) const { return m_row_ndx < other.m_row_ndx; }
     };
+
+    // The accessors stored in `m_list_accessors` are sorted by their row index. When an accessor is unregistered,
+    // its entry is replaced by a tombstone (an entry with a null `m_list`). These tombstones are pruned at a later
+    // time by `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost of `std::vector::erase` that
+    // would otherwise be incurred each time an accessor is removed.
     mutable std::vector<list_entry> m_list_accessors;
     mutable bool m_list_accessors_contains_tombstones = false;
 
