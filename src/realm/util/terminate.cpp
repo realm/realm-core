@@ -39,10 +39,12 @@
 extern "C" REALM_NORETURN REALM_NOINLINE
 void please_report_this_error_to_help_at_realm_dot_io();
 
+// LCOV_EXCL_START
 extern "C" REALM_NORETURN REALM_NOINLINE
 void please_report_this_error_to_help_at_realm_dot_io() {
     std::abort();
 }
+// LCOV_EXCL_STOP
 
 namespace {
 
@@ -67,6 +69,7 @@ void nslog(const char *message) {
 namespace realm {
 namespace util {
 
+// LCOV_EXCL_START
 REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
 {
 
@@ -100,6 +103,7 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line) 
     ss << file << ":" << line << ": " REALM_VER_CHUNK " " << message << '\n';
     terminate_internal(ss);
 }
+// LCOV_EXCL_STOP
 
 } // namespace util
 } // namespace realm
