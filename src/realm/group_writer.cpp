@@ -252,6 +252,7 @@ ref_type GroupWriter::write_group()
     // m_free_positions has the capacity to store the new larger value without
     // reallocation.
     size_t rest = reserve_pos + reserve_size - size_t(end_ref);
+    size_t used = size_t(end_ref) - reserve_pos;
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = int_fast64_t(end_ref); // FIXME: Problematic unsigned -> signed conversion
     int_fast64_t value_9 = int_fast64_t(rest); // FIXME: Problematic unsigned -> signed conversion
@@ -260,7 +261,7 @@ ref_type GroupWriter::write_group()
 
     // The free-list now have their final form, so we can write them to the file
     char* start_addr = m_file_map.get_addr() + reserve_ref;
-    realm::util::encryption_read_barrier(start_addr, reserve_size, m_file_map.get_encrypted_mapping());
+    realm::util::encryption_read_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
     write_array_at(free_positions_ref, m_free_positions.get_header(),
                    free_positions_size); // Throws
     write_array_at(free_sizes_ref, m_free_lengths.get_header(),
@@ -272,7 +273,7 @@ ref_type GroupWriter::write_group()
 
     // Write top
     write_array_at(top_ref, top.get_header(), top_byte_size); // Throws
-    realm::util::encryption_write_barrier(start_addr, reserve_size, m_file_map.get_encrypted_mapping());
+    realm::util::encryption_write_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
 
     // Return top_ref so that it can be saved in lock file used for coordination
     return top_ref;

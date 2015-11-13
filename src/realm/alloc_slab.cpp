@@ -379,7 +379,10 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
 
     char* addr;
 
-    std::size_t cache_index = ((ref>>3) ^ (ref>>11)) & 0xFF;
+    //std::size_t cache_index = ((ref>>3) ^ (ref>>11)) & 0xFF;
+    std::size_t cache_index = ref ^(ref >> 32);
+    cache_index = ref ^(ref >> 16);
+    cache_index = (ref ^(ref >> 8)) & 0xFF;
     if (cache[cache_index].ref == ref && cache[cache_index].version == version)
         return cache[cache_index].addr;
 

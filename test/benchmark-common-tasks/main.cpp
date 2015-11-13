@@ -17,6 +17,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 namespace {
+#define BASE_SIZE 3600
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -91,8 +92,8 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
-        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
+        t->add_empty_row(BASE_SIZE * 4);
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << rand();
             t->set_string(0, i, ss.str());
@@ -110,9 +111,9 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
         t->insert_empty_row(0);
         // This should be enough to upgrade the entire array:
         t->set_string(0, 0, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
         tr.commit();
     }
 };
@@ -140,9 +141,9 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
+        t->add_empty_row(BASE_SIZE * 4);
         Random r;
-        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             t->set_int(0, i, r.draw_int<int64_t>());
         }
         tr.commit();
@@ -362,11 +363,14 @@ void run_benchmark(BenchmarkResults& results)
 {
     typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
     std::vector<config_pair> configs;
+
     configs.push_back(config_pair(SharedGroup::durability_MemOnly, nullptr));
 #if REALM_ENABLE_ENCRYPTION
     configs.push_back(config_pair(SharedGroup::durability_MemOnly, crypt_key(true)));
 #endif
+
     configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
+
 #if REALM_ENABLE_ENCRYPTION
     configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
 #endif
@@ -455,7 +459,9 @@ int benchmark_common_tasks_main()
     run_benchmark<BenchmarkSortInt>(results);
     run_benchmark<BenchmarkInsert>(results);
     run_benchmark<BenchmarkGetString>(results);
+
     run_benchmark<BenchmarkSetString>(results);
+
     run_benchmark<BenchmarkCreateIndex>(results);
     run_benchmark<BenchmarkGetLongString>(results);
     run_benchmark<BenchmarkSetLongString>(results);

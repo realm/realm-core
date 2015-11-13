@@ -464,8 +464,8 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     EntryHeader hdr;
     hdr.size = entry.changeset.size();
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
-    write_ptr += sizeof(EntryHeader);
-    std::copy(entry.changeset.data(), entry.changeset.data() + entry.changeset.size(), write_ptr);
+    auto write_ptr2 = write_ptr + sizeof(EntryHeader);
+    std::copy(entry.changeset.data(), entry.changeset.data() + entry.changeset.size(), write_ptr2);
     bool disable_sync = get_disable_sync_to_disk();
     realm::util::encryption_write_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size(),
                                           active_log->map.get_encrypted_mapping());
