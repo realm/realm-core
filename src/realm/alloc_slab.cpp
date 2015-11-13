@@ -373,18 +373,14 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     return new_mem;
 }
 
+
 char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
     char* addr;
 
-    //std::size_t cache_index = ((ref>>3) ^ (ref>>11)) & 0xFF;
-    std::size_t cache_index;
-    if (sizeof(ref) > 4)
-        cache_index = ref ^(ref >> 32);
-    else
-        cache_index = ref;
+    size_t cache_index = ref ^ ((ref >> 16) >> 16);
     cache_index = cache_index ^(cache_index >> 16);
     cache_index = (cache_index ^(cache_index >> 8)) & 0xFF;
     if (cache[cache_index].ref == ref && cache[cache_index].version == version)
