@@ -913,6 +913,20 @@ TEST(Links_LinkList_SwapRows)
     CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
     CHECK_EQUAL(2, target->get_backlink(2, *origin, col_link, 1));
     CHECK_EQUAL(1, target->get_backlink(2, *origin, col_link, 2));
+
+    // Release the accessor so we can test swapping when only one of
+    // the two rows has an accessor.
+    links0.reset();
+
+    // Row 0 has no accessor.
+    _impl::TableFriend::do_swap_rows(*origin, 0, 1);
+    CHECK_EQUAL(2, links1->get_origin_row_index());
+    CHECK_EQUAL(0, links2->get_origin_row_index());
+
+    // Row 1 has no accessor.
+    _impl::TableFriend::do_swap_rows(*origin, 0, 1);
+    CHECK_EQUAL(2, links1->get_origin_row_index());
+    CHECK_EQUAL(1, links2->get_origin_row_index());
 }
 
 TEST(Links_LinkList_TargetSwapRows)

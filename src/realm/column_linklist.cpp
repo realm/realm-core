@@ -570,8 +570,6 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
         std::swap(it_1->m_list, it_2->m_list);
     }
     else if (row_1_found || row_2_found) {
-        // FIXME: Test coverage.
-
         auto single = end;
         auto remainder = end;
 
