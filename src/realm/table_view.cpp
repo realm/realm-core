@@ -613,7 +613,7 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     original.resize(size());
     std::vector<bool> ascending;
     for (size_t r = 0; r < size(); r++) {
-        original.push_back(m_row_indexes.get(r));
+        original[r] = m_row_indexes.get(r);
         ascending.push_back(true);
     }
 
