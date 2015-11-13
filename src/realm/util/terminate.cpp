@@ -49,7 +49,8 @@ void please_report_this_error_to_help_at_realm_dot_io() {
 namespace {
 
 #if REALM_PLATFORM_APPLE
-void nslog(const char *message) {
+void nslog(const char *message) noexcept
+{
     CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
     CFShow(str);
 
@@ -63,20 +64,20 @@ void nslog(const char *message) {
     CFRelease(str);
 }
 
-static realm::util::TerminationNotificationCallback termination_notification_callback = nslog;
+void(*termination_notification_callback)(const char*) noexcept = nslog;
 
 #elif REALM_PLATFORM_ANDROID
 
-void android_log(const char* message)
+void android_log(const char* message) noexcept
 {
     __android_log_print(ANDROID_LOG_ERROR, "REALM", message);
 }
 
-static realm::util::TerminationNotificationCallback termination_notification_callback = android_log;
+void(*termination_notification_callback)(const char*) noexcept = android_log;
 
 #else
 
-static realm::util::TerminationNotificationCallback termination_notification_callback = nullptr;
+void(*termination_notification_callback)(const char*) noexcept = nullptr;
 
 #endif
 
@@ -85,7 +86,7 @@ static realm::util::TerminationNotificationCallback termination_notification_cal
 namespace realm {
 namespace util {
 
-void set_termination_notification_callback(TerminationNotificationCallback callback)
+void set_termination_notification_callback(void(*callback)(const char* ) noexcept) noexcept
 {
     termination_notification_callback = callback;
 }

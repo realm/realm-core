@@ -32,9 +32,17 @@
 namespace realm {
 namespace util {
 
-using TerminationNotificationCallback = void(*)(const char* message);
-
-void set_termination_notification_callback(TerminationNotificationCallback);
+/// Install a custom termination notification callback. This will only be called as a result of
+/// Realm crashing internally, i.e. a failed assertion or an otherwise irrecoverable error
+/// condition. The termination notification callback is supplied with a zero-terminated string
+/// containing information relevant for debugging the issue leading to the crash.
+///
+/// The termination notification callback is shared by all threads, which is another way of saying
+/// that it must be reentrant, in case multiple threads crash simultaneously.
+///
+/// Furthermore, the provided callback must be `noexcept`, indicating that if an exception
+/// is thrown in the callback, the process is terminated with a call to `std::terminate`.
+void set_termination_notification_callback(void(*callback)(const char* message) noexcept) noexcept;
 
 REALM_NORETURN void terminate_internal(std::stringstream&) noexcept;
 
