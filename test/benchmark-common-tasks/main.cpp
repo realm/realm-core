@@ -315,8 +315,44 @@ struct BenchmarkQueryNot : Benchmark {
     }
 };
 
+struct BenchmarkGetLinkList : Benchmark {
+    const char* name() const { return "GetLinkList"; }
+    static const size_t rows = 10000;
 
+    void before_all(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef destination_table = tr.add_table(std::string(name()) + "_Destination");
+        TableRef table = tr.add_table(name());
+        table->add_column_link(type_LinkList, "linklist", *destination_table);
+        table->add_empty_row(rows);
+        tr.commit();
+    }
 
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table(name());
+        std::vector<ConstLinkViewRef> linklists(rows);
+        for (size_t i = 0; i < rows; ++i) {
+            linklists[i] = table->get_linklist(0, i);
+        }
+        for (size_t i = 0; i < rows; ++i) {
+            table->get_linklist(0, i);
+        }
+        for (size_t i = 0; i < rows; ++i) {
+            linklists[i].reset();
+        }
+    }
+
+    void after_all(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table(name());
+        g.remove_table(std::string(name()) + "_Destination");
+        group.commit();
+    }
+};
 
 const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
 {
@@ -443,6 +479,7 @@ int benchmark_common_tasks_main()
     run_benchmark<BenchmarkCreateIndex>(results);
     run_benchmark<BenchmarkGetLongString>(results);
     run_benchmark<BenchmarkSetLongString>(results);
+    run_benchmark<BenchmarkGetLinkList>(results);
 
     return 0;
 }
