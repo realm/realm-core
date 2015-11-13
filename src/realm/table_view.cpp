@@ -610,6 +610,7 @@ void TableViewBase::distinct(std::vector<size_t> columns)
 {
     // Step 1: First copy original TableView into a vector
     std::vector<size_t> original;
+    original.resize(size());
     std::vector<bool> ascending;
     for (size_t r = 0; r < size(); r++) {
         original.push_back(m_row_indexes.get(r));
