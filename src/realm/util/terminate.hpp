@@ -31,6 +31,11 @@
 
 namespace realm {
 namespace util {
+
+using TerminationNotificationCallback = void(*)(const char* message);
+
+void set_termination_notification_callback(TerminationNotificationCallback);
+
 REALM_NORETURN void terminate_internal(std::stringstream&) noexcept;
 
 REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept;

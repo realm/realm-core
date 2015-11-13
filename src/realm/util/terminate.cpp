@@ -62,12 +62,33 @@ void nslog(const char *message) {
 
     CFRelease(str);
 }
+
+static realm::util::TerminationNotificationCallback termination_notification_callback = nslog;
+
+#elif REALM_PLATFORM_ANDROID
+
+void android_log(const char* message)
+{
+    __android_log_print(ANDROID_LOG_ERROR, "REALM", message);
+}
+
+static realm::util::TerminationNotificationCallback termination_notification_callback = android_log;
+
+#else
+
+static realm::util::TerminationNotificationCallback termination_notification_callback = nullptr;
+
 #endif
 
 } // unnamed namespace
 
 namespace realm {
 namespace util {
+
+void set_termination_notification_callback(TerminationNotificationCallback callback)
+{
+    termination_notification_callback = callback;
+}
 
 // LCOV_EXCL_START
 REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
@@ -88,11 +109,9 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
     std::cerr << ss.rdbuf() << '\n';
 #endif
 
-#if REALM_PLATFORM_APPLE
-    nslog(ss.str().c_str());
-#elif defined(__ANDROID__)
-    __android_log_print(ANDROID_LOG_ERROR, "REALM", ss.str().c_str());
-#endif
+    if (termination_notification_callback) {
+        termination_notification_callback(ss.str().c_str());
+    }
 
     please_report_this_error_to_help_at_realm_dot_io();
 }
