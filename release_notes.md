@@ -8,6 +8,8 @@
 * Fewer things are copied in TableView's move constructor.
 * Prevent spurious blocking in networking subsystem (put sockets in nonblocking
   mode even when used with poll/select).
+* Fixed the shared group being left in an inconsistent state if the transaction
+  log observer threw an exception.
 
 ### API breaking changes:
 
