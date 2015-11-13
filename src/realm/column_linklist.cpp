@@ -523,9 +523,13 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
         to->m_list = nullptr;
         m_list_accessors_contains_tombstones = true;
     }
+    if (from_row_ndx == to_row_ndx) {
+        validate_list_accessors();
+        return;
+    }
 
     auto from = std::lower_bound(begin, end, list_entry{ from_row_ndx, nullptr });
-    if (from != end && from->m_row_ndx == from_row_ndx && from != to) {
+    if (from != end && from->m_row_ndx == from_row_ndx) {
         from->m_row_ndx = to_row_ndx;
         if (fix_ndx_in_parent)
             from->m_list->set_origin_row_index(to_row_ndx);
@@ -535,11 +539,9 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
             std::iter_swap(to, from);
         }
         else if (from < to) {
-            // FIXME: Test coverage.
             std::rotate(from, from + 1, to);
         }
         else {
-            // FIXME: Test coverage.
             std::rotate(to, from, from + 1);
         }
     }
