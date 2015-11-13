@@ -327,7 +327,11 @@ protected:
 
     // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
     size_t m_distinct_column_source;
+
+    // If m_distinct_columns.size() > 0, it means that this TableView has had called TableView::distinct() and
+    // must only contain unique rows with respect to that column set of the parent table
     std::vector<size_t> m_distinct_columns;
+
     Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
     bool m_auto_sort = false;
 
