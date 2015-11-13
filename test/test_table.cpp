@@ -6575,5 +6575,27 @@ TEST(Table_AllocatorCapacityBug)
 }
 
 
+// Exposes crash when setting a int, float or double that has its least significant bit set
+TEST(Table_MixedCrashValues)
+{
+    GROUP_TEST_PATH(path);
+    const char* encryption_key = 0;
+    Group group(path, encryption_key, Group::mode_ReadWrite);
+    TableRef table = group.add_table("t");
+    table->add_column(type_Mixed, "m");
+    table->add_empty_row(3);
+
+    table->set_mixed(0, 0, Mixed(int64_t(-1)));
+    table->set_mixed(0, 1, Mixed(2.0f));
+    table->set_mixed(0, 2, Mixed(2.0));
+
+    CHECK_EQUAL(table->get_mixed(0, 0).get_int(), int64_t(-1));
+    CHECK_EQUAL(table->get_mixed(0, 1).get_float(), 2.0f);
+    CHECK_EQUAL(table->get_mixed(0, 2).get_double(), 2.0);
+
+    group.verify();
+}
+
+
 
 #endif // TEST_TABLE
