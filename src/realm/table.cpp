@@ -13,7 +13,6 @@
 #include <realm/descriptor.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/column.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_binary.hpp>
@@ -26,6 +25,8 @@
 #include <realm/group.hpp>
 #include <realm/link_view.hpp>
 #include <realm/replication.hpp>
+#include <realm/table_view.hpp>
+#include <realm/query_engine.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -1377,10 +1378,10 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             }
             break;
         case col_type_Float:
-            col = new FloatColumn(alloc, ref, nullable); // Throws
+            col = new FloatColumn(alloc, ref); // Throws
             break;
         case col_type_Double:
-            col = new DoubleColumn(alloc, ref, nullable); // Throws
+            col = new DoubleColumn(alloc, ref); // Throws
             break;
         case col_type_String:
             col = new StringColumn(alloc, ref, nullable); // Throws
@@ -1571,6 +1572,12 @@ void Table::add_search_index(size_t col_ndx)
 
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
+
+    if (REALM_UNLIKELY(get_column_type(col_ndx) == type_Float))
+        throw LogicError(LogicError::illegal_combination);
+
+    if (REALM_UNLIKELY(get_column_type(col_ndx) == type_Double))
+        throw LogicError(LogicError::illegal_combination);
 
     if (has_search_index(col_ndx))
         return;
@@ -2032,13 +2039,13 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
         case col_type_Float:
-            return FloatColumn::create(alloc, size); // Throws
+            return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Double:
-            return DoubleColumn::create(alloc, size); // Throws
+            return DoubleColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_String:
             return StringColumn::create(alloc, size); // Throws
         case col_type_Binary:
-            return BinaryColumn::create(alloc, size); // Throws
+            return BinaryColumn::create(alloc, size, nullable); // Throws
         case col_type_Table:
             return SubtableColumn::create(alloc, size); // Throws
         case col_type_Mixed:
@@ -2115,7 +2122,8 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
-        column.insert_rows(row_ndx, num_rows, m_size); // Throws
+        bool insert_nulls = is_nullable(col_ndx);
+        column.insert_rows(row_ndx, num_rows, m_size, insert_nulls); // Throws
     }
     if (row_ndx < m_size)
         adj_row_acc_insert_rows(row_ndx, num_rows);
@@ -2591,7 +2599,7 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx);
+        return column.get(ndx).value_or(0);
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -2629,7 +2637,7 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx) != 0;
+        return column.get(ndx).value_or(0) != 0;
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -2667,7 +2675,7 @@ DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const noexcept
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx);
+        return column.get(ndx).value_or(0);
     }
     else {
         const IntegerColumn& column = get_column(col_ndx);
@@ -2780,16 +2788,14 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
-    // column, however, the previous row index check guarantees that `m_size >
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
+    // columns, however, the previous row index check guarantees that `m_size >
     // 0`, and since `m_size` is also zero for a degenerate subtable, the table
     // cannot be degenerate if we got this far.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
-
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
-
     if (REALM_UNLIKELY(value.size() > max_string_size))
         throw LogicError(LogicError::string_too_big);
 
@@ -2808,13 +2814,14 @@ void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringD
         throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(row_ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
-    // column, however, the previous row index check guarantees that `m_size >
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
+    // columns, however, the previous row index check guarantees that `m_size >
     // 0`, and since `m_size` is also zero for a degenerate subtable, the table
     // cannot be degenerate if we got this far.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
+    // FIXME: Loophole: Assertion violation in Table::get_string() on column type mismatch.
     StringData old_value = get_string(col_ndx, row_ndx);
     if (REALM_UNLIKELY(pos > old_value.size()))
         throw LogicError(LogicError::string_position_out_of_range);
@@ -2839,13 +2846,14 @@ void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t 
         throw LogicError(LogicError::detached_accessor);
     if (REALM_UNLIKELY(row_ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
-    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
-    // column, however, the previous row index check guarantees that `m_size >
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
+    // columns, however, the previous row index check guarantees that `m_size >
     // 0`, and since `m_size` is also zero for a degenerate subtable, the table
     // cannot be degenerate if we got this far.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
+    // FIXME: Loophole: Assertion violation in Table::get_string() on column type mismatch.
     StringData old_value = get_string(col_ndx, row_ndx);
     if (REALM_UNLIKELY(pos > old_value.size()))
         throw LogicError(LogicError::string_position_out_of_range);
@@ -2876,14 +2884,24 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 
 void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
 {
-    if (REALM_UNLIKELY(value.size() > max_binary_size))
-        throw LogicError(LogicError::binary_too_big);
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has
+    // columns, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
+    if (REALM_UNLIKELY(value.size() > max_binary_size))
+        throw LogicError(LogicError::binary_too_big);
     bump_version();
 
+    // FIXME: Loophole: Assertion violation in Table::get_column_binary() on
+    // column type mismatch.
     BinaryColumn& column = get_column_binary(col_ndx);
     column.set(ndx, value);
 
@@ -2948,32 +2966,32 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
 
     switch (type) {
         case type_Int:
-            column.set_int(ndx, value.get_int());
+            column.set_int(ndx, value.get_int()); // Throws
             break;
         case type_Bool:
-            column.set_bool(ndx, value.get_bool());
+            column.set_bool(ndx, value.get_bool()); // Throws
             break;
         case type_DateTime:
-            column.set_datetime(ndx, value.get_datetime());
+            column.set_datetime(ndx, value.get_datetime()); // Throws
             break;
         case type_Float:
-            column.set_float(ndx, value.get_float());
+            column.set_float(ndx, value.get_float()); // Throws
             break;
         case type_Double:
-            column.set_double(ndx, value.get_double());
+            column.set_double(ndx, value.get_double()); // Throws
             break;
         case type_String:
             if (REALM_UNLIKELY(value.get_string().size() > max_string_size))
                 throw LogicError(LogicError::string_too_big);
-            column.set_string(ndx, value.get_string());
+            column.set_string(ndx, value.get_string()); // Throws
             break;
         case type_Binary:
             if (REALM_UNLIKELY(value.get_binary().size() > max_binary_size))
                 throw LogicError(LogicError::binary_too_big);
-            column.set_binary(ndx, value.get_binary());
+            column.set_binary(ndx, value.get_binary()); // Throws
             break;
         case type_Table:
-            column.set_subtable(ndx, 0);
+            column.set_subtable(ndx, 0); // Throws
             break;
         case type_Mixed:
         case type_Link:
@@ -3004,8 +3022,26 @@ TableRef Table::get_link_target(size_t col_ndx) noexcept
 
 void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(row_ndx, <, m_size);
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(row_ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
+    // column, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
+        throw LogicError(LogicError::column_index_out_of_range);
+    LinkColumn& col = get_column_link(col_ndx);
+    Table& target_table = col.get_target_table();
+    if (REALM_UNLIKELY(target_row_ndx != realm::npos && target_row_ndx >= target_table.size()))
+        throw LogicError(LogicError::target_row_index_out_of_range);
+
+    // FIXME: There is still no proper check for column type mismatch. One
+    // solution would be to go in the direction of set_string() (using
+    // ColumnBase::set_string()), but that works less well here. The ideal
+    // solution seems to be to have a very efficient way of checking the column
+    // type. Idea: Introduce `DataType ColumnBase::m_type`.
 
     if (Replication* repl = get_repl())
         repl->set_link(this, col_ndx, row_ndx, target_row_ndx); // Throws
@@ -3014,11 +3050,9 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     if (old_target_row_ndx == realm::npos)
         return;
 
-    LinkColumn& col = get_column_link(col_ndx);
     if (col.get_weak_links())
         return;
 
-    Table& target_table = col.get_target_table();
     size_t num_remaining = target_table.get_num_strong_backlinks(old_target_row_ndx);
     if (num_remaining > 0)
         return;
@@ -3097,10 +3131,10 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
 
 void Table::set_null(size_t col_ndx, size_t row_ndx)
 {
-    auto& col = get_column_base(col_ndx);
-    if (!col.is_nullable()) {
+    if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
+    ColumnBase& col = get_column_base(col_ndx);
     col.set_null(row_ndx);
 
     if (Replication* repl = get_repl())
@@ -3407,10 +3441,32 @@ size_t Table::do_find_pkey_string(StringData value) const
 }
 
 
-template<class T, bool Nullable>
+namespace {
+
+util::Optional<int64_t> upgrade_optional_int(util::Optional<bool> value)
+{
+    return value ? some<int64_t>(*value ? 1 : 0) : none;
+}
+
+util::Optional<int64_t> upgrade_optional_int(util::Optional<DateTime> value)
+{
+    return value ? some<int64_t>(value->get_datetime()) : none;
+}
+
+template<class T>
+T upgrade_optional_int(T value)
+{
+    // No conversion
+    return value;
+}
+
+} // anonymous namespace
+
+
+template<class T>
 size_t Table::find_first(size_t col_ndx, T value) const
 {
-    using type_traits = ColumnTypeTraits<T, Nullable>;
+    using type_traits = ColumnTypeTraits<T>;
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, type_traits::column_id);
 
@@ -3419,7 +3475,7 @@ size_t Table::find_first(size_t col_ndx, T value) const
 
     typedef typename type_traits::column_type ColType;
     const ColType& column = get_column<ColType, type_traits::column_id>(col_ndx);
-    return column.find_first(value);
+    return column.find_first(upgrade_optional_int(value));
 }
 
 size_t Table::find_first_link(size_t target_row_index) const
@@ -3432,41 +3488,35 @@ size_t Table::find_first_link(size_t target_row_index) const
 size_t Table::find_first_int(size_t col_ndx, int64_t value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<int64_t, true>(col_ndx, value);
+        return find_first<util::Optional<int64_t>>(col_ndx, value);
     else
-        return find_first<int64_t, false>(col_ndx, value);
+        return find_first<int64_t>(col_ndx, value);
 }
 
 size_t Table::find_first_bool(size_t col_ndx, bool value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<bool, true>(col_ndx, value);
+        return find_first<util::Optional<bool>>(col_ndx, value);
     else
-        return find_first<bool, false>(col_ndx, value);
+        return find_first<bool>(col_ndx, value);
 }
 
 size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<DateTime, true>(col_ndx, value);
+        return find_first<util::Optional<DateTime>>(col_ndx, value);
     else
-        return find_first<DateTime, false>(col_ndx, value);
+        return find_first<DateTime>(col_ndx, value);
 }
 
 size_t Table::find_first_float(size_t col_ndx, float value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<Float, true>(col_ndx, value);
-    else
-        return find_first<Float, false>(col_ndx, value);
+    return find_first<Float>(col_ndx, value);
 }
 
 size_t Table::find_first_double(size_t col_ndx, double value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<Double, true>(col_ndx, value);
-    else
-        return find_first<Double, false>(col_ndx, value);
+    return find_first<Double>(col_ndx, value);
 }
 
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
@@ -3487,10 +3537,7 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
 
 size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const
 {
-    if (is_nullable(col_ndx))
-        return find_first<BinaryData, true>(col_ndx, value);
-    else
-        return find_first<BinaryData, false>(col_ndx, value);
+    return find_first<BinaryData>(col_ndx, value);
 }
 
 size_t Table::find_first_null(size_t column_ndx) const
@@ -3996,25 +4043,25 @@ TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_
 size_t Table::lower_bound_int(size_t col_ndx, int64_t value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound_int(value);
+    return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound(value);
 }
 
 size_t Table::upper_bound_int(size_t col_ndx, int64_t value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound_int(value);
+    return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound(value);
 }
 
 size_t Table::lower_bound_bool(size_t col_ndx, bool value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound_int(value);
+    return !m_columns.is_attached() ? 0 : get_column(col_ndx).lower_bound(value);
 }
 
 size_t Table::upper_bound_bool(size_t col_ndx, bool value) const noexcept
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound_int(value);
+    return !m_columns.is_attached() ? 0 : get_column(col_ndx).upper_bound(value);
 }
 
 size_t Table::lower_bound_float(size_t col_ndx, float value) const noexcept
@@ -4812,14 +4859,14 @@ bool Table::compare_rows(const Table& t) const
                 if (nullable) {
                     const IntNullColumn& c1 = get_column_int_null(i);
                     const IntNullColumn& c2 = t.get_column_int_null(i);
-                    if (!c1.compare_int(c2)) {
+                    if (!c1.compare(c2)) {
                         return false;
                     }
                 }
                 else {
                     const IntegerColumn& c1 = get_column(i);
                     const IntegerColumn& c2 = t.get_column(i);
-                    if (!c1.compare_int(c2))
+                    if (!c1.compare(c2))
                         return false;
                 }
                 continue;
@@ -4894,7 +4941,7 @@ bool Table::compare_rows(const Table& t) const
             case col_type_Link: {
                 const LinkColumn& c1 = get_column_link(i);
                 const LinkColumn& c2 = t.get_column_link(i);
-                if (!c1.compare_int(c2))
+                if (!c1.compare(c2))
                     return false;
                 continue;
             }
@@ -5013,6 +5060,11 @@ void Table::adj_acc_clear_root_table() noexcept
     for (size_t i = 0; i < n; ++i) {
         if (ColumnBase* col = m_cols[i])
             col->adj_acc_clear_root_table();
+    }
+
+    // Adjust rows in tableviews after removal of all rows
+    for (auto& view : m_views) {
+        view->adj_row_acc_clear();
     }
 }
 
@@ -5284,6 +5336,14 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
     for (size_t col_ndx = col_ndx_begin; col_ndx != col_ndx_end; ++col_ndx) {
         ColumnBase* col = m_cols[col_ndx];
 
+        // If there is no search index accessor, but the column has been
+        // equipped with a search index, create the accessor now.
+        ColumnAttr attr = m_spec.get_column_attr(col_ndx);
+        bool has_search_index = (attr & col_attr_Indexed) != 0;
+
+        if (!has_search_index && col)
+            col->destroy_search_index();
+
         // If the current column accessor is StringColumn, but the underlying
         // column has been upgraded to an enumerated strings column, then we
         // need to replace the accessor with an instance of StringEnumColumn.
@@ -5318,7 +5378,6 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // of the connection is postponed.
             typedef _impl::GroupFriend gf;
             if (is_link_type(col_type)) {
-                ColumnAttr attr = m_spec.get_column_attr(col_ndx);
                 bool weak_links = (attr & col_attr_StrongLinks) == 0;
                 LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
                 link_col->set_weak_links(weak_links);
@@ -5343,14 +5402,9 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             }
         }
 
-        // If there is no search index accessor, but the column has been
-        // equipped with a search index, create the accessor now.
-        ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-        bool has_search_index = (attr & col_attr_Indexed)    != 0;
-        bool is_primary_key   = (attr & col_attr_PrimaryKey) != 0;
-
-        REALM_ASSERT(has_search_index || !is_primary_key);
         if (has_search_index) {
+            bool is_primary_key = (attr & col_attr_PrimaryKey) != 0;
+            REALM_ASSERT(has_search_index || !is_primary_key);
             bool allow_duplicate_values = !is_primary_key;
             if (col->has_search_index()) {
                 col->set_search_index_allow_duplicate_values(allow_duplicate_values);
@@ -5361,9 +5415,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                                           allow_duplicate_values); // Throws
             }
         }
-        else {
-            col->destroy_search_index();
-        }
+
         ndx_in_parent += (has_search_index ? 2 : 1);
     }
 
@@ -5475,11 +5527,11 @@ void Table::to_dot_internal(std::ostream& out) const
 void Table::print() const
 {
     // Table header
-    std::cout << "Table: len(" << m_size << ")\n    ";
+    std::cout << "Table (name = \"" << std::string(get_name()) << "\",  size = " << m_size << ")\n    ";
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
         StringData name = m_spec.get_column_name(i);
-        std::cout << std::left << std::setw(10) << name << std::right << " ";
+        std::cout << std::left << std::setw(10) << std::string(name).substr(0, 10) << " ";
     }
 
     // Types
@@ -5499,6 +5551,13 @@ void Table::print() const
                 std::cout << "String     "; break;
             case col_type_StringEnum:
                 std::cout << "String     "; break;
+            case col_type_Link: {
+                size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(i);
+                ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
+                const StringData target_name = target_table->get_name();
+                std::cout << "->" << std::setw(8) << std::string(target_name).substr(0, 8) << " ";
+                break;
+            }
             default:
                 REALM_ASSERT(false);
         }
@@ -5538,6 +5597,11 @@ void Table::print() const
                 }
                 case col_type_StringEnum: {
                     const StringEnumColumn& column = get_column_string_enum(n);
+                    std::cout << std::setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_Link: {
+                    const LinkColumn& column = get_column_link(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }

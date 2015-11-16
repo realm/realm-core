@@ -104,8 +104,10 @@ public:
 
     /// Construct a binary array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
-    /// initialized to zero size blobs.
-    static MemRef create_array(size_t size, Allocator&);
+    /// initialized to the binary value `defaults`, which can be either
+    /// null or zero-length non-null (value with size > 0 is not allowed as
+    /// initialization value).
+    static MemRef create_array(size_t size, Allocator&, BinaryData defaults);
 
     /// Construct a copy of the specified slice of this binary array
     /// using the specified target allocator.
@@ -140,7 +142,8 @@ inline ArrayBinary::ArrayBinary(Allocator& alloc) noexcept:
 inline void ArrayBinary::create()
 {
     size_t size = 0;
-    MemRef mem = create_array(size, get_alloc()); // Throws
+    BinaryData defaults = BinaryData(0, 0); // This init value is ignored because size = 0
+    MemRef mem = create_array(size, get_alloc(), defaults); // Throws
     init_from_mem(mem);
 }
 

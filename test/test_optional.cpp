@@ -184,7 +184,7 @@ TEST(Optional_RvalueReferences)
     Optional<const int&> x{foo};
     static_cast<void>(x);
 
-    
+
     static_cast<void>(make_rvalue);
     // Should not compile (would generate references to temporaries):
     // Optional<const int&> y{1};

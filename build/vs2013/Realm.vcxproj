@@ -825,16 +825,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\..\test\test_column_basic.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\..\test\test_column_binary.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
@@ -1121,6 +1111,7 @@
     <ClInclude Include="..\..\src\realm\impl\destroy_guard.hpp" />
     <ClInclude Include="..\..\src\realm\impl\input_stream.hpp" />
     <ClInclude Include="..\..\src\realm\impl\output_stream.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\sequential_getter.hpp" />
     <ClInclude Include="..\..\src\realm\impl\simulated_failure.hpp" />
     <ClInclude Include="..\..\src\realm\impl\transact_log.hpp" />
     <ClInclude Include="..\..\src\realm\importer.hpp" />

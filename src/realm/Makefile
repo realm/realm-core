@@ -64,6 +64,7 @@ group_shared.hpp \
 history.hpp \
 handover_defs.hpp \
 replication.hpp \
+impl/sequential_getter.hpp \
 query.hpp \
 query_conditions.hpp \
 lang_bind_helper.hpp \
@@ -91,8 +92,6 @@ array_blobs_big.hpp \
 array_string_long.hpp \
 column.hpp \
 column_tpl.hpp \
-column_basic.hpp \
-column_basic_tpl.hpp \
 column_binary.hpp \
 column_string_enum.hpp \
 column_string.hpp \

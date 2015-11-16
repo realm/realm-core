@@ -35,16 +35,20 @@ class LinkColumn;
 class LinkListColumn;
 
 // Templated classes
-template<class T, bool Nullable = false>
+template<class T>
 class Column;
 template<class T>
 class BasicColumn;
 
+namespace util {
+template <class> class Optional;
+}
+
 // Shortcuts, aka typedefs.
-using IntegerColumn = Column<int64_t, false>;
-using IntNullColumn = Column<int64_t, true>;
-using DoubleColumn = BasicColumn<double>;
-using FloatColumn = BasicColumn<float>;
+using IntegerColumn = Column<int64_t>;
+using IntNullColumn = Column<util::Optional<int64_t>>;
+using DoubleColumn = Column<double>;
+using FloatColumn = Column<float>;
 
 } // namespace realm
 

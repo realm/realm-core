@@ -450,6 +450,144 @@ TEST(Network_CancelEmptyRead)
 }
 
 
+TEST(Network_AcceptorMixedAsyncSync)
+{
+    network::io_service service;
+    network::acceptor acceptor(service);
+    acceptor.open(network::protocol::ip_v4());
+    acceptor.listen();
+    network::endpoint ep = acceptor.local_endpoint();
+    auto connect = [ep] {
+        network::io_service service;
+        network::socket socket(service);
+        socket.connect(ep);
+    };
+
+    // Synchronous accept -> stay on blocking mode
+    {
+        ThreadWrapper thread;
+        thread.start(connect);
+        network::socket socket(service);
+        acceptor.accept(socket);
+        CHECK_NOT(thread.join());
+    }
+
+    // Asynchronous accept -> switch to nonblocking mode
+    {
+        ThreadWrapper thread;
+        thread.start(connect);
+        network::socket socket(service);
+        bool was_accepted = false;
+        auto accept_handler = [&](std::error_code ec) {
+            if (!ec)
+                was_accepted = true;
+        };
+        acceptor.async_accept(socket, accept_handler);
+        service.run();
+        CHECK(was_accepted);
+        CHECK_NOT(thread.join());
+    }
+
+    // Synchronous accept -> switch back to blocking mode
+    {
+        ThreadWrapper thread;
+        thread.start(connect);
+        network::socket socket(service);
+        acceptor.accept(socket);
+        CHECK_NOT(thread.join());
+    }
+}
+
+
+TEST(Network_SocketMixedAsyncSync)
+{
+    network::io_service acceptor_service;
+    network::acceptor acceptor(acceptor_service);
+    acceptor.open(network::protocol::ip_v4());
+    acceptor.listen();
+    network::endpoint ep = acceptor.local_endpoint();
+    auto accept_and_echo = [&] {
+        network::socket socket(acceptor_service);
+        acceptor.accept(socket);
+        network::buffered_input_stream in(socket);
+        size_t buffer_size = 1024;
+        std::unique_ptr<char[]> buffer(new char[buffer_size]);
+        size_t size = in.read_until(buffer.get(), buffer_size, '\n');
+        socket.write(buffer.get(), size);
+    };
+
+    {
+        ThreadWrapper thread;
+        thread.start(accept_and_echo);
+        network::io_service service;
+
+        // Synchronous connect -> stay in blocking mode
+        network::socket socket(service);
+        socket.connect(ep);
+        network::buffered_input_stream in(socket);
+
+        // Asynchronous write -> switch to nonblocking mode
+        const char* message = "Calabi–Yau\n";
+        bool was_written = false;
+        auto write_handler = [&](std::error_code ec, size_t) {
+            if (!ec)
+                was_written = true;
+        };
+        socket.async_write(message, strlen(message), write_handler);
+        service.run();
+        CHECK(was_written);
+
+        // Synchronous read -> switch back to blocking mode
+        size_t buffer_size = 1024;
+        std::unique_ptr<char[]> buffer(new char[buffer_size]);
+        std::error_code ec;
+        size_t size = in.read(buffer.get(), buffer_size, ec);
+        if (CHECK_EQUAL(ec, network::end_of_input)) {
+            if (CHECK_EQUAL(size, strlen(message)))
+                CHECK(std::equal(buffer.get(), buffer.get()+size, message));
+        }
+
+        CHECK_NOT(thread.join());
+    }
+
+    {
+        ThreadWrapper thread;
+        thread.start(accept_and_echo);
+        network::io_service service;
+
+        // Asynchronous connect -> switch to nonblocking mode
+        network::socket socket(service);
+        bool is_connected = false;
+        auto connect_handler = [&](std::error_code ec) {
+            if (!ec)
+                is_connected = true;
+        };
+        socket.async_connect(ep, connect_handler);
+        service.run();
+        CHECK(is_connected);
+        network::buffered_input_stream in(socket);
+
+        // Synchronous write -> switch back to blocking mode
+        const char* message = "The Verlinde Algebra And The Cohomology Of The Grassmannian\n";
+        socket.write(message, strlen(message));
+
+        // Asynchronous read -> swich once again to nonblocking mode
+        size_t buffer_size = 1024;
+        std::unique_ptr<char[]> buffer(new char[buffer_size]);
+        auto read_handler = [&](std::error_code ec, size_t size) {
+            if (CHECK_EQUAL(ec, network::end_of_input)) {
+                if (CHECK_EQUAL(size, strlen(message)))
+                    CHECK(std::equal(buffer.get(), buffer.get()+size, message));
+            }
+        };
+        in.async_read(buffer.get(), buffer_size, read_handler);
+        service.run();
+
+        CHECK_NOT(thread.join());
+    }
+}
+
+
 TEST(Network_DeadlineTimer)
 {
     network::io_service service;

@@ -66,7 +66,6 @@
     <ClCompile Include="..\..\test\test_array_string.cpp" />
     <ClCompile Include="..\..\test\test_array_string_long.cpp" />
     <ClCompile Include="..\..\test\test_column.cpp" />
-    <ClCompile Include="..\..\test\test_column_basic.cpp" />
     <ClCompile Include="..\..\test\test_column_binary.cpp" />
     <ClCompile Include="..\..\test\test_column_float.cpp" />
     <ClCompile Include="..\..\test\test_column_mixed.cpp" />
@@ -228,6 +227,7 @@
     <ClInclude Include="..\..\src\realm\disable_sync_to_disk.hpp" />
     <ClInclude Include="..\..\src\realm\util\priority_queue.hpp" />
     <ClInclude Include="..\..\src\realm\util\inspect.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\sequential_getter.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

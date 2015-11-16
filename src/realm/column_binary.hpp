@@ -66,7 +66,7 @@ public:
     /// Compare two binary columns for equality.
     bool compare_binary(const BinaryColumn&) const;
 
-    static ref_type create(Allocator&, size_t size = 0);
+    static ref_type create(Allocator&, size_t size, bool nullable);
 
     static size_t get_size_from_ref(ref_type root_ref, Allocator&) noexcept;
 
@@ -74,7 +74,7 @@ public:
     ref_type write(size_t, size_t, size_t,
                    _impl::OutputStream&) const override;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;
@@ -181,14 +181,20 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
     REALM_ASSERT_DEBUG(ndx < size());
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
+        BinaryData ret;
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
-            return leaf->get(ndx);
+            ret = leaf->get(ndx);
         }
-        // Big blobs root leaf
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-        return leaf->get(ndx);
+        else {
+            // Big blobs root leaf
+            ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
+            ret = leaf->get(ndx);
+        }
+        if (!m_nullable && ret.is_null())
+            return BinaryData("", 0); // return empty string (non-null)
+        return ret;
     }
 
     // Non-leaf root
@@ -286,10 +292,11 @@ inline void BinaryColumn::clear()
 
 // Implementing pure virtual method of ColumnBase.
 inline void BinaryColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                      size_t prior_num_rows)
+                                      size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(!insert_nulls || m_nullable);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     BinaryData value = m_nullable ? BinaryData() : BinaryData("", 0);

@@ -421,6 +421,7 @@ private:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
+    void adj_row_acc_clear() noexcept;
 
     template<typename Tab>
     friend class BasicTableView;
@@ -823,7 +824,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
     m_distinct_columns(std::move(tv.m_distinct_columns)),
-    m_sorting_predicate(tv.m_sorting_predicate),
+    m_sorting_predicate(std::move(tv.m_sorting_predicate)),
     m_auto_sort(tv.m_auto_sort),
     m_query(tv.m_query),
     m_start(tv.m_start),
@@ -849,15 +850,15 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     m_linked_table(move(tv.m_linked_table)),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
-    m_linkview_source(tv.m_linkview_source),
+    m_linkview_source(std::move(tv.m_linkview_source)),
     // if we are created from a table view which is outdated, take care to use the outdated
     // version number so that we can later trigger a sync if needed.
     m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
     m_distinct_columns(std::move(tv.m_distinct_columns)),
-    m_sorting_predicate(tv.m_sorting_predicate),
+    m_sorting_predicate(std::move(tv.m_sorting_predicate)),
     m_auto_sort(tv.m_auto_sort),
-    m_query(tv.m_query),
+    m_query(std::move(tv.m_query)),
     m_start(tv.m_start),
     m_end(tv.m_end),
     m_limit(tv.m_limit),
@@ -885,16 +886,16 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
         m_table->move_registered_view(&tv, this);
 
     m_row_indexes.move_assign(tv.m_row_indexes);
-    m_query = tv.m_query;
+    m_query = std::move(tv.m_query);
     m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_version = tv.m_last_seen_version;
     m_auto_sort = tv.m_auto_sort;
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linkview_source = tv.m_linkview_source;
+    m_linkview_source = std::move(tv.m_linkview_source);
     m_distinct_columns = tv.m_distinct_columns;
-    m_sorting_predicate = tv.m_sorting_predicate;
+    m_sorting_predicate = std::move(tv.m_sorting_predicate);
 
     return *this;
 }

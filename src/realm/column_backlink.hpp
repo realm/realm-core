@@ -62,7 +62,7 @@ public:
     LinkColumnBase& get_origin_column() const noexcept;
     void set_origin_column(LinkColumnBase& column, size_t col_ndx) noexcept;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void swap_rows(size_t, size_t) override;

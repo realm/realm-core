@@ -5,6 +5,8 @@ using namespace realm;
 
 const char* LogicError::what() const noexcept
 {
+    // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
+    // rely on the contents of these strings, as they are deliberately unspecified.)
     switch (m_kind) {
         case string_too_big:
             return "String too big";
@@ -40,6 +42,8 @@ const char* LogicError::what() const noexcept
             return "Wrong kind of table";
         case detached_accessor:
             return "Detached accessor";
+        case target_row_index_out_of_range:
+            return "Target table row index out of range";
         case no_search_index:
             return "Column has no search index";
         case no_primary_key:
@@ -60,4 +64,5 @@ const char* LogicError::what() const noexcept
                 "or transaction already in progress)";
     }
     return "Unknown error";
+    // LCOV_EXCL_STOP (LogicError messages)
 }

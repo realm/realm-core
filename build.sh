@@ -238,10 +238,11 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     else
         if [ -r "/proc/cpuinfo" ]; then
             NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
+            LIMIT_LOAD_AVERAGE=YES
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
-        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS -l$NUM_PROCESSORS" || exit 1
+        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS ${LIMIT_LOAD_AVERAGE:+-l$MAX_LOAD_AVERAGE}" || exit 1
         export MAKEFLAGS
 
         if ! [ "$UNITTEST_THREADS" ]; then

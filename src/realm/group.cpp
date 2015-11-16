@@ -879,9 +879,9 @@ void Group::to_string(std::ostream& out) const
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << std::setw(int(index_width)) << std::right << i           << " ";
-        out << std::setw(int(name_width))  << std::left  << name.data() << " ";
-        out << std::setw(int(rows_width))  << std::left  << row_count   << std::endl;
+        out << std::setw(int(index_width)) << std::right << i                 << " ";
+        out << std::setw(int(name_width))  << std::left  << std::string(name) << " ";
+        out << std::setw(int(rows_width))  << std::left  << row_count         << std::endl;
     }
 }
 

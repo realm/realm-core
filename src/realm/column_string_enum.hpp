@@ -122,7 +122,7 @@ public:
     bool compare_string(const StringColumn&) const;
     bool compare_string(const StringEnumColumn&) const;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;
@@ -235,10 +235,11 @@ inline void StringEnumColumn::clear()
 
 // Overriding virtual method of Column.
 inline void StringEnumColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                          size_t prior_num_rows)
+                                          size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(!insert_nulls || m_nullable);
 
     StringData value = m_nullable ? realm::null() : StringData("");
     bool is_append = (row_ndx == prior_num_rows);

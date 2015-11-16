@@ -342,6 +342,8 @@ struct null {
     null() {}
     operator StringData() { return StringData(0, 0); }
     operator int64_t() { throw(LogicError::type_mismatch); }
+    template<class T>
+    operator util::Optional<T>() { return util::none; }
 
     template<class T>
     bool operator == (const T&) const { REALM_ASSERT(false); return false; }
@@ -370,7 +372,7 @@ struct null {
         int64_t double_nan = 0x7ff80000000000aa;
         i = std::is_same<T, float>::value ? 0x7fc000aa : static_cast<decltype(i)>(double_nan);
         T d = type_punning<T, decltype(i)>(i);
-        REALM_ASSERT_DEBUG(isnan(static_cast<double>(d)));
+        REALM_ASSERT_DEBUG(std::isnan(static_cast<double>(d)));
         REALM_ASSERT_DEBUG(!is_signaling(d));
         return d;
     }
@@ -378,7 +380,7 @@ struct null {
     /// Takes a NaN as argument and returns whether or not it's signaling
     template<class T>
     static bool is_signaling(T v) {
-        REALM_ASSERT(isnan(static_cast<double>(v)));
+        REALM_ASSERT(std::isnan(static_cast<double>(v)));
         typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
         size_t signal_bit = std::is_same<T, float>::value ? 22 : 51; // If this bit is set, it's quiet
         i = type_punning<decltype(i), T>(v);
@@ -389,7 +391,7 @@ struct null {
     /// ARM clang and x64 Java.
     template<class T>
     static T to_realm(T v) {
-        if (isnan(static_cast<double>(v))) {
+        if (std::isnan(static_cast<double>(v))) {
             typename std::conditional<std::is_same<T, float>::value, uint32_t, uint64_t>::type i;
             if (std::is_same<T, float>::value) {
                 i = is_signaling(v) ? 0x7fa00000 : 0x7fc00000;
