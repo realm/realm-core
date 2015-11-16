@@ -7800,4 +7800,88 @@ TEST(Query_DeepLink)
     CHECK_EQUAL(N, view.size());
 }
 
+// Triggers bug in compare_relation()
+TEST(Query_BrokenFindGT)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    size_t col = table->add_column(type_Int, "int");
+
+    const size_t rows = 12;
+    for (size_t i = 0; i < rows; ++i) {
+        table->add_empty_row();
+        table->set_int(col, i, i + 2);
+    }
+
+    table->add_empty_row();
+    table->set_int(col, rows + 0, 1);
+
+    table->add_empty_row();
+    table->set_int(col, rows + 1, 1);
+
+    table->add_empty_row();
+    table->set_int(col, rows + 2, 1);
+
+    for (size_t i = 0; i < 3; ++i) {
+        table->add_empty_row();
+        table->set_int(col, rows + 3 + i, i + 2);
+    }
+
+    CHECK_EQUAL(18, table->size());
+
+    Query q = table->where().greater(col, 1);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(15, tv.size());
+
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_NOT_EQUAL(1, tv.get_int(col, i));
+    }
+}
+
+// Small fuzzy test also to trigger bugs such as the compare_relation() bug above
+TEST(Query_FuzzyFind)
+{
+    // TEST_DURATION is normally 0.
+    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++)
+    {
+        Group group;
+        TableRef table = group.add_table("test");
+        size_t col = table->add_column(type_Int, "int");
+
+        // The bug happened when values were stored in 4 bits or less. So create a table full of such random values
+        const size_t rows = 18;
+        for (size_t i = 0; i < rows; ++i) {
+            table->add_empty_row();
+            
+            // Produce numbers -3 ... 17. Just to test edge cases around 4-bit values also
+            int64_t t = (fastrand() % 21) - 3;
+            table->set_int(col, i, t);
+        }
+
+        for (int64_t s = -2; s < 18; s++) {
+            Query q_g = table->where().greater(col, s);
+            TableView tv_g = q_g.find_all();
+            for (size_t i = 0; i < tv_g.size(); ++i) {
+                CHECK(tv_g.get_int(col, i) > s);
+            }
+
+            Query q_l = table->where().less(col, s);
+            TableView tv_l = q_l.find_all();
+            for (size_t i = 0; i < tv_l.size(); ++i) {
+                CHECK(tv_l.get_int(col, i) < s);
+            }
+
+            Query q_le = table->where().less_equal(col, s);
+            TableView tv_le = q_le.find_all();
+            for (size_t i = 0; i < tv_le.size(); ++i) {
+                CHECK(tv_le.get_int(col, i) <= s);
+            }
+
+            // Sum of values greater + less-or-equal should be total number of rows. This ensures that both
+            // 1) no search results are *omitted* from find_all(), and no 2) results are *false* positives
+            CHECK(tv_g.size() + tv_le.size() == rows);
+        }
+    }
+}
+
 #endif // TEST_QUERY
