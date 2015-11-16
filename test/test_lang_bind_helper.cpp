@@ -7296,6 +7296,61 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    // Add some initial data and then begin a read transaction at that version
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("Table");
+        table->add_column(type_Int, "int");
+        table->add_empty_row();
+        table->set_int(0, 0, 10);
+        wt.commit();
+    }
+    const Group& g = sg.begin_read();
+
+    // Modify the data with a different SG so that we can determine which version
+    // the read transaction is using
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+        wt.get_table("Table")->set_int(0, 0, 20);
+        wt.commit();
+    }
+
+    struct ObserverError { };
+    try {
+        struct : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            bool set_int(size_t, size_t, size_t) const
+            {
+                throw ObserverError();
+            }
+        } parser(test_results);
+
+        LangBindHelper::advance_read(sg, *hist, parser);
+        CHECK(false); // Should not be reached
+    }
+    catch (ObserverError) {
+    }
+
+    // Should still see data from old version
+    CHECK_EQUAL(10, g.get_table("Table")->get_int(0, 0));
+
+    // Should be able to advance to the new version still
+    LangBindHelper::advance_read(sg, *hist);
+
+    // And see that version's data
+    CHECK_EQUAL(20, g.get_table("Table")->get_int(0, 0));
+}
+
+
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
