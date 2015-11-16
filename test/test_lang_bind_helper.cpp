@@ -9394,6 +9394,105 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     }
 }
 
+
+TEST(LangBindHelper_HandoverWithLinkQueries)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    sg.begin_read();
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    TableRef table1 = group_w.add_table("table1");
+    TableRef table2 = group_w.add_table("table2");
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    table2->add_column(type_Int, "col1");
+    table2->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    table2->add_empty_row();
+    table2->set_int(0, 0, 400);
+    table2->set_string(1, 0, "hello");
+    table2->add_empty_row();
+    table2->set_int(0, 1, 500);
+    table2->set_string(1, 1, "world");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 2, "!");
+
+
+    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+
+    // set some links
+    LinkViewRef links1;
+
+    links1 = table1->get_linklist(col_link2, 0);
+    links1->add(1);
+
+    links1 = table1->get_linklist(col_link2, 1);
+    links1->add(1);
+    links1->add(2);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    size_t match;
+
+    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery;
+    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery2;
+
+
+    {
+      realm::Query query = table1->where().and_query(table1->link(col_link2).column<String>(1) == "nabil");
+      handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+      handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+    }
+
+    SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction();// vid == 2
+    {
+        LangBindHelper::advance_read(sg, *hist, vid);
+        std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
+        realm::TableView tv = q->find_all();
+        match = tv.size();
+        CHECK_EQUAL(0, match);
+    }
+
+
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        table2->add_empty_row();
+        table2->set_int(0, 3, 700);
+        table2->set_string(1, 3, "nabil");
+        links1 = table1->get_linklist(col_link2, 2);
+        links1->add(3);
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    {
+        std::unique_ptr<Query> q2(sg.import_from_handover(move(handoverQuery2)));
+        realm::TableView tv2 = q2->find_all();
+        match = tv2.size();
+        CHECK_EQUAL(0, match);// THIS IS FAILING IT's RETURNING 1!!
+    }
+}
+
+
+
+
+
 REALM_TABLE_1(MyTable, first,  Int)
 
 #ifndef _WIN32
