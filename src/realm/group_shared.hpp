@@ -904,7 +904,12 @@ inline void SharedGroup::advance_read(History& history, O* observer, VersionID v
     if (observer) {
         _impl::TransactLogParser parser;
         _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-        parser.parse(in, *observer); // Throws
+        try {
+            parser.parse(in, *observer); // Throws
+        }
+        catch (const _impl::TransactLogParser::BadTransactLog&) {
+            // Ignore BadTransactLog, under the observation that it will also be handled by advance_transact.
+        }
         observer->parse_complete(); // Throws
     }
     _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
@@ -989,7 +994,12 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
 
     if (observer && uncommitted_changes.size()) {
         _impl::ReversedNoCopyInputStream reversed_in(reverser);
-        parser.parse(reversed_in, *observer); // Throws
+        try {
+            parser.parse(reversed_in, *observer); // Throws
+        }
+        catch (const _impl::TransactLogParser::BadTransactLog&) {
+            // Ignore.
+        }
         observer->parse_complete(); // Throws
     }
 
