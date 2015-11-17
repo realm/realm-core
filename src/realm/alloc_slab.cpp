@@ -378,9 +378,12 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
-    char* addr;
+    char* addr = nullptr;
 
     size_t cache_index = ref ^ ((ref >> 16) >> 16);
+    // we shift by 16 two times. On 32-bitters it's undefined to shift by
+    // 32. Shifting twice x16 however, is defined and gives zero. On 64-bitters
+    // the compiler should reduce it to a single 32 bit shift.
     cache_index = cache_index ^(cache_index >> 16);
     cache_index = (cache_index ^(cache_index >> 8)) & 0xFF;
     if (cache[cache_index].ref == ref && cache[cache_index].version == version)
@@ -403,6 +406,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
             REALM_ASSERT_DEBUG(m_additional_mappings);
             REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
             map = &m_additional_mappings[mapping_index];
+            REALM_ASSERT_DEBUG(map->get_addr() != nullptr);
             addr = map->get_addr() + section_offset;
         }
         realm::util::encryption_read_barrier(addr, Array::header_size, 
@@ -420,6 +424,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     cache[cache_index].addr = addr;
     cache[cache_index].ref = ref;
     cache[cache_index].version = version;
+    REALM_ASSERT_DEBUG(addr != nullptr);
     return addr;
 }
 

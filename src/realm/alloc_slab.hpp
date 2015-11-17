@@ -392,8 +392,8 @@ private:
     bool m_debug_out = false;
 #endif
     struct hash_entry {
-        ref_type ref;
-        char* addr;
+        ref_type ref = 0;
+        char* addr = nullptr;
         size_t version = 0;
     };
     mutable hash_entry cache[256];
