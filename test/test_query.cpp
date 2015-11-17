@@ -7814,23 +7814,11 @@ void query_negative_numbers(TestResults* test_results_ptr, bool nullable)
         table->set_int(0, i, id--);
     }
 
-    CHECK_EQUAL(10, table->where().between(0, -10, -1).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) > -11).find_all().size());
-    CHECK_EQUAL(10, table->where().greater(0, -11).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) >= -10).find_all().size());
-    CHECK_EQUAL(10, table->where().greater_equal(0, -10).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) < 128).find_all().size());
-    CHECK_EQUAL(10, table->where().less(0, 128).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) < 127).find_all().size());
-    CHECK_EQUAL(10, table->where().less(0, 127).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) <= -1).find_all().size());
-    CHECK_EQUAL(10, table->where().less_equal(0, -1).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) < 0).find_all().size());
     TableView view = table->where().less(0, 0).find_all();
-    CHECK_EQUAL(10, view.size());
+    CHECK_EQUAL(10, view.size());                                           //
     id = -1;
     for (size_t i = 0; i < view.size(); ++i) {
-        CHECK_EQUAL(id, view.get_int(0, i));
+        CHECK_EQUAL(id, view.get_int(0, i));                                // // 
         id--;
     }
 }
@@ -7840,7 +7828,7 @@ TEST(Query_NegativeNumbers_Nullable)
     query_negative_numbers(&test_results, true);
 }
 
-TEST(Query_NegativeNumbers_NotNullable)
+ONLY(Query_NegativeNumbers_NotNullable)
 {
     query_negative_numbers(&test_results, false);
 }
