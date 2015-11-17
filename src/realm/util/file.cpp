@@ -375,6 +375,7 @@ error:
     if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
+        realm::util::encryption_read_barrier(map, pos, size);
         memcpy(data, map.get_addr() + pos, size);
         lseek(m_fd, size, SEEK_CUR);
         return map.get_size() - pos;
@@ -433,7 +434,10 @@ void File::write(const char* data, size_t size)
     if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
+        // FIXME: Expect this to fail du to assert asking for a read first!
+        realm::util::encryption_read_barrier(map, pos, size);
         memcpy(map.get_addr() + pos, data, size);
+        realm::util::encryption_write_barrier(map, pos, size);
         lseek(m_fd, size, SEEK_CUR);
         return;
     }
@@ -814,6 +818,19 @@ void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
 #endif
 }
 
+#if REALM_ENABLE_ENCRYPTION
+#ifdef _WIN32
+#error "Encryption is not supported on Windows"
+#else
+void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping,
+                int map_flags, size_t offset) const
+{
+    static_cast<void>(map_flags);
+
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+}
+#endif
+#endif
 
 void File::unmap(void* addr, size_t size) noexcept
 {

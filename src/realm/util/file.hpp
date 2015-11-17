@@ -35,9 +35,11 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
+
 namespace realm {
 namespace util {
 
+class EncryptedFileMapping;
 
 /// Create the specified directory in the file system.
 ///
@@ -343,6 +345,10 @@ public:
     void* remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
                 int map_flags = 0, size_t file_offset = 0) const;
 
+#if REALM_ENABLE_ENCRYPTION
+    void* map(AccessMode, size_t size, EncryptedFileMapping*& mapping, 
+              int map_flags = 0, size_t offset = 0) const;
+#endif
     /// Unmap the specified address range which must have been
     /// previously returned by map().
     static void unmap(void* addr, size_t size) noexcept;
@@ -474,8 +480,8 @@ private:
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
 
     struct MapBase {
-        void* m_addr;
-        size_t m_size;
+        void* m_addr = 0;
+        size_t m_size = 0;
 
         MapBase() noexcept;
         ~MapBase() noexcept;
@@ -484,6 +490,18 @@ private:
         void remap(const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         void sync();
+#if REALM_ENABLE_ENCRYPTION
+        util::EncryptedFileMapping* m_encrypted_mapping = 0;
+        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        {
+            return m_encrypted_mapping;
+        }
+#else
+        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        {
+            return nullptr;
+        }
+#endif
     };
 };
 
@@ -546,6 +564,10 @@ public:
         m_size = other.m_size;
         other.m_addr = 0;
         other.m_size = 0;
+#if REALM_ENABLE_ENCRYPTION
+        m_encrypted_mapping = other.m_encrypted_mapping;
+        other.m_encrypted_mapping = nullptr;
+#endif
         return *this;
     }
 
@@ -597,6 +619,19 @@ public:
     /// Map instance. The address range may then be unmapped later by
     /// a call to File::unmap().
     T* release() noexcept;
+
+#if REALM_ENABLE_ENCRYPTION
+    /// Get the encrypted file mapping corresponding to this mapping
+    inline EncryptedFileMapping* get_encrypted_mapping() const
+    {
+        return m_encrypted_mapping;
+    }
+#else
+    inline EncryptedFileMapping* get_encrypted_mapping() const
+    {
+        return nullptr;
+    }
+#endif
 
     friend class UnmapGuard;
 };
@@ -819,8 +854,11 @@ inline File::MapBase::~MapBase() noexcept
 inline void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
 {
     REALM_ASSERT(!m_addr);
-
+#if REALM_ENABLE_ENCRYPTION
+    m_addr = f.map(a, size, m_encrypted_mapping, map_flags, offset);
+#else
     m_addr = f.map(a, size, map_flags, offset);
+#endif
     m_size = size;
 }
 
@@ -829,6 +867,9 @@ inline void File::MapBase::unmap() noexcept
     if (!m_addr) return;
     File::unmap(m_addr, m_size);
     m_addr = nullptr;
+#if REALM_ENABLE_ENCRYPTION
+    m_encrypted_mapping = nullptr;
+#endif
 }
 
 inline void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)

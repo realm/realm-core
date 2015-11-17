@@ -372,22 +372,22 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 
     // Add the first table
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table_1");
         wt.commit();
     }
 
     // Create a SharedGroup to which we can apply a foreign transaction
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path));
-    SharedGroup sg(*hist);
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     // Add the second table in a "foreign" transaction
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table_2");
         wt.commit();
@@ -409,22 +409,22 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 
     // Add the table
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
     // Create a SharedGroup to which we can apply a foreign transaction
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path));
-    SharedGroup sg(*hist);
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     // remove the table in a "foreign" transaction
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.get_group().remove_table("table");
         wt.commit();
@@ -439,20 +439,20 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path));
-    SharedGroup sg(*hist);
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
         WriteTransaction wt(sg_w);
         for (int i = 0; i < 16; ++i) {
@@ -8915,7 +8915,8 @@ void handover_writer(std::string path)
         LangBindHelper::commit_and_continue_as_read(sg);
         // improve chance of consumers running concurrently with
         // new writes:
-        sched_yield();
+        for (int n=0; n<10; ++n)
+            sched_yield();
     }
     LangBindHelper::promote_to_write(sg, *hist);
     table[0].first = 0; // <---- signals other threads to stop

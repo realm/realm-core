@@ -18,7 +18,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Eliminated use of signals in encryption. This also fixes failures related
+  to signals on some devices.
 
 -----------
 

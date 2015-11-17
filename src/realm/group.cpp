@@ -148,6 +148,7 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
         m_alloc.remap(new_file_size); // Throws
     }
 
+    m_alloc.invalidate_cache();
     update_refs(new_top_ref, old_baseline);
 }
 
@@ -229,6 +230,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
     if (new_file_size > m_alloc.get_baseline())
         m_alloc.remap(new_file_size); // Throws
 
+    m_alloc.invalidate_cache();
     attach(new_top_ref); // Throws
 }
 
@@ -788,6 +790,7 @@ void Group::commit()
         m_alloc.remap(new_file_size); // Throws
     }
 
+    m_alloc.invalidate_cache();
     out.commit(top_ref); // Throws
 
     // Recursively update refs in all active tables (columns, arrays..)
@@ -1616,6 +1619,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
         m_alloc.remap(new_file_size); // Throws
     }
 
+    m_alloc.invalidate_cache();
     m_top.detach(); // Soft detach
     attach(new_top_ref); // Throws
     refresh_dirty_accessors(); // Throws

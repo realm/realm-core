@@ -178,7 +178,6 @@ size_t Array::bit_width(int64_t v)
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.m_addr;
-
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs             = get_hasrefs_from_header(header);
@@ -3194,6 +3193,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
 
         mem_2.m_ref  = child_ref;
         mem_2.m_addr = alloc.translate(child_ref);
+        // inform encryption layer on next loop iteration
     }
 }
 
@@ -3397,6 +3397,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
         // 'root' may be destroyed at this point
         destroy_inner_bptree_node(root_mem, first_value, alloc);
         char* child_header = alloc.translate(child_ref);
+        // destroy_singlet.... will take care of informing the encryption layer
         MemRef child_mem(child_header, child_ref);
         destroy_singlet_bptree_branch(child_mem, alloc, handler);
         return;
@@ -3484,6 +3485,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
         REALM_ASSERT_3(num_children, >=, 2);
         child_ref = get_as_ref(child_ref_ndx);
         child_header = m_alloc.translate(child_ref);
+        // destroy_singlet.... will take care of informing the encryption layer
         child_mem = MemRef(child_header, child_ref);
         erase(child_ref_ndx); // Throws
         destroy_singlet_bptree_branch(child_mem, m_alloc, handler);

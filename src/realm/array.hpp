@@ -50,6 +50,7 @@ Searching: The main finding function is:
 
 #include <realm/util/meta.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/file_mapper.hpp>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
 #include <realm/string_data.hpp>
@@ -1013,6 +1014,8 @@ public:
 
     static const int header_size = 8; // Number of bytes used by header
 
+    // The encryption layer relies on headers always fitting within a single page.
+    static_assert(header_size == 8, "Header must always fit in entirely on a page");
 private:
     Array& operator=(const Array&); // not allowed
 protected:
