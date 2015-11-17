@@ -32,6 +32,7 @@
 #if REALM_ENABLE_ENCRYPTION
 
 #include "encrypted_file_mapping.hpp"
+#include "aes_cryptor.hpp"
 
 #include <memory>
 #include <signal.h>

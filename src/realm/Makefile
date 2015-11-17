@@ -25,6 +25,7 @@ util/utf8.hpp \
 util/priority_queue.hpp \
 util/platform_specific_condvar.hpp \
 util/file_mapper.hpp \
+util/encrypted_file_mapping.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
