@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Bugfixes:
-
+* Fixed bug that would give false search results for queries on integer columns
+  due to bug in bithacks deep inside Array::find()
 * When inserting a new non-nullable Binary column to a table that had
   *existing* rows, then the automatically added values would become null
 * Fixed updating TableViews when applying a transaction log with a table clear.
