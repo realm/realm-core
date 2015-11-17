@@ -104,8 +104,8 @@ struct TypeCount<void>
 ///
 /// \tparam Pred Must be such that `Pred<T>::value` is true if, and
 /// only if the predicate is satisfied for `T`.
-template<class List, template<class>
-class Pred> struct FindType {
+template<class List, template<class> class Pred>
+struct FindType {
 private:
     typedef typename List::head                                type_1;
     typedef typename FindType<typename List::tail, Pred>::type type_2;
@@ -113,8 +113,8 @@ public:
     typedef typename std::conditional<Pred<type_1>::value, type_1, type_2>::type type;
 };
 /// Base case for empty type list.
-template<template<class>
-class Pred> struct FindType<void, Pred> {
+template<template<class> class Pred>
+struct FindType<void, Pred> {
     typedef void type;
 };
 
@@ -123,8 +123,8 @@ class Pred> struct FindType<void, Pred> {
 ///
 /// \tparam List The list of types, constructed using TypeCons<>. Note
 /// that 'void' is interpreted as a zero-length list.
-template<class List, template<class T, int i>
-class Op, int i=0> struct ForEachType {
+template<class List, template<class T, int i> class Op, int i=0>
+struct ForEachType {
     /// Execute the `Op<T,i>::exec()` for each type `T` at index `i`
     /// in `List`.
     static void exec()
@@ -177,8 +177,8 @@ class Op, int i> struct ForEachType<void, Op, i> {
 ///
 /// \tparam List The list of types, constructed using TypeCons<>. Note
 /// that 'void' is interpreted as a zero-length list.
-template<class List, template<class T, int i>
-class Pred, int i=0> struct HasType {
+template<class List, template<class T, int i> class Pred, int i=0>
+struct HasType {
     /// Execute the `Op<T,i>::exec()` for each type `T` at index `i`
     /// in `List`.
     static bool exec()
@@ -212,8 +212,8 @@ class Pred, int i=0> struct HasType {
     }
 };
 /// Base case for empty type list.
-template<template<class T, int i>
-class Pred, int i> struct HasType<void, Pred, i> {
+template<template<class T, int i> class Pred, int i>
+struct HasType<void, Pred, i> {
     static bool exec() { return false; }
     template<class A>
     static bool exec(const A&) { return false; }

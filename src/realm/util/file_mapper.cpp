@@ -194,8 +194,7 @@ void copy_state(const RaiseRequest<CodeType>&, const RaiseStateIdentityRequest<N
     // RaiseRequest does not have state
 }
 
-template<template<typename>
-class ForwardType, typename ForwardCodeType>
+template<template<typename> class ForwardType, typename ForwardCodeType>
 void copy_state(ForwardType<ForwardCodeType>& forward,
                 const RaiseStateIdentityRequest<NativeCodeType>& request,
                 typename ForwardType<ForwardCodeType>::has_state = 0)
@@ -225,8 +224,7 @@ void copy_thread(const RaiseStateRequest<CodeType>&, const RaiseStateIdentityReq
     // RaiseStateRequest does not have a thread
 }
 
-template<template<typename>
-class ForwardType, typename ForwardCodeType>
+template<template<typename> class ForwardType, typename ForwardCodeType>
 void copy_thread(ForwardType<ForwardCodeType>& forward,
                 const RaiseStateIdentityRequest<NativeCodeType>& request,
                 typename ForwardType<ForwardCodeType>::has_thread = 0)
@@ -236,8 +234,7 @@ void copy_thread(ForwardType<ForwardCodeType>& forward,
     forward.thread.task = request.thread.task;
 }
 
-template<template<typename>
-class ForwardType, typename ForwardCodeType>
+template<template<typename> class ForwardType, typename ForwardCodeType>
 void convert_and_forward_message(const RaiseStateIdentityRequest<NativeCodeType>& request, MachExceptionMessageID msg)
 {
     ForwardType<ForwardCodeType> forward;
