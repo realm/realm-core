@@ -2,7 +2,6 @@
 #include <algorithm>
 
 #include <realm/array.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/query.hpp>
 #include <realm/query_engine.hpp>
@@ -401,61 +400,61 @@ Query& Query::greater_int(size_t column_ndx1, size_t column_ndx2)
 // column vs column, float
 Query& Query::not_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return not_equal<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return less<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return greater<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return greater_equal<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return less_equal<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return equal<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 // column vs column, double
 Query& Query::equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return equal<DoubleColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return less_equal<DoubleColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return greater_equal<DoubleColumn>(column_ndx1, column_ndx2);
 }
 Query& Query::greater_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return greater<DoubleColumn>(column_ndx1, column_ndx2);
 }
 Query& Query::less_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return less<DoubleColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return not_equal<DoubleColumn>(column_ndx1, column_ndx2);
 }
 
 // null vs column

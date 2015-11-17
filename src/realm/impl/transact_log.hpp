@@ -2136,38 +2136,52 @@ public:
         return true;
     }
 
-    bool set_int(size_t, size_t, int_fast64_t)
+    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
     {
+        m_encoder.set_int(col_ndx, row_ndx, value);
+        append_instruction();
         return true;
     }
 
-    bool set_bool(size_t, size_t, bool)
+    bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
     {
+        m_encoder.set_bool(col_ndx, row_ndx, value);
+        append_instruction();
         return true;
     }
 
-    bool set_float(size_t, size_t, float)
+    bool set_float(size_t col_ndx, size_t row_ndx, float value)
     {
+        m_encoder.set_float(col_ndx, row_ndx, value);
+        append_instruction();
         return true;
     }
 
-    bool set_double(size_t, size_t, double)
+    bool set_double(size_t col_ndx, size_t row_ndx, double value)
     {
+        m_encoder.set_double(col_ndx, row_ndx, value);
+        append_instruction();
         return true;
     }
 
-    bool set_string(size_t, size_t, StringData)
+    bool set_string(size_t col_ndx, size_t row_ndx, StringData value)
     {
+        m_encoder.set_string(col_ndx, row_ndx, value);
+        append_instruction();
         return true;
     }
 
-    bool set_binary(size_t, size_t, BinaryData)
+    bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
     {
+        m_encoder.set_binary(col_ndx, row_ndx, value);
+        append_instruction();
         return true;
     }
 
-    bool set_date_time(size_t, size_t, DateTime)
+    bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
     {
+        m_encoder.set_date_time(col_ndx, row_ndx, value);
+        append_instruction();
         return true;
     }
 

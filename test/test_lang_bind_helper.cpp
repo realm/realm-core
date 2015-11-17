@@ -775,7 +775,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->set_mixed(0, 1, Mixed(true));
         table_w->set_mixed(0, 2, Mixed(DateTime(3)));
         table_w->set_mixed(1, 0, Mixed(4.0f));
-//        table_w->set_mixed(1, 1, Mixed(5.0)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+        table_w->set_mixed(1, 1, Mixed(5.0));
         wt.get_group().verify();
         table_w->set_mixed(1, 2, Mixed(StringData("Hadamard")));
         table_w->set_mixed(2, 0, Mixed(BinaryData(bin_1)));
@@ -792,8 +792,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(DateTime(3), table->get_mixed(0, 2).get_datetime());
     CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) &&
         CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
-//    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
-//        CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
+        CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(1, 2)) &&
         CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
     CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0)) &&
@@ -813,7 +813,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         set_subtab(table_w, 1, 0, 30);
         table_w->set_mixed(1, 1, Mixed(BinaryData(bin_2)));
         table_w->set_mixed(1, 2, Mixed(int_type(40)));
-//        table_w->set_mixed(2, 0, Mixed(50.0)); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+        table_w->set_mixed(2, 0, Mixed(50.0));
         table_w->set_mixed(2, 1, Mixed(StringData("Banach")));
         table_w->set_mixed(2, 2, Mixed(DateTime(60)));
         wt.commit();
@@ -832,8 +832,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
     CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
         CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
-//    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
-//        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double()); // FIXME: Bug. See https://github.com/realm/realm-core/issues/1281
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
     CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
@@ -6983,6 +6983,47 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     t_r->clear();
 }
 
+TEST(LangBindHelper_AdvanceReadTransact_TableClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->add_empty_row();
+        wt.commit();
+    }
+
+    ConstTableRef table = sg.begin_read().get_table("table");
+    TableView tv = table->where().find_all();
+    ConstRow row = table->get(0);
+    CHECK(row.is_attached());
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+        WriteTransaction wt(sg_w);
+        wt.get_table("table")->clear();
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK(!row.is_attached());
+
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK(!tv.is_in_sync());
+    CHECK(!tv.is_row_attached(0));
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+}
+
 namespace {
 // A base class for transaction log parsers so that tests which want to test
 // just a single part of the transaction log handling don't have to implement
@@ -7252,6 +7293,61 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         } parser(test_results);
         TEST_TYPE::call(sg, *hist, parser);
     }
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    // Add some initial data and then begin a read transaction at that version
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("Table");
+        table->add_column(type_Int, "int");
+        table->add_empty_row();
+        table->set_int(0, 0, 10);
+        wt.commit();
+    }
+    const Group& g = sg.begin_read();
+
+    // Modify the data with a different SG so that we can determine which version
+    // the read transaction is using
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+        wt.get_table("Table")->set_int(0, 0, 20);
+        wt.commit();
+    }
+
+    struct ObserverError { };
+    try {
+        struct : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            bool set_int(size_t, size_t, size_t) const
+            {
+                throw ObserverError();
+            }
+        } parser(test_results);
+
+        LangBindHelper::advance_read(sg, *hist, parser);
+        CHECK(false); // Should not be reached
+    }
+    catch (ObserverError) {
+    }
+
+    // Should still see data from old version
+    CHECK_EQUAL(10, g.get_table("Table")->get_int(0, 0));
+
+    // Should be able to advance to the new version still
+    LangBindHelper::advance_read(sg, *hist);
+
+    // And see that version's data
+    CHECK_EQUAL(20, g.get_table("Table")->get_int(0, 0));
 }
 
 

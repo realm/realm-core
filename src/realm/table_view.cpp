@@ -23,9 +23,10 @@
 
 #include <realm/column.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/util/utf8.hpp>
 #include <realm/index_string.hpp>
+#include <realm/column_tpl.hpp>
+#include <realm/impl/sequential_getter.hpp>
 
 using namespace realm;
 
@@ -532,6 +533,14 @@ void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx
             break;
         m_row_indexes.set(it, to_row_ndx);
     }
+}
+
+
+void TableViewBase::adj_row_acc_clear() noexcept
+{
+    m_num_detached_refs = m_row_indexes.size();
+    for (size_t i = 0, size = m_row_indexes.size(); i < size; ++i)
+        m_row_indexes.set(i, -1);
 }
 
 

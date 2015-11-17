@@ -272,16 +272,13 @@ public:
     struct VersionID {
         uint_fast64_t version;
         uint_fast32_t index;
-        VersionID(const VersionID& v)
-        {
-            version = v.version;
-            index = v.index;
-        }
-        VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
+
+        explicit VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
         {
             this->version = version;
             this->index = index;
         }
+
         bool operator==(const VersionID& other) { return version == other.version; }
         bool operator!=(const VersionID& other) { return version != other.version; }
         bool operator<(const VersionID& other) { return version < other.version; }
@@ -905,11 +902,20 @@ inline void SharedGroup::advance_read(History& history, O* observer, VersionID v
     const BinaryData* changesets_end = changesets_begin + num_changesets;
 
     if (observer) {
-        _impl::TransactLogParser parser;
-        _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-        parser.parse(in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        try {
+            _impl::TransactLogParser parser;
+            _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
+            parser.parse(in, *observer); // Throws
+            observer->parse_complete(); // Throws
+        }
+        catch (...) {
+            release_readlock(m_readlock);
+            m_readlock = old_readlock;
+            rlug.release();
+            throw;
+        }
     }
+
     _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
     using gf = _impl::GroupFriend;
     gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size, in); // Throws

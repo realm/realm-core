@@ -64,8 +64,28 @@ inline MemRef BasicArray<T>::create_array(size_t size, Allocator& alloc)
 
 
 template<class T>
-inline void BasicArray<T>::create()
+inline MemRef BasicArray<T>::create_array(Array::Type type, bool context_flag, size_t size,
+                                          T value, Allocator& alloc)
 {
+    REALM_ASSERT(type == Array::type_Normal);
+    REALM_ASSERT(!context_flag);
+    MemRef mem = create_array(size, alloc);
+    if (size) {
+        BasicArray<T> tmp(alloc);
+        tmp.init_from_mem(mem);
+        for (size_t i = 0; i < size; ++i) {
+            tmp.set(i, value);
+        }
+    }
+    return mem;
+}
+
+
+template<class T>
+inline void BasicArray<T>::create(Array::Type type, bool context_flag)
+{
+    REALM_ASSERT(type == Array::type_Normal);
+    REALM_ASSERT(!context_flag);
     size_t size = 0;
     MemRef mem = create_array(size, get_alloc()); // Throws
     init_from_mem(mem);
@@ -92,6 +112,14 @@ MemRef BasicArray<T>::slice(size_t offset, size_t size, Allocator& target_alloc)
     return slice.get_mem();
 }
 
+template<class T>
+MemRef BasicArray<T>::slice_and_clone_children(size_t offset, size_t size,
+                                               Allocator& target_alloc) const
+{
+    // BasicArray<T> never contains refs, so never has children.
+    return slice(offset, size, target_alloc);
+}
+
 
 template<class T>
 inline void BasicArray<T>::add(T value)
@@ -104,6 +132,15 @@ template<class T>
 inline T BasicArray<T>::get(size_t ndx) const noexcept
 {
     return *(reinterpret_cast<const T*>(m_data) + ndx);
+}
+
+
+template<class T>
+inline bool BasicArray<T>::is_null(size_t ndx) const noexcept
+{
+    // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
+    auto x = get(ndx);
+    return null::is_null_float(x);
 }
 
 
@@ -130,6 +167,13 @@ inline void BasicArray<T>::set(size_t ndx, T value)
     // Set the value
     T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
+}
+
+template<class T>
+inline void BasicArray<T>::set_null(size_t ndx)
+{
+    // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
+    set(ndx, null::get_null_float<T>());
 }
 
 template<class T>

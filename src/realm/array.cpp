@@ -289,7 +289,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
         // Null-refs signify empty subtrees. Also, all refs are
         // 8-byte aligned, so the lowest bits cannot be set. If they
         // are, it means that it should not be interpreted as a ref.
-        bool is_subarray = value != 0 && value % 2 == 0;
+        bool is_subarray = value != 0 && (value & 1) == 0;
         if (!is_subarray) {
             slice.add(value); // Throws
             continue;
@@ -338,7 +338,7 @@ void Array::destroy_children(size_t offset) noexcept
         // A ref is always 8-byte aligned, so the lowest bit
         // cannot be set. If it is, it means that it should not be
         // interpreted as a ref.
-        if (value % 2 != 0)
+        if ((value & 1) != 0)
             continue;
 
         ref_type ref = to_ref(value);
@@ -373,7 +373,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
     size_t n = size();
     for (size_t i = 0; i < n; ++i) {
         int_fast64_t value = get(i);
-        bool is_ref = (value != 0 && value % 2 == 0);
+        bool is_ref = (value != 0 && (value & 1) == 0);
         if (is_ref) {
             ref_type subref = to_ref(value);
             ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
@@ -1534,7 +1534,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         // Null-refs signify empty subtrees. Also, all refs are
         // 8-byte aligned, so the lowest bits cannot be set. If they
         // are, it means that it should not be interpreted as a ref.
-        bool is_subarray = value != 0 && value % 2 == 0;
+        bool is_subarray = value != 0 && (value & 1) == 0;
         if (!is_subarray) {
             new_array.add(value); // Throws
             continue;
@@ -2419,7 +2419,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         int_fast64_t value = get(i);
         // Skip null refs and values that are not refs. Values are not refs when
         // the least significant bit is set.
-        if (value == 0 || value % 2 == 1)
+        if (value == 0 || (value & 1) == 1)
             continue;
 
         size_t used;

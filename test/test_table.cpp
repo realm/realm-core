@@ -348,6 +348,28 @@ TEST(Table_StringOrBinaryTooBig)
 }
 
 
+TEST(Table_SetBinaryLogicErrors)
+{
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column(type_Binary, "a");
+    table->add_column(type_Int, "b");
+    table->add_empty_row();
+
+    BinaryData bd;
+    CHECK_LOGIC_ERROR(table->set_binary(2, 0, bd), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(table->set_binary(0, 1, bd), LogicError::row_index_out_of_range);
+    CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
+
+    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_binary() does not properly check it yet.
+
+    group.remove_table("table");
+    CHECK_LOGIC_ERROR(table->set_binary(0, 0, bd), LogicError::detached_accessor);
+
+    // Logic error LogicError::binary_too_big checked in Table_StringOrBinaryTooBig
+}
+
+
 TEST(Table_Floats)
 {
     Table table;
@@ -3567,8 +3589,7 @@ TEST(Table_Aggregates3)
 
         size_t count;
         size_t pos;
-        if (i == 1) {
-            // This i == 1 is the NULLABLE case where columns are nullable
+        if (nullable) {
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
@@ -3621,7 +3642,7 @@ TEST(Table_Aggregates3)
             CHECK_EQUAL(table->sum_float(1), 30.f);
             CHECK_APPROXIMATELY_EQUAL(table->sum_double(2), 1.1 + 2.2, 0.01);
         }
-        else {
+        else { // not nullable
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
@@ -6551,6 +6572,28 @@ TEST(Table_AllocatorCapacityBug)
             }
         }
     }
+}
+
+
+// Exposes crash when setting a int, float or double that has its least significant bit set
+TEST(Table_MixedCrashValues)
+{
+    GROUP_TEST_PATH(path);
+    const char* encryption_key = 0;
+    Group group(path, encryption_key, Group::mode_ReadWrite);
+    TableRef table = group.add_table("t");
+    table->add_column(type_Mixed, "m");
+    table->add_empty_row(3);
+
+    table->set_mixed(0, 0, Mixed(int64_t(-1)));
+    table->set_mixed(0, 1, Mixed(2.0f));
+    table->set_mixed(0, 2, Mixed(2.0));
+
+    CHECK_EQUAL(table->get_mixed(0, 0).get_int(), int64_t(-1));
+    CHECK_EQUAL(table->get_mixed(0, 1).get_float(), 2.0f);
+    CHECK_EQUAL(table->get_mixed(0, 2).get_double(), 2.0);
+
+    group.verify();
 }
 
 
