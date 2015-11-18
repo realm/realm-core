@@ -1140,8 +1140,8 @@ TEST(Table_6)
     }};
 
     RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
-        (void)b;
-        (void)a;
+        static_cast<void>(b);
+        static_cast<void>(a);
         //first.between(a, b);
         second == str || second.MatchRegEx(".*");
     }};
@@ -6602,7 +6602,7 @@ TEST(Table_AllocatorCapacityBug)
 TEST(Table_MixedCrashValues)
 {
     GROUP_TEST_PATH(path);
-    const char* encryption_key = 0;
+    const char* encryption_key = nullptr;
     Group group(path, encryption_key, Group::mode_ReadWrite);
     TableRef table = group.add_table("t");
     table->add_column(type_Mixed, "m");

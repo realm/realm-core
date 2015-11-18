@@ -87,7 +87,7 @@ public:
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
                                 ArrayParent*& keys_parent, size_t& keys_ndx);
     size_t get_enumkeys_ndx(size_t column_ndx) const noexcept;
-    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = 0,
+    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = nullptr,
                               size_t* keys_ndx = nullptr) noexcept;
 
     // Links
@@ -95,9 +95,9 @@ public:
     void set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx);
     bool has_backlinks() const noexcept;
     void set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx);
-    size_t get_origin_column_ndx(size_t backlink_col_ndx) const  noexcept;
+    size_t get_origin_column_ndx(size_t backlink_col_ndx) const noexcept;
     size_t find_backlink_column(size_t origin_table_ndx,
-                                     size_t origin_col_ndx) const noexcept;
+                                size_t origin_col_ndx) const noexcept;
 
     /// Get position in `Table::m_columns` of the specified column. It may be
     /// different from the specified logical column index due to the presence of

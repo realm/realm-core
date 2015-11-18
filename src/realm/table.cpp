@@ -1105,7 +1105,7 @@ void Table::discard_row_accessors() noexcept
     LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
         row->m_table.reset(); // Detach
-    m_row_accessors = 0;
+    m_row_accessors = nullptr;
 }
 
 
@@ -5050,8 +5050,7 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
-    noexcept
+void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the

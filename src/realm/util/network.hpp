@@ -1204,7 +1204,7 @@ public:
         }
         else {
             REALM_ASSERT(m_socket.m_write_oper);
-            m_socket.m_write_oper = 0;
+            m_socket.m_write_oper = nullptr;
             ec = m_error_code;
         }
         m_handler(ec); // Throws
@@ -1269,7 +1269,7 @@ public:
         }
         else {
             REALM_ASSERT(m_socket.m_write_oper);
-            m_socket.m_write_oper = 0;
+            m_socket.m_write_oper = nullptr;
             ec = m_error_code;
         }
         m_handler(ec, num_bytes_transferred); // Throws
@@ -1423,7 +1423,7 @@ public:
         }
         else {
             REALM_ASSERT(m_acceptor.m_read_oper);
-            m_acceptor.m_read_oper = 0;
+            m_acceptor.m_read_oper = nullptr;
             ec = m_error_code;
         }
         m_handler(ec); // Throws
@@ -1572,7 +1572,7 @@ public:
         }
         else {
             REALM_ASSERT(m_stream.m_socket.m_read_oper);
-            m_stream.m_socket.m_read_oper = 0;
+            m_stream.m_socket.m_read_oper = nullptr;
             ec = m_error_code;
         }
         m_handler(ec, num_bytes_transferred); // Throws
@@ -1676,7 +1676,7 @@ public:
         }
         else {
             REALM_ASSERT(m_timer.m_wait_oper);
-            m_timer.m_wait_oper = 0;
+            m_timer.m_wait_oper = nullptr;
         }
         m_handler(ec);
     }

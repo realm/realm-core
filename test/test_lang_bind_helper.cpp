@@ -135,8 +135,7 @@ public:
     {
     }
 
-    void prepare_changeset(const char* data, size_t size, Replication::version_type new_version)
-        override
+    void prepare_changeset(const char* data, size_t size, Replication::version_type new_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data+size, m_incoming_changeset.data());
@@ -154,8 +153,8 @@ public:
         m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
     }
 
-    void get_changesets(version_type begin_version, version_type end_version, BinaryData* buffer)
-        const noexcept override
+    void get_changesets(version_type begin_version, version_type end_version,
+                        BinaryData* buffer) const noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i != n; ++i) {
@@ -1168,8 +1167,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
         int_fast64_t v = 7;
-        int n = table_w->size();
-        for (int i = 0; i < n; ++i) {
+        size_t n = table_w->size();
+        for (size_t i = 0; i < n; ++i) {
 //            std::cerr << i << " " << v << "\n";
             std::ostringstream out;
             out << v;
@@ -8856,7 +8855,7 @@ struct HandoverControl {
     {
         LockGuard lg(m_lock);
         //std::cout << "put " << h << std::endl;
-        while (m_handover != 0) m_changed.wait(lg);
+        while (m_handover != nullptr) m_changed.wait(lg);
         //std::cout << " -- put " << h << std::endl;
         m_handover = move(h);
         m_version = v;
@@ -8866,20 +8865,20 @@ struct HandoverControl {
     {
         LockGuard lg(m_lock);
         //std::cout << "get " << std::endl;
-        while (m_handover == 0) m_changed.wait(lg);
+        while (m_handover == nullptr) m_changed.wait(lg);
         //std::cout << " -- get " << m_handover << std::endl;
         h = move(m_handover);
         v = m_version;
-        m_handover = 0;
+        m_handover = nullptr;
         m_changed.notify_all();
     }
     bool try_get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
     {
         LockGuard lg(m_lock);
-        if (m_handover == 0) return false;
+        if (m_handover == nullptr) return false;
         h = move(m_handover);
         v = m_version;
-        m_handover = 0;
+        m_handover = nullptr;
         m_changed.notify_all();
         return true;
     }

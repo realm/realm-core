@@ -2070,7 +2070,7 @@ inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int
 
 inline bool Array::has_parent() const noexcept
 {
-    return m_parent != 0;
+    return m_parent != nullptr;
 }
 
 inline ArrayParent* Array::get_parent() const noexcept

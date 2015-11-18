@@ -747,13 +747,13 @@ void socket_base::cancel() noexcept
         if (!m_read_oper->complete)
             any_incomplete = true;
         m_read_oper->canceled = true;
-        m_read_oper = 0;
+        m_read_oper = nullptr;
     }
     if (m_write_oper) {
         if (!m_write_oper->complete)
             any_incomplete = true;
         m_write_oper->canceled = true;
-        m_write_oper = 0;
+        m_write_oper = nullptr;
     }
     if (any_incomplete)
         m_service.m_impl->cancel_incomplete_io_ops(m_sock_fd);
@@ -1200,7 +1200,7 @@ void deadline_timer::cancel() noexcept
         if (!m_wait_oper->complete)
             m_service.m_impl->cancel_incomplete_wait_oper(m_wait_oper);
         m_wait_oper->canceled = true;
-        m_wait_oper = 0;
+        m_wait_oper = nullptr;
     }
 }
 

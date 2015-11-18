@@ -36,7 +36,7 @@ void StringIndex::validate_value(int64_t) const noexcept
 void StringIndex::validate_value(StringData str) const
 {
     // The "nulls on String column" branch fixed all known bugs in the index
-    (void)str;
+    static_cast<void>(str);
     return;
 }
 

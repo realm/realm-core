@@ -630,7 +630,7 @@ private:
     TableRef m_table;
     DescriptorRef m_desc;
     LinkViewRef m_link_list;
-    util::Logger* m_logger = 0;
+    util::Logger* m_logger = nullptr;
 
     bool check_set_cell(size_t col_ndx, size_t row_ndx) noexcept
     {
