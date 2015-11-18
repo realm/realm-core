@@ -10,6 +10,8 @@
   mode even when used with poll/select).
 * Fixed the shared group being left in an inconsistent state if the transaction
   log observer threw an exception.
+* Fixed issue with table accessors not being updated properly, when link columns
+  were changed (e.g. in Group::remove_table, when the table had link columns).
 
 ### API breaking changes:
 
