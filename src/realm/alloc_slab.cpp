@@ -127,6 +127,7 @@ void SlabAlloc::detach() noexcept
     }
     REALM_ASSERT(false);
   found:
+    invalidate_cache();
     m_attach_mode = attach_None;
 }
 
@@ -744,6 +745,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 
 void SlabAlloc::reset_free_space_tracking()
 {
+    invalidate_cache();
     if (m_free_space_state == free_space_Clean)
         return;
 
