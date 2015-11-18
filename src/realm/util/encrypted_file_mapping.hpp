@@ -120,7 +120,7 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size,
 
         // We know it's an array, and array headers are 8-byte aligned, so it is
         // included in the first page which was handled above.
-        size = header_to_size((const char*)addr);
+        size = header_to_size(static_cast<const char*>(addr));
     }
     size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) >> m_page_shift;
     size_t last_idx = last_accessed_page - m_first_page;
