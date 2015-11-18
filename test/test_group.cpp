@@ -77,47 +77,6 @@ REALM_TABLE_3(TestTableGroup2,
 } // Anonymous namespace
 
 
-
-
-
-
-
-
-
-
-char buf[256];
-
-StringData create_string(unsigned char byte) {
-    for (size_t i = 0; i < sizeof(buf); i++)
-        buf[i] = 'a' + (rand() % 20);
-
-    return StringData(buf, byte);
-}
-
-
-
-enum INS {ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
-          ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST, COUNT};
-
-DataType get_type(unsigned char c) {
-    unsigned char mod = c % 11;
-
-    DataType types[11] = {
-        type_Int,
-        type_Bool,
-        type_Float,
-        type_Double,
-        type_String,
-        type_Binary,
-        type_DateTime,
-        type_Table,
-        type_Mixed
-    };
-
-    return types[mod];
-}
-
-
 TEST(Group_Unattached)
 {
     Group group((Group::unattached_tag()));
