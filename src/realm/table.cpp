@@ -1009,7 +1009,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
         size_t origin_table_ndx = get_index_in_group();
         size_t old_col_ndx = old_col_ndx_begin + (new_col_ndx - new_col_ndx_begin);
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
-        update_backlink_columns.push_back(std::make_tuple(target_table, backlink_col_ndx, new_col_ndx)); // Throws
+        update_backlink_columns.emplace_back(target_table, backlink_col_ndx, new_col_ndx); // Throws
     }
 
     for (auto& t: update_backlink_columns) {
