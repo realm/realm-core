@@ -1166,8 +1166,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
         int_fast64_t v = 7;
-        int n = table_w->size();
-        for (int i = 0; i < n; ++i) {
+        size_t n = table_w->size();
+        for (size_t i = 0; i < n; ++i) {
 //            std::cerr << i << " " << v << "\n";
             std::ostringstream out;
             out << v;
