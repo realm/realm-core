@@ -1192,8 +1192,8 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
 #if REALM_MULTITHREAD_QUERY
 TableView Query::find_all_multi(size_t start, size_t end)
 {
-    (void)start;
-    (void)end;
+    static_cast<void>(start);
+    static_cast<void>(end);
 
     // Initialization
     init(*m_table);
