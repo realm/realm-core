@@ -101,9 +101,8 @@ protected:
     ASIO m_io_service;
 };
 
-
-}
-}
+} // namespace util
+} // namespace realm
 
 
 #endif // REALM_UTIL_EVENT_LOOP_HPP
