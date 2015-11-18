@@ -45,6 +45,7 @@ Searching: The main finding function is:
 #include <utility>
 #include <vector>
 #include <ostream>
+#include <iostream>
 
 #include <stdint.h> // unint8_t etc
 
@@ -2857,14 +2858,24 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
     }
     else if (width == 8) {
         // 88 ms:
+
+        std::cerr << chunk << " ";
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        std::cerr << chunk << " ";
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        std::cerr << chunk << " ";
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        std::cerr << chunk << " ";
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        std::cerr << chunk << " ";
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 4 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        std::cerr << chunk << " ";
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 5 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        std::cerr << chunk << " ";
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 6 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        std::cerr << chunk << " ";
         if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 7 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        std::cerr << chunk << " ";
 
         //97 ms ms:
         // if (gt ? static_cast<char>(chunk >> 0*8) > v : static_cast<char>(chunk >> 0*8) < v) return 0;
@@ -3398,7 +3409,8 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
     if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {
         uint64_t magic = find_gtlt_magic<gt, bitwidth>(value);
 
-        // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
+        // Bit hacks only work if searched item has its most significant bit clear for 'greater than' or
+        // 'item <= 1 << bitwidth' for 'less than'
         if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= static_cast<int64_t>((mask >> 1) - (gt ? 1 : 0))) {
             // 15 ms
             while (p < e) {
@@ -3407,11 +3419,11 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
                 const int64_t v = *p;
                 size_t idx;
 
-                // Bit hacks only works for positive items in chunk, so test their sign bits
+                // Bit hacks only works if all items in chunk have their most significant bit clear. Test this:
                 upper = upper & v;
 
-                if ((bitwidth > 4 ? !upper : true)) {
-                    // Assert that all values in chunk are positive.
+                if (!upper) {
+                    // Assert that all values in chunk have their most significant bit clear.
                     REALM_ASSERT(bitwidth <= 4 || ((lower_bits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
                     idx = find_gtlt_fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
