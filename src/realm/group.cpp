@@ -1521,6 +1521,7 @@ void Group::update_table_indices(F&& map_function)
         spec.init_from_parent();
 
         size_t num_cols = spec.get_column_count();
+        bool spec_changed = false;
         for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
             ColumnType type = spec.get_column_type(col_ndx);
             if (tf::is_link_type(type) || type == col_type_BackLink) {
@@ -1528,8 +1529,13 @@ void Group::update_table_indices(F&& map_function)
                 size_t new_table_ndx = map_function(table_ndx);
                 if (new_table_ndx != table_ndx) {
                     spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx);
+                    spec_changed = true;
                 }
             }
+        }
+
+        if (spec_changed && !m_table_accessors.empty() && m_table_accessors[i] != nullptr) {
+            tf::mark(*m_table_accessors[i]);
         }
     }
 
