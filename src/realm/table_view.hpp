@@ -1008,7 +1008,7 @@ inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) c
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     REALM_ASSERT(real_ndx != detached_ref);
-    return m_table->get_binary(column_ndx, real_ndx); // Throws
+    return m_table->get_binary(column_ndx, real_ndx);
 }
 
 inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const noexcept
@@ -1017,7 +1017,7 @@ inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const n
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     REALM_ASSERT(real_ndx != detached_ref);
-    return m_table->get_mixed(column_ndx, real_ndx); // Throws
+    return m_table->get_mixed(column_ndx, real_ndx);
 }
 
 inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept
