@@ -77,6 +77,323 @@ REALM_TABLE_3(TestTableGroup2,
 } // Anonymous namespace
 
 
+
+
+
+
+
+
+
+
+char buf[256];
+
+StringData create_string(unsigned char byte) {
+    for (size_t i = 0; i < sizeof(buf); i++)
+        buf[i] = 'a' + (rand() % 20);
+
+    return StringData(buf, byte);
+}
+
+
+
+enum INS {ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
+          ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST, COUNT};
+
+DataType get_type(unsigned char c) {
+    unsigned char mod = c % 11;
+
+    DataType types[11] = {
+        type_Int,
+        type_Bool,
+        type_Float,
+        type_Double,
+        type_String,
+        type_Binary,
+        type_DateTime,
+        type_Table,
+        type_Mixed
+    };
+
+    return types[mod];
+}
+
+
+ONLY(Group_Fuzzy)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("hrnetprsafd");
+    TableRef t1 = g.add_table("qrsfdrpnkd");
+
+    t1->add_column_link(type_Link, "bbb", *t0);
+    t1->add_column_link(type_Link, "bbb", *t0);
+    t1->insert_column(0, DataType(10), "aaa");
+
+    t0->add_column_link(type_Link, "bbb", *t1);
+
+    t1->remove_column(0);
+    t1->remove_column(0);
+    t1->remove_column(0);
+
+    return;
+
+
+
+ //   srand(time(0));
+
+
+    size_t fewest = -1;
+
+    for (int64_t iter = 10*436925; iter < 100000000LL; iter++) {
+        srand(iter);
+        Group g;
+        unsigned char ins[800];
+        int64_t instructions = 0;
+
+
+        for (size_t i = 0; i < sizeof(ins); i++)
+            ins[i] = rand() % COUNT;
+
+  /*      std::cerr << "\n\n\n\n\n\n\n\n\n\n\n";
+
+        std::cerr << "Group g;\n";*/
+
+        for (size_t i = 0; i < sizeof(ins) - 100;) {
+            instructions++;
+
+
+
+            try {
+
+
+
+
+
+                /* **********************************************************************************/
+                int64_t counter = iter*i;
+
+                if (counter == 92926743)
+                    counter = counter;
+
+
+
+                /*
+                if (ins[i++] == ADD_TABLE && g.size() < 1000) {
+                    try {
+                        g.add_table(create_string(ins[i++] % Group::max_table_name_length));
+                    }
+                    catch (...) {}
+                    i++;
+                }
+
+                */
+
+                if (ins[i++] == INSERT_TABLE && g.size() < 1000) {
+                    try {
+                        size_t s0 = ins[i++] % (g.size() + 1);
+                        StringData sd0 = create_string(ins[i++] % (Group::max_table_name_length - 10) + 5);
+
+                        //std::cerr << "g.insert_table(" << s0 << ", \"" << sd0 << "\");\n";
+                        g.insert_table(s0, sd0);
+
+
+                    }
+                    catch (...) {
+                        int iffd = 3432;
+                    
+                    }
+                }
+
+/*
+                else if (ins[i++] == REMOVE_TABLE && g.size() > 0) {
+                    try {
+                        g.remove_table(ins[i++] % g.size());
+                        i++;
+                    }
+                    catch (...) {
+
+                    }
+                }
+
+*/
+
+
+/*
+                else if (ins[i++] == INSERT_ROW && g.size() > 0) {
+                    TableRef t = g.get_table(ins[i++] % g.size());
+                    t->insert_empty_row(ins[i++] % (t->size() + 1), ins[i++]);
+                }
+                else if (ins[i++] == ADD_EMPTY_ROW && g.size() > 0) {
+                    TableRef t = g.get_table(ins[i++] % g.size());
+                    t->add_empty_row(ins[i++]);
+                }
+*/
+
+/*
+                else if (ins[i++] == ADD_COLUMN && g.size() > 0) {
+                    TableRef t = g.get_table(ins[i++] % g.size());
+                    t->add_column(get_type(ins[i++]), create_string(ins[i++] % Group::max_table_name_length));
+                }
+                */
+
+                else if (ins[i++] == INSERT_COLUMN && g.size() > 0) {
+                    size_t s3 = ins[i++] % g.size();
+                    TableRef t = g.get_table(s3);
+                    size_t s0 = ins[i++] % (t->get_column_count() + 1);
+                    DataType d0 = get_type(ins[i++]);
+                    StringData sd0 = "aaa"; // create_string(ins[i++] % Group::max_table_name_length);
+
+         /*           std::cerr << "{TableRef t = g.get_table(" << s3 << ");\n";
+                    std::cerr << "t->insert_column(" << s0 << ", DataType(" << d0 << "), \"" << sd0 << "\");}\n";
+*/
+                    t->insert_column(s0, d0, sd0);
+
+
+                }
+
+
+                else if (ins[i++] == REMOVE_COLUMN && g.size() > 0) {
+                    size_t s3 = ins[i++] % g.size();
+                    TableRef t = g.get_table(s3);
+                    if (t->get_column_count() > 0) {
+                        size_t s0 = ins[i++] % t->get_column_count();
+
+                        //std::cerr << "{TableRef t = g.get_table(" << s3 << ");\n";
+                        //std::cerr << "t->remove_column(" << s0 << ");}\n";
+
+                        t->remove_column(s0);
+
+                    }
+                }
+
+                else if (ins[i++] == ADD_COLUMN_LINK && g.size() >= 2) {
+                    size_t s0 = ins[i++] % g.size();
+                    size_t s1 = ins[i++] % g.size();
+                    TableRef t1 = g.get_table(s0);
+                    TableRef t2 = g.get_table(s1);
+                    StringData sd0 = "bbb"; // create_string(ins[i++] % Group::max_table_name_length);
+
+                    //std::cerr << "{TableRef t1 = g.get_table(" << s0 << ");\n";
+                    //std::cerr << "TableRef t2 = g.get_table(" << s1 << ");\n";
+                    //std::cerr << "t1->add_column_link(type_Link, \"" << sd0 << "\", *t2);}\n";
+
+                    t1->add_column_link(type_Link, sd0, *t2);
+                }
+
+                /*
+                else if (ins[i++] == ADD_COLUMN_LINK_LIST && g.size() >= 2) {
+                    TableRef t1 = g.get_table(ins[i++] % g.size());
+                    TableRef t2 = g.get_table(ins[i++] % g.size());
+                    t1->add_column_link(type_LinkList, create_string(ins[i++] % Group::max_table_name_length), *t2);
+                }
+                */
+
+
+/*
+                else if (ins[i++] == SET && g.size() > 0) {
+                    TableRef t = g.get_table(ins[i++] % g.size());
+                    if (t->get_column_count() > 0 && t->size() > 0) {
+                        size_t c = ins[i++] % t->get_column_count();
+                        size_t r = ins[i++] % t->size();
+
+                        DataType d = t->get_column_type(c);
+
+                        if (d == type_String) {
+                            t->set_string(c, r, create_string(ins[i++]));
+                        }
+                        else if (d == type_Int) {
+                            t->set_int(c, r, ins[i++]);
+                        }
+                        else if (d == type_Bool) {
+                            t->set_bool(c, r, ins[i++] % 2 == 0);
+                        }
+                        else if (d == type_Float) {
+                            t->set_float(c, r, ins[i++]);
+                        }
+                        else if (d == type_Double) {
+                            t->set_double(c, r, ins[i++]);
+                        }
+                        else if (d == type_Link) {
+                            TableRef target = t->get_link_target(c);
+                            if (target->size() > 0)
+                                t->set_link(c, r, ins[i++] % target->size());
+                        }
+                        else if (d == type_LinkList) {
+                            TableRef target = t->get_link_target(c);
+                            if (target->size() > 0) {
+                                LinkViewRef links = t->get_linklist(c, r);
+
+                                // either add or set, 50/50 probability
+                                if (links->size() > 0 && ins[i++] > 128) {
+                                    links->set(ins[i++] % links->size(), ins[i++] % target->size());
+                                }
+                                else {
+                                    links->add(ins[i++] % target->size());
+                                }
+                            }
+                        }
+                    }
+                }
+                */
+
+                /*
+
+                else if (ins[i++] == REMOVE_ROW && g.size() > 0) {
+                    TableRef t = g.get_table(ins[i++] % g.size());
+                    if (t->size() > 0) {
+                        t->remove(ins[i++] % t->size());
+                    }
+                }
+                */
+
+
+                /* **********************************************************************************/
+
+
+
+
+                if (i > sizeof(ins))
+                    i = i;
+
+                if (instructions > fewest)
+                    break;
+
+            }
+            catch (...) {
+                std::cerr << "error after " << instructions << " instructions at iter = " << iter << "\n";
+                if (instructions < fewest)
+                    fewest = instructions;
+                getchar();
+                break;
+            }
+
+
+        } 
+
+
+
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 TEST(Group_Unattached)
 {
     Group group((Group::unattached_tag()));

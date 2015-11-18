@@ -332,6 +332,8 @@ void Table::cascade_break_backlinks_to_all_rows(CascadeState& state)
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
+
+        // Problem is that column.m_backlink_column is unitialized at this point
         column.cascade_break_backlinks_to_all_rows(m_size, state); // Throws
     }
 }
