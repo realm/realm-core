@@ -6112,6 +6112,29 @@ TEST(Table_EnumStringInsertEmptyRow)
 }
 
 
+TEST(Table_InsertColumnMaintainsBacklinkIndices)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("hrnetprsafd");
+    TableRef t1 = g.add_table("qrsfdrpnkd");
+
+    t1->add_column_link(type_Link, "bbb", *t0);
+    t1->add_column_link(type_Link, "ccc", *t0);
+    t1->insert_column(0, type_Int, "aaa");
+
+    t1->add_empty_row();
+
+    t0->add_column(type_Int, "foo");
+    t0->add_empty_row();
+
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
