@@ -987,16 +987,35 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
     // origin table column indices.
 
     size_t num_cols = m_cols.size();
+
+    // If multiple link columns exist to the same table, updating the backlink
+    // columns one by one is risky, because we use Spec::find_backlink_column
+    // to figure out which backlink column should be updated. If we update them
+    // as we find them, the next iteration might find the column that we have
+    // just updated, thinking it should be updated once more.
+    //
+    // Therefore, we figure out which backlink columns need to be updated first,
+    // and then we actually update them in the second pass.
+    //
+    // Tuples are: (target table, backlink column index, new column index).
+    std::vector<std::tuple<Table*, size_t, size_t>> update_backlink_columns;
+
     for (size_t new_col_ndx = new_col_ndx_begin; new_col_ndx < num_cols; ++new_col_ndx) {
         ColumnType type = m_spec.get_column_type(new_col_ndx);
         if (!is_link_type(type))
             continue;
         LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[new_col_ndx]);
-        Spec& target_spec = link_col->get_target_table().m_spec;
+        Table* target_table = &link_col->get_target_table();
+        Spec& target_spec = target_table->m_spec;
         size_t origin_table_ndx = get_index_in_group();
         size_t old_col_ndx = old_col_ndx_begin + (new_col_ndx - new_col_ndx_begin);
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
-        target_spec.set_backlink_origin_column(backlink_col_ndx, new_col_ndx); // Throws
+        update_backlink_columns.emplace_back(target_table, backlink_col_ndx, new_col_ndx); // Throws
+    }
+
+    for (auto& t: update_backlink_columns) {
+        Spec& target_spec = std::get<0>(t)->m_spec;
+        target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
     }
 }
 
