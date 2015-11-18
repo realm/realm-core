@@ -1,78 +1,101 @@
+#include <algorithm>
 #include <stdexcept>
+#include <system_error>
 
+#if REALM_IOS
+#  define USE_PTHREADS_IMPL 1
+#else
+#  define USE_PTHREADS_IMPL 0
+#endif
+
+#if USE_PTHREADS_IMPL
+#  include <pthread.h>
+#endif
+
+#include <realm/util/basic_system_errors.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
+using namespace realm;
 using namespace realm::_impl;
 
 #ifdef REALM_DEBUG
-#  if !REALM_IOS
 
 namespace {
 
 const int num_failure_types = SimulatedFailure::_num_failure_types;
+
+#  if !USE_PTHREADS_IMPL
+
+
 REALM_THREAD_LOCAL bool primed_failure_types[num_failure_types];
 
-} // anonymous namespace
-
-
-void SimulatedFailure::do_prime(type failure_type)
+bool* get() noexcept
 {
-    primed_failure_types[failure_type] = true;
+    return primed_failure_types;
 }
 
-void SimulatedFailure::do_unprime(type failure_type) noexcept
+
+#  else // USE_PTHREADS_IMPL
+
+
+pthread_key_t key;
+pthread_once_t key_once = PTHREAD_ONCE_INIT;
+
+void destroy(void* ptr) noexcept
 {
-    primed_failure_types[failure_type] = false;
+    bool* primed_failure_types = static_cast<bool*>(ptr);
+    delete[] primed_failure_types;
 }
 
-void SimulatedFailure::do_check(type failure_type)
+void create() noexcept
 {
-    if (primed_failure_types[failure_type]) {
-        primed_failure_types[failure_type] = false;
-        throw SimulatedFailure();
+    int ret = pthread_key_create(&key, &destroy);
+    if (REALM_UNLIKELY(ret != 0)) {
+        std::error_code ec = util::make_basic_system_error_code(errno);
+        throw std::system_error(ec); // Termination intended
     }
 }
 
-#  else // !REALM_IOS
-
-#include <pthread.h>
-#include <stdlib.h>
-
-namespace {
-
-    const int num_failure_types = SimulatedFailure::_num_failure_types;
-    pthread_key_t key;
-
-    bool * get_threadlocal_primed_failure_types() {
-        pthread_key_create(&key, NULL);
-        if (bool *primed_failure_types = static_cast<bool *>(pthread_getspecific(key))) {
-            return primed_failure_types;
+bool* get() noexcept
+{
+    pthread_once(&key_once, &create);
+    void* ptr = pthread_getspecific(key);
+    bool* primed_failure_types = static_cast<bool*>(ptr);
+    if (!primed_failure_types) {
+        primed_failure_types = new bool[num_failure_types]; // Throws with intended termination
+        std::fill(primed_failure_types, primed_failure_types+num_failure_types, false);
+        int ret = pthread_setspecific(key, primed_failure_types);
+        if (REALM_UNLIKELY(ret != 0)) {
+            std::error_code ec = util::make_basic_system_error_code(errno);
+            throw std::system_error(ec); // Termination intended
         }
-        auto primed_failure_types = calloc(num_failure_types, sizeof(bool));
-        pthread_setspecific(key, primed_failure_types);
-        return static_cast<bool *>(primed_failure_types);
     }
+    return primed_failure_types;
+}
 
-} // anonymous namespace
+
+#  endif // USE_PTHREADS_IMPL
+
+} // unnamed namespace
+
 
 void SimulatedFailure::do_prime(type failure_type)
 {
-    get_threadlocal_primed_failure_types()[failure_type] = true;
+    get()[failure_type] = true;
 }
 
 void SimulatedFailure::do_unprime(type failure_type) noexcept
 {
-    get_threadlocal_primed_failure_types()[failure_type] = false;
+    get()[failure_type] = false;
 }
 
 void SimulatedFailure::do_check(type failure_type)
 {
-    auto primed_failure_types = get_threadlocal_primed_failure_types();
+    bool* primed_failure_types = get();
     if (primed_failure_types[failure_type]) {
         primed_failure_types[failure_type] = false;
         throw SimulatedFailure();
     }
 }
 
-#  endif // !REALM_IOS
 #endif // REALM_DEBUG
