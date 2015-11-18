@@ -2,6 +2,10 @@
 #include <stdexcept>
 #include <system_error>
 
+#include <realm/util/features.h>
+#include <realm/util/basic_system_errors.hpp>
+#include <realm/impl/simulated_failure.hpp>
+
 #if REALM_IOS
 #  define USE_PTHREADS_IMPL 1
 #else
@@ -11,9 +15,6 @@
 #if USE_PTHREADS_IMPL
 #  include <pthread.h>
 #endif
-
-#include <realm/util/basic_system_errors.hpp>
-#include <realm/impl/simulated_failure.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
