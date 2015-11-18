@@ -981,7 +981,6 @@
 		F45013BC1B01022800CD4A7E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		F45013BE1B01022800CD4A7E /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		F45013C11B01022800CD4A7E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/LaunchScreen.xib; sourceTree = "<group>"; };
-		F47B5FAE1B55B183001F3018 /* simulated_failure.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simulated_failure.cpp; sourceTree = "<group>"; };
 		F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = query_engine.cpp; path = realm/query_engine.cpp; sourceTree = "<group>"; };
 		F4D0FC161B00E0D70040956A /* benchmark-common-tasks */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "benchmark-common-tasks"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4D0FC1F1B00E1020040956A /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
@@ -1112,12 +1111,10 @@
 				3620DF0518B6CA7B003AD498 /* output_stream.cpp */,
 				3620DF0918B6CA7B003AD498 /* output_stream.hpp */,
 				65F667241BFD096900749FA2 /* sequential_getter.hpp */,
-				F47B5FAE1B55B183001F3018 /* simulated_failure.cpp */,
 				C08FE2B61B45BD750037AFCE /* simulated_failure.cpp */,
 				C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */,
 				3F967AF81AA4C00800005C38 /* transact_log.cpp */,
 				3F967AF91AA4C00800005C38 /* transact_log.hpp */,
-				C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */,
 			);
 			name = impl;
 			path = realm/impl;
