@@ -480,7 +480,7 @@ private:
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
 
     struct MapBase {
-        void* m_addr = 0;
+        void* m_addr = nullptr;
         size_t m_size = 0;
 
         MapBase() noexcept;
@@ -491,7 +491,7 @@ private:
         void unmap() noexcept;
         void sync();
 #if REALM_ENABLE_ENCRYPTION
-        util::EncryptedFileMapping* m_encrypted_mapping = 0;
+        util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
         inline util::EncryptedFileMapping* get_encrypted_mapping() const
         {
             return m_encrypted_mapping;

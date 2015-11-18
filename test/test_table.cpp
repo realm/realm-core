@@ -6579,7 +6579,7 @@ TEST(Table_AllocatorCapacityBug)
 TEST(Table_MixedCrashValues)
 {
     GROUP_TEST_PATH(path);
-    const char* encryption_key = 0;
+    const char* encryption_key = nullptr;
     Group group(path, encryption_key, Group::mode_ReadWrite);
     TableRef table = group.add_table("t");
     table->add_column(type_Mixed, "m");
