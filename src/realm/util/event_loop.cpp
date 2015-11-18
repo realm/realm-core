@@ -25,15 +25,43 @@ void EventLoop<ASIO>::reset() noexcept
 }
 
 struct EventLoop<ASIO>::Socket: SocketBase {
-    Socket(network::io_service& io_service, const Endpoint& endpoint, EventLoopBase::OnConnectComplete on_complete):
+    Socket(network::io_service& io_service, std::string host, int port, EventLoopBase::OnConnectComplete on_complete):
+        m_on_complete(std::move(on_complete)),
         m_socket(io_service),
         m_stream(m_socket)
     {
-        m_socket.async_connect(endpoint, std::move(on_complete));
+        std::stringstream ss;
+        ss << port;
+        network::resolver::query query{host, ss.str()};
+        network::resolver resolver{io_service};
+        m_last_error = resolver.resolve(query, m_endpoints, m_last_error);
+
+        m_try_endpoint = m_endpoints.begin();
+
+        schedule_next_connection_attempt();
     }
 
     ~Socket()
     {
+    }
+
+    void schedule_next_connection_attempt()
+    {
+        if (m_try_endpoint != m_endpoints.end()) {
+            m_socket.async_connect(*m_try_endpoint, [=](std::error_code ec) {
+                m_last_error = ec;
+                if (ec) {
+                    ++m_try_endpoint;
+                    schedule_next_connection_attempt();
+                }
+                else {
+                    m_on_complete(ec);
+                }
+            });
+        }
+        else {
+            m_on_complete(m_last_error);
+        }
     }
 
     void cancel() final
@@ -61,14 +89,18 @@ struct EventLoop<ASIO>::Socket: SocketBase {
         m_stream.async_read_until(data, size, delim, std::move(on_complete));
     }
 
+    OnConnectComplete m_on_complete;
     network::socket m_socket;
     network::buffered_input_stream m_stream;
+    network::endpoint::list m_endpoints;
+    network::endpoint::list::iterator m_try_endpoint;
+    std::error_code m_last_error;
 };
 
 std::unique_ptr<SocketBase>
-EventLoop<ASIO>::async_connect(const Endpoint& endpoint, EventLoopBase::OnConnectComplete on_complete)
+EventLoop<ASIO>::async_connect(std::string host, int port, EventLoopBase::OnConnectComplete on_complete)
 {
-    return std::unique_ptr<SocketBase>{new Socket{m_io_service, endpoint, std::move(on_complete)}};
+    return std::unique_ptr<SocketBase>{new Socket{m_io_service, std::move(host), port, std::move(on_complete)}};
 }
 
 
@@ -99,39 +131,6 @@ EventLoop<ASIO>::async_timer(EventLoopBase::Duration delay, EventLoopBase::OnTim
 }
 
 
-struct EventLoop<ASIO>::Resolver: ResolverBase {
-    Resolver(EventLoop<ASIO>& loop, DNSQuery query, EndpointList& endpoints, EventLoopBase::OnResolveComplete on_complete):
-        m_on_complete(std::move(on_complete))
-    {
-        m_timer = loop.async_timer(Duration::zero(), [=](std::error_code ec) { this->complete(ec); });
-        network::resolver resolver{loop.m_io_service};
-        resolver.resolve(query, endpoints, m_ec);
-    }
-
-    void cancel() final
-    {
-        // FIXME: No-op until resolve becomes an actual async operation.
-    }
-
-    void complete(std::error_code ec)
-    {
-        if (!ec) {
-            ec = m_ec;
-        }
-        m_on_complete(m_ec);
-    }
-
-    std::unique_ptr<DeadlineTimerBase> m_timer;
-    std::error_code m_ec;
-    EventLoopBase::OnResolveComplete m_on_complete;
-};
-
-std::unique_ptr<ResolverBase>
-EventLoop<ASIO>::async_resolve(DNSQuery query, EndpointList& endpoints, EventLoopBase::OnResolveComplete on_complete)
-{
-    return std::unique_ptr<ResolverBase>{new Resolver{*this, query, endpoints, std::move(on_complete)}};
-}
-
-}
-}
+} // namespace util
+} // namespace realm
 

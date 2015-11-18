@@ -26,11 +26,6 @@
 namespace realm {
 namespace util {
 
-using Protocol = network::protocol;
-using Endpoint = network::endpoint;
-using EndpointList = network::endpoint::list;
-using DNSQuery = network::resolver::query;
-
 class SocketBase;
 class DeadlineTimerBase;
 class ResolverBase;
@@ -41,12 +36,10 @@ public:
 
     using Duration = std::chrono::milliseconds;
 
-    using OnResolveComplete = std::function<void(std::error_code)>;
     using OnConnectComplete = std::function<void(std::error_code)>;
     using OnTimeout = std::function<void(std::error_code)>;
 
-    virtual std::unique_ptr<ResolverBase> async_resolve(DNSQuery, EndpointList&, OnResolveComplete) = 0;
-    virtual std::unique_ptr<SocketBase> async_connect(const Endpoint&, OnConnectComplete) = 0;
+    virtual std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) = 0;
     virtual std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) = 0;
 };
 
@@ -98,8 +91,7 @@ public:
     void stop() noexcept;
     void reset() noexcept;
 
-    std::unique_ptr<ResolverBase> async_resolve(DNSQuery, EndpointList&, OnResolveComplete);
-    std::unique_ptr<SocketBase> async_connect(const Endpoint&, OnConnectComplete) final;
+    std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) final;
     std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
 protected:
     struct Resolver;

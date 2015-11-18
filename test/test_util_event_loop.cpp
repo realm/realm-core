@@ -21,23 +21,6 @@ TEST_TYPES(EventLoop_Timer, ASIO)
 }
 
 
-TEST_TYPES(EventLoop_Resolve, ASIO)
-{
-    EventLoop<TEST_TYPE> loop;
-    bool ran = false;
-    DNSQuery query{Protocol::ip_v4(), "127.0.0.1", "http"};
-    EndpointList result;
-    auto resolver = loop.async_resolve(query, result, [&](std::error_code ec) {
-        std::cerr << ec << '\n';
-        CHECK(!ec);
-        ran = true;
-    });
-    CHECK(!ran);
-    loop.run();
-    CHECK(ran);
-    CHECK_GREATER(result.size(), 0);
-}
-
 namespace {
 
 network::endpoint bind_acceptor(network::acceptor& acceptor)
@@ -213,42 +196,16 @@ public:
 
     void run()
     {
-        std::string service;
-        {
-            std::ostringstream out;
-            out << m_listen_port;
-            service = out.str();
-        }
-
-        DNSQuery query{"localhost", service};
-        m_resolver = m_loop.async_resolve(query, m_endpoints, [=](std::error_code ec) {
+        m_socket = m_loop.async_connect("localhost", m_listen_port, [=](std::error_code ec) {
             auto& test_results = this->m_test_results;
             CHECK(!ec);
-            this->try_connect(0);
+            this->connection_established();
         });
 
         m_loop.run();
         if (m_socket) {
             m_socket->close();
         }
-    }
-
-    void try_connect(size_t idx)
-    {
-        if (idx == m_endpoints.size()) {
-            throw std::runtime_error("Failed to connect to localhost.");
-        }
-
-        auto it = this->m_endpoints.begin() + idx;
-        m_socket = m_loop.async_connect(*it, [=](std::error_code ec) {
-            if (!ec) {
-                this->connection_established();
-            }
-            else {
-                m_socket->close();
-                this->try_connect(idx + 1);
-            }
-        });
     }
 
     void connection_established()
@@ -265,8 +222,6 @@ public:
 private:
     unsigned short m_listen_port;
     EventLoop<Provider> m_loop;
-    EndpointList m_endpoints;
-    std::unique_ptr<ResolverBase> m_resolver;
     std::unique_ptr<SocketBase> m_socket;
 
     static const size_t s_max_header_size = 32;
