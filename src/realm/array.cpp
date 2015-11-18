@@ -612,9 +612,8 @@ void Array::insert(size_t ndx, int_fast64_t value)
         // when byte sized and no expansion, use memmove
 // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        char* base = reinterpret_cast<char*>(m_data);
-        char* src_begin = base + ndx*w;
-        char* src_end   = base + m_size*w;
+        char* src_begin = m_data + ndx*w;
+        char* src_end   = m_data + m_size*w;
         char* dst_end   = src_end + w;
         std::copy_backward(src_begin, src_end, dst_end);
     }

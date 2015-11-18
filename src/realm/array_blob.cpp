@@ -22,16 +22,15 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
     // also updates header
     alloc(new_size, 1); // Throws
 
-    char* base = reinterpret_cast<char*>(m_data);
-    char* modify_begin = base + begin;
+    char* modify_begin = m_data + begin;
 
     // Resize previous space to fit new data
     // (not needed if we append to end)
     if (begin != m_size) {
-        const char* old_begin = base + end;
-        const char* old_end   = base + m_size;
+        const char* old_begin = m_data + end;
+        const char* old_end   = m_data + m_size;
         if (remove_size < add_size) { // expand gap
-            char* new_end = base + new_size;
+            char* new_end = m_data + new_size;
             std::copy_backward(old_begin, old_end, new_end);
         }
         else if (add_size < remove_size) { // shrink gap

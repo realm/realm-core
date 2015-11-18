@@ -193,9 +193,8 @@ void BasicArray<T>::insert(size_t ndx, T value)
 
     // Move values below insertion
     if (ndx != m_size) {
-        char* base = reinterpret_cast<char*>(m_data);
-        char* src_begin = base + ndx*m_width;
-        char* src_end   = base + m_size*m_width;
+        char* src_begin = m_data + ndx*m_width;
+        char* src_end   = m_data + m_size*m_width;
         char* dst_end   = src_end + m_width;
         std::copy_backward(src_begin, src_end, dst_end);
     }
@@ -217,10 +216,9 @@ void BasicArray<T>::erase(size_t ndx)
 
     // move data under deletion up
     if (ndx < m_size-1) {
-        char* base = reinterpret_cast<char*>(m_data);
-        char* dst_begin = base + ndx*m_width;
+        char* dst_begin = m_data + ndx*m_width;
         const char* src_begin = dst_begin + m_width;
-        const char* src_end   = base + m_size*m_width;
+        const char* src_end   = m_data + m_size*m_width;
         std::copy(src_begin, src_end, dst_begin);
     }
 
