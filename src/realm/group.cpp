@@ -83,7 +83,6 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     // Make all dynamically allocated memory (space beyond the attached file) as
     // available free-space.
     reset_free_space_tracking(); // Throws
-
     SlabAlloc::DetachGuard dg(m_alloc);
     attach(top_ref); // Throws
     dg.release(); // Do not detach allocator from file
@@ -230,7 +229,6 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
     if (new_file_size > m_alloc.get_baseline())
         m_alloc.remap(new_file_size); // Throws
 
-    m_alloc.invalidate_cache();
     attach(new_top_ref); // Throws
 }
 
@@ -780,7 +778,7 @@ void Group::commit()
     // commit
 
     // Mark all managed space (beyond the attached file) as free.
-    m_alloc.reset_free_space_tracking(); // Throws
+    reset_free_space_tracking(); // Throws
 
     size_t old_baseline = m_alloc.get_baseline();
 
@@ -790,7 +788,6 @@ void Group::commit()
         m_alloc.remap(new_file_size); // Throws
     }
 
-    m_alloc.invalidate_cache();
     out.commit(top_ref); // Throws
 
     // Recursively update refs in all active tables (columns, arrays..)
