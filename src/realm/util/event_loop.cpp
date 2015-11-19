@@ -1,6 +1,11 @@
 #include "realm/util/event_loop.hpp"
 #include "realm/util/network.hpp"
 
+#if REALM_PLATFORM_APPLE
+#include <CoreFoundation/CoreFoundation.h>
+#include <CoreServices/CoreServices.h>
+#endif // REALM_PLATFORM_APPLE
+
 
 namespace realm {
 namespace util {
@@ -130,6 +135,205 @@ EventLoop<ASIO>::async_timer(EventLoopBase::Duration delay, EventLoopBase::OnTim
     return std::unique_ptr<DeadlineTimerBase>{new DeadlineTimer{m_io_service, delay, std::move(on_timeout)}};
 }
 
+
+#if REALM_PLATFORM_APPLE
+
+
+namespace {
+
+class CFStreamErrorCategory: public std::error_category {
+    const char* name() const noexcept override;
+    std::string message(int) const override;
+};
+CFStreamErrorCategory g_cfstream_error_category{};
+
+const char* CFStreamErrorCategory::name() const noexcept
+{
+    return "CFStream";
+}
+
+std::string CFStreamErrorCategory::message(int) const
+{
+    // FIXME
+    REALM_ASSERT(false);
+}
+
+} // anonymous namespace
+
+
+struct EventLoop<Apple>::Impl {
+    CFRunLoopRef m_runloop;
+};
+
+EventLoop<Apple>::EventLoop(): m_impl(new Impl)
+{
+    m_impl->m_runloop = CFRunLoopGetCurrent();
+    CFRetain(m_impl->m_runloop);
+}
+
+EventLoop<Apple>::~EventLoop()
+{
+    CFRelease(m_impl->m_runloop);
+}
+
+void EventLoop<Apple>::run()
+{
+    CFRunLoopRunResult r;
+    do {
+        r = CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+    } while (r == kCFRunLoopRunTimedOut);
+}
+
+void EventLoop<Apple>::stop() noexcept
+{
+    CFRunLoopStop(m_impl->m_runloop);
+}
+
+struct EventLoop<Apple>::Socket: SocketBase {
+    CFRunLoopRef m_runloop;
+    OnConnectComplete m_on_connect_complete;
+
+    CFReadStreamRef m_read_stream;
+    CFWriteStreamRef m_write_stream;
+    CFStreamClientContext m_context;
+
+    bool m_read_scheduled = false;
+    bool m_write_scheduled = false;
+    size_t m_num_open_streams = 0;
+
+    OnReadComplete m_on_read_complete;
+    OnWriteComplete m_on_write_complete;
+
+
+    Socket(CFRunLoopRef runloop, std::string host, int port, OnConnectComplete on_connect_complete):
+        m_runloop(runloop), m_on_connect_complete(std::move(on_connect_complete))
+    {
+        CFRetain(m_runloop);
+
+		CFStringRef cf_host = CFStringCreateWithCString(kCFAllocatorDefault, host.c_str(), kCFStringEncodingUTF8);
+		CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, cf_host, static_cast<UInt32>(port), &m_read_stream, &m_write_stream);
+		CFRelease(cf_host);
+
+        m_context.version = 0;
+        m_context.info = this;
+        m_context.retain = nullptr;
+        m_context.release = nullptr;
+        m_context.copyDescription = nullptr;
+
+        CFOptionFlags read_flags = kCFStreamEventOpenCompleted
+                                 | kCFStreamEventErrorOccurred
+                                 | kCFStreamEventEndEncountered;
+        CFOptionFlags write_flags = kCFStreamEventOpenCompleted
+                                  | kCFStreamEventErrorOccurred
+                                  | kCFStreamEventEndEncountered;
+
+        CFReadStreamSetClient(m_read_stream, read_flags, read_cb, &m_context);
+        CFWriteStreamSetClient(m_write_stream, write_flags, write_cb, &m_context);
+        CFReadStreamScheduleWithRunLoop(m_read_stream, m_runloop, kCFRunLoopDefaultMode);
+        CFWriteStreamScheduleWithRunLoop(m_write_stream, m_runloop, kCFRunLoopDefaultMode);
+        CFReadStreamOpen(m_read_stream);
+        CFWriteStreamOpen(m_write_stream);
+    }
+
+    ~Socket()
+    {
+        CFRelease(m_read_stream);
+        CFRelease(m_write_stream);
+        CFRelease(m_runloop);
+    }
+
+    void close() override
+    {
+        CFReadStreamClose(m_read_stream);
+        CFWriteStreamClose(m_write_stream);
+        m_num_open_streams = 0;
+    }
+
+    void cancel() override
+    {
+        CFReadStreamUnscheduleFromRunLoop(m_read_stream, m_runloop, kCFRunLoopDefaultMode);
+        CFWriteStreamUnscheduleFromRunLoop(m_write_stream, m_runloop, kCFRunLoopDefaultMode);
+    }
+
+    bool is_open() const
+    {
+        return m_num_open_streams == 2;
+    }
+
+    void async_write(const char* data, size_t size, OnWriteComplete on_write_complete) override
+    {
+        m_on_write_complete = std::move(on_write_complete);
+
+    }
+
+    void async_read(char* buffer, size_t size, OnReadComplete on_read_complete) override
+    {
+        // FIXME
+    }
+
+    void async_read_until(char* buffer, size_t size, char delim, OnReadComplete on_read_complete) override
+    {
+        // FIXME
+    }
+
+private:
+    void handle_open_completed()
+    {
+        ++m_num_open_streams;
+        if (is_open()) {
+            m_on_connect_complete(std::error_code{});
+        }
+    }
+
+    void read_cb(CFReadStreamRef stream, CFStreamEventType event_type)
+    {
+        REALM_ASSERT(stream == m_read_stream);
+        static_cast<void>(stream);
+
+        switch (event_type) {
+            case kCFStreamEventOpenCompleted:
+                handle_open_completed();
+                break;
+        }
+    }
+
+    void write_cb(CFWriteStreamRef stream, CFStreamEventType event_type)
+    {
+        REALM_ASSERT(stream == m_write_stream);
+        static_cast<void>(stream);
+
+        switch (event_type) {
+            case kCFStreamEventOpenCompleted:
+                handle_open_completed();
+                break;
+        }
+    }
+
+    static void read_cb(CFReadStreamRef stream, CFStreamEventType event_type, void* info)
+    {
+        Socket* self = reinterpret_cast<Socket*>(info);
+        self->read_cb(stream, event_type);
+    }
+
+    static void write_cb(CFWriteStreamRef stream, CFStreamEventType event_type, void* info)
+    {
+        Socket* self = reinterpret_cast<Socket*>(info);
+        self->write_cb(stream, event_type);
+    }
+};
+
+std::unique_ptr<SocketBase> EventLoop<Apple>::async_connect(std::string host, int port, OnConnectComplete on_connect)
+{
+    return std::unique_ptr<SocketBase>(new Socket{m_impl->m_runloop, std::move(host), port, std::move(on_connect)});
+}
+
+std::unique_ptr<DeadlineTimerBase> EventLoop<Apple>::async_timer(Duration, OnTimeout)
+{
+    // FIXME
+    return nullptr;
+}
+
+#endif // REALM_PLATFORM_APPLE
 
 } // namespace util
 } // namespace realm

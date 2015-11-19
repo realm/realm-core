@@ -39,7 +39,7 @@ endif
 
 # CoreFoundation is required for logging
 ifeq ($(OS),Darwin)
-  PROJECT_LDFLAGS += -framework CoreFoundation
+  PROJECT_LDFLAGS += -framework CoreFoundation -framework CoreServices
 endif
 
 # Android logging

@@ -132,6 +132,14 @@ std::string network_error_category::message(int value) const
 } // anonymous namespace
 
 
+endpoint::endpoint(const unsigned char* data, size_t num_bytes)
+{
+    REALM_ASSERT(num_bytes <= sizeof(m_sockaddr_union));
+    unsigned char* target = reinterpret_cast<unsigned char*>(&m_sockaddr_union);
+    std::copy(data, data + num_bytes, target);
+}
+
+
 class io_service::oper_queue {
 public:
     bool empty() const noexcept
@@ -709,7 +717,7 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
     }
 
     // Copy the IPv4/IPv6 endpoints
-    list.m_endpoints.set_size(num_endpoints); // Throws
+    list.m_endpoints.resize(num_endpoints); // Throws
     struct addrinfo* curr = first;
     size_t endpoint_ndx = 0;
     while (curr) {

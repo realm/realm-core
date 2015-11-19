@@ -101,6 +101,27 @@ protected:
     ASIO m_io_service;
 };
 
+class Apple {};
+template<>
+class EventLoop<Apple>: public EventLoopBase {
+public:
+    EventLoop();
+    ~EventLoop();
+
+    void run();
+    void stop() noexcept;
+
+    std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) final;
+    std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
+protected:
+    struct Impl;
+
+    struct Socket;
+    struct DeadlineTimer;
+
+    std::unique_ptr<Impl> m_impl;
+};
+
 } // namespace util
 } // namespace realm
 
