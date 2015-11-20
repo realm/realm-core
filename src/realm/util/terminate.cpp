@@ -22,6 +22,7 @@
 #include <realm/util/features.h>
 
 #if REALM_PLATFORM_APPLE
+#  include <asl.h>
 #  include <dlfcn.h>
 #  include <execinfo.h>
 #  include <CoreFoundation/CoreFoundation.h>
@@ -51,17 +52,18 @@ namespace {
 #if REALM_PLATFORM_APPLE
 void nslog(const char *message) noexcept
 {
-    CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
-    CFShow(str);
+    // Standard error goes nowhere for applications managed by launchd, so log to ASL as well.
+    fputs(message, stderr);
+    asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 
     // Log the message to Crashlytics if it's loaded into the process
     void* addr = dlsym(RTLD_DEFAULT, "CLSLog");
     if (addr) {
+        CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
         auto fn = reinterpret_cast<void (*)(CFStringRef, ...)>(reinterpret_cast<size_t>(addr));
         fn(CFSTR("%@"), str);
+        CFRelease(str);
     }
-
-    CFRelease(str);
 }
 
 void(*termination_notification_callback)(const char*) noexcept = nslog;
