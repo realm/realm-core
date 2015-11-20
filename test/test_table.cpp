@@ -1140,8 +1140,8 @@ TEST(Table_6)
     }};
 
     RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
-        (void)b;
-        (void)a;
+        static_cast<void>(b);
+        static_cast<void>(a);
         //first.between(a, b);
         second == str || second.MatchRegEx(".*");
     }};
@@ -6129,6 +6129,29 @@ TEST(Table_EnumStringInsertEmptyRow)
 }
 
 
+TEST(Table_InsertColumnMaintainsBacklinkIndices)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("hrnetprsafd");
+    TableRef t1 = g.add_table("qrsfdrpnkd");
+
+    t1->add_column_link(type_Link, "bbb", *t0);
+    t1->add_column_link(type_Link, "ccc", *t0);
+    t1->insert_column(0, type_Int, "aaa");
+
+    t1->add_empty_row();
+
+    t0->add_column(type_Int, "foo");
+    t0->add_empty_row();
+
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
@@ -6579,7 +6602,7 @@ TEST(Table_AllocatorCapacityBug)
 TEST(Table_MixedCrashValues)
 {
     GROUP_TEST_PATH(path);
-    const char* encryption_key = 0;
+    const char* encryption_key = nullptr;
     Group group(path, encryption_key, Group::mode_ReadWrite);
     TableRef table = group.add_table("t");
     table->add_column(type_Mixed, "m");

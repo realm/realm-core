@@ -7801,132 +7801,46 @@ TEST(Query_DeepLink)
     CHECK_EQUAL(N, view.size());
 }
 
-void query_negative_numbers(TestResults* test_results_ptr, bool nullable)
+TEST(Query_AverageNullableColumns)
 {
-    TestResults& test_results = *test_results_ptr;
-    Group group;
-    TableRef table = group.add_table("test");
-    table->add_column(type_Int, "int", nullable);
+    Table table;
+    size_t col_int = table.add_column(type_Int, "int", true);
+    size_t col_float = table.add_column(type_Float, "float", true);
+    size_t col_double = table.add_column(type_Double, "double", true);
 
-    int64_t id = -1;
-    for (size_t i = 0; i < 10; ++i) {
-        table->add_empty_row();
-        table->set_int(0, i, id--);
-    }
+    CHECK_EQUAL(0, table.where().average_int(col_int));
+    CHECK_EQUAL(0, table.where().average_float(col_float));
+    CHECK_EQUAL(0, table.where().average_double(col_double));
 
-    CHECK_EQUAL(10, table->where().between(0, -10, -1).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) > -11).find_all().size());
-    CHECK_EQUAL(10, table->where().greater(0, -11).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) >= -10).find_all().size());
-    CHECK_EQUAL(10, table->where().greater_equal(0, -10).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) < 128).find_all().size());
-    CHECK_EQUAL(10, table->where().less(0, 128).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) < 127).find_all().size());
-    CHECK_EQUAL(10, table->where().less(0, 127).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) <= -1).find_all().size());
-    CHECK_EQUAL(10, table->where().less_equal(0, -1).find_all().size());
-    CHECK_EQUAL(10, (table->column<Int>(0) < 0).find_all().size());
-    TableView view = table->where().less(0, 0).find_all();
-    CHECK_EQUAL(10, view.size());
-    id = -1;
-    for (size_t i = 0; i < view.size(); ++i) {
-        CHECK_EQUAL(id, view.get_int(0, i));
-        id--;
-    }
-}
+    //
+    // +-----+-------+--------+
+    // | int | float | double |
+    // +-----+-------+--------+
+    // |   2 |     2 |      2 |
+    // |   4 |     4 |      4 |
+    // +-----+-------+--------+
 
-TEST(Query_NegativeNumbers_Nullable)
-{
-    query_negative_numbers(&test_results, true);
-}
+    table.add_empty_row(2);
 
-TEST(Query_NegativeNumbers_NotNullable)
-{
-    query_negative_numbers(&test_results, false);
-}
+    table.set_int(col_int, 0, 2);
+    table.set_int(col_int, 1, 4);
 
-// Triggers bug in compare_relation()
-TEST(Query_BrokenFindGT)
-{
-    Group group;
-    TableRef table = group.add_table("test");
-    size_t col = table->add_column(type_Int, "int");
+    table.set_float(col_float, 0, 2);
+    table.set_float(col_float, 1, 4);
 
-    const size_t rows = 12;
-    for (size_t i = 0; i < rows; ++i) {
-        table->add_empty_row();
-        table->set_int(col, i, i + 2);
-    }
+    table.set_double(col_double, 1, 4);
+    table.set_double(col_double, 0, 2);
 
-    table->add_empty_row();
-    table->set_int(col, rows + 0, 1);
+    CHECK_EQUAL(3, table.where().average_int(col_int));
+    CHECK_EQUAL(3, table.where().average_float(col_float));
+    CHECK_EQUAL(3, table.where().average_double(col_double));
 
-    table->add_empty_row();
-    table->set_int(col, rows + 1, 1);
+    // Add a row with nulls in each column.
+    table.add_empty_row();
 
-    table->add_empty_row();
-    table->set_int(col, rows + 2, 1);
-
-    for (size_t i = 0; i < 3; ++i) {
-        table->add_empty_row();
-        table->set_int(col, rows + 3 + i, i + 2);
-    }
-
-    CHECK_EQUAL(18, table->size());
-
-    Query q = table->where().greater(col, 1);
-    TableView tv = q.find_all();
-    CHECK_EQUAL(15, tv.size());
-
-    for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_NOT_EQUAL(1, tv.get_int(col, i));
-    }
-}
-
-// Small fuzzy test also to trigger bugs such as the compare_relation() bug above
-TEST(Query_FuzzyFind)
-{
-    // TEST_DURATION is normally 0.
-    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++)
-    {
-        Group group;
-        TableRef table = group.add_table("test");
-        size_t col = table->add_column(type_Int, "int");
-
-        // The bug happened when values were stored in 4 bits or less. So create a table full of such random values
-        const size_t rows = 18;
-        for (size_t i = 0; i < rows; ++i) {
-            table->add_empty_row();
-            
-            // Produce numbers -3 ... 17. Just to test edge cases around 4-bit values also
-            int64_t t = (fastrand() % 21) - 3;
-            table->set_int(col, i, t);
-        }
-
-        for (int64_t s = -2; s < 18; s++) {
-            Query q_g = table->where().greater(col, s);
-            TableView tv_g = q_g.find_all();
-            for (size_t i = 0; i < tv_g.size(); ++i) {
-                CHECK(tv_g.get_int(col, i) > s);
-            }
-
-            Query q_l = table->where().less(col, s);
-            TableView tv_l = q_l.find_all();
-            for (size_t i = 0; i < tv_l.size(); ++i) {
-                CHECK(tv_l.get_int(col, i) < s);
-            }
-
-            Query q_le = table->where().less_equal(col, s);
-            TableView tv_le = q_le.find_all();
-            for (size_t i = 0; i < tv_le.size(); ++i) {
-                CHECK(tv_le.get_int(col, i) <= s);
-            }
-
-            // Sum of values greater + less-or-equal should be total number of rows. This ensures that both
-            // 1) no search results are *omitted* from find_all(), and no 2) results are *false* positives
-            CHECK(tv_g.size() + tv_le.size() == rows);
-        }
-    }
+    CHECK_EQUAL(2, table.where().average_int(col_int));
+    CHECK_EQUAL(2, table.where().average_float(col_float));
+    CHECK_EQUAL(2, table.where().average_double(col_double));
 }
 
 #endif // TEST_QUERY

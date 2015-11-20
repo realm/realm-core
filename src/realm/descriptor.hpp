@@ -762,8 +762,7 @@ public:
         return new Descriptor; // Throws
     }
 
-    static void attach(Descriptor& desc, Table* table, Descriptor* parent, Spec* spec)
-        noexcept
+    static void attach(Descriptor& desc, Table* table, Descriptor* parent, Spec* spec) noexcept
     {
         desc.attach(table, parent, spec);
     }
@@ -799,8 +798,7 @@ public:
         return desc.record_subdesc_path(begin, end);
     }
 
-    static Descriptor* get_subdesc_accessor(Descriptor& desc, size_t column_ndx)
-        noexcept
+    static Descriptor* get_subdesc_accessor(Descriptor& desc, size_t column_ndx) noexcept
     {
         return desc.get_subdesc_accessor(column_ndx);
     }
@@ -820,8 +818,7 @@ public:
         desc.adj_erase_column(col_ndx);
     }
 
-    static void adj_move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2)
-        noexcept
+    static void adj_move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2) noexcept
     {
         desc.adj_move_column(col_ndx_1, col_ndx_2);
     }

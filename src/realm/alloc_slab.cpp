@@ -118,7 +118,8 @@ void SlabAlloc::detach() noexcept
             goto found;
         case attach_SharedFile:
         case attach_UnsharedFile:
-            File::unmap(m_data, m_initial_mapping_size);
+            m_data = 0;
+            m_initial_mapping.unmap();
             // running the destructors on the mappings will cause them to unmap:
             m_additional_mappings = nullptr;
             m_file.close();
@@ -126,6 +127,7 @@ void SlabAlloc::detach() noexcept
     }
     REALM_ASSERT(false);
   found:
+    invalidate_cache();
     m_attach_mode = attach_None;
 }
 
@@ -372,31 +374,59 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     return new_mem;
 }
 
+
 char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
-    // fast path if reference is inside the initial mapping:
-    if (ref < m_initial_mapping_size)
-        return m_data + ref;
+    char* addr = nullptr;
+
+    size_t cache_index = ref ^ ((ref >> 16) >> 16);
+    // we shift by 16 two times. On 32-bitters it's undefined to shift by
+    // 32. Shifting twice x16 however, is defined and gives zero. On 64-bitters
+    // the compiler should reduce it to a single 32 bit shift.
+    cache_index = cache_index ^(cache_index >> 16);
+    cache_index = (cache_index ^(cache_index >> 8)) & 0xFF;
+    if (cache[cache_index].ref == ref && cache[cache_index].version == version)
+        return cache[cache_index].addr;
 
     if (ref < m_baseline) {
 
-        // reference must be inside a section mapped later
-        size_t section_index = get_section_index(ref);
-        size_t mapping_index = section_index - m_first_additional_mapping;
-        size_t section_offset = ref - get_section_base(section_index);
-        REALM_ASSERT_DEBUG(m_additional_mappings);
-        REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
-        return m_additional_mappings[mapping_index].get_addr() + section_offset;
+        const util::File::Map<char>* map;
+
+        // fast path if reference is inside the initial mapping:
+        if (ref < m_initial_mapping_size) {
+            addr = m_data + ref;
+            map = &m_initial_mapping;
+        }
+        else {
+            // reference must be inside a section mapped later
+            size_t section_index = get_section_index(ref);
+            size_t mapping_index = section_index - m_first_additional_mapping;
+            size_t section_offset = ref - get_section_base(section_index);
+            REALM_ASSERT_DEBUG(m_additional_mappings);
+            REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
+            map = &m_additional_mappings[mapping_index];
+            REALM_ASSERT_DEBUG(map->get_addr() != nullptr);
+            addr = map->get_addr() + section_offset;
+        }
+        realm::util::encryption_read_barrier(addr, Array::header_size, 
+                                             map->get_encrypted_mapping(),
+                                             Array::get_byte_size_from_header);
     }
+    else {
+        typedef slabs::const_iterator iter;
+        iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
+        REALM_ASSERT_DEBUG(i != m_slabs.end());
 
-    typedef slabs::const_iterator iter;
-    iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
-    REALM_ASSERT_DEBUG(i != m_slabs.end());
-
-    ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
-    return i->addr + (ref - slab_ref);
+        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
+        addr = i->addr + (ref - slab_ref);
+    }
+    cache[cache_index].addr = addr;
+    cache[cache_index].ref = ref;
+    cache[cache_index].version = version;
+    REALM_ASSERT_DEBUG(addr != nullptr);
+    return addr;
 }
 
 int SlabAlloc::get_committed_file_format() const noexcept
@@ -502,6 +532,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     ref_type top_ref;
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
+        // we'll read header and (potentially) footer
+        realm::util::encryption_read_barrier(map, 0, sizeof(Header));
+        realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
 
         if (!cfg.skip_validate) {
             // Verify the data structures
@@ -511,7 +544,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             Header& header = *writable_map.get_addr();
+            realm::util::encryption_read_barrier(writable_map, 0);
             header.m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
+            realm::util::encryption_write_barrier(writable_map, 0);
         }
         else {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
@@ -540,7 +575,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             }
         }
 
-        m_data        = map.release();
+        m_data        = map.get_addr();
+        m_initial_mapping = std::move(map);
         m_baseline    = size;
         m_initial_mapping_size = size;
         m_first_additional_mapping = get_section_index(m_initial_mapping_size);
@@ -578,10 +614,14 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             File::Map<Header> writable_map(m_file, File::access_ReadWrite,
                                            sizeof (Header)); // Throws
             Header& writable_header = *writable_map.get_addr();
+            realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_top_ref[1] = footer.m_top_ref;
+            realm::util::encryption_write_barrier(writable_map, 0);
             writable_map.sync();
             // keep bit 1 used for server sync mode unchanged
+            realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_flags |= flags_SelectBit;
+            realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
             writable_map.sync();
         }
@@ -705,6 +745,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 
 void SlabAlloc::reset_free_space_tracking()
 {
+    invalidate_cache();
     if (m_free_space_state == free_space_Clean)
         return;
 

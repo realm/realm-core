@@ -419,8 +419,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
 }
 
 
-size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const
-    noexcept
+size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const noexcept
 {
     size_t backlinks_column_start = m_names.size();
     size_t backlinks_start = get_subspec_ndx(backlinks_column_start);

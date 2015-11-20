@@ -152,7 +152,7 @@ public:
 
     void lock() noexcept;
     void unlock() noexcept;
-
+    bool holds_lock() noexcept;
 private:
     Mutex* m_mutex;
     bool m_is_locked;
@@ -437,6 +437,11 @@ inline UniqueLock::~UniqueLock() noexcept
 {
     if (m_is_locked)
         m_mutex->unlock();
+}
+
+inline bool UniqueLock::holds_lock() noexcept
+{
+    return m_is_locked;
 }
 
 inline void UniqueLock::lock() noexcept

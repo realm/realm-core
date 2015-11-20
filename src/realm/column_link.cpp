@@ -54,6 +54,7 @@ void LinkColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t p
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
     REALM_ASSERT(insert_nulls);
+    static_cast<void>(insert_nulls);
 
     // Update backlinks to the moved origin rows
     size_t num_rows_moved = prior_num_rows - row_ndx;
