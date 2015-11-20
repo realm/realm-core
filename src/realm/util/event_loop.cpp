@@ -178,10 +178,8 @@ EventLoop<Apple>::~EventLoop()
 
 void EventLoop<Apple>::run()
 {
-    CFRunLoopRunResult r;
-    do {
-        r = CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, false);
-    } while (r != kCFRunLoopRunFinished);
+    REALM_ASSERT(m_impl->m_runloop == CFRunLoopGetCurrent()); // Running a different runloop than expected.
+    CFRunLoopRun();
 }
 
 void EventLoop<Apple>::stop() noexcept
@@ -269,11 +267,6 @@ struct EventLoop<Apple>::Socket: SocketBase {
                 }
             }
         }
-
-//        CFRunLoopPerformBlock(m_runloop, kCFRunLoopCommonModes, ^(void) {
-//            this->m_on_connect_complete(std::error_code{});
-//        });
-//        CFRunLoopWakeUp(m_runloop);
     }
 
     ~Socket()
@@ -308,12 +301,6 @@ struct EventLoop<Apple>::Socket: SocketBase {
         m_on_write_complete = std::move(on_write_complete);
         m_current_write_buffer = data;
         m_current_write_buffer_size = size;
-
-        CFOptionFlags write_flags = kCFStreamEventOpenCompleted
-                                  | kCFStreamEventErrorOccurred
-                                  | kCFStreamEventEndEncountered
-                                  | kCFStreamEventCanAcceptBytes;
-        CFWriteStreamSetClient(m_write_stream, write_flags, write_cb, &m_context);
     }
 
     void async_read(char* buffer, size_t size, OnReadComplete on_read_complete) override
@@ -324,12 +311,6 @@ struct EventLoop<Apple>::Socket: SocketBase {
         m_on_read_complete = std::move(on_read_complete);
         m_current_read_buffer = buffer;
         m_current_read_buffer_size = size;
-
-        CFOptionFlags read_flags = kCFStreamEventOpenCompleted
-                                 | kCFStreamEventErrorOccurred
-                                 | kCFStreamEventEndEncountered
-                                 | kCFStreamEventHasBytesAvailable;
-        CFReadStreamSetClient(m_read_stream, read_flags, read_cb, &m_context);
     }
 
     void async_read_until(char* buffer, size_t size, char delim, OnReadComplete on_read_complete) override
