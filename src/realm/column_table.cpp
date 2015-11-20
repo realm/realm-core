@@ -192,8 +192,7 @@ bool SubtableColumnBase::SubtableMap::remove(Table* subtable) noexcept
 }
 
 
-void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline)
-    const noexcept
+void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline) const noexcept
 {
     typedef _impl::TableFriend tf;
     typedef entries::const_iterator iter;
@@ -203,9 +202,9 @@ void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline)
 }
 
 
-void SubtableColumnBase::SubtableMap::
-update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
-                 _impl::TableFriend::AccessorUpdater& updater)
+void SubtableColumnBase::SubtableMap::update_accessors(const size_t* col_path_begin,
+                                                       const size_t* col_path_end,
+                                                       _impl::TableFriend::AccessorUpdater& updater)
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();

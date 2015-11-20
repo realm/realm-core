@@ -83,7 +83,6 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     // Make all dynamically allocated memory (space beyond the attached file) as
     // available free-space.
     reset_free_space_tracking(); // Throws
-
     SlabAlloc::DetachGuard dg(m_alloc);
     attach(top_ref); // Throws
     dg.release(); // Do not detach allocator from file
@@ -148,6 +147,7 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
         m_alloc.remap(new_file_size); // Throws
     }
 
+    m_alloc.invalidate_cache();
     update_refs(new_top_ref, old_baseline);
 }
 
@@ -778,7 +778,7 @@ void Group::commit()
     // commit
 
     // Mark all managed space (beyond the attached file) as free.
-    m_alloc.reset_free_space_tracking(); // Throws
+    reset_free_space_tracking(); // Throws
 
     size_t old_baseline = m_alloc.get_baseline();
 
@@ -1521,6 +1521,7 @@ void Group::update_table_indices(F&& map_function)
         spec.init_from_parent();
 
         size_t num_cols = spec.get_column_count();
+        bool spec_changed = false;
         for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
             ColumnType type = spec.get_column_type(col_ndx);
             if (tf::is_link_type(type) || type == col_type_BackLink) {
@@ -1528,8 +1529,13 @@ void Group::update_table_indices(F&& map_function)
                 size_t new_table_ndx = map_function(table_ndx);
                 if (new_table_ndx != table_ndx) {
                     spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx);
+                    spec_changed = true;
                 }
             }
+        }
+
+        if (spec_changed && !m_table_accessors.empty() && m_table_accessors[i] != nullptr) {
+            tf::mark(*m_table_accessors[i]);
         }
     }
 
@@ -1616,6 +1622,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
         m_alloc.remap(new_file_size); // Throws
     }
 
+    m_alloc.invalidate_cache();
     m_top.detach(); // Soft detach
     attach(new_top_ref); // Throws
     refresh_dirty_accessors(); // Throws

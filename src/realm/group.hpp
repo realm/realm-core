@@ -1029,8 +1029,7 @@ inline bool Group::has_schema_change_notification_handler() const noexcept
     return !!m_schema_change_handler;
 }
 
-inline void Group::set_schema_change_notification_handler(std::function<void ()> new_handler)
-    noexcept
+inline void Group::set_schema_change_notification_handler(std::function<void ()> new_handler) noexcept
 {
     m_schema_change_handler = std::move(new_handler);
 }

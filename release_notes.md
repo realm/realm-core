@@ -3,12 +3,38 @@
 ### Bugfixes:
 * Fixed bug that would give false search results for queries on integer columns
   due to bug in bithacks deep inside Array::find()
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.95.0 Release notes
+
+### Bugfixes:
+
 * When inserting a new non-nullable Binary column to a table that had
   *existing* rows, then the automatically added values would become null
 * Fixed updating TableViews when applying a transaction log with a table clear.
 * Fewer things are copied in TableView's move constructor.
 * Prevent spurious blocking in networking subsystem (put sockets in nonblocking
   mode even when used with poll/select).
+* Fixed the shared group being left in an inconsistent state if the transaction
+  log observer threw an exception.
+* Fixed issue with table accessors not being updated properly, when link columns
+  were changed (e.g. in Group::remove_table, when the table had link columns).
 
 ### API breaking changes:
 
@@ -17,7 +43,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Eliminated use of signals in encryption. This also fixes failures related
+  to signals on some devices.
 
 -----------
 

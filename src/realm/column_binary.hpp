@@ -135,7 +135,7 @@ inline StringData BinaryColumn::get_index_data(size_t, StringIndex::StringConver
     REALM_UNREACHABLE();
 }
 
-inline size_t BinaryColumn::size() const  noexcept
+inline size_t BinaryColumn::size() const noexcept
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
@@ -297,6 +297,7 @@ inline void BinaryColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
     REALM_ASSERT(!insert_nulls || m_nullable);
+    static_cast<void>(insert_nulls);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     BinaryData value = m_nullable ? BinaryData() : BinaryData("", 0);

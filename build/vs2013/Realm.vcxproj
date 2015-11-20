@@ -1141,8 +1141,6 @@
     <ClInclude Include="..\..\src\realm\column.hpp" />
     <ClInclude Include="..\..\src\realm\column_binary.hpp" />
     <ClInclude Include="..\..\src\realm\column_fwd.hpp" />
-    <ClInclude Include="..\..\src\realm\column_basic.hpp" />
-    <ClInclude Include="..\..\src\realm\column_basic_tpl.hpp" />
     <ClInclude Include="..\..\src\realm\column_mixed.hpp" />
     <ClInclude Include="..\..\src\realm\column_mixed_tpl.hpp" />
     <ClInclude Include="..\..\src\realm\column_string.hpp" />

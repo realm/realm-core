@@ -78,8 +78,7 @@ struct SpecBase {
     ///     typedef TypeAppend<void, int>::type Columns1;
     ///     typedef TypeAppend<Columns1, bool>::type Columns;
     ///
-    ///     template<template<int>
-    ///     class Col, class Init>
+    ///     template<template<int> class Col, class Init>
     ///     struct ColNames {
     ///       typename Col<0>::type foo;
     ///       typename Col<1>::type bar;
@@ -93,8 +92,8 @@ struct SpecBase {
     /// particular column index. You may specify the column names in
     /// any order. Multiple names may refer to the same column, and
     /// you do not have to specify a name for every column.
-    template<template<int>
-    class Col, class Init> struct ColNames {
+    template<template<int> class Col, class Init>
+    struct ColNames {
         ColNames(Init) noexcept {}
     };
 
