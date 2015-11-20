@@ -16,6 +16,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+using unit_test::TestResults;
 
 
 // Test independence and thread-safety

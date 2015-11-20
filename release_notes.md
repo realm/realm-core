@@ -1,6 +1,29 @@
 # NEXT RELEASE
 
 ### Bugfixes:
+* Fixed bug that would give false search results for queries on integer columns
+  due to bug in bithacks deep inside Array::find()
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.95.0 Release notes
+
+### Bugfixes:
 
 * Lorem ipsum.
 

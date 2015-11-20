@@ -3398,7 +3398,8 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
     if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {
         uint64_t magic = find_gtlt_magic<gt, bitwidth>(value);
 
-        // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
+        // Bit hacks only work if searched item has its most significant bit clear for 'greater than' or
+        // 'item <= 1 << bitwidth' for 'less than'
         if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= static_cast<int64_t>((mask >> 1) - (gt ? 1 : 0))) {
             // 15 ms
             while (p < e) {
@@ -3407,11 +3408,11 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
                 const int64_t v = *p;
                 size_t idx;
 
-                // Bit hacks only works for positive items in chunk, so test their sign bits
+                // Bit hacks only works if all items in chunk have their most significant bit clear. Test this:
                 upper = upper & v;
 
-                if ((bitwidth > 4 ? !upper : true)) {
-                    // Assert that all values in chunk are positive.
+                if (!upper) {
+                    // Assert that all values in chunk have their most significant bit clear.
                     REALM_ASSERT(bitwidth <= 4 || ((lower_bits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
                     idx = find_gtlt_fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
