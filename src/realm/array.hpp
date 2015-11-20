@@ -3412,7 +3412,6 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
                 upper = upper & v;
 
                 if (!upper) {
-                    // Assert that all values in chunk have their most significant bit clear.
                     idx = find_gtlt_fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
                 else
