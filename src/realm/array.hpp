@@ -3413,7 +3413,6 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
 
                 if (!upper) {
                     // Assert that all values in chunk have their most significant bit clear.
-                    REALM_ASSERT(bitwidth <= 4 || ((lower_bits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
                     idx = find_gtlt_fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
                 else
