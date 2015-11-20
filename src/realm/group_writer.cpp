@@ -252,6 +252,7 @@ ref_type GroupWriter::write_group()
     // m_free_positions has the capacity to store the new larger value without
     // reallocation.
     size_t rest = reserve_pos + reserve_size - size_t(end_ref);
+    size_t used = size_t(end_ref) - reserve_pos;
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = int_fast64_t(end_ref); // FIXME: Problematic unsigned -> signed conversion
     int_fast64_t value_9 = int_fast64_t(rest); // FIXME: Problematic unsigned -> signed conversion
@@ -259,6 +260,8 @@ ref_type GroupWriter::write_group()
     m_free_lengths.set(reserve_ndx, value_9); // Throws
 
     // The free-list now have their final form, so we can write them to the file
+    char* start_addr = m_file_map.get_addr() + reserve_ref;
+    realm::util::encryption_read_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
     write_array_at(free_positions_ref, m_free_positions.get_header(),
                    free_positions_size); // Throws
     write_array_at(free_sizes_ref, m_free_lengths.get_header(),
@@ -270,6 +273,7 @@ ref_type GroupWriter::write_group()
 
     // Write top
     write_array_at(top_ref, top.get_header(), top_byte_size); // Throws
+    realm::util::encryption_write_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
 
     // Return top_ref so that it can be saved in lock file used for coordination
     return top_ref;
@@ -511,7 +515,9 @@ void GroupWriter::write(const char* data, size_t size)
 
     // Write the block
     char* dest_addr = m_file_map.get_addr() + pos;
+    realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
     std::copy(data, data+size, dest_addr);
+    realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
 }
 
 
@@ -523,6 +529,7 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint_fast32_t c
 
     // Write the block
     char* dest_addr = m_file_map.get_addr() + pos;
+    realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
 #ifdef REALM_DEBUG
     const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
     std::copy(cksum_bytes, cksum_bytes+4, dest_addr);
@@ -532,6 +539,7 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint_fast32_t c
     std::copy(data, data+size, dest_addr);
 #endif
 
+    realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
     // return ref of the written array
     ref_type ref = to_ref(pos);
     return ref;
@@ -563,6 +571,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     // being top_refs (only one valid at a time) and the last being the info
     // block.
     char* file_header = m_file_map.get_addr();
+    realm::util::encryption_read_barrier(file_header, sizeof(SlabAlloc::Header), m_file_map.get_encrypted_mapping());
 
     // Least significant bit in last byte of info block indicates which top_ref
     // block is valid - other bits remain unchanged
@@ -581,6 +590,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     bool disable_sync = get_disable_sync_to_disk();
 
     // Make sure that all data and the top pointer is written to stable storage
+    realm::util::encryption_write_barrier(file_header, sizeof(SlabAlloc::Header), m_file_map.get_encrypted_mapping());
     if (!disable_sync)
         m_file_map.sync(); // Throws
 
@@ -592,6 +602,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     // FIXME: we might optimize this to write of a single page?
+    realm::util::encryption_write_barrier(file_header, sizeof(SlabAlloc::Header), m_file_map.get_encrypted_mapping());
     if (!disable_sync)
         m_file_map.sync(); // Throws
 }

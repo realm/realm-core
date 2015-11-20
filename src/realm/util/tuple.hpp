@@ -37,8 +37,7 @@ struct Tuple {
     Tuple(const head_type& h, const tail_type& t): m_head(h), m_tail(t) {}
 };
 template<>
-struct Tuple<void>
-{};
+struct Tuple<void> {};
 
 
 template<class H, class T>
@@ -84,16 +83,14 @@ tuple(const A& a, const B& b, const C& c, const D& d, const E& e)
 }
 
 template<class A, class B, class C, class D, class E, class F>
-inline
-Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>>
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>>
 tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f)
 {
     return cons(a, tuple(b,c,d,e,f));
 }
 
 template<class A, class B, class C, class D, class E, class F, class G>
-inline
-Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>>
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>>
 tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f, const G& g)
 {
     return cons(a, tuple(b,c,d,e,f,g));
@@ -155,26 +152,22 @@ inline typename TypeAt<L,i>::type at(const Tuple<L>& tuple)
     return _impl::TupleAt<L,i>::exec(tuple);
 }
 
-template<template<class T>
-class Op, class L>
+template<template<class T> class Op, class L>
 inline void for_each(const Tuple<L>& tuple)
 {
     Op<typename L::head>()(tuple.head);
     for_each<Op>(tuple.m_tail);
 }
-template<template<class T>
-class Op>
+template<template<class T> class Op>
 inline void for_each(const Tuple<void>&) {}
 
-template<template<class T>
-class Op, class L, class A>
+template<template<class T> class Op, class L, class A>
 inline void for_each(const Tuple<L>& tuple, const A& a)
 {
     Op<typename L::head>()(tuple.m_head, a);
     for_each<Op>(tuple.m_tail, a);
 }
-template<template<class T>
-class Op, class A>
+template<template<class T> class Op, class A>
 inline void for_each(const Tuple<void>&, const A&) {}
 
 template<class Ch, class Tr, class L>

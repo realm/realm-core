@@ -60,7 +60,7 @@ public:
     {
     }
 
-    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = 0)
+    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = nullptr)
     {
         for (const Buffer<char>& changeset: m_changesets)
             apply_changeset(changeset.data(), changeset.size(), target, replay_logger);

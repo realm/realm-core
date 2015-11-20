@@ -291,7 +291,7 @@ public:
         if (m_child) m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)  override
+    size_t find_first_local(size_t start, size_t end) override
     {
         // Simply return index of first table row which is >= start
         size_t r;
@@ -1573,7 +1573,7 @@ public:
         m_dT = 50.0;
     }
 
-    void init(const Table& table)  override
+    void init(const Table& table) override
     {
         m_compare->set_table();
         if (m_child)
