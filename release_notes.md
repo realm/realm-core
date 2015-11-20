@@ -25,6 +25,28 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.95.0 Release notes
+
+### Bugfixes:
+
 * When inserting a new non-nullable Binary column to a table that had
   *existing* rows, then the automatically added values would become null
 * Fixed updating TableViews when applying a transaction log with a table clear.
