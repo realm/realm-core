@@ -7926,46 +7926,5 @@ TEST(Query_AverageNullableColumns)
     CHECK_EQUAL(2, table.where().average_double(col_double));
 }
 
-TEST(Query_AverageNullableColumns)
-{
-    Table table;
-    size_t col_int = table.add_column(type_Int, "int", true);
-    size_t col_float = table.add_column(type_Float, "float", true);
-    size_t col_double = table.add_column(type_Double, "double", true);
-
-    CHECK_EQUAL(0, table.where().average_int(col_int));
-    CHECK_EQUAL(0, table.where().average_float(col_float));
-    CHECK_EQUAL(0, table.where().average_double(col_double));
-
-    //
-    // +-----+-------+--------+
-    // | int | float | double |
-    // +-----+-------+--------+
-    // |   2 |     2 |      2 |
-    // |   4 |     4 |      4 |
-    // +-----+-------+--------+
-
-    table.add_empty_row(2);
-
-    table.set_int(col_int, 0, 2);
-    table.set_int(col_int, 1, 4);
-
-    table.set_float(col_float, 0, 2);
-    table.set_float(col_float, 1, 4);
-
-    table.set_double(col_double, 1, 4);
-    table.set_double(col_double, 0, 2);
-
-    CHECK_EQUAL(3, table.where().average_int(col_int));
-    CHECK_EQUAL(3, table.where().average_float(col_float));
-    CHECK_EQUAL(3, table.where().average_double(col_double));
-
-    // Add a row with nulls in each column.
-    table.add_empty_row();
-
-    CHECK_EQUAL(2, table.where().average_int(col_int));
-    CHECK_EQUAL(2, table.where().average_float(col_float));
-    CHECK_EQUAL(2, table.where().average_double(col_double));
-}
 
 #endif // TEST_QUERY
