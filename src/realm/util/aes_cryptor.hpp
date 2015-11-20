@@ -20,10 +20,11 @@
 
 #include <cstddef>
 #include <memory>
-#include <stdint.h>
 #include <realm/util/features.h>
-
+#include <stdint.h>
 #include <vector>
+
+#if REALM_ENABLE_ENCRYPTION
 
 #if REALM_PLATFORM_APPLE
 #  include <CommonCrypto/CommonCrypto.h>
@@ -91,3 +92,5 @@ struct SharedFileInfo {
 
 }
 }
+
+#endif // REALM_ENABLE_ENCRYPTION
