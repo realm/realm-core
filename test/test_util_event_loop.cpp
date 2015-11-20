@@ -196,13 +196,15 @@ public:
 
     void run()
     {
-        m_socket = m_loop.async_connect("localhost", m_listen_port, [=](std::error_code ec) {
+        m_loop.reset(new EventLoop<Provider>);
+        m_socket = m_loop->async_connect("localhost", m_listen_port, [=](std::error_code ec) {
             auto& test_results = this->m_test_results;
             CHECK(!ec);
             this->connection_established();
         });
 
-        m_loop.run();
+        m_loop->run();
+
         if (m_socket) {
             m_socket->close();
         }
@@ -221,7 +223,7 @@ public:
 
 private:
     unsigned short m_listen_port;
-    EventLoop<Provider> m_loop;
+    std::unique_ptr<EventLoop<Provider>> m_loop;
     std::unique_ptr<SocketBase> m_socket;
 
     static const size_t s_max_header_size = 32;
