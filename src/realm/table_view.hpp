@@ -183,6 +183,11 @@ public:
     size_t size() const noexcept;
     size_t num_attached_rows() const noexcept;
 
+    // Get the query used to create this TableView
+    // The query will have a null source table if this tv was not created from
+    // a query
+    const Query& get_query() const noexcept;
+
     // Column information
     const ColumnBase& get_column_base(size_t index) const;
 
@@ -698,6 +703,10 @@ private:
 // ================================================================================================
 // TableViewBase Implementation:
 
+inline const Query& TableViewBase::get_query() const noexcept
+{
+    return m_query;
+}
 
 inline bool TableViewBase::is_empty() const noexcept
 {
