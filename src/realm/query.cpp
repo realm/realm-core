@@ -914,7 +914,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
 double Query::average_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return average<int64_t, true>(column_ndx, resultcount, start, end, limit);
+        return average<util::Optional<int64_t>, true>(column_ndx, resultcount, start, end, limit);
     }
     return average<int64_t, false>(column_ndx, resultcount, start, end, limit);
 }
