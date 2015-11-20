@@ -7800,4 +7800,16 @@ TEST(Query_DeepLink)
     CHECK_EQUAL(N, view.size());
 }
 
+TEST(Query_AverageNullableColumns)
+{
+    Table table;
+    table.add_column(type_Int, "int", true);
+
+    table.add_empty_row(2);
+    table.set_int(0, 0, 3);
+    table.set_int(0, 1, 4);
+
+    CHECK_EQUAL(3.5, table.where().average_int(0));
+}
+
 #endif // TEST_QUERY
