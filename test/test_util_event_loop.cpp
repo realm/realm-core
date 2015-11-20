@@ -296,7 +296,7 @@ private:
 
 } // anonymous namespace
 
-TEST_TYPES(EventLoop_AsyncCommunication, ASIO, Apple)
+TEST_TYPES(EventLoop_AsyncCommunication, Apple)
 {
     AsyncServer server(test_results);
     unsigned short listen_port = server.init();

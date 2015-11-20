@@ -337,6 +337,11 @@ private:
                 handle_open_completed();
                 break;
             case kCFStreamEventHasBytesAvailable: {
+                if (!m_on_read_complete) {
+                    // No read operation in progress, so just leave the data in the buffer for now.
+                    return;
+                }
+
                 UInt8* buffer = reinterpret_cast<UInt8*>(m_current_read_buffer);
                 size_t bytes_read = CFReadStreamRead(m_read_stream, buffer, m_current_read_buffer_size);
                 m_bytes_read += bytes_read;
@@ -376,6 +381,11 @@ private:
                 handle_open_completed();
                 break;
             case kCFStreamEventCanAcceptBytes: {
+                if (!m_on_write_complete) {
+                    // No write operation in progress, so just don't do anything until one is.
+                    return;
+                }
+
                 const UInt8* buffer = reinterpret_cast<const UInt8*>(m_current_write_buffer);
                 size_t bytes_written = CFWriteStreamWrite(m_write_stream, buffer, m_current_write_buffer_size);
                 m_bytes_written += bytes_written;
