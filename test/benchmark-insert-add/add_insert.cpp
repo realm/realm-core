@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
     File::try_remove("gtest.realm");
 
     SharedGroup sg = SharedGroup("test.realm", false, dlevel);
-    Group g("gtest.realm", Group::mode_ReadWrite);
+    Group g("gtest.realm", NULL, Group::mode_ReadWrite);
 
     switch(m) {
         case mode_UseShared: {
