@@ -625,7 +625,13 @@ public:
     /// destroy_deep() for every contained 'ref' element.
     static void destroy_deep(MemRef, Allocator&) noexcept;
 
-    Allocator& get_alloc() const noexcept { return m_alloc; }
+    Allocator& get_alloc() const noexcept { 
+        if (uint64_t(this) == 0xddddddddddddddddull || uint64_t(this) < 0x10000ll ||            
+            uint64_t(this) == 0xcdcdcdcd00000001)
+            throw("");
+        return m_alloc; 
+    
+    }
 
     // Serialization
 
