@@ -244,7 +244,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(type_Int, foo->get_column_type(0));
     CHECK_EQUAL(1, foo->size());
     CHECK_EQUAL(0, foo->get_int(0,0));
-
+    uint_fast64_t version = foo->get_version_counter();
 
     // Modify the table via the other SharedGroup
     {
@@ -259,6 +259,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);
+    CHECK(version != foo->get_version_counter());
     group.verify();
     CHECK_EQUAL(2, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(0));

@@ -11,7 +11,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added Table::get_version_counter() exposing the versioning counter for the Table
 
 -----------
 
