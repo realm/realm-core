@@ -75,7 +75,7 @@ struct ColumnTemplateBase
 
 template<class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, size_t start, size_t end,
-                size_t limit, size_t* return_ndx);
+                size_t limit, size_t* return_ndx = nullptr, size_t* matchcount = nullptr);
 
 template<class T>
 struct ColumnTemplate : public ColumnTemplateBase
@@ -773,7 +773,7 @@ size_t Column<T>::count(T target) const
     if (has_search_index()) {
         return m_search_index->count(target);
     }
-    return to_size_t(aggregate<T, int64_t, act_Count, Equal>(*this, target, 0, size(), npos, nullptr));
+    return to_size_t(aggregate<T, int64_t, act_Count, Equal>(*this, target, 0, size(), npos, nullptr, nullptr));
 }
 
 template<class T>
@@ -782,9 +782,9 @@ Column<T>::sum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
     using sum_type = typename ColumnTypeTraits<T>::sum_type;
     if (nullable)
-        return aggregate<T, sum_type, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
+        return aggregate<T, sum_type, act_Sum, NotNull>(*this, 0, start, end, limit, nullptr, return_ndx);
     else
-        return aggregate<T, sum_type, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
+        return aggregate<T, sum_type, act_Sum, None>(*this, 0, start, end, limit, nullptr, return_ndx);
 }
 
 template<class T>

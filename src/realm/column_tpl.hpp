@@ -111,7 +111,7 @@ struct FindInLeaf<IntNullColumn> {
 
 template<class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, size_t start, size_t end,
-            size_t limit, size_t* return_ndx)
+            size_t limit, size_t* return_ndx, size_t* match_count)
 {
     if (end == npos)
         end = column.size();
@@ -131,6 +131,9 @@ R aggregate(const ColType& column, T target, size_t start, size_t end,
 
     if (return_ndx)
         *return_ndx = state.m_minmax_index;
+    
+    if(match_count)
+        *match_count = state.m_match_count;
 
     return state.m_state;
 }

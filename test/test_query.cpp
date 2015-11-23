@@ -7842,4 +7842,19 @@ TEST(Query_AverageNullableColumns)
     CHECK_EQUAL(2, table.where().average_double(col_double));
 }
 
+
+ONLY(Query_Link_MaximumSumAverage2)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int", /* nullable */ true);
+    table1->add_empty_row(3);
+    table1->set_int(0, 0, 3);
+    table1->set_int(0, 1, 4);
+
+    double d = table1->where().average_int(0);
+    CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+}
+
 #endif // TEST_QUERY
