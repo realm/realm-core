@@ -156,5 +156,5 @@ int main()
 
     results.submit_single("total_time", "Total time", timer_total);
 
-    std::cout << "dummy = "<<dummy<<" (to avoid over-optimization)"<<endl;
+    std::cout << "dummy = "<<dummy<<" (to avoid over-optimization)"<<std::endl;
 }
