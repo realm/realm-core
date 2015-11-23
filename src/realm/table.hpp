@@ -633,7 +633,16 @@ public:
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const IntegerColumn* viewrefs = nullptr) const;
 
-
+    /// Report the current versioning counter for the table. The versioning counter is guaranteed to
+    /// change when the contents of the table changes after advance_read() or promote_to_write(), or
+    /// immediately after calls to methods which change the table. The term "change" means "change of
+    /// value": The storage layout of the table may change, for example due to optimization, but this
+    /// is not considered a change of a value. This means that you *cannot* use a non-changing version
+    /// count to indicate that object addresses (e.g. strings, binary data) remain the same.
+    /// The versioning counter *may* change (but is not required to do so) when another table linked
+    /// from this table, or linking to this table, is changed. The version counter *may* also change
+    /// without any apparent reason.
+    uint_fast64_t get_version_counter() const noexcept;
 private:
     template<class T>
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
@@ -1412,6 +1421,7 @@ protected:
 
 
 // Implementation:
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 
 inline void Table::bump_version(bool bump_global) const noexcept
