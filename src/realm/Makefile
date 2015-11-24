@@ -111,7 +111,7 @@ query_expression.hpp
 
 lib_LIBRARIES    = librealm.a
 libexec_PROGRAMS = realmd
-bin_PROGRAMS     = realm-import
+bin_PROGRAMS     = realm-import realm-compact
 DEV_PROGRAMS     = realm-config
 
 librealm_a_SOURCES = \
@@ -201,6 +201,9 @@ realmd_LIBS = librealm.a
 
 realm_import_SOURCES = importer_tool.cpp
 realm_import_LIBS    = librealm.a
+
+realm_compact_SOURCES = compact.cpp
+realm_compact_LIBS    = librealm.a
 
 CONFIG_H = util/config.h
 CONFIG_SH = $(CONFIG_H:.h=.sh)
