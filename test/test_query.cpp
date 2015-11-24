@@ -8107,6 +8107,101 @@ TEST(Query_MaximumSumAverage)
         d = (table1->column<Int>(1) != null()).maximum_int(0);
         CHECK_EQUAL(dbl, 4);
     }
+
+    // Maximum
+    {
+        int64_t d;
+        double dbl;
+        // Those that have criterias include all rows, also those with null
+        d = table1->where().sum_int(0);
+        CHECK_EQUAL(d, 7);
+
+        // Criteria on same column as maximum
+        d = table1->where().not_equal(0, 1234).sum_int(0);
+        CHECK_EQUAL(d, 7);
+
+        // Criteria on other column than maximum (triggers different code paths)
+        d = table1->where().not_equal(0, 1234).sum_int(1);
+        CHECK_EQUAL(d, 7);
+
+        // Average of double, criteria on integer
+        dbl = table1->where().not_equal(0, 1234).sum_double(2);
+        CHECK_EQUAL(d, 7.);
+
+        dbl = table1->where().not_equal(2, 1234.).sum_double(2);
+        CHECK_APPROXIMATELY_EQUAL(d, 7., 0.001);
+
+
+        // Those with criteria now only include some rows, whereof none are null
+        d = table1->where().sum_int(0);
+        CHECK_EQUAL(d, 7);
+
+        d = table1->where().sum_int(1);
+        CHECK_EQUAL(d, 7);
+
+        // Criteria on same column as maximum
+        d = table1->where().equal(0, 4).sum_int(0);
+        CHECK_EQUAL(d, 4);
+
+        // Criteria on other column than maximum (triggers different code paths)
+        d = table1->where().equal(0, 4).sum_int(1);
+        CHECK_EQUAL(d, 4);
+
+        // Average of double, criteria on integer
+        dbl = table1->where().not_equal(0, 3).sum_double(2);
+        CHECK_APPROXIMATELY_EQUAL(dbl, 4., 0.001);
+
+        dbl = table1->where().equal(2, 3.).sum_double(2);
+        CHECK_APPROXIMATELY_EQUAL(dbl, 3., 0.001);
+
+        // Now using null as criteria
+        dbl = (table1->column<Int>(0) != null()).sum_double(2);
+        CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+
+        dbl = (table1->column<Double>(2) != null()).sum_double(2);
+        CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+
+        d = (table1->column<Int>(0) != null()).sum_int(0);
+        CHECK_EQUAL(dbl, 7);
+
+        d = (table1->column<Int>(1) != null()).sum_int(0);
+        CHECK_EQUAL(dbl, 7);
+    }
+
+
+
+    // Count
+    {
+        int64_t d;
+        d = table1->where().count();
+        CHECK_EQUAL(d, 3);
+
+        d = table1->where().not_equal(0, 1234).count();
+        CHECK_EQUAL(d, 3);
+
+        d = table1->where().equal(0, 4).count();
+        CHECK_EQUAL(d, 1);
+
+        d = table1->where().not_equal(0, 3).count();
+        CHECK_EQUAL(d, 2);
+
+        d = table1->where().equal(2, 3.).count();
+        CHECK_EQUAL(d, 1);
+
+        // Now using null as criteria
+        d = (table1->column<Int>(0) != null()).count();
+        CHECK_EQUAL(d, 2);
+
+        d = (table1->column<Double>(2) != null()).count();
+        CHECK_EQUAL(d, 2);
+
+        d = (table1->column<Int>(0) != null()).count();
+        CHECK_EQUAL(d, 2);
+
+        d = (table1->column<Int>(1) != null()).count();
+        CHECK_EQUAL(d, 2);
+    }
+
 }
 
 #endif // TEST_QUERY
