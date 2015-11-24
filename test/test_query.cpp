@@ -7918,12 +7918,13 @@ TEST(Query_AverageNullableColumns)
     CHECK_EQUAL(3, table.where().average_float(col_float));
     CHECK_EQUAL(3, table.where().average_double(col_double));
 
-    // Add a row with nulls in each column.
+    // Add a row with nulls in each column. These nulls must be treated as not existing, that is,
+    // it must be such that the average of 2 + 2 + null == 2.
     table.add_empty_row();
 
-    CHECK_EQUAL(2, table.where().average_int(col_int));
-    CHECK_EQUAL(2, table.where().average_float(col_float));
-    CHECK_EQUAL(2, table.where().average_double(col_double));
+    CHECK_EQUAL(3, table.where().average_int(col_int));
+    CHECK_EQUAL(3, table.where().average_float(col_float));
+    CHECK_EQUAL(3, table.where().average_double(col_double));
 }
 
 TEST(Query_NegativeNumbers)
@@ -7961,4 +7962,154 @@ TEST(Query_NegativeNumbers)
     }
 }
 
+// Exposes bug that would lead to nulls being included as 0 value in average when performed
+// on Query. When performed on TableView or Table, it worked OK.
+TEST(Query_MaximumSumAverage)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_Int, "int1", /* nullable */ true);
+    table1->add_column(type_Int, "int2", /* nullable */ true);
+    table1->add_column(type_Double, "d", /* nullable */ true);
+
+    // Create three identical columns with values: 3, 4, null
+    table1->add_empty_row(3);
+    table1->set_int(0, 0, 3);
+    table1->set_int(0, 1, 4);
+    table1->set_int(1, 0, 3);
+    table1->set_int(1, 1, 4);
+    table1->set_double(2, 0, 3.);
+    table1->set_double(2, 1, 4.);
+    
+    // Average
+    {
+        double d;
+
+        // Those that have criterias include all rows, also those with null
+        d = table1->where().average_int(0);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        d = table1->where().average_int(1);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        // Criteria on same column as average
+        d = table1->where().not_equal(0, 1234).average_int(0);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        // Criteria on other column than average (triggers different code paths)
+        d = table1->where().not_equal(0, 1234).average_int(1);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        // Average of double, criteria on integer
+        d = table1->where().not_equal(0, 1234).average_double(2);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        d = table1->where().not_equal(2, 1234.).average_double(2);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+
+        // Those with criteria now only include some rows, whereof none are null
+        d = table1->where().average_int(0);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        d = table1->where().average_int(1);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        // Criteria on same column as average
+        d = table1->where().equal(0, 3).average_int(0);
+        CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+
+        // Criteria on other column than average (triggers different code paths)
+        d = table1->where().equal(0, 3).average_int(1);
+        CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+
+        // Average of double, criteria on integer
+        d = table1->where().not_equal(0, 3).average_double(2);
+        CHECK_APPROXIMATELY_EQUAL(d, 4., 0.001);
+
+        d = table1->where().equal(2, 3.).average_double(2);
+        CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+
+        // Now using null as criteria
+        d = (table1->column<Int>(0) != null()).average_double(2);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        d = (table1->column<Double>(2) != null()).average_double(2);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        d = (table1->column<Int>(0) != null()).average_int(0);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+        d = (table1->column<Int>(1) != null()).average_int(0);
+        CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+    }
+
+
+    // Maximum
+    {
+        int64_t d;
+        double dbl;
+        // Those that have criterias include all rows, also those with null
+        d = table1->where().maximum_int(0);
+        CHECK_EQUAL(d, 4);
+
+        d = table1->where().maximum_int(1);
+        CHECK_EQUAL(d, 4);
+
+        // Criteria on same column as maximum
+        d = table1->where().not_equal(0, 1234).maximum_int(0);
+        CHECK_EQUAL(d, 4);
+
+        // Criteria on other column than maximum (triggers different code paths)
+        d = table1->where().not_equal(0, 1234).maximum_int(1);
+        CHECK_EQUAL(d, 4);
+
+        // Average of double, criteria on integer
+        dbl = table1->where().not_equal(0, 1234).maximum_double(2);
+        CHECK_EQUAL(d, 4);
+
+        dbl = table1->where().not_equal(2, 1234.).maximum_double(2);
+        CHECK_EQUAL(d, 4.);
+
+
+        // Those with criteria now only include some rows, whereof none are null
+        d = table1->where().maximum_int(0);
+        CHECK_EQUAL(d, 4);
+
+        d = table1->where().maximum_int(1);
+        CHECK_EQUAL(d, 4);
+
+        // Criteria on same column as maximum
+        d = table1->where().equal(0, 4).maximum_int(0);
+        CHECK_EQUAL(d, 4);
+
+        // Criteria on other column than maximum (triggers different code paths)
+        d = table1->where().equal(0, 4).maximum_int(1);
+        CHECK_EQUAL(d, 4);
+
+        // Average of double, criteria on integer
+        dbl = table1->where().not_equal(0, 3).maximum_double(2);
+        CHECK_EQUAL(dbl, 4.);
+
+        dbl = table1->where().equal(2, 3.).maximum_double(2);
+        CHECK_EQUAL(dbl, 3.);
+
+        // Now using null as criteria
+        dbl = (table1->column<Int>(0) != null()).maximum_double(2);
+        CHECK_EQUAL(dbl, 4.);
+
+        dbl = (table1->column<Double>(2) != null()).maximum_double(2);
+        CHECK_EQUAL(dbl, 4.);
+
+        d = (table1->column<Int>(0) != null()).maximum_int(0);
+        CHECK_EQUAL(dbl, 4);
+
+        d = (table1->column<Int>(1) != null()).maximum_int(0);
+        CHECK_EQUAL(dbl, 4);
+    }
+}
+
 #endif // TEST_QUERY
+
+
+
