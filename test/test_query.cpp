@@ -7311,26 +7311,36 @@ TEST(Query_Link_MaximumSumAverage)
     table1->set_null(2, 3);
 
     TableRef table2 = group.add_table("table2");
+    size_t col_double = table2->add_column(type_Double, "double");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
     size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // table2
-    // 0: { }
-    // 1: { 1 }
-    // 2: { 1, 2 }
-    // 3: { 1, 2, 3 }
+    // 0: 456.0 ->0 { }
+    // 1: 456.0 ->1 { 1 }
+    // 2: 456.0 ->2 { 1, 2 }
+    // 3: 456.0 ->3 { 1, 2, 3 }
 
     table2->add_empty_row();
+    table2->set_double(col_double, 0, 456.0);
+    table2->set_link(col_link, 0, 0);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 1, 456.0);
+    table2->set_link(col_link, 1, 1);
     LinkViewRef links = table2->get_linklist(col_linklist, 1);
     links->add(1);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 2, 456.0);
+    table2->set_link(col_link, 2, 2);
     links = table2->get_linklist(col_linklist, 2);
     links->add(1);
     links->add(2);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 3, 456.0);
+    table2->set_link(col_link, 3, 3);
     links = table2->get_linklist(col_linklist, 3);
     links->add(1);
     links->add(2);
@@ -7358,6 +7368,20 @@ TEST(Query_Link_MaximumSumAverage)
     q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == table2->column<Double>(col_double);
+    match = q.find();
+    CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
@@ -7404,6 +7428,18 @@ TEST(Query_Link_MaximumSumAverage)
     CHECK_EQUAL(not_found, match);
 
     q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == table2->column<Double>(col_double);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7460,6 +7496,18 @@ TEST(Query_Link_MaximumSumAverage)
     q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() < table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == table2->column<Double>(col_double);
+    match = q.find();
+    CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
