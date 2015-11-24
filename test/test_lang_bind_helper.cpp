@@ -506,7 +506,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist); // Crashes here
+    LangBindHelper::advance_read(sg, *hist);
 
     CHECK_EQUAL(table1->size(), 1);
     CHECK_EQUAL(table2->size(), 2);
@@ -585,15 +585,15 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
         CHECK_EQUAL(wt.get_group().size(), 3);
         wt.get_group().remove_table(0);
         CHECK_EQUAL(wt.get_group().size(), 2);
-        CHECK_EQUAL(wt.get_table(0), wt.get_table("table1")); // fails because move last over places table2 in slot 0
-        CHECK_EQUAL(wt.get_table(1), wt.get_table("table2")); // fails because table1 in still in slot 1
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table2"));
         wt.commit();
     }
 
     LangBindHelper::advance_read(sg, *hist);
 
-    CHECK_EQUAL(rt.get_table(0), rt.get_table("table1")); // fails because move last over places table2 in slot 0
-    CHECK_EQUAL(rt.get_table(1), rt.get_table("table2")); // fails because table1 in still in slot 1
+    CHECK_EQUAL(rt.get_table(0), rt.get_table("table1"));
+    CHECK_EQUAL(rt.get_table(1), rt.get_table("table2"));
     CHECK_EQUAL(rt.get_group().size(), 2);
 }
 

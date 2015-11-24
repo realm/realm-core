@@ -457,38 +457,33 @@ void Group::remove_table(size_t table_ndx)
 
     ref_type ref = m_tables.get(table_ndx);
 
-    // If the specified table is not the last one, it will be removed by moving
-    // that last table to the index of the removed one. The movement of the last
-    // table requires link column adjustments.
-    size_t last_ndx = m_tables.size() - 1;
-    if (last_ndx != table_ndx) {
-        m_tables.set(table_ndx, m_tables.get(last_ndx)); // Throws
-        m_table_names.set(table_ndx, m_table_names.get(last_ndx)); // Throws
-    }
+    // Remove table and move all successive tables
+    m_tables.erase(table_ndx);
+    m_table_names.erase(table_ndx);
+    m_table_accessors.erase(m_table_accessors.begin() + table_ndx);
 
-    m_tables.erase(last_ndx); // Throws
-    m_table_names.erase(last_ndx); // Throws
-
-    m_table_accessors[table_ndx] = m_table_accessors[last_ndx];
-    m_table_accessors.pop_back();
-
-    tf::detach(*table);
-    tf::unbind_ptr(*table);
-
-    if (last_ndx != table_ndx) {
+    // Unless the removed table is the last, update all indices of tables after
+    // the removed table.
+    bool last_table_removed = table_ndx == m_tables.size();
+    if (!last_table_removed) {
         update_table_indices([&](size_t old_table_ndx) {
-            if (old_table_ndx == last_ndx) {
-                return table_ndx;
+            REALM_ASSERT(old_table_ndx != table_ndx); // We should not see links to the removed table
+            if (old_table_ndx > table_ndx) {
+                return old_table_ndx - 1;
             }
             return old_table_ndx;
         }); // Throws
     }
 
+    tf::detach(*table);
+    tf::unbind_ptr(*table);
+
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
 
+    size_t num_tables_before_remove = m_tables.size() + 1;
     if (Replication* repl = m_alloc.get_replication())
-        repl->erase_group_level_table(table_ndx, last_ndx+1); // Throws
+        repl->erase_group_level_table(table_ndx, num_tables_before_remove); // Throws
 }
 
 
@@ -1001,27 +996,24 @@ private:
 // transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
-    TransactAdvancer(Group& group, bool& schema_changed):
-        m_group(group), m_schema_changed(schema_changed)
+    TransactAdvancer(Group& group, bool& schema_changed) : m_group(group), m_schema_changed(schema_changed)
     {
     }
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) noexcept
     {
         REALM_ASSERT_3(table_ndx, <=, num_tables);
-        REALM_ASSERT(m_group.m_table_accessors.empty() ||
-                       m_group.m_table_accessors.size() == num_tables);
+        REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
+        static_cast<void>(num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
-            // for end-insertions, table_ndx will be equal to num_tables
-            m_group.m_table_accessors.push_back(nullptr); // Throws
-            size_t last_ndx = num_tables;
-            m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
-            m_group.m_table_accessors[table_ndx] = nullptr;
-            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
-                typedef _impl::TableFriend tf;
-                tf::mark(*moved_table);
-                tf::mark_opposite_link_tables(*moved_table);
+            m_group.m_table_accessors.insert(m_group.m_table_accessors.begin() + table_ndx, nullptr);
+            for (size_t i = table_ndx + 1; i < m_group.m_table_accessors.size(); ++i) {
+                if (Table* moved_table = m_group.m_table_accessors[i]) {
+                    typedef _impl::TableFriend tf;
+                    tf::mark(*moved_table);
+                    tf::mark_opposite_link_tables(*moved_table);
+                }
             }
         }
 
@@ -1033,8 +1025,8 @@ public:
     bool erase_group_level_table(size_t table_ndx, size_t num_tables) noexcept
     {
         REALM_ASSERT_3(table_ndx, <, num_tables);
-        REALM_ASSERT(m_group.m_table_accessors.empty() ||
-                       m_group.m_table_accessors.size() == num_tables);
+        REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
+        static_cast<void>(num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
             // Link target tables do not need to be considered here, since all
@@ -1045,16 +1037,14 @@ public:
                 tf::unbind_ptr(*table);
             }
 
-            size_t last_ndx = num_tables - 1;
-            if (table_ndx < last_ndx) {
-                if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
+            m_group.m_table_accessors.erase(m_group.m_table_accessors.begin() + table_ndx);
+            for (size_t i = table_ndx; i < m_group.m_table_accessors.size(); ++i) {
+                if (Table* moved_table = m_group.m_table_accessors[i]) {
                     typedef _impl::TableFriend tf;
                     tf::mark(*moved_table);
                     tf::mark_opposite_link_tables(*moved_table);
                 }
-                m_group.m_table_accessors[table_ndx] = m_group.m_table_accessors[last_ndx];
             }
-            m_group.m_table_accessors.pop_back();
         }
 
         m_schema_changed = true;
