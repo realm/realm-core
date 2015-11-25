@@ -19,7 +19,6 @@
  **************************************************************************/
 
 #include <realm/util/aes_cryptor.hpp>
-#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/utilities.hpp>
 
@@ -34,6 +33,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/terminate.hpp>
 
 namespace realm {
