@@ -749,7 +749,14 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             if (repl)
                 cfg.server_sync_mode = repl->is_in_server_synchronization_mode();
             cfg.encryption_key = encryption_key;
-            ref_type top_ref = alloc.attach_file(path, cfg); // Throws
+            ref_type top_ref;
+            try {
+                top_ref = alloc.attach_file(path, cfg); // Throws
+            }
+            catch (SlabAlloc::Retry&) {
+                continue;
+            }
+
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {

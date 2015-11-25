@@ -85,6 +85,8 @@ public:
         const char* encryption_key = nullptr;
     };
 
+    struct Retry {};
+
     /// Attach this allocator to the specified file.
     ///
     /// When used by free-standing Group instances, no concurrency is
@@ -133,6 +135,7 @@ public:
     /// \return The `ref` of the root node, or zero if there is none.
     ///
     /// \throw util::File::AccessError
+    /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& path, Config& cfg);
 
     /// Attach this allocator to the specified memory buffer.
