@@ -10,14 +10,15 @@ benchmark-prealloc \
 benchmark-index \
 benchmark-transaction \
 benchmark-row-accessor \
+benchmark-util-network \
 experiments \
-fuzzy \
+fuzzy
 
 
 RESOURCES=expect_json.json expect_string.txt
 
 DIR_DEPS          = util
-test_realm_DEPS = util
+test_realm_DEPS   = util
 test_sqlite3_DEPS = util
 test_stl_DEPS     = util
 
@@ -86,6 +87,11 @@ benchmark-row-accessor: check-norun/subdir/util
 .PHONY: benchmark-common-tasks
 benchmark-common-tasks: check-norun/subdir/util
 	@$(MAKE) -C benchmark-common-tasks check
+
+# Build and run the "util networks" benchmarking program
+.PHONY: benchmark-util-network
+benchmark-util-network: check-norun/subdir/util
+	@$(MAKE) -C benchmark-util-network check
 
 .PHONY: fuzzy
 fuzzy: check-norun/subdir/util
