@@ -5393,96 +5393,100 @@ TEST(Query_SubtablesTyped)
 
 TEST(Query_AllTypesDynamicallyTyped)
 {
-    Table table;
-    DescriptorRef sub1;
-    table.add_column(type_Bool, "boo");
-    table.add_column(type_Int, "int");
-    table.add_column(type_Float, "flt");
-    table.add_column(type_Double, "dbl");
-    table.add_column(type_String, "str");
-    table.add_column(type_Binary, "bin");
-    table.add_column(type_DateTime, "dat");
-    table.add_column(type_Table, "tab", &sub1);
-    table.add_column(type_Mixed, "mix");
-    sub1->add_column(type_Int, "sub_int");
-    sub1.reset();
+    for (int nullable = 0; nullable < 2; nullable++) {
+        bool n = (nullable == 1);
 
-    const char bin[4] = { 0, 1, 2, 3 };
-    BinaryData bin1(bin, sizeof bin / 2);
-    BinaryData bin2(bin, sizeof bin);
-    int_fast64_t time_now = time(0);
-    Mixed mix_int(int64_t(1));
-    Mixed mix_subtab((Mixed::subtable_tag()));
+        Table table;
+        DescriptorRef sub1;
+        table.add_column(type_Bool, "boo", n);
+        table.add_column(type_Int, "int", n);
+        table.add_column(type_Float, "flt", n);
+        table.add_column(type_Double, "dbl", n);
+        table.add_column(type_String, "str", n);
+        table.add_column(type_Binary, "bin", n);
+        table.add_column(type_DateTime, "dat", n);
+        table.add_column(type_Table, "tab", &sub1);
+        table.add_column(type_Mixed, "mix");
+        sub1->add_column(type_Int, "sub_int");
+        sub1.reset();
 
-    table.add_empty_row();
-    table.set_bool(0, 0, false);
-    table.set_int(1, 0, 54);
-    table.set_float(2, 0, 0.7f);
-    table.set_double(3, 0, 0.8);
-    table.set_string(4, 0, "foo");
-    table.set_binary(5, 0, bin1);
-    table.set_datetime(6, 0, 0);
-    table.set_mixed(8, 0, mix_int);
+        const char bin[4] = { 0, 1, 2, 3 };
+        BinaryData bin1(bin, sizeof bin / 2);
+        BinaryData bin2(bin, sizeof bin);
+        int_fast64_t time_now = time(0);
+        Mixed mix_int(int64_t(1));
+        Mixed mix_subtab((Mixed::subtable_tag()));
 
-    table.add_empty_row();
-    table.set_bool(0, 1, true);
-    table.set_int(1, 1, 506);
-    table.set_float(2, 1, 7.7f);
-    table.set_double(3, 1, 8.8);
-    table.set_string(4, 1, "banach");
-    table.set_binary(5, 1, bin2);
-    table.set_datetime(6, 1, time_now);
-    TableRef subtab = table.get_subtable(7, 1);
-    subtab->add_empty_row();
-    subtab->set_int(0, 0, 100);
-    table.set_mixed(8, 1, mix_subtab);
+        table.add_empty_row();
+        table.set_bool(0, 0, false);
+        table.set_int(1, 0, 54);
+        table.set_float(2, 0, 0.7f);
+        table.set_double(3, 0, 0.8);
+        table.set_string(4, 0, "foo");
+        table.set_binary(5, 0, bin1);
+        table.set_datetime(6, 0, 0);
+        table.set_mixed(8, 0, mix_int);
 
-    CHECK_EQUAL(1, table.where().equal(0, false).count());
-    CHECK_EQUAL(1, table.where().equal(1, int64_t(54)).count());
-    CHECK_EQUAL(1, table.where().equal(2, 0.7f).count());
-    CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
-    CHECK_EQUAL(1, table.where().equal(4, "foo").count());
-    CHECK_EQUAL(1, table.where().equal(5, bin1).count());
-    CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
-    //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
-    //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
+        table.add_empty_row();
+        table.set_bool(0, 1, true);
+        table.set_int(1, 1, 506);
+        table.set_float(2, 1, 7.7f);
+        table.set_double(3, 1, 8.8);
+        table.set_string(4, 1, "banach");
+        table.set_binary(5, 1, bin2);
+        table.set_datetime(6, 1, time_now);
+        TableRef subtab = table.get_subtable(7, 1);
+        subtab->add_empty_row();
+        subtab->set_int(0, 0, 100);
+        table.set_mixed(8, 1, mix_subtab);
 
-    Query query = table.where().equal(0, false);
+        CHECK_EQUAL(1, table.where().equal(0, false).count());
+        CHECK_EQUAL(1, table.where().equal(1, int64_t(54)).count());
+        CHECK_EQUAL(1, table.where().equal(2, 0.7f).count());
+        CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
+        CHECK_EQUAL(1, table.where().equal(4, "foo").count());
+        CHECK_EQUAL(1, table.where().equal(5, bin1).count());
+        CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
+        //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
+        //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
 
-    size_t ndx = not_found;
+        Query query = table.where().equal(0, false);
 
-    CHECK_EQUAL(54, query.minimum_int(1));
-    query.minimum_int(1, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        size_t ndx = not_found;
 
-    CHECK_EQUAL(54, query.maximum_int(1));
-    query.maximum_int(1, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(54, query.minimum_int(1));
+        query.minimum_int(1, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(54, query.sum_int(1));
-    CHECK_EQUAL(54, query.average_int(1));
+        CHECK_EQUAL(54, query.maximum_int(1));
+        query.maximum_int(1, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(0.7f, query.minimum_float(2));
-    query.minimum_float(2, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(54, query.sum_int(1));
+        CHECK_EQUAL(54, query.average_int(1));
 
-    CHECK_EQUAL(0.7f, query.maximum_float(2));
-    query.maximum_float(2, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.7f, query.minimum_float(2));
+        query.minimum_float(2, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(0.7f, query.sum_float(2));
-    CHECK_EQUAL(0.7f, query.average_float(2));
+        CHECK_EQUAL(0.7f, query.maximum_float(2));
+        query.maximum_float(2, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(0.8, query.minimum_double(3));
-    query.minimum_double(3, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.7f, query.sum_float(2));
+        CHECK_EQUAL(0.7f, query.average_float(2));
 
-    CHECK_EQUAL(0.8, query.maximum_double(3));
-    query.maximum_double(3, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.8, query.minimum_double(3));
+        query.minimum_double(3, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(0.8, query.sum_double(3));
-    CHECK_EQUAL(0.8, query.average_double(3));
+        CHECK_EQUAL(0.8, query.maximum_double(3));
+        query.maximum_double(3, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
+
+        CHECK_EQUAL(0.8, query.sum_double(3));
+        CHECK_EQUAL(0.8, query.average_double(3));
+    }
 }
 
 TEST(Query_AggregateSortedView)
@@ -8108,7 +8112,71 @@ TEST(Query_MaximumSumAverage)
         CHECK_EQUAL(dbl, 4);
     }
 
-    // Maximum
+
+    // Minimum
+    {
+        int64_t d;
+        double dbl;
+        // Those that have criterias include all rows, also those with null
+        d = table1->where().minimum_int(0);
+        CHECK_EQUAL(d, 3);
+
+        d = table1->where().minimum_int(1);
+        CHECK_EQUAL(d, 3);
+
+        // Criteria on same column as minimum
+        d = table1->where().not_equal(0, 1234).minimum_int(0);
+        CHECK_EQUAL(d, 3);
+
+        // Criteria on other column than minimum (triggers different code paths)
+        d = table1->where().not_equal(0, 1234).minimum_int(1);
+        CHECK_EQUAL(d, 3);
+
+        // Average of double, criteria on integer
+        dbl = table1->where().not_equal(0, 1234).minimum_double(2);
+        CHECK_EQUAL(d, 3);
+
+        dbl = table1->where().not_equal(2, 1234.).minimum_double(2);
+        CHECK_EQUAL(d, 3.);
+
+
+        // Those with criteria now only include some rows, whereof none are null
+        d = table1->where().minimum_int(0);
+        CHECK_EQUAL(d, 3);
+
+        d = table1->where().minimum_int(1);
+        CHECK_EQUAL(d, 3);
+
+        // Criteria on same column as minimum
+        d = table1->where().equal(0, 4).minimum_int(0);
+        CHECK_EQUAL(d, 4);
+
+        // Criteria on other column than minimum (triggers different code paths)
+        d = table1->where().equal(0, 4).minimum_int(1);
+        CHECK_EQUAL(d, 4);
+
+        // Average of double, criteria on integer
+        dbl = table1->where().not_equal(0, 3).minimum_double(2);
+        CHECK_EQUAL(dbl, 4.);
+
+        dbl = table1->where().equal(2, 3.).minimum_double(2);
+        CHECK_EQUAL(dbl, 3.);
+
+        // Now using null as criteria
+        dbl = (table1->column<Int>(0) != null()).minimum_double(2);
+        CHECK_EQUAL(dbl, 3.);
+
+        dbl = (table1->column<Double>(2) != null()).minimum_double(2);
+        CHECK_EQUAL(dbl, 3.);
+
+        d = (table1->column<Int>(0) != null()).minimum_int(0);
+        CHECK_EQUAL(dbl, 3);
+
+        d = (table1->column<Int>(1) != null()).minimum_int(0);
+        CHECK_EQUAL(dbl, 3);
+    }
+
+    // Sum
     {
         int64_t d;
         double dbl;
