@@ -138,7 +138,7 @@ public:
     {
         return !m_back;
     }
-    void push_back(std::unique_ptr<async_oper> op) noexcept
+    void push_back(LendersOperPtr op) noexcept
     {
         REALM_ASSERT(!op->m_next);
         if (m_back) {
@@ -159,7 +159,7 @@ public:
         m_back = q.m_back;
         q.m_back = nullptr;
     }
-    std::unique_ptr<async_oper> pop_front() noexcept
+    LendersOperPtr pop_front() noexcept
     {
         async_oper* op = nullptr;
         if (m_back) {
@@ -172,19 +172,14 @@ public:
             }
             op->m_next = nullptr;
         }
-        return std::unique_ptr<async_oper>(op);
+        return LendersOperPtr(op);
     }
     ~oper_queue() noexcept
     {
         if (m_back) {
-            async_oper* op = m_back;
-            for (;;) {
-                async_oper* next = op->m_next;
-                delete op;
-                if (next == m_back)
-                    break;
-                op = next;
-            }
+            LendersOperPtr op(m_back);
+            while (op->m_next != m_back)
+                op.reset(op->m_next);
         }
     }
 private:
@@ -251,8 +246,8 @@ public:
 
       on_operations_completed:
         {
-            while (std::unique_ptr<async_oper> op = m_completed_operations.pop_front())
-                op->exec_handler(); // Throws
+            while (LendersOperPtr op = m_completed_operations.pop_front())
+                execute(op); // Throws
             goto on_handlers_executed_or_checked_stopped;
         }
 
@@ -276,7 +271,7 @@ public:
                 //
                 // It is possible that a different thread has added new post
                 // operations since we checked, but there is really no point in
-                // rechecking that, as it is always possible that, even after a
+                // rechecking that, as it is always possible, even after a
                 // recheck, that new post handlers get added after we decide to
                 // return, but before we actually do return. Also, if would
                 // offer no additional guarantees to the application.
@@ -310,7 +305,7 @@ public:
         m_stopped = false;
     }
 
-    void add_io_oper(int fd, std::unique_ptr<async_oper> op, io_op type)
+    void add_io_oper(int fd, LendersOperPtr op, io_op type)
     {
         REALM_ASSERT(fd >= 0);
 
@@ -355,37 +350,82 @@ public:
     }
 
     struct wait_oper_compare {
-        bool operator()(const std::unique_ptr<wait_oper_base>& a, clock::time_point b)
+        bool operator()(const LendersWaitOperPtr& a, clock::time_point b)
         {
             return a->m_expiration_time > b;
         }
-        bool operator()(clock::time_point a, const std::unique_ptr<wait_oper_base>& b)
+        bool operator()(clock::time_point a, const LendersWaitOperPtr& b)
         {
             return a > b->m_expiration_time;
         }
-        bool operator()(const std::unique_ptr<wait_oper_base>& a, const std::unique_ptr<wait_oper_base>& b)
+        bool operator()(const LendersWaitOperPtr& a, const LendersWaitOperPtr& b)
         {
             return a->m_expiration_time > b->m_expiration_time;
         }
     };
 
-    void add_wait_oper(std::unique_ptr<wait_oper_base> op)
+    void add_wait_oper(LendersWaitOperPtr op)
     {
         m_wait_operations.push(std::move(op)); // Throws
     }
 
-    void add_completed_oper(std::unique_ptr<async_oper> op) noexcept
+    void add_completed_oper(LendersOperPtr op) noexcept
     {
         m_completed_operations.push_back(std::move(op));
     }
 
-    void add_post_oper(std::unique_ptr<async_oper> op) noexcept
+    void post(PostOperConstr constr, size_t size, const void* cookie)
     {
         {
             LockGuard l(m_mutex);
+            LendersOperPtr op = alloc_post(constr, size, cookie); // Throws
             m_post_operations.push_back(std::move(op));
         }
         wake_up_poll_thread();
+    }
+
+    LendersOperPtr alloc_post(PostOperConstr constr, size_t size, const void* cookie)
+    {
+        // Special version of io_service::alloc() for post operations. See
+        // io_service::alloc() for more information.
+
+        OwnersOperPtr temp_owners_ptr;
+        OwnersOperPtr* owners_ptr_ptr = &m_post_oper;
+        // The cast is for extra type safety
+        void* addr = static_cast<async_oper*>(m_post_oper.get());
+        size_t size_2;
+        if (REALM_LIKELY(addr)) {
+            // Two operations of a single type are generally not allowed to
+            // overlap in time, but in the case of post operations, they
+            // are. This is handled by creating additional operations in the
+            // orphaned (unowned) state if the owned instance is already in use.
+            if (m_post_oper->in_use()) {
+                owners_ptr_ptr = &temp_owners_ptr;
+                goto no_object;
+            }
+            size_2 = m_post_oper->m_size;
+            m_post_oper->async_oper::~async_oper();
+            if (REALM_UNLIKELY(size_2 < size)) {
+                m_post_oper.release();
+                delete[] static_cast<char*>(addr);
+                goto no_object;
+            }
+        }
+        else {
+          no_object:
+            addr = new char[size]; // Throws
+            size_2 = size;
+            owners_ptr_ptr->reset(static_cast<async_oper*>(addr));
+        }
+        LendersOperPtr lenders_ptr;
+        try {
+            lenders_ptr.reset((*constr)(addr, size, cookie)); // Throws
+        }
+        catch (...) {
+            new (addr) UnusedOper(size); // Does not throw
+            throw;
+        }
+        return lenders_ptr;
     }
 
     void cancel_incomplete_io_ops(int fd) noexcept
@@ -413,7 +453,7 @@ public:
     {
         auto p = std::equal_range(m_wait_operations.begin(), m_wait_operations.end(),
                                   op->m_expiration_time, wait_oper_compare());
-        auto pred = [=](const std::unique_ptr<wait_oper_base>& op_2) { return op_2.get() == op; };
+        auto pred = [=](const LendersWaitOperPtr& op_2) { return op_2.get() == op; };
         auto i = std::find_if(p.first, p.second, pred);
         REALM_ASSERT(i != p.second);
         m_completed_operations.push_back(m_wait_operations.erase(i));
@@ -423,7 +463,7 @@ private:
     typedef struct pollfd pollfd;
 
     struct io_oper_slot {
-        std::unique_ptr<async_oper> read_oper, write_oper;
+        LendersOperPtr read_oper, write_oper;
     };
 
     int m_wakeup_pipe_read_fd, m_wakeup_pipe_write_fd;
@@ -433,12 +473,12 @@ private:
     std::vector<io_oper_slot> m_io_operations;
     size_t m_num_active_io_operations = 0;
 
-    using WaitQueue = util::PriorityQueue<std::unique_ptr<wait_oper_base>,
-                                          std::vector<std::unique_ptr<wait_oper_base>>,
+    using WaitQueue = util::PriorityQueue<LendersWaitOperPtr, std::vector<LendersWaitOperPtr>,
                                           wait_oper_compare>;
     WaitQueue m_wait_operations;
 
     Mutex m_mutex;
+    OwnersOperPtr m_post_oper; // Protected by `m_mutex`
     oper_queue m_post_operations; // Protected by `m_mutex` (including the enqueued operations).
     bool m_stopped = false; // Protected by `m_mutex`
 
@@ -565,7 +605,7 @@ private:
             // Check read readiness
             if ((pollfd_slot.revents & POLLRDNORM) != 0) {
                 oper_slot.read_oper->proceed();
-                if (oper_slot.read_oper->complete) {
+                if (oper_slot.read_oper->is_complete()) {
                     pollfd_slot.events &= ~POLLRDNORM;
                     if (pollfd_slot.events == 0)
                         pollfd_slot.fd = -1;
@@ -577,7 +617,7 @@ private:
             // Check write readiness
             if ((pollfd_slot.revents & POLLWRNORM) != 0) {
                 oper_slot.write_oper->proceed();
-                if (oper_slot.write_oper->complete) {
+                if (oper_slot.write_oper->is_complete()) {
                     pollfd_slot.events &= ~POLLWRNORM;
                     if (pollfd_slot.events == 0)
                         pollfd_slot.fd = -1;
@@ -648,24 +688,24 @@ void io_service::reset() noexcept
     m_impl->reset(); // Throws
 }
 
-void io_service::add_io_oper(int fd, std::unique_ptr<async_oper> op, io_op type)
+void io_service::add_io_oper(int fd, LendersOperPtr op, io_op type)
 {
     m_impl->add_io_oper(fd, std::move(op), type); // Throws
 }
 
-void io_service::add_wait_oper(std::unique_ptr<wait_oper_base> op)
+void io_service::add_wait_oper(LendersWaitOperPtr op)
 {
     m_impl->add_wait_oper(std::move(op)); // Throws
 }
 
-void io_service::add_completed_oper(std::unique_ptr<async_oper> op) noexcept
+void io_service::add_completed_oper(LendersOperPtr op) noexcept
 {
     m_impl->add_completed_oper(std::move(op));
 }
 
-void io_service::add_post_oper(std::unique_ptr<async_oper> op) noexcept
+void io_service::do_post(PostOperConstr constr, size_t size, const void* cookie)
 {
-    m_impl->add_post_oper(std::move(op));
+    m_impl->post(constr, size, cookie); // Throws
 }
 
 
@@ -743,17 +783,15 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
 void socket_base::cancel() noexcept
 {
     bool any_incomplete = false;
-    if (m_read_oper) {
-        if (!m_read_oper->complete)
+    if (m_read_oper && m_read_oper->is_uncanceled()) {
+        m_read_oper->cancel();
+        if (!m_read_oper->is_complete())
             any_incomplete = true;
-        m_read_oper->canceled = true;
-        m_read_oper = nullptr;
     }
-    if (m_write_oper) {
-        if (!m_write_oper->complete)
+    if (m_write_oper && m_write_oper->is_uncanceled()) {
+        m_write_oper->cancel();
+        if (!m_write_oper->is_complete())
             any_incomplete = true;
-        m_write_oper->canceled = true;
-        m_write_oper = nullptr;
     }
     if (any_incomplete)
         m_service.m_impl->cancel_incomplete_io_ops(m_sock_fd);
@@ -904,7 +942,7 @@ std::error_code socket_base::set_nonblocking_mode(bool enable, std::error_code& 
 
 std::error_code socket::connect(const endpoint& ep, std::error_code& ec)
 {
-    REALM_ASSERT(!m_write_oper);
+    REALM_ASSERT(!m_write_oper || !m_write_oper->in_use());
 
     if (!is_open()) {
         if (REALM_UNLIKELY(open(ep.protocol(), ec)))
@@ -929,7 +967,7 @@ std::error_code socket::connect(const endpoint& ep, std::error_code& ec)
 
 std::error_code socket::write(const char* data, size_t size, std::error_code& ec) noexcept
 {
-    REALM_ASSERT(!m_write_oper);
+    REALM_ASSERT(!m_write_oper || !m_write_oper->in_use());
     if (ensure_blocking_mode(ec))
         return ec;
     const char* begin = data;
@@ -1107,7 +1145,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
 size_t buffered_input_stream::do_read(char* buffer, size_t size, int delim,
                                       std::error_code& ec) noexcept
 {
-    REALM_ASSERT(!m_socket.m_read_oper);
+    REALM_ASSERT(!m_socket.m_read_oper || !m_socket.m_read_oper->in_use());
     if (m_socket.ensure_blocking_mode(ec))
         return 0;
     char* out_begin = buffer;
@@ -1148,59 +1186,58 @@ size_t buffered_input_stream::do_read(char* buffer, size_t size, int delim,
 
 void buffered_input_stream::read_oper_base::process_buffered_input() noexcept
 {
-    REALM_ASSERT(!complete);
-    REALM_ASSERT(!canceled);
-    size_t in_avail = m_stream.m_end - m_stream.m_begin;
+    REALM_ASSERT(!is_complete());
+    REALM_ASSERT(!is_canceled());
+    size_t in_avail = m_stream->m_end - m_stream->m_begin;
     size_t out_avail = m_out_end - m_out_curr;
     size_t n = std::min(in_avail, out_avail);
     bool delim_mode = m_delim != std::char_traits<char>::eof();
-    char* i = !delim_mode ? m_stream.m_begin + n :
-        std::find(m_stream.m_begin, m_stream.m_begin + n,
+    char* i = !delim_mode ? m_stream->m_begin + n :
+        std::find(m_stream->m_begin, m_stream->m_begin + n,
                   std::char_traits<char>::to_char_type(m_delim));
-    m_out_curr = std::copy(m_stream.m_begin, i, m_out_curr);
-    m_stream.m_begin = i;
+    m_out_curr = std::copy(m_stream->m_begin, i, m_out_curr);
+    m_stream->m_begin = i;
     if (m_out_curr == m_out_end) {
         if (delim_mode)
             m_error_code = network::delim_not_found;
     }
     else {
-        if (m_stream.m_begin == m_stream.m_end)
+        if (m_stream->m_begin == m_stream->m_end)
             return;
         REALM_ASSERT(delim_mode);
-        *m_out_curr++ = *m_stream.m_begin++; // Transfer delimiter
+        *m_out_curr++ = *m_stream->m_begin++; // Transfer delimiter
     }
-    complete = true;
+    set_is_complete(true);
 }
 
 
 void buffered_input_stream::read_oper_base::proceed() noexcept
 {
-    REALM_ASSERT(!complete);
-    REALM_ASSERT(!canceled);
+    REALM_ASSERT(!is_complete());
+    REALM_ASSERT(!is_canceled());
     REALM_ASSERT(!m_error_code);
-    REALM_ASSERT(m_stream.m_begin == m_stream.m_end);
+    REALM_ASSERT(m_stream->m_begin == m_stream->m_end);
     REALM_ASSERT(m_out_curr < m_out_end);
-    size_t n = m_stream.m_socket.do_read_some(m_stream.m_buffer.get(), s_buffer_size,
+    size_t n = m_stream->m_socket.do_read_some(m_stream->m_buffer.get(), s_buffer_size,
                                               m_error_code);
     if (REALM_UNLIKELY(m_error_code)) {
-        complete = true;
+        set_is_complete(true);
         return;
     }
     REALM_ASSERT(n > 0);
     REALM_ASSERT(n <= s_buffer_size);
-    m_stream.m_begin = m_stream.m_buffer.get();
-    m_stream.m_end = m_stream.m_begin + n;
+    m_stream->m_begin = m_stream->m_buffer.get();
+    m_stream->m_end = m_stream->m_begin + n;
     process_buffered_input();
 }
 
 
 void deadline_timer::cancel() noexcept
 {
-    if (m_wait_oper) {
-        if (!m_wait_oper->complete)
-            m_service.m_impl->cancel_incomplete_wait_oper(m_wait_oper);
-        m_wait_oper->canceled = true;
-        m_wait_oper = nullptr;
+    if (m_wait_oper && m_wait_oper->is_uncanceled()) {
+        m_wait_oper->cancel();
+        if (!m_wait_oper->is_complete())
+            m_service.m_impl->cancel_incomplete_wait_oper(m_wait_oper.get());
     }
 }
 

@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <memory>
 #include <chrono>
+#include <tuple>
 #include <string>
 #include <ostream>
 
@@ -35,6 +36,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/basic_system_errors.hpp>
+#include <realm/util/call_with_tuple.hpp>
 
 namespace realm {
 namespace util {
@@ -260,16 +262,39 @@ public:
 private:
     class async_oper;
     class wait_oper_base;
+    class post_oper_base;
     template<class H> class post_oper;
+    class UnusedOper; // Allocated, but currently unused memory
     class oper_queue;
 
-    using clock = std::chrono::steady_clock;
+    struct OwnersOperDeleter {
+        void operator()(async_oper*) const noexcept;
+    };
+    struct LendersOperDeleter {
+        void operator()(async_oper*) const noexcept;
+    };
+    using OwnersOperPtr      = std::unique_ptr<async_oper, OwnersOperDeleter>;
+    using LendersOperPtr     = std::unique_ptr<async_oper, LendersOperDeleter>;
+    using OwnersWaitOperPtr  = std::unique_ptr<wait_oper_base, OwnersOperDeleter>;
+    using LendersWaitOperPtr = std::unique_ptr<wait_oper_base, LendersOperDeleter>;
+
+    template<class Oper, class Oper2, class... Args>
+    static std::unique_ptr<Oper, LendersOperDeleter>
+    alloc(std::unique_ptr<Oper2, OwnersOperDeleter>&, Args&&...);
+
+    template<class Oper> static void execute(std::unique_ptr<Oper, LendersOperDeleter>&);
 
     enum io_op { io_op_Read, io_op_Write };
-    void add_io_oper(int fd, std::unique_ptr<async_oper>, io_op type);
-    void add_wait_oper(std::unique_ptr<wait_oper_base>);
-    void add_completed_oper(std::unique_ptr<async_oper>) noexcept;
-    void add_post_oper(std::unique_ptr<async_oper>) noexcept;
+    void add_io_oper(int fd, LendersOperPtr, io_op type);
+    void add_wait_oper(LendersWaitOperPtr);
+    void add_completed_oper(LendersOperPtr) noexcept;
+
+    using PostOperConstr = async_oper*(void* addr, size_t size, const void* cookie);
+    void do_post(PostOperConstr, size_t size, const void* cookie);
+    template<class H>
+    static async_oper* post_oper_constr(void* addr, size_t size, const void* cookie);
+
+    using clock = std::chrono::steady_clock;
 
     class impl;
     const std::unique_ptr<impl> m_impl;
@@ -314,7 +339,7 @@ public:
     query(std::string host, std::string service, int flags = address_configured);
     query(const protocol&, std::string host, std::string service, int flags = address_configured);
 
-    ~query() noexcept {}
+    ~query() noexcept;
 
     int flags() const;
     class protocol protocol() const;
@@ -400,8 +425,8 @@ private:
 protected:
     io_service& m_service;
     protocol m_protocol;
-    io_service::async_oper* m_read_oper  = nullptr; // Read or accept
-    io_service::async_oper* m_write_oper = nullptr; // Write or connect
+    io_service::OwnersOperPtr m_read_oper;  // Read or accept
+    io_service::OwnersOperPtr m_write_oper; // Write or connect
 
     socket_base(io_service&);
 
@@ -443,7 +468,7 @@ private:
 class socket: public socket_base {
 public:
     socket(io_service&);
-    ~socket() noexcept {}
+    ~socket() noexcept;
 
     void connect(const endpoint&);
     std::error_code connect(const endpoint&, std::error_code&);
@@ -506,15 +531,20 @@ private:
     class write_oper_base;
     template<class H> class write_oper;
 
+    using LendersConnectOperPtr =
+        std::unique_ptr<connect_oper_base, io_service::LendersOperDeleter>;
+    using LendersWriteOperPtr =
+        std::unique_ptr<write_oper_base, io_service::LendersOperDeleter>;
+
     size_t do_read_some(char* buffer, size_t size, std::error_code& ec) noexcept;
     size_t do_write_some(const char* data, size_t size, std::error_code&) noexcept;
 
-    void do_async_connect(std::unique_ptr<connect_oper_base>);
+    void do_async_connect(LendersConnectOperPtr);
     // `ec` untouched on success, but no immediate completion
     bool initiate_async_connect(const endpoint&, std::error_code& ec) noexcept;
     // `ec` untouched on success
     std::error_code finalize_async_connect(std::error_code& ec) noexcept;
-    void do_async_write(std::unique_ptr<write_oper_base>);
+    void do_async_write(LendersWriteOperPtr);
 
     friend class buffered_input_stream;
 };
@@ -523,7 +553,7 @@ private:
 class acceptor: public socket_base {
 public:
     acceptor(io_service&);
-    ~acceptor() noexcept {}
+    ~acceptor() noexcept;
 
     static const int max_connections = SOMAXCONN;
 
@@ -578,16 +608,18 @@ private:
     class accept_oper_base;
     template<class H> class accept_oper;
 
+    using LendersAcceptOperPtr = std::unique_ptr<accept_oper_base, io_service::LendersOperDeleter>;
+
     template<class H>
     void async_accept(socket&, endpoint*, const H&);
-    void do_async_accept(std::unique_ptr<accept_oper_base>);
+    void do_async_accept(LendersAcceptOperPtr);
 };
 
 
 class buffered_input_stream {
 public:
     buffered_input_stream(socket&);
-    ~buffered_input_stream() noexcept {}
+    ~buffered_input_stream() noexcept;
 
     size_t read(char* buffer, size_t size);
     size_t read(char* buffer, size_t size, std::error_code&) noexcept;
@@ -649,6 +681,8 @@ private:
     class read_oper_base;
     template<class H> class read_oper;
 
+    using LendersReadOperPtr = std::unique_ptr<read_oper_base, io_service::LendersOperDeleter>;
+
     socket& m_socket;
     static const size_t s_buffer_size = 1024;
     std::unique_ptr<char[]> m_buffer;
@@ -659,7 +693,7 @@ private:
 
     template<class H>
     void async_read(char* buffer, size_t size, int delim, const H& handler);
-    void do_async_read(std::unique_ptr<read_oper_base>);
+    void do_async_read(LendersReadOperPtr);
 };
 
 
@@ -717,7 +751,7 @@ private:
     using clock = io_service::clock;
 
     io_service& m_service;
-    io_service::wait_oper_base* m_wait_oper = nullptr;
+    io_service::OwnersWaitOperPtr m_wait_oper;
 };
 
 
@@ -889,22 +923,45 @@ inline endpoint::list::iterator endpoint::list::end() const
 
 class io_service::async_oper {
 public:
-    bool complete = false;
-    bool canceled = false;
-
+    bool in_use() const noexcept;
+    bool is_complete() const noexcept;
+    bool is_uncanceled() const noexcept;
+    void cancel() noexcept;
     virtual void proceed() noexcept = 0;
-    virtual void exec_handler() const = 0;
+    /// Every object of type \ref async_oper must be desroyed either by a call
+    /// to this function or to recycle(). This function recycles the operation
+    /// object (commits suicide), even if it throws.
+    virtual void recycle_and_execute() = 0;
+    /// Every object of type \ref async_oper must be destroyed either by a call
+    /// to recycle_and_execute() or to this function. This function destroys the
+    /// object (commits suicide).
+    virtual void recycle() noexcept = 0;
+    /// Must be called when the owner dies, and the object is in use (not an
+    /// instance of UnusedOper).
+    virtual void orphan()  noexcept = 0;
     virtual ~async_oper() noexcept {}
-
+protected:
+    async_oper(size_t size, bool in_use) noexcept;
+    bool is_canceled() const noexcept;
+    void set_is_complete(bool value) noexcept;
+    template<class H, class... Args>
+    void do_recycle_and_execute(bool orphaned, H& handler, Args&&...);
+    void do_recycle(bool orphaned) noexcept;
 private:
-    async_oper* m_next = nullptr;
+    size_t m_size; // Allocated number of bytes
+    bool m_in_use   = false;
+    bool m_complete = false;      // Always false when not in use
+    bool m_canceled = false;      // Always false when not in use
+    async_oper* m_next = nullptr; // Always null when not in use
     friend class io_service;
 };
 
 class io_service::wait_oper_base:
         public async_oper {
 public:
-    wait_oper_base(clock::time_point expiration_time):
+    wait_oper_base(size_t size, deadline_timer& timer, clock::time_point expiration_time):
+        async_oper(size, true), // Second argument is `in_use`
+        m_timer(&timer),
         m_expiration_time(expiration_time)
     {
     }
@@ -912,38 +969,247 @@ public:
     {
         REALM_ASSERT(false); // Never called
     }
-private:
+    void recycle() noexcept override
+    {
+        bool orphaned = !m_timer;
+        // Note: do_recycle() commits suicide.
+        do_recycle(orphaned);
+    }
+    void orphan() noexcept override
+    {
+        m_timer = 0;
+    }
+protected:
+    deadline_timer* m_timer;
     clock::time_point m_expiration_time;
     friend class io_service;
 };
 
-template<class H>
-class io_service::post_oper:
+class io_service::post_oper_base:
         public async_oper {
 public:
-    post_oper(const H& handler):
-        m_handler(handler)
+    post_oper_base(size_t size):
+        async_oper(size, true) // Second argument is `in_use`
     {
     }
     void proceed() noexcept override
     {
         REALM_ASSERT(false); // Never called
     }
-    void exec_handler() const override
+    void recycle() noexcept override
     {
-        m_handler(); // Throws
+        bool orphaned = m_orphaned;
+        // Note: do_recycle() commits suicide.
+        do_recycle(orphaned);
+    }
+    void orphan() noexcept override
+    {
+        m_orphaned = true;
+    }
+protected:
+    bool m_orphaned = false;
+};
+
+template<class H>
+class io_service::post_oper:
+        public post_oper_base {
+public:
+    post_oper(size_t size, const H& handler):
+        post_oper_base(size),
+        m_handler(handler)
+    {
+    }
+    void recycle_and_execute() override
+    {
+        bool orphaned = m_orphaned;
+        // Note: do_recycle_and_execute() commits suicide.
+        do_recycle_and_execute(orphaned, m_handler); // Throws
     }
 private:
     const H m_handler;
 };
 
-template<class H>
-inline void io_service::post(const H& handler)
+class io_service::UnusedOper:
+        public async_oper {
+public:
+    UnusedOper(size_t size) noexcept:
+        async_oper(size, false) // Second argument is `in_use`
+    {
+    }
+    void proceed() noexcept override
+    {
+        REALM_ASSERT(false); // Never called
+    }
+    void recycle_and_execute() override
+    {
+        // Must never be called
+        REALM_ASSERT(false);
+    }
+    void recycle() noexcept override
+    {
+        // Must never be called
+        REALM_ASSERT(false);
+    }
+    void orphan() noexcept override
+    {
+        // Must never be called
+        REALM_ASSERT(false);
+    }
+};
+
+template<class H> inline void io_service::post(const H& handler)
 {
-    std::unique_ptr<io_service::post_oper<H>> op;
-    op.reset(new io_service::post_oper<H>(handler)); // Throws
-    add_post_oper(std::move(op));
+    do_post(&io_service::post_oper_constr<H>, sizeof (post_oper<H>), &handler);
 }
+
+inline void io_service::OwnersOperDeleter::operator()(async_oper* op) const noexcept
+{
+    if (op->in_use()) {
+        op->orphan();
+    }
+    else {
+        void* addr = op;
+        op->~async_oper();
+        delete[] static_cast<char*>(addr);
+    }
+}
+
+inline void io_service::LendersOperDeleter::operator()(async_oper* op) const noexcept
+{
+    op->recycle(); // Suicide
+}
+
+template<class Oper, class Oper2, class... Args>
+std::unique_ptr<Oper, io_service::LendersOperDeleter>
+io_service::alloc(std::unique_ptr<Oper2, OwnersOperDeleter>& owners_ptr, Args&&... args)
+{
+    void* addr = owners_ptr.get();
+    size_t size;
+    if (REALM_LIKELY(addr)) {
+        REALM_ASSERT(!owners_ptr->in_use());
+        size = owners_ptr->m_size;
+        owners_ptr->~async_oper();
+        if (REALM_UNLIKELY(size < sizeof (Oper))) {
+            owners_ptr.release();
+            delete[] static_cast<char*>(addr);
+            goto no_object;
+        }
+    }
+    else {
+      no_object:
+        addr = new char[sizeof (Oper)]; // Throws
+        size = sizeof (Oper);
+        owners_ptr.reset(static_cast<Oper2*>(addr));
+    }
+    std::unique_ptr<Oper, LendersOperDeleter> lenders_ptr;
+    try {
+        lenders_ptr.reset(new (addr) Oper(size, std::forward<Args>(args)...)); // Throws
+    }
+    catch (...) {
+        new (addr) UnusedOper(size); // Does not throw
+        throw;
+    }
+    return lenders_ptr;
+}
+
+template<class Oper>
+inline void io_service::execute(std::unique_ptr<Oper, LendersOperDeleter>& lenders_ptr)
+{
+    lenders_ptr.release()->recycle_and_execute(); // Throws
+}
+
+template<class H> inline io_service::async_oper*
+io_service::post_oper_constr(void* addr, size_t size, const void* cookie)
+{
+    const H& handler = *static_cast<const H*>(cookie);
+    return new (addr) post_oper<H>(size, handler); // Throws
+}
+
+inline bool io_service::async_oper::in_use() const noexcept
+{
+    return m_in_use != 0;
+}
+
+inline bool io_service::async_oper::is_complete() const noexcept
+{
+    return m_complete;
+}
+
+inline bool io_service::async_oper::is_uncanceled() const noexcept
+{
+    return m_in_use && !m_canceled;
+}
+
+inline void io_service::async_oper::cancel() noexcept
+{
+    REALM_ASSERT(m_in_use);
+    REALM_ASSERT(!m_canceled);
+    m_canceled = true;
+}
+
+inline io_service::async_oper::async_oper(size_t size, bool in_use) noexcept:
+    m_size(size),
+    m_in_use(in_use)
+{
+}
+
+inline bool io_service::async_oper::is_canceled() const noexcept
+{
+    return m_canceled;
+}
+
+inline void io_service::async_oper::set_is_complete(bool value) noexcept
+{
+    REALM_ASSERT(!m_complete);
+    if (value)
+        REALM_ASSERT(m_in_use);
+    m_complete = value;
+}
+
+template<class H, class... Args>
+inline void io_service::async_oper::do_recycle_and_execute(bool orphaned, H& handler,
+                                                           Args&&... args)
+{
+    // Recycle the operation object before the handler is exceuted, such that it
+    // is available for reuse during the execution of the handler.
+    bool was_recycled = false;
+    try {
+        H handler_2 = std::move(handler); // Throws
+        // The caller (various subclasses of `async_oper`) must not pass any
+        // arguments to the completion handler by reference if they refer to
+        // this operation object, or parts of it. Due to the recycling of the
+        // operation object (`do_recycle()`), such references would become
+        // dangling before the invocation of the completion handler. Due to
+        // `std::decay`, the following tuple will introduce a copy of all
+        // nonconst lvalue reference arguments, preventing such references from
+        // being passed through.
+        std::tuple<typename std::decay<Args>::type...> copy_of_args(args...);
+        do_recycle(orphaned);
+        was_recycled = true;
+        util::call_with_tuple(handler_2, std::move(copy_of_args)); // Throws
+    }
+    catch (...) {
+        if (!was_recycled)
+            do_recycle(orphaned);
+        throw;
+    }
+}
+
+inline void io_service::async_oper::do_recycle(bool orphaned) noexcept
+{
+    REALM_ASSERT(in_use());
+    void* addr = this;
+    size_t size = m_size;
+    this->~async_oper(); // Suicide
+    if (orphaned) {
+        delete[] static_cast<char*>(addr);
+    }
+    else {
+        new (addr) UnusedOper(size);
+    }
+}
+
+// ---------------- resolver ----------------
 
 inline resolver::resolver(io_service& serv):
     m_service(serv)
@@ -954,8 +1220,6 @@ inline io_service& resolver::service() noexcept
 {
     return m_service;
 }
-
-// ---------------- resolver ----------------
 
 inline void resolver::resolve(const query& q, endpoint::list& l)
 {
@@ -990,6 +1254,10 @@ inline resolver::query::query(const class protocol& prot, std::string host, std:
     m_protocol(prot),
     m_host(host),
     m_service(service)
+{
+}
+
+inline resolver::query::~query() noexcept
 {
 }
 
@@ -1167,22 +1435,33 @@ inline void socket_base::option<T, opt, U>::set(socket_base& sock, std::error_co
 class socket::connect_oper_base:
         public io_service::async_oper {
 public:
-    connect_oper_base(socket& sock, const endpoint& ep):
-        m_socket(sock)
+    connect_oper_base(size_t size, socket& sock, const endpoint& ep):
+        async_oper(size, true), // Second argument is `in_use`
+        m_socket(&sock)
     {
-        if (m_socket.initiate_async_connect(ep, m_error_code))
-            complete = true; // Failure, or immediate completion
+        if (m_socket->initiate_async_connect(ep, m_error_code))
+            set_is_complete(true); // Failure, or immediate completion
     }
     void proceed() noexcept override
     {
-        REALM_ASSERT(!complete);
-        REALM_ASSERT(!canceled);
+        REALM_ASSERT(!is_complete());
+        REALM_ASSERT(!is_canceled());
         REALM_ASSERT(!m_error_code);
-        m_socket.finalize_async_connect(m_error_code);
-        complete = true;
+        m_socket->finalize_async_connect(m_error_code);
+        set_is_complete(true);
+    }
+    void recycle() noexcept override
+    {
+        bool orphaned = !m_socket;
+        // Note: do_recycle() commits suicide.
+        do_recycle(orphaned);
+    }
+    void orphan() noexcept override
+    {
+        m_socket = 0;
     }
 protected:
-    socket& m_socket;
+    socket* m_socket;
     std::error_code m_error_code;
 };
 
@@ -1190,24 +1469,20 @@ template<class H>
 class socket::connect_oper:
         public connect_oper_base {
 public:
-    connect_oper(socket& sock, const endpoint& ep, const H& handler):
-        connect_oper_base(sock, ep),
+    connect_oper(size_t size, socket& sock, const endpoint& ep, const H& handler):
+        connect_oper_base(size, sock, ep),
         m_handler(handler)
     {
     }
-    void exec_handler() const override
+    void recycle_and_execute() override
     {
-        REALM_ASSERT(complete || canceled);
-        std::error_code ec;
-        if (canceled) {
+        REALM_ASSERT(is_complete() || is_canceled());
+        bool orphaned = !m_socket;
+        std::error_code ec = m_error_code;
+        if (is_canceled())
             ec = error::operation_aborted;
-        }
-        else {
-            REALM_ASSERT(m_socket.m_write_oper);
-            m_socket.m_write_oper = nullptr;
-            ec = m_error_code;
-        }
-        m_handler(ec); // Throws
+        // Note: do_recycle_and_execute() commits suicide.
+        do_recycle_and_execute(orphaned, m_handler, ec); // Throws
     }
 private:
     const H m_handler;
@@ -1216,32 +1491,44 @@ private:
 class socket::write_oper_base:
         public io_service::async_oper {
 public:
-    write_oper_base(socket& s, const char* data, size_t size):
-        m_socket(s),
+    write_oper_base(size_t size_1, socket& sock, const char* data, size_t size_2):
+        async_oper(size_1, true), // Second argument is `in_use`
+        m_socket(&sock),
         m_begin(data),
-        m_end(data + size),
+        m_end(data + size_2),
         m_curr(data)
     {
     }
     void initiate() noexcept
     {
-        if (m_socket.ensure_nonblocking_mode(m_error_code))
-            complete = true; // Failure
+        REALM_ASSERT(!is_complete());
+        if (m_socket->ensure_nonblocking_mode(m_error_code))
+            set_is_complete(true); // Failure
     }
     void proceed() noexcept override
     {
-        REALM_ASSERT(!complete);
-        REALM_ASSERT(!canceled);
+        REALM_ASSERT(!is_complete());
+        REALM_ASSERT(!is_canceled());
         REALM_ASSERT(!m_error_code);
         REALM_ASSERT(m_curr <= m_end);
         size_t n_1 = size_t(m_end - m_curr);
-        size_t n_2 = m_socket.do_write_some(m_curr, n_1, m_error_code);
+        size_t n_2 = m_socket->do_write_some(m_curr, n_1, m_error_code);
         REALM_ASSERT(n_2 <= n_1);
         m_curr += n_2;
-        complete = (m_error_code || m_curr == m_end);
+        set_is_complete(m_error_code || m_curr == m_end);
+    }
+    void recycle() noexcept override
+    {
+        bool orphaned = !m_socket;
+        // Note: do_recycle() commits suicide.
+        do_recycle(orphaned);
+    }
+    void orphan() noexcept override
+    {
+        m_socket = 0;
     }
 protected:
-    socket& m_socket;
+    socket* m_socket;
     const char* const m_begin;
     const char* const m_end;
     const char* m_curr;
@@ -1252,27 +1539,23 @@ template<class H>
 class socket::write_oper:
         public write_oper_base {
 public:
-    write_oper(socket& s, const char* data, size_t size, const H& handler):
-        write_oper_base(s, data, size),
+    write_oper(size_t size_1, socket& sock, const char* data, size_t size_2, const H& handler):
+        write_oper_base(size_1, sock, data, size_2),
         m_handler(handler)
     {
     }
-    void exec_handler() const override
+    void recycle_and_execute() override
     {
-        REALM_ASSERT(complete || canceled);
-        REALM_ASSERT(complete == (m_error_code || m_curr == m_end));
+        REALM_ASSERT(is_complete() || is_canceled());
+        REALM_ASSERT(is_complete() == (m_error_code || m_curr == m_end));
         REALM_ASSERT(m_curr >= m_begin);
-        size_t num_bytes_transferred = size_t(m_curr - m_begin);
-        std::error_code ec;
-        if (canceled) {
+        bool orphaned = !m_socket;
+        std::error_code ec = m_error_code;
+        if (is_canceled())
             ec = error::operation_aborted;
-        }
-        else {
-            REALM_ASSERT(m_socket.m_write_oper);
-            m_socket.m_write_oper = nullptr;
-            ec = m_error_code;
-        }
-        m_handler(ec, num_bytes_transferred); // Throws
+        size_t num_bytes_transferred = size_t(m_curr - m_begin);
+        // Note: do_recycle_and_execute() commits suicide.
+        do_recycle_and_execute(orphaned, m_handler, ec, num_bytes_transferred); // Throws
     }
 private:
     const H m_handler;
@@ -1280,6 +1563,10 @@ private:
 
 inline socket::socket(io_service& service):
     socket_base(service)
+{
+}
+
+inline socket::~socket() noexcept
 {
 }
 
@@ -1293,12 +1580,9 @@ inline void socket::connect(const endpoint& ep)
 template<class H>
 inline void socket::async_connect(const endpoint& ep, const H& handler)
 {
-    REALM_ASSERT(!m_write_oper);
-    std::unique_ptr<connect_oper<H>> op;
-    op.reset(new connect_oper<H>(*this, ep, handler)); // Throws
-    connect_oper<H>* op_2 = op.get();
+    LendersConnectOperPtr op =
+        io_service::alloc<connect_oper<H>>(m_write_oper, *this, ep, handler); // Throws
     do_async_connect(std::move(op)); // Throws
-    m_write_oper = op_2;
 }
 
 inline void socket::write(const char* data, size_t size)
@@ -1311,12 +1595,9 @@ inline void socket::write(const char* data, size_t size)
 template<class H>
 inline void socket::async_write(const char* data, size_t size, const H& handler)
 {
-    REALM_ASSERT(!m_write_oper);
-    std::unique_ptr<write_oper<H>> op;
-    op.reset(new write_oper<H>(*this, data, size, handler)); // Throws
-    write_oper<H>* op_2 = op.get();
+    LendersWriteOperPtr op =
+        io_service::alloc<write_oper<H>>(m_write_oper, *this, data, size, handler); // Throws
     do_async_write(std::move(op)); // Throws
-    m_write_oper = op_2;
 }
 
 inline size_t socket::read_some(char* buffer, size_t size)
@@ -1351,9 +1632,9 @@ inline size_t socket::write_some(const char* data, size_t size, std::error_code&
     return do_write_some(data, size, ec);
 }
 
-inline void socket::do_async_connect(std::unique_ptr<connect_oper_base> op)
+inline void socket::do_async_connect(LendersConnectOperPtr op)
 {
-    if (op->complete) {
+    if (op->is_complete()) {
         m_service.add_completed_oper(std::move(op));
     }
     else {
@@ -1361,10 +1642,10 @@ inline void socket::do_async_connect(std::unique_ptr<connect_oper_base> op)
     }
 }
 
-inline void socket::do_async_write(std::unique_ptr<write_oper_base> op)
+inline void socket::do_async_write(LendersWriteOperPtr op)
 {
     op->initiate();
-    if (op->complete) {
+    if (op->is_complete()) {
         m_service.add_completed_oper(std::move(op));
     }
     else {
@@ -1377,28 +1658,40 @@ inline void socket::do_async_write(std::unique_ptr<write_oper_base> op)
 class acceptor::accept_oper_base:
         public io_service::async_oper {
 public:
-    accept_oper_base(acceptor& a, socket& s, endpoint* e):
-        m_acceptor(a),
+    accept_oper_base(size_t size, acceptor& a, socket& s, endpoint* e):
+        async_oper(size, true), // Second argument is `in_use`
+        m_acceptor(&a),
         m_socket(s),
         m_endpoint(e)
     {
     }
     void initiate() noexcept
     {
-        if (m_acceptor.ensure_nonblocking_mode(m_error_code))
-            complete = true; // Failure
+        REALM_ASSERT(!is_complete());
+        if (m_acceptor->ensure_nonblocking_mode(m_error_code))
+            set_is_complete(true); // Failure
     }
     void proceed() noexcept override
     {
-        REALM_ASSERT(!complete);
-        REALM_ASSERT(!canceled);
+        REALM_ASSERT(!is_complete());
+        REALM_ASSERT(!is_canceled());
         REALM_ASSERT(!m_error_code);
         REALM_ASSERT(!m_socket.is_open());
-        m_acceptor.do_accept(m_socket, m_endpoint, m_error_code);
-        complete = true;
+        m_acceptor->do_accept(m_socket, m_endpoint, m_error_code);
+        set_is_complete(true);
+    }
+    void recycle() noexcept override
+    {
+        bool orphaned = !m_acceptor;
+        // Note: do_recycle() commits suicide.
+        do_recycle(orphaned);
+    }
+    void orphan() noexcept override
+    {
+        m_acceptor = 0;
     }
 protected:
-    acceptor& m_acceptor;
+    acceptor* m_acceptor;
     socket& m_socket;
     endpoint* const m_endpoint;
     std::error_code m_error_code;
@@ -1408,25 +1701,21 @@ template<class H>
 class acceptor::accept_oper:
         public accept_oper_base {
 public:
-    accept_oper(acceptor& a, socket& s, endpoint* e, const H& handler):
-        accept_oper_base(a, s, e),
+    accept_oper(size_t size, acceptor& a, socket& s, endpoint* e, const H& handler):
+        accept_oper_base(size, a, s, e),
         m_handler(handler)
     {
     }
-    void exec_handler() const override
+    void recycle_and_execute() override
     {
-        REALM_ASSERT(complete || canceled);
-        REALM_ASSERT(complete == (m_socket.is_open() || m_error_code));
-        std::error_code ec;
-        if (canceled) {
+        REALM_ASSERT(is_complete() || is_canceled());
+        REALM_ASSERT(is_complete() == (m_socket.is_open() || m_error_code));
+        bool orphaned = !m_acceptor;
+        std::error_code ec = m_error_code;
+        if (is_canceled())
             ec = error::operation_aborted;
-        }
-        else {
-            REALM_ASSERT(m_acceptor.m_read_oper);
-            m_acceptor.m_read_oper = nullptr;
-            ec = m_error_code;
-        }
-        m_handler(ec); // Throws
+        // Note: do_recycle_and_execute() commits suicide.
+        do_recycle_and_execute(orphaned, m_handler, ec); // Throws
     }
 private:
     const H m_handler;
@@ -1434,6 +1723,10 @@ private:
 
 inline acceptor::acceptor(io_service& service):
     socket_base(service)
+{
+}
+
+inline acceptor::~acceptor() noexcept
 {
 }
 
@@ -1484,7 +1777,7 @@ inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
 
 inline std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_code& ec)
 {
-    REALM_ASSERT(!m_read_oper);
+    REALM_ASSERT(!m_read_oper || !m_read_oper->in_use());
     if (REALM_UNLIKELY(sock.is_open()))
         throw std::runtime_error("Socket is already open");
     if (ensure_blocking_mode(ec))
@@ -1495,20 +1788,17 @@ inline std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_c
 template<class H>
 inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
 {
-    REALM_ASSERT(!m_read_oper);
     if (REALM_UNLIKELY(sock.is_open()))
         throw std::runtime_error("Socket is already open");
-    std::unique_ptr<accept_oper<H>> op;
-    op.reset(new accept_oper<H>(*this, sock, ep, handler)); // Throws
-    accept_oper<H>* op_2 = op.get();
+    LendersAcceptOperPtr op =
+        io_service::alloc<accept_oper<H>>(m_read_oper, *this, sock, ep, handler); // Throws
     do_async_accept(std::move(op)); // Throws
-    m_read_oper = op_2;
 }
 
-inline void acceptor::do_async_accept(std::unique_ptr<accept_oper_base> op)
+inline void acceptor::do_async_accept(LendersAcceptOperPtr op)
 {
     op->initiate();
-    if (op->complete) {
+    if (op->is_complete()) {
         m_service.add_completed_oper(std::move(op));
     }
     else {
@@ -1521,26 +1811,39 @@ inline void acceptor::do_async_accept(std::unique_ptr<accept_oper_base> op)
 class buffered_input_stream::read_oper_base:
         public io_service::async_oper {
 public:
-    read_oper_base(buffered_input_stream& s, char* buffer, size_t size, int delim):
-        m_stream(s),
+    read_oper_base(size_t size_1, buffered_input_stream& s, char* buffer, size_t size_2,
+                   int delim):
+        async_oper(size_1, true), // Second argument is `in_use`
+        m_stream(&s),
         m_out_begin(buffer),
-        m_out_end(buffer + size),
+        m_out_end(buffer + size_2),
         m_out_curr(buffer),
         m_delim(delim)
     {
     }
     void initiate() noexcept
     {
+        REALM_ASSERT(!is_complete());
         process_buffered_input();
-        if (!complete) {
-            if (m_stream.m_socket.ensure_nonblocking_mode(m_error_code))
-                complete = true; // Failure
+        if (!is_complete()) {
+            if (m_stream->m_socket.ensure_nonblocking_mode(m_error_code))
+                set_is_complete(true); // Failure
         }
     }
     void process_buffered_input() noexcept;
     void proceed() noexcept override;
+    void recycle() noexcept override
+    {
+        bool orphaned = !m_stream;
+        // Note: do_recycle() commits suicide.
+        do_recycle(orphaned);
+    }
+    void orphan() noexcept override
+    {
+        m_stream = 0;
+    }
 protected:
-    buffered_input_stream& m_stream;
+    buffered_input_stream* m_stream;
     char* const m_out_begin;
     char* const m_out_end;
     char* m_out_curr;
@@ -1552,30 +1855,28 @@ template<class H>
 class buffered_input_stream::read_oper:
         public read_oper_base {
 public:
-    read_oper(buffered_input_stream& s, char* buffer, size_t size, int delim, const H& h):
-        read_oper_base(s, buffer, size, delim),
+    read_oper(size_t size_1, buffered_input_stream& stream, char* buffer, size_t size_2, int delim,
+              const H& h):
+        read_oper_base(size_1, stream, buffer, size_2, delim),
         m_handler(h)
     {
     }
-    void exec_handler() const override
+    void recycle_and_execute() override
     {
-        REALM_ASSERT(complete || canceled);
-        REALM_ASSERT(complete == (m_error_code || (m_delim != std::char_traits<char>::eof() ?
-                                                   m_out_curr > m_out_begin && m_out_curr[-1] ==
-                                                   std::char_traits<char>::to_char_type(m_delim) :
-                                                   m_out_curr == m_out_end)));
+        REALM_ASSERT(is_complete() || is_canceled());
+        REALM_ASSERT(is_complete() ==
+                     (m_error_code || (m_delim != std::char_traits<char>::eof() ?
+                                       m_out_curr > m_out_begin && m_out_curr[-1] ==
+                                       std::char_traits<char>::to_char_type(m_delim) :
+                                       m_out_curr == m_out_end)));
         REALM_ASSERT(m_out_curr >= m_out_begin);
-        size_t num_bytes_transferred = size_t(m_out_curr - m_out_begin);
-        std::error_code ec;
-        if (canceled) {
+        bool orphaned = !m_stream;
+        std::error_code ec = m_error_code;
+        if (is_canceled())
             ec = error::operation_aborted;
-        }
-        else {
-            REALM_ASSERT(m_stream.m_socket.m_read_oper);
-            m_stream.m_socket.m_read_oper = nullptr;
-            ec = m_error_code;
-        }
-        m_handler(ec, num_bytes_transferred); // Throws
+        size_t num_bytes_transferred = size_t(m_out_curr - m_out_begin);
+        // Note: do_recycle_and_execute() commits suicide.
+        do_recycle_and_execute(orphaned, m_handler, ec, num_bytes_transferred); // Throws
     }
 private:
     const H m_handler;
@@ -1589,6 +1890,10 @@ inline buffered_input_stream::buffered_input_stream(socket& sock):
 {
 }
 
+inline buffered_input_stream::~buffered_input_stream() noexcept
+{
+}
+
 inline size_t buffered_input_stream::read(char* buffer, size_t size)
 {
     std::error_code ec;
@@ -1598,8 +1903,7 @@ inline size_t buffered_input_stream::read(char* buffer, size_t size)
     return n;
 }
 
-inline size_t buffered_input_stream::read(char* buffer, size_t size,
-                                               std::error_code& ec) noexcept
+inline size_t buffered_input_stream::read(char* buffer, size_t size, std::error_code& ec) noexcept
 {
     return do_read(buffer, size, std::char_traits<char>::eof(), ec);
 }
@@ -1614,7 +1918,7 @@ inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char 
 }
 
 inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim,
-                                                     std::error_code& ec) noexcept
+                                                std::error_code& ec) noexcept
 {
     return do_read(buffer, size, std::char_traits<char>::to_int_type(delim), ec);
 }
@@ -1636,18 +1940,16 @@ template<class H>
 inline void buffered_input_stream::async_read(char* buffer, size_t size, int delim,
                                               const H& handler)
 {
-    REALM_ASSERT(!m_socket.m_read_oper);
-    std::unique_ptr<read_oper<H>> op;
-    op.reset(new read_oper<H>(*this, buffer, size, delim, handler)); // Throws
-    read_oper<H>* op_2 = op.get();
+    LendersReadOperPtr op =
+        io_service::alloc<read_oper<H>>(m_socket.m_read_oper, *this, buffer, size, delim,
+                                       handler); // Throws
     do_async_read(std::move(op)); // Throws
-    m_socket.m_read_oper = op_2;
 }
 
-inline void buffered_input_stream::do_async_read(std::unique_ptr<read_oper_base> op)
+inline void buffered_input_stream::do_async_read(LendersReadOperPtr op)
 {
     op->initiate();
-    if (op->complete) {
+    if (op->is_complete()) {
         m_socket.m_service.add_completed_oper(std::move(op));
     }
     else {
@@ -1662,26 +1964,21 @@ template<class H>
 class deadline_timer::wait_oper:
         public io_service::wait_oper_base {
 public:
-    wait_oper(deadline_timer& timer, clock::time_point expiration_time, const H& handler):
-        io_service::wait_oper_base(expiration_time),
-        m_timer(timer),
+    wait_oper(size_t size, deadline_timer& timer, clock::time_point expiration_time, const H& handler):
+        io_service::wait_oper_base(size, timer, expiration_time),
         m_handler(handler)
     {
     }
-    void exec_handler() const override
+    void recycle_and_execute() override
     {
+        bool orphaned = !m_timer;
         std::error_code ec;
-        if (canceled) {
+        if (is_canceled())
             ec = error::operation_aborted;
-        }
-        else {
-            REALM_ASSERT(m_timer.m_wait_oper);
-            m_timer.m_wait_oper = nullptr;
-        }
-        m_handler(ec);
+        // Note: do_recycle_and_execute() commits suicide.
+        do_recycle_and_execute(orphaned, m_handler, ec); // Throws
     }
 private:
-    deadline_timer& m_timer;
     const H m_handler;
 };
 
@@ -1703,17 +2000,14 @@ inline io_service& deadline_timer::service() noexcept
 template<class R, class P, class H>
 inline void deadline_timer::async_wait(std::chrono::duration<R,P> delay, const H& handler) noexcept
 {
-    REALM_ASSERT(!m_wait_oper);
     clock::time_point now = clock::now();
     auto max_add = clock::time_point::max() - now;
     if (delay > max_add)
         throw std::runtime_error("Expiration time overflow");
     clock::time_point expiration_time = now + delay;
-    std::unique_ptr<wait_oper<H>> op;
-    op.reset(new wait_oper<H>(*this, expiration_time, handler)); // Throws
-    wait_oper<H>* op_2 = op.get();
+    io_service::LendersWaitOperPtr op =
+        io_service::alloc<wait_oper<H>>(m_wait_oper, *this, expiration_time, handler); // Throws
     m_service.add_wait_oper(std::move(op)); // Throws
-    m_wait_oper = op_2;
 }
 
 } // namespace network
