@@ -7968,7 +7968,7 @@ TEST(Query_NegativeNumbers)
 
 // Exposes bug that would lead to nulls being included as 0 value in average when performed
 // on Query. When performed on TableView or Table, it worked OK.
-ONLY(Query_MaximumSumAverage)
+TEST(Query_MaximumSumAverage)
 {
     for (int nullable = 0; nullable < 2; nullable++)
     {
@@ -8249,16 +8249,16 @@ ONLY(Query_MaximumSumAverage)
         {
             int64_t d;
             d = table1->where().count();
-            CHECK_EQUAL(d, 3);
+            CHECK_EQUAL(d, n ? 3 : 2);
 
             d = table1->where().not_equal(0, 1234).count();
-            CHECK_EQUAL(d, 3);
+            CHECK_EQUAL(d, n ? 3 : 2);
 
             d = table1->where().equal(0, 4).count();
             CHECK_EQUAL(d, 1);
 
             d = table1->where().not_equal(0, 3).count();
-            CHECK_EQUAL(d, 2);
+            CHECK_EQUAL(d, n ? 2 : 1);
 
             d = table1->where().equal(2, 3.).count();
             CHECK_EQUAL(d, 1);
