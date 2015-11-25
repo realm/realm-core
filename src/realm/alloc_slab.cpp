@@ -466,67 +466,98 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     size_t initial_size = m_initial_section_size;
 
     size_t initial_size_of_file;
-
-    // The size of a database file must not exceed what can be encoded in
-    // size_t.
     size_t size;
     bool did_create = false;
-    if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file.get_size(), size)))
-        throw InvalidDatabase("Realm file too large", path);
 
-    // FIXME: This initialization procedure does not provide sufficient
-    // robustness given that processes may be abruptly terminated at any point
-    // in time. In unshared mode, we must be able to reliably detect any invalid
-    // file as long as its invalidity is due to a terminated serialization
-    // process (e.g. due to a power failure). In shared mode we can guarantee
-    // that if the database file was ever valid, then it will remain valid,
-    // however, there is no way we can ensure that initialization of an empty
-    // database file succeeds. Thus, in shared mode we must be able to reliably
-    // distiguish between three cases when opening a database file: A) It was
-    // never properly initialized. In this case we should simply reinitialize
-    // it. B) It looks corrupt. In this case we throw an exception. C) It looks
-    // good. In this case we proceede as normal.
-    if (size == 0 || cfg.clear_file) {
-        did_create = true;
-        if (REALM_UNLIKELY(cfg.read_only))
-            throw InvalidDatabase("Read-only access to empty Realm file", path);
+    for (;;) {
 
-        const char* data = reinterpret_cast<const char*>(&empty_file_header);
-        m_file.write(data, sizeof empty_file_header); // Throws
+        // We now try to establish a resonable state of the file before mapping it.
+        // This can fail due to a race with a concurrent commmit, in which case we
+        // must retry, but the common case is to exit this loop after the first pass
 
-        // Pre-alloc initial space
-        m_file.prealloc(0, initial_size); // Throws
-        bool disable_sync = get_disable_sync_to_disk();
-        if (!disable_sync)
-            m_file.sync(); // Throws
-        size = initial_size;
-    }
+        // The size of a database file must not exceed what can be encoded in
+        // size_t.
+        if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file.get_size(), size)))
+            throw InvalidDatabase("Realm file too large", path);
 
-    // We must now make sure the filesize matches a page boundary...
-    // first, save the original filesize for use during validation and
-    // (potentially) conversion from streaming format.
-    initial_size_of_file = size;
+        // FIXME: This initialization procedure does not provide sufficient
+        // robustness given that processes may be abruptly terminated at any point
+        // in time. In unshared mode, we must be able to reliably detect any invalid
+        // file as long as its invalidity is due to a terminated serialization
+        // process (e.g. due to a power failure). In shared mode we can guarantee
+        // that if the database file was ever valid, then it will remain valid,
+        // however, there is no way we can ensure that initialization of an empty
+        // database file succeeds. Thus, in shared mode we must be able to reliably
+        // distiguish between three cases when opening a database file: A) It was
+        // never properly initialized. In this case we should simply reinitialize
+        // it. B) It looks corrupt. In this case we throw an exception. C) It looks
+        // good. In this case we proceede as normal.
+        if (size == 0 || cfg.clear_file) {
+            did_create = true;
+            if (REALM_UNLIKELY(cfg.read_only))
+                throw InvalidDatabase("Read-only access to empty Realm file", path);
 
-    // next extend the file to a mmapping boundary (unless already there)
-    // The file must be extended prior to being mmapped, as extending it after mmap has
-    // undefined behavior.
-    // The mapping of the first part of the file *must* be contiguous, because
-    // we do not know if the file was created by a version of the code, that took
-    // the section boundaries into account. If it wasn't we cannot map it in sections
-    // without risking datastructures that cross a mapping boundary.
-    // If the file is opened read-only, we cannot extend it. This is not a problem,
-    // because for a read-only file we assume that it will not change while we use it.
-    // This assumption obviously will not hold, if the file is shared by multiple
-    // processes with different opening modes.
-    if (!cfg.read_only && !matches_section_boundary(size)) {
+            const char* data = reinterpret_cast<const char*>(&empty_file_header);
+            m_file.write(data, sizeof empty_file_header); // Throws
 
-        REALM_ASSERT_3(cfg.session_initiator, ||, !cfg.is_shared);
-        size = get_upper_section_boundary(size);
-        m_file.prealloc(0, size);
-        // resizing the file (as we do here) without actually changing any internal
-        // datastructures to reflect the additional free space will work, because the
-        // free space management relies on the logical filesize and disregards the
-        // actual size of the file.
+            // Pre-alloc initial space
+            m_file.prealloc(0, initial_size); // Throws
+            bool disable_sync = get_disable_sync_to_disk();
+            if (!disable_sync)
+                m_file.sync(); // Throws
+            size = initial_size;
+        }
+
+        // We must now make sure the filesize matches a mmap boundary...
+        // first, save the original filesize for use during validation and
+        // (potentially) conversion from streaming format.
+        initial_size_of_file = size;
+
+        if (matches_section_boundary(size)) {
+
+            // The file size is ok!
+            break;
+        }
+
+        // The file size did not match a section boundary.
+        // We must extend the file to a section boundary (unless already there)
+        // The file must be extended to match in size prior to being mmapped,
+        // as extending it after mmap has undefined behavior.
+
+        // The mapping of the first part of the file *must* be contiguous, because
+        // we do not know if the file was created by a version of the code, that took
+        // the section boundaries into account. If it wasn't we cannot map it in sections
+        // without risking datastructures that cross a mapping boundary.
+
+        if (cfg.read_only) {
+
+            // If the file is opened read-only, we cannot extend it. This is not a problem,
+            // because for a read-only file we assume that it will not change while we use it.
+            // This assumption obviously will not hold, if the file is shared by multiple
+            // processes with different opening modes.
+            break;
+        }
+
+        if (cfg.session_initiator || !cfg.is_shared) {
+
+            // We can only safely extend the file if we're the session initiator, or if
+            // the file isn't shared at all.
+
+            // resizing the file (as we do here) without actually changing any internal
+            // datastructures to reflect the additional free space will work, because the
+            // free space management relies on the logical filesize and disregards the
+            // actual size of the file.
+            size = get_upper_section_boundary(size);
+            m_file.prealloc(0, size);
+            break;
+        }
+
+        // Getting here, we have a file of a size that will not work, and without being
+        // allowed to extend it.
+        // This can happen in the case where a concurrent commit is extending the file,
+        // and we observe it part-way (file extension is not atomic). If so, we
+        // need to start all over. The alternative would be to synchronize with commit,
+        // and we generally try to avoid this when possible.
     }
 
     ref_type top_ref;
