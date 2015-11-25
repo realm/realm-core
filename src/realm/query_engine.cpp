@@ -46,8 +46,11 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
             m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntegerColumn>;
     }
     else if (TAction == act_Count) {
+        // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
+        // from any column upon each query match (just matchcount++ is performed), and we pass nullable = false simply 
+        // by convention. FIXME: Clean up all this.
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, IntNullColumn>;
+            REALM_ASSERT(false);
         else
             m_column_action_specializer = &ThisType::column_action_specialization<act_Count, IntegerColumn>;
     }
@@ -88,12 +91,18 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         m_column_action_specializer = &ThisType::column_action_specialization<act_Min, DoubleColumn>;
     }
     else if (TAction == act_FindAll) {
+        // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
+        // from any column upon each query match (just a TableView.add(size_t index) is performed), and we pass 
+        // nullable = false simply by convention. FIXME: Clean up all this.
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, IntNullColumn>;
+            REALM_ASSERT(false);
         else
             m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
     }
     else if (TAction == act_CallbackIdx) {
+        // Future features where for each query match, you want to perform an action that only requires knowlege
+        // about the row index, and not the payload there. Examples could be find_all(), however, this code path
+        // below is for new features given in a callback method and not yet supported by core.
         if (nullable)
             m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, IntNullColumn>;
         else
