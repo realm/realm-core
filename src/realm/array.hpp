@@ -2608,6 +2608,8 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
                 Array::minimum(res, start2, end2, &res_ndx);
 
             find_action<action, Callback>(res_ndx + baseindex, res, state, callback);
+            // find_action will increment match count by 1, so we need to `-1` from the number of elements that
+            // we performed the fast Array methods on.
             state->m_match_count += end2 - start2 - 1;
 
         }
