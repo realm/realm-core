@@ -12,7 +12,7 @@ benchmark-transaction \
 benchmark-row-accessor \
 benchmark-util-network \
 experiments \
-fuzzy
+fuzzy \
 
 
 RESOURCES=expect_json.json expect_string.txt

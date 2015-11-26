@@ -275,12 +275,10 @@ private:
     };
     using OwnersOperPtr      = std::unique_ptr<async_oper, OwnersOperDeleter>;
     using LendersOperPtr     = std::unique_ptr<async_oper, LendersOperDeleter>;
-    using OwnersWaitOperPtr  = std::unique_ptr<wait_oper_base, OwnersOperDeleter>;
     using LendersWaitOperPtr = std::unique_ptr<wait_oper_base, LendersOperDeleter>;
 
-    template<class Oper, class Oper2, class... Args>
-    static std::unique_ptr<Oper, LendersOperDeleter>
-    alloc(std::unique_ptr<Oper2, OwnersOperDeleter>&, Args&&...);
+    template<class Oper, class... Args>
+    static std::unique_ptr<Oper, LendersOperDeleter> alloc(OwnersOperPtr&, Args&&...);
 
     template<class Oper> static void execute(std::unique_ptr<Oper, LendersOperDeleter>&);
 
@@ -751,7 +749,7 @@ private:
     using clock = io_service::clock;
 
     io_service& m_service;
-    io_service::OwnersWaitOperPtr m_wait_oper;
+    io_service::OwnersOperPtr m_wait_oper;
 };
 
 
@@ -939,9 +937,9 @@ public:
     /// Must be called when the owner dies, and the object is in use (not an
     /// instance of UnusedOper).
     virtual void orphan()  noexcept = 0;
-    virtual ~async_oper() noexcept {}
 protected:
     async_oper(size_t size, bool in_use) noexcept;
+    virtual ~async_oper() noexcept {}
     bool is_canceled() const noexcept;
     void set_is_complete(bool value) noexcept;
     template<class H, class... Args>
@@ -1079,16 +1077,18 @@ inline void io_service::LendersOperDeleter::operator()(async_oper* op) const noe
     op->recycle(); // Suicide
 }
 
-template<class Oper, class Oper2, class... Args>
-std::unique_ptr<Oper, io_service::LendersOperDeleter>
-io_service::alloc(std::unique_ptr<Oper2, OwnersOperDeleter>& owners_ptr, Args&&... args)
+template<class Oper, class... Args> std::unique_ptr<Oper, io_service::LendersOperDeleter>
+io_service::alloc(OwnersOperPtr& owners_ptr, Args&&... args)
 {
     void* addr = owners_ptr.get();
     size_t size;
     if (REALM_LIKELY(addr)) {
         REALM_ASSERT(!owners_ptr->in_use());
         size = owners_ptr->m_size;
-        owners_ptr->~async_oper();
+        // We can use static dispatch in the destructor call here, since an
+        // object, that is not in use, is always an instance of UnusedOper.
+        REALM_ASSERT(dynamic_cast<UnusedOper*>(owners_ptr.get()));
+        static_cast<UnusedOper*>(owners_ptr.get())->UnusedOper::~UnusedOper();
         if (REALM_UNLIKELY(size < sizeof (Oper))) {
             owners_ptr.release();
             delete[] static_cast<char*>(addr);
@@ -1099,7 +1099,7 @@ io_service::alloc(std::unique_ptr<Oper2, OwnersOperDeleter>& owners_ptr, Args&&.
       no_object:
         addr = new char[sizeof (Oper)]; // Throws
         size = sizeof (Oper);
-        owners_ptr.reset(static_cast<Oper2*>(addr));
+        owners_ptr.reset(static_cast<async_oper*>(addr));
     }
     std::unique_ptr<Oper, LendersOperDeleter> lenders_ptr;
     try {

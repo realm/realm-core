@@ -378,35 +378,38 @@ public:
     {
         {
             LockGuard l(m_mutex);
-            LendersOperPtr op = alloc_post(constr, size, cookie); // Throws
+            LendersOperPtr op = alloc_post(m_post_oper, constr, size, cookie); // Throws
             m_post_operations.push_back(std::move(op));
         }
         wake_up_poll_thread();
     }
 
-    LendersOperPtr alloc_post(PostOperConstr constr, size_t size, const void* cookie)
+    static LendersOperPtr alloc_post(OwnersOperPtr& owners_ptr, PostOperConstr constr, size_t size,
+                                     const void* cookie)
     {
         // Special version of io_service::alloc() for post operations. See
         // io_service::alloc() for more information.
 
         OwnersOperPtr temp_owners_ptr;
-        OwnersOperPtr* owners_ptr_ptr = &m_post_oper;
-        // The cast is for extra type safety
-        void* addr = static_cast<async_oper*>(m_post_oper.get());
+        OwnersOperPtr* owners_ptr_ptr = &owners_ptr;
+        void* addr = owners_ptr.get();
         size_t size_2;
         if (REALM_LIKELY(addr)) {
             // Two operations of a single type are generally not allowed to
             // overlap in time, but in the case of post operations, they
             // are. This is handled by creating additional operations in the
             // orphaned (unowned) state if the owned instance is already in use.
-            if (m_post_oper->in_use()) {
+            if (owners_ptr->in_use()) {
                 owners_ptr_ptr = &temp_owners_ptr;
                 goto no_object;
             }
-            size_2 = m_post_oper->m_size;
-            m_post_oper->async_oper::~async_oper();
+            size_2 = owners_ptr->m_size;
+            // We can use static dispatch in the destructor call here, since an
+            // object, that is not in use, is always an instance of UnusedOper.
+            REALM_ASSERT(dynamic_cast<UnusedOper*>(owners_ptr.get()));
+            static_cast<UnusedOper*>(owners_ptr.get())->UnusedOper::~UnusedOper();
             if (REALM_UNLIKELY(size_2 < size)) {
-                m_post_oper.release();
+                owners_ptr.release();
                 delete[] static_cast<char*>(addr);
                 goto no_object;
             }
@@ -1236,8 +1239,11 @@ void deadline_timer::cancel() noexcept
 {
     if (m_wait_oper && m_wait_oper->is_uncanceled()) {
         m_wait_oper->cancel();
-        if (!m_wait_oper->is_complete())
-            m_service.m_impl->cancel_incomplete_wait_oper(m_wait_oper.get());
+        if (!m_wait_oper->is_complete()) {
+            using wait_oper_base = io_service::wait_oper_base;
+            wait_oper_base* wait_oper = static_cast<wait_oper_base*>(m_wait_oper.get());
+            m_service.m_impl->cancel_incomplete_wait_oper(wait_oper);
+        }
     }
 }
 
