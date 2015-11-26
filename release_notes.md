@@ -12,6 +12,8 @@
 ### Enhancements:
 
 * Added Table::get_version_counter() exposing the versioning counter for the Table
+* Recycle memory allocated for asynchronous operations in the networking
+  subsystem (`util::network`).
 
 -----------
 
