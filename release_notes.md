@@ -1,8 +1,7 @@
 # NEXT RELEASE
 
 ### Bugfixes:
-* Fixed bug that would give false search results for queries on integer columns
-  due to bug in bithacks deep inside Array::find()
+
 * Lorem ipsum.
 
 ### API breaking changes:
@@ -11,7 +10,6 @@
 
 ### Enhancements:
 
-* Added Table::get_version_counter() exposing the versioning counter for the Table
 * Recycle memory allocated for asynchronous operations in the networking
   subsystem (`util::network`).
 
@@ -23,25 +21,18 @@
 
 ----------------------------------------------
 
-# 0.95.0 Release notes
+# 0.95.1 Release notes
 
 ### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
+* Fixed bug that would give false search results for queries on integer columns
+  due to bug in bithacks deep inside Array::find()
 * Lorem ipsum.
 
 ### Enhancements:
 
+* Added Table::get_version_counter() exposing the versioning counter for the Table
 * Add `TableView::get_query()`.
 
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
