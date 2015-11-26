@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Recycle memory allocated for asynchronous operations in the networking
+  subsystem (`util::network`).
 
 -----------
 
