@@ -5,41 +5,11 @@
   due to bug in bithacks deep inside Array::find()
 * Lorem ipsum.
 
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * Added Table::get_version_counter() exposing the versioning counter for the Table
-
------------
-
-### Internals:
-
-* Lorem ipsum.
-
-----------------------------------------------
-
-# 0.95.0 Release notes
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
 * Add `TableView::get_query()`.
 
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
