@@ -193,7 +193,8 @@ typedef TypeAppend<types_12, unsigned long long>::type types_13;
 typedef types_13 types;
 
 
-template<class T, int> struct add_min_max {
+template<class T, int>
+struct add_min_max {
     static void exec(std::set<super_int>* values)
     {
         typedef std::numeric_limits<T> lim;
@@ -202,8 +203,10 @@ template<class T, int> struct add_min_max {
     }
 };
 
-template<class T_1, int> struct test_two_args_1 {
-    template<class T_2, int> struct test_two_args_2 {
+template<class T_1, int>
+struct test_two_args_1 {
+    template<class T_2, int>
+    struct test_two_args_2 {
         static void exec(TestResults* test_results, const std::set<super_int>* values)
         {
             test_two_args<T_1, T_2>(*test_results, *values);

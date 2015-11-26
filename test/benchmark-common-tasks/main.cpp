@@ -8,12 +8,16 @@
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 #include "../util/test_path.hpp"
+#if REALM_ENABLE_ENCRYPTION
+#include "../crypt_key.hpp"
+#endif
 
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
 namespace {
+#define BASE_SIZE 3600
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -30,14 +34,17 @@ namespace {
 */
 
 const size_t min_repetitions = 10;
-const size_t max_repetitions = 100;
-const double min_duration_s = 0.05;
+const size_t max_repetitions = 1000;
+const double min_duration_s = 0.1;
+const double min_warmup_time_s = 0.05;
 
 struct Benchmark
 {
     virtual const char* name() const = 0;
-    virtual void setup(SharedGroup&) {}
-    virtual void teardown(SharedGroup&) {}
+    virtual void before_all(SharedGroup&) {}
+    virtual void after_all(SharedGroup&) {}
+    virtual void before_each(SharedGroup&) {}
+    virtual void after_each(SharedGroup&) {}
     virtual void operator()(SharedGroup&) = 0;
 };
 
@@ -54,7 +61,7 @@ struct AddTable : Benchmark {
         tr.commit();
     }
 
-    void teardown(SharedGroup& group)
+    void after_each(SharedGroup& group)
     {
         Group& g = group.begin_write();
         g.remove_table(name());
@@ -63,7 +70,7 @@ struct AddTable : Benchmark {
 };
 
 struct BenchmarkWithStringsTable : Benchmark {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("StringOnly");
@@ -71,7 +78,7 @@ struct BenchmarkWithStringsTable : Benchmark {
         tr.commit();
     }
 
-    void teardown(SharedGroup& group)
+    void after_all(SharedGroup& group)
     {
         Group& g = group.begin_write();
         g.remove_table("StringOnly");
@@ -80,13 +87,13 @@ struct BenchmarkWithStringsTable : Benchmark {
 };
 
 struct BenchmarkWithStrings : BenchmarkWithStringsTable {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
-        BenchmarkWithStringsTable::setup(group);
+        BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
-        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
+        t->add_empty_row(BASE_SIZE * 4);
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << rand();
             t->set_string(0, i, ss.str());
@@ -96,23 +103,23 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
 };
 
 struct BenchmarkWithLongStrings : BenchmarkWithStrings {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
-        BenchmarkWithStrings::setup(group);
+        BenchmarkWithStrings::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
         t->insert_empty_row(0);
         // This should be enough to upgrade the entire array:
         t->set_string(0, 0, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
         tr.commit();
     }
 };
 
 struct BenchmarkWithIntsTable : Benchmark {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
         TableRef t = tr.add_table("IntOnly");
@@ -120,7 +127,7 @@ struct BenchmarkWithIntsTable : Benchmark {
         tr.commit();
     }
 
-    void teardown(SharedGroup& group)
+    void after_all(SharedGroup& group)
     {
         Group& g = group.begin_write();
         g.remove_table("IntOnly");
@@ -129,14 +136,14 @@ struct BenchmarkWithIntsTable : Benchmark {
 };
 
 struct BenchmarkWithInts : BenchmarkWithIntsTable {
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
-        BenchmarkWithIntsTable::setup(group);
+        BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
+        t->add_empty_row(BASE_SIZE * 4);
         Random r;
-        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             t->set_int(0, i, r.draw_int<int64_t>());
         }
         tr.commit();
@@ -175,6 +182,17 @@ struct BenchmarkSort : BenchmarkWithStrings {
         ConstTableRef table = tr.get_table("StringOnly");
         ConstTableView view = table->get_sorted_view(0);
     }
+};
+
+struct BenchmarkEmptyCommit : Benchmark {
+    const char* name() const { return "EmptyCommit"; }
+
+    void operator()(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        tr.commit();
+    }
+
 };
 
 struct BenchmarkSortInt : BenchmarkWithInts {
@@ -279,7 +297,7 @@ struct BenchmarkSetLongString : BenchmarkWithLongStrings {
 struct BenchmarkQueryNot : Benchmark {
     const char* name() const { return "QueryNot"; }
 
-    void setup(SharedGroup& group)
+    void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
         TableRef table = tr.add_table(name());
@@ -301,7 +319,7 @@ struct BenchmarkQueryNot : Benchmark {
         results.size();
     }
 
-    void teardown(SharedGroup& group)
+    void after_all(SharedGroup& group)
     {
         Group& g = group.begin_write();
         g.remove_table(name());
@@ -309,91 +327,154 @@ struct BenchmarkQueryNot : Benchmark {
     }
 };
 
+struct BenchmarkGetLinkList : Benchmark {
+    const char* name() const { return "GetLinkList"; }
+    static const size_t rows = 10000;
 
+    void before_all(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef destination_table = tr.add_table(std::string(name()) + "_Destination");
+        TableRef table = tr.add_table(name());
+        table->add_column_link(type_LinkList, "linklist", *destination_table);
+        table->add_empty_row(rows);
+        tr.commit();
+    }
 
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table(name());
+        std::vector<ConstLinkViewRef> linklists(rows);
+        for (size_t i = 0; i < rows; ++i) {
+            linklists[i] = table->get_linklist(0, i);
+        }
+        for (size_t i = 0; i < rows; ++i) {
+            table->get_linklist(0, i);
+        }
+        for (size_t i = 0; i < rows; ++i) {
+            linklists[i].reset();
+        }
+    }
+
+    void after_all(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table(name());
+        g.remove_table(std::string(name()) + "_Destination");
+        group.commit();
+    }
+};
 
 const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
 {
     switch (level) {
-        case SharedGroup::durability_Full: return "Full";
+        case SharedGroup::durability_Full:    return "Full   ";
         case SharedGroup::durability_MemOnly: return "MemOnly";
 #ifndef _WIN32
-        case SharedGroup::durability_Async: return "Async";
+        case SharedGroup::durability_Async:   return "Async  ";
 #endif
     }
+    return nullptr;
 }
 
 void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 {
     timer.pause();
-    benchmark.setup(sg);
+    benchmark.before_each(sg);
     timer.unpause();
 
     benchmark(sg);
 
     timer.pause();
-    benchmark.teardown(sg);
+    benchmark.after_each(sg);
     timer.unpause();
 }
 
 
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
-template <typename B>
+template<typename B>
 void run_benchmark(BenchmarkResults& results)
 {
-#ifdef _WIN32
-    const size_t num_durabilities = 2;
-#else
-    const size_t num_durabilities = 2; // FIXME Figure out how to run the async commit daemon.
-#endif
-    
-    static long test_counter = 0;
+    typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
+    std::vector<config_pair> configs;
 
+    configs.push_back(config_pair(SharedGroup::durability_MemOnly, nullptr));
+#if REALM_ENABLE_ENCRYPTION
+    configs.push_back(config_pair(SharedGroup::durability_MemOnly, crypt_key(true)));
+#endif
+
+    configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
+
+#if REALM_ENABLE_ENCRYPTION
+    configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
+#endif
+
+    static long test_counter = 0;
     Timer timer(Timer::type_UserTime);
-    for (size_t i = 0; i < num_durabilities; ++i) {
-        SharedGroup::DurabilityLevel level = static_cast<SharedGroup::DurabilityLevel>(i);
+
+    for (auto it = configs.begin(); it != configs.end(); ++it) {
+        SharedGroup::DurabilityLevel level = it->first;
+        const char* key = it->second;
         B benchmark;
-        
+
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
-        lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) << ")";
-        ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level);
+        lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) <<
+            ", " << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
+        ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level) <<
+            (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
-        
+
         realm::test_util::unit_test::TestDetails test_details;
         test_details.test_index = test_counter++;
         test_details.suite_name = "BenchmarkCommonTasks";
         test_details.test_name = ident.c_str();
         test_details.file_name = __FILE__;
         test_details.line_number = __LINE__;
-        
+
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
         std::unique_ptr<SharedGroup> group;
-        group.reset(new SharedGroup(realm_path, false, level));
+        group.reset(new SharedGroup(realm_path, false, level, key));
+
+        benchmark.before_all(*group);
 
         // Warm-up and initial measuring:
-        Timer t_unused(Timer::type_UserTime);
-        run_benchmark_once(benchmark, *group, t_unused);
-        run_benchmark_once(benchmark, *group, t_unused);
-        run_benchmark_once(benchmark, *group, t_unused);
-        run_benchmark_once(benchmark, *group, t_unused);
-        run_benchmark_once(benchmark, *group, t_unused);
+        Timer t_baseline(Timer::type_UserTime);
+        size_t num_warmup_reps = 1;
+        double time_to_execute_warmup_reps = 0;
+        while (time_to_execute_warmup_reps < min_warmup_time_s && num_warmup_reps < max_repetitions) {
+            num_warmup_reps *= 10;
+            Timer t_baseline(Timer::type_UserTime);
+            for (size_t i = 0; i < num_warmup_reps; ++i) {
+                run_benchmark_once(benchmark, *group, t_baseline);
+            }
+            time_to_execute_warmup_reps = t_baseline.get_elapsed_time();
+        }
 
-        size_t rep;
-        double total = 0;
-        for (rep = 0; rep < max_repetitions && (rep < min_repetitions || total < min_duration_s); ++rep) {
+        size_t required_reps = size_t(min_duration_s / (time_to_execute_warmup_reps / num_warmup_reps));
+        if (required_reps < min_repetitions) {
+            required_reps = min_repetitions;
+        }
+        if (required_reps > max_repetitions) {
+            required_reps = max_repetitions;
+        }
+
+        for (size_t rep = 0; rep < required_reps; ++rep) {
             Timer t;
             run_benchmark_once(benchmark, *group, t);
             double s = t.get_elapsed_time();
-            total += s;
             results.submit(ident.c_str(), s);
         }
 
+        benchmark.after_all(*group);
+
         results.finish(ident, lead_text_ss.str());
     }
+    std::cout << std::endl;
 }
 
 } // anonymous namespace
@@ -405,6 +486,7 @@ int benchmark_common_tasks_main()
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
+    run_benchmark<BenchmarkEmptyCommit>(results);
     run_benchmark<AddTable>(results);
     run_benchmark<BenchmarkQuery>(results);
     run_benchmark<BenchmarkQueryNot>(results);
@@ -413,10 +495,13 @@ int benchmark_common_tasks_main()
     run_benchmark<BenchmarkSortInt>(results);
     run_benchmark<BenchmarkInsert>(results);
     run_benchmark<BenchmarkGetString>(results);
+
     run_benchmark<BenchmarkSetString>(results);
+
     run_benchmark<BenchmarkCreateIndex>(results);
     run_benchmark<BenchmarkGetLongString>(results);
     run_benchmark<BenchmarkSetLongString>(results);
+    run_benchmark<BenchmarkGetLinkList>(results);
 
     return 0;
 }

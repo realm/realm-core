@@ -146,6 +146,41 @@ TEST(Descriptor_Basics)
 }
 
 
+TEST(Descriptor_MoveColumn)
+{
+    using df = _impl::DescriptorFriend;
+
+    TableRef table = Table::create();
+    DescriptorRef desc = table->get_descriptor();
+
+    desc->add_column(type_Int, "alpha");
+    desc->add_column(type_Int, "beta");
+    desc->add_column(type_Int, "gamma");
+    desc->add_column(type_Int, "delta");
+
+    // Sanity check
+    CHECK_EQUAL(4, desc->get_column_count());
+    CHECK_EQUAL("alpha", desc->get_column_name(0));
+    CHECK_EQUAL("beta", desc->get_column_name(1));
+    CHECK_EQUAL("gamma", desc->get_column_name(2));
+    CHECK_EQUAL("delta", desc->get_column_name(3));
+
+    // Move up:
+    df::move_column(*desc, 1, 3);
+    CHECK_EQUAL("alpha", desc->get_column_name(0));
+    CHECK_EQUAL("gamma", desc->get_column_name(1));
+    CHECK_EQUAL("delta", desc->get_column_name(2));
+    CHECK_EQUAL("beta", desc->get_column_name(3));
+
+    // Move down:
+    df::move_column(*desc, 2, 0);
+    CHECK_EQUAL("alpha", desc->get_column_name(1));
+    CHECK_EQUAL("gamma", desc->get_column_name(2));
+    CHECK_EQUAL("delta", desc->get_column_name(0));
+    CHECK_EQUAL("beta", desc->get_column_name(3));
+}
+
+
 TEST(Descriptor_EmptyAndDuplicateNames)
 {
     TableRef table = Table::create();

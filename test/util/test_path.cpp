@@ -85,6 +85,51 @@ TestPathGuard::~TestPathGuard() noexcept
 }
 
 
+TestDirGuard::TestDirGuard(const std::string& path):
+    m_path(path)
+{
+    if (!File::exists(path)) {
+        make_dir(path);
+    }
+    else {
+        clean_dir(path);
+    }
+}
+
+TestDirGuard::~TestDirGuard() noexcept
+{
+    if (keep_files)
+        return;
+    try {
+        clean_dir(m_path);
+        remove_dir(m_path);
+    }
+    catch (...) {
+        // Exception deliberately ignored
+    }
+}
+
+void TestDirGuard::clean_dir(const std::string& path)
+{
+    DirScanner ds(path);
+    std::string name;
+    while (ds.next(name)) {
+        std::string subpath = File::resolve(name, path);
+        if (File::is_dir(subpath)) {
+            clean_dir(subpath);
+            remove_dir(subpath);
+        }
+        else {
+            // Try to avoid accidental removal of precious files due to bugs in
+            // TestDirGuard or TEST_DIR macro.
+            if (subpath.find(".test-dir") == std::string::npos)
+                throw std::runtime_error("Bad test dir path");
+            File::remove(subpath);
+        }
+    }
+}
+
+
 SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
     TestPathGuard(path)
 {
@@ -94,11 +139,18 @@ SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
 }
 
 
-SharedGroupTestPathGuard::~SharedGroupTestPathGuard()
+SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
 {
-    File::try_remove(get_lock_path());
-    File::try_remove(m_path + ".log_a");
-    File::try_remove(m_path + ".log_b");
+    if (keep_files)
+        return;
+    try {
+        File::try_remove(get_lock_path());
+        File::try_remove(m_path + ".log_a");
+        File::try_remove(m_path + ".log_b");
+    }
+    catch (...) {
+        // Exception deliberately ignored
+    }
 }
 
 } // namespace test_util

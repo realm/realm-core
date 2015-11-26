@@ -27,6 +27,7 @@
 
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
+#include <realm/owned_data.hpp>
 
 namespace realm {
 
@@ -38,19 +39,20 @@ namespace realm {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() noexcept : m_data(0), m_size(0) {}
-    BinaryData(const char* data, std::size_t size) noexcept: m_data(data), m_size(size) {}
-    template<std::size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
-    template<class T, class A> explicit BinaryData(const std::basic_string<char, T, A>&);
+    BinaryData() noexcept : m_data(nullptr), m_size(0) {}
+    BinaryData(const char* data, size_t size) noexcept: m_data(data), m_size(size) {}
+    template<size_t N>
+    explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
+    template<class T, class A>
+    explicit BinaryData(const std::basic_string<char, T, A>&);
 
-#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-    template<class T, class A> explicit operator std::basic_string<char, T, A>() const;
-#endif
+    template<class T, class A>
+    explicit operator std::basic_string<char, T, A>() const;
 
-    char operator[](std::size_t i) const noexcept { return m_data[i]; }
+    char operator[](size_t i) const noexcept { return m_data[i]; }
 
     const char* data() const noexcept { return m_data; }
-    std::size_t size() const noexcept { return m_size; }
+    size_t size() const noexcept { return m_size; }
 
     /// Is this a null reference?
     ///
@@ -94,36 +96,43 @@ public:
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     explicit operator bool() const noexcept;
-#else
-    typedef const char* BinaryData::*unspecified_bool_type;
-    operator unspecified_bool_type() const noexcept;
-#endif
 
 private:
     const char* m_data;
-    std::size_t m_size;
+    size_t m_size;
+};
+
+/// A read-only chunk of binary data.
+class OwnedBinaryData : public OwnedData {
+public:
+    using OwnedData::OwnedData;
+
+    OwnedBinaryData() = default;
+    OwnedBinaryData(const BinaryData& data) : OwnedData(data.data(), data.size()) { }
+
+    BinaryData get() const
+    {
+        return { data(), size() };
+    }
 };
 
 
 
 // Implementation:
 
-template<class T, class A> inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s):
+template<class T, class A>
+inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s):
     m_data(s.data()),
     m_size(s.size())
 {
 }
 
-#if REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
-
-template<class T, class A> inline BinaryData::operator std::basic_string<char, T, A>() const
+template<class T, class A>
+inline BinaryData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
 }
-
-#endif
 
 inline bool BinaryData::is_null() const noexcept
 {
@@ -196,17 +205,10 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const B
     return out;
 }
 
-#ifdef REALM_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
 inline BinaryData::operator bool() const noexcept
 {
     return !is_null();
 }
-#else
-inline BinaryData::operator unspecified_bool_type() const noexcept
-{
-    return is_null() ? 0 : &BinaryData::m_data;
-}
-#endif
 
 } // namespace realm
 

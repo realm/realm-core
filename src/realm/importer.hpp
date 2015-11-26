@@ -84,10 +84,14 @@ public:
 private:
     size_t import_csv(FILE* file, Table& table, std::vector<DataType> *scheme, std::vector<std::string> *column_names,
                       size_t type_detection_rows, size_t skip_first_rows, size_t import_rows);
-    template <bool can_fail> float parse_float(const char*col, bool* success = nullptr);
-    template <bool can_fail> double parse_double(const char* col, bool* success = nullptr, size_t* significants = nullptr);
-    template <bool can_fail> int64_t parse_integer(const char* col, bool* success = nullptr);
-    template <bool can_fail> bool parse_bool(const char*col, bool* success = nullptr);
+    template<bool can_fail>
+    float parse_float(const char*col, bool* success = nullptr);
+    template<bool can_fail>
+    double parse_double(const char* col, bool* success = nullptr, size_t* significants = nullptr);
+    template<bool can_fail>
+    int64_t parse_integer(const char* col, bool* success = nullptr);
+    template<bool can_fail>
+    bool parse_bool(const char*col, bool* success = nullptr);
     std::vector<DataType> types (std::vector<std::string> v);
     size_t tokenize(std::vector<std::vector<std::string>> & payload, size_t records);
     std::vector<DataType> detect_scheme (std::vector<std::vector<std::string>> payload, size_t begin, size_t end);

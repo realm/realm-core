@@ -27,10 +27,10 @@
 
 namespace realm {
 
-/* 
+/*
 STORAGE FORMAT
 ---------------------------------------------------------------------------------------
-ArrayBinary stores binary elements using two ArrayInteger and one ArrayBlob. The ArrayBlob can only store one 
+ArrayBinary stores binary elements using two ArrayInteger and one ArrayBlob. The ArrayBlob can only store one
 single concecutive array of bytes (contrary to its 'Array' name that misleadingly indicates it could store multiple
 elements).
 
@@ -38,19 +38,19 @@ Assume we have the strings "a", "", "abc", null, "ab". Then the three arrays wil
 
 ArrayInteger    m_offsets   1, 1, 5, 5, 6
 ArrayBlob       m_blob      aabcab
-ArrayInteger    m_nulls     0, 0, 0, 1, 0 // 1 indicates null, 0 indicates non-null 
+ArrayInteger    m_nulls     0, 0, 0, 1, 0 // 1 indicates null, 0 indicates non-null
 
 So for each element the ArrayInteger, the ArrayInteger points into the ArrayBlob at the position of the first
 byte of the next element.
 
-m_nulls is always present (except for old database files; see below), so any ArrayBinary is always nullable! 
-The nullable property (such as throwing exception upon set(null) on non-nullable column, etc) is handled on 
+m_nulls is always present (except for old database files; see below), so any ArrayBinary is always nullable!
+The nullable property (such as throwing exception upon set(null) on non-nullable column, etc) is handled on
 column level only.
 
 DATABASE FILE VERSION CHANGES
 ---------------------------------------------------------------------------------------
-Old database files do not have any m_nulls array. To be backwardscompatible, many methods will have tests like 
-`if(Array::size() == 3)` and have a backwards compatible code paths for these (e.g. avoid writing to m_nulls 
+Old database files do not have any m_nulls array. To be backwardscompatible, many methods will have tests like
+`if(Array::size() == 3)` and have a backwards compatible code paths for these (e.g. avoid writing to m_nulls
 in set(), etc). This way no file format upgrade is needed to support nulls for BinaryData.
 */
 
@@ -79,15 +79,15 @@ public:
     //@}
 
     bool is_empty() const noexcept;
-    std::size_t size() const noexcept;
+    size_t size() const noexcept;
 
-    BinaryData get(std::size_t ndx) const noexcept;
+    BinaryData get(size_t ndx) const noexcept;
 
     void add(BinaryData value, bool add_zero_term = false);
-    void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
-    void erase(std::size_t ndx);
-    void truncate(std::size_t size);
+    void set(size_t ndx, BinaryData value, bool add_zero_term = false);
+    void insert(size_t ndx, BinaryData value, bool add_zero_term = false);
+    void erase(size_t ndx);
+    void truncate(size_t size);
     void clear();
     void destroy();
 
@@ -95,26 +95,28 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static BinaryData get(const char* header, std::size_t ndx, Allocator&) noexcept;
+    static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
+    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term,
                                 TreeInsertBase& state);
 
-    static std::size_t get_size_from_header(const char*, Allocator&) noexcept;
+    static size_t get_size_from_header(const char*, Allocator&) noexcept;
 
     /// Construct a binary array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
-    /// initialized to zero size blobs.
-    static MemRef create_array(std::size_t size, Allocator&);
+    /// initialized to the binary value `defaults`, which can be either
+    /// null or zero-length non-null (value with size > 0 is not allowed as
+    /// initialization value).
+    static MemRef create_array(size_t size, Allocator&, BinaryData defaults);
 
     /// Construct a copy of the specified slice of this binary array
     /// using the specified target allocator.
-    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+    MemRef slice(size_t offset, size_t size, Allocator& target_alloc) const;
 
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
-    bool update_from_parent(std::size_t old_baseline) noexcept;
+    bool update_from_parent(size_t old_baseline) noexcept;
 
 private:
     ArrayInteger m_offsets;
@@ -129,7 +131,7 @@ private:
 // Implementation:
 
 inline ArrayBinary::ArrayBinary(Allocator& alloc) noexcept:
-    Array(alloc), m_offsets(alloc), m_blob(alloc), 
+    Array(alloc), m_offsets(alloc), m_blob(alloc),
     m_nulls(alloc)
 {
     m_offsets.set_parent(this, 0);
@@ -139,8 +141,9 @@ inline ArrayBinary::ArrayBinary(Allocator& alloc) noexcept:
 
 inline void ArrayBinary::create()
 {
-    std::size_t size = 0;
-    MemRef mem = create_array(size, get_alloc()); // Throws
+    size_t size = 0;
+    BinaryData defaults = BinaryData(0, 0); // This init value is ignored because size = 0
+    MemRef mem = create_array(size, get_alloc(), defaults); // Throws
     init_from_mem(mem);
 }
 
@@ -176,12 +179,12 @@ inline bool ArrayBinary::legacy_array_type() const noexcept
     return false;
 }
 
-inline std::size_t ArrayBinary::size() const noexcept
+inline size_t ArrayBinary::size() const noexcept
 {
     return m_offsets.size();
 }
 
-inline BinaryData ArrayBinary::get(std::size_t ndx) const noexcept
+inline BinaryData ArrayBinary::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
@@ -189,8 +192,8 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const noexcept
         return BinaryData();
     }
     else {
-        std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-        std::size_t end = to_size_t(m_offsets.get(ndx));
+        size_t begin = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
+        size_t end = to_size_t(m_offsets.get(ndx));
 
         BinaryData bd = BinaryData(m_blob.get(begin), end - begin);
         // Old database file (non-nullable column should never return null)
@@ -199,11 +202,11 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const noexcept
     }
 }
 
-inline void ArrayBinary::truncate(std::size_t size)
+inline void ArrayBinary::truncate(size_t size)
 {
     REALM_ASSERT_3(size, <, m_offsets.size());
 
-    std::size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
+    size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
 
     m_offsets.truncate(size);
     m_blob.truncate(blob_size);
@@ -228,7 +231,7 @@ inline void ArrayBinary::destroy()
     Array::destroy();
 }
 
-inline std::size_t ArrayBinary::get_size_from_header(const char* header,
+inline size_t ArrayBinary::get_size_from_header(const char* header,
                                                      Allocator& alloc) noexcept
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
@@ -236,7 +239,7 @@ inline std::size_t ArrayBinary::get_size_from_header(const char* header,
     return Array::get_size_from_header(offsets_header);
 }
 
-inline bool ArrayBinary::update_from_parent(std::size_t old_baseline) noexcept
+inline bool ArrayBinary::update_from_parent(size_t old_baseline) noexcept
 {
     bool res = Array::update_from_parent(old_baseline);
     if (res) {

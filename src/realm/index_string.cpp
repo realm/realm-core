@@ -36,7 +36,7 @@ void StringIndex::validate_value(int64_t) const noexcept
 void StringIndex::validate_value(StringData str) const
 {
     // The "nulls on String column" branch fixed all known bugs in the index
-    (void)str;
+    static_cast<void>(str);
     return;
 }
 
@@ -381,7 +381,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     size_t suboffset = offset + 4;
 
     // Single match (lowest bit set indicates literal row_ndx)
-    if (slot_value % 2 != 0) {
+    if ((slot_value & 1) != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
         // for integer index, get_func fills out 'buffer' and makes str point at it
         StringConversionBuffer buffer;
@@ -409,7 +409,8 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     // If there already is a list of matches, we see if we fit there
     // or it has to be split into a subindex
     ref_type ref = to_ref(slot_value);
-    if (!Array::get_context_flag_from_header(alloc.translate(ref))) {
+    char* header = alloc.translate(ref);
+    if (!Array::get_context_flag_from_header(header)) {
         IntegerColumn sub(alloc, ref); // Throws
         sub.set_parent(m_array.get(), ins_pos_refs);
 
@@ -428,7 +429,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                 sub.add(row_ndx);
             }
             else {
-                size_t pos = sub.lower_bound_int(row_ndx);
+                size_t pos = sub.lower_bound(row_ndx);
                 if (pos == sub.size()) {
                     sub.add(row_ndx);
                 }
@@ -479,7 +480,8 @@ void StringIndex::distinct(IntegerColumn& result) const
             }
             else {
                 // A real ref either points to a list or a subindex
-                if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+                char* header = alloc.translate(to_ref(ref));
+                if (Array::get_context_flag_from_header(header)) {
                     StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column,
                                     m_deny_duplicate_values, alloc);
                     ndx.distinct(result);
@@ -494,7 +496,7 @@ void StringIndex::distinct(IntegerColumn& result) const
     }
 }
 
-StringData StringIndex::get(std::size_t ndx, StringConversionBuffer& buffer) const
+StringData StringIndex::get(size_t ndx, StringConversionBuffer& buffer) const
 {
     return m_target_column->get_index_data(ndx, buffer);
 }
@@ -528,7 +530,8 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
             }
             else {
                 // A real ref either points to a list or a subindex
-                if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+                char* header = alloc.translate(to_ref(ref));
+                if (Array::get_context_flag_from_header(header)) {
                     StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column,
                                     m_deny_duplicate_values, alloc);
                     ndx.adjust_row_indexes(min_row_ndx, diff);
@@ -601,7 +604,8 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
         }
         else {
             // A real ref either points to a list or a subindex
-            if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+            char* header = alloc.translate(to_ref(ref));
+            if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
                 subindex.do_delete(row_ndx, value, offset+4);
@@ -661,7 +665,8 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
         }
         else {
             // A real ref either points to a list or a subindex
-            if (Array::get_context_flag_from_header(alloc.translate(to_ref(ref)))) {
+            char* header = alloc.translate(to_ref(ref));
+            if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
                 subindex.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
@@ -671,7 +676,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 sub.set_parent(m_array.get(), pos_refs);
 
                 size_t old_pos = sub.find_first(row_ndx);
-                size_t new_pos = sub.lower_bound_int(new_row_ndx);
+                size_t new_pos = sub.lower_bound(new_row_ndx);
                 REALM_ASSERT(old_pos != not_found);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
 
@@ -716,7 +721,7 @@ bool has_duplicate_values(const Array& node) noexcept
     // Leaf node
     for (size_t i = 1; i < n; ++i) {
         int_fast64_t value = node.get(i);
-        bool is_single_row_index = value % 2 != 0;
+        bool is_single_row_index = (value & 1) != 0;
         if (is_single_row_index)
             continue;
 
@@ -843,7 +848,7 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
     if (node_is_leaf) {
         for (size_t i = 1; i != node_size; ++i) {
             int_fast64_t value = node.get(i);
-            bool is_single_row_index = value % 2 != 0;
+            bool is_single_row_index = (value & 1) != 0;
             if (is_single_row_index) {
                 out << std::setw(indent) << "" << "  Single row index (value: "<<(value/2)<<")\n";
                 continue;

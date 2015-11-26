@@ -132,8 +132,9 @@ TEST(Table_Null)
         TableRef table = group.add_table("test");
 
         table->add_column(type_String, "name");
-        table->add_empty_row();
+        CHECK(!table->is_nullable(0));
 
+        table->add_empty_row();
         CHECK(!table->get_string(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
@@ -145,6 +146,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("table");
         table->add_column(type_Int, "name", true /*nullable*/);
+        CHECK(table->is_nullable(0));
         table->add_empty_row();
         CHECK(table->is_null(0, 0));
     }
@@ -154,6 +156,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
         table->add_column(type_Int, "name");
+        CHECK(!table->is_nullable(0));
         table->add_empty_row();
         CHECK(!table->is_null(0, 0));
         CHECK_EQUAL(0, table->get_int(0, 0));
@@ -168,8 +171,9 @@ TEST(Table_Null)
         TableRef table = group.add_table("test");
 
         table->add_column(type_Binary, "name", true /*nullable*/);
-        table->add_empty_row();
+        CHECK(table->is_nullable(0));
 
+        table->add_empty_row();
         CHECK(table->get_binary(0, 0).is_null());
     }
 
@@ -179,12 +183,37 @@ TEST(Table_Null)
         TableRef table = group.add_table("test");
 
         table->add_column(type_Binary, "name");
-        table->add_empty_row();
+        CHECK(!table->is_nullable(0));
 
+        table->add_empty_row();
         CHECK(!table->get_binary(0, 0).is_null());
 
         // Test that inserting null in non-nullable column will throw
         CHECK_THROW_ANY(table->set_binary(0, 0, BinaryData()));
+    }
+
+    {
+        // Check that link columns are nullable.
+        Group group;
+        TableRef target = group.add_table("target");
+        TableRef table  = group.add_table("table");
+
+        target->add_column(type_Int, "int");
+        table->add_column_link(type_Link, "link", *target);
+        CHECK(table->is_nullable(0));
+        CHECK(!target->is_nullable(0));
+    }
+
+    {
+        // Check that linklist columns are not nullable.
+        Group group;
+        TableRef target = group.add_table("target");
+        TableRef table  = group.add_table("table");
+
+        target->add_column(type_Int, "int");
+        table->add_column_link(type_LinkList, "link", *target);
+        CHECK(!table->is_nullable(0));
+        CHECK(!target->is_nullable(0));
     }
 
 }
@@ -316,6 +345,28 @@ TEST(Table_StringOrBinaryTooBig)
     table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
     table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
     table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
+}
+
+
+TEST(Table_SetBinaryLogicErrors)
+{
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column(type_Binary, "a");
+    table->add_column(type_Int, "b");
+    table->add_empty_row();
+
+    BinaryData bd;
+    CHECK_LOGIC_ERROR(table->set_binary(2, 0, bd), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(table->set_binary(0, 1, bd), LogicError::row_index_out_of_range);
+    CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
+
+    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_binary() does not properly check it yet.
+
+    group.remove_table("table");
+    CHECK_LOGIC_ERROR(table->set_binary(0, 0, bd), LogicError::detached_accessor);
+
+    // Logic error LogicError::binary_too_big checked in Table_StringOrBinaryTooBig
 }
 
 
@@ -1088,8 +1139,8 @@ TEST(Table_6)
     }};
 
     RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
-        (void)b;
-        (void)a;
+        static_cast<void>(b);
+        static_cast<void>(a);
         //first.between(a, b);
         second == str || second.MatchRegEx(".*");
     }};
@@ -2210,6 +2261,111 @@ TEST(Table_SpecDeleteColumns)
 #endif
 }
 
+
+TEST(Table_SpecMoveColumns)
+{
+    using df = _impl::DescriptorFriend;
+
+    Group group;
+    TableRef foo = group.add_table("foo");
+    foo->add_column(type_Int, "a");
+    foo->add_column(type_Float, "b");
+    foo->add_column(type_Table, "c");
+    DescriptorRef foo_descriptor = foo->get_descriptor();
+    DescriptorRef c_descriptor = foo_descriptor->get_subdescriptor(2);
+    c_descriptor->add_column(type_Int, "c_a");
+    c_descriptor->add_column(type_Float, "c_b");
+
+    foo->add_empty_row();
+    foo->add_empty_row();
+
+    TableRef subtable0 = foo->get_subtable(2, 0);
+    subtable0->add_empty_row();
+    subtable0->set_int(0, 0, 123);
+
+    df::move_column(*foo_descriptor, 0, 2);
+    CHECK_EQUAL(foo_descriptor->get_column_type(1), type_Table);
+    CHECK_EQUAL(foo_descriptor->get_column_name(1), "c");
+    CHECK(c_descriptor->is_attached());
+    CHECK(subtable0->is_attached());
+    CHECK_EQUAL(123, subtable0->get_int(0, 0));
+
+    TableRef subtable1 = foo->get_subtable(1, 1);
+    subtable1->add_empty_row();
+    subtable1->set_int(0, 0, 456);
+
+    df::move_column(*c_descriptor, 0, 1);
+    CHECK(subtable0->is_attached());
+    CHECK(subtable1->is_attached());
+    CHECK_EQUAL(subtable0->get_int(1, 0), 123);
+    CHECK_EQUAL(subtable1->get_int(1, 0), 456);
+}
+
+
+TEST(Table_SpecMoveColumnsWithIndexes)
+{
+    using df = _impl::DescriptorFriend;
+    using tf = _impl::TableFriend;
+
+    Group group;
+
+    TableRef foo = group.add_table("foo");
+    DescriptorRef desc = foo->get_descriptor();
+    foo->add_column(type_Int, "a");
+    foo->add_search_index(0);
+    foo->add_column(type_Int, "b");
+    StringIndex* a_index = tf::get_column(*foo, 0).get_search_index();
+    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
+
+    df::move_column(*desc, 0, 1);
+
+    CHECK_EQUAL(2, a_index->get_ndx_in_parent());
+
+    auto& spec = df::get_spec(*desc);
+
+    CHECK(foo->has_search_index(1));
+    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
+    CHECK(!foo->has_search_index(0));
+    CHECK(!(spec.get_column_attr(0) & col_attr_Indexed));
+
+    foo->add_column(type_Int, "c");
+    foo->add_search_index(0);
+    StringIndex* b_index = tf::get_column(*foo, 0).get_search_index();
+    CHECK_EQUAL(1, b_index->get_ndx_in_parent());
+    CHECK_EQUAL(3, a_index->get_ndx_in_parent());
+
+    df::move_column(*desc, 0, 1);
+    CHECK(foo->has_search_index(0));
+    CHECK((spec.get_column_attr(0) & col_attr_Indexed));
+    CHECK(foo->has_search_index(1));
+    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
+    CHECK(!foo->has_search_index(2));
+    CHECK(!(spec.get_column_attr(2) & col_attr_Indexed));
+    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
+    CHECK_EQUAL(3, b_index->get_ndx_in_parent());
+
+    df::move_column(*desc, 2, 0);
+    CHECK(!foo->has_search_index(0));
+    CHECK(!(spec.get_column_attr(0) & col_attr_Indexed));
+    CHECK(foo->has_search_index(1));
+    CHECK((spec.get_column_attr(1) & col_attr_Indexed));
+    CHECK(foo->has_search_index(2));
+    CHECK((spec.get_column_attr(2) & col_attr_Indexed));
+    CHECK_EQUAL(2, a_index->get_ndx_in_parent());
+    CHECK_EQUAL(4, b_index->get_ndx_in_parent());
+
+    df::move_column(*desc, 1, 0);
+    CHECK(foo->has_search_index(0));
+    CHECK((spec.get_column_attr(0) & col_attr_Indexed));
+    CHECK(!foo->has_search_index(1));
+    CHECK(!(spec.get_column_attr(1) & col_attr_Indexed));
+    CHECK(foo->has_search_index(2));
+    CHECK((spec.get_column_attr(2) & col_attr_Indexed));
+    CHECK_EQUAL(1, a_index->get_ndx_in_parent());
+    CHECK_EQUAL(4, b_index->get_ndx_in_parent());
+}
+
+
 TEST(Table_NullInEnum)
 {
     Group group;
@@ -3300,8 +3456,7 @@ TEST(Table_Aggregates3)
 
         size_t count;
         size_t pos;
-        if (i == 1) {
-            // This i == 1 is the NULLABLE case where columns are nullable
+        if (nullable) {
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
@@ -3354,7 +3509,7 @@ TEST(Table_Aggregates3)
             CHECK_EQUAL(table->sum_float(1), 30.f);
             CHECK_APPROXIMATELY_EQUAL(table->sum_double(2), 1.1 + 2.2, 0.01);
         }
-        else {
+        else { // not nullable
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
@@ -3726,11 +3881,7 @@ TEST(Table_WriteSlice)
     // Run through a 3-D matrix of table sizes, slice offsets, and
     // slice sizes. Each test involves a table with columns of each
     // possible type.
-#ifdef REALM_DEBUG
-    int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 135 };
-#else
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187, 6561 };
-#endif
     int num_sizes = sizeof table_sizes / sizeof *table_sizes;
     for (int table_size_i = 0; table_size_i != num_sizes; ++table_size_i) {
         int table_size = table_sizes[table_size_i];
@@ -5845,6 +5996,29 @@ TEST(Table_EnumStringInsertEmptyRow)
 }
 
 
+TEST(Table_InsertColumnMaintainsBacklinkIndices)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("hrnetprsafd");
+    TableRef t1 = g.add_table("qrsfdrpnkd");
+
+    t1->add_column_link(type_Link, "bbb", *t0);
+    t1->add_column_link(type_Link, "ccc", *t0);
+    t1->insert_column(0, type_Int, "aaa");
+
+    t1->add_empty_row();
+
+    t0->add_column(type_Int, "foo");
+    t0->add_empty_row();
+
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
@@ -6071,6 +6245,123 @@ TEST(Table_Nulls)
 }
 
 
+TEST(Table_InsertSubstring)
+{
+    struct Fixture {
+        Table table;
+        Fixture()
+        {
+            table.add_column(type_String, "");
+            table.add_empty_row();
+            table.set_string(0, 0, "0123456789");
+        }
+    };
+    {
+        Fixture f;
+        f.table.insert_substring(0, 0, 0, "x");
+        CHECK_EQUAL("x0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.insert_substring(0, 0, 5, "x");
+        CHECK_EQUAL("01234x56789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.insert_substring(0, 0, 10, "x");
+        CHECK_EQUAL("0123456789x", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.insert_substring(0, 0, 5, "");
+        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.insert_substring(1, 0, 5, "x"),
+                          LogicError::column_index_out_of_range);
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.insert_substring(0, 1, 5, "x"),
+                          LogicError::row_index_out_of_range);
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.insert_substring(0, 0, 11, "x"),
+                          LogicError::string_position_out_of_range);
+    }
+}
+
+
+TEST(Table_RemoveSubstring)
+{
+    struct Fixture {
+        Table table;
+        Fixture()
+        {
+            table.add_column(type_String, "");
+            table.add_empty_row();
+            table.set_string(0, 0, "0123456789");
+        }
+    };
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 0, 1);
+        CHECK_EQUAL("123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 9, 1);
+        CHECK_EQUAL("012345678", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 0);
+        CHECK_EQUAL("", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 5);
+        CHECK_EQUAL("01234", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 10);
+        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 5, 1000);
+        CHECK_EQUAL("01234", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 10, 0);
+        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        f.table.remove_substring(0, 0, 10, 1);
+        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.remove_substring(1, 0, 5, 1),
+                          LogicError::column_index_out_of_range);
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.remove_substring(0, 1, 5, 1),
+                          LogicError::row_index_out_of_range);
+    }
+    {
+        Fixture f;
+        CHECK_LOGIC_ERROR(f.table.remove_substring(0, 0, 11, 1),
+                          LogicError::string_position_out_of_range);
+    }
+}
+
 TEST(Table_RowAccessor_Null)
 {
     Table table;
@@ -6138,7 +6429,7 @@ TEST(Table_AllocatorCapacityBug)
 
     // First a simple trigger of `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`
     {
-        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref, true);
 
         c.add(BinaryData(buf.get(), 13000000));
@@ -6171,6 +6462,28 @@ TEST(Table_AllocatorCapacityBug)
             }
         }
     }
+}
+
+
+// Exposes crash when setting a int, float or double that has its least significant bit set
+TEST(Table_MixedCrashValues)
+{
+    GROUP_TEST_PATH(path);
+    const char* encryption_key = nullptr;
+    Group group(path, encryption_key, Group::mode_ReadWrite);
+    TableRef table = group.add_table("t");
+    table->add_column(type_Mixed, "m");
+    table->add_empty_row(3);
+
+    table->set_mixed(0, 0, Mixed(int64_t(-1)));
+    table->set_mixed(0, 1, Mixed(2.0f));
+    table->set_mixed(0, 2, Mixed(2.0));
+
+    CHECK_EQUAL(table->get_mixed(0, 0).get_int(), int64_t(-1));
+    CHECK_EQUAL(table->get_mixed(0, 1).get_float(), 2.0f);
+    CHECK_EQUAL(table->get_mixed(0, 2).get_double(), 2.0);
+
+    group.verify();
 }
 
 

@@ -1,6 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_ENCRYPTED_FILE_MAPPING
 
+#include <realm/util/aes_cryptor.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 
 #include "test.hpp"
@@ -38,7 +39,7 @@
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
 
 using namespace realm::util;
 

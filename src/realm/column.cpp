@@ -64,7 +64,7 @@ void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) noexcept
     }
 }
 
-void ColumnBaseWithIndex::refresh_accessor_tree(std::size_t new_col_ndx, const realm::Spec& spec)
+void ColumnBaseWithIndex::refresh_accessor_tree(size_t new_col_ndx, const realm::Spec& spec)
 {
     if (m_search_index) {
         m_search_index->refresh_accessor_tree(new_col_ndx, spec);
@@ -104,7 +104,7 @@ void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
 {
     // FIXME: Duplicated from bptree.cpp.
     ArrayParent* parent = m_array->get_parent();
-    std::size_t ndx_in_parent = m_array->get_ndx_in_parent();
+    size_t ndx_in_parent = m_array->get_ndx_in_parent();
     leaf->set_parent(parent, ndx_in_parent);
     leaf->update_parent(); // Throws
     m_array = std::move(leaf);
@@ -118,13 +118,15 @@ struct GetSizeFromRef {
     Allocator& m_alloc;
     size_t m_size;
     GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
-    template<class Col> void call() noexcept
+    template<class Col>
+    void call() noexcept
     {
         m_size = Col::get_size_from_ref(m_ref, m_alloc);
     }
 };
 
-template<class Op> void col_type_deleg(Op& op, ColumnType type)
+template<class Op>
+void col_type_deleg(Op& op, ColumnType type)
 {
     switch (type) {
         case col_type_Int:
@@ -291,8 +293,9 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         m_main.set(0, 1 + 2*v); // Throws
     }
     else {
-        size_t pos = m_offsets.write(m_out); // Throws
-        ref_type ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref_type ref = m_offsets.write(m_out, deep, only_if_modified); // Throws
         int_fast64_t v(ref); // FIXME: Dangerous cast (unsigned -> signed)
         m_main.set(0, v); // Throws
     }
@@ -300,9 +303,9 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
         m_main.add(1 + 2*v); // Throws
     }
-    bool recurse = false; // Shallow
-    size_t pos = m_main.write(m_out, recurse); // Throws
-    ref_type parent_ref = pos;
+    bool deep = false; // Shallow
+    bool only_if_modified = false; // Always
+    ref_type parent_ref = m_main.write(m_out, deep, only_if_modified); // Throws
 
     // Whether the resulting ref must be added to the previous parent
     // level, or reported as the final ref (through `is_last`) depends
@@ -366,7 +369,8 @@ public:
     }
     bool visit(const Array::NodeInfo& leaf_info) override
     {
-        size_t size = leaf_info.m_size, pos;
+        ref_type ref;
+        size_t size = leaf_info.m_size;
         size_t leaf_begin = leaf_info.m_offset;
         size_t leaf_end   = leaf_begin + size;
         REALM_ASSERT_3(leaf_begin, <=, m_end);
@@ -374,7 +378,9 @@ public:
         bool no_slicing = leaf_begin >= m_begin && leaf_end <= m_end;
         if (no_slicing) {
             m_leaf_cache.init_from_mem(leaf_info.m_mem);
-            pos = m_leaf_cache.write(m_out); // Throws
+            bool deep = true; // Deep
+            bool only_if_modified = false; // Always
+            ref = m_leaf_cache.write(m_out, deep, only_if_modified); // Throws
         }
         else {
             // Slice the leaf
@@ -388,9 +394,10 @@ public:
             Array slice(slice_alloc);
             _impl::DeepArrayDestroyGuard dg(&slice);
             slice.init_from_mem(mem);
-            pos = slice.write(m_out); // Throws
+            bool deep = true; // Deep
+            bool only_if_modified = false; // Always
+            ref = slice.write(m_out, deep, only_if_modified); // Throws
         }
-        ref_type ref = pos;
         ref_type* is_last = nullptr;
         if (leaf_end >= m_end)
             is_last = &m_top_ref;

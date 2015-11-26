@@ -23,9 +23,10 @@
 
 #include <realm/column.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/util/utf8.hpp>
 #include <realm/index_string.hpp>
+#include <realm/column_tpl.hpp>
+#include <realm/impl/sequential_getter.hpp>
 
 using namespace realm;
 
@@ -174,12 +175,12 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
-template <int function, typename T, typename R, class ColType>
+template<int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx, T count_target, size_t* return_ndx) const
 {
     check_cookie();
 
-    using ColTypeTraits = ColumnTypeTraits<T, ColType::nullable>;
+    using ColTypeTraits = ColumnTypeTraits<typename ColType::value_type>;
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
     REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count
               || function == act_Average);
@@ -215,16 +216,19 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     size_t leaf_end = 0;
     size_t row_ndx;
 
-    R res = static_cast<R>(0);
-    T first = column->get(to_size_t(m_row_indexes.get(0)));
+    R res = R{};
+    auto first = column->get(to_size_t(m_row_indexes.get(0)));
 
     if (return_ndx)
         *return_ndx = 0;
 
     if (function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
-    else
-        res = static_cast<R>(first);
+    else {
+        // FIXME: This assumes that all non-count aggregates on nullable integer columns run with
+        // the NotNull condition.
+        res = static_cast<R>(util::unwrap(first));
+    }
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
         row_ndx = to_size_t(m_row_indexes.get(ss));
@@ -240,26 +244,28 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
             leaf_end = leaf_start + arrp->size();
         }
 
-        T v = arrp->get(row_ndx - leaf_start);
+        auto v = arrp->get(row_ndx - leaf_start);
 
-        if (function == act_Sum) {
-            res += static_cast<R>(v);
-        }
-        else if (function == act_Max && v > static_cast<T>(res)) {
-            res = static_cast<R>(v);
-            if (return_ndx)
-                *return_ndx = ss;
-        }
-        else if (function == act_Min && v < static_cast<T>(res)) {
-            res = static_cast<R>(v);
-            if (return_ndx)
-                *return_ndx = ss;
-        }
-        else if (function == act_Count && v == count_target) {
+        if (function == act_Count && v == count_target) {
             res++;
         }
-        else if (function == act_Average) {
-            res += static_cast<R>(v);
+        else {
+            // FIXME: This assumes that all non-count aggregates on nullable integer columns run with
+            // the NotNull condition.
+            R unpacked = static_cast<R>(util::unwrap(v));
+            if (function == act_Sum || function == act_Average) {
+                res += unpacked;
+            }
+            else if (function == act_Max && unpacked > res) {
+                res = unpacked;
+                if (return_ndx)
+                    *return_ndx = ss;
+            }
+            else if (function == act_Min && unpacked < res) {
+                res = unpacked;
+                if (return_ndx)
+                    *return_ndx = ss;
+            }
         }
     }
 
@@ -488,15 +494,15 @@ uint_fast64_t TableViewBase::sync_if_needed() const
 
 
 
-void TableViewBase::adj_row_acc_insert_rows(std::size_t row_ndx, std::size_t num_rows) noexcept
+void TableViewBase::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
 {
     m_row_indexes.adjust_ge(int_fast64_t(row_ndx), num_rows);
 }
 
 
-void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) noexcept
+void TableViewBase::adj_row_acc_erase_row(size_t row_ndx) noexcept
 {
-    std::size_t it = 0;
+    size_t it = 0;
     for (;;) {
         it = m_row_indexes.find_first(row_ndx, it);
         if (it == not_found)
@@ -508,9 +514,9 @@ void TableViewBase::adj_row_acc_erase_row(std::size_t row_ndx) noexcept
 }
 
 
-void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t to_row_ndx) noexcept
+void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
-    std::size_t it = 0;
+    size_t it = 0;
     // kill any refs to the target row ndx
     for (;;) {
         it = m_row_indexes.find_first(to_row_ndx, it);
@@ -527,6 +533,14 @@ void TableViewBase::adj_row_acc_move_over(std::size_t from_row_ndx, std::size_t 
             break;
         m_row_indexes.set(it, to_row_ndx);
     }
+}
+
+
+void TableViewBase::adj_row_acc_clear() noexcept
+{
+    m_num_detached_refs = m_row_indexes.size();
+    for (size_t i = 0, size = m_row_indexes.size(); i < size; ++i)
+        m_row_indexes.set(i, -1);
 }
 
 

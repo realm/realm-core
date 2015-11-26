@@ -3393,7 +3393,7 @@ TEST(Query_Subtable)
     subtable->set_int(0, 1, 33);
     subtable->set_string(1, 1, "c");
 
-    //  Intentioally have empty (degenerate) subtable at 2,2
+    // Intentionally have empty (degenerate) subtable at 2,2
 
     subtable = table->get_subtable(2, 3);
     subtable->insert_empty_row(0);
@@ -5619,14 +5619,14 @@ TEST(Query_DeepCopy)
 
 
     // Test if we can execute a copy
-    Query q2 = Query(q, Query::TCopyExpressionTag());
+    Query q2(q);
 
     CHECK_EQUAL(2, q2.find());
 
 
-    // See if we can execute a copy of a delted query (copy should not contain references to original)
-    Query* q3 = new Query(q, Query::TCopyExpressionTag());
-    Query* q4 = new Query(*q3, Query::TCopyExpressionTag());
+    // See if we can execute a copy of a deleted query. The copy should not contain references to the original.
+    Query* q3 = new Query(q);
+    Query* q4 = new Query(*q3);
     delete q3;
 
 
@@ -5652,7 +5652,7 @@ TEST(Query_DeepCopy)
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_expression integer node.
     Query q6 = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
-    Query q7 = Query(q6, Query::TCopyExpressionTag());
+    Query q7(q6);
 
     q7.greater(2, 4.0);
     CHECK_EQUAL(3, q7.find());
@@ -5662,7 +5662,7 @@ TEST(Query_DeepCopy)
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_engine integer node.
     Query q8 = t.column().ints > 2;
-    Query q9 = Query(q8, Query::TCopyExpressionTag());
+    Query q9(q8);
 
     q9.greater(2, 4.0);
     CHECK_EQUAL(3, q9.find());
@@ -5672,7 +5672,7 @@ TEST(Query_DeepCopy)
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_engine string node.
     Query q10 = t.column().strings != "2";
-    Query q11 = Query(q10, Query::TCopyExpressionTag());
+    Query q11(q10);
 
     q11.greater(2, 4.0);
     CHECK_EQUAL(3, q11.find());
@@ -5680,7 +5680,7 @@ TEST(Query_DeepCopy)
 
     // Test and_query() on a copy
     Query q12 = t.column().ints > 2;
-    Query q13 = Query(q12, Query::TCopyExpressionTag());
+    Query q13(q12);
 
     q13.and_query(t.column().strings != "3");
     CHECK_EQUAL(3, q13.find());
@@ -5777,8 +5777,8 @@ TEST(Query_DeepCopyLeak1)
 
     // See if copying of a mix of query_expression and query_engine nodes will leak
     Query q = !(t.column().ints > Value<Int>(2) && t.column().ints > 2 && t.column().doubles > 2.2) || t.column().ints == 4 || t.column().ints == Value<Int>(4);
-    Query q2 = Query(q, Query::TCopyExpressionTag());
-    Query q3 = Query(q2, Query::TCopyExpressionTag());
+    Query q2(q);
+    Query q3(q2);
 }
 
 TEST(Query_DeepCopyTest)
@@ -5790,7 +5790,7 @@ TEST(Query_DeepCopyTest)
 
     Query q1 = table.where();
 
-    Query q2(q1, Query::TCopyExpressionTag());
+    Query q2(q1);
 
     q2.group();
     q2.end_group();
@@ -5806,7 +5806,7 @@ TEST(Query_StringIndexCrash)
 
     Query q = table.where().equal(0, StringData(""));
     q.count();
-    Query(q, Query::TCopyExpressionTag());
+    Query q2(q);
 }
 
 TEST(Query_NullStrings)
@@ -6202,6 +6202,8 @@ TEST(Query_64BitValues)
     CHECK_EQUAL(0, table->where().greater_equal(0, max).count());
 }
 
+namespace {
+
 void create_columns(TableRef table, bool nullable = true)
 {
     table->insert_column(0, type_Int, "Price", nullable);
@@ -6252,6 +6254,8 @@ void fill_data(TableRef table) {
     table->set_null(5, 1);
     table->set_datetime(5, 2, DateTime(2016, 6, 6));
 }
+
+} // unnamed namespace
 
 TEST(Query_NullShowcase)
 {
@@ -7307,26 +7311,36 @@ TEST(Query_Link_MaximumSumAverage)
     table1->set_null(2, 3);
 
     TableRef table2 = group.add_table("table2");
+    size_t col_double = table2->add_column(type_Double, "double");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
     size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // table2
-    // 0: { }
-    // 1: { 1 }
-    // 2: { 1, 2 }
-    // 3: { 1, 2, 3 }
+    // 0: 456.0 ->0 { }
+    // 1: 456.0 ->1 { 1 }
+    // 2: 456.0 ->2 { 1, 2 }
+    // 3: 456.0 ->3 { 1, 2, 3 }
 
     table2->add_empty_row();
+    table2->set_double(col_double, 0, 456.0);
+    table2->set_link(col_link, 0, 0);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 1, 456.0);
+    table2->set_link(col_link, 1, 1);
     LinkViewRef links = table2->get_linklist(col_linklist, 1);
     links->add(1);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 2, 456.0);
+    table2->set_link(col_link, 2, 2);
     links = table2->get_linklist(col_linklist, 2);
     links->add(1);
     links->add(2);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 3, 456.0);
+    table2->set_link(col_link, 3, 3);
     links = table2->get_linklist(col_linklist, 3);
     links->add(1);
     links->add(2);
@@ -7354,6 +7368,20 @@ TEST(Query_Link_MaximumSumAverage)
     q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == table2->column<Double>(col_double);
+    match = q.find();
+    CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
@@ -7400,6 +7428,18 @@ TEST(Query_Link_MaximumSumAverage)
     CHECK_EQUAL(not_found, match);
 
     q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == table2->column<Double>(col_double);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7456,6 +7496,18 @@ TEST(Query_Link_MaximumSumAverage)
     q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() < table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == table2->column<Double>(col_double);
+    match = q.find();
+    CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
@@ -7756,6 +7808,205 @@ TEST(Query_CompareThroughUnaryLinks)
     CHECK_EQUAL(2, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
+}
+
+TEST(Query_DeepLink)
+{
+
+    //
+    // +---------+--------+------------+
+    // | int     | bool   | list       |
+    // +---------+--------+------------+
+    // |       0 | true   | null       |
+    // |       1 | false  | 0          |
+    // |       2 | true   | 0, 1       |
+    // |       N | even(N)| 0, .., N-1 |
+    // +---------+--------+-------------+
+
+    const size_t N = 10;
+
+    Group group;
+    TableRef table = group.add_table("test");
+    size_t col_int = table->add_column(type_Int, "int");
+    size_t col_bool = table->add_column(type_Bool, "bool");
+    size_t col_linklist = table->add_column_link(type_LinkList, "list", *table);
+
+    for(size_t j = 0; j < N; ++j) {
+        table->add_empty_row();
+        table->set_int(col_int, j, j);
+        table->set_bool(col_bool, j, (j % 2) == 0);
+
+        LinkViewRef links = table->get_linklist(col_linklist, j);
+        TableView view = table->where().find_all();
+        for(size_t i = 0; i < view.size(); ++i) {
+            links->add(i);
+        }
+    }
+
+    Query query = table->link(col_linklist).column<Bool>(col_bool) == true;
+    TableView view = query.find_all();
+    CHECK_EQUAL(N, view.size());
+}
+
+// Triggers bug in compare_relation()
+TEST(Query_BrokenFindGT)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    size_t col = table->add_column(type_Int, "int");
+
+    const size_t rows = 12;
+    for (size_t i = 0; i < rows; ++i) {
+        table->add_empty_row();
+        table->set_int(col, i, i + 2);
+    }
+
+    table->add_empty_row();
+    table->set_int(col, rows + 0, 1);
+
+    table->add_empty_row();
+    table->set_int(col, rows + 1, 1);
+
+    table->add_empty_row();
+    table->set_int(col, rows + 2, 1);
+
+    for (size_t i = 0; i < 3; ++i) {
+        table->add_empty_row();
+        table->set_int(col, rows + 3 + i, i + 2);
+    }
+
+    CHECK_EQUAL(18, table->size());
+
+    Query q = table->where().greater(col, 1);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(15, tv.size());
+
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_NOT_EQUAL(1, tv.get_int(col, i));
+    }
+}
+
+// Small fuzzy test also to trigger bugs such as the compare_relation() bug above
+TEST(Query_FuzzyFind)
+{
+    // TEST_DURATION is normally 0.
+    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++)
+    {
+        Group group;
+        TableRef table = group.add_table("test");
+        size_t col = table->add_column(type_Int, "int");
+
+        // The bug happened when values were stored in 4 bits or less. So create a table full of such random values
+        const size_t rows = 18;
+        for (size_t i = 0; i < rows; ++i) {
+            table->add_empty_row();
+            
+            // Produce numbers -3 ... 17. Just to test edge cases around 4-bit values also
+            int64_t t = (fastrand() % 21) - 3;
+            table->set_int(col, i, t);
+        }
+
+        for (int64_t s = -2; s < 18; s++) {
+            Query q_g = table->where().greater(col, s);
+            TableView tv_g = q_g.find_all();
+            for (size_t i = 0; i < tv_g.size(); ++i) {
+                CHECK(tv_g.get_int(col, i) > s);
+            }
+
+            Query q_l = table->where().less(col, s);
+            TableView tv_l = q_l.find_all();
+            for (size_t i = 0; i < tv_l.size(); ++i) {
+                CHECK(tv_l.get_int(col, i) < s);
+            }
+
+            Query q_le = table->where().less_equal(col, s);
+            TableView tv_le = q_le.find_all();
+            for (size_t i = 0; i < tv_le.size(); ++i) {
+                CHECK(tv_le.get_int(col, i) <= s);
+            }
+
+            // Sum of values greater + less-or-equal should be total number of rows. This ensures that both
+            // 1) no search results are *omitted* from find_all(), and no 2) results are *false* positives
+            CHECK(tv_g.size() + tv_le.size() == rows);
+        }
+    }
+}
+
+TEST(Query_AverageNullableColumns)
+{
+    Table table;
+    size_t col_int = table.add_column(type_Int, "int", true);
+    size_t col_float = table.add_column(type_Float, "float", true);
+    size_t col_double = table.add_column(type_Double, "double", true);
+
+    CHECK_EQUAL(0, table.where().average_int(col_int));
+    CHECK_EQUAL(0, table.where().average_float(col_float));
+    CHECK_EQUAL(0, table.where().average_double(col_double));
+
+    //
+    // +-----+-------+--------+
+    // | int | float | double |
+    // +-----+-------+--------+
+    // |   2 |     2 |      2 |
+    // |   4 |     4 |      4 |
+    // +-----+-------+--------+
+
+    table.add_empty_row(2);
+
+    table.set_int(col_int, 0, 2);
+    table.set_int(col_int, 1, 4);
+
+    table.set_float(col_float, 0, 2);
+    table.set_float(col_float, 1, 4);
+
+    table.set_double(col_double, 1, 4);
+    table.set_double(col_double, 0, 2);
+
+    CHECK_EQUAL(3, table.where().average_int(col_int));
+    CHECK_EQUAL(3, table.where().average_float(col_float));
+    CHECK_EQUAL(3, table.where().average_double(col_double));
+
+    // Add a row with nulls in each column.
+    table.add_empty_row();
+
+    CHECK_EQUAL(2, table.where().average_int(col_int));
+    CHECK_EQUAL(2, table.where().average_float(col_float));
+    CHECK_EQUAL(2, table.where().average_double(col_double));
+}
+
+TEST(Query_NegativeNumbers)
+{
+    for (size_t nullable = 0; nullable < 2; ++nullable) {
+        Group group;
+        TableRef table = group.add_table("test");
+        table->add_column(type_Int, "int", nullable == 0);
+
+        int64_t id = -1;
+        for (size_t i = 0; i < 10; ++i) {
+            table->add_empty_row();
+            table->set_int(0, i, id--);
+        }
+
+        CHECK_EQUAL(10, table->where().between(0, -10, -1).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) > -11).find_all().size());
+        CHECK_EQUAL(10, table->where().greater(0, -11).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) >= -10).find_all().size());
+        CHECK_EQUAL(10, table->where().greater_equal(0, -10).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) < 128).find_all().size());
+        CHECK_EQUAL(10, table->where().less(0, 128).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) < 127).find_all().size());
+        CHECK_EQUAL(10, table->where().less(0, 127).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) <= -1).find_all().size());
+        CHECK_EQUAL(10, table->where().less_equal(0, -1).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) < 0).find_all().size());
+        TableView view = table->where().less(0, 0).find_all();
+        CHECK_EQUAL(10, view.size());
+        id = -1;
+        for (size_t i = 0; i < view.size(); ++i) {
+            CHECK_EQUAL(id, view.get_int(0, i));
+            id--;
+        }
+    }
 }
 
 #endif // TEST_QUERY

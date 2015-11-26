@@ -25,7 +25,8 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable) : m_nullable(nullable)
+BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable):
+    m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -324,6 +325,43 @@ void BinaryColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     erase(last_row_ndx, is_last); // Throws
 }
 
+void BinaryColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <=, size());
+    REALM_ASSERT_3(row_ndx_2, <=, size());
+    REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
+
+    // FIXME: Do this in a way that avoids the intermediate copying.
+
+    BinaryData value_1 = get(row_ndx_1);
+    BinaryData value_2 = get(row_ndx_2);
+
+    if (value_1.is_null() && value_2.is_null()) {
+        return;
+    }
+
+    std::unique_ptr<char[]> buffer_1(new char[value_1.size()]); // Throws
+    std::unique_ptr<char[]> buffer_2(new char[value_2.size()]); // Throws
+    std::copy(value_1.data(), value_1.data() + value_1.size(), buffer_1.get());
+    std::copy(value_2.data(), value_2.data() + value_2.size(), buffer_2.get());
+
+    if (value_1.is_null()) {
+        set(row_ndx_2, BinaryData());
+    }
+    else {
+        BinaryData copy{buffer_1.get(), value_1.size()};
+        set(row_ndx_2, copy);
+    }
+
+    if (value_2.is_null()) {
+        set(row_ndx_1, BinaryData());
+    }
+    else {
+        BinaryData copy{buffer_2.get(), value_2.size()};
+        set(row_ndx_1, copy);
+    }
+}
+
 
 void BinaryColumn::do_clear()
 {
@@ -383,22 +421,22 @@ bool BinaryColumn::upgrade_root_leaf(size_t value_size)
 
 class BinaryColumn::CreateHandler: public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    CreateHandler(Allocator& alloc, BinaryData defaults): m_alloc(alloc), m_defaults(defaults) {}
     ref_type create_leaf(size_t size) override
     {
-        MemRef mem = ArrayBinary::create_array(size, m_alloc); // Throws
+        MemRef mem = ArrayBinary::create_array(size, m_alloc, m_defaults); // Throws
         return mem.m_ref;
     }
 private:
     Allocator& m_alloc;
+    BinaryData m_defaults;
 };
 
-ref_type BinaryColumn::create(Allocator& alloc, size_t size)
+ref_type BinaryColumn::create(Allocator& alloc, size_t size, bool nullable)
 {
-    CreateHandler handler(alloc);
+    CreateHandler handler(alloc, nullable ? BinaryData(0, 0) : BinaryData("", 0));
     return ColumnBase::create(alloc, size, handler);
 }
-
 
 class BinaryColumn::SliceHandler: public ColumnBase::SliceHandler {
 public:
@@ -443,8 +481,9 @@ ref_type BinaryColumn::write(size_t slice_offset, size_t slice_size,
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
         slice.init_from_mem(mem);
-        size_t pos = slice.write(out); // Throws
-        ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref = slice.write(out, deep, only_if_modified); // Throws
     }
     else {
         SliceHandler handler(get_alloc());

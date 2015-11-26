@@ -76,8 +76,8 @@ namespace {
 
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 // Also: async requires interprocess communication, which does not work with our current encryption support.
-#if !defined(_WIN32) && !defined(__APPLE__)
-#  if REALM_ANDROID || defined DISABLE_ASYNC || defined REALM_ENABLE_ENCRYPTION
+#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
+#  if REALM_ANDROID || defined DISABLE_ASYNC || REALM_ENABLE_ENCRYPTION
 bool allow_async = false;
 #  else
 bool allow_async = true;
@@ -98,7 +98,7 @@ void writer(std::string path, int id)
     // std::cerr << "Started writer " << std::endl;
     try {
         bool done = false;
-        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        SharedGroup sg(path, true, SharedGroup::durability_Full, crypt_key());
         // std::cerr << "Opened sg " << std::endl;
         for (int i=0; !done; ++i) {
             // std::cerr << "       - " << getpid() << std::endl;
@@ -114,16 +114,17 @@ void writer(std::string path, int id)
         // std::cerr << "Ended pid " << getpid() << std::endl;
     } catch (...) {
         // std::cerr << "Exception from " << getpid() << std::endl;
+        REALM_ASSERT(false);
     }
 }
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && !defined REALM_ENABLE_ENCRYPTION
+#if !REALM_PLATFORM_APPLE && !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, std::string path, int id)
 {
     {
-        SharedGroup sg(path, true, SharedGroup::durability_Full);
+        SharedGroup sg(path, true, SharedGroup::durability_Full, crypt_key());
         bool done = false;
         do {
             sched_yield();
@@ -167,7 +168,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !defined(__APPLE__) && !defined(_WIN32)&& !defined REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if !REALM_PLATFORM_APPLE && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -185,7 +186,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
     {
-        SharedGroup sg(path, false, SharedGroup::durability_Full);
+        SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         // Create table entries
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
@@ -228,8 +229,6 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
 TEST(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::string old_path = path;
-    std::string tmp_path = std::string(path)+".tmp";
     Thread writer_thread;
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
@@ -243,7 +242,7 @@ TEST(Shared_CompactingOnTheFly)
             wt.commit();
         }
         {
-            writer_thread.start(std::bind(&writer, old_path, 41));
+            writer_thread.start(std::bind(&writer, std::string(path), 41));
 
             // make sure writer has started:
             bool waiting = true;
@@ -275,7 +274,20 @@ TEST(Shared_CompactingOnTheFly)
             sg2.commit();
         }
         CHECK_EQUAL(true, sg2.compact());
+
         ReadTransaction rt2(sg2);
+        TestTableShared::ConstRef table = rt2.get_table<TestTableShared>("test");
+        CHECK(table);
+        CHECK_EQUAL(table->size(), 100);
+        rt2.get_group().verify();
+        sg2.close();
+    }
+    {
+        SharedGroup sg2(path, true, SharedGroup::durability_Full, crypt_key());
+        ReadTransaction rt2(sg2);
+        TestTableShared::ConstRef table = rt2.get_table<TestTableShared>("test");
+        CHECK(table);
+        CHECK_EQUAL(table->size(), 100);
         rt2.get_group().verify();
     }
 }
@@ -1323,7 +1335,7 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 #if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
@@ -1392,7 +1404,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 }
 
 #endif // not ios or android
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !defined REALM_ENABLE_ENCRYPTION
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
@@ -1824,7 +1836,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
 
 // disable shared async on windows and any Apple operating system
 // TODO: enable async daemon for OS X - think how to do it in XCode (no issue for build.sh)
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
 // Todo. Keywords: winbug
 TEST_IF(Shared_Async, allow_async)
 {
@@ -2087,9 +2099,9 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #endif
 }
 
-#endif // !defined(_WIN32) && !defined(__APPLE__)
+#endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
 
 // Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
@@ -2368,7 +2380,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
-#ifndef REALM_ENABLE_ENCRYPTION // encrpted buffers aren't supported
+#if !REALM_ENABLE_ENCRYPTION // encrpted buffers aren't supported
     // The empty group created initially by a shared group accessor is special
     // in that it contains no nodes, and the root-ref is therefore zero. The
     // following block checks that the contents of such a file is still
@@ -2462,7 +2474,14 @@ TEST(Shared_ReserveDiskSpace)
         size_t reserve_size_2 = orig_file_size;
         sg.reserve(reserve_size_2);
         size_t new_file_size_2 = size_t(File(path).get_size());
-        CHECK_EQUAL(orig_file_size, new_file_size_2);
+        if (crypt_key()) {
+            // For encrypted files, reserve() may actually grow the file
+            // with a page sized header.
+            CHECK(orig_file_size <= new_file_size_2 && (orig_file_size+page_size()) >= new_file_size_2 );
+        }
+        else {
+            CHECK_EQUAL(orig_file_size, new_file_size_2);
+        }
 
         // Check that reserve() does change the file size if the
         // specified size is greater than the actual file size, and

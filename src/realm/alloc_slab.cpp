@@ -40,7 +40,7 @@ SlabAlloc::SlabAlloc()
     size_t max = std::numeric_limits<size_t>::max();
     m_num_section_bases = 1 + get_section_index(max);
     m_section_bases.reset( new size_t[m_num_section_bases] );
-    for (int i = 0; i < m_num_section_bases; ++i) {
+    for (size_t i = 0; i < m_num_section_bases; ++i) {
         m_section_bases[i] = compute_section_base(i);
     }
 }
@@ -118,7 +118,8 @@ void SlabAlloc::detach() noexcept
             goto found;
         case attach_SharedFile:
         case attach_UnsharedFile:
-            File::unmap(m_data, m_initial_mapping_size);
+            m_data = 0;
+            m_initial_mapping.unmap();
             // running the destructors on the mappings will cause them to unmap:
             m_additional_mappings = nullptr;
             m_file.close();
@@ -126,6 +127,7 @@ void SlabAlloc::detach() noexcept
     }
     REALM_ASSERT(false);
   found:
+    invalidate_cache();
     m_attach_mode = attach_None;
 }
 
@@ -199,7 +201,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #endif
 
                 char* addr = translate(ref);
-#ifdef REALM_ENABLE_ALLOC_SET_ZERO
+#if REALM_ENABLE_ALLOC_SET_ZERO
                 std::fill(addr, addr+size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
@@ -251,7 +253,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
         std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
-#ifdef REALM_ENABLE_ALLOC_SET_ZERO
+#if REALM_ENABLE_ALLOC_SET_ZERO
     std::fill(slab.addr, slab.addr+size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
@@ -350,7 +352,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
     // FIXME: Check if we can extend current space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
-    // fill with zero if REALM_ENABLE_ALLOC_SET_ZERO is defined.
+    // fill with zero if REALM_ENABLE_ALLOC_SET_ZERO is non-zero.
 
     // Allocate new space
     MemRef new_mem = do_alloc(new_size); // Throws
@@ -372,31 +374,59 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     return new_mem;
 }
 
+
 char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
-    // fast path if reference is inside the initial mapping:
-    if (ref < m_initial_mapping_size)
-        return m_data + ref;
+    char* addr = nullptr;
+
+    size_t cache_index = ref ^ ((ref >> 16) >> 16);
+    // we shift by 16 two times. On 32-bitters it's undefined to shift by
+    // 32. Shifting twice x16 however, is defined and gives zero. On 64-bitters
+    // the compiler should reduce it to a single 32 bit shift.
+    cache_index = cache_index ^(cache_index >> 16);
+    cache_index = (cache_index ^(cache_index >> 8)) & 0xFF;
+    if (cache[cache_index].ref == ref && cache[cache_index].version == version)
+        return cache[cache_index].addr;
 
     if (ref < m_baseline) {
 
-        // reference must be inside a section mapped later
-        size_t section_index = get_section_index(ref);
-        size_t mapping_index = section_index - m_first_additional_mapping;
-        size_t section_offset = ref - get_section_base(section_index);
-        REALM_ASSERT_DEBUG(m_additional_mappings);
-        REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
-        return m_additional_mappings[mapping_index].get_addr() + section_offset;
+        const util::File::Map<char>* map;
+
+        // fast path if reference is inside the initial mapping:
+        if (ref < m_initial_mapping_size) {
+            addr = m_data + ref;
+            map = &m_initial_mapping;
+        }
+        else {
+            // reference must be inside a section mapped later
+            size_t section_index = get_section_index(ref);
+            size_t mapping_index = section_index - m_first_additional_mapping;
+            size_t section_offset = ref - get_section_base(section_index);
+            REALM_ASSERT_DEBUG(m_additional_mappings);
+            REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
+            map = &m_additional_mappings[mapping_index];
+            REALM_ASSERT_DEBUG(map->get_addr() != nullptr);
+            addr = map->get_addr() + section_offset;
+        }
+        realm::util::encryption_read_barrier(addr, Array::header_size, 
+                                             map->get_encrypted_mapping(),
+                                             Array::get_byte_size_from_header);
     }
+    else {
+        typedef slabs::const_iterator iter;
+        iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
+        REALM_ASSERT_DEBUG(i != m_slabs.end());
 
-    typedef slabs::const_iterator iter;
-    iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
-    REALM_ASSERT_DEBUG(i != m_slabs.end());
-
-    ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
-    return i->addr + (ref - slab_ref);
+        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
+        addr = i->addr + (ref - slab_ref);
+    }
+    cache[cache_index].addr = addr;
+    cache[cache_index].ref = ref;
+    cache[cache_index].version = version;
+    REALM_ASSERT_DEBUG(addr != nullptr);
+    return addr;
 }
 
 int SlabAlloc::get_committed_file_format() const noexcept
@@ -436,7 +466,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     size_t initial_size = m_initial_section_size;
 
     size_t initial_size_of_file;
-    ref_type top_ref = 0;
 
     // The size of a database file must not exceed what can be encoded in
     // size_t.
@@ -483,7 +512,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // undefined behavior.
     // The mapping of the first part of the file *must* be contiguous, because
     // we do not know if the file was created by a version of the code, that took
-    // the section boundaries into account. If it wasn't we cannot map it in sections 
+    // the section boundaries into account. If it wasn't we cannot map it in sections
     // without risking datastructures that cross a mapping boundary.
     // If the file is opened read-only, we cannot extend it. This is not a problem,
     // because for a read-only file we assume that it will not change while we use it.
@@ -500,23 +529,28 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         // actual size of the file.
     }
 
+    ref_type top_ref;
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
+        // we'll read header and (potentially) footer
+        realm::util::encryption_read_barrier(map, 0, sizeof(Header));
+        realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
 
-        m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!cfg.skip_validate) {
             // Verify the data structures
-            validate_buffer(map.get_addr(), initial_size_of_file, path, top_ref, cfg.is_shared); // Throws
+            validate_buffer(map.get_addr(), initial_size_of_file, path, cfg.is_shared); // Throws
         }
 
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
-            Header* header = writable_map.get_addr();
-            header->m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
+            Header& header = *writable_map.get_addr();
+            realm::util::encryption_read_barrier(writable_map, 0);
+            header.m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
+            realm::util::encryption_write_barrier(writable_map, 0);
         }
         else {
-            const Header* header = reinterpret_cast<const Header*>(map.get_addr());
-            bool stored_server_sync_mode = (header->m_flags & flags_ServerSyncMode) != 0;
+            const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
+            bool stored_server_sync_mode = (header.m_flags & flags_ServerSyncMode) != 0;
             if (cfg.server_sync_mode &&  !stored_server_sync_mode)
                 throw InvalidDatabase("Specified Realm file was not created with support for "
                                       "client/server synchronization", path);
@@ -526,12 +560,23 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         }
 
         {
-            const Header* header = reinterpret_cast<const Header*>(map.get_addr());
-            int select_field = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-            m_file_format = header->m_file_format[select_field];
+            const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
+            int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+            m_file_format = header.m_file_format[select_field];
+            uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
+            m_file_on_streaming_form = (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+            if (m_file_on_streaming_form) {
+                const StreamingFooter& footer =
+                    *(reinterpret_cast<StreamingFooter*>(map.get_addr()+initial_size_of_file) - 1);
+                top_ref = ref_type(footer.m_top_ref);
+            }
+            else {
+                top_ref = ref_type(ref);
+            }
         }
 
-        m_data        = map.release();
+        m_data        = map.get_addr();
+        m_initial_mapping = std::move(map);
         m_baseline    = size;
         m_initial_mapping_size = size;
         m_first_additional_mapping = get_section_index(m_initial_mapping_size);
@@ -543,34 +588,40 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         throw InvalidDatabase("Realm file decryption failed", path);
     }
 
-    // make sure that any call to begin_read cause any slab to be placed in free lists correctly
+    // make sure that any call to begin_read cause any slab to be placed in free
+    // lists correctly
     m_free_space_state = free_space_Invalid;
 
     // make sure the database is not on streaming format. This has to be done at
     // session initialization, even if it means writing the database during open.
     if (cfg.session_initiator && m_file_on_streaming_form) {
-
-        Header* header = reinterpret_cast<Header*>(m_data);
-        static_cast<void>(header);
-
-        // Don't compare file format version fields as they are allowed to differ. 
+        const Header& header = *reinterpret_cast<Header*>(m_data);
+        const StreamingFooter& footer =
+            *(reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1);
+        // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
-        REALM_ASSERT_3(header->m_flags, == , streaming_header.m_flags);
-        REALM_ASSERT_3(header->m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
-        REALM_ASSERT_3(header->m_mnemonic[1], == , streaming_header.m_mnemonic[1]);
-        REALM_ASSERT_3(header->m_mnemonic[2], == , streaming_header.m_mnemonic[2]);
-        REALM_ASSERT_3(header->m_mnemonic[3], == , streaming_header.m_mnemonic[3]);
-        REALM_ASSERT_3(header->m_top_ref[0], == , streaming_header.m_top_ref[0]);
-        REALM_ASSERT_3(header->m_top_ref[1], == , streaming_header.m_top_ref[1]);
+        static_cast<void>(header);
+        REALM_ASSERT_3(header.m_flags, == , streaming_header.m_flags);
+        REALM_ASSERT_3(header.m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
+        REALM_ASSERT_3(header.m_mnemonic[1], == , streaming_header.m_mnemonic[1]);
+        REALM_ASSERT_3(header.m_mnemonic[2], == , streaming_header.m_mnemonic[2]);
+        REALM_ASSERT_3(header.m_mnemonic[3], == , streaming_header.m_mnemonic[3]);
+        REALM_ASSERT_3(header.m_top_ref[0], == , streaming_header.m_top_ref[0]);
+        REALM_ASSERT_3(header.m_top_ref[1], == , streaming_header.m_top_ref[1]);
 
-        StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1;
-        REALM_ASSERT_3(footer->m_magic_cookie, ==, footer_magic_cookie);
+        REALM_ASSERT_3(footer.m_magic_cookie, ==, footer_magic_cookie);
         {
-            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
-            Header* writable_header = writable_map.get_addr();
-            writable_header->m_top_ref[1] = footer->m_top_ref;
+            File::Map<Header> writable_map(m_file, File::access_ReadWrite,
+                                           sizeof (Header)); // Throws
+            Header& writable_header = *writable_map.get_addr();
+            realm::util::encryption_read_barrier(writable_map, 0);
+            writable_header.m_top_ref[1] = footer.m_top_ref;
+            realm::util::encryption_write_barrier(writable_map, 0);
             writable_map.sync();
-            writable_header->m_flags |= flags_SelectBit; // keep bit 1 used for server sync mode unchanged
+            // keep bit 1 used for server sync mode unchanged
+            realm::util::encryption_read_barrier(writable_map, 0);
+            writable_header.m_flags |= flags_SelectBit;
+            realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
             writable_map.sync();
         }
@@ -588,16 +639,24 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     REALM_ASSERT(!is_attached());
 
     // Verify the data structures
-    m_file_on_streaming_form = false; // May be updated by validate_buffer()
     std::string path; // No path
-    ref_type top_ref;
     bool is_shared = false;
-    validate_buffer(data, size, path, top_ref, is_shared); // Throws
+    validate_buffer(data, size, path, is_shared); // Throws
 
+    ref_type top_ref;
     {
-        const Header* header = reinterpret_cast<const Header*>(data);
-        int select_field = ((header->m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-        m_file_format = header->m_file_format[select_field];
+        const Header& header = reinterpret_cast<const Header&>(*data);
+        int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+        m_file_format = header.m_file_format[select_field];
+        uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
+        m_file_on_streaming_form = (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+        if (m_file_on_streaming_form) {
+            const StreamingFooter& footer = *(reinterpret_cast<StreamingFooter*>(data+size) - 1);
+            top_ref = ref_type(footer.m_top_ref);
+        }
+        else {
+            top_ref = ref_type(ref);
+        }
     }
 
     m_data        = data;
@@ -629,30 +688,28 @@ void SlabAlloc::attach_empty()
     m_initial_mapping_size = m_baseline;
 }
 
+
 void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string& path,
-                                ref_type& top_ref, bool is_shared)
+                                bool is_shared)
 {
     // Verify that size is sane and 8-byte aligned
     if (REALM_UNLIKELY(size < sizeof (Header) || size % 8 != 0))
         throw InvalidDatabase("Realm file has bad size", path);
 
-    // File header is 24 bytes, composed of three 64-bit
-    // blocks. The two first being top_refs (only one valid
-    // at a time) and the last being the info block.
-    const char* file_header = data;
+    const Header& header = *reinterpret_cast<const Header*>(data);
 
     // First four bytes of info block is file format id
-    if (REALM_UNLIKELY(!(file_header[16] == 'T' &&
-                         file_header[17] == '-' &&
-                         file_header[18] == 'D' &&
-                         file_header[19] == 'B')))
+    if (REALM_UNLIKELY(!(char(header.m_mnemonic[0]) == 'T' &&
+                         char(header.m_mnemonic[1]) == '-' &&
+                         char(header.m_mnemonic[2]) == 'D' &&
+                         char(header.m_mnemonic[3]) == 'B')))
         throw InvalidDatabase("Not a Realm file", path);
 
     // Last bit in info block indicates which top_ref block is valid
-    int valid_part = file_header[16 + 7] & 0x1;
+    int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
-    int file_format = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
+    int file_format = int(header.m_file_format[select_field]);
     bool bad_file_format = (file_format != library_file_format);
 
     // As a special case, allow upgrading from version 2 to 3, but only when
@@ -664,23 +721,19 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
         throw InvalidDatabase("Unsupported Realm file format version", path);
 
     // Top_ref should always point within buffer
-    const uint64_t* top_refs = reinterpret_cast<const uint64_t*>(data);
-    uint_fast64_t ref = top_refs[valid_part];
-    if (valid_part == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
+    uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
+    if (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof (Header) + sizeof (StreamingFooter)))
             throw InvalidDatabase("Realm file in streaming form has bad size", path);
-        const StreamingFooter* footer = reinterpret_cast<const StreamingFooter*>(data+size) - 1;
-        ref = footer->m_top_ref;
-        if (REALM_UNLIKELY(footer->m_magic_cookie != footer_magic_cookie))
+        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data+size) - 1);
+        ref = footer.m_top_ref;
+        if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie))
             throw InvalidDatabase("Bad Realm file header (#1)", path);
-        m_file_on_streaming_form = true;
     }
     if (REALM_UNLIKELY(ref % 8 != 0))
         throw InvalidDatabase("Bad Realm file header (#2)", path);
     if (REALM_UNLIKELY(ref >= size))
         throw InvalidDatabase("Bad Realm file header (#3)", path);
-
-    top_ref = ref_type(ref);
 }
 
 
@@ -692,6 +745,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 
 void SlabAlloc::reset_free_space_tracking()
 {
+    invalidate_cache();
     if (m_free_space_state == free_space_Clean)
         return;
 

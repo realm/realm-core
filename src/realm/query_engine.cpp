@@ -15,15 +15,14 @@ using namespace realm;
 
 size_t ParentNode::find_first(size_t start, size_t end)
 {
-    size_t m = start;
     size_t next_cond = 0;
     size_t first_cond = 0;
 
     while (start < end) {
-        m = m_children[next_cond]->find_first_local(start, end);
+        size_t m = m_children[next_cond]->find_first_local(start, end);
 
         next_cond++;
-        if (next_cond == m_conds)
+        if (next_cond == m_children.size())
             next_cond = 0;
 
         if (m == start) {
@@ -52,23 +51,23 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, IntegerColumn>;
 
     else if (TAction == act_Sum && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<float>>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, FloatColumn>;
     else if (TAction == act_Sum && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, BasicColumn<double>>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, DoubleColumn>;
 
     else if (TAction == act_Max && col_id == type_Int)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Max, IntegerColumn>;
     else if (TAction == act_Max && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<float>>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, FloatColumn>;
     else if (TAction == act_Max && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, BasicColumn<double>>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Max, DoubleColumn>;
 
     else if (TAction == act_Min && col_id == type_Int)
         m_column_action_specializer = & ThisType::column_action_specialization<act_Min, IntegerColumn>;
     else if (TAction == act_Min && col_id == type_Float)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<float>>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, FloatColumn>;
     else if (TAction == act_Min && col_id == type_Double)
-        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, BasicColumn<double>>;
+        m_column_action_specializer = & ThisType::column_action_specialization<act_Min, DoubleColumn>;
 
     else if (TAction == act_FindAll)
         m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
@@ -112,7 +111,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
         // Find first match in remaining condition nodes
         size_t m = r;
 
-        for (size_t c = 1; c < m_conds; c++) {
+        for (size_t c = 1; c < m_children.size(); c++) {
             m = m_children[c]->find_first_local(r, r + 1);
             if (m != r) {
                 break;
@@ -141,7 +140,7 @@ size_t NotNode::find_first_local(size_t start, size_t end)
         return find_first_overlap_lower(start, end);
     }
     else if (start <= m_known_range_end && end > m_known_range_end) {
-        return find_first_overlap_upper(start, end);   
+        return find_first_overlap_upper(start, end);
     }
     else { // start > m_known_range_end || end < m_known_range_start
         return find_first_no_overlap(start, end);
@@ -150,7 +149,7 @@ size_t NotNode::find_first_local(size_t start, size_t end)
 
 bool NotNode::evaluate_at(size_t rowndx)
 {
-    return m_cond->find_first(rowndx, rowndx+1) == not_found;
+    return m_condition->find_first(rowndx, rowndx+1) == not_found;
 }
 
 void NotNode::update_known(size_t start, size_t end, size_t first)

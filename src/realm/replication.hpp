@@ -25,17 +25,15 @@
 #include <memory>
 #include <exception>
 #include <string>
-#include <ostream>
 
 #include <realm/util/assert.hpp>
 #include <realm/util/tuple.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/history.hpp>
 #include <realm/impl/transact_log.hpp>
-
-#include <iostream>
 
 namespace realm {
 
@@ -95,8 +93,7 @@ public:
     /// Called by SharedGroup during a write transaction, when readlocks are
     /// recycled, to keep the commit log management in sync with what versions
     /// can possibly be interesting in the future.
-    virtual void set_last_version_seen_locally(version_type last_seen_version_number)
-        noexcept;
+    virtual void set_last_version_seen_locally(version_type last_seen_version_number) noexcept;
 
 
     //@{
@@ -202,14 +199,14 @@ public:
     /// Called by the local coordinator to apply a transaction log received from
     /// another local coordinator.
     ///
-    /// \param apply_log If specified, and the library was compiled in debug
-    /// mode, then a line describing each individual operation is writted to the
-    /// specified stream.
+    /// \param logger If specified, and the library was compiled in debug mode,
+    /// then a line describing each individual operation is writted to the
+    /// specified logger.
     ///
     /// \throw BadTransactLog If the transaction log could not be successfully
     /// parsed, or ended prematurely.
     static void apply_changeset(InputStream& transact_log, Group& target,
-                                std::ostream* apply_log = 0);
+                                util::Logger* logger = nullptr);
 
     virtual ~Replication() noexcept {}
 
@@ -288,13 +285,13 @@ protected:
 
     TrivialReplication(const std::string& database_file);
 
-    virtual void prepare_changeset(const char* data, std::size_t size,
+    virtual void prepare_changeset(const char* data, size_t size,
                                    version_type new_version) = 0;
 
     virtual void finalize_changeset() noexcept = 0;
 
-    static void apply_changeset(const char* data, std::size_t size, SharedGroup& target,
-                                std::ostream* apply_log = 0);
+    static void apply_changeset(const char* data, size_t size, SharedGroup& target,
+                                util::Logger* logger = nullptr);
 
 private:
     const std::string m_database_file;
@@ -307,12 +304,12 @@ private:
     void do_abort_transact(SharedGroup&) noexcept override;
     void do_interrupt() noexcept override;
     void do_clear_interrupt() noexcept override;
-    void transact_log_reserve(std::size_t n, char** new_begin, char** new_end) override;
-    void transact_log_append(const char* data, std::size_t size, char** new_begin,
+    void transact_log_reserve(size_t n, char** new_begin, char** new_end) override;
+    void transact_log_append(const char* data, size_t size, char** new_begin,
                              char** new_end) override;
-    void internal_transact_log_reserve(std::size_t, char** new_begin, char** new_end);
+    void internal_transact_log_reserve(size_t, char** new_begin, char** new_end);
 
-    std::size_t transact_log_size();
+    size_t transact_log_size();
 };
 
 
@@ -383,20 +380,20 @@ inline TrivialReplication::TrivialReplication(const std::string& database_file):
 {
 }
 
-inline std::size_t TrivialReplication::transact_log_size()
+inline size_t TrivialReplication::transact_log_size()
 {
     return write_position() - m_transact_log_buffer.data();
 }
 
-inline void TrivialReplication::transact_log_reserve(std::size_t n, char** new_begin, char** new_end)
+inline void TrivialReplication::transact_log_reserve(size_t n, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(n, new_begin, new_end);
 }
 
-inline void TrivialReplication::internal_transact_log_reserve(std::size_t n, char** new_begin, char** new_end)
+inline void TrivialReplication::internal_transact_log_reserve(size_t n, char** new_begin, char** new_end)
 {
     char* data = m_transact_log_buffer.data();
-    std::size_t size = write_position() - data;
+    size_t size = write_position() - data;
     m_transact_log_buffer.reserve_extra(size, n);
     data = m_transact_log_buffer.data(); // May have changed
     *new_begin = data + size;

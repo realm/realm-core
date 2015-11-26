@@ -58,7 +58,7 @@ size_t get_capacity(const char* header)
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (std::size_t(h[0]) << 16) + (std::size_t(h[1]) << 8) + h[2];
+    return (size_t(h[0]) << 16) + (size_t(h[1]) << 8) + h[2];
 }
 
 } // anonymous namespace

@@ -22,62 +22,108 @@
 #define REALM_COLUMN_TYPE_TRAITS_HPP
 
 #include <realm/column_fwd.hpp>
+#include <realm/column_type.hpp>
+#include <realm/data_type.hpp>
 
 namespace realm {
 
-template <class T, bool Nullable> struct ColumnTypeTraits;
+class DateTime;
+class ArrayBinary;
+class ArrayInteger;
+class ArrayIntNull;
+template <class> class BasicArray;
 
-template <bool Nullable> struct ColumnTypeTraits<int64_t, Nullable> {
-    using column_type = Column<int64_t, Nullable>;
-    using leaf_type = typename column_type::LeafType;
+template<class T>
+struct ColumnTypeTraits;
+
+template<>
+struct ColumnTypeTraits<int64_t> {
+    using column_type = Column<int64_t>;
+    using leaf_type = ArrayInteger;
     using sum_type = int64_t;
+    using minmax_type = int64_t;
     static const DataType id = type_Int;
     static const ColumnType column_id = col_type_Int;
     static const ColumnType real_column_type = col_type_Int;
 };
 
-template <bool Nullable> struct ColumnTypeTraits<bool, Nullable> :
-    ColumnTypeTraits<int64_t, Nullable>
+template<>
+struct ColumnTypeTraits<util::Optional<int64_t>> {
+    using column_type = Column<util::Optional<int64_t>>;
+    using leaf_type = ArrayIntNull;
+    using sum_type = int64_t;
+    using minmax_type = int64_t;
+    static const DataType id = type_Int;
+    static const ColumnType column_id = col_type_Int;
+    static const ColumnType real_column_type = col_type_Int;
+};
+
+template<>
+struct ColumnTypeTraits<bool> :
+    ColumnTypeTraits<int64_t>
 {
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
 };
 
-template <bool N> struct ColumnTypeTraits<float, N> {
+template<>
+struct ColumnTypeTraits<util::Optional<bool>> :
+    ColumnTypeTraits<util::Optional<int64_t>>
+{
+    static const DataType id = type_Bool;
+    static const ColumnType column_id = col_type_Bool;
+};
+
+template<>
+struct ColumnTypeTraits<float> {
     using column_type = FloatColumn;
-    using leaf_type = ArrayFloat;
+    using leaf_type = BasicArray<float>;
     using sum_type = double;
+    using minmax_type = float;
     static const DataType id = type_Float;
     static const ColumnType column_id = col_type_Float;
     static const ColumnType real_column_type = col_type_Float;
 };
 
-template <bool N> struct ColumnTypeTraits<double, N> {
+template<>
+struct ColumnTypeTraits<double> {
     using column_type = DoubleColumn;
-    using leaf_type = ArrayDouble;
+    using leaf_type = BasicArray<double>;
     using sum_type = double;
+    using minmax_type = double;
     static const DataType id = type_Double;
     static const ColumnType column_id = col_type_Double;
     static const ColumnType real_column_type = col_type_Double;
 };
 
-template <bool N> struct ColumnTypeTraits<DateTime, N> :
-    ColumnTypeTraits<int64_t, N>
+template<>
+struct ColumnTypeTraits<DateTime> :
+    ColumnTypeTraits<int64_t>
 {
     static const DataType id = type_DateTime;
     static const ColumnType column_id = col_type_DateTime;
 };
 
-template <bool N> struct ColumnTypeTraits<StringData, N> {
+template<>
+struct ColumnTypeTraits<util::Optional<DateTime>> :
+    ColumnTypeTraits<util::Optional<int64_t>>
+{
+    static const DataType id = type_DateTime;
+    static const ColumnType column_id = col_type_DateTime;
+};
+
+template<>
+struct ColumnTypeTraits<StringData> {
     using column_type = StringEnumColumn;
-    using leaf_type = StringEnumColumn::LeafType;
+    using leaf_type = ArrayInteger;
     using sum_type = int64_t;
     static const DataType id = type_String;
     static const ColumnType column_id = col_type_String;
     static const ColumnType real_column_type = col_type_String;
 };
 
-template <bool N> struct ColumnTypeTraits<BinaryData, N> {
+template<>
+struct ColumnTypeTraits<BinaryData> {
     using column_type = BinaryColumn;
     using leaf_type = ArrayBinary;
     static const DataType id = type_Binary;
@@ -85,29 +131,45 @@ template <bool N> struct ColumnTypeTraits<BinaryData, N> {
     static const ColumnType real_column_type = col_type_Binary;
 };
 
-template <DataType, bool Nullable> struct GetColumnType;
-template <> struct GetColumnType<type_Int, false> {
+template<DataType, bool Nullable>
+struct GetColumnType;
+template<>
+struct GetColumnType<type_Int, false>
+{
     using type = IntegerColumn;
 };
-template <> struct GetColumnType<type_Int, true> {
+template<>
+struct GetColumnType<type_Int, true>
+{
     using type = IntNullColumn;
 };
-template <bool N> struct GetColumnType<type_Float, N> {
+template<bool N>
+struct GetColumnType<type_Float, N> {
     // FIXME: Null definition
     using type = FloatColumn;
 };
-template <bool N> struct GetColumnType<type_Double, N> {
+template<bool N>
+struct GetColumnType<type_Double, N> {
     // FIXME: Null definition
     using type = DoubleColumn;
 };
 
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
-template<class T, Action A> struct ColumnTypeTraitsSum {
+template<class T, Action A>
+struct ColumnTypeTraitsSum {
     typedef T sum_type;
 };
 
-template<> struct ColumnTypeTraitsSum<float, act_Sum> {
+template<>
+struct ColumnTypeTraitsSum<float, act_Sum>
+{
     typedef double sum_type;
+};
+
+template<Action A>
+struct ColumnTypeTraitsSum<util::Optional<int64_t>, A>
+{
+    using sum_type = int64_t;
 };
 
 }

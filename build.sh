@@ -64,6 +64,7 @@ Available modes are:
     config:                             
     clean:                              
     build:                              
+    build-arm-benchmark:
     build-config-progs:                 
     build-osx:                          
     build-iphone:                       
@@ -78,7 +79,6 @@ Available modes are:
     check-debug:                        
     memcheck:                           
     memcheck-debug:                     
-    check-doc-examples:                 
     check-testcase:                     
     check-testcase-debug:               
     memcheck-testcase:                  
@@ -238,10 +238,11 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     else
         if [ -r "/proc/cpuinfo" ]; then
             NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
+            LIMIT_LOAD_AVERAGE=YES
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
-        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS -l$NUM_PROCESSORS" || exit 1
+        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS ${LIMIT_LOAD_AVERAGE:+-l$MAX_LOAD_AVERAGE}" || exit 1
         export MAKEFLAGS
 
         if ! [ "$UNITTEST_THREADS" ]; then
@@ -967,11 +968,9 @@ EOF
         rm -f "$REALM_HOME/$file_name" || exit 1
         (cd "$REALM_HOME/$ANDROID_DIR" && tar czf "$REALM_HOME/$file_name" include $tar_files) || exit 1
 
-        echo "Unpacking in ../realm_java/$dir_name"
-        mkdir -p ../realm_java/realm-jni/build || exit 1 # to help Mr. Jenkins
-        cp "$REALM_HOME/$file_name" ../realm_java/realm-jni/build
-        (cd ../realm_java && rm -rf $dir_name && mkdir $dir_name) || exit 1
-        (cd ../realm_java/$dir_name && tar xzf "$REALM_HOME/$file_name") || exit 1
+        echo "Copying to ../realm-java/"
+        mkdir -p ../realm-java/ || exit 1 # to help Mr. Jenkins
+        cp "$REALM_HOME/$file_name" "../realm-java/core-android-$realm_version.tar.gz"
         ;;
 
     "build-cocoa")
@@ -989,6 +988,7 @@ EOF
         sh build.sh build-osx || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-watchos || exit 1
+        sh build.sh build-tvos || exit 1
 
         echo "Copying files"
         tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
@@ -997,7 +997,7 @@ EOF
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
-        cp "$IPHONE_DIR"/*.a "$WATCHOS_DIR"/*.a "src/realm/librealm.a" "src/realm/librealm-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$IPHONE_DIR"/*.a "$WATCHOS_DIR"/*.a "$TVOS_DIR"/*.a "src/realm/librealm.a" "src/realm/librealm-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
@@ -1055,7 +1055,6 @@ EOF
     "test"|"test-debug"|\
     "check"|"check-debug"|\
     "memcheck"|"memcheck-debug"|\
-    "check-doc-examples"|\
     "check-testcase"|"check-testcase-debug"|\
     "memcheck-testcase"|"memcheck-testcase-debug")
         auto_configure || exit 1
@@ -2892,6 +2891,10 @@ EOF
         exit 0
         ;;
 
+    "build-arm-benchmark")
+        CC=arm-linux-gnueabihf-gcc AR=arm-linux-gnueabihf-ar LD=arm-linux-gnueabihf-g++ make benchmark-common-tasks COMPILER_IS_GCC_LIKE=1 LD_IS_GCC_LIKE=1 EXTRA_CFLAGS=-mthumb
+        ;;
+
     "jenkins-pull-request")
         # Run by Jenkins for each pull request whenever it changes
         if ! [ -d "$WORKSPACE" ]; then
@@ -2913,7 +2916,6 @@ EOF
         sh build.sh build || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
         sh build.sh install || exit 1
-        sh build.sh check-doc-examples || exit 1
         (
             cd "examples" || exit 1
             make || exit 1

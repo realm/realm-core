@@ -2,6 +2,7 @@
 #include <limits>
 #include <iostream>
 #include <iomanip>
+#include <array>
 
 #ifdef _MSC_VER
 #  include <intrin.h>
@@ -177,12 +178,11 @@ size_t Array::bit_width(int64_t v)
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.m_addr;
-
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs             = get_hasrefs_from_header(header);
     m_context_flag         = get_context_flag_from_header(header);
-    m_width                = get_width_from_header(header);
+    m_width                = uint_least8_t(get_width_from_header(header));
     m_size                 = get_size_from_header(header);
 
     // Capacity is how many items there are room for
@@ -289,7 +289,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
         // Null-refs signify empty subtrees. Also, all refs are
         // 8-byte aligned, so the lowest bits cannot be set. If they
         // are, it means that it should not be interpreted as a ref.
-        bool is_subarray = value != 0 && value % 2 == 0;
+        bool is_subarray = value != 0 && (value & 1) == 0;
         if (!is_subarray) {
             slice.add(value); // Throws
             continue;
@@ -338,7 +338,7 @@ void Array::destroy_children(size_t offset) noexcept
         // A ref is always 8-byte aligned, so the lowest bit
         // cannot be set. If it is, it means that it should not be
         // interpreted as a ref.
-        if (value % 2 != 0)
+        if ((value & 1) != 0)
             continue;
 
         ref_type ref = to_ref(value);
@@ -346,69 +346,43 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
-size_t Array::write(_impl::ArrayWriterBase& out, bool recurse, bool persist) const
+
+ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
-    REALM_ASSERT(is_attached());
+    // FIXME: Replace capacity with checksum
 
-    // Ignore un-changed arrays when persisting
-    if (persist && m_alloc.is_read_only(m_ref))
-        return m_ref;
+    // Write flat array
+    const char* header = get_header_from_data(m_data);
+    size_t size = get_byte_size();
+    uint_fast32_t dummy_checksum = 0x01010101UL;
+    ref_type new_ref = out.write_array(header, size, dummy_checksum); // Throws
+    REALM_ASSERT_3(new_ref % 8, ==, 0); // 8-byte alignment
+    return new_ref;
+}
 
-    if (!recurse || !m_has_refs) {
-        // FIXME: Replace capacity with checksum
 
-        // Write flat array
-        const char* header = get_header_from_data(m_data);
-        std::size_t size = get_byte_size();
-        uint_fast32_t dummy_checksum = 0x01010101UL;
-        std::size_t array_pos = out.write_array(header, size, dummy_checksum);
-        REALM_ASSERT_3(array_pos % 8, ==, 0); // 8-byte alignment
-
-        return array_pos;
-    }
-
+ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified) const
+{
     // Temp array for updated refs
-    ArrayInteger new_refs(Allocator::get_default());
+    Array new_array(Allocator::get_default());
     Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
-    new_refs.create(type, m_context_flag); // Throws
+    new_array.create(type, m_context_flag); // Throws
+    _impl::ShallowArrayDestroyGuard dg(&new_array);
 
-    try {
-        // First write out all sub-arrays
-        std::size_t n = size();
-        for (std::size_t i = 0; i != n; ++i) {
-            int_fast64_t value = get(i);
-            if (value == 0 || value % 2 != 0) {
-                // Zero-refs and values that are not 8-byte aligned do
-                // not point to subarrays.
-                new_refs.add(value); // Throws
-            }
-            else if (persist && m_alloc.is_read_only(to_ref(value))) {
-                // Ignore un-changed arrays when persisting
-                new_refs.add(value); // Throws
-            }
-            else {
-                Array sub(get_alloc());
-                sub.init_from_ref(to_ref(value));
-                bool subrecurse = true;
-                std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
-                REALM_ASSERT_3(sub_pos % 8, ==, 0); // 8-byte alignment
-                new_refs.add(sub_pos); // Throws
-            }
+    // First write out all sub-arrays
+    size_t n = size();
+    for (size_t i = 0; i < n; ++i) {
+        int_fast64_t value = get(i);
+        bool is_ref = (value != 0 && (value & 1) == 0);
+        if (is_ref) {
+            ref_type subref = to_ref(value);
+            ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
+            value = int_fast64_t(new_subref); // FIXME: Problematic unsigned -> signed conversion
         }
-
-        // Write out the replacement array
-        // (but don't write sub-tree as it has alredy been written)
-        bool subrecurse = false;
-        std::size_t refs_pos = new_refs.write(out, subrecurse, persist); // Throws
-
-        new_refs.destroy(); // Shallow
-
-        return refs_pos; // Return position
+        new_array.add(value); // Throws
     }
-    catch (...) {
-        new_refs.destroy(); // Shallow
-        throw;
-    }
+
+    return new_array.do_write_shallow(out); // Throws
 }
 
 
@@ -423,7 +397,13 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    if (m_width < 8) {
+    size_t bits_per_elem = m_width;
+    const char* header = get_header_from_data(m_data);
+    if (get_wtype_from_header(header) == wtype_Multiply) {
+        bits_per_elem *= 8;
+    }
+
+    if (bits_per_elem < 8) {
         // FIXME: Should be optimized
         for (size_t i = begin; i != end; ++i) {
             int_fast64_t v = (this->*m_getter)(i);
@@ -432,7 +412,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
         return;
     }
 
-    size_t bytes_per_elem = m_width / 8;
+    size_t bytes_per_elem = bits_per_elem / 8;
     const char* begin_2 = m_data + begin      * bytes_per_elem;
     const char* end_2   = m_data + end        * bytes_per_elem;
     char* dest_begin_2  = m_data + dest_begin * bytes_per_elem;
@@ -450,7 +430,13 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    if (m_width < 8) {
+    size_t bits_per_elem = m_width;
+    const char* header = get_header_from_data(m_data);
+    if (get_wtype_from_header(header) == wtype_Multiply) {
+        bits_per_elem *= 8;
+    }
+
+    if (bits_per_elem < 8) {
         // FIXME: Should be optimized
         for (size_t i = end; i != begin; --i) {
             int_fast64_t v = (this->*m_getter)(i-1);
@@ -459,12 +445,80 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
         return;
     }
 
-    size_t bytes_per_elem = m_width / 8;
+    size_t bytes_per_elem = bits_per_elem / 8;
     const char* begin_2 = m_data + begin    * bytes_per_elem;
     const char* end_2   = m_data + end      * bytes_per_elem;
     char* dest_end_2    = m_data + dest_end * bytes_per_elem;
     std::copy_backward(begin_2, end_2, dest_end_2);
 }
+
+
+void Array::move_rotate(size_t from, size_t to, size_t num_elems)
+{
+    if (from == to)
+        return;
+
+    copy_on_write(); // Throws
+
+    size_t bits_per_elem = m_width;
+    const char* header = get_header_from_data(m_data);
+    if (get_wtype_from_header(header) == wtype_Multiply) {
+        bits_per_elem *= 8;
+    }
+
+    if (bits_per_elem < 8) {
+        // Allocate some space for saving the moved elements.
+        // FIXME: Optimize this.
+        // FIXME: Support larger numbers of elements.
+        static const size_t small_save_limit = 32;
+        std::array<int64_t, small_save_limit> small_save;
+        std::unique_ptr<int64_t[]> big_save;
+        int64_t* save;
+        if (num_elems < small_save_limit) {
+            save = small_save.data();
+        }
+        else {
+            big_save.reset(new int64_t[num_elems]);
+            save = big_save.get();
+        }
+
+        // Save elements that should be moved.=
+        for (size_t i = 0; i < num_elems; ++i) {
+            save[i] = get(from + i);
+        }
+
+        // Shift elements in between up or down.
+        if (from < to) {
+            // Shift down.
+            move(from + num_elems, to + num_elems, from);
+        }
+        else { // from > to
+               // Shift up.
+            move_backward(to, from, from + num_elems);
+        }
+
+        // Restore saved elements at new location.
+        for (size_t i = 0; i < num_elems; ++i) {
+            set(to + i, save[i]);
+        }
+    }
+    else {
+        size_t bytes_per_elem = bits_per_elem / 8;
+        char *first, *new_first, *last;
+        if (from < to) {
+            first     = m_data + (from * bytes_per_elem);
+            new_first = m_data + ((from + num_elems) * bytes_per_elem);
+            last      = m_data + ((to   + num_elems) * bytes_per_elem);
+        }
+        else {
+            first     = m_data + (to * bytes_per_elem);
+            new_first = m_data + (from * bytes_per_elem);
+            last      = m_data + ((from + num_elems) * bytes_per_elem);
+        }
+        std::rotate(first, new_first, last);
+    }
+}
+
 
 void Array::add_to_column(IntegerColumn* column, int64_t value)
 {
@@ -499,7 +553,7 @@ void Array::set(size_t ndx, int64_t value)
     (this->*(m_vtable->setter))(ndx, value);
 }
 
-void Array::set_as_ref(std::size_t ndx, ref_type ref)
+void Array::set_as_ref(size_t ndx, ref_type ref)
 {
     set(ndx, from_ref(ref));
 }
@@ -558,9 +612,8 @@ void Array::insert(size_t ndx, int_fast64_t value)
         // when byte sized and no expansion, use memmove
 // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        char* base = reinterpret_cast<char*>(m_data);
-        char* src_begin = base + ndx*w;
-        char* src_end   = base + m_size*w;
+        char* src_begin = m_data + ndx*w;
+        char* src_end   = m_data + m_size*w;
         char* dst_end   = src_end + w;
         std::copy_backward(src_begin, src_end, dst_end);
     }
@@ -648,7 +701,7 @@ void Array::truncate_and_destroy_children(size_t size)
 }
 
 
-void Array::ensure_minimum_width(int64_t value)
+void Array::ensure_minimum_width(int_fast64_t value)
 {
     if (value >= m_lbound && value <= m_ubound)
         return;
@@ -693,7 +746,7 @@ void Array::set_all_to_zero()
 // pointed at are sorted increasingly
 //
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-std::size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
+size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
     switch (m_width) {
         case 0:
@@ -717,8 +770,8 @@ std::size_t Array::find_gte(const int64_t target, size_t start, Array const* ind
     }
 }
 
-template<std::size_t w>
-std::size_t Array::find_gte(const int64_t target, std::size_t start, Array const* indirection) const
+template<size_t w>
+size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
     REALM_ASSERT(start < (indirection ? indirection->size() : size()));
 
@@ -859,7 +912,8 @@ size_t Array::first_set_bit64(int64_t v) const
 
 namespace {
 
-template<size_t width> inline int64_t lower_bits()
+template<size_t width>
+inline int64_t lower_bits()
 {
     if (width == 1)
         return 0xFFFFFFFFFFFFFFFFULL;
@@ -882,7 +936,8 @@ template<size_t width> inline int64_t lower_bits()
 }
 
 // Return true if 'value' has an element (of bit-width 'width') which is 0
-template<size_t width> inline bool has_zero_element(uint64_t value) {
+template<size_t width>
+inline bool has_zero_element(uint64_t value) {
     uint64_t hasZeroByte;
     uint64_t lower = lower_bits<width>();
     uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -892,7 +947,8 @@ template<size_t width> inline bool has_zero_element(uint64_t value) {
 
 
 // Finds zero element of bit width 'width'
-template<bool eq, size_t width> size_t find_zero(uint64_t v)
+template<bool eq, size_t width>
+size_t find_zero(uint64_t v)
 {
     size_t start = 0;
     uint64_t hasZeroByte;
@@ -936,7 +992,8 @@ template<bool eq, size_t width> size_t find_zero(uint64_t v)
 } // anonymous namesapce
 
 
-template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
+template<bool find_max, size_t w>
+bool Array::minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
     size_t best_index = 0;
 
@@ -1033,7 +1090,8 @@ int64_t Array::sum(size_t start, size_t end) const
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
-template<size_t w> int64_t Array::sum(size_t start, size_t end) const
+template<size_t w>
+int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
@@ -1475,7 +1533,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         // Null-refs signify empty subtrees. Also, all refs are
         // 8-byte aligned, so the lowest bits cannot be set. If they
         // are, it means that it should not be interpreted as a ref.
-        bool is_subarray = value != 0 && value % 2 == 0;
+        bool is_subarray = value != 0 && (value & 1) == 0;
         if (!is_subarray) {
             new_array.add(value); // Throws
             continue;
@@ -1678,7 +1736,7 @@ void Array::alloc(size_t size, size_t width)
             if (new_capacity_bytes > max_array_payload) // cap at max allowed allocation
                 new_capacity_bytes = max_array_payload;
             capacity_bytes = new_capacity_bytes;
-            
+
             // If doubling is not enough, expand enough to fit
             if (capacity_bytes < needed_bytes) {
                 size_t rest = (~needed_bytes & 0x7) + 1;
@@ -1719,7 +1777,7 @@ int_fast64_t Array::lbound_for_width(size_t width) noexcept
     REALM_TEMPEX(return lbound_for_width, width, ());
 }
 
-template <size_t width>
+template<size_t width>
 int_fast64_t Array::lbound_for_width() noexcept
 {
     if (width == 0) {
@@ -1756,7 +1814,7 @@ int_fast64_t Array::ubound_for_width(size_t width) noexcept
     REALM_TEMPEX(return ubound_for_width, width, ());
 }
 
-template <size_t width>
+template<size_t width>
 int_fast64_t Array::ubound_for_width() noexcept
 {
     if (width == 0) {
@@ -1790,7 +1848,7 @@ int_fast64_t Array::ubound_for_width() noexcept
 
 
 
-template <size_t width>
+template<size_t width>
 struct Array::VTableForWidth {
     struct PopulatedVTable : Array::VTable {
         PopulatedVTable() {
@@ -1806,7 +1864,7 @@ struct Array::VTableForWidth {
     static const PopulatedVTable vtable;
 };
 
-template <size_t width>
+template<size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
 void Array::set_width(size_t width) noexcept
@@ -1814,7 +1872,8 @@ void Array::set_width(size_t width) noexcept
     REALM_TEMPEX(set_width, width, ());
 }
 
-template<size_t width> void Array::set_width() noexcept
+template<size_t width>
+void Array::set_width() noexcept
 {
     m_lbound = lbound_for_width<width>();
     m_ubound = ubound_for_width<width>();
@@ -1827,7 +1886,8 @@ template<size_t width> void Array::set_width() noexcept
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
 // exceed array length; in this case, remainder of res[8] will be left untouched.
-template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
+template<size_t w>
+void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
 
@@ -1883,7 +1943,8 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const noexc
 }
 
 
-template<size_t width> void Array::set(size_t ndx, int64_t value)
+template<size_t width>
+void Array::set(size_t ndx, int64_t value)
 {
     set_direct<width>(m_data, ndx, value);
 }
@@ -2357,7 +2418,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         int_fast64_t value = get(i);
         // Skip null refs and values that are not refs. Values are not refs when
         // the least significant bit is set.
-        if (value == 0 || value % 2 == 1)
+        if (value == 0 || (value & 1) == 1)
             continue;
 
         size_t used;
@@ -2392,7 +2453,8 @@ namespace {
 
 // Direct access methods
 
-template<int w> int64_t get_direct(const char* data, size_t ndx) noexcept
+template<int w>
+int64_t get_direct(const char* data, size_t ndx) noexcept
 {
     if (w == 0) {
         return 0;
@@ -2434,7 +2496,8 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
 }
 
 
-template<int width> inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
+template<int width>
+inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
 {
     return std::make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
                      to_size_t(get_direct<width>(data, ndx + 1)));
@@ -2647,142 +2710,22 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
 bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state, bool nullable_array, bool find_null) const
 {
     if (cond == cond_Equal) {
-        if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, Equal, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Min) {
-            REALM_TEMPEX3(return find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Max) {
-            REALM_TEMPEX3(return find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Count) {
-            REALM_TEMPEX3(return find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
+        return find<Equal>(action, value, start, end, baseindex, state, nullable_array, find_null);
     }
     if (cond == cond_NotEqual) {
-        if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, NotEqual, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Min) {
-            REALM_TEMPEX3(return find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Max) {
-            REALM_TEMPEX3(return find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Count) {
-            REALM_TEMPEX3(return find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
+        return find<NotEqual>(action, value, start, end, baseindex, state, nullable_array, find_null);
     }
     if (cond == cond_Greater) {
-        if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, Greater, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Min) {
-            REALM_TEMPEX3(return find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Max) {
-            REALM_TEMPEX3(return find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Count) {
-            REALM_TEMPEX3(return find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
+        return find<Greater>(action, value, start, end, baseindex, state, nullable_array, find_null);
     }
     if (cond == cond_Less) {
-        if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, Less, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Min) {
-            REALM_TEMPEX3(return find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Max) {
-            REALM_TEMPEX3(return find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Count) {
-            REALM_TEMPEX3(return find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
+        return find<Less>(action, value, start, end, baseindex, state, nullable_array, find_null);
     }
     if (cond == cond_None) {
-        if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, None, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Min) {
-            REALM_TEMPEX3(return find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Max) {
-            REALM_TEMPEX3(return find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Count) {
-            REALM_TEMPEX3(return find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
+        return find<None>(action, value, start, end, baseindex, state, nullable_array, find_null);
     }
     else if (cond == cond_LeftNotNull) {
-        if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, NotNull, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, NotNull, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Min) {
-            REALM_TEMPEX3(return find, NotNull, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Max) {
-            REALM_TEMPEX3(return find, NotNull, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Count) {
-            REALM_TEMPEX3(return find, NotNull, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, NotNull, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, NotNull, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
+        return find<NotNull>(action, value, start, end, baseindex, state, nullable_array, find_null);
     }
     REALM_ASSERT_DEBUG(false);
     return false;
@@ -2796,7 +2739,8 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-template <IndexMethod method, class T> size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
+template<IndexMethod method, class T>
+size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
 {
     bool first(method == index_FindFirst);
     bool count(method == index_Count);
@@ -2987,7 +2931,8 @@ namespace {
 // the specified 'offsets' array.
 //
 // Returns (child_ndx, ndx_in_child).
-template<int width> inline std::pair<size_t, size_t>
+template<int width>
+inline std::pair<size_t, size_t>
 find_child_from_offsets(const char* offsets_header, size_t elem_ndx) noexcept
 {
     const char* offsets_data = Array::get_data_from_header(offsets_header);
@@ -3019,7 +2964,7 @@ inline std::pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, siz
         // Case 2/2: Offsets array (general form)
         ref_type offsets_ref = to_ref(first_value);
         char* offsets_header = alloc.translate(offsets_ref);
-        int offsets_width = Array::get_width_from_header(offsets_header);
+        size_t offsets_width = Array::get_width_from_header(offsets_header);
         std::pair<size_t, size_t> p;
         REALM_TEMPEX(p = find_child_from_offsets, offsets_width, (offsets_header, ndx));
         child_ndx    = p.first;
@@ -3173,7 +3118,8 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
 // `Array::NodeInfo::m_offset` and `Array::NodeInfo::m_size` are not
 // calculated. With these simplification it is possible to avoid any
 // access to the `offsets` array.
-template<class Handler> void simplified_foreach_bptree_leaf(Array& node, Handler handler)
+template<class Handler>
+void simplified_foreach_bptree_leaf(Array& node, Handler handler)
     noexcept(noexcept(handler(Array::NodeInfo())))
 {
     REALM_ASSERT(node.is_inner_bptree_node());
@@ -3236,7 +3182,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
         }
 
         const char* data = Array::get_data_from_header(header);
-        int width = Array::get_width_from_header(header);
+        size_t width = Array::get_width_from_header(header);
         size_t ndx = 0;
         std::pair<int_fast64_t, int_fast64_t> p = get_two(data, width, ndx);
         int_fast64_t first_value = p.first;
@@ -3246,6 +3192,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
 
         mem_2.m_ref  = child_ref;
         mem_2.m_addr = alloc.translate(child_ref);
+        // inform encryption layer on next loop iteration
     }
 }
 
@@ -3315,7 +3262,7 @@ std::pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const noexcept
     REALM_ASSERT(is_inner_bptree_node());
 
     size_t ndx_2 = ndx;
-    int width = int(m_width);
+    size_t width = m_width;
     const char* data = m_data;
 
     for (;;) {
@@ -3449,6 +3396,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
         // 'root' may be destroyed at this point
         destroy_inner_bptree_node(root_mem, first_value, alloc);
         char* child_header = alloc.translate(child_ref);
+        // destroy_singlet.... will take care of informing the encryption layer
         MemRef child_mem(child_header, child_ref);
         destroy_singlet_bptree_branch(child_mem, alloc, handler);
         return;
@@ -3536,6 +3484,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
         REALM_ASSERT_3(num_children, >=, 2);
         child_ref = get_as_ref(child_ref_ndx);
         child_header = m_alloc.translate(child_ref);
+        // destroy_singlet.... will take care of informing the encryption layer
         child_mem = MemRef(child_header, child_ref);
         erase(child_ref_ndx); // Throws
         destroy_singlet_bptree_branch(child_mem, m_alloc, handler);
@@ -3592,7 +3541,7 @@ void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
-    int width = get_width_from_header(header);
+    size_t width = get_width_from_header(header);
     return get_direct(data, width, ndx);
 }
 
@@ -3600,7 +3549,7 @@ int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
-    int width = get_width_from_header(header);
+    size_t width = get_width_from_header(header);
     std::pair<int64_t, int64_t> p = ::get_two(data, width, ndx);
     return std::make_pair(p.first, p.second);
 }
@@ -3609,6 +3558,6 @@ std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexc
 void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
 {
     const char* data = get_data_from_header(header);
-    int width = get_width_from_header(header);
+    size_t width = get_width_from_header(header);
     ::get_three(data, width, ndx, v0, v1, v2);
 }

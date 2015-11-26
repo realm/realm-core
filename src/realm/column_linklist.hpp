@@ -49,40 +49,42 @@ public:
     using LinkColumnBase::LinkColumnBase;
     ~LinkListColumn() noexcept override;
 
-    static ref_type create(Allocator&, std::size_t size = 0);
+    static ref_type create(Allocator&, size_t size = 0);
 
     bool is_nullable() const noexcept final;
 
-    bool has_links(std::size_t row_ndx) const noexcept;
-    std::size_t get_link_count(std::size_t row_ndx) const noexcept;
+    bool has_links(size_t row_ndx) const noexcept;
+    size_t get_link_count(size_t row_ndx) const noexcept;
 
-    ConstLinkViewRef get(std::size_t row_ndx) const;
-    LinkViewRef get(std::size_t row_ndx);
+    ConstLinkViewRef get(size_t row_ndx) const;
+    LinkViewRef get(size_t row_ndx);
 
-    bool is_null(std::size_t row_ndx) const noexcept final;
-    void set_null(std::size_t row_ndx) final;
+    bool is_null(size_t row_ndx) const noexcept final;
+    void set_null(size_t row_ndx) final;
 
     /// Compare two columns for equality.
     bool compare_link_list(const LinkListColumn&) const;
 
-    void to_json_row(std::size_t row_ndx, std::ostream& out) const;
+    void to_json_row(size_t row_ndx, std::ostream& out) const;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
-    void clear(std::size_t, bool) override;
-    void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
-    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
-    void update_from_parent(std::size_t) noexcept override;
+    void swap_rows(size_t, size_t) override;
+    void clear(size_t, bool) override;
+    void cascade_break_backlinks_to(size_t, CascadeState&) override;
+    void cascade_break_backlinks_to_all_rows(size_t, CascadeState&) override;
+    void update_from_parent(size_t) noexcept override;
     void adj_acc_clear_root_table() noexcept override;
     void adj_acc_insert_rows(size_t, size_t) noexcept override;
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;
-    void refresh_accessor_tree(std::size_t, const Spec&) override;
+    void adj_acc_swap_rows(size_t, size_t) noexcept override;
+    void refresh_accessor_tree(size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
     void verify() const override;
-    void verify(const Table&, std::size_t) const override;
+    void verify(const Table&, size_t) const override;
 #endif
 
 protected:
@@ -90,31 +92,40 @@ protected:
 
 private:
     struct list_entry {
-        std::size_t m_row_ndx;
+        size_t m_row_ndx;
         LinkView* m_list;
+        bool operator<(const list_entry& other) const { return m_row_ndx < other.m_row_ndx; }
     };
+
+    // The accessors stored in `m_list_accessors` are sorted by their row index. When an accessor is unregistered,
+    // its entry is replaced by a tombstone (an entry with a null `m_list`). These tombstones are pruned at a later
+    // time by `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost of `std::vector::erase` that
+    // would otherwise be incurred each time an accessor is removed.
     mutable std::vector<list_entry> m_list_accessors;
+    mutable bool m_list_accessors_contains_tombstones = false;
 
-    LinkView* get_ptr(std::size_t row_ndx) const;
+    LinkView* get_ptr(size_t row_ndx) const;
 
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
-    void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                        std::size_t new_target_row_ndx) override;
+    void do_nullify_link(size_t row_ndx, size_t old_target_row_ndx) override;
+    void do_update_link(size_t row_ndx, size_t old_target_row_ndx,
+                        size_t new_target_row_ndx) override;
+    void do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
+                      size_t target_row_ndx_2) override;
 
     void unregister_linkview(const LinkView& view);
-    ref_type get_row_ref(std::size_t row_ndx) const noexcept;
-    void set_row_ref(std::size_t row_ndx, ref_type new_ref);
-    void add_backlink(std::size_t target_row, std::size_t source_row);
-    void remove_backlink(std::size_t target_row, std::size_t source_row);
+    ref_type get_row_ref(size_t row_ndx) const noexcept;
+    void set_row_ref(size_t row_ndx, ref_type new_ref);
+    void add_backlink(size_t target_row, size_t source_row);
+    void remove_backlink(size_t target_row, size_t source_row);
 
     // ArrayParent overrides
-    void update_child_ref(std::size_t child_ndx, ref_type new_ref) override;
-    ref_type get_child_ref(std::size_t child_ndx) const noexcept override;
+    void update_child_ref(size_t child_ndx, ref_type new_ref) override;
+    ref_type get_child_ref(size_t child_ndx) const noexcept override;
 
     // These helpers are needed because of the way the B+-tree of links is
     // traversed in cascade_break_backlinks_to() and
     // cascade_break_backlinks_to_all_rows().
-    void cascade_break_backlinks_to__leaf(std::size_t row_ndx, const Array& link_list_leaf,
+    void cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf,
                                           CascadeState&);
     void cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf, CascadeState&);
 
@@ -122,13 +133,21 @@ private:
 
     template<bool fix_ndx_in_parent>
     void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept;
+
     template<bool fix_ndx_in_parent>
     void adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept;
+
     template<bool fix_ndx_in_parent>
     void adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
 
+    template<bool fix_ndx_in_parent>
+    void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+
+    void prune_list_accessor_tombstones() noexcept;
+    void validate_list_accessors() const noexcept;
+
 #ifdef REALM_DEBUG
-    std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override;
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
 #endif
 
     friend class BacklinkColumn;
@@ -147,7 +166,7 @@ inline LinkListColumn::~LinkListColumn() noexcept
     discard_child_accessors();
 }
 
-inline ref_type LinkListColumn::create(Allocator& alloc, std::size_t size)
+inline ref_type LinkListColumn::create(Allocator& alloc, size_t size)
 {
     return IntegerColumn::create(alloc, Array::type_HasRefs, size); // Throws
 }
@@ -157,13 +176,13 @@ inline bool LinkListColumn::is_nullable() const noexcept
     return false;
 }
 
-inline bool LinkListColumn::has_links(std::size_t row_ndx) const noexcept
+inline bool LinkListColumn::has_links(size_t row_ndx) const noexcept
 {
     ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
     return (ref != 0);
 }
 
-inline std::size_t LinkListColumn::get_link_count(std::size_t row_ndx) const noexcept
+inline size_t LinkListColumn::get_link_count(size_t row_ndx) const noexcept
 {
     ref_type ref = LinkColumnBase::get_as_ref(row_ndx);
     if (ref == 0)
@@ -171,24 +190,24 @@ inline std::size_t LinkListColumn::get_link_count(std::size_t row_ndx) const noe
     return ColumnBase::get_size_from_ref(ref, get_alloc());
 }
 
-inline ConstLinkViewRef LinkListColumn::get(std::size_t row_ndx) const
+inline ConstLinkViewRef LinkListColumn::get(size_t row_ndx) const
 {
     LinkView* link_list = get_ptr(row_ndx); // Throws
     return ConstLinkViewRef(link_list);
 }
 
-inline LinkViewRef LinkListColumn::get(std::size_t row_ndx)
+inline LinkViewRef LinkListColumn::get(size_t row_ndx)
 {
     LinkView* link_list = get_ptr(row_ndx); // Throws
     return LinkViewRef(link_list);
 }
 
-inline bool LinkListColumn::is_null(std::size_t) const noexcept
+inline bool LinkListColumn::is_null(size_t) const noexcept
 {
     return false;
 }
 
-inline void LinkListColumn::set_null(std::size_t)
+inline void LinkListColumn::set_null(size_t)
 {
     throw LogicError{LogicError::column_not_nullable};
 }
@@ -198,33 +217,22 @@ inline void LinkListColumn::do_discard_child_accessors() noexcept
     discard_child_accessors();
 }
 
-inline void LinkListColumn::unregister_linkview(const LinkView& list)
-{
-    auto end = m_list_accessors.end();
-    for (auto i = m_list_accessors.begin(); i != end; ++i) {
-        if (i->m_list == &list) {
-            m_list_accessors.erase(i);
-            return;
-        }
-    }
-}
-
-inline ref_type LinkListColumn::get_row_ref(std::size_t row_ndx) const noexcept
+inline ref_type LinkListColumn::get_row_ref(size_t row_ndx) const noexcept
 {
     return LinkColumnBase::get_as_ref(row_ndx);
 }
 
-inline void LinkListColumn::set_row_ref(std::size_t row_ndx, ref_type new_ref)
+inline void LinkListColumn::set_row_ref(size_t row_ndx, ref_type new_ref)
 {
     LinkColumnBase::set(row_ndx, new_ref); // Throws
 }
 
-inline void LinkListColumn::add_backlink(std::size_t target_row, std::size_t source_row)
+inline void LinkListColumn::add_backlink(size_t target_row, size_t source_row)
 {
     m_backlink_column->add_backlink(target_row, source_row); // Throws
 }
 
-inline void LinkListColumn::remove_backlink(std::size_t target_row, std::size_t source_row)
+inline void LinkListColumn::remove_backlink(size_t target_row, size_t source_row)
 {
     m_backlink_column->remove_one_backlink(target_row, source_row); // Throws
 }

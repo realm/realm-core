@@ -36,13 +36,15 @@ namespace util {
 /// type to 'stdout', since it will convert values of character-like
 /// types to regular integer types, which will then be printed as
 /// numbers rather characters.
-template<class T> typename Promote<T>::type promote(T value) noexcept;
+template<class T>
+typename Promote<T>::type promote(T value) noexcept;
 
 
 /// This function allows you to test for a negative value in any
 /// numeric type, even when the type is unsigned. Normally, when the
 /// type is unsigned, such a test will produce a compiler warning.
-template<class T> bool is_negative(T value) noexcept;
+template<class T>
+bool is_negative(T value) noexcept;
 
 
 /// Cast the specified value to the specified unsigned type reducing
@@ -50,7 +52,8 @@ template<class T> bool is_negative(T value) noexcept;
 /// representation) modulo `2**N` where `N` is the number of value
 /// bits (or digits) in the unsigned target type. This is usefull in
 /// cases where the target type may be `bool`, but need not be `bool`.
-template<class To, class From> To cast_to_unsigned(From) noexcept;
+template<class To, class From>
+To cast_to_unsigned(From) noexcept;
 
 
 //@{
@@ -77,12 +80,18 @@ template<class To, class From> To cast_to_unsigned(From) noexcept;
 /// These functions make absolutely no assumptions about the platform
 /// except that it complies with at least C++03.
 
-template<class A, class B> inline bool int_equal_to(A,B) noexcept;
-template<class A, class B> inline bool int_not_equal_to(A,B) noexcept;
-template<class A, class B> inline bool int_less_than(A,B) noexcept;
-template<class A, class B> inline bool int_less_than_or_equal(A,B) noexcept;
-template<class A, class B> inline bool int_greater_than(A,B) noexcept;
-template<class A, class B> inline bool int_greater_than_or_equal(A,B) noexcept;
+template<class A, class B>
+inline bool int_equal_to(A,B) noexcept;
+template<class A, class B>
+inline bool int_not_equal_to(A,B) noexcept;
+template<class A, class B>
+inline bool int_less_than(A,B) noexcept;
+template<class A, class B>
+inline bool int_less_than_or_equal(A,B) noexcept;
+template<class A, class B>
+inline bool int_greater_than(A,B) noexcept;
+template<class A, class B>
+inline bool int_greater_than_or_equal(A,B) noexcept;
 
 //@}
 
@@ -151,7 +160,8 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept;
 ///
 /// This function makes absolutely no assumptions about the platform
 /// except that it complies with at least C++03.
-template<class T> inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept;
+template<class T>
+inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept;
 
 
 //@{
@@ -177,46 +187,43 @@ bool int_cast_with_overflow_detect(From from, To& to) noexcept;
 //@}
 
 
-/// Convert negative values from two's complement representation to
-/// the platforms native representation.
+/// Convert negative values from two's complement representation to the
+/// platforms native representation.
 ///
-/// If `To` is an unsigned type, this function is does nothing beyond
-/// casting the specified value to `To`. Otherwise, `To` is a signed
-/// type, and negative values will be converted from two's complement
-/// representation in unsigned `From` to the platforms native
-/// representation in `To`.
+/// If `To` is an unsigned type, this function does nothing beyond casting the
+/// specified value to `To`. Otherwise, `To` is a signed type, and negative
+/// values will be converted from two's complement representation in unsigned
+/// `From` to the platforms native representation in `To`.
 ///
-/// For signed `To` the result is well-defined if, and only if the
-/// value with the specified two's complement representation is
-/// representable in the specified signed type. While this is
-/// generally the case when using corresponding signed/unsigned type
-/// pairs, it is not guaranteed by the standard. However, if you know
-/// that the signed type has at least as many value bits as the
-/// unsigned type, then the result is always well-defined. Note that a
-/// 'value bit' in this context is the same as a 'digit' from the
-/// point of view of `std::numeric_limits`.
+/// For signed `To` the result is well-defined if, and only if the value with
+/// the specified two's complement representation is representable in the
+/// specified signed type. While this is generally the case when using
+/// corresponding signed/unsigned type pairs, it is not guaranteed by the
+/// standard. However, if you know that the signed type has at least as many
+/// value bits as the unsigned type, then the result is always
+/// well-defined. Note that a 'value bit' in this context is the same as a
+/// 'digit' from the point of view of `std::numeric_limits`.
 ///
-/// On platforms that use two's complement representation of negative
-/// values, this function is expected to be completely optimized
-/// away. This has been observed to be true with both GCC 4.8 and
-/// Clang 3.2.
+/// On platforms that use two's complement representation of negative values,
+/// this function is expected to be completely optimized away. This has been
+/// observed to be true with both GCC 4.8 and Clang 3.2.
 ///
 /// Note that the **opposite** direction (from the platforms native
-/// representation to two's complement) is trivially handled by
-/// casting the signed value to a value of a sufficiently wide
-/// unsigned integer type. An unsigned type will be sufficiently wide
-/// if it has at least one more value bit than the signed type.
+/// representation to two's complement) is trivially handled by casting the
+/// signed value to a value of a sufficiently wide unsigned integer type. An
+/// unsigned type will be sufficiently wide if it has at least one more value
+/// bit than the signed type.
 ///
-/// Interestingly, the C++ language offers no direct way of doing what
-/// this function does, yet, this function is implemented in a way
-/// that makes no assumption about the underlying platform except what
-/// is guaranteed by C++11.
+/// Interestingly, the C++ language offers no direct way of doing what this
+/// function does, yet, this function is implemented in a way that makes no
+/// assumption about the underlying platform except what is guaranteed by C++11.
 ///
 /// \tparam From The unsigned type used to store the two's complement
 /// representation.
 ///
 /// \tparam To A signed or unsigned integer type.
-template<class To, class From> To from_twos_compl(From twos_compl) noexcept;
+template<class To, class From>
+To from_twos_compl(From twos_compl) noexcept;
 
 
 
@@ -225,7 +232,8 @@ template<class To, class From> To from_twos_compl(From twos_compl) noexcept;
 
 // Implementation:
 
-template<class T> inline typename Promote<T>::type promote(T value) noexcept
+template<class T>
+inline typename Promote<T>::type promote(T value) noexcept
 {
     typedef typename Promote<T>::type promoted_type;
     promoted_type value_2 = promoted_type(value);
@@ -236,33 +244,41 @@ template<class T> inline typename Promote<T>::type promote(T value) noexcept
 
 namespace _impl {
 
-template<class T, bool is_signed> struct IsNegative {
+template<class T, bool is_signed>
+struct IsNegative {
     static bool test(T value) noexcept
     {
         return value < 0;
     }
 };
-template<class T> struct IsNegative<T, false> {
+template<class T>
+struct IsNegative<T, false> {
     static bool test(T) noexcept
     {
         return false;
     }
 };
 
-template<class To> struct CastToUnsigned {
-    template<class From> static To cast(From value) noexcept
+template<class To>
+struct CastToUnsigned {
+    template<class From>
+    static To cast(From value) noexcept
     {
         return To(value);
     }
 };
-template<> struct CastToUnsigned<bool> {
-    template<class From> static bool cast(From value) noexcept
+template<>
+struct CastToUnsigned<bool>
+{
+    template<class From>
+    static bool cast(From value) noexcept
     {
         return bool(unsigned(value) & 1);
     }
 };
 
-template<class L, class R, bool l_signed, bool r_signed> struct SafeIntBinopsImpl {};
+template<class L, class R, bool l_signed, bool r_signed>
+struct SafeIntBinopsImpl {};
 
 // (unsigned, unsigned) (all size combinations)
 //
@@ -275,7 +291,8 @@ template<class L, class R, bool l_signed, bool r_signed> struct SafeIntBinopsImp
 // overflows, then the result must be a value that is less than both
 // operands. Also, if modular subtraction overflows, then the result
 // must be a value that is greater than the first operand.
-template<class L, class R> struct SafeIntBinopsImpl<L, R, false, false> {
+template<class L, class R>
+struct SafeIntBinopsImpl<L, R, false, false> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     static const int needed_bits_l = lim_l::digits;
@@ -311,7 +328,8 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, false> {
 };
 
 // (unsigned, signed) (all size combinations)
-template<class L, class R> struct SafeIntBinopsImpl<L, R, false, true> {
+template<class L, class R>
+struct SafeIntBinopsImpl<L, R, false, true> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     static const int needed_bits_l = lim_l::digits;
@@ -362,7 +380,8 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, false, true> {
 };
 
 // (signed, unsigned) (all size combinations)
-template<class L, class R> struct SafeIntBinopsImpl<L, R, true, false> {
+template<class L, class R>
+struct SafeIntBinopsImpl<L, R, true, false> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     static const int needed_bits_l = lim_l::digits + 1;
@@ -400,7 +419,8 @@ template<class L, class R> struct SafeIntBinopsImpl<L, R, true, false> {
 };
 
 // (signed, signed) (all size combinations)
-template<class L, class R> struct SafeIntBinopsImpl<L, R, true, true> {
+template<class L, class R>
+struct SafeIntBinopsImpl<L, R, true, true> {
     typedef std::numeric_limits<L> lim_l;
     static bool equal(L l, R r) noexcept
     {
@@ -459,52 +479,60 @@ struct SafeIntBinops: SafeIntBinopsImpl<L, R, std::numeric_limits<L>::is_signed,
 {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
-    REALM_STATIC_ASSERT(lim_l::is_specialized && lim_r::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
-    REALM_STATIC_ASSERT(lim_l::is_integer && lim_r::is_integer,
-                          "Both types must be integers");
+    static_assert(lim_l::is_specialized && lim_r::is_specialized,
+                  "std::numeric_limits<> must be specialized for both types");
+    static_assert(lim_l::is_integer && lim_r::is_integer,
+                  "Both types must be integers");
 };
 
 } // namespace _impl
 
 namespace util {
 
-template<class T> inline bool is_negative(T value) noexcept
+template<class T>
+inline bool is_negative(T value) noexcept
 {
     return _impl::IsNegative<T, std::numeric_limits<T>::is_signed>::test(value);
 }
 
-template<class To, class From> inline To cast_to_unsigned(From value) noexcept
+template<class To, class From>
+inline To cast_to_unsigned(From value) noexcept
 {
     return _impl::CastToUnsigned<To>::cast(value);
 }
 
-template<class A, class B> inline bool int_equal_to(A a, B b) noexcept
+template<class A, class B>
+inline bool int_equal_to(A a, B b) noexcept
 {
     return _impl::SafeIntBinops<A,B>::equal(a,b);
 }
 
-template<class A, class B> inline bool int_not_equal_to(A a, B b) noexcept
+template<class A, class B>
+inline bool int_not_equal_to(A a, B b) noexcept
 {
     return !_impl::SafeIntBinops<A,B>::equal(a,b);
 }
 
-template<class A, class B> inline bool int_less_than(A a, B b) noexcept
+template<class A, class B>
+inline bool int_less_than(A a, B b) noexcept
 {
     return _impl::SafeIntBinops<A,B>::less(a,b);
 }
 
-template<class A, class B> inline bool int_less_than_or_equal(A a, B b) noexcept
+template<class A, class B>
+inline bool int_less_than_or_equal(A a, B b) noexcept
 {
     return !_impl::SafeIntBinops<B,A>::less(b,a); // Not greater than
 }
 
-template<class A, class B> inline bool int_greater_than(A a, B b) noexcept
+template<class A, class B>
+inline bool int_greater_than(A a, B b) noexcept
 {
     return _impl::SafeIntBinops<B,A>::less(b,a);
 }
 
-template<class A, class B> inline bool int_greater_than_or_equal(A a, B b) noexcept
+template<class A, class B>
+inline bool int_greater_than_or_equal(A a, B b) noexcept
 {
     return !_impl::SafeIntBinops<A,B>::less(a,b); // Not less than
 }
@@ -529,10 +557,10 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
     // bool overflow  =  rval != 0  &&  (lval_2 / rval) != lval;
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
-    REALM_STATIC_ASSERT(lim_l::is_specialized && lim_r::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
-    REALM_STATIC_ASSERT(lim_l::is_integer && lim_r::is_integer,
-                          "Both types must be integers");
+    static_assert(lim_l::is_specialized && lim_r::is_specialized,
+                  "std::numeric_limits<> must be specialized for both types");
+    static_assert(lim_l::is_integer && lim_r::is_integer,
+                  "Both types must be integers");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     REALM_ASSERT(int_greater_than(rval, 0));
     if (int_less_than(lim_r::max() / rval, lval))
@@ -545,10 +573,10 @@ template<class T>
 inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
 {
     typedef std::numeric_limits<T> lim;
-    REALM_STATIC_ASSERT(lim::is_specialized,
-                          "std::numeric_limits<> must be specialized for T");
-    REALM_STATIC_ASSERT(lim::is_integer,
-                          "T must be an integer type");
+    static_assert(lim::is_specialized,
+                  "std::numeric_limits<> must be specialized for T");
+    static_assert(lim::is_integer,
+                  "T must be an integer type");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     if ((lim::max() >> i) < lval)
         return true;
@@ -573,15 +601,16 @@ inline bool int_cast_with_overflow_detect(From from, To& to) noexcept
     return true;
 }
 
-template<class To, class From> inline To from_twos_compl(From twos_compl) noexcept
+template<class To, class From>
+inline To from_twos_compl(From twos_compl) noexcept
 {
     typedef std::numeric_limits<From> lim_f;
     typedef std::numeric_limits<To>   lim_t;
-    REALM_STATIC_ASSERT(lim_f::is_specialized && lim_t::is_specialized,
-                          "std::numeric_limits<> must be specialized for both types");
-    REALM_STATIC_ASSERT(lim_f::is_integer && lim_t::is_integer,
-                          "Both types must be integers");
-    REALM_STATIC_ASSERT(!lim_f::is_signed, "`From` must be unsigned");
+    static_assert(lim_f::is_specialized && lim_t::is_specialized,
+                  "std::numeric_limits<> must be specialized for both types");
+    static_assert(lim_f::is_integer && lim_t::is_integer,
+                  "Both types must be integers");
+    static_assert(!lim_f::is_signed, "`From` must be unsigned");
     To native;
     int sign_bit_pos = lim_f::digits - 1;
     From sign_bit = From(1) << sign_bit_pos;

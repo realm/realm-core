@@ -1,9 +1,10 @@
 #include "testsettings.hpp"
 #ifdef TEST_BASIC_UTILS
 
-#include <realm/util/shared_ptr.hpp>
-#include <realm/util/file.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/inspect.hpp>
+#include <realm/util/shared_ptr.hpp>
 
 #include "test.hpp"
 

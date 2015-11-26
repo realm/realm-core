@@ -49,7 +49,8 @@ struct SpecBase {
     typedef realm::BinaryData Binary;
     typedef realm::Mixed      Mixed;
 
-    template<class E> class Enum {
+    template<class E>
+    class Enum {
     public:
         typedef E enum_type;
         Enum(E v): m_value(v) {}
@@ -58,7 +59,8 @@ struct SpecBase {
         E m_value;
     };
 
-    template<class T> class Subtable {
+    template<class T>
+    class Subtable {
     public:
         typedef T table_type;
         Subtable(T* t): m_table(t) {}
@@ -76,7 +78,8 @@ struct SpecBase {
     ///     typedef TypeAppend<void, int>::type Columns1;
     ///     typedef TypeAppend<Columns1, bool>::type Columns;
     ///
-    ///     template<template<int> class Col, class Init> struct ColNames {
+    ///     template<template<int> class Col, class Init>
+    ///     struct ColNames {
     ///       typename Col<0>::type foo;
     ///       typename Col<1>::type bar;
     ///       ColNames(Init i) noexcept: foo(i), bar(i) {}
@@ -89,7 +92,8 @@ struct SpecBase {
     /// particular column index. You may specify the column names in
     /// any order. Multiple names may refer to the same column, and
     /// you do not have to specify a name for every column.
-    template<template<int> class Col, class Init> struct ColNames {
+    template<template<int> class Col, class Init>
+    struct ColNames {
         ColNames(Init) noexcept {}
     };
 
@@ -122,7 +126,7 @@ struct SpecBase {
     ///
     /// FIXME: ConvenienceMethods may not contain any virtual methods,
     /// nor may it contain any data memebers. We might want to check
-    /// this by REALM_STATIC_ASSERT(sizeof(Derivative of
+    /// this by static_assert(sizeof(Derivative of
     /// ConvenienceMethods) == 1)), however, this would not be
     /// guaranteed by the standard, since even an empty class may add
     /// to the size of the derived class. Fortunately, as long as
@@ -134,8 +138,10 @@ struct SpecBase {
 };
 
 
-template<class> class BasicTable;
-template<class> class BasicTableView;
+template<class>
+class BasicTable;
+template<class>
+class BasicTableView;
 
 
 namespace _impl {
@@ -145,9 +151,12 @@ namespace _impl {
 ///
 /// If T matches 'BasicTableView<T2>' or 'const BasicTableView<T2>',
 /// then return T2, else simply return T.
-template<class Tab> struct GetTableFromView { typedef Tab type; };
-template<class Tab> struct GetTableFromView<BasicTableView<Tab>> { typedef Tab type; };
-template<class Tab> struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
+template<class Tab>
+struct GetTableFromView { typedef Tab type; };
+template<class Tab>
+struct GetTableFromView<BasicTableView<Tab>> { typedef Tab type; };
+template<class Tab>
+struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
 
 
 /// Determine whether an accessor has const-only access to a table, so
@@ -157,9 +166,12 @@ template<class Tab> struct GetTableFromView<const BasicTableView<Tab>> { typedef
 /// Note that for Taboid = 'BasicTableView<const Tab>', a column
 /// accessor is still allowed to reorder the rows of the view, as long
 /// as it does not modify the contents of the table.
-template<class Taboid> struct TableIsConst { static const bool value = false; };
-template<class Taboid> struct TableIsConst<const Taboid> { static const bool value = true; };
-template<class Tab> struct TableIsConst<BasicTableView<const Tab>> {
+template<class Taboid>
+struct TableIsConst { static const bool value = false; };
+template<class Taboid>
+struct TableIsConst<const Taboid> { static const bool value = true; };
+template<class Tab>
+struct TableIsConst<BasicTableView<const Tab>> {
     static const bool value = true;
 };
 
@@ -179,15 +191,17 @@ template<class Tab> struct TableIsConst<BasicTableView<const Tab>> {
 /// \tparam const_tab Indicates whether the accessor has const-only
 /// access to the field, that is, if, and only if Taboid matches
 /// 'const T' or 'BasicTableView<const T>' for any T.
-template<class Taboid, int col_idx, class Type, bool const_tab> class FieldAccessor;
+template<class Taboid, int col_idx, class Type, bool const_tab>
+class FieldAccessor;
 
 
 /// Commmon base class for all field accessor specializations.
-template<class Taboid> class FieldAccessorBase {
+template<class Taboid>
+class FieldAccessorBase {
 protected:
-    typedef std::pair<Taboid*, std::size_t> Init;
+    typedef std::pair<Taboid*, size_t> Init;
     Taboid* const m_table;
-    const std::size_t m_row_idx;
+    const size_t m_row_idx;
     FieldAccessorBase(Init i) noexcept: m_table(i.first), m_row_idx(i.second) {}
 };
 
@@ -432,7 +446,7 @@ public:
     const FieldAccessor& operator=(StringData value) const { set(value); return *this; }
 
     const char* data() const noexcept { return get().data(); }
-    std::size_t size() const noexcept { return get().size(); }
+    size_t size() const noexcept { return get().size(); }
 
     const char* c_str() const noexcept { return data(); }
 
@@ -462,7 +476,7 @@ public:
     const FieldAccessor& operator=(const BinaryData& value) const { set(value); return *this; }
 
     const char* data() const noexcept { return get().data(); }
-    std::size_t size() const noexcept { return get().size(); }
+    size_t size() const noexcept { return get().size(); }
 
 
     explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
@@ -480,7 +494,7 @@ private:
     // FIXME: Need BasicTableView::Cursor and BasicTableView::ConstCursor if Cursors should exist at all.
     struct SubtabRowAccessor: Subtab::RowAccessor {
     public:
-        SubtabRowAccessor(Subtab* subtab, std::size_t row_idx):
+        SubtabRowAccessor(Subtab* subtab, size_t row_idx):
             Subtab::RowAccessor(std::make_pair(subtab, row_idx)),
             m_owner(subtab->get_table_ref()) {}
 
@@ -510,7 +524,7 @@ public:
         return subtab->get_table_ref();
     }
 
-    SubtabRowAccessor operator[](std::size_t row_idx) const
+    SubtabRowAccessor operator[](size_t row_idx) const
     {
         Subtab* subtab =
             Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
@@ -531,7 +545,7 @@ private:
     // FIXME: Dangerous slicing posibility as long as Cursor is same as RowAccessor.
     struct SubtabRowAccessor: Subtab::ConstRowAccessor {
     public:
-        SubtabRowAccessor(const Subtab* subtab, std::size_t row_idx):
+        SubtabRowAccessor(const Subtab* subtab, size_t row_idx):
             Subtab::ConstRowAccessor(std::make_pair(subtab, row_idx)),
             m_owner(subtab->get_table_ref()) {}
 
@@ -556,7 +570,7 @@ public:
         return subtab->get_table_ref();
     }
 
-    SubtabRowAccessor operator[](std::size_t row_idx) const
+    SubtabRowAccessor operator[](size_t row_idx) const
     {
         const Subtab* subtab =
             Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
@@ -617,7 +631,8 @@ public:
     /// redundant, and it is inefficient if you want to also get a
     /// reference to the table, or if you want to check for multiple
     /// table types.
-    template<class T> bool is_subtable() const
+    template<class T>
+    bool is_subtable() const
     {
         // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
         ConstTableRef t = static_cast<const FieldAccessor*>(this)->get_subtable();
@@ -625,27 +640,31 @@ public:
     }
 
     /// Generally more efficient that get_subtable()->size().
-    std::size_t get_subtable_size() const noexcept
+    size_t get_subtable_size() const noexcept
     {
         return Base::m_table->get_impl()->get_subtable_size(col_idx, Base::m_row_idx);
     }
 
-    template<class T> friend bool operator==(const FieldAccessor& a, const T& b) noexcept
+    template<class T>
+    friend bool operator==(const FieldAccessor& a, const T& b) noexcept
     {
         return a.get() == b;
     }
 
-    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b) noexcept
+    template<class T>
+    friend bool operator!=(const FieldAccessor& a, const T& b) noexcept
     {
         return a.get() != b;
     }
 
-    template<class T> friend bool operator==(const T& a, const FieldAccessor& b) noexcept
+    template<class T>
+    friend bool operator==(const T& a, const FieldAccessor& b) noexcept
     {
         return a == b.get();
     }
 
-    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b) noexcept
+    template<class T>
+    friend bool operator!=(const T& a, const FieldAccessor& b) noexcept
     {
         return a != b.get();
     }
@@ -717,7 +736,8 @@ public:
     ///
     /// FIXME: Consider deleting this function, since it is both
     /// unsafe and superfluous.
-    template<class T> BasicTableRef<T> get_subtable() const
+    template<class T>
+    BasicTableRef<T> get_subtable() const
     {
         REALM_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
         return unchecked_cast<T>(get_subtable());
@@ -727,7 +747,8 @@ public:
     /// returns a reference to it.
     ///
     /// \tparam T The subtable type. It must not be const-qualified.
-    template<class T> BasicTableRef<T> set_subtable() const
+    template<class T>
+    BasicTableRef<T> set_subtable() const
     {
         BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
         T::set_dynamic_type(*t);
@@ -736,7 +757,8 @@ public:
 
     /// Overwrites the current value with a copy of the specified
     /// table and returns a reference to the copy.
-    template<class T> typename T::Ref set_subtable(const T& t) const
+    template<class T>
+    typename T::Ref set_subtable(const T& t) const
     {
         t.set_into_mixed(Base::m_table->get_impl(), col_idx, Base::m_row_idx);
         return unchecked_cast<T>(get_subtable());
@@ -763,7 +785,8 @@ public:
 
     /// FIXME: Consider deleting this function, since it is both
     /// unsafe and superfluous.
-    template<class T> BasicTableRef<const T> get_subtable() const
+    template<class T>
+    BasicTableRef<const T> get_subtable() const
     {
         REALM_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
         return unchecked_cast<const T>(get_subtable());
@@ -780,17 +803,19 @@ public:
 ///
 /// \tparam Taboid Either a table or a table view. Constness of access
 /// is controlled by what is allowed to be done with/on a 'Taboid*'.
-template<class Taboid, int col_idx, class Type> class ColumnAccessor;
+template<class Taboid, int col_idx, class Type>
+class ColumnAccessor;
 
 
 /// Commmon base class for all column accessor specializations.
-template<class Taboid, int col_idx, class Type> class ColumnAccessorBase {
+template<class Taboid, int col_idx, class Type>
+class ColumnAccessorBase {
 protected:
     typedef typename GetTableFromView<Taboid>::type RealTable;
     typedef FieldAccessor<Taboid, col_idx, Type, TableIsConst<Taboid>::value> Field;
 
 public:
-    Field operator[](std::size_t row_idx) const
+    Field operator[](size_t row_idx) const
     {
         return Field(std::make_pair(m_table, row_idx));
     }
@@ -833,7 +858,7 @@ public:
         return make_subexpr<Columns<int64_t>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
-    std::size_t find_first(int64_t value) const
+    size_t find_first(int64_t value) const
     {
         return Base::m_table->get_impl()->find_first_int(col_idx, value);
     }
@@ -858,12 +883,12 @@ public:
         return Base::m_table->get_impl()->sum_int(col_idx);
     }
 
-    int64_t maximum(std::size_t* return_ndx = 0) const
+    int64_t maximum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->maximum_int(col_idx, return_ndx);
     }
 
-    int64_t minimum(std::size_t* return_ndx = 0) const
+    int64_t minimum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->minimum_int(col_idx, return_ndx);
     }
@@ -873,12 +898,12 @@ public:
         return Base::m_table->get_impl()->average_int(col_idx);
     }
 
-    std::size_t lower_bound(int64_t value) const noexcept
+    size_t lower_bound(int64_t value) const noexcept
     {
         return Base::m_table->lower_bound_int(col_idx, value);
     }
 
-    std::size_t upper_bound(int64_t value) const noexcept
+    size_t upper_bound(int64_t value) const noexcept
     {
         return Base::m_table->upper_bound_int(col_idx, value);
     }
@@ -905,7 +930,7 @@ public:
         return make_subexpr<Columns<float>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
-    std::size_t find_first(float value) const
+    size_t find_first(float value) const
     {
         return Base::m_table->get_impl()->find_first_float(col_idx, value);
     }
@@ -930,12 +955,12 @@ public:
         return Base::m_table->get_impl()->sum_float(col_idx);
     }
 
-    float maximum(std::size_t* return_ndx = 0) const
+    float maximum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->maximum_float(col_idx, return_ndx);
     }
 
-    float minimum(std::size_t* return_ndx = 0) const
+    float minimum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->minimum_float(col_idx, return_ndx);
     }
@@ -951,12 +976,12 @@ public:
         return *this;
     }
 
-    std::size_t lower_bound(float value) const noexcept
+    size_t lower_bound(float value) const noexcept
     {
         return Base::m_table->lower_bound_float(col_idx, value);
     }
 
-    std::size_t upper_bound(float value) const noexcept
+    size_t upper_bound(float value) const noexcept
     {
         return Base::m_table->upper_bound_float(col_idx, value);
     }
@@ -983,7 +1008,7 @@ public:
         return make_subexpr<Columns<double>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
-    std::size_t find_first(double value) const
+    size_t find_first(double value) const
     {
         return Base::m_table->get_impl()->find_first_double(col_idx, value);
     }
@@ -1008,12 +1033,12 @@ public:
         return Base::m_table->get_impl()->sum_double(col_idx);
     }
 
-    double maximum(std::size_t* return_ndx = 0) const
+    double maximum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->maximum_double(col_idx, return_ndx);
     }
 
-    double minimum(std::size_t* return_ndx = 0) const
+    double minimum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->minimum_double(col_idx, return_ndx);
     }
@@ -1029,12 +1054,12 @@ public:
         return *this;
     }
 
-    std::size_t lower_bound(float value) const noexcept
+    size_t lower_bound(float value) const noexcept
     {
         return Base::m_table->lower_bound_double(col_idx, value);
     }
 
-    std::size_t upper_bound(float value) const noexcept
+    size_t upper_bound(float value) const noexcept
     {
         return Base::m_table->upper_bound_double(col_idx, value);
     }
@@ -1050,7 +1075,7 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
-    std::size_t find_first(bool value) const
+    size_t find_first(bool value) const
     {
         return Base::m_table->get_impl()->find_first_bool(col_idx, value);
     }
@@ -1060,12 +1085,12 @@ public:
         return Base::m_table->get_impl()->find_all_bool(col_idx, value);
     }
 
-    std::size_t lower_bound(bool value) const noexcept
+    size_t lower_bound(bool value) const noexcept
     {
         return Base::m_table->lower_bound_bool(col_idx, value);
     }
 
-    std::size_t upper_bound(bool value) const noexcept
+    size_t upper_bound(bool value) const noexcept
     {
         return Base::m_table->upper_bound_bool(col_idx, value);
     }
@@ -1087,7 +1112,7 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
-    std::size_t find_first(E value) const
+    size_t find_first(E value) const
     {
         return Base::m_table->get_impl()->find_first_int(col_idx, int64_t(value));
     }
@@ -1113,17 +1138,17 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
-    DateTime maximum(std::size_t* return_ndx = 0) const
+    DateTime maximum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->maximum_datetime(col_idx, return_ndx);
     }
 
-    DateTime minimum(std::size_t* return_ndx = 0) const
+    DateTime minimum(size_t* return_ndx = nullptr) const
     {
         return Base::m_table->get_impl()->minimum_datetime(col_idx, return_ndx);
     }
 
-    std::size_t find_first(DateTime value) const
+    size_t find_first(DateTime value) const
     {
         return Base::m_table->get_impl()->find_first_datetime(col_idx, value);
     }
@@ -1158,7 +1183,7 @@ public:
         return Base::m_table->get_impl()->count_string(col_idx, value);
     }
 
-    std::size_t find_first(StringData value) const
+    size_t find_first(StringData value) const
     {
         return Base::m_table->get_impl()->find_first_string(col_idx, value);
     }
@@ -1173,12 +1198,12 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    std::size_t lower_bound(StringData value) const noexcept
+    size_t lower_bound(StringData value) const noexcept
     {
         return Base::m_table->lower_bound_string(col_idx, value);
     }
 
-    std::size_t upper_bound(StringData value) const noexcept
+    size_t upper_bound(StringData value) const noexcept
     {
         return Base::m_table->upper_bound_string(col_idx, value);
     }
@@ -1195,7 +1220,7 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
-    std::size_t find_first(const BinaryData &value) const
+    size_t find_first(const BinaryData &value) const
     {
         return Base::m_table->get_impl()->find_first_binary(col_idx, value.data(), value.size());
     }
@@ -1238,11 +1263,13 @@ public:
 /// 'BasicTableView<Tab>'. Neither may be const-qualified.
 ///
 /// FIXME: These do not belong in this file!
-template<class Taboid, int col_idx, class Type> class QueryColumn;
+template<class Taboid, int col_idx, class Type>
+class QueryColumn;
 
 
 /// Commmon base class for all query column specializations.
-template<class Taboid, int col_idx, class Type> class QueryColumnBase {
+template<class Taboid, int col_idx, class Type>
+class QueryColumnBase {
 protected:
     typedef typename Taboid::Query Query;
     Query* const m_query;
@@ -1306,28 +1333,28 @@ public:
         return *Base::m_query;
     };
 
-    int64_t sum(std::size_t* resultcount = 0, std::size_t start = 0,
-                std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    int64_t sum(size_t* resultcount = nullptr, size_t start = 0,
+                size_t end = size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_int(col_idx, resultcount, start, end, limit);
     }
 
-    int64_t maximum(std::size_t* resultcount = 0, std::size_t start = 0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1), 
-                    std::size_t* return_ndx = 0) const
+    int64_t maximum(size_t* resultcount = nullptr, size_t start = 0,
+                    size_t end = size_t(-1), size_t limit=size_t(-1),
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    int64_t minimum(std::size_t* resultcount = 0, std::size_t start = 0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
-                    std::size_t* return_ndx = 0) const
+    int64_t minimum(size_t* resultcount = nullptr, size_t start = 0,
+                    size_t end = size_t(-1), size_t limit=size_t(-1),
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(std::size_t* resultcount = 0, std::size_t start = 0,
-                   std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    double average(size_t* resultcount = nullptr, size_t start = 0,
+                   size_t end=size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.average_int(col_idx, resultcount, start, end, limit);
     }
@@ -1377,28 +1404,28 @@ public:
         return *Base::m_query;
     };
 
-    double sum(std::size_t* resultcount = 0, std::size_t start = 0,
-               std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    double sum(size_t* resultcount = nullptr, size_t start = 0,
+               size_t end = size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_float(col_idx, resultcount, start, end, limit);
     }
 
-    float maximum(std::size_t* resultcount = 0, std::size_t start = 0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
-                    std::size_t* return_ndx = 0) const
+    float maximum(size_t* resultcount = nullptr, size_t start = 0,
+                    size_t end = size_t(-1), size_t limit=size_t(-1),
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    float minimum(std::size_t* resultcount = 0, std::size_t start = 0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
-                    std::size_t* return_ndx = 0) const
+    float minimum(size_t* resultcount = nullptr, size_t start = 0,
+                    size_t end = size_t(-1), size_t limit=size_t(-1),
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(std::size_t* resultcount = 0, std::size_t start = 0,
-                   std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    double average(size_t* resultcount = nullptr, size_t start = 0,
+                   size_t end=size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.average_float(col_idx, resultcount, start, end, limit);
     }
@@ -1448,28 +1475,28 @@ public:
         return *Base::m_query;
     };
 
-    double sum(std::size_t* resultcount = 0, std::size_t start = 0,
-               std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    double sum(size_t* resultcount = nullptr, size_t start = 0,
+               size_t end = size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_double(col_idx, resultcount, start, end, limit);
     }
 
-    double maximum(std::size_t* resultcount = 0, std::size_t start = 0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
-                    std::size_t* return_ndx = 0) const
+    double maximum(size_t* resultcount = nullptr, size_t start = 0,
+                    size_t end = size_t(-1), size_t limit=size_t(-1),
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double minimum(std::size_t* resultcount = 0, std::size_t start = 0,
-                    std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
-                    std::size_t* return_ndx = 0) const
+    double minimum(size_t* resultcount = nullptr, size_t start = 0,
+                    size_t end = size_t(-1), size_t limit=size_t(-1),
+                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(std::size_t* resultcount = 0, std::size_t start = 0,
-                   std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    double average(size_t* resultcount = nullptr, size_t start = 0,
+                   size_t end=size_t(-1), size_t limit=size_t(-1)) const
     {
         return Base::m_query->m_impl.average_double(col_idx, resultcount, start, end, limit);
     }
@@ -1558,16 +1585,16 @@ public:
         return *Base::m_query;
     };
 
-    DateTime maximum(std::size_t* resultcount = 0, std::size_t start = 0,
-                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
-                 std::size_t* return_ndx = 0) const
+    DateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
+                 size_t end = size_t(-1), size_t limit=size_t(-1),
+                 size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_datetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    DateTime minimum(std::size_t* resultcount = 0, std::size_t start = 0,
-                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1),
-                 std::size_t* return_ndx = 0) const
+    DateTime minimum(size_t* resultcount = nullptr, size_t start = 0,
+                 size_t end = size_t(-1), size_t limit=size_t(-1),
+                 size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_datetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
@@ -1679,7 +1706,8 @@ public:
 
 
 /// QueryColumn specialization for mixed type.
-template<class Taboid, int col_idx> class QueryColumn<Taboid, col_idx, Mixed> {
+template<class Taboid, int col_idx>
+class QueryColumn<Taboid, col_idx, Mixed> {
 private:
     typedef typename Taboid::Query Query;
 

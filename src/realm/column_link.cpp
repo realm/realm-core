@@ -49,10 +49,12 @@ void LinkColumn::clear(size_t, bool broken_reciprocal_backlinks)
 }
 
 
-void LinkColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
+void LinkColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(insert_nulls);
+    static_cast<void>(insert_nulls);
 
     // Update backlinks to the moved origin rows
     size_t num_rows_moved = prior_num_rows - row_ndx;
@@ -67,7 +69,7 @@ void LinkColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t p
         }
     }
 
-    LinkColumnBase::insert_rows(row_ndx, num_rows_to_insert, prior_num_rows); // Throws
+    LinkColumnBase::insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, false); // Throws
 }
 
 
@@ -124,6 +126,22 @@ void LinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
 
     LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows,
                                        broken_reciprocal_backlinks); // Throws
+}
+
+
+void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
+    int_fast64_t value_1 = LinkColumnBase::get(row_ndx_1);
+    int_fast64_t value_2 = LinkColumnBase::get(row_ndx_2);
+    if (value_1 != 0) {
+        size_t target_row_ndx = to_size_t(value_1 - 1);
+        m_backlink_column->swap_backlinks(target_row_ndx, row_ndx_1, row_ndx_2);
+    }
+    if (value_2 != 0) {
+        size_t target_row_ndx = to_size_t(value_2 - 1);
+        m_backlink_column->swap_backlinks(target_row_ndx, row_ndx_1, row_ndx_2);
+    }
 }
 
 

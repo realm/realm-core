@@ -60,10 +60,10 @@ public:
     {
     }
 
-    void replay_transacts(SharedGroup& target, std::ostream* replay_log = 0)
+    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = nullptr)
     {
         for (const Buffer<char>& changeset: m_changesets)
-            apply_changeset(changeset.data(), changeset.size(), target, replay_log);
+            apply_changeset(changeset.data(), changeset.size(), target, replay_logger);
         m_changesets.clear();
     }
 
@@ -171,10 +171,10 @@ TEST(Replication_General)
         wt.commit();
     }
 
-    std::ostream* replay_log = nullptr;
-//    replay_log = &cout;
+    std::unique_ptr<util::Logger> replay_logger;
+//    replay_logger.reset(new util::Logger);
     SharedGroup sg_2(path_2);
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
 
     {
         ReadTransaction rt_1(sg_1);
@@ -212,10 +212,10 @@ TEST(Replication_Links)
         wt.commit();
     }
 
-    std::ostream* replay_log = nullptr;
-//    replay_log = &cout;
+    std::unique_ptr<util::Logger> replay_logger;
+//    replay_logger.reset(new util::Logger);
     SharedGroup sg_2(path_2);
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
 
     {
         ReadTransaction rt_1(sg_1);
@@ -244,7 +244,7 @@ TEST(Replication_Links)
         wt.commit();
     }
 
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
 
     {
         ReadTransaction rt_1(sg_1);
@@ -296,8 +296,8 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = nullptr;
-//    replay_log = &cout;
+    std::unique_ptr<util::Logger> replay_logger;
+//    replay_logger.reset(new util::Logger);
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -316,7 +316,7 @@ TEST(Replication_Links)
         target_2->add_empty_row(2);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
         check(test_results, sg_1, rt);
@@ -331,7 +331,7 @@ TEST(Replication_Links)
         origin_2->add_empty_row(2);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     // O_1: LL_1->T_1
     // O_2: F_1
     {
@@ -348,7 +348,7 @@ TEST(Replication_Links)
         origin_2->set_link(0, 0, 1); // O_2_L_2[0] -> T_1[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     // O_1: F_2   LL_1->T_1
     // O_2: L_2->T_1   F_1
     {
@@ -368,7 +368,7 @@ TEST(Replication_Links)
         origin_2->get_linklist(2, 1)->add(1); // O_2_LL_3[1] -> T_2[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     // O_1: L_3->T_1   F_2   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2
     {
@@ -386,7 +386,7 @@ TEST(Replication_Links)
         origin_2->set_link(3, 1, 0); // O_2_L_4[1] -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     // O_1: L_3->T_1   F_2   L_4->T_2   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2   L_4->T_2
     {
@@ -403,7 +403,7 @@ TEST(Replication_Links)
         origin_2->insert_column(3, type_Int, "o_2_f_5");
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     // O_1: L_3->T_1   F_2   L_4->T_2   F_5   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2   F_5   L_4->T_2
     {
@@ -420,7 +420,7 @@ TEST(Replication_Links)
         origin_1->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -501,8 +501,8 @@ TEST(Replication_CascadeRemove_ColumnLink)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = nullptr;
-//    replay_log = &cout;
+    std::unique_ptr<util::Logger> replay_logger;
+//    replay_logger.reset(new util::Logger);
 
     SharedGroup sg(path_1);
     MyTrivialReplication repl(path_2);
@@ -550,7 +550,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
 
         // Apply the changes to sg via replication
         sg.end_read();
-        repl.replay_transacts(sg, replay_log);
+        repl.replay_transacts(sg, replay_logger.get());
         const Group& group = sg.begin_read();
         group.verify();
 
@@ -600,13 +600,14 @@ TEST(Replication_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target->size(), 0);
 }
 
+
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = nullptr;
-//    replay_log = &cout;
+    std::unique_ptr<util::Logger> replay_logger;
+//    replay_logger.reset(new util::Logger);
 
     SharedGroup sg(path_1);
     MyTrivialReplication repl(path_2);
@@ -655,7 +656,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 
         // Apply the changes to sg via replication
         sg.end_read();
-        repl.replay_transacts(sg, replay_log);
+        repl.replay_transacts(sg, replay_logger.get());
         const Group& group = sg.begin_read();
         group.verify();
 
@@ -718,7 +719,8 @@ TEST(Replication_NullStrings)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = nullptr;
+    std::unique_ptr<util::Logger> replay_logger;
+//    replay_logger.reset(new util::Logger);
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -730,7 +732,7 @@ TEST(Replication_NullStrings)
         table1->add_column(type_String, "c1", true);
         table1->add_column(type_Binary, "b1", true);
         table1->add_empty_row(3);                   // default value is null
-        
+
         table1->set_string(0, 1, StringData(""));   // empty string
         table1->set_string(0, 2, realm::null());    // null
 
@@ -747,7 +749,7 @@ TEST(Replication_NullStrings)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
@@ -767,7 +769,8 @@ TEST(Replication_NullInteger)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::ostream* replay_log = 0;
+    std::unique_ptr<util::Logger> replay_logger;
+//    replay_logger.reset(new util::Logger);
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -788,7 +791,7 @@ TEST(Replication_NullInteger)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_log);
+    repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
@@ -796,6 +799,82 @@ TEST(Replication_NullInteger)
         CHECK(table2->is_null(0, 0));
         CHECK(!table2->is_null(0, 1));
         CHECK(table2->is_null(0, 2));
+    }
+}
+
+
+TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColumn)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("foo");
+        table1->add_column(type_Int, "a");
+        table1->add_column(type_Int, "c");
+        TableRef table2 = wt.add_table("foo2");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        wt.get_group().rename_table("foo", "bar");
+        auto bar = wt.get_table("bar");
+        bar->rename_column(0, "b");
+        _impl::TableFriend::move_column(*bar->get_descriptor(), 1, 0);
+        wt.get_group().move_table(1, 0);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef foo = rt.get_table("foo");
+        CHECK(!foo);
+        ConstTableRef bar = rt.get_table("bar");
+        CHECK(bar);
+        CHECK_EQUAL(1, bar->get_index_in_group());
+        CHECK_EQUAL(1, bar->get_column_index("b"));
+    }
+}
+
+
+TEST(Replication_Substrings)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_String, "string");
+        table->add_empty_row();
+        table->set_string(0, 0, "Hello, World!");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("table");
+        table->remove_substring(0, 0, 0, 6);
+        table->insert_substring(0, 0, 0, "Goodbye, Cruel");
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        auto table = rt.get_table("table");
+        CHECK_EQUAL("Goodbye, Cruel World!", table->get_string(0, 0));
     }
 }
 

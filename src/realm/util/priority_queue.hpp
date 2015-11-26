@@ -40,7 +40,7 @@ namespace util {
 /// Note: As opposed to `std::priority_queue`, this does not store elements in a heap
 /// internally. Instead, elements are stored in sorted order. Users of this class are
 /// allowed to operate on this assumption.
-template <class T, class Container = std::vector<T>,
+template<class T, class Container = std::vector<T>,
     class Compare = std::less<typename Container::value_type>>
 class PriorityQueue : private Compare {
 public:

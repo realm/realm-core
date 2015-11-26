@@ -38,4 +38,20 @@ const char* get_test_only();
 } // namespace test_util
 } // namespace realm
 
+#ifdef __ANDROID__
+
+#include <string>
+#include <sstream>
+using namespace std;
+namespace std
+{
+    template < typename T > std::string to_string( const T& n )
+    {
+        std::ostringstream stm ;
+        stm << n ;
+        return stm.str() ;
+    }
+}
+#endif // __ANDROID__
+
 #endif // REALM_TEST_UTIL_TEST_ONLY_HPP

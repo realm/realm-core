@@ -24,30 +24,56 @@
 #include <sstream>
 
 #include <realm/util/features.h>
+#include <realm/util/inspect.hpp>
 #include <realm/version.hpp>
 
 #define REALM_TERMINATE(msg) realm::util::terminate((msg), __FILE__, __LINE__)
 
 namespace realm {
 namespace util {
+
+/// Install a custom termination notification callback. This will only be called as a result of
+/// Realm crashing internally, i.e. a failed assertion or an otherwise irrecoverable error
+/// condition. The termination notification callback is supplied with a zero-terminated string
+/// containing information relevant for debugging the issue leading to the crash.
+///
+/// The termination notification callback is shared by all threads, which is another way of saying
+/// that it must be reentrant, in case multiple threads crash simultaneously.
+///
+/// Furthermore, the provided callback must be `noexcept`, indicating that if an exception
+/// is thrown in the callback, the process is terminated with a call to `std::terminate`.
+void set_termination_notification_callback(void(*callback)(const char* message) noexcept) noexcept;
+
 REALM_NORETURN void terminate_internal(std::stringstream&) noexcept;
 
 REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept;
 
-template<class T, class... Ts>
+// LCOV_EXCL_START
+template<class... Ts>
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
-                              T first_info, Ts... other_infos) noexcept
+                              Ts... infos) noexcept
 {
     std::stringstream ss;
-    using variadics_unpacker = int[];
-
-    static_assert(sizeof...(other_infos) == 1 || sizeof...(other_infos) == 3 || sizeof...(other_infos) == 5,
+    static_assert(sizeof...(infos) == 2 || sizeof...(infos) == 4 || sizeof...(infos) == 6,
                   "Called realm::util::terminate() with wrong number of arguments");
-
-    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message << " [" << first_info;
-    (void) variadics_unpacker { 0, (ss << ", " << other_infos, void(), 0)... };
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message << " [";
+    inspect_all(ss, std::forward<Ts>(infos)...);
     ss << "]" << '\n';
 
+    terminate_internal(ss);
+}
+// LCOV_EXCL_STOP
+
+template<class... Args>
+REALM_NORETURN void terminate_with_info(const char* assert_message, int line, const char* file,
+                                        const char* interesting_names,
+                                        Args&&... interesting_values) noexcept
+{
+    std::stringstream ss;
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " ";
+    ss << assert_message << " with " << interesting_names << " = (";
+    inspect_all(ss, std::forward<Args>(interesting_values)...);
+    ss << "). \n";
     terminate_internal(ss);
 }
 

@@ -113,6 +113,7 @@ public:
         table_index_out_of_range,
         row_index_out_of_range,
         column_index_out_of_range,
+        string_position_out_of_range,
         link_index_out_of_range,
         bad_version,
         illegal_type,
@@ -141,6 +142,12 @@ public:
         /// Indicates that an involved accessor is was detached, i.e., was not
         /// attached to an underlying object.
         detached_accessor,
+
+        /// Indicates that a specified row index of a target table (a link) is
+        /// out of range. This is used for disambiguation in cases such as
+        /// Table::set_link() where one specifies both a row index of the origin
+        /// table, and a row index of the target table.
+        target_row_index_out_of_range,
 
         // Indicates that an involved column lacks a search index.
         no_search_index,

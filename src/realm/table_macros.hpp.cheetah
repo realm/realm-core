@@ -66,7 +66,8 @@ ${j+1}%slurp
 ; \
 %end for
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
 %for $j in range($num_cols)
         typename Col<$j>::type name${j+1}; \
 %end for
@@ -106,7 +107,7 @@ type${j+1} name${j+1}%slurp
 %end for
 )); \
         } \
-        void insert(std::size_t _realm_i%slurp
+        void insert(size_t _realm_i%slurp
 %for $j in range($num_cols)
 , type${j+1} name${j+1}%slurp
 %end for
@@ -120,7 +121,7 @@ type${j+1} name${j+1}%slurp
 %end for
 )); \
         } \
-        void set(std::size_t _realm_i%slurp
+        void set(size_t _realm_i%slurp
 %for $j in range($num_cols)
 , type${j+1} name${j+1}%slurp
 %end for

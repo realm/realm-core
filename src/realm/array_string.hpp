@@ -25,7 +25,7 @@
 namespace realm {
 
 /*
-ArrayString stores strings as a concecutive list of fixed-length blocks of m_width bytes. The 
+ArrayString stores strings as a concecutive list of fixed-length blocks of m_width bytes. The
 longest string it can store is (m_width - 1) bytes before it needs to expand.
 
 An example of the format for m_width = 4 is following sequence of bytes, where x is payload:
@@ -42,6 +42,8 @@ New: StringData is null() if-and-only-if StringData::data() == 0.
 
 class ArrayString: public Array {
 public:
+    static const size_t max_width = 64;
+
     typedef StringData value_type;
     // Constructor defaults to non-nullable because we use non-nullable ArrayString so many places internally in core
     // (data which isn't user payload) where null isn't needed.
@@ -51,19 +53,19 @@ public:
 
     bool is_null(size_t ndx) const;
     void set_null(size_t ndx);
-    StringData get(std::size_t ndx) const noexcept;
+    StringData get(size_t ndx) const noexcept;
     void add();
     void add(StringData value);
-    void set(std::size_t ndx, StringData value);
-    void insert(std::size_t ndx, StringData value);
-    void erase(std::size_t ndx);
+    void set(size_t ndx, StringData value);
+    void insert(size_t ndx, StringData value);
+    void erase(size_t ndx);
 
-    std::size_t count(StringData value, std::size_t begin = 0,
-                      std::size_t end = npos) const noexcept;
-    std::size_t find_first(StringData value, std::size_t begin = 0,
-                           std::size_t end = npos) const noexcept;
-    void find_all(IntegerColumn& result, StringData value, std::size_t add_offset = 0,
-                  std::size_t begin = 0, std::size_t end = npos);
+    size_t count(StringData value, size_t begin = 0,
+                      size_t end = npos) const noexcept;
+    size_t find_first(StringData value, size_t begin = 0,
+                           size_t end = npos) const noexcept;
+    void find_all(IntegerColumn& result, StringData value, size_t add_offset = 0,
+                  size_t begin = 0, size_t end = npos);
 
     /// Compare two string arrays for equality.
     bool compare_string(const ArrayString&) const noexcept;
@@ -72,14 +74,14 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static StringData get(const char* header, std::size_t ndx, bool nullable) noexcept;
+    static StringData get(const char* header, size_t ndx, bool nullable) noexcept;
 
-    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(size_t ndx, StringData, TreeInsertBase& state);
 
     /// Construct a string array of the specified size and return just
     /// the reference to the underlying memory. All elements will be
     /// initialized to the empty string.
-    static MemRef create_array(std::size_t size, Allocator&);
+    static MemRef create_array(size_t size, Allocator&);
 
     /// Create a new empty string array and attach this accessor to
     /// it. This does not modify the parent reference information of
@@ -91,7 +93,7 @@ public:
 
     /// Construct a copy of the specified slice of this string array
     /// using the specified target allocator.
-    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+    MemRef slice(size_t offset, size_t size, Allocator& target_alloc) const;
 
 #ifdef REALM_DEBUG
     void string_stats() const;
@@ -99,9 +101,9 @@ public:
 #endif
 
 private:
-    std::size_t calc_byte_len(std::size_t count, std::size_t width) const override;
-    std::size_t calc_item_count(std::size_t bytes,
-                              std::size_t width) const noexcept override;
+    size_t calc_byte_len(size_t count, size_t width) const override;
+    size_t calc_item_count(size_t bytes,
+                              size_t width) const noexcept override;
     WidthType GetWidthType() const override { return wtype_Multiply; }
 
     bool m_nullable;
@@ -127,26 +129,26 @@ inline ArrayString::ArrayString(no_prealloc_tag) noexcept:
 
 inline void ArrayString::create()
 {
-    std::size_t size = 0;
+    size_t size = 0;
     MemRef mem = create_array(size, get_alloc()); // Throws
     init_from_mem(mem);
 }
 
-inline MemRef ArrayString::create_array(std::size_t size, Allocator& alloc)
+inline MemRef ArrayString::create_array(size_t size, Allocator& alloc)
 {
     bool context_flag = false;
     int_fast64_t value = 0;
     return Array::create(type_Normal, context_flag, wtype_Multiply, size, value, alloc); // Throws
 }
 
-inline StringData ArrayString::get(std::size_t ndx) const noexcept
+inline StringData ArrayString::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
     if (m_width == 0)
         return m_nullable ? realm::null() : StringData("");
 
     const char* data = m_data + (ndx * m_width);
-    std::size_t size = (m_width-1) - data[m_width-1];
+    size_t size = (m_width-1) - data[m_width-1];
 
     if (size == static_cast<size_t>(-1))
         return m_nullable ? realm::null() : StringData("");
@@ -166,16 +168,16 @@ inline void ArrayString::add()
     add(m_nullable ? realm::null() : StringData("")); // Throws
 }
 
-inline StringData ArrayString::get(const char* header, std::size_t ndx, bool nullable) noexcept
+inline StringData ArrayString::get(const char* header, size_t ndx, bool nullable) noexcept
 {
     REALM_ASSERT(ndx < get_size_from_header(header));
-    std::size_t width = get_width_from_header(header);
+    size_t width = get_width_from_header(header);
     const char* data = get_data_from_header(header) + (ndx * width);
 
     if (width == 0)
         return nullable ? realm::null() : StringData("");
 
-    std::size_t size = (width-1) - data[width-1];
+    size_t size = (width-1) - data[width-1];
 
     if (size == static_cast<size_t>(-1))
         return nullable ? realm::null() : StringData("");

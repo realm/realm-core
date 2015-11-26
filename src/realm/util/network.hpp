@@ -248,7 +248,14 @@ public:
     /// called before post() returns. If post() is called from another
     /// completion handler, the submitted handler is guaranteed to not be called
     /// during the execution of post().
-    template<class H> void post(const H& handler);
+    ///
+    /// Completion handlers added through post() will be executed in the order
+    /// that they are added. More precisely, if post() is called twice to add
+    /// two handlers, A and B, and the execution of post(A) ands before the
+    /// beginning of the execution of post(B), then A is guaranteed to execute
+    /// before B.
+    template<class H>
+    void post(const H& handler);
 
 private:
     class async_oper;
@@ -358,11 +365,17 @@ public:
     /// of cancel().
     void cancel() noexcept;
 
-    template<class O> void get_option(O& option) const;
-    template<class O> std::error_code get_option(O& option, std::error_code&) const;
+    template<class O>
+    void get_option(O& option) const;
 
-    template<class O> void set_option(const O& option);
-    template<class O> std::error_code set_option(const O& option, std::error_code&);
+    template<class O>
+    std::error_code get_option(O& option, std::error_code&) const;
+
+    template<class O>
+    void set_option(const O& option);
+
+    template<class O>
+    std::error_code set_option(const O& option, std::error_code&);
 
     void bind(const endpoint&);
     std::error_code bind(const endpoint&, std::error_code&);
@@ -382,28 +395,37 @@ public:
 
 private:
     int m_sock_fd;
+    bool m_in_blocking_mode; // Not in nonblocking mode
 
 protected:
     io_service& m_service;
     protocol m_protocol;
-    io_service::async_oper* m_read_oper  = 0; // Read or accept
-    io_service::async_oper* m_write_oper = 0; // Write or connect
+    io_service::async_oper* m_read_oper  = nullptr; // Read or accept
+    io_service::async_oper* m_write_oper = nullptr; // Write or connect
 
     socket_base(io_service&);
 
     int get_sock_fd() noexcept;
-    virtual void do_open(const protocol&, std::error_code&);
     void do_close() noexcept;
 
-    void get_option(opt_enum, void* value_data, std::size_t& value_size, std::error_code&) const;
-    void set_option(opt_enum, const void* value_data, std::size_t value_size, std::error_code&);
+    void get_option(opt_enum, void* value_data, size_t& value_size, std::error_code&) const;
+    void set_option(opt_enum, const void* value_data, size_t value_size, std::error_code&);
     void map_option(opt_enum, int& level, int& option_name) const;
+
+    // `ec` untouched on success
+    std::error_code ensure_blocking_mode(std::error_code& ec) noexcept;
+    std::error_code ensure_nonblocking_mode(std::error_code& ec) noexcept;
+
+private:
+    // `ec` untouched on success
+    std::error_code set_nonblocking_mode(bool enable, std::error_code&) noexcept;
 
     friend class acceptor;
 };
 
 
-template<class T, int opt, class U> class socket_base::option {
+template<class T, int opt, class U>
+class socket_base::option {
 public:
     option(T value = T());
     T value() const;
@@ -447,12 +469,14 @@ public:
     /// handler will always be called, as long as the event loop is running.
     ///
     /// \param ep The remote endpoint of the connection to be established.
-    template<class H> void async_connect(const endpoint& ep, const H& handler);
+    template<class H>
+    void async_connect(const endpoint& ep, const H& handler);
 
-    void write(const char* data, std::size_t size);
-    std::error_code write(const char* data, std::size_t size, std::error_code&) noexcept;
+    void write(const char* data, size_t size);
+    std::error_code write(const char* data, size_t size, std::error_code&) noexcept;
 
-    template<class H> void async_write(const char* data, std::size_t size, const H& handler);
+    template<class H>
+    void async_write(const char* data, size_t size, const H& handler);
 
     /// @{ \brief Read at least one byte from this socket.
     ///
@@ -469,24 +493,28 @@ public:
     /// The two argument version always return a value greater than zero, and
     /// the three argument version returns a value greather than zero if, and
     /// only if `ec` is set to indicate success (no error, and no end of input).
-    std::size_t read_some(char* buffer, std::size_t size);
-    std::size_t read_some(char* buffer, std::size_t size, std::error_code& ec) noexcept;
+    size_t read_some(char* buffer, size_t size);
+    size_t read_some(char* buffer, size_t size, std::error_code& ec) noexcept;
     /// @}
 
-    std::size_t write_some(const char* data, std::size_t size);
-    std::size_t write_some(const char* data, std::size_t size, std::error_code&) noexcept;
-
-protected:
-    void do_open(const protocol&, std::error_code&) override;
+    size_t write_some(const char* data, size_t size);
+    size_t write_some(const char* data, size_t size, std::error_code&) noexcept;
 
 private:
     class connect_oper_base;
     template<class H> class connect_oper;
+    class write_oper_base;
     template<class H> class write_oper;
 
+    size_t do_read_some(char* buffer, size_t size, std::error_code& ec) noexcept;
+    size_t do_write_some(const char* data, size_t size, std::error_code&) noexcept;
+
     void do_async_connect(std::unique_ptr<connect_oper_base>);
-    bool initiate_connect(const endpoint&, std::error_code&) noexcept;
-    std::error_code finalize_connect(std::error_code&) noexcept;
+    // `ec` untouched on success, but no immediate completion
+    bool initiate_async_connect(const endpoint&, std::error_code& ec) noexcept;
+    // `ec` untouched on success
+    std::error_code finalize_async_connect(std::error_code& ec) noexcept;
+    void do_async_write(std::unique_ptr<write_oper_base>);
 
     friend class buffered_input_stream;
 };
@@ -536,15 +564,23 @@ public:
     ///
     /// \param ep Upon completion, the remote peer endpoint will have been
     /// assigned to this variable.
-    template<class H> void async_accept(socket& sock, const H& handler);
-    template<class H> void async_accept(socket& sock, endpoint& ep, const H& handler);
+    template<class H>
+    void async_accept(socket& sock, const H& handler);
+
+    template<class H>
+    void async_accept(socket& sock, endpoint& ep, const H& handler);
     /// @}
 
 private:
     std::error_code accept(socket&, endpoint*, std::error_code&);
     std::error_code do_accept(socket&, endpoint*, std::error_code&) noexcept;
+
+    class accept_oper_base;
     template<class H> class accept_oper;
-    template<class H> void async_accept(socket&, endpoint*, const H&);
+
+    template<class H>
+    void async_accept(socket&, endpoint*, const H&);
+    void do_async_accept(std::unique_ptr<accept_oper_base>);
 };
 
 
@@ -553,11 +589,11 @@ public:
     buffered_input_stream(socket&);
     ~buffered_input_stream() noexcept {}
 
-    std::size_t read(char* buffer, std::size_t size);
-    std::size_t read(char* buffer, std::size_t size, std::error_code&) noexcept;
+    size_t read(char* buffer, size_t size);
+    size_t read(char* buffer, size_t size, std::error_code&) noexcept;
 
-    std::size_t read_until(char* buffer, std::size_t size, char delim);
-    std::size_t read_until(char* buffer, std::size_t size, char delim,
+    size_t read_until(char* buffer, size_t size, char delim);
+    size_t read_until(char* buffer, size_t size, char delim,
                            std::error_code&) noexcept;
 
     /// @{ \brief Perform an asynchronous read operation.
@@ -603,10 +639,10 @@ public:
     ///
     ///  - The asynchronous operation is canceled (the socket is closed).
     template<class H>
-    void async_read(char* buffer, std::size_t size, const H& handler);
+    void async_read(char* buffer, size_t size, const H& handler);
 
     template<class H>
-    void async_read_until(char* buffer, std::size_t size, char delim, const H& handler);
+    void async_read_until(char* buffer, size_t size, char delim, const H& handler);
     /// @}
 
 private:
@@ -614,15 +650,15 @@ private:
     template<class H> class read_oper;
 
     socket& m_socket;
-    static const std::size_t s_buffer_size = 1024;
+    static const size_t s_buffer_size = 1024;
     std::unique_ptr<char[]> m_buffer;
     char* m_begin;
     char* m_end;
 
-    std::size_t do_read(char* buffer, std::size_t size, int delim, std::error_code&) noexcept;
+    size_t do_read(char* buffer, size_t size, int delim, std::error_code&) noexcept;
 
     template<class H>
-    void async_read(char* buffer, std::size_t size, int delim, const H& handler);
+    void async_read(char* buffer, size_t size, int delim, const H& handler);
     void do_async_read(std::unique_ptr<read_oper_base>);
 };
 
@@ -681,7 +717,7 @@ private:
     using clock = io_service::clock;
 
     io_service& m_service;
-    io_service::wait_oper_base* m_wait_oper = 0;
+    io_service::wait_oper_base* m_wait_oper = nullptr;
 };
 
 
@@ -719,7 +755,9 @@ std::error_code make_error_code(errors);
 
 namespace std {
 
-template<> struct is_error_code_enum<realm::util::network::errors> {
+template<>
+struct is_error_code_enum<realm::util::network::errors>
+{
 public:
     static const bool value = true;
 };
@@ -859,7 +897,7 @@ public:
     virtual ~async_oper() noexcept {}
 
 private:
-    async_oper* m_next = 0;
+    async_oper* m_next = nullptr;
     friend class io_service;
 };
 
@@ -879,7 +917,8 @@ private:
     friend class io_service;
 };
 
-template<class H> class io_service::post_oper:
+template<class H>
+class io_service::post_oper:
         public async_oper {
 public:
     post_oper(const H& handler):
@@ -898,11 +937,12 @@ private:
     const H m_handler;
 };
 
-template<class H> inline void io_service::post(const H& handler)
+template<class H>
+inline void io_service::post(const H& handler)
 {
     std::unique_ptr<io_service::post_oper<H>> op;
     op.reset(new io_service::post_oper<H>(handler)); // Throws
-    add_post_oper(move(op));
+    add_post_oper(std::move(op));
 }
 
 inline resolver::resolver(io_service& serv):
@@ -1003,12 +1043,6 @@ inline void socket_base::open(const protocol& prot)
         throw std::system_error(ec);
 }
 
-inline std::error_code socket_base::open(const protocol& prot, std::error_code& ec)
-{
-    do_open(prot, ec);
-    return ec;
-}
-
 inline void socket_base::close() noexcept
 {
     if (!is_open())
@@ -1017,7 +1051,8 @@ inline void socket_base::close() noexcept
     do_close();
 }
 
-template<class O> inline void socket_base::get_option(O& option) const
+template<class O>
+inline void socket_base::get_option(O& option) const
 {
     std::error_code ec;
     if (get_option(option, ec))
@@ -1031,7 +1066,8 @@ inline std::error_code socket_base::get_option(O& option, std::error_code& ec) c
     return ec;
 }
 
-template<class O> inline void socket_base::set_option(const O& option)
+template<class O>
+inline void socket_base::set_option(const O& option)
 {
     std::error_code ec;
     if (set_option(option, ec))
@@ -1066,12 +1102,40 @@ inline int socket_base::get_sock_fd() noexcept
     return m_sock_fd;
 }
 
-template<class T, int opt, class U> inline socket_base::option<T, opt, U>::option(T value):
+inline std::error_code socket_base::ensure_blocking_mode(std::error_code& ec) noexcept
+{
+    // Assuming that sockets are either used mostly in blocking mode, or mostly
+    // in nonblocking mode.
+    if (REALM_UNLIKELY(!m_in_blocking_mode)) {
+        bool enable = false;
+        if (set_nonblocking_mode(enable, ec))
+            return ec;
+        m_in_blocking_mode = true;
+    }
+    return std::error_code(); // Success
+}
+
+inline std::error_code socket_base::ensure_nonblocking_mode(std::error_code& ec) noexcept
+{
+    // Assuming that sockets are either used mostly in blocking mode, or mostly
+    // in nonblocking mode.
+    if (REALM_UNLIKELY(m_in_blocking_mode)) {
+        bool enable = true;
+        if (set_nonblocking_mode(enable, ec))
+            return ec;
+        m_in_blocking_mode = false;
+    }
+    return std::error_code(); // Success
+}
+
+template<class T, int opt, class U>
+inline socket_base::option<T, opt, U>::option(T value):
     m_value(value)
 {
 }
 
-template<class T, int opt, class U> inline T socket_base::option<T, opt, U>::value() const
+template<class T, int opt, class U>
+inline T socket_base::option<T, opt, U>::value() const
 {
     return m_value;
 }
@@ -1106,7 +1170,7 @@ public:
     connect_oper_base(socket& sock, const endpoint& ep):
         m_socket(sock)
     {
-        if (m_socket.initiate_connect(ep, m_error_code))
+        if (m_socket.initiate_async_connect(ep, m_error_code))
             complete = true; // Failure, or immediate completion
     }
     void proceed() noexcept override
@@ -1114,7 +1178,7 @@ public:
         REALM_ASSERT(!complete);
         REALM_ASSERT(!canceled);
         REALM_ASSERT(!m_error_code);
-        m_socket.finalize_connect(m_error_code);
+        m_socket.finalize_async_connect(m_error_code);
         complete = true;
     }
 protected:
@@ -1122,7 +1186,8 @@ protected:
     std::error_code m_error_code;
 };
 
-template<class H> class socket::connect_oper:
+template<class H>
+class socket::connect_oper:
         public connect_oper_base {
 public:
     connect_oper(socket& sock, const endpoint& ep, const H& handler):
@@ -1139,7 +1204,7 @@ public:
         }
         else {
             REALM_ASSERT(m_socket.m_write_oper);
-            m_socket.m_write_oper = 0;
+            m_socket.m_write_oper = nullptr;
             ec = m_error_code;
         }
         m_handler(ec); // Throws
@@ -1147,15 +1212,21 @@ public:
 private:
     const H m_handler;
 };
-template<class H> class socket::write_oper: public io_service::async_oper {
+
+class socket::write_oper_base:
+        public io_service::async_oper {
 public:
-    write_oper(socket& s, const char* data, std::size_t size, const H& handler):
+    write_oper_base(socket& s, const char* data, size_t size):
         m_socket(s),
         m_begin(data),
         m_end(data + size),
-        m_curr(data),
-        m_handler(handler)
+        m_curr(data)
     {
+    }
+    void initiate() noexcept
+    {
+        if (m_socket.ensure_nonblocking_mode(m_error_code))
+            complete = true; // Failure
     }
     void proceed() noexcept override
     {
@@ -1163,35 +1234,47 @@ public:
         REALM_ASSERT(!canceled);
         REALM_ASSERT(!m_error_code);
         REALM_ASSERT(m_curr <= m_end);
-        std::size_t n_1 = std::size_t(m_end - m_curr);
-        std::size_t n_2 = m_socket.write_some(m_curr, n_1, m_error_code);
+        size_t n_1 = size_t(m_end - m_curr);
+        size_t n_2 = m_socket.do_write_some(m_curr, n_1, m_error_code);
         REALM_ASSERT(n_2 <= n_1);
         m_curr += n_2;
         complete = (m_error_code || m_curr == m_end);
+    }
+protected:
+    socket& m_socket;
+    const char* const m_begin;
+    const char* const m_end;
+    const char* m_curr;
+    std::error_code m_error_code;
+};
+
+template<class H>
+class socket::write_oper:
+        public write_oper_base {
+public:
+    write_oper(socket& s, const char* data, size_t size, const H& handler):
+        write_oper_base(s, data, size),
+        m_handler(handler)
+    {
     }
     void exec_handler() const override
     {
         REALM_ASSERT(complete || canceled);
         REALM_ASSERT(complete == (m_error_code || m_curr == m_end));
         REALM_ASSERT(m_curr >= m_begin);
-        std::size_t num_bytes_transferred = std::size_t(m_curr - m_begin);
+        size_t num_bytes_transferred = size_t(m_curr - m_begin);
         std::error_code ec;
         if (canceled) {
             ec = error::operation_aborted;
         }
         else {
             REALM_ASSERT(m_socket.m_write_oper);
-            m_socket.m_write_oper = 0;
+            m_socket.m_write_oper = nullptr;
             ec = m_error_code;
         }
         m_handler(ec, num_bytes_transferred); // Throws
     }
 private:
-    socket& m_socket;
-    const char* const m_begin;
-    const char* const m_end;
-    const char* m_curr;
-    std::error_code m_error_code;
     const H m_handler;
 };
 
@@ -1207,17 +1290,18 @@ inline void socket::connect(const endpoint& ep)
         throw std::system_error(ec);
 }
 
-template<class H> inline void socket::async_connect(const endpoint& ep, const H& handler)
+template<class H>
+inline void socket::async_connect(const endpoint& ep, const H& handler)
 {
     REALM_ASSERT(!m_write_oper);
     std::unique_ptr<connect_oper<H>> op;
     op.reset(new connect_oper<H>(*this, ep, handler)); // Throws
     connect_oper<H>* op_2 = op.get();
-    do_async_connect(move(op)); // Throws
+    do_async_connect(std::move(op)); // Throws
     m_write_oper = op_2;
 }
 
-inline void socket::write(const char* data, std::size_t size)
+inline void socket::write(const char* data, size_t size)
 {
     std::error_code ec;
     if (write(data, size, ec))
@@ -1225,55 +1309,84 @@ inline void socket::write(const char* data, std::size_t size)
 }
 
 template<class H>
-inline void socket::async_write(const char* data, std::size_t size, const H& handler)
+inline void socket::async_write(const char* data, size_t size, const H& handler)
 {
     REALM_ASSERT(!m_write_oper);
     std::unique_ptr<write_oper<H>> op;
     op.reset(new write_oper<H>(*this, data, size, handler)); // Throws
     write_oper<H>* op_2 = op.get();
-    m_service.add_io_oper(get_sock_fd(), move(op), io_service::io_op_Write); // Throws
+    do_async_write(std::move(op)); // Throws
     m_write_oper = op_2;
 }
 
-inline std::size_t socket::read_some(char* buffer, std::size_t size)
+inline size_t socket::read_some(char* buffer, size_t size)
 {
     std::error_code ec;
-    std::size_t n = read_some(buffer, size, ec);
+    size_t n = read_some(buffer, size, ec);
     if (ec)
         throw std::system_error(ec);
     return n;
 }
 
-inline std::size_t socket::write_some(const char* data, std::size_t size)
+inline size_t socket::read_some(char* buffer, size_t size, std::error_code& ec) noexcept
+{
+    if (ensure_blocking_mode(ec))
+        return 0;
+    return do_read_some(buffer, size, ec);
+}
+
+inline size_t socket::write_some(const char* data, size_t size)
 {
     std::error_code ec;
-    std::size_t n = write_some(data, size, ec);
+    size_t n = write_some(data, size, ec);
     if (ec)
         throw std::system_error(ec);
     return n;
+}
+
+inline size_t socket::write_some(const char* data, size_t size, std::error_code& ec) noexcept
+{
+    if (ensure_blocking_mode(ec))
+        return 0;
+    return do_write_some(data, size, ec);
 }
 
 inline void socket::do_async_connect(std::unique_ptr<connect_oper_base> op)
 {
     if (op->complete) {
-        m_service.add_completed_oper(move(op));
+        m_service.add_completed_oper(std::move(op));
     }
     else {
-        m_service.add_io_oper(get_sock_fd(), move(op), io_service::io_op_Write); // Throws
+        m_service.add_io_oper(get_sock_fd(), std::move(op), io_service::io_op_Write); // Throws
+    }
+}
+
+inline void socket::do_async_write(std::unique_ptr<write_oper_base> op)
+{
+    op->initiate();
+    if (op->complete) {
+        m_service.add_completed_oper(std::move(op));
+    }
+    else {
+        m_service.add_io_oper(get_sock_fd(), std::move(op), io_service::io_op_Write); // Throws
     }
 }
 
 // ---------------- acceptor ----------------
 
-template<class H> class acceptor::accept_oper:
+class acceptor::accept_oper_base:
         public io_service::async_oper {
 public:
-    accept_oper(acceptor& a, socket& s, endpoint* e, const H& handler):
+    accept_oper_base(acceptor& a, socket& s, endpoint* e):
         m_acceptor(a),
         m_socket(s),
-        m_endpoint(e),
-        m_handler(handler)
+        m_endpoint(e)
     {
+    }
+    void initiate() noexcept
+    {
+        if (m_acceptor.ensure_nonblocking_mode(m_error_code))
+            complete = true; // Failure
     }
     void proceed() noexcept override
     {
@@ -1284,26 +1397,38 @@ public:
         m_acceptor.do_accept(m_socket, m_endpoint, m_error_code);
         complete = true;
     }
+protected:
+    acceptor& m_acceptor;
+    socket& m_socket;
+    endpoint* const m_endpoint;
+    std::error_code m_error_code;
+};
+
+template<class H>
+class acceptor::accept_oper:
+        public accept_oper_base {
+public:
+    accept_oper(acceptor& a, socket& s, endpoint* e, const H& handler):
+        accept_oper_base(a, s, e),
+        m_handler(handler)
+    {
+    }
     void exec_handler() const override
     {
         REALM_ASSERT(complete || canceled);
-        REALM_ASSERT(complete == m_socket.is_open());
+        REALM_ASSERT(complete == (m_socket.is_open() || m_error_code));
         std::error_code ec;
         if (canceled) {
             ec = error::operation_aborted;
         }
         else {
             REALM_ASSERT(m_acceptor.m_read_oper);
-            m_acceptor.m_read_oper = 0;
+            m_acceptor.m_read_oper = nullptr;
             ec = m_error_code;
         }
         m_handler(ec); // Throws
     }
 private:
-    acceptor& m_acceptor;
-    socket& m_socket;
-    endpoint* const m_endpoint;
-    std::error_code m_error_code;
     const H m_handler;
 };
 
@@ -1335,7 +1460,7 @@ inline void acceptor::accept(socket& sock, endpoint& ep)
 
 inline std::error_code acceptor::accept(socket& sock, std::error_code& ec)
 {
-    endpoint* ep = 0;
+    endpoint* ep = nullptr;
     return accept(sock, ep, ec); // Throws
 }
 
@@ -1344,13 +1469,15 @@ inline std::error_code acceptor::accept(socket& sock, endpoint& ep, std::error_c
     return accept(sock, &ep, ec); // Throws
 }
 
-template<class H> inline void acceptor::async_accept(socket& sock, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, const H& handler)
 {
-    endpoint* ep = 0;
+    endpoint* ep = nullptr;
     async_accept(sock, ep, handler); // Throws
 }
 
-template<class H> inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
 {
     async_accept(sock, &ep, handler); // Throws
 }
@@ -1360,10 +1487,13 @@ inline std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_c
     REALM_ASSERT(!m_read_oper);
     if (REALM_UNLIKELY(sock.is_open()))
         throw std::runtime_error("Socket is already open");
+    if (ensure_blocking_mode(ec))
+        return ec;
     return do_accept(sock, ep, ec);
 }
 
-template<class H> inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
+template<class H>
+inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
 {
     REALM_ASSERT(!m_read_oper);
     if (REALM_UNLIKELY(sock.is_open()))
@@ -1371,8 +1501,19 @@ template<class H> inline void acceptor::async_accept(socket& sock, endpoint* ep,
     std::unique_ptr<accept_oper<H>> op;
     op.reset(new accept_oper<H>(*this, sock, ep, handler)); // Throws
     accept_oper<H>* op_2 = op.get();
-    m_service.add_io_oper(m_sock_fd, move(op), io_service::io_op_Read); // Throws
+    do_async_accept(std::move(op)); // Throws
     m_read_oper = op_2;
+}
+
+inline void acceptor::do_async_accept(std::unique_ptr<accept_oper_base> op)
+{
+    op->initiate();
+    if (op->complete) {
+        m_service.add_completed_oper(std::move(op));
+    }
+    else {
+        m_service.add_io_oper(get_sock_fd(), std::move(op), io_service::io_op_Read); // Throws
+    }
 }
 
 // ---------------- buffered_input_stream ----------------
@@ -1380,13 +1521,21 @@ template<class H> inline void acceptor::async_accept(socket& sock, endpoint* ep,
 class buffered_input_stream::read_oper_base:
         public io_service::async_oper {
 public:
-    read_oper_base(buffered_input_stream& s, char* buffer, std::size_t size, int delim):
+    read_oper_base(buffered_input_stream& s, char* buffer, size_t size, int delim):
         m_stream(s),
         m_out_begin(buffer),
         m_out_end(buffer + size),
         m_out_curr(buffer),
         m_delim(delim)
     {
+    }
+    void initiate() noexcept
+    {
+        process_buffered_input();
+        if (!complete) {
+            if (m_stream.m_socket.ensure_nonblocking_mode(m_error_code))
+                complete = true; // Failure
+        }
     }
     void process_buffered_input() noexcept;
     void proceed() noexcept override;
@@ -1403,7 +1552,7 @@ template<class H>
 class buffered_input_stream::read_oper:
         public read_oper_base {
 public:
-    read_oper(buffered_input_stream& s, char* buffer, std::size_t size, int delim, const H& h):
+    read_oper(buffered_input_stream& s, char* buffer, size_t size, int delim, const H& h):
         read_oper_base(s, buffer, size, delim),
         m_handler(h)
     {
@@ -1416,14 +1565,14 @@ public:
                                                    std::char_traits<char>::to_char_type(m_delim) :
                                                    m_out_curr == m_out_end)));
         REALM_ASSERT(m_out_curr >= m_out_begin);
-        std::size_t num_bytes_transferred = std::size_t(m_out_curr - m_out_begin);
+        size_t num_bytes_transferred = size_t(m_out_curr - m_out_begin);
         std::error_code ec;
         if (canceled) {
             ec = error::operation_aborted;
         }
         else {
             REALM_ASSERT(m_stream.m_socket.m_read_oper);
-            m_stream.m_socket.m_read_oper = 0;
+            m_stream.m_socket.m_read_oper = nullptr;
             ec = m_error_code;
         }
         m_handler(ec, num_bytes_transferred); // Throws
@@ -1440,76 +1589,77 @@ inline buffered_input_stream::buffered_input_stream(socket& sock):
 {
 }
 
-inline std::size_t buffered_input_stream::read(char* buffer, std::size_t size)
+inline size_t buffered_input_stream::read(char* buffer, size_t size)
 {
     std::error_code ec;
-    std::size_t n = read(buffer, size, ec);
+    size_t n = read(buffer, size, ec);
     if (ec)
         throw std::system_error(ec);
     return n;
 }
 
-inline std::size_t buffered_input_stream::read(char* buffer, std::size_t size,
+inline size_t buffered_input_stream::read(char* buffer, size_t size,
                                                std::error_code& ec) noexcept
 {
     return do_read(buffer, size, std::char_traits<char>::eof(), ec);
 }
 
-inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t size, char delim)
+inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim)
 {
     std::error_code ec;
-    std::size_t n = read_until(buffer, size, delim, ec);
+    size_t n = read_until(buffer, size, delim, ec);
     if (ec)
         throw std::system_error(ec);
     return n;
 }
 
-inline std::size_t buffered_input_stream::read_until(char* buffer, std::size_t size, char delim,
+inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim,
                                                      std::error_code& ec) noexcept
 {
     return do_read(buffer, size, std::char_traits<char>::to_int_type(delim), ec);
 }
 
 template<class H>
-inline void buffered_input_stream::async_read(char* buffer, std::size_t size, const H& handler)
+inline void buffered_input_stream::async_read(char* buffer, size_t size, const H& handler)
 {
     async_read(buffer, size, std::char_traits<char>::eof(), handler);
 }
 
 template<class H>
-inline void buffered_input_stream::async_read_until(char* buffer, std::size_t size, char delim,
+inline void buffered_input_stream::async_read_until(char* buffer, size_t size, char delim,
                                                     const H& handler)
 {
     async_read(buffer, size, std::char_traits<char>::to_int_type(delim), handler);
 }
 
 template<class H>
-inline void buffered_input_stream::async_read(char* buffer, std::size_t size, int delim,
+inline void buffered_input_stream::async_read(char* buffer, size_t size, int delim,
                                               const H& handler)
 {
     REALM_ASSERT(!m_socket.m_read_oper);
     std::unique_ptr<read_oper<H>> op;
     op.reset(new read_oper<H>(*this, buffer, size, delim, handler)); // Throws
     read_oper<H>* op_2 = op.get();
-    do_async_read(move(op)); // Throws
+    do_async_read(std::move(op)); // Throws
     m_socket.m_read_oper = op_2;
 }
 
 inline void buffered_input_stream::do_async_read(std::unique_ptr<read_oper_base> op)
 {
-    op->process_buffered_input();
+    op->initiate();
     if (op->complete) {
-        m_socket.m_service.add_completed_oper(move(op));
+        m_socket.m_service.add_completed_oper(std::move(op));
     }
     else {
-        m_socket.m_service.add_io_oper(m_socket.get_sock_fd(), move(op),
+        m_socket.m_service.add_io_oper(m_socket.get_sock_fd(), std::move(op),
                                        io_service::io_op_Read); // Throws
     }
 }
 
 // ---------------- deadline_timer ----------------
 
-template<class H> class deadline_timer::wait_oper:
+template<class H>
+class deadline_timer::wait_oper:
         public io_service::wait_oper_base {
 public:
     wait_oper(deadline_timer& timer, clock::time_point expiration_time, const H& handler):
@@ -1526,7 +1676,7 @@ public:
         }
         else {
             REALM_ASSERT(m_timer.m_wait_oper);
-            m_timer.m_wait_oper = 0;
+            m_timer.m_wait_oper = nullptr;
         }
         m_handler(ec);
     }
@@ -1562,7 +1712,7 @@ inline void deadline_timer::async_wait(std::chrono::duration<R,P> delay, const H
     std::unique_ptr<wait_oper<H>> op;
     op.reset(new wait_oper<H>(*this, expiration_time, handler)); // Throws
     wait_oper<H>* op_2 = op.get();
-    m_service.add_wait_oper(move(op)); // Throws
+    m_service.add_wait_oper(std::move(op)); // Throws
     m_wait_oper = op_2;
 }
 

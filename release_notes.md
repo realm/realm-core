@@ -2,6 +2,141 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.95.1 Release notes
+
+### Bugfixes:
+* Fixed bug that would give false search results for queries on integer columns
+  due to bug in bithacks deep inside Array::find()
+* Lorem ipsum.
+
+### Enhancements:
+
+* Added Table::get_version_counter() exposing the versioning counter for the Table
+* Add `TableView::get_query()`.
+
+
+----------------------------------------------
+
+# 0.95.0 Release notes
+
+### Bugfixes:
+
+* When inserting a new non-nullable Binary column to a table that had
+  *existing* rows, then the automatically added values would become null
+* Fixed updating TableViews when applying a transaction log with a table clear.
+* Fewer things are copied in TableView's move constructor.
+* Prevent spurious blocking in networking subsystem (put sockets in nonblocking
+  mode even when used with poll/select).
+* Fixed the shared group being left in an inconsistent state if the transaction
+  log observer threw an exception.
+* Fixed issue with table accessors not being updated properly, when link columns
+  were changed (e.g. in Group::remove_table, when the table had link columns).
+
+### API breaking changes:
+
+* Use `util::Logger` instead of `std::ostream` for logging during changeset
+  replay (`Replication::apply_changeset()`).
+
+### Enhancements:
+
+* Eliminated use of signals in encryption. This also fixes failures related
+  to signals on some devices.
+
+-----------
+
+### Internals:
+
+* More checking and throwing of logical errors in `Table::set_binary()` and
+  `Table::set_link()`.
+
+----------------------------------------------
+
+# 0.94.4 Release notes
+
+### Bugfixes:
+
+* Fixed crash in find_all()
+
+### Enhancements:
+
+* Queries are no longer limited to 16 levels of grouping.
+* New substring operations (ranged insert, erase on values in string columns).
+* Adds schema change notification handler API to Group.
+
+-----------
+
+### Internals:
+
+* New operations: Swap rows, move rows, move column, move group level table.
+* Changes order of nullify instructions that appeared as a result of erase
+  to occur in the transaction log before the erase instruction that caused
+  them.
+* New utility class: DirScanner.
+* New test utility function: quote.
+* New assertion macro: REALM_ASSERT_EX, replacing REALM_ASSERT_n macros.
+
+
+----------------------------------------------
+
+# 0.94.3 Release notes
+
+### Bugfixes:
+
+* Fixed mremap() fallback on Blackberry.
+
+----------------------------------------------
+
+# 0.94.2 Release notes
+
+### Bugfixes:
+
+* Fixed a bug that lead to SharedGroup::compact failing to attach to the newly
+  written file.
+
+----------------------------------------------
+
+# 0.94.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug in SharedGroup::Compact() which could leave the database in an
+  inconsistent state.
+
+### Enhancements:
+
+* Queries are no longer limited to 16 levels of grouping.
+
+-----------
+
+### Internals:
+
+* Obsolete YAML-based documentation removed.
+* Removed `std::` in front integral types (e.g. `size_t`, `int64_t` etc.)
+
+----------------------------------------------
+
+# 0.94.0 Release notes
+
+### Bugfixes:
+
 * Fixed a crash bug that could be triggered if a Realm is rapidly opened and
   closed and reopened many times on multiple threads. The bug caused the
   internal version information structure to overflow, causing an assert or a
@@ -16,10 +151,7 @@
   Xcode 6.
 
 ### API breaking changes:
-
-* Free-standing functions `util::network::write()` and
-  `util::network::async_write()` converted to members of
-  `util::network::socket`.
+* None.
 
 ### Enhancements:
 * Supports finding non-null links (Link + LinkList) in queries, using
@@ -30,8 +162,6 @@
   `pthread_mutex_lock()`.
 * Termination routines now always display the library's version before the
   error message.
-* New `util::network::socket_base::cancel()`.
-* Added `util::network::deadline_timer` class.
 * Automatically clean up stale MemOnly files which were not deleted on close
   due to the process crashing.
 
@@ -47,13 +177,19 @@
 * Improved documentation in `util::network`.
 * Improved exception safety in `util::network`.
 * `util::network::socket_base::close()` is now `noexcept`.
+* New `util::network::socket_base::cancel()`.
+* Added `util::network::deadline_timer` class.
+* Breaking: Free-standing functions `util::network::write()` and
+  `util::network::async_write()` converted to members of
+  `util::network::socket`.
+
 
 ----------------------------------------------
 
 # 0.93.0 Release notes
 
 ### Bugfixes:
-* Fixed severe bug in Array allocator that could give asserts like 
+* Fixed severe bug in Array allocator that could give asserts like
   `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`, especially
   for BinaryData columns. This bug could be triggered by using binary data
   blobs with a size in the range between 8M and 16M.
@@ -87,7 +223,7 @@
   to another during handover_export() leading to corruption.
 * Query expression operators now give correct results when an argument comes
   from a link.
-* Fixed a bug in the way the new memory mapping machinery interacted with 
+* Fixed a bug in the way the new memory mapping machinery interacted with
   encryption.
 * Query expression comparisons now give correct results when comparing a linked
   column with a column in the base table.

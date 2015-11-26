@@ -38,7 +38,8 @@
 struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< void,     type1 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         ColNames(Init i) noexcept: name1(i) {} \
     }; \
@@ -55,13 +56,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1) \
+        void insert(size_t _realm_i, type1 name1) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1)); \
         } \
-        void set(std::size_t _realm_i, type1 name1) \
+        void set(size_t _realm_i, type1 name1) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -77,7 +78,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< void,     type1 >::type Columns1; \
     typedef ::realm::util::TypeAppend< Columns1, type2 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         ColNames(Init i) noexcept: name1(i), name2(i) {} \
@@ -96,13 +98,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2) \
+        void insert(size_t _realm_i, type1 name1, type2 name2) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2) \
+        void set(size_t _realm_i, type1 name1, type2 name2) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -119,7 +121,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns1, type2 >::type Columns2; \
     typedef ::realm::util::TypeAppend< Columns2, type3 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -140,13 +143,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -164,7 +167,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns2, type3 >::type Columns3; \
     typedef ::realm::util::TypeAppend< Columns3, type4 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -187,13 +191,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -212,7 +216,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns3, type4 >::type Columns4; \
     typedef ::realm::util::TypeAppend< Columns4, type5 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -237,13 +242,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -263,7 +268,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns4, type5 >::type Columns5; \
     typedef ::realm::util::TypeAppend< Columns5, type6 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -290,13 +296,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -317,7 +323,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns5, type6 >::type Columns6; \
     typedef ::realm::util::TypeAppend< Columns6, type7 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -346,13 +353,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -374,7 +381,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns6, type7 >::type Columns7; \
     typedef ::realm::util::TypeAppend< Columns7, type8 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -405,13 +413,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -434,7 +442,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns7, type8 >::type Columns8; \
     typedef ::realm::util::TypeAppend< Columns8, type9 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -467,13 +476,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -497,7 +506,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns8, type9 >::type Columns9; \
     typedef ::realm::util::TypeAppend< Columns9, type10 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -532,13 +542,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -563,7 +573,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns9, type10 >::type Columns10; \
     typedef ::realm::util::TypeAppend< Columns10, type11 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -600,13 +611,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -632,7 +643,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns10, type11 >::type Columns11; \
     typedef ::realm::util::TypeAppend< Columns11, type12 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -671,13 +683,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11, name12)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11, name12)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -704,7 +716,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns11, type12 >::type Columns12; \
     typedef ::realm::util::TypeAppend< Columns12, type13 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -745,13 +758,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11, name12, name13)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11, name12, name13)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -779,7 +792,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns12, type13 >::type Columns13; \
     typedef ::realm::util::TypeAppend< Columns13, type14 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -822,13 +836,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11, name12, name13, name14)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13, type14 name14) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13, type14 name14) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11, name12, name13, name14)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13, type14 name14) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13, type14 name14) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
@@ -857,7 +871,8 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns13, type14 >::type Columns14; \
     typedef ::realm::util::TypeAppend< Columns14, type15 >::type Columns; \
  \
-    template<template<int> class Col, class Init> struct ColNames { \
+    template<template<int> class Col, class Init> \
+    struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
         typename Col<2>::type name3; \
@@ -902,13 +917,13 @@ struct Table##Spec: ::realm::SpecBase { \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->add((::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11, name12, name13, name14, name15)); \
         } \
-        void insert(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13, type14 name14, type15 name15) \
+        void insert(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13, type14 name14, type15 name15) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \
             _realm_t->insert(_realm_i, (::realm::util::tuple(), name1, name2, name3, name4, name5, name6, name7, name8, name9, name10, name11, name12, name13, name14, name15)); \
         } \
-        void set(std::size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13, type14 name14, type15 name15) \
+        void set(size_t _realm_i, type1 name1, type2 name2, type3 name3, type4 name4, type5 name5, type6 name6, type7 name7, type8 name8, type9 name9, type10 name10, type11 name11, type12 name12, type13 name13, type14 name14, type15 name15) \
         { \
             ::realm::BasicTable<Table##Spec>* const _realm_t = \
                 static_cast< ::realm::BasicTable<Table##Spec>* >(this); \

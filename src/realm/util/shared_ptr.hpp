@@ -1,46 +1,47 @@
 #ifndef REALM_SHARED_PTR_HPP
 #define REALM_SHARED_PTR_HPP
 
-#include <cstdlib> // std::size_t
+#include <cstdlib> // size_t
 
 namespace realm {
 namespace util {
 
-template <class T> class SharedPtr 
+template<class T>
+class SharedPtr
 {
 public:
-    SharedPtr(T* p) 
-    { 
-        init(p); 
+    SharedPtr(T* p)
+    {
+        init(p);
     }
 
-    SharedPtr() 
+    SharedPtr()
     {
         init(0);
     }
 
-    ~SharedPtr() 
-    { 
-        decref(); 
+    ~SharedPtr()
+    {
+        decref();
     }
-                        
+
     SharedPtr(const SharedPtr<T>& o) : m_ptr(o.m_ptr), m_count(o.m_count)
-    { 
-        incref(); 
+    {
+        incref();
     }
-              
+
     SharedPtr<T>& operator=(const SharedPtr<T>& o) {
-        if (m_ptr == o.m_ptr) 
+        if (m_ptr == o.m_ptr)
             return *this;
         decref();
         m_ptr = o.m_ptr;
         m_count = o.m_count;
         incref();
-        return *this;                          
+        return *this;
     }
-     
-    T* operator->() const 
-    { 
+
+    T* operator->() const
+    {
         return m_ptr;
     }
 
@@ -48,28 +49,28 @@ public:
     {
         return *m_ptr;
     }
-                        
-    T* get() const 
+
+    T* get() const
     {
         return m_ptr;
     }
-                        
+
     bool operator==(const SharedPtr<T>& o) const
-    { 
+    {
         return m_ptr == o.m_ptr;
     }
 
     bool operator!=(const SharedPtr<T>& o) const
-    { 
+    {
         return m_ptr != o.m_ptr;
     }
 
     bool operator<(const SharedPtr<T>& o) const
-    { 
+    {
         return m_ptr < o.m_ptr;
     }
-                        
-    std::size_t ref_count() const
+
+    size_t ref_count() const
     {
         return *m_count;
     }
@@ -79,7 +80,7 @@ private:
     {
         m_ptr = p;
         try {
-            m_count = new std::size_t(1);
+            m_count = new size_t(1);
         }
         catch (...) {
             delete p;
@@ -87,21 +88,21 @@ private:
         }
     }
 
-    void decref() 
-    { 
+    void decref()
+    {
         if (--(*m_count) == 0) {
             delete m_ptr;
             delete m_count;
-        } 
+        }
     }
 
-    void incref() 
+    void incref()
     {
-        ++(*m_count); 
+        ++(*m_count);
     }
 
     T* m_ptr;
-    std::size_t* m_count;
+    size_t* m_count;
 };
 
 }

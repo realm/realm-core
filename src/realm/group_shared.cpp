@@ -141,7 +141,8 @@ const uint16_t relaxed_sync_threshold = 50;
 //   there is no standardized support for it.
 //
 
-template<typename T> bool atomic_double_inc_if_even(std::atomic<T>& counter)
+template<typename T>
+bool atomic_double_inc_if_even(std::atomic<T>& counter)
 {
     T oldval = counter.fetch_add(2, std::memory_order_acquire);
     if (oldval & 1) {
@@ -152,12 +153,14 @@ template<typename T> bool atomic_double_inc_if_even(std::atomic<T>& counter)
     return true;
 }
 
-template<typename T> inline void atomic_double_dec(std::atomic<T>& counter)
+template<typename T>
+inline void atomic_double_dec(std::atomic<T>& counter)
 {
     counter.fetch_sub(2, std::memory_order_release);
 }
 
-template<typename T> bool atomic_one_if_zero(std::atomic<T>& counter)
+template<typename T>
+bool atomic_one_if_zero(std::atomic<T>& counter)
 {
     T old_val = counter.fetch_add(1, std::memory_order_acquire);
     if (old_val != 0) {
@@ -167,7 +170,8 @@ template<typename T> bool atomic_one_if_zero(std::atomic<T>& counter)
     return true;
 }
 
-template<typename T> void atomic_dec(std::atomic<T>& counter)
+template<typename T>
+void atomic_dec(std::atomic<T>& counter)
 {
     counter.fetch_sub(1, std::memory_order_release);
 }
@@ -241,7 +245,7 @@ public:
         std::cout << "--- Done" << std::endl;
     }
 
-    void expand_to(uint_fast32_t new_entries)  noexcept
+    void expand_to(uint_fast32_t new_entries) noexcept
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
@@ -258,7 +262,7 @@ public:
         // dump();
     }
 
-    static size_t compute_required_space(uint_fast32_t num_entries)  noexcept
+    static size_t compute_required_space(uint_fast32_t num_entries) noexcept
     {
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
@@ -266,22 +270,22 @@ public:
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const  noexcept
+    uint_fast32_t get_num_entries() const noexcept
     {
         return entries;
     }
 
-    uint_fast32_t last() const  noexcept
+    uint_fast32_t last() const noexcept
     {
         return put_pos.load(std::memory_order_acquire);
     }
 
-    const ReadCount& get(uint_fast32_t idx) const  noexcept
+    const ReadCount& get(uint_fast32_t idx) const noexcept
     {
         return data[idx];
     }
 
-    const ReadCount& get_last() const  noexcept
+    const ReadCount& get_last() const noexcept
     {
         return get(last());
     }
@@ -305,36 +309,36 @@ public:
         return r;
     }
 
-    const ReadCount& get_oldest() const  noexcept
+    const ReadCount& get_oldest() const noexcept
     {
         return get(old_pos.load(std::memory_order_relaxed));
     }
 
-    bool is_full() const  noexcept
+    bool is_full() const noexcept
     {
         uint_fast32_t idx = get(last()).next;
         return idx == old_pos.load(std::memory_order_relaxed);
     }
 
-    uint_fast32_t next() const  noexcept
+    uint_fast32_t next() const noexcept
     { // do not call this if the buffer is full!
         uint_fast32_t idx = get(last()).next;
         return idx;
     }
 
-    ReadCount& get_next()  noexcept
+    ReadCount& get_next() noexcept
     {
         REALM_ASSERT(!is_full());
         return data[ next() ];
     }
 
-    void use_next()  noexcept
+    void use_next() noexcept
     {
         atomic_dec(get_next().count); // .store_release(0);
         put_pos.store(next(), std::memory_order_release);
     }
 
-    void cleanup()  noexcept
+    void cleanup() noexcept
     {   // invariant: entry held by put_pos has count > 1.
         // std::cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
@@ -661,12 +665,12 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             throw std::runtime_error("Lock file too large");
 
         // Compile time validate the alignment of the first three fields in SharedInfo
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
+        static_assert(offsetof(SharedInfo,init_complete) == 0, "misalignment of init_complete");
+        static_assert(offsetof(SharedInfo,size_of_mutex) == 1, "misalignment of size_of_mutex");
+        static_assert(offsetof(SharedInfo,size_of_condvar) == 2, "misalignment of size_of_condvar");
 
         // If this ever triggers we are on a really weird architecture
-        REALM_STATIC_ASSERT(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
+        static_assert(offsetof(SharedInfo,latest_version_number) == 16, "misalignment of latest_version_number");
 
         // we need to have the size_of_mutex, size_of_condvar and init_complete
         // fields available before we can check for compatibility
@@ -754,7 +758,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                 uint_fast64_t version;
                 Array top(alloc);
                 if (top_ref) {
-
                     // top_ref is non-zero implying that the database has seen at least one commit,
                     // so we can get the versioning info from the database
                     top.init_from_ref(top_ref);
@@ -765,7 +768,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                     }
                     else {
                         // the database was written by shared group, so it has versioning info
-                        REALM_ASSERT(top.size() == 7);
+                        REALM_ASSERT(top.size() >= 7);
                         version = top.get(6) / 2;
                         // In case this was written by an older version of shared group, it
                         // will have version 0. Version 0 is not a legal initial version, so
@@ -786,7 +789,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
 #ifndef _WIN32
                 if (encryption_key) {
-                    REALM_STATIC_ASSERT(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+                    static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     info->session_initiator_pid = uint64_t(getpid());
                 }
 #endif
@@ -1024,7 +1027,7 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
-#ifndef __APPLE__
+#if !REALM_PLATFORM_APPLE
 bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
@@ -1051,7 +1054,7 @@ void SharedGroup::enable_wait_for_change()
     RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
     m_wait_for_change_enabled = true;
 }
-#endif
+#endif // !REALM_PLATFORM_APPLE
 
 void SharedGroup::do_async_commits()
 {

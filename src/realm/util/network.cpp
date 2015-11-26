@@ -12,6 +12,7 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/priority_queue.hpp>
 #include <realm/util/network.hpp>
+#include <realm/util/features.h>
 
 
 using namespace realm::util;
@@ -20,6 +21,7 @@ using namespace realm::util::network;
 
 namespace {
 
+// `ec` untouched on success
 std::error_code set_nonblocking(int fd, bool enable, std::error_code& ec) noexcept
 {
     int flags = ::fcntl(fd, F_GETFL, 0);
@@ -35,8 +37,7 @@ std::error_code set_nonblocking(int fd, bool enable, std::error_code& ec) noexce
         ec = make_basic_system_error_code(errno);
         return ec;
     }
-    ec = std::error_code(); // Success
-    return ec;
+    return std::error_code(); // Success
 }
 
 void set_nonblocking(int fd, bool enable)
@@ -156,20 +157,20 @@ public:
         if (m_back)
             std::swap(m_back->m_next, q.m_back->m_next);
         m_back = q.m_back;
-        q.m_back = 0;
+        q.m_back = nullptr;
     }
     std::unique_ptr<async_oper> pop_front() noexcept
     {
-        async_oper* op = 0;
+        async_oper* op = nullptr;
         if (m_back) {
             op = m_back->m_next;
             if (op != m_back) {
                 m_back->m_next = op->m_next;
             }
             else {
-                m_back = 0;
+                m_back = nullptr;
             }
-            op->m_next = 0;
+            op->m_next = nullptr;
         }
         return std::unique_ptr<async_oper>(op);
     }
@@ -187,7 +188,7 @@ public:
         }
     }
 private:
-    async_oper* m_back = 0;
+    async_oper* m_back = nullptr;
 };
 
 
@@ -241,6 +242,7 @@ public:
             LockGuard l(m_mutex);
             if (m_stopped)
                 return;
+            // Note: Order of post operations must be preserved.
             m_completed_operations.push_back(m_post_operations);
 
             if (m_completed_operations.empty())
@@ -336,12 +338,12 @@ public:
             case io_op_Read:
                 REALM_ASSERT(!oper_slot.read_oper);
                 pollfd_slot.events |= POLLRDNORM;
-                oper_slot.read_oper = move(op);
+                oper_slot.read_oper = std::move(op);
                 goto finish;
             case io_op_Write:
                 REALM_ASSERT(!oper_slot.write_oper);
                 pollfd_slot.events |= POLLWRNORM;
-                oper_slot.write_oper = move(op);
+                oper_slot.write_oper = std::move(op);
                 goto finish;
         }
         REALM_ASSERT(false);
@@ -374,14 +376,14 @@ public:
 
     void add_completed_oper(std::unique_ptr<async_oper> op) noexcept
     {
-        m_completed_operations.push_back(move(op));
+        m_completed_operations.push_back(std::move(op));
     }
 
     void add_post_oper(std::unique_ptr<async_oper> op) noexcept
     {
         {
             LockGuard l(m_mutex);
-            m_post_operations.push_back(move(op));
+            m_post_operations.push_back(std::move(op));
         }
         wake_up_poll_thread();
     }
@@ -398,11 +400,11 @@ public:
         io_oper_slot& oper_slot = m_io_operations[fd];
         REALM_ASSERT(oper_slot.read_oper || oper_slot.write_oper);
         if (oper_slot.read_oper) {
-            m_completed_operations.push_back(move(oper_slot.read_oper));
+            m_completed_operations.push_back(std::move(oper_slot.read_oper));
             --m_num_active_io_operations;
         }
         if (oper_slot.write_oper) {
-            m_completed_operations.push_back(move(oper_slot.write_oper));
+            m_completed_operations.push_back(std::move(oper_slot.write_oper));
             --m_num_active_io_operations;
         }
     }
@@ -459,13 +461,13 @@ private:
     {
         size_t num_ready_descriptors = 0;
         {
-            wait_oper_base* next_wait_op = 0;
+            wait_oper_base* next_wait_op = nullptr;
             if (!m_wait_operations.empty())
                 next_wait_op = m_wait_operations.top().get();
 
             // std::vector guarantees contiguous storage
             pollfd* fds = &m_pollfd_slots.front();
-            nfds_t nfds = m_pollfd_slots.size();
+            nfds_t nfds = nfds_t(m_pollfd_slots.size());
             for (;;) {
                 int max_wait_millis = -1; // Wait indefinitely
                 if (next_wait_op) {
@@ -567,7 +569,7 @@ private:
                     pollfd_slot.events &= ~POLLRDNORM;
                     if (pollfd_slot.events == 0)
                         pollfd_slot.fd = -1;
-                    m_completed_operations.push_back(move(oper_slot.read_oper));
+                    m_completed_operations.push_back(std::move(oper_slot.read_oper));
                     --m_num_active_io_operations;
                 }
             }
@@ -579,7 +581,7 @@ private:
                     pollfd_slot.events &= ~POLLWRNORM;
                     if (pollfd_slot.events == 0)
                         pollfd_slot.fd = -1;
-                    m_completed_operations.push_back(move(oper_slot.write_oper));
+                    m_completed_operations.push_back(std::move(oper_slot.write_oper));
                     --m_num_active_io_operations;
                 }
             }
@@ -643,27 +645,27 @@ void io_service::stop() noexcept
 
 void io_service::reset() noexcept
 {
-    m_impl->reset();
+    m_impl->reset(); // Throws
 }
 
 void io_service::add_io_oper(int fd, std::unique_ptr<async_oper> op, io_op type)
 {
-    m_impl->add_io_oper(fd, move(op), type); // Throws
+    m_impl->add_io_oper(fd, std::move(op), type); // Throws
 }
 
 void io_service::add_wait_oper(std::unique_ptr<wait_oper_base> op)
 {
-    m_impl->add_wait_oper(move(op)); // Throws
+    m_impl->add_wait_oper(std::move(op)); // Throws
 }
 
 void io_service::add_completed_oper(std::unique_ptr<async_oper> op) noexcept
 {
-    m_impl->add_completed_oper(move(op));
+    m_impl->add_completed_oper(std::move(op));
 }
 
 void io_service::add_post_oper(std::unique_ptr<async_oper> op) noexcept
 {
-    m_impl->add_post_oper(move(op));
+    m_impl->add_post_oper(std::move(op));
 }
 
 
@@ -745,13 +747,13 @@ void socket_base::cancel() noexcept
         if (!m_read_oper->complete)
             any_incomplete = true;
         m_read_oper->canceled = true;
-        m_read_oper = 0;
+        m_read_oper = nullptr;
     }
     if (m_write_oper) {
         if (!m_write_oper->complete)
             any_incomplete = true;
         m_write_oper->canceled = true;
-        m_write_oper = 0;
+        m_write_oper = nullptr;
     }
     if (any_incomplete)
         m_service.m_impl->cancel_incomplete_io_ops(m_sock_fd);
@@ -804,31 +806,34 @@ endpoint socket_base::local_endpoint(std::error_code& ec) const
 }
 
 
-void socket_base::do_open(const protocol& prot, std::error_code& ec)
+std::error_code socket_base::open(const protocol& prot, std::error_code& ec)
 {
     if (REALM_UNLIKELY(is_open()))
         throw std::runtime_error("Socket is already open");
     int sock_fd = ::socket(prot.m_family, prot.m_socktype, prot.m_protocol);
     if (REALM_UNLIKELY(sock_fd == -1)) {
         ec = make_basic_system_error_code(errno);
-        return;
+        return ec;
     }
 
-#if defined(__MACH__) && defined(__APPLE__) || defined(__FreeBSD__)
+#if REALM_PLATFORM_APPLE
     {
         int optval = 1;
         int ret = setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
         if (REALM_UNLIKELY(ret == -1)) {
             ec = make_basic_system_error_code(errno);
             ::close(sock_fd);
-            return;
+            return ec;
         }
     }
 #endif
 
     m_protocol = prot;
     m_sock_fd = sock_fd;
+    // Sockets are in blocking mode by default
+    m_in_blocking_mode = true;
     ec = std::error_code(); // Success
+    return ec;
 }
 
 
@@ -870,7 +875,7 @@ void socket_base::set_option(opt_enum opt, const void* value_data, size_t value_
     int option_name = 0;
     map_option(opt, level, option_name);
 
-    int ret = ::setsockopt(m_sock_fd, level, option_name, value_data, value_size);
+    int ret = ::setsockopt(m_sock_fd, level, option_name, value_data, socklen_t(value_size));
     if (REALM_UNLIKELY(ret == -1)) {
         ec = make_basic_system_error_code(errno);
         return;
@@ -891,37 +896,31 @@ void socket_base::map_option(opt_enum opt, int& level, int& option_name) const
 }
 
 
+std::error_code socket_base::set_nonblocking_mode(bool enable, std::error_code& ec) noexcept
+{
+    return set_nonblocking(m_sock_fd, enable, ec);
+}
+
+
 std::error_code socket::connect(const endpoint& ep, std::error_code& ec)
 {
     REALM_ASSERT(!m_write_oper);
 
-    if (initiate_connect(ep, ec))
-        return ec; // Failure, or immediate completion
-
-    // Wait for file descriptor to become writable
-    {
-        using pollfd = struct pollfd;
-        pollfd slot = pollfd(); // Cleared slot
-        slot.fd = get_sock_fd();
-        slot.events = POLLWRNORM;
-        nfds_t nfds = 1;
-        int timeout = -1; // Wait indefinitely
-        for (;;) {
-            int ret = ::poll(&slot, nfds, timeout);
-            if (ret >= 0) {
-                REALM_ASSERT(ret == 1);
-                break;
-            }
-            if (REALM_UNLIKELY(errno != EINTR)) {
-                ec = make_basic_system_error_code(errno);
-                return ec;
-            }
-            // Retry on interruption by system signal
-        }
+    if (!is_open()) {
+        if (REALM_UNLIKELY(open(ep.protocol(), ec)))
+            return ec;
     }
 
-    if (finalize_connect(ec))
-        return ec; // Failure
+    if (REALM_UNLIKELY(ensure_blocking_mode(ec)))
+        return ec;
+
+    socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
+        sizeof (endpoint::sockaddr_ip_v4_type) : sizeof (endpoint::sockaddr_ip_v6_type);
+    int ret = ::connect(get_sock_fd(), &ep.m_sockaddr_union.m_base, addr_len);
+    if (REALM_UNLIKELY(ret == -1)) {
+        ec = make_basic_system_error_code(errno);
+        return ec;
+    }
 
     ec = std::error_code(); // Success
     return ec;
@@ -931,10 +930,12 @@ std::error_code socket::connect(const endpoint& ep, std::error_code& ec)
 std::error_code socket::write(const char* data, size_t size, std::error_code& ec) noexcept
 {
     REALM_ASSERT(!m_write_oper);
+    if (ensure_blocking_mode(ec))
+        return ec;
     const char* begin = data;
     const char* end = data + size;
     while (begin != end) {
-        size_t n = write_some(begin, end-begin, ec);
+        size_t n = do_write_some(begin, end-begin, ec);
         if (REALM_UNLIKELY(ec))
             return ec;
         REALM_ASSERT(n > 0);
@@ -946,7 +947,7 @@ std::error_code socket::write(const char* data, size_t size, std::error_code& ec
 }
 
 
-size_t socket::read_some(char* buffer, size_t size, std::error_code& ec) noexcept
+size_t socket::do_read_some(char* buffer, size_t size, std::error_code& ec) noexcept
 {
     int flags = 0;
     for (;;) {
@@ -969,7 +970,7 @@ size_t socket::read_some(char* buffer, size_t size, std::error_code& ec) noexcep
 }
 
 
-size_t socket::write_some(const char* data, size_t size, std::error_code& ec) noexcept
+size_t socket::do_write_some(const char* data, size_t size, std::error_code& ec) noexcept
 {
     int flags = 0;
 #ifdef __linux__
@@ -991,24 +992,15 @@ size_t socket::write_some(const char* data, size_t size, std::error_code& ec) no
 }
 
 
-void socket::do_open(const protocol& prot, std::error_code& ec)
-{
-    socket_base::do_open(prot, ec); // Throws
-    if (ec)
-        return;
-    if (set_nonblocking(get_sock_fd(), true, ec)) {
-        do_close();
-        return;
-    }
-}
-
-
-bool socket::initiate_connect(const endpoint& ep, std::error_code& ec) noexcept
+bool socket::initiate_async_connect(const endpoint& ep, std::error_code& ec) noexcept
 {
     if (!is_open()) {
         if (REALM_UNLIKELY(open(ep.protocol(), ec)))
             return true; // Failure
     }
+
+    if (REALM_UNLIKELY(ensure_nonblocking_mode(ec)))
+        return true; // Failure
 
     // Initiate connect operation.
     socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
@@ -1029,12 +1021,11 @@ bool socket::initiate_connect(const endpoint& ep, std::error_code& ec) noexcept
         return true; // Failure
     }
 
-    ec = std::error_code(); // Success
     return false; // Successful initiation, but no immediate completion.
 }
 
 
-std::error_code socket::finalize_connect(std::error_code& ec) noexcept
+std::error_code socket::finalize_async_connect(std::error_code& ec) noexcept
 {
     int connect_errno = 0;
     socklen_t connect_errno_size = sizeof connect_errno;
@@ -1048,13 +1039,7 @@ std::error_code socket::finalize_connect(std::error_code& ec) noexcept
         ec = make_basic_system_error_code(connect_errno);
         return ec; // connect failed
     }
-
-    // Disable nonblocking mode
-    if (REALM_UNLIKELY(set_nonblocking(get_sock_fd(), false, ec)))
-        return ec;
-
-    ec = std::error_code(); // Success
-    return ec;
+    return std::error_code(); // Success
 }
 
 
@@ -1098,7 +1083,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     if (REALM_UNLIKELY(addr_len != expected_addr_len))
         REALM_TERMINATE("Unexpected peer address length");
 
-#if defined(__MACH__) && defined(__APPLE__) || defined(__FreeBSD__)
+#if REALM_PLATFORM_APPLE
     int optval = 1;
     int ret = ::setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
     if (REALM_UNLIKELY(ret == -1)) {
@@ -1109,6 +1094,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
 #endif
 
     sock.m_sock_fd = sock_fd;
+    sock.m_in_blocking_mode = true;
     if (ep) {
         ep->m_protocol = m_protocol;
         ep->m_sockaddr_union = buffer.m_sockaddr_union;
@@ -1122,6 +1108,8 @@ size_t buffered_input_stream::do_read(char* buffer, size_t size, int delim,
                                       std::error_code& ec) noexcept
 {
     REALM_ASSERT(!m_socket.m_read_oper);
+    if (m_socket.ensure_blocking_mode(ec))
+        return 0;
     char* out_begin = buffer;
     char* out_end = buffer + size;
     for (;;) {
@@ -1145,7 +1133,7 @@ size_t buffered_input_stream::do_read(char* buffer, size_t size, int delim,
             *out_begin++ = *m_begin++; // Transfer delimiter
             break;
         }
-        size_t m = m_socket.read_some(m_buffer.get(), s_buffer_size, ec);
+        size_t m = m_socket.do_read_some(m_buffer.get(), s_buffer_size, ec);
         if (REALM_UNLIKELY(ec))
             return out_begin - buffer;
         REALM_ASSERT(m > 0);
@@ -1192,7 +1180,8 @@ void buffered_input_stream::read_oper_base::proceed() noexcept
     REALM_ASSERT(!m_error_code);
     REALM_ASSERT(m_stream.m_begin == m_stream.m_end);
     REALM_ASSERT(m_out_curr < m_out_end);
-    size_t n = m_stream.m_socket.read_some(m_stream.m_buffer.get(), s_buffer_size, m_error_code);
+    size_t n = m_stream.m_socket.do_read_some(m_stream.m_buffer.get(), s_buffer_size,
+                                              m_error_code);
     if (REALM_UNLIKELY(m_error_code)) {
         complete = true;
         return;
@@ -1211,7 +1200,7 @@ void deadline_timer::cancel() noexcept
         if (!m_wait_oper->complete)
             m_service.m_impl->cancel_incomplete_wait_oper(m_wait_oper);
         m_wait_oper->canceled = true;
-        m_wait_oper = 0;
+        m_wait_oper = nullptr;
     }
 }
 

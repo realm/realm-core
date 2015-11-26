@@ -246,17 +246,20 @@ TEST(UTF8_Compare_Core_utf8_zero)
     CHECK_EQUAL(false, utf8_compare(StringData("a\0\0", 3), StringData("a\0", 2)));
 }
 
-template<class Int> struct IntChar {
+template<class Int>
+struct IntChar {
     typedef Int int_type;
     Int m_value;
 };
 
-template<class Int> bool operator<(IntChar<Int> a, IntChar<Int> b)
+template<class Int>
+bool operator<(IntChar<Int> a, IntChar<Int> b)
 {
     return a.m_value < b.m_value;
 }
 
-template<class Char, class Int> struct IntCharTraits: private std::char_traits<Char> {
+template<class Char, class Int>
+struct IntCharTraits: private std::char_traits<Char> {
     typedef Char char_type;
     typedef Int  int_type;
     typedef typename std::char_traits<Char>::off_type off_type;
@@ -335,7 +338,8 @@ std::string encode_8bit_hex(const std::string& bin)
 }
 
 
-template<class String16> String16 decode_16bit_hex(const std::string& hex)
+template<class String16>
+String16 decode_16bit_hex(const std::string& hex)
 {
     String16 s;
     s.reserve(hex.size() / 4);
@@ -361,7 +365,8 @@ template<class String16> String16 decode_16bit_hex(const std::string& hex)
     return s;
 }
 
-template<class String16> std::string encode_16bit_hex(const String16& bin)
+template<class String16>
+std::string encode_16bit_hex(const String16& bin)
 {
     std::string s;
     s.reserve(bin.size() * 4);
@@ -380,7 +385,8 @@ template<class String16> std::string encode_16bit_hex(const String16& bin)
 }
 
 
-template<class String16> String16 utf8_to_utf16(const std::string& s)
+template<class String16>
+String16 utf8_to_utf16(const std::string& s)
 {
     typedef typename String16::traits_type Traits16;
     typedef typename Traits16::char_type   Char16;
@@ -400,7 +406,8 @@ template<class String16> String16 utf8_to_utf16(const std::string& s)
     return String16(utf16_buf.get(), out_begin);
 }
 
-template<class String16> std::string utf16_to_utf8(const String16& s)
+template<class String16>
+std::string utf16_to_utf8(const String16& s)
 {
     typedef typename String16::traits_type Traits16;
     typedef typename Traits16::char_type   Char16;
@@ -431,7 +438,8 @@ size_t find_buf_size_utf8_to_utf16(const std::string& s)
     return size;
 }
 
-template<class String16> size_t find_buf_size_utf16_to_utf8(const String16& s)
+template<class String16>
+size_t find_buf_size_utf16_to_utf8(const String16& s)
 {
     typedef typename String16::traits_type Traits16;
     typedef typename Traits16::char_type   Char16;

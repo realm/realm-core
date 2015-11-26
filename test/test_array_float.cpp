@@ -42,7 +42,8 @@ using test_util::unit_test::TestResults;
 
 namespace {
 
-template<class T, size_t N> inline size_t size_of_array(T(&)[N])
+template<class T, size_t N>
+inline size_t size_of_array(T(&)[N])
 {
     return N;
 }
@@ -73,7 +74,7 @@ const size_t num_double_values = size_of_array(double_values);
 
 // TODO: Add test of full range of floats.
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_AddGet(TestResults& test_results, T values[], size_t num_values)
 {
     A f(Allocator::get_default());
@@ -102,7 +103,7 @@ TEST(ArrayDouble_AddGet)
 }
 
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_AddManyValues(TestResults& test_results)
 {
     A f(Allocator::get_default());
@@ -133,7 +134,7 @@ TEST(ArrayDouble_AddManyValues)
     BasicArray_AddManyValues<ArrayDouble, double>(test_results);
 }
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Delete(TestResults& test_results)
 {
     A f(Allocator::get_default());
@@ -182,7 +183,7 @@ TEST(ArrayDouble_Delete)
 }
 
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Set(TestResults& test_results, T values[], size_t num_values)
 {
     A f(Allocator::get_default());
@@ -215,7 +216,7 @@ TEST(ArrayDouble_Set)
 }
 
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Insert(TestResults& test_results)
 {
     A f(Allocator::get_default());
@@ -265,7 +266,7 @@ TEST(ArrayDouble_Insert)
 
 #if 0
 // sum() is unused by other classes
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Sum(TestResults& test_results)
 {
     A f(Allocator::get_default());
@@ -301,7 +302,7 @@ TEST(ArrayDouble_Sum)
 }
 #endif
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Minimum(TestResults& test_results)
 {
     A f(Allocator::get_default());
@@ -344,7 +345,7 @@ TEST(ArrayDouble_Minimum)
 }
 
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Maximum(TestResults& test_results)
 {
     A f(Allocator::get_default());
@@ -387,7 +388,7 @@ TEST(ArrayDouble_Maximum)
 }
 
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Find(TestResults& test_results)
 {
     A f(Allocator::get_default());
@@ -442,7 +443,7 @@ TEST(ArrayDouble_Find)
 }
 
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Count(TestResults& test_results)
 {
     A f(Allocator::get_default());
@@ -485,7 +486,7 @@ TEST(ArrayDouble_Count)
 }
 
 
-template <class A, typename T>
+template<class A, typename T>
 void BasicArray_Compare(TestResults& test_results)
 {
     A f1(Allocator::get_default()), f2(Allocator::get_default());

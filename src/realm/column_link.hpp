@@ -37,7 +37,7 @@ public:
     using LinkColumnBase::LinkColumnBase;
     ~LinkColumn() noexcept override;
 
-    static ref_type create(Allocator&, std::size_t size = 0);
+    static ref_type create(Allocator&, size_t size = 0);
 
     bool is_nullable() const noexcept override;
 
@@ -49,36 +49,39 @@ public:
     /// `insert_link(realm::npos)`. set_link() returns the original link, with
     /// `realm::npos` indicating that it was null.
 
-    std::size_t get_link(std::size_t row_ndx) const noexcept;
-    bool is_null(std::size_t row_ndx) const noexcept override;
-    bool is_null_link(std::size_t row_ndx) const noexcept;
-    std::size_t set_link(std::size_t row_ndx, std::size_t target_row_ndx);
-    void set_null(std::size_t row_ndx) override;
-    void nullify_link(std::size_t row_ndx);
-    void insert_link(std::size_t row_ndx, std::size_t target_row_ndx);
-    void insert_null_link(std::size_t row_ndx);
+    size_t get_link(size_t row_ndx) const noexcept;
+    bool is_null(size_t row_ndx) const noexcept override;
+    bool is_null_link(size_t row_ndx) const noexcept;
+    size_t set_link(size_t row_ndx, size_t target_row_ndx);
+    void set_null(size_t row_ndx) override;
+    void nullify_link(size_t row_ndx);
+    void insert_link(size_t row_ndx, size_t target_row_ndx);
+    void insert_null_link(size_t row_ndx);
 
     //@}
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
-    void clear(std::size_t, bool) override;
-    void cascade_break_backlinks_to(std::size_t, CascadeState&) override;
-    void cascade_break_backlinks_to_all_rows(std::size_t, CascadeState&) override;
+    void swap_rows(size_t, size_t) override;
+    void clear(size_t, bool) override;
+    void cascade_break_backlinks_to(size_t, CascadeState&) override;
+    void cascade_break_backlinks_to_all_rows(size_t, CascadeState&) override;
 
 #ifdef REALM_DEBUG
-    void verify(const Table&, std::size_t) const override;
+    void verify(const Table&, size_t) const override;
 #endif
 
 protected:
     friend class BacklinkColumn;
-    void do_nullify_link(std::size_t row_ndx, std::size_t old_target_row_ndx) override;
-    void do_update_link(std::size_t row_ndx, std::size_t old_target_row_ndx,
-                        std::size_t new_target_row_ndx) override;
+    void do_nullify_link(size_t row_ndx, size_t old_target_row_ndx) override;
+    void do_update_link(size_t row_ndx, size_t old_target_row_ndx,
+                        size_t new_target_row_ndx) override;
+    void do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
+                      size_t target_row_ndx_2) override;
 
 private:
-    void remove_backlinks(std::size_t row_ndx);
+    void remove_backlinks(size_t row_ndx);
 };
 
 
@@ -93,32 +96,32 @@ inline bool LinkColumn::is_nullable() const noexcept
     return true;
 }
 
-inline ref_type LinkColumn::create(Allocator& alloc, std::size_t size)
+inline ref_type LinkColumn::create(Allocator& alloc, size_t size)
 {
     return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
 }
 
-inline bool LinkColumn::is_null(std::size_t row_ndx) const noexcept
+inline bool LinkColumn::is_null(size_t row_ndx) const noexcept
 {
     // Null is represented by zero
     return LinkColumnBase::get(row_ndx) == 0;
 }
 
-inline std::size_t LinkColumn::get_link(std::size_t row_ndx) const noexcept
+inline size_t LinkColumn::get_link(size_t row_ndx) const noexcept
 {
     // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
     return to_size_t(LinkColumnBase::get(row_ndx)) - size_t(1);
 }
 
-inline bool LinkColumn::is_null_link(std::size_t row_ndx) const noexcept
+inline bool LinkColumn::is_null_link(size_t row_ndx) const noexcept
 {
     return is_null(row_ndx);
 }
 
-inline std::size_t LinkColumn::set_link(std::size_t row_ndx, std::size_t target_row_ndx)
+inline size_t LinkColumn::set_link(size_t row_ndx, size_t target_row_ndx)
 {
     int_fast64_t old_value = LinkColumnBase::get(row_ndx);
-    std::size_t old_target_row_ndx = to_size_t(old_value) - size_t(1);
+    size_t old_target_row_ndx = to_size_t(old_value) - size_t(1);
     if (old_value != 0)
         m_backlink_column->remove_one_backlink(old_target_row_ndx, row_ndx); // Throws
 
@@ -141,7 +144,7 @@ inline void LinkColumn::nullify_link(size_t row_ndx)
     set_null(row_ndx); // Throws
 }
 
-inline void LinkColumn::insert_link(std::size_t row_ndx, std::size_t target_row_ndx)
+inline void LinkColumn::insert_link(size_t row_ndx, size_t target_row_ndx)
 {
     int_fast64_t value = int_fast64_t(size_t(1) + target_row_ndx);
     LinkColumnBase::insert(row_ndx, value); // Throws
@@ -155,11 +158,27 @@ inline void LinkColumn::insert_null_link(size_t row_ndx)
     insert_link(row_ndx, realm::npos); // Throws
 }
 
-inline void LinkColumn::do_update_link(std::size_t row_ndx, std::size_t,
-                                       std::size_t new_target_row_ndx)
+inline void LinkColumn::do_update_link(size_t row_ndx, size_t,
+                                       size_t new_target_row_ndx)
 {
     // Row pos is offset by one, to allow null refs
     LinkColumnBase::set(row_ndx, new_target_row_ndx + 1);
+}
+
+inline void LinkColumn::do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
+                                     size_t target_row_ndx_2)
+{
+    // Row pos is offset by one, to allow null refs
+    ++target_row_ndx_1;
+    ++target_row_ndx_2;
+
+    size_t value = LinkColumnBase::get(row_ndx);
+    if (value == target_row_ndx_1) {
+        LinkColumnBase::set(row_ndx, target_row_ndx_2);
+    }
+    else if (value == target_row_ndx_2) {
+        LinkColumnBase::set(row_ndx, target_row_ndx_1);
+    }
 }
 
 } //namespace realm

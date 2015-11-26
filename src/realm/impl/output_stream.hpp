@@ -38,14 +38,17 @@ public:
     OutputStream(std::ostream&);
     ~OutputStream() noexcept;
 
-    size_t get_pos() const noexcept;
+    ref_type get_ref_of_next_array() const noexcept;
 
     void write(const char* data, size_t size);
 
-    size_t write_array(const char* data, size_t size, uint_fast32_t checksum) override;
+    ref_type write_array(const char* data, size_t size, uint_fast32_t checksum) override;
+
 private:
-    std::size_t m_pos;
+    ref_type m_next_ref;
     std::ostream& m_out;
+
+    void do_write(const char* data, size_t size);
 };
 
 
@@ -55,7 +58,7 @@ private:
 // Implementation:
 
 inline OutputStream::OutputStream(std::ostream& out):
-    m_pos(0),
+    m_next_ref(0),
     m_out(out)
 {
 }
@@ -64,9 +67,9 @@ inline OutputStream::~OutputStream() noexcept
 {
 }
 
-inline std::size_t OutputStream::get_pos() const noexcept
+inline size_t OutputStream::get_ref_of_next_array() const noexcept
 {
-    return m_pos;
+    return m_next_ref;
 }
 
 

@@ -13,7 +13,7 @@ ifneq ($(REALM_ENABLE_FAT_BINARIES),)
 endif
 
 ifeq ($(OS),Darwin)
-  CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++
+  CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++ -Wno-nested-anon-types
   VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
 endif
 
@@ -72,19 +72,14 @@ ifneq ($(REALM_HAVE_CONFIG),)
   libdir      = $(INSTALL_LIBDIR)
   libexecdir  = $(INSTALL_LIBEXECDIR)
   ifeq ($(ENABLE_ENCRYPTION),yes)
-    PROJECT_CFLAGS += -DREALM_ENABLE_ENCRYPTION
     ifeq ($(OS),Linux)
       PROJECT_LDFLAGS += -lcrypto
     endif
   endif
-else
-  ifneq ($(REALM_ENABLE_ALLOC_SET_ZERO),)
-    PROJECT_CFLAGS += -DREALM_ENABLE_ALLOC_SET_ZERO
-  endif
 endif
 
 ifneq ($(REALM_ANDROID),)
-  PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden -DANDROID
+  PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden
   CFLAGS_OPTIM = -Os -flto -DNDEBUG
   ifeq ($(ENABLE_ENCRYPTION),yes)
 	PROJECT_CFLAGS += -I../../openssl/include

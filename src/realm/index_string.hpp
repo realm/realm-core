@@ -34,9 +34,10 @@ class Spec;
 
 // to_str() is used by the integer index. The existing StringIndex is re-used for this
 // by making IntegerColumn convert its integers to strings by calling to_str().
-template <class T> inline StringData to_str(const T& value)
+template<class T>
+inline StringData to_str(const T& value)
 {
-    REALM_STATIC_ASSERT((std::is_same<T, int64_t>::value), "");
+    static_assert((std::is_same<T, int64_t>::value), "");
     const char* c = reinterpret_cast<const char*>(&value);
     return StringData(c, sizeof(T));
 }
@@ -46,9 +47,30 @@ inline StringData to_str(const StringData& input)
     return input;
 }
 
-inline StringData to_str(null& input)
+inline StringData to_str(null input)
 {
     return input;
+}
+
+inline StringData to_str(float)
+{
+    REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
+}
+
+inline StringData to_str(double)
+{
+    REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on double not supported
+}
+
+template<class T>
+inline StringData to_str(const util::Optional<T>& value)
+{
+    if (value) {
+        return to_str(*value);
+    }
+    else {
+        return to_str(null{});
+    }
 }
 
 // todo, should be removed
@@ -60,7 +82,7 @@ inline StringData to_str(const char* value)
 class StringIndex {
 public:
     StringIndex(ColumnBase* target_column, Allocator&);
-    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, ColumnBase* target_column,
+    StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, ColumnBase* target_column,
                 bool allow_duplicate_values, Allocator&);
     ~StringIndex() noexcept {}
     void set_target(ColumnBase* target_column) noexcept;
@@ -70,11 +92,11 @@ public:
     void destroy() noexcept;
     void detach();
     bool is_attached() const noexcept;
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept;
-    std::size_t get_ndx_in_parent() const noexcept;
-    void set_ndx_in_parent(std::size_t ndx_in_parent) noexcept;
-    void update_from_parent(std::size_t old_baseline) noexcept;
-    void refresh_accessor_tree(std::size_t, const Spec&);
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept;
+    size_t get_ndx_in_parent() const noexcept;
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
+    void update_from_parent(size_t old_baseline) noexcept;
+    void refresh_accessor_tree(size_t, const Spec&);
     ref_type get_ref() const noexcept;
 
     // StringIndex interface:
@@ -84,35 +106,49 @@ public:
 
     bool is_empty() const;
 
-    template <class T> void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
-    template <class T> void set(size_t row_ndx, T new_value);
-    template <class T> void erase(size_t row_ndx, bool is_last);
+    template<class T>
+    void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
+    template<class T>
+    void insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append);
 
-    template <class T> size_t find_first(T value) const
+    template<class T>
+    void set(size_t row_ndx, T new_value);
+    template<class T>
+    void set(size_t row_ndx, util::Optional<T> new_value);
+
+    template<class T>
+    void erase(size_t row_ndx, bool is_last);
+
+    template<class T>
+    size_t find_first(T value) const
     {
         // Use direct access method
         return m_array->index_string_find_first(to_str(value), m_target_column);
     }
 
-    template <class T> void find_all(IntegerColumn& result, T value) const
+    template<class T>
+    void find_all(IntegerColumn& result, T value) const
     {
         // Use direct access method
         return m_array->index_string_find_all(result, to_str(value), m_target_column);
     }
 
-    template <class T> FindRes find_all(T value, ref_type& ref) const
+    template<class T>
+    FindRes find_all(T value, ref_type& ref) const
     {
         // Use direct access method
         return m_array->index_string_find_all_no_copy(to_str(value), ref, m_target_column);
     }
 
-    template <class T> size_t count(T value) const
+    template<class T>
+    size_t count(T value) const
     {
         // Use direct access method
         return m_array->index_string_count(to_str(value), m_target_column);
     }
 
-    template <class T> void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
+    template<class T>
+    void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
     {
         do_update_ref(to_str(value), old_row_ndx, new_row_ndx, 0);
     }
@@ -201,7 +237,7 @@ inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc):
 {
 }
 
-inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
                                 ColumnBase* target_column,
                                 bool deny_duplicate_values, Allocator& alloc):
     m_array(new Array(alloc)),
@@ -215,7 +251,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t n
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
     m_array(create_node(alloc, false)), // Throws
-    m_target_column(0),
+    m_target_column(nullptr),
     m_deny_duplicate_values(false)
 {
 }
@@ -280,7 +316,8 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
     return create_key(str.substr(offset));
 }
 
-template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
+template<class T>
+void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
 {
     REALM_ASSERT_3(row_ndx, !=, npos);
 
@@ -300,7 +337,19 @@ template <class T> void StringIndex::insert(size_t row_ndx, T value, size_t num_
     }
 }
 
-template <class T> void StringIndex::set(size_t row_ndx, T new_value)
+template<class T>
+void StringIndex::insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append)
+{
+    if (value) {
+        insert(row_ndx, *value, num_rows, is_append);
+    }
+    else {
+        insert(row_ndx, null{}, num_rows, is_append);
+    }
+}
+
+template<class T>
+void StringIndex::set(size_t row_ndx, T new_value)
 {
     StringConversionBuffer buffer;
     StringData old_value = get(row_ndx, buffer);
@@ -317,7 +366,19 @@ template <class T> void StringIndex::set(size_t row_ndx, T new_value)
     }
 }
 
-template <class T> void StringIndex::erase(size_t row_ndx, bool is_last)
+template<class T>
+void StringIndex::set(size_t row_ndx, util::Optional<T> new_value)
+{
+    if (new_value) {
+        set(row_ndx, *new_value);
+    }
+    else {
+        set(row_ndx, null{});
+    }
+}
+
+template<class T>
+void StringIndex::erase(size_t row_ndx, bool is_last)
 {
     StringConversionBuffer buffer;
     StringData value = get(row_ndx, buffer);
@@ -355,7 +416,7 @@ bool StringIndex::is_attached() const noexcept
 }
 
 inline
-void StringIndex::refresh_accessor_tree(std::size_t, const Spec&)
+void StringIndex::refresh_accessor_tree(size_t, const Spec&)
 {
     m_array->init_from_parent();
 }
@@ -367,25 +428,25 @@ ref_type StringIndex::get_ref() const noexcept
 }
 
 inline
-void StringIndex::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept
+void StringIndex::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
 {
     m_array->set_parent(parent, ndx_in_parent);
 }
 
 inline
-std::size_t StringIndex::get_ndx_in_parent() const noexcept
+size_t StringIndex::get_ndx_in_parent() const noexcept
 {
     return m_array->get_ndx_in_parent();
 }
 
 inline
-void StringIndex::set_ndx_in_parent(std::size_t ndx_in_parent) noexcept
+void StringIndex::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
     m_array->set_ndx_in_parent(ndx_in_parent);
 }
 
 inline
-void StringIndex::update_from_parent(std::size_t old_baseline) noexcept
+void StringIndex::update_from_parent(size_t old_baseline) noexcept
 {
     m_array->update_from_parent(old_baseline);
 }

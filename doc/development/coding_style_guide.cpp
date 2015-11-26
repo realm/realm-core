@@ -90,7 +90,8 @@ namespace my_namespace {
 
 // A Class name uses CamelCase with uppercase initial.
 
-template<class T> class MyClass: public Base {
+template<class T>
+class MyClass: public Base {
 public:
     MyClass(...):
         Base(...),

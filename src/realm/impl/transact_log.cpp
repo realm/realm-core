@@ -20,43 +20,19 @@ TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& st
 
 bool TransactLogEncoder::select_table(size_t group_level_ndx, size_t levels, const size_t* path)
 {
-    const size_t* p = path;
-    const size_t* end = path + (levels * 2);
-
-    // The point with "chunking" here is to avoid reserving
-    // very large chunks in the case of very long paths.
-    const int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
-    char* buf = reserve(1 + (1 + max_elems_per_chunk) * max_enc_bytes_per_int); // Throws
-
-    *buf++ = char(instr_SelectTable);
-    buf = encode_int(buf, levels);
-    buf = encode_int(buf, group_level_ndx);
-
-    if (p == end)
-        goto good;
-
-    for (;;) {
-        for (int i = 0; i < max_elems_per_chunk; ++i) {
-            buf = encode_int(buf, *p++);
-            if (p == end)
-                goto good;
-        }
-        buf = reserve(max_elems_per_chunk * max_enc_bytes_per_int); // Throws
-    }
-good:
-    advance(buf);
+    const size_t* path_end = path + (levels * 2);
+    append_variable_size_instr(instr_SelectTable, util::tuple(levels, group_level_ndx),
+                               path, path_end); // Throws
     return true;
 }
 
-void TransactLogConvenientEncoder::do_select_table(const Table* table)
+void TransactLogConvenientEncoder::record_subtable_path(const Table& table, size_t*& begin, size_t*& end)
 {
-    size_t* begin;
-    size_t* end;
     for (;;) {
         begin = m_subtab_path_buf.data();
         end   = begin + m_subtab_path_buf.size();
         typedef _impl::TableFriend tf;
-        end = tf::record_subtable_path(*table, begin, end);
+        end = tf::record_subtable_path(table, begin, end);
         if (end)
             break;
         size_t new_size = m_subtab_path_buf.size();
@@ -65,6 +41,13 @@ void TransactLogConvenientEncoder::do_select_table(const Table* table)
         m_subtab_path_buf.set_size(new_size); // Throws
     }
     std::reverse(begin, end);
+}
+
+void TransactLogConvenientEncoder::do_select_table(const Table* table)
+{
+    size_t* begin;
+    size_t* end;
+    record_subtable_path(*table, begin, end);
 
     size_t levels = (end - begin) / 2;
     m_encoder.select_table(*begin, levels, begin + 1); // Throws
@@ -118,9 +101,11 @@ void TransactLogConvenientEncoder::do_select_desc(const Descriptor& desc)
     m_selected_spec = &df::get_spec(desc);
 }
 
-bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx)
+bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx,
+                                          size_t link_target_group_level_ndx)
 {
-    simple_cmd(instr_SelectLinkList, util::tuple(col_ndx, row_ndx)); // Throws
+    append_simple_instr(instr_SelectLinkList, util::tuple(col_ndx, row_ndx,
+                                                          link_target_group_level_ndx)); // Throws
     return true;
 }
 
@@ -130,7 +115,16 @@ void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
     select_table(list.m_origin_table.get());
     size_t col_ndx = list.m_origin_column.m_column_ndx;
     size_t row_ndx = list.get_origin_row_index();
-    m_encoder.select_link_list(col_ndx, row_ndx); // Throws
+
+    size_t* link_target_path_begin;
+    size_t* link_target_path_end;
+    record_subtable_path(list.m_origin_column.get_target_table(), link_target_path_begin,
+                         link_target_path_end);
+    size_t link_target_levels = (link_target_path_end - link_target_path_begin) / 2;
+    static_cast<void>(link_target_levels);
+    REALM_ASSERT_3(link_target_levels, ==, 0);
+
+    m_encoder.select_link_list(col_ndx, row_ndx, link_target_path_begin[0]); // Throws
     m_selected_link_list = &list;
 }
 

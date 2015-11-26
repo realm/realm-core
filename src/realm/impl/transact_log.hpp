@@ -46,14 +46,15 @@ enum Instruction {
     instr_InsertGroupLevelTable =  1,
     instr_EraseGroupLevelTable  =  2, // Remove columnless table from group
     instr_RenameGroupLevelTable =  3,
+    instr_MoveGroupLevelTable   = 45,
     instr_SelectTable           =  4,
     instr_SetInt                =  5,
-    instr_SetIntUnique          = 30,
+    instr_SetIntUnique          = 31,
     instr_SetBool               =  6,
     instr_SetFloat              =  7,
     instr_SetDouble             =  8,
     instr_SetString             =  9,
-    instr_SetStringUnique       = 31,
+    instr_SetStringUnique       = 32,
     instr_SetBinary             = 10,
     instr_SetDateTime           = 11,
     instr_SetTable              = 12,
@@ -61,29 +62,33 @@ enum Instruction {
     instr_SetLink               = 14,
     instr_NullifyLink           = 15, // Set link to null due to target being erased
     instr_SetNull               = 16,
+    instr_InsertSubstring       = 43,                                                      // FIXME: Reenumerate
+    instr_EraseFromString       = 44,                                                      // FIXME: Reenumerate
     instr_InsertEmptyRows       = 17,
     instr_EraseRows             = 18, // Remove (multiple) rows
-    instr_ClearTable            = 19, // Remove all rows in selected table
-    instr_OptimizeTable         = 20,
-    instr_SelectDescriptor      = 21, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 22, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 23, // do, but for a link-type column
-    instr_InsertNullableColumn  = 24, // Insert nullable column
-    instr_EraseColumn           = 25, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 26, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 27, // Rename column in selected descriptor
-    instr_AddSearchIndex        = 28, // Add a search index to a column
-    instr_RemoveSearchIndex     = 29, // Remove a search index from a column
-    instr_SetLinkType           = 32, // Strong/weak
-    instr_SelectLinkList        = 33,
-    instr_LinkListSet           = 34, // Assign to link list entry
-    instr_LinkListInsert        = 35, // Insert entry into link list
-    instr_LinkListMove          = 36, // Move an entry within a link list
-    instr_LinkListSwap          = 37, // Swap two entries within a link list
-    instr_LinkListErase         = 38, // Remove an entry from a link list
-    instr_LinkListNullify       = 39, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear         = 40, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 41, // Assign to link list entry
+    instr_SwapRows              = 19,
+    instr_ClearTable            = 20, // Remove all rows in selected table
+    instr_OptimizeTable         = 21,
+    instr_SelectDescriptor      = 22, // Select descriptor from currently selected root table
+    instr_InsertColumn          = 23, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn      = 24, // do, but for a link-type column
+    instr_InsertNullableColumn  = 25, // Insert nullable column
+    instr_EraseColumn           = 26, // Remove column from selected descriptor
+    instr_EraseLinkColumn       = 27, // Remove link-type column from selected descriptor
+    instr_RenameColumn          = 28, // Rename column in selected descriptor
+    instr_MoveColumn            = 46, // Move column in selected descriptor                // FIXME: Reenumerate
+    instr_AddSearchIndex        = 29, // Add a search index to a column
+    instr_RemoveSearchIndex     = 30, // Remove a search index from a column
+    instr_SetLinkType           = 33, // Strong/weak
+    instr_SelectLinkList        = 34,
+    instr_LinkListSet           = 35, // Assign to link list entry
+    instr_LinkListInsert        = 36, // Insert entry into link list
+    instr_LinkListMove          = 37, // Move an entry within a link list
+    instr_LinkListSwap          = 38, // Swap two entries within a link list
+    instr_LinkListErase         = 39, // Remove an entry from a link list
+    instr_LinkListNullify       = 40, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear         = 41, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 42, // Assign to link list entry
 };
 
 
@@ -97,7 +102,7 @@ public:
     /// \param n The required amount of contiguous free space. Must be
     /// small (probably not greater than 1024)
     /// \param n Must be small (probably not greater than 1024)
-    virtual void transact_log_reserve(std::size_t size, char** out_free_begin, char** out_free_end) = 0;
+    virtual void transact_log_reserve(size_t size, char** out_free_begin, char** out_free_end) = 0;
 
     /// Copy the specified data into the transaction log buffer. This
     /// function should be called only when the specified data does
@@ -107,13 +112,13 @@ public:
     /// This method must update `out_begin` and
     /// `out_end` such that, upon return, they still
     /// refer to a (possibly empty) chunk of free space.
-    virtual void transact_log_append(const char* data, std::size_t size, char** out_free_begin, char** out_free_end) = 0;
+    virtual void transact_log_append(const char* data, size_t size, char** out_free_begin, char** out_free_end) = 0;
 };
 
 class TransactLogBufferStream: public TransactLogStream {
 public:
-    void transact_log_reserve(std::size_t size, char** out_free_begin, char** out_free_end) override;
-    void transact_log_append(const char* data, std::size_t size, char** out_free_begin, char** out_free_end) override;
+    void transact_log_reserve(size_t size, char** out_free_begin, char** out_free_end) override;
+    void transact_log_append(const char* data, size_t size, char** out_free_begin, char** out_free_end) override;
 
     const char* transact_log_data() const;
 
@@ -121,60 +126,67 @@ public:
 };
 
 
+// LCOV_EXCL_START (because the NullInstructionObserver is trivial)
 class NullInstructionObserver {
 public:
     /// The following methods are also those that TransactLogParser expects
     /// to find on the `InstructionHandler`.
 
     // No selection needed:
-    bool select_table(std::size_t, std::size_t, const std::size_t*) { return true; }
-    bool select_descriptor(std::size_t, const std::size_t*) { return true; }
-    bool select_link_list(std::size_t, std::size_t) { return true; }
-    bool insert_group_level_table(std::size_t, std::size_t, StringData) { return true; }
-    bool erase_group_level_table(std::size_t, std::size_t) { return true; }
-    bool rename_group_level_table(std::size_t, StringData) { return true; }
+    bool select_table(size_t, size_t, const size_t*) { return true; }
+    bool select_descriptor(size_t, const size_t*) { return true; }
+    bool select_link_list(size_t, size_t, size_t) { return true; }
+    bool insert_group_level_table(size_t, size_t, StringData) { return true; }
+    bool erase_group_level_table(size_t, size_t) { return true; }
+    bool rename_group_level_table(size_t, StringData) { return true; }
+    bool move_group_level_table(size_t, size_t) { return true; }
 
     // Must have table selected:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
+    bool swap_rows(size_t, size_t) { return true; }
     bool clear_table() { return true; }
-    bool set_int(std::size_t, std::size_t, int_fast64_t) { return true; }
-    bool set_int_unique(std::size_t, std::size_t, int_fast64_t) { return true; }
-    bool set_bool(std::size_t, std::size_t, bool) { return true; }
-    bool set_float(std::size_t, std::size_t, float) { return true; }
-    bool set_double(std::size_t, std::size_t, double) { return true; }
-    bool set_string(std::size_t, std::size_t, StringData) { return true; }
-    bool set_string_unique(std::size_t, std::size_t, StringData) { return true; }
-    bool set_binary(std::size_t, std::size_t, BinaryData) { return true; }
-    bool set_date_time(std::size_t, std::size_t, DateTime) { return true; }
-    bool set_table(std::size_t, std::size_t) { return true; }
-    bool set_mixed(std::size_t, std::size_t, const Mixed&) { return true; }
-    bool set_link(std::size_t, std::size_t, std::size_t) { return true; }
-    bool set_null(std::size_t, std::size_t) { return true; }
-    bool nullify_link(std::size_t, std::size_t) { return true; }
+    bool set_int(size_t, size_t, int_fast64_t) { return true; }
+    bool set_int_unique(size_t, size_t, int_fast64_t) { return true; }
+    bool set_bool(size_t, size_t, bool) { return true; }
+    bool set_float(size_t, size_t, float) { return true; }
+    bool set_double(size_t, size_t, double) { return true; }
+    bool set_string(size_t, size_t, StringData) { return true; }
+    bool set_string_unique(size_t, size_t, StringData) { return true; }
+    bool set_binary(size_t, size_t, BinaryData) { return true; }
+    bool set_date_time(size_t, size_t, DateTime) { return true; }
+    bool set_table(size_t, size_t) { return true; }
+    bool set_mixed(size_t, size_t, const Mixed&) { return true; }
+    bool set_link(size_t, size_t, size_t, size_t) { return true; }
+    bool set_null(size_t, size_t) { return true; }
+    bool nullify_link(size_t, size_t, size_t) { return true; }
+    bool insert_substring(size_t, size_t, size_t, StringData) { return true; }
+    bool erase_substring(size_t, size_t, size_t, size_t) { return true; }
     bool optimize_table() { return true; };
 
     // Must have descriptor selected:
-    bool insert_link_column(std::size_t, DataType, StringData, std::size_t, std::size_t) { return true; }
-    bool insert_column(std::size_t, DataType, StringData, bool) { return true; }
-    bool erase_link_column(std::size_t, std::size_t, std::size_t) { return true; }
-    bool erase_column(std::size_t) { return true; }
-    bool rename_column(std::size_t, StringData) { return true; }
-    bool add_search_index(std::size_t) { return true; }
-    bool remove_search_index(std::size_t) { return true; }
-    bool set_link_type(std::size_t, LinkType) { return true; }
+    bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return true; }
+    bool insert_column(size_t, DataType, StringData, bool) { return true; }
+    bool erase_link_column(size_t, size_t, size_t) { return true; }
+    bool erase_column(size_t) { return true; }
+    bool rename_column(size_t, StringData) { return true; }
+    bool move_column(size_t, size_t) { return true; }
+    bool add_search_index(size_t) { return true; }
+    bool remove_search_index(size_t) { return true; }
+    bool set_link_type(size_t, LinkType) { return true; }
 
     // Must have linklist selected:
-    bool link_list_set(std::size_t, std::size_t) { return true; }
-    bool link_list_insert(std::size_t, std::size_t) { return true; }
-    bool link_list_move(std::size_t, std::size_t) { return true; }
-    bool link_list_swap(std::size_t, std::size_t) { return true; }
-    bool link_list_erase(std::size_t) { return true; }
-    bool link_list_nullify(std::size_t) { return true; }
-    bool link_list_clear(std::size_t) { return true; }
+    bool link_list_set(size_t, size_t) { return true; }
+    bool link_list_insert(size_t, size_t) { return true; }
+    bool link_list_move(size_t, size_t) { return true; }
+    bool link_list_swap(size_t, size_t) { return true; }
+    bool link_list_erase(size_t) { return true; }
+    bool link_list_nullify(size_t) { return true; }
+    bool link_list_clear(size_t) { return true; }
 
     void parse_complete() {}
 };
+// LCOV_EXCL_STOP (NullInstructionObserver)
 
 
 /// See TransactLogConvenientEncoder for information about the meaning of the
@@ -185,54 +197,60 @@ public:
     /// to find on the `InstructionHandler`.
 
     // No selection needed:
-    bool select_table(std::size_t group_level_ndx, std::size_t levels, const std::size_t* path);
-    bool select_descriptor(std::size_t levels, const std::size_t* path);
-    bool select_link_list(std::size_t col_ndx, std::size_t row_ndx);
-    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData name);
-    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables);
-    bool rename_group_level_table(std::size_t table_ndx, StringData new_name);
+    bool select_table(size_t group_level_ndx, size_t levels, const size_t* path);
+    bool select_descriptor(size_t levels, const size_t* path);
+    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx);
+    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name);
+    bool erase_group_level_table(size_t table_ndx, size_t num_tables);
+    bool rename_group_level_table(size_t table_ndx, StringData new_name);
+    bool move_group_level_table(size_t table_ndx_1, size_t table_ndx_2);
 
     /// Must have table selected.
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
                            bool unordered);
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool unordered);
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     bool clear_table();
-    bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t);
-    bool set_int_unique(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t);
-    bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool);
-    bool set_float(std::size_t col_ndx, std::size_t row_ndx, float);
-    bool set_double(std::size_t col_ndx, std::size_t row_ndx, double);
-    bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData);
-    bool set_string_unique(std::size_t col_ndx, std::size_t row_ndx, StringData);
-    bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData);
-    bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime);
-    bool set_table(std::size_t col_ndx, std::size_t row_ndx);
-    bool set_mixed(std::size_t col_ndx, std::size_t row_ndx, const Mixed&);
-    bool set_link(std::size_t col_ndx, std::size_t row_ndx, std::size_t);
-    bool set_null(std::size_t col_ndx, std::size_t row_ndx);
-    bool nullify_link(std::size_t col_ndx, std::size_t row_ndx);
+
+    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t);
+    bool set_int_unique(size_t col_ndx, size_t row_ndx, int_fast64_t);
+    bool set_bool(size_t col_ndx, size_t row_ndx, bool);
+    bool set_float(size_t col_ndx, size_t row_ndx, float);
+    bool set_double(size_t col_ndx, size_t row_ndx, double);
+    bool set_string(size_t col_ndx, size_t row_ndx, StringData);
+    bool set_string_unique(size_t col_ndx, size_t row_ndx, StringData);
+    bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData);
+    bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime);
+    bool set_table(size_t col_ndx, size_t row_ndx);
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&);
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t, size_t target_group_level_ndx);
+    bool set_null(size_t col_ndx, size_t row_ndx);
+    bool nullify_link(size_t col_ndx, size_t row_ndx, size_t target_group_level_ndx);
+    bool insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
+    bool erase_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size);
     bool optimize_table();
 
     // Must have descriptor selected:
-    bool insert_link_column(std::size_t col_ndx, DataType, StringData name, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx);
-    bool insert_column(std::size_t col_ndx, DataType, StringData name, bool nullable = false);
-    bool erase_link_column(std::size_t col_ndx, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx);
-    bool erase_column(std::size_t col_ndx);
-    bool rename_column(std::size_t col_ndx, StringData new_name);
-    bool add_search_index(std::size_t col_ndx);
-    bool remove_search_index(std::size_t col_ndx);
-    bool set_link_type(std::size_t col_ndx, LinkType);
+    bool insert_link_column(size_t col_ndx, DataType, StringData name, size_t link_target_table_ndx, size_t backlink_col_ndx);
+    bool insert_column(size_t col_ndx, DataType, StringData name, bool nullable = false);
+    bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx);
+    bool erase_column(size_t col_ndx);
+    bool rename_column(size_t col_ndx, StringData new_name);
+    bool move_column(size_t col_ndx_1, size_t col_ndx_2);
+    bool add_search_index(size_t col_ndx);
+    bool remove_search_index(size_t col_ndx);
+    bool set_link_type(size_t col_ndx, LinkType);
 
     // Must have linklist selected:
-    bool link_list_set(std::size_t link_ndx, std::size_t value);
+    bool link_list_set(size_t link_ndx, size_t value);
     bool link_list_set_all(const IntegerColumn& values);
-    bool link_list_insert(std::size_t link_ndx, std::size_t value);
-    bool link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx);
-    bool link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx);
-    bool link_list_erase(std::size_t link_ndx);
-    bool link_list_nullify(std::size_t link_ndx);
-    bool link_list_clear(std::size_t old_list_size);
+    bool link_list_insert(size_t link_ndx, size_t value);
+    bool link_list_move(size_t old_link_ndx, size_t new_link_ndx);
+    bool link_list_swap(size_t link1_ndx, size_t link2_ndx);
+    bool link_list_erase(size_t link_ndx);
+    bool link_list_nullify(size_t link_ndx);
+    bool link_list_clear(size_t old_list_size);
 
     /// End of methods expected by parser.
 
@@ -242,15 +260,6 @@ public:
     char* write_position() const { return m_transact_log_free_begin; }
 
 private:
-    std::size_t max_required_bytes_for_string_cmd(std::size_t string_size) const;
-    std::size_t max_required_bytes_for_string_value(std::size_t string_size) const;
-    std::size_t max_required_bytes_for_simple_cmd(std::size_t num_numbers) const;
-    std::size_t max_required_bytes_for_mixed_cmd(const Mixed& value) const;
-    std::size_t max_required_bytes_for_mixed_value(const Mixed& value) const;
-    std::size_t max_required_bytes_for_select_table(const Table*) const;
-    std::size_t max_required_bytes_for_select_desc(const Descriptor&) const;
-    std::size_t max_required_bytes_for_select_link_list(const LinkView&) const;
-
     // Make sure this is in agreement with the actual integer encoding
     // scheme (see encode_int()).
     static const int max_enc_bytes_per_int = 10;
@@ -266,53 +275,59 @@ private:
     char* m_transact_log_free_begin;
     char* m_transact_log_free_end;
 
-    char* reserve(std::size_t size);
+    char* reserve(size_t size);
     /// \param ptr Must be in the range [m_transact_log_free_begin, m_transact_log_free_end]
     void advance(char* ptr) noexcept;
-    void append(const char* data, std::size_t size);
 
-    void string_cmd(Instruction, std::size_t col_ndx, std::size_t ndx, const char* data, std::size_t size);
-    void string_value(const char* data, std::size_t size);
-    void mixed_cmd(Instruction, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
-    void mixed_value(const Mixed& value);
+    template<class L>
+    void append_simple_instr(Instruction, const util::Tuple<L>& numbers);
 
-    template <class L>
-    void simple_cmd(Instruction, const util::Tuple<L>& numbers);
+    template<class L>
+    void append_string_instr(Instruction, const util::Tuple<L>& numbers, StringData);
 
-    template <class T>
-    void append_num(T value);
+    template<class L>
+    void append_mixed_instr(Instruction, const util::Tuple<L>& numbers, const Mixed&);
 
-    template <class T>
+    template<class L, class I>
+    bool append_variable_size_instr(Instruction instr, const util::Tuple<L>& numbers,
+                                    I var_begin, I var_end);
+
+    template<class T>
     static char* encode_int(char*, T value);
     static char* encode_float(char*, float value);
     static char* encode_double(char*, double value);
-    template <class> struct EncodeNumber;
+    template<class>
+    struct EncodeNumber;
 };
 
 class TransactLogConvenientEncoder {
 public:
-    void insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData name);
-    void erase_group_level_table(std::size_t table_ndx, std::size_t num_tables);
-    void rename_group_level_table(std::size_t table_ndx, StringData new_name);
-    void insert_column(const Descriptor&, std::size_t col_ndx, DataType type, StringData name,
+    void insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name);
+    void erase_group_level_table(size_t table_ndx, size_t num_tables);
+    void rename_group_level_table(size_t table_ndx, StringData new_name);
+    void move_group_level_table(size_t table_ndx_1, size_t table_ndx_2);
+    void insert_column(const Descriptor&, size_t col_ndx, DataType type, StringData name,
                        const Table* link_target_table, bool nullable = false);
-    void erase_column(const Descriptor&, std::size_t col_ndx);
-    void rename_column(const Descriptor&, std::size_t col_ndx, StringData name);
+    void erase_column(const Descriptor&, size_t col_ndx);
+    void rename_column(const Descriptor&, size_t col_ndx, StringData name);
+    void move_column(const Descriptor&, size_t from, size_t to);
 
-    void set_int(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
-    void set_int_unique(const Table*, std::size_t col_ndx, std::size_t ndx, int_fast64_t value);
-    void set_bool(const Table*, std::size_t col_ndx, std::size_t ndx, bool value);
-    void set_float(const Table*, std::size_t col_ndx, std::size_t ndx, float value);
-    void set_double(const Table*, std::size_t col_ndx, std::size_t ndx, double value);
-    void set_string(const Table*, std::size_t col_ndx, std::size_t ndx, StringData value);
-    void set_string_unique(const Table*, std::size_t col_ndx, std::size_t ndx, StringData value);
-    void set_binary(const Table*, std::size_t col_ndx, std::size_t ndx, BinaryData value);
-    void set_date_time(const Table*, std::size_t col_ndx, std::size_t ndx, DateTime value);
-    void set_table(const Table*, std::size_t col_ndx, std::size_t ndx);
-    void set_mixed(const Table*, std::size_t col_ndx, std::size_t ndx, const Mixed& value);
-    void set_link(const Table*, std::size_t col_ndx, std::size_t ndx, std::size_t value);
-    void set_null(const Table*, std::size_t col_ndx, std::size_t ndx);
+    void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
+    void set_int_unique(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
+    void set_bool(const Table*, size_t col_ndx, size_t ndx, bool value);
+    void set_float(const Table*, size_t col_ndx, size_t ndx, float value);
+    void set_double(const Table*, size_t col_ndx, size_t ndx, double value);
+    void set_string(const Table*, size_t col_ndx, size_t ndx, StringData value);
+    void set_string_unique(const Table*, size_t col_ndx, size_t ndx, StringData value);
+    void set_binary(const Table*, size_t col_ndx, size_t ndx, BinaryData value);
+    void set_date_time(const Table*, size_t col_ndx, size_t ndx, DateTime value);
+    void set_table(const Table*, size_t col_ndx, size_t ndx);
+    void set_mixed(const Table*, size_t col_ndx, size_t ndx, const Mixed& value);
+    void set_link(const Table*, size_t col_ndx, size_t ndx, size_t value);
+    void set_null(const Table*, size_t col_ndx, size_t ndx);
     void set_link_list(const LinkView&, const IntegerColumn& values);
+    void insert_substring(const Table*, size_t col_ndx, size_t row_ndx, size_t pos, StringData);
+    void erase_substring(const Table*, size_t col_ndx, size_t row_ndx, size_t pos, size_t size);
 
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
@@ -324,17 +339,18 @@ public:
     void erase_rows(const Table*, size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool is_move_last_over);
 
-    void add_search_index(const Table*, std::size_t col_ndx);
-    void remove_search_index(const Table*, std::size_t col_ndx);
-    void set_link_type(const Table*, std::size_t col_ndx, LinkType);
+    void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
+    void add_search_index(const Table*, size_t col_ndx);
+    void remove_search_index(const Table*, size_t col_ndx);
+    void set_link_type(const Table*, size_t col_ndx, LinkType);
     void clear_table(const Table*);
     void optimize_table(const Table*);
 
-    void link_list_set(const LinkView&, std::size_t link_ndx, std::size_t value);
-    void link_list_insert(const LinkView&, std::size_t link_ndx, std::size_t value);
-    void link_list_move(const LinkView&, std::size_t old_link_ndx, std::size_t new_link_ndx);
-    void link_list_swap(const LinkView&, std::size_t link_ndx_1, std::size_t link_ndx_2);
-    void link_list_erase(const LinkView&, std::size_t link_ndx);
+    void link_list_set(const LinkView&, size_t link_ndx, size_t value);
+    void link_list_insert(const LinkView&, size_t link_ndx, size_t value);
+    void link_list_move(const LinkView&, size_t old_link_ndx, size_t new_link_ndx);
+    void link_list_swap(const LinkView&, size_t link_ndx_1, size_t link_ndx_2);
+    void link_list_erase(const LinkView&, size_t link_ndx);
     void link_list_clear(const LinkView&);
 
     //@{
@@ -346,8 +362,8 @@ public:
     /// (reactor pattern) to be explicitly notified about the implicit
     /// nullifications.
 
-    void nullify_link(const Table*, std::size_t col_ndx, std::size_t ndx);
-    void link_list_nullify(const LinkView&, std::size_t link_ndx);
+    void nullify_link(const Table*, size_t col_ndx, size_t ndx);
+    void link_list_nullify(const LinkView&, size_t link_ndx);
 
     //@}
 
@@ -365,7 +381,7 @@ protected:
 private:
     TransactLogEncoder m_encoder;
     // These are mutable because they are caches.
-    mutable util::Buffer<std::size_t> m_subtab_path_buf;
+    mutable util::Buffer<size_t> m_subtab_path_buf;
     mutable const Table*    m_selected_table;
     mutable const Spec*     m_selected_spec;
     mutable const LinkView* m_selected_link_list;
@@ -374,6 +390,7 @@ private:
     void select_desc(const Descriptor&);
     void select_link_list(const LinkView&);
     // These reset the above caches and modify them as necessary
+    void record_subtable_path(const Table&, size_t*& out_begin, size_t*& out_end);
     void do_select_table(const Table*);
     void do_select_desc(const Descriptor&);
     void do_select_link_list(const LinkView&);
@@ -393,9 +410,11 @@ public:
     /// parse() promises that the path passed by reference to
     /// InstructionHandler::select_descriptor() will remain valid
     /// during subsequent calls to all descriptor modifying functions.
-    template <class InstructionHandler> void parse(InputStream&, InstructionHandler&);
+    template<class InstructionHandler>
+    void parse(InputStream&, InstructionHandler&);
 
-    template<class InstructionHandler> void parse(NoCopyInputStream&, InstructionHandler&);
+    template<class InstructionHandler>
+    void parse(NoCopyInputStream&, InstructionHandler&);
 
 private:
     util::Buffer<char> m_input_buffer;
@@ -413,16 +432,19 @@ private:
     const char* m_input_end;
     util::StringBuffer m_string_buffer;
     static const int m_max_levels = 1024;
-    util::Buffer<std::size_t> m_path;
+    util::Buffer<size_t> m_path;
 
     REALM_NORETURN void parser_error() const;
 
-    template<class InstructionHandler> void parse_one(InstructionHandler&);
+    template<class InstructionHandler>
+    void parse_one(InstructionHandler&);
     bool has_next() noexcept;
 
-    template<class T> T read_int();
+    template<class T>
+    T read_int();
 
-    void read_bytes(char* data, std::size_t size);
+    void read_bytes(char* data, size_t size);
+    BinaryData read_buffer(util::StringBuffer&, size_t size);
 
     float read_float();
     double read_double();
@@ -455,19 +477,19 @@ public:
 
 /// Implementation:
 
-inline void TransactLogBufferStream::transact_log_reserve(std::size_t n, char** inout_new_begin, char** out_new_end)
+inline void TransactLogBufferStream::transact_log_reserve(size_t n, char** inout_new_begin, char** out_new_end)
 {
     char* data = m_buffer.data();
     REALM_ASSERT(*inout_new_begin >= data);
     REALM_ASSERT(*inout_new_begin <= (data + m_buffer.size()));
-    std::size_t size = *inout_new_begin - data;
+    size_t size = *inout_new_begin - data;
     m_buffer.reserve_extra(size, n);
     data = m_buffer.data(); // May have changed
     *inout_new_begin = data + size;
     *out_new_end = data + m_buffer.size();
 }
 
-inline void TransactLogBufferStream::transact_log_append(const char* data, std::size_t size, char** out_new_begin, char** out_new_end)
+inline void TransactLogBufferStream::transact_log_append(const char* data, size_t size, char** out_new_begin, char** out_new_end)
 {
     transact_log_reserve(size, out_new_begin, out_new_end);
     *out_new_begin = std::copy(data, data + size, *out_new_begin);
@@ -499,9 +521,9 @@ inline void TransactLogConvenientEncoder::reset_selection_caches()
     m_selected_link_list  = nullptr;
 }
 
-inline char* TransactLogEncoder::reserve(std::size_t n)
+inline char* TransactLogEncoder::reserve(size_t n)
 {
-    if (std::size_t(m_transact_log_free_end - m_transact_log_free_begin) < n) {
+    if (size_t(m_transact_log_free_end - m_transact_log_free_begin) < n) {
         m_stream.transact_log_reserve(n, &m_transact_log_free_begin, &m_transact_log_free_end);
     }
     return m_transact_log_free_begin;
@@ -512,16 +534,6 @@ inline void TransactLogEncoder::advance(char* ptr) noexcept
     REALM_ASSERT_DEBUG(m_transact_log_free_begin <= ptr);
     REALM_ASSERT_DEBUG(ptr <= m_transact_log_free_end);
     m_transact_log_free_begin = ptr;
-}
-
-inline void TransactLogEncoder::append(const char* data, std::size_t size)
-{
-    if (std::size_t(m_transact_log_free_end - m_transact_log_free_begin) < size) {
-        m_stream.transact_log_append(data, size, &m_transact_log_free_begin, &m_transact_log_free_end);
-    }
-    else {
-        advance(std::copy(data, data + size, m_transact_log_free_begin));
-    }
 }
 
 
@@ -563,10 +575,10 @@ inline void TransactLogEncoder::append(const char* data, std::size_t size)
 //     int64_t       63             64             10
 //     uint64_t      64             65             10
 //
-template <class T>
+template<class T>
 char* TransactLogEncoder::encode_int(char* ptr, T value)
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<T>::is_integer, "Integer required");
+    static_assert(std::numeric_limits<T>::is_integer, "Integer required");
     bool negative = util::is_negative(value);
     if (negative) {
         // The following conversion is guaranteed by C++11 to never
@@ -585,7 +597,7 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     // number of value bits in 'unsigned').
     const int bits_per_byte = 7;
     const int max_bytes = (num_bits + (bits_per_byte-1)) / bits_per_byte;
-    REALM_STATIC_ASSERT(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
+    static_assert(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
     // An explicit constant maximum number of iterations is specified
     // in the hope that it will help the optimizer (to do loop
     // unrolling, for example).
@@ -593,17 +605,19 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     for (int i=0; i<max_bytes; ++i) {
         if (value >> (bits_per_byte-1) == 0)
             break;
-        *reinterpret_cast<uchar*>(ptr) = uchar((1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1)));
+        *reinterpret_cast<uchar*>(ptr) =
+            uchar((1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1)));
         ++ptr;
         value >>= bits_per_byte;
     }
-    *reinterpret_cast<uchar*>(ptr) = uchar(negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value);
+    *reinterpret_cast<uchar*>(ptr) =
+        uchar(negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value);
     return ++ptr;
 }
 
 inline char* TransactLogEncoder::encode_float(char* ptr, float value)
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+    static_assert(std::numeric_limits<float>::is_iec559 &&
                           sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
                           "Unsupported 'float' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
@@ -612,28 +626,29 @@ inline char* TransactLogEncoder::encode_float(char* ptr, float value)
 
 inline char* TransactLogEncoder::encode_double(char* ptr, double value)
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
+    static_assert(std::numeric_limits<double>::is_iec559 &&
                           sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
                           "Unsupported 'double' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
     return std::copy(val_ptr, val_ptr + sizeof value, ptr);
 }
 
-template <class T>
+template<class T>
 struct TransactLogEncoder::EncodeNumber {
     void operator()(T value, char** ptr)
     {
-        *ptr = encode_int(*ptr, value);
+        auto value_2 = value + 0; // Perform integral promotion
+        *ptr = encode_int(*ptr, value_2);
     }
 };
-template <>
+template<>
 struct TransactLogEncoder::EncodeNumber<float> {
     void operator()(float value, char** ptr)
     {
         *ptr = encode_float(*ptr, value);
     }
 };
-template <>
+template<>
 struct TransactLogEncoder::EncodeNumber<double> {
     void operator()(double value, char** ptr)
     {
@@ -641,23 +656,106 @@ struct TransactLogEncoder::EncodeNumber<double> {
     }
 };
 
-
-template <class L>
-void TransactLogEncoder::simple_cmd(Instruction instr, const util::Tuple<L>& numbers)
+template<class L>
+void TransactLogEncoder::append_simple_instr(Instruction instr, const util::Tuple<L>& numbers)
 {
-    char* ptr = reserve(max_required_bytes_for_simple_cmd(util::TypeCount<L>::value));
+    size_t num_numbers = util::TypeCount<L>::value;
+    size_t max_required_bytes = 1 + max_enc_bytes_per_num * num_numbers;
+    char* ptr = reserve(max_required_bytes); // Throws
     *ptr++ = char(instr);
     util::for_each<EncodeNumber>(numbers, &ptr);
     advance(ptr);
 }
 
-
-template <class T>
-void TransactLogEncoder::append_num(T value)
+template<class L>
+void TransactLogEncoder::append_string_instr(Instruction instr, const util::Tuple<L>& numbers,
+                                             StringData string)
 {
-    char* ptr = reserve(sizeof(value));
-    EncodeNumber<T>()(value, &ptr);
+    size_t num_numbers = util::TypeCount<L>::value + 1;
+    size_t max_required_bytes = 1 + max_enc_bytes_per_num * num_numbers + string.size();
+    char* ptr = reserve(max_required_bytes); // Throws
+    *ptr++ = char(instr);
+    util::for_each<EncodeNumber>(append(numbers, string.size()), &ptr);
+    ptr = std::copy(string.data(), string.data() + string.size(), ptr);
     advance(ptr);
+}
+
+template<class L>
+void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple<L>& numbers,
+                                            const Mixed& value)
+{
+    DataType type = value.get_type();
+    auto numbers_2 = append(numbers, type);
+    switch (type) {
+        case type_Int:
+            append_simple_instr(instr, append(numbers_2, value.get_int())); // Throws
+            return;
+        case type_Bool:
+            append_simple_instr(instr, append(numbers_2, value.get_bool())); // Throws
+            return;
+        case type_Float:
+            append_simple_instr(instr, append(numbers_2, value.get_float())); // Throws
+            return;
+        case type_Double:
+            append_simple_instr(instr, append(numbers_2, value.get_double())); // Throws
+            return;
+        case type_DateTime: {
+            auto value_2 = value.get_datetime().get_datetime();
+            append_simple_instr(instr, append(numbers_2, value_2)); // Throws
+            return;
+        }
+        case type_String: {
+            append_string_instr(instr, numbers_2, value.get_string()); // Throws
+            return;
+        }
+        case type_Binary: {
+            BinaryData value_2 = value.get_binary();
+            StringData value_3(value_2.data(), value_2.size());
+            append_string_instr(instr, numbers_2, value_3); // Throws
+            return;
+        }
+        case type_Table:
+            append_simple_instr(instr, numbers_2); // Throws
+            return;
+        case type_Mixed:
+            // Mixed in mixed is not possible
+            REALM_ASSERT_RELEASE(false);
+        case type_Link:
+        case type_LinkList:
+            // FIXME: Need to handle new link types here.
+            REALM_ASSERT_RELEASE(false);
+    }
+    REALM_ASSERT_RELEASE(false);
+}
+
+template<class L, class I>
+bool TransactLogEncoder::append_variable_size_instr(Instruction instr,
+                                                    const util::Tuple<L>& numbers,
+                                                    I var_begin, I var_end)
+{
+    // Space is reserved in chunks to avoid excessive over allocation.
+#ifdef REALM_DEBUG
+    const int max_numbers_per_chunk = 2; // Increase the chance of chunking in debug mode
+#else
+    const int max_numbers_per_chunk = 8;
+#endif
+    size_t num_numbers = util::TypeCount<L>::value + max_numbers_per_chunk;
+    size_t max_required_bytes = 1 + max_enc_bytes_per_num * num_numbers;
+    char* ptr = reserve(max_required_bytes); // Throws
+    *ptr++ = char(instr);
+    util::for_each<EncodeNumber>(numbers, &ptr);
+    I i = var_begin;
+    while (var_end - i > max_numbers_per_chunk) {
+        for (int j = 0; j < max_numbers_per_chunk; ++j)
+            ptr = encode_int(ptr, *i++);
+        advance(ptr);
+        size_t max_required_bytes_2 = max_enc_bytes_per_num * max_numbers_per_chunk;
+        ptr = reserve(max_required_bytes_2); // Throws
+    }
+    while (i != var_end)
+        ptr = encode_int(ptr, *i++);
+    advance(ptr);
+    return true;
 }
 
 inline
@@ -684,166 +782,113 @@ void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
 }
 
 
-inline
-void TransactLogEncoder::string_cmd(Instruction instr, std::size_t col_ndx,
-    std::size_t ndx, const char* data, std::size_t size)
+inline bool TransactLogEncoder::insert_group_level_table(size_t table_ndx, size_t num_tables,
+                                                         StringData name)
 {
-    simple_cmd(instr, util::tuple(col_ndx, ndx)); // Throws
-    string_value(data, size); // Throws
-}
-
-inline
-void TransactLogEncoder::string_value(const char* data, std::size_t size)
-{
-    char* buf = reserve(max_required_bytes_for_string_value(size));
-    buf = encode_int(buf, size);
-    buf = std::copy(data, data + (data ? size : 0), buf);
-    advance(buf);
-}
-
-inline
-void TransactLogEncoder::mixed_cmd(Instruction instr, std::size_t col_ndx,
-    std::size_t ndx, const Mixed& value)
-{
-    simple_cmd(instr, util::tuple(col_ndx, ndx));
-    mixed_value(value);
-}
-
-inline
-void TransactLogEncoder::mixed_value(const Mixed& value)
-{
-    DataType type = value.get_type();
-    append_num(int(type));
-    switch (type) {
-        case type_Int:
-            append_num(value.get_int());
-            return;
-        case type_Bool:
-            append_num(int32_t(value.get_bool()));
-            return;
-        case type_Float:
-            append_num(value.get_float());
-            return;
-        case type_Double:
-            append_num(value.get_double());
-            return;
-        case type_DateTime:
-            append_num(value.get_datetime().get_datetime());
-            return;
-        case type_String: {
-            StringData data = value.get_string();
-            string_value(data.data(), data.size());
-            return;
-        }
-        case type_Binary: {
-            BinaryData data = value.get_binary();
-            append_num(data.size());
-            append(data.data(), data.size());
-            return;
-        }
-        case type_Table:
-            return;
-        case type_Mixed:
-            REALM_ASSERT_RELEASE(false); // Mixed in mixed?
-        case type_Link:
-        case type_LinkList:
-            // FIXME: Need to handle new link types here.
-            REALM_ASSERT_RELEASE(false);
-    }
-    REALM_ASSERT_RELEASE(false);
-}
-
-
-inline bool TransactLogEncoder::insert_group_level_table(std::size_t table_ndx, std::size_t num_tables,
-                                                  StringData name)
-{
-    simple_cmd(instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables,
-                                                        name.size())); // Throws
-    append(name.data(), name.size()); // Throws
+    append_string_instr(instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables),
+                        name); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::insert_group_level_table(std::size_t table_ndx, std::size_t num_tables,
-                                                  StringData name)
+inline void TransactLogConvenientEncoder::insert_group_level_table(size_t table_ndx,
+                                                                   size_t num_tables,
+                                                                   StringData name)
 {
-    m_encoder.insert_group_level_table(table_ndx, num_tables, name);
+    m_encoder.insert_group_level_table(table_ndx, num_tables, name); // Throws
 }
 
-inline bool TransactLogEncoder::erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+inline bool TransactLogEncoder::erase_group_level_table(size_t table_ndx, size_t num_tables)
 {
-    simple_cmd(instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables)); // Throws
+    append_simple_instr(instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+inline void TransactLogConvenientEncoder::erase_group_level_table(size_t table_ndx,
+                                                                  size_t num_tables)
 {
-    m_encoder.erase_group_level_table(table_ndx, num_tables);
+    m_encoder.erase_group_level_table(table_ndx, num_tables); // Throws
 }
 
-inline bool TransactLogEncoder::rename_group_level_table(std::size_t table_ndx, StringData new_name)
+inline bool TransactLogEncoder::rename_group_level_table(size_t table_ndx, StringData new_name)
 {
-    simple_cmd(instr_RenameGroupLevelTable, util::tuple(table_ndx, new_name.size())); // Throws
-    append(new_name.data(), new_name.size()); // Throws
+    append_string_instr(instr_RenameGroupLevelTable, util::tuple(table_ndx), new_name); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::rename_group_level_table(std::size_t table_ndx, StringData new_name)
+inline void TransactLogConvenientEncoder::rename_group_level_table(size_t table_ndx,
+                                                                   StringData new_name)
 {
-    m_encoder.rename_group_level_table(table_ndx, new_name);
+    m_encoder.rename_group_level_table(table_ndx, new_name); // Throws
 }
 
-inline bool TransactLogEncoder::insert_column(std::size_t col_ndx, DataType type, StringData name, bool nullable)
+inline bool TransactLogEncoder::move_group_level_table(size_t table_ndx_1, size_t table_ndx_2)
 {
-    simple_cmd(nullable ? instr_InsertNullableColumn : instr_InsertColumn, util::tuple(col_ndx, int(type), name.size()));
-    append(name.data(), name.size());
+    append_simple_instr(instr_MoveGroupLevelTable, util::tuple(table_ndx_1, table_ndx_2));
     return true;
 }
 
-inline bool TransactLogEncoder::insert_link_column(std::size_t col_ndx, DataType type, StringData name,
-    std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
+inline void TransactLogConvenientEncoder::move_group_level_table(size_t table_ndx_1, size_t table_ndx_2)
+{
+    m_encoder.move_group_level_table(table_ndx_1, table_ndx_2);
+}
+
+inline bool TransactLogEncoder::insert_column(size_t col_ndx, DataType type, StringData name,
+                                              bool nullable)
+{
+    Instruction instr = (nullable ? instr_InsertNullableColumn : instr_InsertColumn);
+    append_string_instr(instr, util::tuple(col_ndx, type), name); // Throws
+    return true;
+}
+
+inline bool TransactLogEncoder::insert_link_column(size_t col_ndx, DataType type, StringData name,
+                                                   size_t link_target_table_ndx,
+                                                   size_t backlink_col_ndx)
 {
     REALM_ASSERT(_impl::TableFriend::is_link_type(ColumnType(type)));
-    simple_cmd(instr_InsertLinkColumn, util::tuple(col_ndx, int(type), name.size())); // Throws
-    append(name.data(), name.size()); // Throws
-    append_num(link_target_table_ndx); // Throws
-    append_num(backlink_col_ndx);
+    append_string_instr(instr_InsertLinkColumn, util::tuple(col_ndx, type, link_target_table_ndx,
+                                                            backlink_col_ndx), name); // Throws
     return true;
 }
 
 
-inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, std::size_t col_ndx, DataType type,
-                                       StringData name, const Table* link_target_table, bool nullable)
+inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, size_t col_ndx,
+                                                        DataType type,
+                                                        StringData name,
+                                                        const Table* link_target_table,
+                                                        bool nullable)
 {
     select_desc(desc); // Throws
     if (link_target_table) {
         typedef _impl::TableFriend tf;
         typedef _impl::DescriptorFriend df;
-        std::size_t target_table_ndx = link_target_table->get_index_in_group();
+        size_t target_table_ndx = link_target_table->get_index_in_group();
         const Table& origin_table = df::get_root_table(desc);
         REALM_ASSERT(origin_table.is_group_level());
         const Spec& target_spec = tf::get_spec(*link_target_table);
-        std::size_t origin_table_ndx = origin_table.get_index_in_group();
-        std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
+        size_t origin_table_ndx = origin_table.get_index_in_group();
+        size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
         m_encoder.insert_link_column(col_ndx, type, name, target_table_ndx, backlink_col_ndx); // Throws
     }
     else {
-        m_encoder.insert_column(col_ndx, type, name, nullable);
+        m_encoder.insert_column(col_ndx, type, name, nullable); // Throws
     }
 }
 
-inline bool TransactLogEncoder::erase_column(std::size_t col_ndx)
+inline bool TransactLogEncoder::erase_column(size_t col_ndx)
 {
-    simple_cmd(instr_EraseColumn, util::tuple(col_ndx)); // Throws
+    append_simple_instr(instr_EraseColumn, util::tuple(col_ndx)); // Throws
     return true;
 }
 
-inline bool TransactLogEncoder::erase_link_column(std::size_t col_ndx, std::size_t link_target_table_ndx, std::size_t backlink_col_ndx)
+inline bool TransactLogEncoder::erase_link_column(size_t col_ndx, size_t link_target_table_ndx,
+                                                  size_t backlink_col_ndx)
 {
-    simple_cmd(instr_EraseLinkColumn, util::tuple(col_ndx, link_target_table_ndx, backlink_col_ndx)); // Throws
+    append_simple_instr(instr_EraseLinkColumn, util::tuple(col_ndx, link_target_table_ndx,
+                                                           backlink_col_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::erase_column(const Descriptor& desc, std::size_t col_ndx)
+inline void TransactLogConvenientEncoder::erase_column(const Descriptor& desc, size_t col_ndx)
 {
     select_desc(desc); // Throws
 
@@ -858,22 +903,21 @@ inline void TransactLogConvenientEncoder::erase_column(const Descriptor& desc, s
         const Table& origin_table = df::get_root_table(desc);
         REALM_ASSERT(origin_table.is_group_level());
         const Table& target_table = *tf::get_link_target_table_accessor(origin_table, col_ndx);
-        std::size_t target_table_ndx = target_table.get_index_in_group();
+        size_t target_table_ndx = target_table.get_index_in_group();
         const Spec& target_spec = tf::get_spec(target_table);
-        std::size_t origin_table_ndx = origin_table.get_index_in_group();
-        std::size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
+        size_t origin_table_ndx = origin_table.get_index_in_group();
+        size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
         m_encoder.erase_link_column(col_ndx, target_table_ndx, backlink_col_ndx); // Throws
     }
 }
 
-inline bool TransactLogEncoder::rename_column(std::size_t col_ndx, StringData new_name)
+inline bool TransactLogEncoder::rename_column(size_t col_ndx, StringData new_name)
 {
-    simple_cmd(instr_RenameColumn, util::tuple(col_ndx, new_name.size())); // Throws
-    append(new_name.data(), new_name.size());
+    append_string_instr(instr_RenameColumn, util::tuple(col_ndx), new_name); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::rename_column(const Descriptor& desc, std::size_t col_ndx,
+inline void TransactLogConvenientEncoder::rename_column(const Descriptor& desc, size_t col_ndx,
                                        StringData name)
 {
     select_desc(desc); // Throws
@@ -881,210 +925,266 @@ inline void TransactLogConvenientEncoder::rename_column(const Descriptor& desc, 
 }
 
 
-inline bool TransactLogEncoder::set_int(std::size_t col_ndx, std::size_t ndx, int_fast64_t value)
+inline bool TransactLogEncoder::move_column(size_t from, size_t to)
 {
-    simple_cmd(instr_SetInt, util::tuple(col_ndx, ndx, value));
+    append_simple_instr(instr_MoveColumn, util::tuple(from, to)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_int(const Table* t, std::size_t col_ndx,
-                                 std::size_t ndx, int_fast64_t value)
+inline void TransactLogConvenientEncoder::move_column(const Descriptor& desc, size_t from, size_t to)
+{
+    select_desc(desc); // Throws
+    m_encoder.move_column(from, to);
+}
+
+
+inline bool TransactLogEncoder::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    append_simple_instr(instr_SetInt, util::tuple(col_ndx, ndx, value)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_int(const Table* t, size_t col_ndx,
+                                 size_t ndx, int_fast64_t value)
 {
     select_table(t); // Throws
     m_encoder.set_int(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_int_unique(std::size_t col_ndx, std::size_t ndx, int_fast64_t value)
+inline bool TransactLogEncoder::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
-    simple_cmd(instr_SetIntUnique, util::tuple(col_ndx, ndx, value));
+    append_simple_instr(instr_SetIntUnique, util::tuple(col_ndx, ndx, value));
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_int_unique(const Table* t, std::size_t col_ndx,
-                                                         std::size_t ndx, int_fast64_t value)
+inline void TransactLogConvenientEncoder::set_int_unique(const Table* t, size_t col_ndx,
+                                                         size_t ndx, int_fast64_t value)
 {
     select_table(t); // Throws
     m_encoder.set_int_unique(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_bool(std::size_t col_ndx, std::size_t ndx, bool value)
+inline bool TransactLogEncoder::set_bool(size_t col_ndx, size_t ndx, bool value)
 {
-    simple_cmd(instr_SetBool, util::tuple(col_ndx, ndx, value));
+    append_simple_instr(instr_SetBool, util::tuple(col_ndx, ndx, value)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_bool(const Table* t, std::size_t col_ndx,
-                                  std::size_t ndx, bool value)
+inline void TransactLogConvenientEncoder::set_bool(const Table* t, size_t col_ndx,
+                                  size_t ndx, bool value)
 {
     select_table(t); // Throws
     m_encoder.set_bool(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_float(std::size_t col_ndx, std::size_t ndx, float value)
+inline bool TransactLogEncoder::set_float(size_t col_ndx, size_t ndx, float value)
 {
-    simple_cmd(instr_SetFloat, util::tuple(col_ndx, ndx, value));
+    append_simple_instr(instr_SetFloat, util::tuple(col_ndx, ndx, value)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_float(const Table* t, std::size_t col_ndx,
-                                   std::size_t ndx, float value)
+inline void TransactLogConvenientEncoder::set_float(const Table* t, size_t col_ndx,
+                                   size_t ndx, float value)
 {
     select_table(t); // Throws
     m_encoder.set_float(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_double(std::size_t col_ndx, std::size_t ndx, double value)
+inline bool TransactLogEncoder::set_double(size_t col_ndx, size_t ndx, double value)
 {
-    simple_cmd(instr_SetDouble, util::tuple(col_ndx, ndx, value));
+    append_simple_instr(instr_SetDouble, util::tuple(col_ndx, ndx, value)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_double(const Table* t, std::size_t col_ndx,
-                                    std::size_t ndx, double value)
+inline void TransactLogConvenientEncoder::set_double(const Table* t, size_t col_ndx,
+                                    size_t ndx, double value)
 {
     select_table(t); // Throws
     m_encoder.set_double(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_string(std::size_t col_ndx, std::size_t ndx, StringData value)
+inline bool TransactLogEncoder::set_string(size_t col_ndx, size_t ndx, StringData value)
 {
     if (value.is_null()) {
         set_null(col_ndx, ndx); // Throws
     }
     else {
-        string_cmd(instr_SetString, col_ndx, ndx, value.data(), value.size()); // Throws
+        append_string_instr(instr_SetString, util::tuple(col_ndx, ndx), value); // Throws
     }
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_string(const Table* t, std::size_t col_ndx,
-                                    std::size_t ndx, StringData value)
+inline void TransactLogConvenientEncoder::set_string(const Table* t, size_t col_ndx,
+                                    size_t ndx, StringData value)
 {
     select_table(t); // Throws
     m_encoder.set_string(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_string_unique(std::size_t col_ndx, std::size_t ndx, StringData value)
+inline bool TransactLogEncoder::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
 {
     if (value.is_null()) {
         set_null(col_ndx, ndx); // Throws
     }
     else {
-        string_cmd(instr_SetStringUnique, col_ndx, ndx, value.data(), value.size()); // Throws
+        append_string_instr(instr_SetStringUnique, util::tuple(col_ndx, ndx), value); // Throws
     }
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_string_unique(const Table* t, std::size_t col_ndx,
-                                                            std::size_t ndx, StringData value)
+inline void TransactLogConvenientEncoder::set_string_unique(const Table* t, size_t col_ndx,
+                                                            size_t ndx, StringData value)
 {
     select_table(t); // Throws
     m_encoder.set_string_unique(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_binary(std::size_t col_ndx, std::size_t ndx, BinaryData value)
+inline bool TransactLogEncoder::set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
 {
     if (value.is_null()) {
-        set_null(col_ndx, ndx); // Throws
+        set_null(col_ndx, row_ndx); // Throws
     }
     else {
-        string_cmd(instr_SetBinary, col_ndx, ndx, value.data(), value.size()); // Throws
+        StringData value_2(value.data(), value.size());
+        append_string_instr(instr_SetBinary, util::tuple(col_ndx, row_ndx), value_2); // Throws
     }
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_binary(const Table* t, std::size_t col_ndx,
-                                    std::size_t ndx, BinaryData value)
+inline void TransactLogConvenientEncoder::set_binary(const Table* t, size_t col_ndx,
+                                    size_t ndx, BinaryData value)
 {
     select_table(t); // Throws
     m_encoder.set_binary(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_date_time(std::size_t col_ndx, std::size_t ndx, DateTime value)
+inline bool TransactLogEncoder::set_date_time(size_t col_ndx, size_t ndx, DateTime value)
 {
-    simple_cmd(instr_SetDateTime, util::tuple(col_ndx, ndx, value.get_datetime())); // Throws
+    append_simple_instr(instr_SetDateTime, util::tuple(col_ndx, ndx,
+                                                       value.get_datetime())); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_date_time(const Table* t, std::size_t col_ndx,
-                                       std::size_t ndx, DateTime value)
+inline void TransactLogConvenientEncoder::set_date_time(const Table* t, size_t col_ndx,
+                                       size_t ndx, DateTime value)
 {
     select_table(t); // Throws
     m_encoder.set_date_time(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_table(std::size_t col_ndx, std::size_t ndx)
+inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx)
 {
-    simple_cmd(instr_SetTable, util::tuple(col_ndx, ndx)); // Throws
+    append_simple_instr(instr_SetTable, util::tuple(col_ndx, ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_table(const Table* t, std::size_t col_ndx,
-                                   std::size_t ndx)
+inline void TransactLogConvenientEncoder::set_table(const Table* t, size_t col_ndx,
+                                   size_t ndx)
 {
     select_table(t); // Throws
     m_encoder.set_table(col_ndx, ndx); // Throws
 }
 
-inline bool TransactLogEncoder::set_mixed(std::size_t col_ndx, std::size_t ndx, const Mixed& value)
+inline bool TransactLogEncoder::set_mixed(size_t col_ndx, size_t ndx, const Mixed& value)
 {
-    mixed_cmd(instr_SetMixed, col_ndx, ndx, value); // Throws
+    append_mixed_instr(instr_SetMixed, util::tuple(col_ndx, ndx), value); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_mixed(const Table* t, std::size_t col_ndx,
-                                   std::size_t ndx, const Mixed& value)
+inline void TransactLogConvenientEncoder::set_mixed(const Table* t, size_t col_ndx,
+                                   size_t ndx, const Mixed& value)
 {
     select_table(t); // Throws
     m_encoder.set_mixed(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_link(std::size_t col_ndx, std::size_t ndx, std::size_t value)
+inline bool TransactLogEncoder::set_link(size_t col_ndx, size_t ndx,
+                                         size_t value, size_t target_group_level_ndx)
 {
     // Map `realm::npos` to zero, and `n` to `n+1`, where `n` is a target row
     // index.
-    std::size_t value_2 = std::size_t(1) + value;
-    simple_cmd(instr_SetLink, util::tuple(col_ndx, ndx, value_2));
+    size_t value_2 = size_t(1) + value;
+    append_simple_instr(instr_SetLink, util::tuple(col_ndx, ndx, value_2,
+                                                   target_group_level_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_link(const Table* t, std::size_t col_ndx,
-                                  std::size_t ndx, std::size_t value)
+inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_ndx,
+                                  size_t ndx, size_t value)
 {
     select_table(t); // Throws
-    m_encoder.set_link(col_ndx, ndx, value); // Throws
+    size_t target_group_level_ndx = t->get_descriptor()->get_column_link_target(col_ndx);
+    m_encoder.set_link(col_ndx, ndx, value, target_group_level_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::set_null(std::size_t col_ndx, std::size_t ndx)
+inline bool TransactLogEncoder::set_null(size_t col_ndx, size_t ndx)
 {
-    simple_cmd(instr_SetNull, util::tuple(col_ndx, ndx));
+    append_simple_instr(instr_SetNull, util::tuple(col_ndx, ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_null(const Table* t, std::size_t col_ndx,
-                                                   std::size_t row_ndx)
+inline void TransactLogConvenientEncoder::set_null(const Table* t, size_t col_ndx,
+                                                   size_t row_ndx)
 {
     select_table(t); // Throws
     m_encoder.set_null(col_ndx, row_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::nullify_link(std::size_t col_ndx, std::size_t ndx)
+inline bool TransactLogEncoder::nullify_link(size_t col_ndx, size_t ndx,
+                                             size_t target_group_level_ndx)
 {
-    simple_cmd(instr_NullifyLink, util::tuple(col_ndx, ndx)); // Throws
+    append_simple_instr(instr_NullifyLink, util::tuple(col_ndx, ndx,
+                                                       target_group_level_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::nullify_link(const Table* t, std::size_t col_ndx, std::size_t ndx)
+inline void TransactLogConvenientEncoder::nullify_link(const Table* t, size_t col_ndx, size_t ndx)
 {
     select_table(t); // Throws
-    m_encoder.nullify_link(col_ndx, ndx); // Throws
+    size_t target_group_level_ndx = t->get_descriptor()->get_column_link_target(col_ndx);
+    m_encoder.nullify_link(col_ndx, ndx, target_group_level_ndx); // Throws
+}
+
+inline bool TransactLogEncoder::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos,
+                                                 StringData value)
+{
+    append_string_instr(instr_InsertSubstring, util::tuple(col_ndx, row_ndx, pos),
+                        value); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::insert_substring(const Table* t, size_t col_ndx,
+                                                           size_t row_ndx, size_t pos,
+                                                           StringData value)
+{
+    if (value.size() > 0) {
+        select_table(t); // Throws
+        m_encoder.insert_substring(col_ndx, row_ndx, pos, value); // Throws
+    }
+}
+
+inline bool TransactLogEncoder::erase_substring(size_t col_ndx, size_t row_ndx, size_t pos,
+                                                size_t size)
+{
+    append_simple_instr(instr_EraseFromString, util::tuple(col_ndx, row_ndx, pos, size)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::erase_substring(const Table* t, size_t col_ndx,
+                                                          size_t row_ndx, size_t pos,
+                                                          size_t size)
+{
+    if (size > 0) {
+        select_table(t); // Throws
+        m_encoder.erase_substring(col_ndx, row_ndx, pos, size); // Throws
+    }
 }
 
 inline bool TransactLogEncoder::insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
                                                   size_t prior_num_rows, bool unordered)
 {
-    simple_cmd(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows_to_insert, prior_num_rows,
-                                                  unordered)); // Throws
+    append_simple_instr(instr_InsertEmptyRows, util::tuple(row_ndx, num_rows_to_insert,
+                                                           prior_num_rows, unordered)); // Throws
     return true;
 }
 
@@ -1101,8 +1201,8 @@ inline void TransactLogConvenientEncoder::insert_empty_rows(const Table* t, size
 inline bool TransactLogEncoder::erase_rows(size_t row_ndx, size_t num_rows_to_erase,
                                            size_t prior_num_rows, bool unordered)
 {
-    simple_cmd(instr_EraseRows, util::tuple(row_ndx, num_rows_to_erase, prior_num_rows,
-                                            unordered)); // Throws
+    append_simple_instr(instr_EraseRows, util::tuple(row_ndx, num_rows_to_erase, prior_num_rows,
+                                                     unordered)); // Throws
     return true;
 }
 
@@ -1117,39 +1217,51 @@ inline void TransactLogConvenientEncoder::erase_rows(const Table* t, size_t row_
     m_encoder.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, unordered); // Throws
 }
 
-inline bool TransactLogEncoder::add_search_index(std::size_t col_ndx)
+inline bool TransactLogEncoder::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
-    simple_cmd(instr_AddSearchIndex, util::tuple(col_ndx)); // Throws
+    append_simple_instr(instr_SwapRows, util::tuple(row_ndx_1, row_ndx_2)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::add_search_index(const Table* t, std::size_t col_ndx)
+inline void TransactLogConvenientEncoder::swap_rows(const Table* t, size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT(row_ndx_1 < row_ndx_2);
+    select_table(t); // Throws
+    m_encoder.swap_rows(row_ndx_1, row_ndx_2);
+}
+
+inline bool TransactLogEncoder::add_search_index(size_t col_ndx)
+{
+    append_simple_instr(instr_AddSearchIndex, util::tuple(col_ndx)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::add_search_index(const Table* t, size_t col_ndx)
 {
     select_table(t); // Throws
     m_encoder.add_search_index(col_ndx); // Throws
 }
 
 
-inline bool TransactLogEncoder::remove_search_index(std::size_t col_ndx)
+inline bool TransactLogEncoder::remove_search_index(size_t col_ndx)
 {
-    simple_cmd(instr_RemoveSearchIndex, util::tuple(col_ndx)); // Throws
+    append_simple_instr(instr_RemoveSearchIndex, util::tuple(col_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, std::size_t col_ndx)
+inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, size_t col_ndx)
 {
     select_table(t); // Throws
     m_encoder.remove_search_index(col_ndx); // Throws
 }
 
-
-inline bool TransactLogEncoder::set_link_type(std::size_t col_ndx, LinkType link_type)
+inline bool TransactLogEncoder::set_link_type(size_t col_ndx, LinkType link_type)
 {
-    simple_cmd(instr_SetLinkType, util::tuple(col_ndx, int(link_type))); // Throws
+    append_simple_instr(instr_SetLinkType, util::tuple(col_ndx, int(link_type))); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_link_type(const Table* t, std::size_t col_ndx, LinkType link_type)
+inline void TransactLogConvenientEncoder::set_link_type(const Table* t, size_t col_ndx, LinkType link_type)
 {
     select_table(t); // Throws
     m_encoder.set_link_type(col_ndx, link_type); // Throws
@@ -1158,7 +1270,7 @@ inline void TransactLogConvenientEncoder::set_link_type(const Table* t, std::siz
 
 inline bool TransactLogEncoder::clear_table()
 {
-    simple_cmd(instr_ClearTable, util::tuple()); // Throws
+    append_simple_instr(instr_ClearTable, util::tuple()); // Throws
     return true;
 }
 
@@ -1170,7 +1282,7 @@ inline void TransactLogConvenientEncoder::clear_table(const Table* t)
 
 inline bool TransactLogEncoder::optimize_table()
 {
-    simple_cmd(instr_OptimizeTable, util::tuple()); // Throws
+    append_simple_instr(instr_OptimizeTable, util::tuple()); // Throws
     return true;
 }
 
@@ -1180,26 +1292,26 @@ inline void TransactLogConvenientEncoder::optimize_table(const Table* t)
     m_encoder.optimize_table(); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_set(std::size_t link_ndx, std::size_t value)
+inline bool TransactLogEncoder::link_list_set(size_t link_ndx, size_t value)
 {
-    simple_cmd(instr_LinkListSet, util::tuple(link_ndx, value)); // Throws
+    append_simple_instr(instr_LinkListSet, util::tuple(link_ndx, value)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, std::size_t link_ndx,
-                                       std::size_t value)
+inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, size_t link_ndx,
+                                       size_t value)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_set(link_ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_nullify(std::size_t link_ndx)
+inline bool TransactLogEncoder::link_list_nullify(size_t link_ndx)
 {
-    simple_cmd(instr_LinkListNullify, util::tuple(link_ndx)); // Throws
+    append_simple_instr(instr_LinkListNullify, util::tuple(link_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list, std::size_t link_ndx)
+inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list, size_t link_ndx)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_nullify(link_ndx); // Throws
@@ -1207,9 +1319,20 @@ inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list
 
 inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
 {
-    simple_cmd(instr_LinkListSetAll, util::tuple(values.size())); // Throws
-    for (std::size_t i = 0; i < values.size(); i++)
-        append_num(values.get(i));
+    struct iter {
+        iter(const IntegerColumn& values, size_t ndx): m_values(&values), m_ndx(ndx) {}
+        const IntegerColumn* m_values;
+        size_t m_ndx;
+        bool operator==(const iter& i) const { return m_ndx == i.m_ndx; }
+        bool operator!=(const iter& i) const { return m_ndx != i.m_ndx; }
+        size_t operator-(const iter& i) const { return m_ndx - i.m_ndx; }
+        int_fast64_t operator*() const { return m_values->get(m_ndx); }
+        iter& operator++() { ++m_ndx; return *this; }
+        iter operator++(int) { iter i = *this; ++m_ndx; return i; }
+    };
+    size_t num_values = values.size();
+    append_variable_size_instr(instr_LinkListSetAll, util::tuple(num_values),
+                               iter(values, 0), iter(values, num_values)); // Throws
     return true;
 }
 
@@ -1219,60 +1342,60 @@ inline void TransactLogConvenientEncoder::set_link_list(const LinkView& list, co
     m_encoder.link_list_set_all(values); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_insert(std::size_t link_ndx, std::size_t value)
+inline bool TransactLogEncoder::link_list_insert(size_t link_ndx, size_t value)
 {
-    simple_cmd(instr_LinkListInsert, util::tuple(link_ndx, value)); // Throws
+    append_simple_instr(instr_LinkListInsert, util::tuple(link_ndx, value)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_insert(const LinkView& list, std::size_t link_ndx,
-                                          std::size_t value)
+inline void TransactLogConvenientEncoder::link_list_insert(const LinkView& list, size_t link_ndx,
+                                          size_t value)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_insert(link_ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_move(std::size_t old_link_ndx, std::size_t new_link_ndx)
+inline bool TransactLogEncoder::link_list_move(size_t old_link_ndx, size_t new_link_ndx)
 {
-    simple_cmd(instr_LinkListMove, util::tuple(old_link_ndx, new_link_ndx)); // Throws
+    append_simple_instr(instr_LinkListMove, util::tuple(old_link_ndx, new_link_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_move(const LinkView& list, std::size_t old_link_ndx,
-                                        std::size_t new_link_ndx)
+inline void TransactLogConvenientEncoder::link_list_move(const LinkView& list, size_t old_link_ndx,
+                                        size_t new_link_ndx)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_move(old_link_ndx, new_link_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_swap(std::size_t link1_ndx, std::size_t link2_ndx)
+inline bool TransactLogEncoder::link_list_swap(size_t link1_ndx, size_t link2_ndx)
 {
-    simple_cmd(instr_LinkListSwap, util::tuple(link1_ndx, link2_ndx)); // Throws
+    append_simple_instr(instr_LinkListSwap, util::tuple(link1_ndx, link2_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_swap(const LinkView& list, std::size_t link1_ndx,
-                                                         std::size_t link2_ndx)
+inline void TransactLogConvenientEncoder::link_list_swap(const LinkView& list, size_t link1_ndx,
+                                                         size_t link2_ndx)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_swap(link1_ndx, link2_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_erase(std::size_t link_ndx)
+inline bool TransactLogEncoder::link_list_erase(size_t link_ndx)
 {
-    simple_cmd(instr_LinkListErase, util::tuple(link_ndx)); // Throws
+    append_simple_instr(instr_LinkListErase, util::tuple(link_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_erase(const LinkView& list, std::size_t link_ndx)
+inline void TransactLogConvenientEncoder::link_list_erase(const LinkView& list, size_t link_ndx)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_erase(link_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_clear(std::size_t old_list_size)
+inline bool TransactLogEncoder::link_list_clear(size_t old_list_size)
 {
-    simple_cmd(instr_LinkListClear, util::tuple(old_list_size)); // Throws
+    append_simple_instr(instr_LinkListClear, util::tuple(old_list_size)); // Throws
     return true;
 }
 
@@ -1295,21 +1418,6 @@ inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView&
         m_selected_link_list = nullptr;
 }
 
-inline std::size_t TransactLogEncoder::max_required_bytes_for_string_value(std::size_t size) const
-{
-    return max_enc_bytes_per_int + size;
-}
-
-inline std::size_t TransactLogEncoder::max_required_bytes_for_string_cmd(std::size_t size) const
-{
-    return 1 + max_required_bytes_for_string_value(size);
-}
-
-inline std::size_t TransactLogEncoder::max_required_bytes_for_simple_cmd(std::size_t num_numbers) const
-{
-    return 1 + max_enc_bytes_per_num * num_numbers;
-}
-
 
 inline TransactLogParser::TransactLogParser():
     m_input_buffer(1024) // Throws
@@ -1322,7 +1430,7 @@ inline TransactLogParser::~TransactLogParser() noexcept
 }
 
 
-template <class InstructionHandler>
+template<class InstructionHandler>
 void TransactLogParser::parse(NoCopyInputStream& in, InstructionHandler& handler)
 {
     m_input = &in;
@@ -1332,7 +1440,7 @@ void TransactLogParser::parse(NoCopyInputStream& in, InstructionHandler& handler
         parse_one(handler); // Throws
 }
 
-template <class InstructionHandler>
+template<class InstructionHandler>
 void TransactLogParser::parse(InputStream& in, InstructionHandler& handler)
 {
     NoCopyInputStreamAdaptor in_2(in, m_input_buffer.data(), m_input_buffer.size());
@@ -1344,17 +1452,17 @@ inline bool TransactLogParser::has_next() noexcept
     return m_input_begin != m_input_end || next_input_buffer();
 }
 
-template <class InstructionHandler>
+template<class InstructionHandler>
 void TransactLogParser::parse_one(InstructionHandler& handler)
 {
     char instr;
     if (!read_char(instr))
         parser_error();
-//    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << "\n";
+//    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << std::dec << "\n";
     switch (Instruction(instr)) {
         case instr_SetInt: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             // FIXME: Don't depend on the existence of int64_t,
             // but don't allow values to use more than 64 bits
             // either.
@@ -1375,32 +1483,32 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SetBool: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             bool value = read_int<bool>(); // Throws
             if (!handler.set_bool(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
         case instr_SetFloat: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             float value = read_float(); // Throws
             if (!handler.set_float(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
         case instr_SetDouble: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             double value = read_double(); // Throws
             if (!handler.set_double(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
         case instr_SetString: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             StringData value = read_string(m_string_buffer); // Throws
             if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
                 parser_error();
@@ -1415,31 +1523,31 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SetBinary: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             BinaryData value = read_binary(m_string_buffer); // Throws
             if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
         case instr_SetDateTime: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             int_fast64_t value = read_int<int_fast64_t>(); // Throws
             if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
         case instr_SetTable: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             if (!handler.set_table(col_ndx, row_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_SetMixed: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             Mixed value;
             read_mixed(&value); // Throws
             if (!handler.set_mixed(col_ndx, row_ndx, value)) // Throws
@@ -1447,26 +1555,46 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SetLink: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t value = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t value = read_int<size_t>(); // Throws
             // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
-            std::size_t target_row_ndx = size_t(value - 1);
-            if (!handler.set_link(col_ndx, row_ndx, target_row_ndx)) // Throws
+            size_t target_row_ndx = size_t(value - 1);
+            size_t target_group_level_ndx = read_int<size_t>(); // Throws
+            if (!handler.set_link(col_ndx, row_ndx, target_row_ndx, target_group_level_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_SetNull: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
             if (!handler.set_null(col_ndx, row_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_NullifyLink: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            if (!handler.nullify_link(col_ndx, row_ndx)) // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t target_group_level_ndx = read_int<size_t>(); // Throws
+            if (!handler.nullify_link(col_ndx, row_ndx, target_group_level_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_InsertSubstring: {
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t pos = read_int<size_t>(); // Throws
+            StringData value = read_string(m_string_buffer); // Throws
+            if (!handler.insert_substring(col_ndx, row_ndx, pos, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_EraseFromString: {
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t pos = read_int<size_t>(); // Throws
+            size_t size = read_int<size_t>(); // Throws
+            if (!handler.erase_substring(col_ndx, row_ndx, pos, size)) // Throws
                 parser_error();
             return;
         }
@@ -1490,16 +1618,23 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_SwapRows: {
+            size_t row_ndx_1 = read_int<size_t>(); // Throws
+            size_t row_ndx_2 = read_int<size_t>(); // Throws
+            if (!handler.swap_rows(row_ndx_1, row_ndx_2)) // Throws
+                parser_error();
+            return;
+        }
         case instr_SelectTable: {
             int levels = read_int<int>(); // Throws
             if (levels < 0 || levels > m_max_levels)
                 parser_error();
             m_path.reserve(0, 2*levels); // Throws
-            std::size_t* path = m_path.data();
-            std::size_t group_level_ndx = read_int<std::size_t>(); // Throws
+            size_t* path = m_path.data();
+            size_t group_level_ndx = read_int<size_t>(); // Throws
             for (int i = 0; i != levels; ++i) {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
-                std::size_t row_ndx = read_int<std::size_t>(); // Throws
+                size_t col_ndx = read_int<size_t>(); // Throws
+                size_t row_ndx = read_int<size_t>(); // Throws
                 path[2*i + 0] = col_ndx;
                 path[2*i + 1] = row_ndx;
             }
@@ -1513,82 +1648,83 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_LinkListSet: {
-            std::size_t link_ndx = read_int<std::size_t>(); // Throws
-            std::size_t value = read_int<std::size_t>(); // Throws
+            size_t link_ndx = read_int<size_t>(); // Throws
+            size_t value = read_int<size_t>(); // Throws
             if (!handler.link_list_set(link_ndx, value)) // Throws
                 parser_error();
             return;
         }
         case instr_LinkListSetAll: {
             // todo, log that it's a SetAll we're doing
-            std::size_t size = read_int<std::size_t>(); // Throws
-            for (std::size_t i = 0; i < size; i++) {
-                std::size_t link = read_int<std::size_t>(); // Throws
+            size_t size = read_int<size_t>(); // Throws
+            for (size_t i = 0; i < size; i++) {
+                size_t link = read_int<size_t>(); // Throws
                 if (!handler.link_list_set(i, link)) // Throws
                     parser_error();
             }
             return;
         }
         case instr_LinkListInsert: {
-            std::size_t link_ndx = read_int<std::size_t>(); // Throws
-            std::size_t value = read_int<std::size_t>(); // Throws
+            size_t link_ndx = read_int<size_t>(); // Throws
+            size_t value = read_int<size_t>(); // Throws
             if (!handler.link_list_insert(link_ndx, value)) // Throws
                 parser_error();
             return;
         }
         case instr_LinkListMove: {
-            std::size_t old_link_ndx = read_int<std::size_t>(); // Throws
-            std::size_t new_link_ndx = read_int<std::size_t>(); // Throws
+            size_t old_link_ndx = read_int<size_t>(); // Throws
+            size_t new_link_ndx = read_int<size_t>(); // Throws
             if (!handler.link_list_move(old_link_ndx, new_link_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_LinkListSwap: {
-            std::size_t link1_ndx = read_int<std::size_t>(); // Throws
-            std::size_t link2_ndx = read_int<std::size_t>(); // Throws
+            size_t link1_ndx = read_int<size_t>(); // Throws
+            size_t link2_ndx = read_int<size_t>(); // Throws
             if (!handler.link_list_swap(link1_ndx, link2_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_LinkListErase: {
-            std::size_t link_ndx = read_int<std::size_t>(); // Throws
+            size_t link_ndx = read_int<size_t>(); // Throws
             if (!handler.link_list_erase(link_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_LinkListNullify: {
-            std::size_t link_ndx = read_int<std::size_t>(); // Throws
+            size_t link_ndx = read_int<size_t>(); // Throws
             if (!handler.link_list_nullify(link_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_LinkListClear: {
-            std::size_t old_list_size = read_int<std::size_t>(); // Throws
+            size_t old_list_size = read_int<size_t>(); // Throws
             if (!handler.link_list_clear(old_list_size)) // Throws
                 parser_error();
             return;
         }
         case instr_SelectLinkList: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            if (!handler.select_link_list(col_ndx, row_ndx)) // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t target_group_level_ndx = read_int<size_t>(); // Throws
+            if (!handler.select_link_list(col_ndx, row_ndx, target_group_level_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_AddSearchIndex: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
             if (!handler.add_search_index(col_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_RemoveSearchIndex: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
             if (!handler.remove_search_index(col_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_SetLinkType: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
             int link_type = read_int<int>(); // Throws
             if (!is_valid_link_type(link_type))
                 parser_error();
@@ -1598,48 +1734,63 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_InsertColumn:
         case instr_InsertNullableColumn: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
             int type = read_int<int>(); // Throws
             if (!is_valid_data_type(type))
                 parser_error();
+            if (REALM_UNLIKELY(type == type_Link || type == type_LinkList))
+                parser_error();
             StringData name = read_string(m_string_buffer); // Throws
             bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
+            if (REALM_UNLIKELY(nullable && (type == type_Table || type == type_Mixed))) {
+                // Nullability not supported for Table and Mixed columns.
+                parser_error();
+            }
             if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
                 parser_error();
             return;
         }
         case instr_InsertLinkColumn: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
             int type = read_int<int>(); // Throws
             if (!is_valid_data_type(type))
                 parser_error();
+            if (REALM_UNLIKELY(type != type_Link && type != type_LinkList))
+                parser_error();
+            size_t link_target_table_ndx = read_int<size_t>(); // Throws
+            size_t backlink_col_ndx = read_int<size_t>(); // Throws
             StringData name = read_string(m_string_buffer); // Throws
-            std::size_t link_target_table_ndx = read_int<std::size_t>(); // Throws
-            std::size_t backlink_col_ndx = read_int<std::size_t>(); // Throws
             if (!handler.insert_link_column(col_ndx, DataType(type), name,
                                             link_target_table_ndx, backlink_col_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_EraseColumn: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
             if (!handler.erase_column(col_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_EraseLinkColumn: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t link_target_table_ndx = read_int<std::size_t>(); // Throws
-            std::size_t backlink_col_ndx      = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t link_target_table_ndx = read_int<size_t>(); // Throws
+            size_t backlink_col_ndx      = read_int<size_t>(); // Throws
             if (!handler.erase_link_column(col_ndx, link_target_table_ndx,
                                            backlink_col_ndx)) // Throws
                 parser_error();
             return;
         }
         case instr_RenameColumn: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
             StringData name = read_string(m_string_buffer); // Throws
             if (!handler.rename_column(col_ndx, name)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_MoveColumn: {
+            size_t col_ndx_1 = read_int<size_t>(); // Throws
+            size_t col_ndx_2 = read_int<size_t>(); // Throws
+            if (!handler.move_column(col_ndx_1, col_ndx_2)) // Throws
                 parser_error();
             return;
         }
@@ -1648,9 +1799,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             if (levels < 0 || levels > m_max_levels)
                 parser_error();
             m_path.reserve(0, levels); // Throws
-            std::size_t* path = m_path.data();
+            size_t* path = m_path.data();
             for (int i = 0; i != levels; ++i) {
-                std::size_t col_ndx = read_int<std::size_t>(); // Throws
+                size_t col_ndx = read_int<size_t>(); // Throws
                 path[i] = col_ndx;
             }
             if (!handler.select_descriptor(levels, path)) // Throws
@@ -1658,24 +1809,31 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_InsertGroupLevelTable: {
-            std::size_t table_ndx  = read_int<std::size_t>(); // Throws
-            std::size_t num_tables = read_int<std::size_t>(); // Throws
+            size_t table_ndx  = read_int<size_t>(); // Throws
+            size_t num_tables = read_int<size_t>(); // Throws
             StringData name = read_string(m_string_buffer); // Throws
             if (!handler.insert_group_level_table(table_ndx, num_tables, name)) // Throws
                 parser_error();
             return;
         }
         case instr_EraseGroupLevelTable: {
-            std::size_t table_ndx  = read_int<std::size_t>(); // Throws
-            std::size_t num_tables = read_int<std::size_t>(); // Throws
+            size_t table_ndx  = read_int<size_t>(); // Throws
+            size_t num_tables = read_int<size_t>(); // Throws
             if (!handler.erase_group_level_table(table_ndx, num_tables)) // Throws
                 parser_error();
             return;
         }
         case instr_RenameGroupLevelTable: {
-            std::size_t table_ndx = read_int<std::size_t>(); // Throws
+            size_t table_ndx = read_int<size_t>(); // Throws
             StringData new_name = read_string(m_string_buffer); // Throws
             if (!handler.rename_group_level_table(table_ndx, new_name)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_MoveGroupLevelTable: {
+            size_t table_ndx_1 = read_int<size_t>(); // Throws
+            size_t table_ndx_2 = read_int<size_t>(); // Throws
+            if (!handler.move_group_level_table(table_ndx_1, table_ndx_2)) // Throws
                 parser_error();
             return;
         }
@@ -1686,11 +1844,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
     }
 
-    REALM_UNREACHABLE();
+    throw BadTransactLog();
 }
 
 
-template<class T> T TransactLogParser::read_int()
+template<class T>
+T TransactLogParser::read_int()
 {
     T value = 0;
     int part = 0;
@@ -1728,10 +1887,10 @@ template<class T> T TransactLogParser::read_int()
 }
 
 
-inline void TransactLogParser::read_bytes(char* data, std::size_t size)
+inline void TransactLogParser::read_bytes(char* data, size_t size)
 {
     for (;;) {
-        const std::size_t avail = m_input_end - m_input_begin;
+        const size_t avail = m_input_end - m_input_begin;
         if (size <= avail)
             break;
         const char* to = m_input_begin + avail;
@@ -1747,9 +1906,24 @@ inline void TransactLogParser::read_bytes(char* data, std::size_t size)
 }
 
 
+inline BinaryData TransactLogParser::read_buffer(util::StringBuffer& buf, size_t size)
+{
+    const size_t avail = m_input_end - m_input_begin;
+    if (avail >= size) {
+        m_input_begin += size;
+        return BinaryData(m_input_begin - size, size);
+    }
+
+    buf.clear();
+    buf.resize(size); // Throws
+    read_bytes(buf.data(), size);
+    return BinaryData(buf.data(), size);
+}
+
+
 inline float TransactLogParser::read_float()
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+    static_assert(std::numeric_limits<float>::is_iec559 &&
                           sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
                           "Unsupported 'float' representation");
     float value;
@@ -1760,7 +1934,7 @@ inline float TransactLogParser::read_float()
 
 inline double TransactLogParser::read_double()
 {
-    REALM_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
+    static_assert(std::numeric_limits<double>::is_iec559 &&
                           sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
                           "Unsupported 'double' representation");
     double value;
@@ -1773,23 +1947,22 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 {
     size_t size = read_int<size_t>(); // Throws
 
-    const std::size_t avail = m_input_end - m_input_begin;
-    if (avail >= size) {
-        m_input_begin += size;
-        return StringData(m_input_begin - size, size);
-    }
+    if (size > Table::max_string_size)
+        parser_error();
 
-    buf.clear();
-    buf.resize(size); // Throws
-    read_bytes(buf.data(), size);
-    return StringData(buf.data(), size);
+    BinaryData buffer = read_buffer(buf, size);
+    return StringData{buffer.data(), size};
 }
 
 
 inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
 {
-    StringData str = read_string(buf); // Throws;
-    return BinaryData(str.data(), str.size());
+    size_t size = read_int<size_t>(); // Throws
+
+    if (size > Table::max_binary_size)
+        parser_error();
+
+    return read_buffer(buf, size);
 }
 
 
@@ -1844,16 +2017,15 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
         case type_Link:
         case type_LinkList:
             // FIXME: Need to handle new link types here
-            REALM_ASSERT(false);
             break;
     }
-    REALM_ASSERT(false);
+    throw BadTransactLog();
 }
 
 
 inline bool TransactLogParser::next_input_buffer()
 {
-    std::size_t sz = m_input->next_block(m_input_begin, m_input_end);
+    size_t sz = m_input->next_block(m_input_begin, m_input_end);
     if (sz == 0)
         return false;
     else
@@ -1903,7 +2075,7 @@ inline bool TransactLogParser::is_valid_link_type(int type)
 
 class TransactReverser {
 public:
-    bool select_table(std::size_t group_level_ndx, size_t levels, const size_t* path)
+    bool select_table(size_t group_level_ndx, size_t levels, const size_t* path)
     {
         sync_table();
         m_encoder.select_table(group_level_ndx, levels, path);
@@ -1919,21 +2091,26 @@ public:
         return true;
     }
 
-    bool insert_group_level_table(std::size_t table_ndx, std::size_t num_tables, StringData)
+    bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData)
     {
         m_encoder.erase_group_level_table(table_ndx, num_tables + 1);
         append_instruction();
         return true;
     }
 
-    bool erase_group_level_table(std::size_t table_ndx, std::size_t num_tables)
+    bool erase_group_level_table(size_t table_ndx, size_t num_tables)
     {
         m_encoder.insert_group_level_table(table_ndx, num_tables - 1, "");
         append_instruction();
         return true;
     }
 
-    bool rename_group_level_table(std::size_t, StringData)
+    bool rename_group_level_table(size_t, StringData)
+    {
+        return true; // No-op
+    }
+
+    bool move_group_level_table(size_t, size_t)
     {
         return true; // No-op
     }
@@ -1965,7 +2142,14 @@ public:
         return true;
     }
 
-    bool set_int(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t value)
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+    {
+        m_encoder.swap_rows(row_ndx_1, row_ndx_2);
+        append_instruction();
+        return true;
+    }
+
+    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
     {
         m_encoder.set_int(col_ndx, row_ndx, value);
         append_instruction();
@@ -1979,28 +2163,28 @@ public:
         return true;
     }
 
-    bool set_bool(std::size_t col_ndx, std::size_t row_ndx, bool value)
+    bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
     {
         m_encoder.set_bool(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }
 
-    bool set_float(std::size_t col_ndx, std::size_t row_ndx, float value)
+    bool set_float(size_t col_ndx, size_t row_ndx, float value)
     {
         m_encoder.set_float(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }
 
-    bool set_double(std::size_t col_ndx, std::size_t row_ndx, double value)
+    bool set_double(size_t col_ndx, size_t row_ndx, double value)
     {
         m_encoder.set_double(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }
 
-    bool set_string(std::size_t col_ndx, std::size_t row_ndx, StringData value)
+    bool set_string(size_t col_ndx, size_t row_ndx, StringData value)
     {
         m_encoder.set_string(col_ndx, row_ndx, value);
         append_instruction();
@@ -2014,14 +2198,14 @@ public:
         return true;
     }
 
-    bool set_binary(std::size_t col_ndx, std::size_t row_ndx, BinaryData value)
+    bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
     {
         m_encoder.set_binary(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }
 
-    bool set_date_time(std::size_t col_ndx, std::size_t row_ndx, DateTime value)
+    bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
     {
         m_encoder.set_date_time(col_ndx, row_ndx, value);
         append_instruction();
@@ -2049,11 +2233,21 @@ public:
         return true;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t value)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t target_group_level_ndx)
     {
-        m_encoder.set_link(col_ndx, row_ndx, value);
+        m_encoder.set_link(col_ndx, row_ndx, value, target_group_level_ndx);
         append_instruction();
         return true;
+    }
+
+    bool insert_substring(size_t, size_t, size_t, StringData)
+    {
+        return true; // No-op
+    }
+
+    bool erase_substring(size_t, size_t, size_t, size_t)
+    {
+        return true; // No-op
     }
 
     bool clear_table()
@@ -2078,16 +2272,16 @@ public:
         return true; // No-op
     }
 
-    bool insert_link_column(std::size_t col_idx, DataType, StringData,
-                            std::size_t target_table_idx, std::size_t backlink_col_ndx)
+    bool insert_link_column(size_t col_idx, DataType, StringData,
+                            size_t target_table_idx, size_t backlink_col_ndx)
     {
         m_encoder.erase_link_column(col_idx, target_table_idx, backlink_col_ndx);
         append_instruction();
         return true;
     }
 
-    bool erase_link_column(std::size_t col_idx, std::size_t target_table_idx,
-                           std::size_t backlink_col_idx)
+    bool erase_link_column(size_t col_idx, size_t target_table_idx,
+                           size_t backlink_col_idx)
     {
         DataType type = type_Link; // The real type of the column doesn't matter here,
                                    // but the encoder asserts that it's actually a link type.
@@ -2096,14 +2290,14 @@ public:
         return true;
     }
 
-    bool insert_column(std::size_t col_idx, DataType, StringData, bool)
+    bool insert_column(size_t col_idx, DataType, StringData, bool)
     {
         m_encoder.erase_column(col_idx);
         append_instruction();
         return true;
     }
 
-    bool erase_column(std::size_t col_idx)
+    bool erase_column(size_t col_idx)
     {
         m_encoder.insert_column(col_idx, DataType(), "");
         append_instruction();
@@ -2115,10 +2309,17 @@ public:
         return true; // No-op
     }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx)
+    bool move_column(size_t col_ndx_1, size_t col_ndx_2)
+    {
+        m_encoder.move_column(col_ndx_2, col_ndx_1);
+        append_instruction();
+        return true;
+    }
+
+    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx)
     {
         sync_linkview();
-        m_encoder.select_link_list(col_ndx, row_ndx);
+        m_encoder.select_link_list(col_ndx, row_ndx, link_target_group_level_ndx);
         m_pending_lv_instr = get_inst();
         return true;
     }
@@ -2163,17 +2364,20 @@ public:
         // Append in reverse order because the reversed log is itself applied
         // in reverse, and this way it generates all back-insertions rather than
         // all front-insertions
-        for (std::size_t i = old_list_size; i > 0; --i) {
+        for (size_t i = old_list_size; i > 0; --i) {
             m_encoder.link_list_insert(i - 1, 0);
             append_instruction();
         }
         return true;
     }
 
-    bool nullify_link(size_t col_ndx, size_t row_ndx)
+    bool nullify_link(size_t col_ndx, size_t row_ndx, size_t target_group_level_ndx)
     {
         size_t value = 0;
-        m_encoder.set_link(col_ndx, row_ndx, value);
+        // FIXME: Is zero this right value to pass here, or should
+        // TransactReverser::nullify_link() also have taken a
+        // `target_group_level_ndx` argument.
+        m_encoder.set_link(col_ndx, row_ndx, value, target_group_level_ndx);
         append_instruction();
         return true;
     }

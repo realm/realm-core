@@ -164,20 +164,20 @@ StringData StringColumn::get(size_t ndx) const noexcept
     return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc, m_nullable);
 }
 
-bool StringColumn::is_null(std::size_t ndx) const noexcept
+bool StringColumn::is_null(size_t ndx) const noexcept
 {
     StringData sd = get(ndx);
     REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
     return sd.is_null();
 }
 
-StringData StringColumn::get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
+StringData StringColumn::get_index_data(size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
 {
     return get(ndx);
 }
 
 
-void StringColumn::set_null(std::size_t ndx)
+void StringColumn::set_null(size_t ndx)
 {
     if (!m_nullable) {
         throw LogicError{LogicError::column_not_nullable};
@@ -240,7 +240,7 @@ void StringColumn::set_search_index_allow_duplicate_values(bool allow) noexcept
 }
 
 
-void StringColumn::update_from_parent(std::size_t old_baseline) noexcept
+void StringColumn::update_from_parent(size_t old_baseline) noexcept
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
@@ -593,6 +593,39 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     m_array->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
     EraseLeafElem erase_leaf_elem(*this, m_nullable);
     Array::erase_bptree_elem(m_array.get(), realm::npos, erase_leaf_elem); // Throws
+}
+
+void StringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+{
+    REALM_ASSERT_3(row_ndx_1, <=, size());
+    REALM_ASSERT_3(row_ndx_2, <=, size());
+    REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
+
+    StringData value_1 = get(row_ndx_1);
+    StringData value_2 = get(row_ndx_2);
+
+    if (value_1.is_null() && value_2.is_null()) {
+        return;
+    }
+
+    std::string buffer_1{value_1.data(), value_1.size()};
+    std::string buffer_2{value_2.data(), value_2.size()};
+
+    if (value_1.is_null()) {
+        set(row_ndx_2, realm::null());
+    }
+    else {
+        StringData copy {buffer_1.data(), buffer_1.size()};
+        set(row_ndx_2, copy);
+    }
+
+    if (value_2.is_null()) {
+        set(row_ndx_1, realm::null());
+    }
+    else {
+        StringData copy {buffer_2.data(), buffer_2.size()};
+        set(row_ndx_1, copy);
+    }
 }
 
 
@@ -1331,8 +1364,9 @@ ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
         slice.init_from_mem(mem);
-        size_t pos = slice.write(out); // Throws
-        ref = pos;
+        bool deep = true; // Deep
+        bool only_if_modified = false; // Always
+        ref = slice.write(out, deep, only_if_modified); // Throws
     }
     else {
         SliceHandler handler(get_alloc(), m_nullable);

@@ -141,13 +141,13 @@ public:
     /// constructed in the unattached state.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// \brief Same as calling the corrsponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     struct unattached_tag {};
 
@@ -203,12 +203,12 @@ public:
     ///        and an upgrade is required.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel = durability_Full,
-              const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in exixtence for as long as the SharedGroup.
     void open(Replication&, DurabilityLevel = durability_Full,
-              const char* encryption_key = 0, bool allow_file_format_upgrade = true);
+              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -238,7 +238,7 @@ public:
     ///
     /// It is an error to call this function on an unattached shared
     /// group. Doing so will result in undefined behavior.
-    void reserve(std::size_t size_in_bytes);
+    void reserve(size_t size_in_bytes);
 
     /// Querying for changes:
     ///
@@ -253,7 +253,7 @@ public:
     /// Has db been changed ?
     bool has_changed();
 
-#ifndef __APPLE__
+#if !REALM_PLATFORM_APPLE
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to wait_for_change_release()
     /// further calls to wait_for_change() will return immediately. To restore
@@ -266,22 +266,19 @@ public:
 
     /// re-enable waiting for change
     void enable_wait_for_change();
-#endif
+#endif // !REALM_PLATFORM_APPLE
     // Transactions:
 
     struct VersionID {
         uint_fast64_t version;
         uint_fast32_t index;
-        VersionID(const VersionID& v)
-        {
-            version = v.version;
-            index = v.index;
-        }
-        VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
+
+        explicit VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
         {
             this->version = version;
             this->index = index;
         }
+
         bool operator==(const VersionID& other) { return version == other.version; }
         bool operator!=(const VersionID& other) { return version != other.version; }
         bool operator<(const VersionID& other) { return version < other.version; }
@@ -290,7 +287,7 @@ public:
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
 
-    using version_type = uint_fast64_t;
+    using version_type = History::version_type;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
@@ -470,7 +467,8 @@ public:
     /// of all other accessors (if any) being created as part of the import.
 
     /// Type used to support handover of accessors between shared groups.
-    template<typename T> struct Handover;
+    template<typename T>
+    struct Handover;
 
     /// thread-safe/const export (mode is Stay or Copy)
     /// during export, the following operations on the shared group is locked:
@@ -505,8 +503,8 @@ private:
         uint_fast32_t   m_reader_idx;
         ref_type        m_top_ref;
         size_t          m_file_size;
-        // FIXME: Bad initialization as std::size_t is not necessarily equal to uint_fast64_t.
-        ReadLockInfo() : m_version(std::numeric_limits<std::size_t>::max()),
+        // FIXME: Bad initialization as size_t is not necessarily equal to uint_fast64_t.
+        ReadLockInfo() : m_version(std::numeric_limits<size_t>::max()),
                          m_reader_idx(0), m_top_ref(0), m_file_size(0) {};
     };
     class ReadLockUnlockGuard;
@@ -543,12 +541,12 @@ private:
 
     // Ring buffer managment
     bool        ringbuf_is_empty() const noexcept;
-    std::size_t ringbuf_size() const noexcept;
-    std::size_t ringbuf_capacity() const noexcept;
-    bool        ringbuf_is_first(std::size_t ndx) const noexcept;
+    size_t ringbuf_size() const noexcept;
+    size_t ringbuf_capacity() const noexcept;
+    bool        ringbuf_is_first(size_t ndx) const noexcept;
     void        ringbuf_remove_first() noexcept;
-    std::size_t ringbuf_find(uint64_t version) const noexcept;
-    ReadCount&  ringbuf_get(std::size_t ndx) noexcept;
+    size_t ringbuf_find(uint64_t version) const noexcept;
+    ReadCount&  ringbuf_get(size_t ndx) noexcept;
     ReadCount&  ringbuf_get_first() noexcept;
     ReadCount&  ringbuf_get_last() noexcept;
     void        ringbuf_put(const ReadCount& v);
@@ -597,10 +595,14 @@ private:
 
     //@{
     /// See LangBindHelper.
-    template<class O> void advance_read(History&, O* observer, VersionID);
-    template<class O> void promote_to_write(History&, O* observer);
+    template<class O>
+    void advance_read(History&, O* observer, VersionID);
+
+    template<class O>
+    void promote_to_write(History&, O* observer);
     void commit_and_continue_as_read();
-    template<class O> void rollback_and_continue_as_read(History&, O* observer);
+    template<class O>
+    void rollback_and_continue_as_read(History&, O* observer);
     //@}
 
     // Advance the readlock to the given version and return the transaction logs
@@ -632,7 +634,7 @@ public:
         return get_group().has_table(name);
     }
 
-    ConstTableRef get_table(std::size_t table_ndx) const
+    ConstTableRef get_table(size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
     }
@@ -642,7 +644,8 @@ public:
         return get_group().get_table(name); // Throws
     }
 
-    template<class T> BasicTableRef<const T> get_table(StringData name) const
+    template<class T>
+    BasicTableRef<const T> get_table(StringData name) const
     {
         return get_group().get_table<T>(name); // Throws
     }
@@ -673,7 +676,7 @@ public:
         return get_group().has_table(name);
     }
 
-    TableRef get_table(std::size_t table_ndx) const
+    TableRef get_table(size_t table_ndx) const
     {
         return get_group().get_table(table_ndx); // Throws
     }
@@ -688,12 +691,13 @@ public:
         return get_group().add_table(name, require_unique_name); // Throws
     }
 
-    TableRef get_or_add_table(StringData name, bool* was_added = 0) const
+    TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table(name, was_added); // Throws
     }
 
-    template<class T> BasicTableRef<T> get_table(StringData name) const
+    template<class T>
+    BasicTableRef<T> get_table(StringData name) const
     {
         return get_group().get_table<T>(name); // Throws
     }
@@ -704,7 +708,8 @@ public:
         return get_group().add_table<T>(name, require_unique_name); // Throws
     }
 
-    template<class T> BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = 0) const
+    template<class T>
+    BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
@@ -814,7 +819,8 @@ private:
 };
 
 
-template<typename T> struct SharedGroup::Handover {
+template<typename T>
+struct SharedGroup::Handover {
     std::unique_ptr<typename T::Handover_patch> patch;
     std::unique_ptr<T> clone;
     VersionID version;
@@ -829,7 +835,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
     std::unique_ptr<Handover<T>> result(new Handover<T>());
     // Implementation note:
     // often, the return value from clone will be T*, BUT it may be ptr to some base of T
-    // instead, so we must cast it to T*. This is alway safe, because no matter the type, 
+    // instead, so we must cast it to T*. This is alway safe, because no matter the type,
     // clone() will clone the actual accessor instance, and hence return an instance of the
     // same type.
     result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
@@ -896,17 +902,27 @@ inline void SharedGroup::advance_read(History& history, O* observer, VersionID v
     const BinaryData* changesets_end = changesets_begin + num_changesets;
 
     if (observer) {
-        _impl::TransactLogParser parser;
-        _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-        parser.parse(in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        try {
+            _impl::TransactLogParser parser;
+            _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
+            parser.parse(in, *observer); // Throws
+            observer->parse_complete(); // Throws
+        }
+        catch (...) {
+            release_readlock(m_readlock);
+            m_readlock = old_readlock;
+            rlug.release();
+            throw;
+        }
     }
+
     _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
     using gf = _impl::GroupFriend;
     gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size, in); // Throws
 }
 
-template<class O> inline void SharedGroup::promote_to_write(History& history, O* observer)
+template<class O>
+inline void SharedGroup::promote_to_write(History& history, O* observer)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
@@ -1065,7 +1081,8 @@ public:
         sg.advance_read(hist, obs, ver); // Throws
     }
 
-    template<class O> static void promote_to_write(SharedGroup& sg, History& hist, O* obs)
+    template<class O>
+    static void promote_to_write(SharedGroup& sg, History& hist, O* obs)
     {
         sg.promote_to_write(hist, obs); // Throws
     }
@@ -1086,7 +1103,7 @@ public:
         bool no_create = true;
         SharedGroup::DurabilityLevel durability = SharedGroup::durability_Async;
         bool is_backend = true;
-        const char* encryption_key = 0;
+        const char* encryption_key = nullptr;
         bool allow_file_format_upgrade = false;
         sg.do_open_1(file, no_create, durability, is_backend, encryption_key,
                      allow_file_format_upgrade); // Throws

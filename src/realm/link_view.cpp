@@ -266,7 +266,7 @@ void LinkView::clear()
 void LinkView::do_clear(bool broken_reciprocal_backlinks)
 {
     size_t origin_row_ndx = get_origin_row_index();
-    if (!broken_reciprocal_backlinks) {
+    if (!broken_reciprocal_backlinks && m_row_indexes.is_attached()) {
         size_t num_links = m_row_indexes.size();
         for (size_t link_ndx = 0; link_ndx < num_links; ++link_ndx) {
             size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
@@ -387,6 +387,23 @@ void LinkView::do_update_link(size_t old_target_row_ndx, size_t new_target_row_n
     REALM_ASSERT_3(pos, !=, realm::not_found);
 
     m_row_indexes.set(pos, new_target_row_ndx);
+}
+
+void LinkView::do_swap_link(size_t target_row_ndx_1, size_t target_row_ndx_2)
+{
+    REALM_ASSERT(m_row_indexes.is_attached());
+
+    // FIXME: Optimize this.
+    size_t len = m_row_indexes.size();
+    for (size_t i = 0; i < len; ++i) {
+        size_t value = m_row_indexes.get(i);
+        if (value == target_row_ndx_1) {
+            m_row_indexes.set(i, target_row_ndx_2);
+        }
+        else if (value == target_row_ndx_2) {
+            m_row_indexes.set(i, target_row_ndx_1);
+        }
+    }
 }
 
 

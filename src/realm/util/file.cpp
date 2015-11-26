@@ -5,6 +5,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -26,6 +27,7 @@
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/string_buffer.hpp>
+#include <realm/util/features.h>
 
 using namespace realm;
 using namespace realm::util;
@@ -327,7 +329,7 @@ void File::close() noexcept
 
     BOOL r = CloseHandle(m_handle);
     REALM_ASSERT_RELEASE(r);
-    m_handle = 0;
+    m_handle = nullptr;
 
 #else // POSIX version
 
@@ -373,6 +375,7 @@ error:
     if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
+        realm::util::encryption_read_barrier(map, pos, size);
         memcpy(data, map.get_addr() + pos, size);
         lseek(m_fd, size, SEEK_CUR);
         return map.get_size() - pos;
@@ -431,7 +434,10 @@ void File::write(const char* data, size_t size)
     if (m_encryption_key) {
         off_t pos = lseek(m_fd, 0, SEEK_CUR);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
+        // FIXME: Expect this to fail du to assert asking for a read first!
+        realm::util::encryption_read_barrier(map, pos, size);
         memcpy(map.get_addr() + pos, data, size);
+        realm::util::encryption_write_barrier(map, pos, size);
         lseek(m_fd, size, SEEK_CUR);
         return;
     }
@@ -656,7 +662,7 @@ void File::sync()
         return;
     throw std::runtime_error("FlushFileBuffers() failed");
 
-#elif defined __APPLE__
+#elif REALM_PLATFORM_APPLE
 
     if (::fcntl(m_fd, F_FULLFSYNC) == 0)
         return;
@@ -762,7 +768,7 @@ void File::unlock() noexcept
 }
 
 
-void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) const
+void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
 {
 #ifdef _WIN32 // Windows version
 
@@ -812,6 +818,19 @@ void* File::map(AccessMode a, size_t size, int map_flags, std::size_t offset) co
 #endif
 }
 
+#if REALM_ENABLE_ENCRYPTION
+#ifdef _WIN32
+#error "Encryption is not supported on Windows"
+#else
+void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping,
+                int map_flags, size_t offset) const
+{
+    static_cast<void>(map_flags);
+
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+}
+#endif
+#endif
 
 void File::unmap(void* addr, size_t size) noexcept
 {
@@ -877,6 +896,28 @@ bool File::exists(const std::string& path)
     }
     std::string msg = get_errno_msg("access() failed: ", err);
     throw std::runtime_error(msg);
+}
+
+
+bool File::is_dir(const std::string& path)
+{
+#ifndef _WIN32
+    struct stat statbuf;
+    if (::stat(path.c_str(), &statbuf) == 0)
+        return S_ISDIR(statbuf.st_mode);
+    int err = errno; // Eliminate any risk of clobbering
+    switch (err) {
+        case EACCES:
+        case ENOENT:
+        case ENOTDIR:
+            return false;
+    }
+    std::string msg = get_errno_msg("stat() failed: ", err);
+    throw std::runtime_error(msg);
+#else
+    static_cast<void>(path);
+    throw std::runtime_error("Not yet supported");
+#endif
 }
 
 
@@ -1052,9 +1093,54 @@ bool File::is_removed() const
 }
 
 
+std::string File::resolve(const std::string& path, const std::string& base_dir)
+{
+#ifndef _WIN32
+    char dir_sep = '/';
+    std::string path_2 = path;
+    std::string base_dir_2 = base_dir;
+    bool is_absolute = (!path_2.empty() && path_2.front() == dir_sep);
+    if (is_absolute)
+        return path_2;
+    if (path_2.empty())
+        path_2 = ".";
+    if (!base_dir_2.empty() && base_dir_2.back() != dir_sep)
+        base_dir_2.push_back(dir_sep);
+/*
+    // Abbreviate
+    for (;;) {
+        if (base_dir_2.empty()) {
+            if (path_2.empty())
+                return "./";
+            return path_2;
+        }
+        if (path_2 == ".") {
+            remove_trailing_dir_seps(base_dir_2);
+            return base_dir_2;
+        }
+        if (has_prefix(path_2, "./")) {
+            remove_trailing_dir_seps(base_dir_2);
+            // drop dot
+            // transfer slashes
+        }
+
+        if (path_2.size() < 2 || path_2[1] != '.')
+            break;
+        if (path_2.size())
+    }
+*/
+    return base_dir_2 + path_2;
+#else
+    static_cast<void>(path);
+    static_cast<void>(base_dir);
+    throw std::runtime_error("Not yet supported");
+#endif
+}
+
+
 void File::set_encryption_key(const char* key)
 {
-#ifdef REALM_ENABLE_ENCRYPTION
+#if REALM_ENABLE_ENCRYPTION
     if (key) {
         char *buffer = new char[64];
         memcpy(buffer, key, 64);
@@ -1069,3 +1155,76 @@ void File::set_encryption_key(const char* key)
     }
 #endif
 }
+
+
+#ifndef _WIN32
+
+DirScanner::DirScanner(const std::string& path)
+{
+    m_dirp = opendir(path.c_str());
+    if (!m_dirp) {
+        int err = errno; // Eliminate any risk of clobbering
+        std::string msg = get_errno_msg("opendir() failed: ", err);
+        switch (err) {
+            case EACCES:
+                throw File::PermissionDenied(msg, path);
+            case ENOENT:
+                throw File::NotFound(msg, path);
+            case ELOOP:
+            case ENAMETOOLONG:
+            case ENOTDIR:
+                throw File::AccessError(msg, path);
+            default:
+                throw std::runtime_error(msg);
+        }
+    }
+}
+
+DirScanner::~DirScanner() noexcept
+{
+    int r = closedir(m_dirp);
+    REALM_ASSERT_RELEASE(r == 0);
+}
+
+bool DirScanner::next(std::string& name)
+{
+    const size_t min_dirent_size = offsetof(struct dirent, d_name) + NAME_MAX + 1;
+    union {
+        struct dirent m_dirent;
+        char m_strut[min_dirent_size];
+    } u;
+    struct dirent* dirent;
+    for (;;) {
+        int err = readdir_r(m_dirp, &u.m_dirent, &dirent);
+        if (err != 0) {
+            std::string msg = get_errno_msg("readdir_r() failed: ", err);
+            throw std::runtime_error(msg);
+        }
+        if (!dirent)
+            return false; // End of stream
+        const char* name_1 = dirent->d_name;
+        std::string name_2 = name_1;
+        if (name_2 != "." && name_2 != "..") {
+            name = name_2;
+            return true;
+        }
+    }
+}
+
+#else
+
+DirScanner::DirScanner(const std::string&)
+{
+    throw std::runtime_error("Not yet supported");
+}
+
+DirScanner::~DirScanner() noexcept
+{
+}
+
+bool DirScanner::next(std::string&)
+{
+    return false;
+}
+
+#endif

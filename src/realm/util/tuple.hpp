@@ -28,17 +28,20 @@ namespace realm {
 namespace util {
 
 
-template<class L> struct Tuple {
+template<class L>
+struct Tuple {
     typedef typename L::head head_type;
     typedef Tuple<typename L::tail> tail_type;
     head_type m_head;
     tail_type m_tail;
     Tuple(const head_type& h, const tail_type& t): m_head(h), m_tail(t) {}
 };
-template<> struct Tuple<void> {};
+template<>
+struct Tuple<void> {};
 
 
-template<class H, class T> inline Tuple<TypeCons<H,T>> cons(const H& h, const Tuple<T>& t)
+template<class H, class T>
+inline Tuple<TypeCons<H,T>> cons(const H& h, const Tuple<T>& t)
 {
     return Tuple<TypeCons<H,T>>(h,t);
 }
@@ -46,7 +49,8 @@ template<class H, class T> inline Tuple<TypeCons<H,T>> cons(const H& h, const Tu
 
 inline Tuple<void> tuple() { return Tuple<void>(); }
 
-template<class A> inline Tuple<TypeCons<A, void>> tuple(const A& a)
+template<class A>
+inline Tuple<TypeCons<A, void>> tuple(const A& a)
 {
     return cons(a, tuple());
 }
@@ -78,15 +82,15 @@ tuple(const A& a, const B& b, const C& c, const D& d, const E& e)
     return cons(a, tuple(b,c,d,e));
 }
 
-template<class A, class B, class C, class D, class E, class F> inline
-Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>>
+template<class A, class B, class C, class D, class E, class F>
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>>
 tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f)
 {
     return cons(a, tuple(b,c,d,e,f));
 }
 
-template<class A, class B, class C, class D, class E, class F, class G> inline
-Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>>
+template<class A, class B, class C, class D, class E, class F, class G>
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>>
 tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f, const G& g)
 {
     return cons(a, tuple(b,c,d,e,f,g));
@@ -112,13 +116,15 @@ inline Tuple<typename TypeAppend<L,V>::type> operator,(const Tuple<L>& t, const 
 } // namespace util
 
 namespace _impl {
-    template<class L, int i> struct TupleAt {
+    template<class L, int i>
+    struct TupleAt {
         static typename util::TypeAt<L,i>::type exec(const util::Tuple<L>& t)
         {
             return TupleAt<typename L::tail, i-1>::exec(t.m_tail);
         }
     };
-    template<class L> struct TupleAt<L,0> {
+    template<class L>
+    struct TupleAt<L,0> {
         static typename L::head exec(const util::Tuple<L>& t) { return t.m_head; }
     };
 
@@ -140,7 +146,8 @@ namespace _impl {
 
 namespace util {
 
-template<int i, class L> inline typename TypeAt<L,i>::type at(const Tuple<L>& tuple)
+template<int i, class L>
+inline typename TypeAt<L,i>::type at(const Tuple<L>& tuple)
 {
     return _impl::TupleAt<L,i>::exec(tuple);
 }

@@ -22,18 +22,24 @@
 
 #include <cstddef>
 #include <stdint.h>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <streambuf>
 
+#ifndef _WIN32
+#  include <dirent.h> // POSIX.1-2001
+#endif
+
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
-#include <memory>
 #include <realm/util/safe_int_ops.hpp>
+
 
 namespace realm {
 namespace util {
 
+class EncryptedFileMapping;
 
 /// Create the specified directory in the file system.
 ///
@@ -156,7 +162,7 @@ public:
     ///
     /// Calling this function on an instance, that is not currently
     /// attached to an open file, has undefined behavior.
-    std::size_t read(char* data, std::size_t size);
+    size_t read(char* data, size_t size);
 
     /// Write the specified data to this file.
     ///
@@ -165,16 +171,18 @@ public:
     ///
     /// Calling this function on an instance, that was opened in
     /// read-only mode, has undefined behavior.
-    void write(const char* data, std::size_t size);
+    void write(const char* data, size_t size);
 
     /// Calls write(s.data(), s.size()).
     void write(const std::string& s) { write(s.data(), s.size()); }
 
     /// Calls read(data, N).
-    template<std::size_t N> std::size_t read(char (&data)[N]) { return read(data, N); }
+    template<size_t N>
+    size_t read(char (&data)[N]) { return read(data, N); }
 
     /// Calls write(data(), N).
-    template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
+    template<size_t N>
+    void write(const char (&data)[N]) { write(data, N); }
 
     /// Plays the same role as off_t in POSIX
     typedef int_fast64_t SizeType;
@@ -208,7 +216,7 @@ public:
     /// through distinct File instances.
     ///
     /// \sa prealloc_if_supported()
-    void prealloc(SizeType offset, std::size_t size);
+    void prealloc(SizeType offset, size_t size);
 
     /// When supported by the system, allocate space on the target
     /// device for the specified region of the file. If the region
@@ -229,7 +237,7 @@ public:
     ///
     /// \sa prealloc()
     /// \sa is_prealloc_supported()
-    void prealloc_if_supported(SizeType offset, std::size_t size);
+    void prealloc_if_supported(SizeType offset, size_t size);
 
     /// See prealloc_if_supported().
     static bool is_prealloc_supported();
@@ -320,7 +328,7 @@ public:
     ///
     /// Calling this function with a size that is greater than the
     /// size of the file has undefined behavior.
-    void* map(AccessMode, std::size_t size, int map_flags = 0, std::size_t offset = 0) const;
+    void* map(AccessMode, size_t size, int map_flags = 0, size_t offset = 0) const;
 
     /// The same as unmap(old_addr, old_size) followed by map(a,
     /// new_size, map_flags), but more efficient on some systems.
@@ -334,24 +342,33 @@ public:
     ///
     /// If this function throws, the old address range will remain
     /// mapped.
-    void* remap(void* old_addr, std::size_t old_size, AccessMode a, std::size_t new_size,
+    void* remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
                 int map_flags = 0, size_t file_offset = 0) const;
 
+#if REALM_ENABLE_ENCRYPTION
+    void* map(AccessMode, size_t size, EncryptedFileMapping*& mapping, 
+              int map_flags = 0, size_t offset = 0) const;
+#endif
     /// Unmap the specified address range which must have been
     /// previously returned by map().
-    static void unmap(void* addr, std::size_t size) noexcept;
+    static void unmap(void* addr, size_t size) noexcept;
 
     /// Flush in-kernel buffers to disk. This blocks the caller until
     /// the synchronization operation is complete. The specified
     /// address range must be (a subset of) one that was previously returned by
     /// map().
-    static void sync_map(void* addr, std::size_t size);
+    static void sync_map(void* addr, size_t size);
 
     /// Check whether the specified file or directory exists. Note
     /// that a file or directory that resides in a directory that the
     /// calling process has no access to, will necessarily be reported
     /// as not existing.
     static bool exists(const std::string& path);
+
+    /// Check whether the specified path exists and refers to a directory. If
+    /// the referenced file system object resides in an inaccessible directory,
+    /// this function returns false.
+    static bool is_dir(const std::string& path);
 
     /// Remove the specified file path from the file system. If the
     /// specified path is not a directory, this function is equivalent
@@ -401,10 +418,41 @@ public:
     // FIXME: Can we get rid of this one please!!!
     bool is_removed() const;
 
+    /// Resolve the specified path against the specified base directory.
+    ///
+    /// If \a path is absolute, or if \a base_dir is empty, \p path is returned
+    /// unmodified, otherwise \a path is resolved against \a base_dir.
+    ///
+    /// Examples (assuming POSIX):
+    ///
+    ///    resolve("/foo/bar", "../baz") -> "/foo/baz"
+    ///    resolve(".", "foo")           -> "./foo"
+    ///    resolve("/foo/", ".")         -> "/foo"
+    ///    resolve("foo", "..")          -> "."
+    ///    resolve("foo", "../..")       -> ".."
+    ///    resolve("..", "..")           -> "../.."
+    ///    resolve("", "")               -> "."
+    ///    resolve("/", "")              -> "/."
+    ///    resolve("/", "..")            -> "/."
+    ///    resolve("foo//bar", "..")     -> "foo"
+    ///
+    /// This function does not access the file system.
+    ///
+    /// \param path The path to be resolved. An empty string produces the same
+    /// result as as if "." was passed. The result has a trailing directory
+    /// separator (`/`) if, and only if this path has a trailing directory
+    /// separator.
+    ///
+    /// \param base_dir The base directory path, which may be relative or
+    /// absolute. A final directory separator (`/`) is optional. The empty
+    /// string is interpreted as a relative path.
+    static std::string resolve(const std::string& path, const std::string& base_dir);
+
     class ExclusiveLock;
     class SharedLock;
 
-    template<class> class Map;
+    template<class>
+    class Map;
 
     class CloseGuard;
     class UnlockGuard;
@@ -432,16 +480,28 @@ private:
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
 
     struct MapBase {
-        void* m_addr;
-        std::size_t m_size;
+        void* m_addr = nullptr;
+        size_t m_size = 0;
 
         MapBase() noexcept;
         ~MapBase() noexcept;
 
-        void map(const File&, AccessMode, std::size_t size, int map_flags, std::size_t offset = 0);
-        void remap(const File&, AccessMode, std::size_t size, int map_flags);
+        void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0);
+        void remap(const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         void sync();
+#if REALM_ENABLE_ENCRYPTION
+        util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
+        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        {
+            return m_encrypted_mapping;
+        }
+#else
+        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        {
+            return nullptr;
+        }
+#endif
     };
 };
 
@@ -480,13 +540,14 @@ private:
 ///
 /// A single Map instance must never be accessed concurrently by
 /// multiple threads.
-template<class T> class File::Map: private MapBase {
+template<class T>
+class File::Map: private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
-    explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+    explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof (T),
                  int map_flags = 0);
 
-    explicit Map(const File&, std::size_t offset, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+    explicit Map(const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof (T),
                  int map_flags = 0);
 
     /// Create an instance that is not initially attached to a memory
@@ -496,13 +557,17 @@ public:
     ~Map() noexcept;
 
     /// Move the mapping from another Map object to this Map object
-    File::Map<T>& operator=(File::Map<T>&& other) 
+    File::Map<T>& operator=(File::Map<T>&& other)
     {
         if (m_addr) unmap();
         m_addr = other.m_addr;
         m_size = other.m_size;
         other.m_addr = 0;
         other.m_size = 0;
+#if REALM_ENABLE_ENCRYPTION
+        m_encrypted_mapping = other.m_encrypted_mapping;
+        other.m_encrypted_mapping = nullptr;
+#endif
         return *this;
     }
 
@@ -512,8 +577,8 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
-           int map_flags = 0, std::size_t offset = 0);
+    T* map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof (T),
+           int map_flags = 0, size_t offset = 0);
 
     /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
@@ -526,7 +591,7 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* remap(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
+    T* remap(const File&, AccessMode = access_ReadOnly, size_t size = sizeof (T),
              int map_flags = 0);
 
     /// See File::sync_map().
@@ -548,12 +613,25 @@ public:
     /// file. When this instance refers to a memory mapped file, the
     /// returned value will always be identical to the size passed to
     /// the constructor or to map().
-    std::size_t get_size() const noexcept;
+    size_t get_size() const noexcept;
 
     /// Release the currently attached memory mapped file from this
     /// Map instance. The address range may then be unmapped later by
     /// a call to File::unmap().
     T* release() noexcept;
+
+#if REALM_ENABLE_ENCRYPTION
+    /// Get the encrypted file mapping corresponding to this mapping
+    inline EncryptedFileMapping* get_encrypted_mapping() const
+    {
+        return m_encrypted_mapping;
+    }
+#else
+    inline EncryptedFileMapping* get_encrypted_mapping() const
+    {
+        return nullptr;
+    }
+#endif
 
     friend class UnmapGuard;
 };
@@ -562,8 +640,8 @@ public:
 class File::CloseGuard {
 public:
     CloseGuard(File& f) noexcept: m_file(&f) {}
-    ~CloseGuard()  noexcept { if (m_file) m_file->close(); }
-    void release() noexcept { m_file = 0; }
+    ~CloseGuard() noexcept { if (m_file) m_file->close(); }
+    void release() noexcept { m_file = nullptr; }
 private:
     File* m_file;
 };
@@ -572,8 +650,8 @@ private:
 class File::UnlockGuard {
 public:
     UnlockGuard(File& f) noexcept: m_file(&f) {}
-    ~UnlockGuard()  noexcept { if (m_file) m_file->unlock(); }
-    void release() noexcept { m_file = 0; }
+    ~UnlockGuard() noexcept { if (m_file) m_file->unlock(); }
+    void release() noexcept { m_file = nullptr; }
 private:
     File* m_file;
 };
@@ -581,9 +659,10 @@ private:
 
 class File::UnmapGuard {
 public:
-    template<class T> UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
-    ~UnmapGuard()  noexcept { if (m_map) m_map->unmap(); }
-    void release() noexcept { m_map = 0; }
+    template<class T>
+    UnmapGuard(Map<T>& m) noexcept: m_map(&m) {}
+    ~UnmapGuard() noexcept { if (m_map) m_map->unmap(); }
+    void release() noexcept { m_map = nullptr; }
 private:
     MapBase* m_map;
 };
@@ -597,7 +676,7 @@ public:
     ~Streambuf();
 
 private:
-    static const std::size_t buffer_size = 4096;
+    static const size_t buffer_size = 4096;
 
     File& m_file;
     std::unique_ptr<char[]> const m_buffer;
@@ -654,6 +733,17 @@ public:
 };
 
 
+class DirScanner {
+public:
+    DirScanner(const std::string& path);
+    ~DirScanner() noexcept;
+    bool next(std::string& name);
+private:
+#ifndef _WIN32
+    DIR* m_dirp;
+#endif
+};
+
 
 
 
@@ -663,7 +753,7 @@ public:
 inline File::File(const std::string& path, Mode m)
 {
 #ifdef _WIN32
-    m_handle = 0;
+    m_handle = nullptr;
 #else
     m_fd = -1;
 #endif
@@ -674,7 +764,7 @@ inline File::File(const std::string& path, Mode m)
 inline File::File() noexcept
 {
 #ifdef _WIN32
-    m_handle = 0;
+    m_handle = nullptr;
 #else
     m_fd = -1;
 #endif
@@ -761,11 +851,14 @@ inline File::MapBase::~MapBase() noexcept
     unmap();
 }
 
-inline void File::MapBase::map(const File& f, AccessMode a, std::size_t size, int map_flags, std::size_t offset)
+inline void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
 {
     REALM_ASSERT(!m_addr);
-
+#if REALM_ENABLE_ENCRYPTION
+    m_addr = f.map(a, size, m_encrypted_mapping, map_flags, offset);
+#else
     m_addr = f.map(a, size, map_flags, offset);
+#endif
     m_size = size;
 }
 
@@ -774,9 +867,12 @@ inline void File::MapBase::unmap() noexcept
     if (!m_addr) return;
     File::unmap(m_addr, m_size);
     m_addr = nullptr;
+#if REALM_ENABLE_ENCRYPTION
+    m_encrypted_mapping = nullptr;
+#endif
 }
 
-inline void File::MapBase::remap(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
 {
     REALM_ASSERT(m_addr);
 
@@ -792,61 +888,69 @@ inline void File::MapBase::sync()
 }
 
 template<class T>
-inline File::Map<T>::Map(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline File::Map<T>::Map(const File& f, AccessMode a, size_t size, int map_flags)
 {
     map(f, a, size, map_flags);
 }
 
 template<class T>
-inline File::Map<T>::Map(const File& f, std::size_t offset, AccessMode a, std::size_t size, int map_flags)
+inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size, int map_flags)
 {
     map(f, a, size, map_flags, offset);
 }
 
-template<class T> inline File::Map<T>::Map() noexcept {}
-
-template<class T> inline File::Map<T>::~Map() noexcept {}
+template<class T>
+inline File::Map<T>::Map() noexcept {}
 
 template<class T>
-inline T* File::Map<T>::map(const File& f, AccessMode a, std::size_t size, int map_flags, std::size_t offset)
+inline File::Map<T>::~Map() noexcept {}
+
+template<class T>
+inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
 {
     MapBase::map(f, a, size, map_flags, offset);
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::unmap() noexcept
+template<class T>
+inline void File::Map<T>::unmap() noexcept
 {
     MapBase::unmap();
 }
 
 template<class T>
-inline T* File::Map<T>::remap(const File& f, AccessMode a, std::size_t size, int map_flags)
+inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_flags)
 {
     MapBase::remap(f, a, size, map_flags);
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline void File::Map<T>::sync()
+template<class T>
+inline void File::Map<T>::sync()
 {
     MapBase::sync();
 }
 
-template<class T> inline bool File::Map<T>::is_attached() const noexcept
+template<class T>
+inline bool File::Map<T>::is_attached() const noexcept
 {
     return (m_addr != nullptr);
 }
 
-template<class T> inline T* File::Map<T>::get_addr() const noexcept
+template<class T>
+inline T* File::Map<T>::get_addr() const noexcept
 {
     return static_cast<T*>(m_addr);
 }
 
-template<class T> inline std::size_t File::Map<T>::get_size() const noexcept
+template<class T>
+inline size_t File::Map<T>::get_size() const noexcept
 {
     return m_addr ? m_size : 0;
 }
 
-template<class T> inline T* File::Map<T>::release() noexcept
+template<class T>
+inline T* File::Map<T>::release() noexcept
 {
     T* addr = static_cast<T*>(m_addr);
     m_addr = nullptr;
@@ -898,7 +1002,7 @@ inline File::Streambuf::pos_type File::Streambuf::seekpos(pos_type pos, std::ios
 
 inline void File::Streambuf::flush()
 {
-    std::size_t n = pptr() - pbase();
+    size_t n = pptr() - pbase();
     m_file.write(pbase(), n);
     setp(m_buffer.get(), epptr());
 }

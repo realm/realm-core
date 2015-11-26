@@ -1135,6 +1135,122 @@ TEST_TYPES(ColumnString_Count, non_nullable, nullable)
     e.destroy();
 }
 
+TEST(ColumnString_SwapRows)
+{
+    // Normal case
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        c.add("a");
+        c.add("b");
+        c.add("c");
+        c.add("d");
+
+        CHECK_EQUAL(c.get(1), "b");
+        CHECK_EQUAL(c.get(2), "c");
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), "c");
+        CHECK_EQUAL(c.get(2), "b");
+        CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
+    }
+
+    // First two elements
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        c.add("a");
+        c.add("b");
+        c.add("c");
+
+        c.swap_rows(0, 1);
+
+        CHECK_EQUAL(c.get(0), "b");
+        CHECK_EQUAL(c.get(1), "a");
+        CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
+    }
+
+    // Last two elements
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        c.add("a");
+        c.add("b");
+        c.add("c");
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), "c");
+        CHECK_EQUAL(c.get(2), "b");
+        CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        c.add("a");
+        c.add("b");
+        c.add("c");
+
+        c.swap_rows(2, 1);
+
+        CHECK_EQUAL(c.get(1), "c");
+        CHECK_EQUAL(c.get(2), "b");
+        CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
+    }
+
+    // Column with duplicate values
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        c.add("a");
+        c.add("a");
+        c.add("c");
+
+        c.swap_rows(0, 1);
+
+        CHECK_EQUAL(c.get(0), "a");
+        CHECK_EQUAL(c.get(1), "a");
+
+        c.destroy();
+    }
+
+    // Null values
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref, true);
+
+        c.add("a");
+        c.add("b");
+        c.add(realm::null());
+
+        CHECK(c.get(2).is_null()); // passes
+
+        c.swap_rows(1, 2);
+
+        CHECK(c.get(1).is_null()); // fails
+        CHECK_EQUAL(c.get(2), "b"); // passes
+
+        c.destroy();
+    }
+}
+
 
 #if !defined DISABLE_INDEX
 

@@ -49,7 +49,7 @@ $ ndk-build V=1
 
 This will create the shared library.
 
-## Building the 
+## Building the app
 
 From the test/android folder:
 
@@ -72,7 +72,13 @@ Of course make sure the device is set to developer mode and connected.
 You can of course tap the app icon. Alternatively you can do it from the command line:
 
 ```
-$ adb shell am start -a android.intent.action.MAIN -n com.realm.test/android.app.NativeActivity
+$ adb shell am start -a android.intent.action.MAIN -n io.realm.coretest/android.app.NativeActivity
+```
+
+It is possible to stop the app using the command:
+
+```
+$ adb shell am force-stop io.realm.coretest
 ```
 
 ## See the logs
@@ -86,6 +92,5 @@ $ adb logcat
 ## Retrieving the XML file containing the test results:
 
 ```
-$ adb pull /storage/sdcard0/Android/data/com.realm.test/files/unit-test-report.xml .
+$ adb pull /storage/sdcard0/Android/data/com.realm.coretest/files/unit-test-report.xml .
 ```
-

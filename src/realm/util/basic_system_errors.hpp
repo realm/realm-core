@@ -39,7 +39,10 @@ enum basic_system_errors {
     no_memory = ENOMEM,
 
     /// Operation cancelled.
-    operation_aborted = ECANCELED
+    operation_aborted = ECANCELED,
+
+    /// Connection aborted.
+    connection_aborted = ECONNABORTED
 };
 
 std::error_code make_error_code(basic_system_errors);
@@ -50,7 +53,9 @@ std::error_code make_error_code(basic_system_errors);
 
 namespace std {
 
-template<> class is_error_code_enum<realm::util::error::basic_system_errors> {
+template<>
+class is_error_code_enum<realm::util::error::basic_system_errors>
+{
 public:
     static const bool value = true;
 };

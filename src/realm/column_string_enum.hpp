@@ -76,43 +76,43 @@ public:
         return utf8_compare(a, b) ? 1 : -1;
     }
 
-    StringData get(std::size_t ndx) const noexcept;
-    bool is_null(std::size_t ndx) const noexcept final;
-    void set(std::size_t ndx, StringData value);
-    void set_null(std::size_t ndx) override;
+    StringData get(size_t ndx) const noexcept;
+    bool is_null(size_t ndx) const noexcept final;
+    void set(size_t ndx, StringData value);
+    void set_null(size_t ndx) override;
     void add();
     void add(StringData value);
-    void insert(std::size_t ndx);
-    void insert(std::size_t ndx, StringData value);
-    void erase(std::size_t row_ndx);
-    void move_last_over(std::size_t row_ndx);
+    void insert(size_t ndx);
+    void insert(size_t ndx, StringData value);
+    void erase(size_t row_ndx);
+    void move_last_over(size_t row_ndx);
     void clear();
     bool is_nullable() const noexcept final;
 
-    std::size_t count(StringData value) const;
-    std::size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
+    size_t count(StringData value) const;
+    size_t find_first(StringData value, size_t begin = 0, size_t end = npos) const;
     void find_all(IntegerColumn& res, StringData value,
-                  std::size_t begin = 0, std::size_t end = npos) const;
-    FindRes find_all_indexref(StringData value, std::size_t& dst) const;
+                  size_t begin = 0, size_t end = npos) const;
+    FindRes find_all_indexref(StringData value, size_t& dst) const;
 
-    std::size_t count(std::size_t key_index) const;
-    std::size_t find_first(std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
-    void find_all(IntegerColumn& res, std::size_t key_index, std::size_t begin = 0, std::size_t end = -1) const;
+    size_t count(size_t key_index) const;
+    size_t find_first(size_t key_index, size_t begin=0, size_t end=-1) const;
+    void find_all(IntegerColumn& res, size_t key_index, size_t begin = 0, size_t end = -1) const;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to StringData::operator<().
-    std::size_t lower_bound_string(StringData value) const noexcept;
-    std::size_t upper_bound_string(StringData value) const noexcept;
+    size_t lower_bound_string(StringData value) const noexcept;
+    size_t upper_bound_string(StringData value) const noexcept;
     //@}
 
-    void set_string(std::size_t, StringData) override;
+    void set_string(size_t, StringData) override;
 
     void adjust_keys_ndx_in_parent(int diff) noexcept;
 
     // Search index
-    StringData get_index_data(std::size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
+    StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     void set_search_index_allow_duplicate_values(bool) noexcept override;
     StringIndex* create_search_index() override;
     void install_search_index(std::unique_ptr<StringIndex>) noexcept;
@@ -122,22 +122,22 @@ public:
     bool compare_string(const StringColumn&) const;
     bool compare_string(const StringEnumColumn&) const;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
-    void clear(std::size_t, bool) override;
-    void update_from_parent(std::size_t) noexcept override;
-    void refresh_accessor_tree(std::size_t, const Spec&) override;
+    void clear(size_t, bool) override;
+    void update_from_parent(size_t) noexcept override;
+    void refresh_accessor_tree(size_t, const Spec&) override;
 
-    std::size_t get_key_ndx(StringData value) const;
-    std::size_t get_key_ndx_or_add(StringData value);
+    size_t get_key_ndx(StringData value) const;
+    size_t get_key_ndx_or_add(StringData value);
 
     StringColumn& get_keys();
     const StringColumn& get_keys() const;
 
 #ifdef REALM_DEBUG
     void verify() const override;
-    void verify(const Table&, std::size_t) const override;
+    void verify(const Table&, size_t) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
     void to_dot(std::ostream&, StringData title) const override;
 #endif
@@ -152,7 +152,7 @@ private:
     /// one is fine.
     ///
     /// \param row_ndx Must be `realm::npos` if appending.
-    void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows);
+    void do_insert(size_t row_ndx, StringData value, size_t num_rows);
 
     /// If you are appending and you do not have the size of the column readily
     /// available, call the 3 argument version instead. If you are not
@@ -160,10 +160,10 @@ private:
     ///
     /// \param is_append Must be true if, and only if `row_ndx` is equal to the
     /// size of the column (before insertion).
-    void do_insert(std::size_t row_ndx, StringData value, std::size_t num_rows, bool is_append);
+    void do_insert(size_t row_ndx, StringData value, size_t num_rows, bool is_append);
 
-    void do_erase(std::size_t row_ndx, bool is_last);
-    void do_move_last_over(std::size_t row_ndx, std::size_t last_row_ndx);
+    void do_erase(size_t row_ndx, bool is_last);
+    void do_move_last_over(size_t row_ndx, size_t last_row_ndx);
     void do_clear();
 };
 
@@ -173,16 +173,16 @@ private:
 
 // Implementation:
 
-inline StringData StringEnumColumn::get(std::size_t ndx) const noexcept
+inline StringData StringEnumColumn::get(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, IntegerColumn::size());
-    std::size_t key_ndx = to_size_t(IntegerColumn::get(ndx));
+    size_t key_ndx = to_size_t(IntegerColumn::get(ndx));
     StringData sd = m_keys.get(key_ndx);
     REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
     return sd;
 }
 
-inline bool StringEnumColumn::is_null(std::size_t ndx) const noexcept
+inline bool StringEnumColumn::is_null(size_t ndx) const noexcept
 {
     return is_nullable() ? get(ndx).is_null() : false;
 }
@@ -195,36 +195,36 @@ inline void StringEnumColumn::add()
 inline void StringEnumColumn::add(StringData value)
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
-    std::size_t row_ndx = realm::npos;
-    std::size_t num_rows = 1;
+    size_t row_ndx = realm::npos;
+    size_t num_rows = 1;
     do_insert(row_ndx, value, num_rows); // Throws
 }
 
-inline void StringEnumColumn::insert(std::size_t row_ndx)
+inline void StringEnumColumn::insert(size_t row_ndx)
 {
     insert(row_ndx, m_nullable ? realm::null() : StringData(""));
 }
 
-inline void StringEnumColumn::insert(std::size_t row_ndx, StringData value)
+inline void StringEnumColumn::insert(size_t row_ndx, StringData value)
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
-    std::size_t size = this->size();
+    size_t size = this->size();
     REALM_ASSERT_3(row_ndx, <=, size);
-    std::size_t num_rows = 1;
+    size_t num_rows = 1;
     bool is_append = row_ndx == size;
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 
-inline void StringEnumColumn::erase(std::size_t row_ndx)
+inline void StringEnumColumn::erase(size_t row_ndx)
 {
-    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    size_t last_row_ndx = size() - 1; // Note that size() is slow
     bool is_last = row_ndx == last_row_ndx;
     do_erase(row_ndx, is_last); // Throws
 }
 
-inline void StringEnumColumn::move_last_over(std::size_t row_ndx)
+inline void StringEnumColumn::move_last_over(size_t row_ndx)
 {
-    std::size_t last_row_ndx = size() - 1; // Note that size() is slow
+    size_t last_row_ndx = size() - 1; // Note that size() is slow
     do_move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
@@ -235,10 +235,12 @@ inline void StringEnumColumn::clear()
 
 // Overriding virtual method of Column.
 inline void StringEnumColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                          size_t prior_num_rows)
+                                          size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(!insert_nulls || m_nullable);
+    static_cast<void>(insert_nulls);
 
     StringData value = m_nullable ? realm::null() : StringData("");
     bool is_append = (row_ndx == prior_num_rows);
@@ -271,27 +273,27 @@ inline void StringEnumColumn::move_last_row_over(size_t row_ndx, size_t prior_nu
 }
 
 // Overriding virtual method of Column.
-inline void StringEnumColumn::clear(std::size_t, bool)
+inline void StringEnumColumn::clear(size_t, bool)
 {
     do_clear(); // Throws
 }
 
-inline std::size_t StringEnumColumn::lower_bound_string(StringData value) const noexcept
+inline size_t StringEnumColumn::lower_bound_string(StringData value) const noexcept
 {
     return ColumnBase::lower_bound(*this, value);
 }
 
-inline std::size_t StringEnumColumn::upper_bound_string(StringData value) const noexcept
+inline size_t StringEnumColumn::upper_bound_string(StringData value) const noexcept
 {
     return ColumnBase::upper_bound(*this, value);
 }
 
-inline void StringEnumColumn::set_string(std::size_t row_ndx, StringData value)
+inline void StringEnumColumn::set_string(size_t row_ndx, StringData value)
 {
     set(row_ndx, value); // Throws
 }
 
-inline void StringEnumColumn::set_null(std::size_t row_ndx)
+inline void StringEnumColumn::set_null(size_t row_ndx)
 {
     set(row_ndx, realm::null{});
 }

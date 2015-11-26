@@ -16,7 +16,7 @@
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "native-activity", __VA_ARGS__))
 
 
-void android_main(struct android_app* state) 
+void android_main(struct android_app* state)
 {
     // Make sure glue isn't stripped.
     app_dummy();
@@ -57,12 +57,13 @@ void android_main(struct android_app* state)
 
     LOGI("Done running unit tests...");
 
-    LOGI("Copying the test results in the external storage");
+    LOGI("Copying the test results to the external storage");
     std::string source = inDataPath + "/unit-test-report.xml";
     std::string destination = exDataPath + "/unit-test-report.xml";
     std::ifstream src(source.c_str(), std::ios::binary);
     std::ofstream dst(destination.c_str(), std::ios::binary);
     dst << src.rdbuf();
+    dst.flush();
     LOGI("The XML file is located in %s", destination.c_str());
 
     ANativeActivity_finish(nativeActivity);

@@ -42,9 +42,10 @@ public:
 
     bool has_strong_link_columns() noexcept;
 
-    void insert_column(std::size_t column_ndx, ColumnType type, StringData name,
+    void insert_column(size_t column_ndx, ColumnType type, StringData name,
                        ColumnAttr attr = col_attr_None);
-    void rename_column(std::size_t column_ndx, StringData new_name);
+    void rename_column(size_t column_ndx, StringData new_name);
+    void move_column(size_t from, size_t to);
 
     /// Erase the column at the specified index, and move columns at
     /// succeeding indexes to the next lower index.
@@ -53,56 +54,56 @@ public:
     /// used in a non-transactional context, or if the spec has
     /// already been successfully modified within the current write
     /// transaction.
-    void erase_column(std::size_t column_ndx);
+    void erase_column(size_t column_ndx);
 
     //@{
     // If a new Spec is constructed from the returned subspec
     // reference, it is the responsibility of the application that the
     // parent Spec object (this) is kept alive for at least as long as
     // the new Spec object.
-    SubspecRef get_subtable_spec(std::size_t column_ndx) noexcept;
-    ConstSubspecRef get_subtable_spec(std::size_t column_ndx) const noexcept;
+    SubspecRef get_subtable_spec(size_t column_ndx) noexcept;
+    ConstSubspecRef get_subtable_spec(size_t column_ndx) const noexcept;
     //@}
 
     // Column info
-    std::size_t get_column_count() const noexcept;
-    std::size_t get_public_column_count() const noexcept;
-    DataType get_public_column_type(std::size_t column_ndx) const noexcept;
-    ColumnType get_column_type(std::size_t column_ndx) const noexcept;
-    StringData get_column_name(std::size_t column_ndx) const noexcept;
+    size_t get_column_count() const noexcept;
+    size_t get_public_column_count() const noexcept;
+    DataType get_public_column_type(size_t column_ndx) const noexcept;
+    ColumnType get_column_type(size_t column_ndx) const noexcept;
+    StringData get_column_name(size_t column_ndx) const noexcept;
 
-    /// Returns std::size_t(-1) if the specified column is not found.
-    std::size_t get_column_index(StringData name) const noexcept;
+    /// Returns size_t(-1) if the specified column is not found.
+    size_t get_column_index(StringData name) const noexcept;
 
     // Column Attributes
-    ColumnAttr get_column_attr(std::size_t column_ndx) const noexcept;
+    ColumnAttr get_column_attr(size_t column_ndx) const noexcept;
 
-    std::size_t get_subspec_ndx(std::size_t column_ndx) const noexcept;
-    ref_type get_subspec_ref(std::size_t subspec_ndx) const noexcept;
-    SubspecRef get_subspec_by_ndx(std::size_t subspec_ndx) noexcept;
-    ConstSubspecRef get_subspec_by_ndx(std::size_t subspec_ndx) const noexcept;
+    size_t get_subspec_ndx(size_t column_ndx) const noexcept;
+    ref_type get_subspec_ref(size_t subspec_ndx) const noexcept;
+    SubspecRef get_subspec_by_ndx(size_t subspec_ndx) noexcept;
+    ConstSubspecRef get_subspec_by_ndx(size_t subspec_ndx) const noexcept;
 
     // Auto Enumerated string columns
-    void upgrade_string_to_enum(std::size_t column_ndx, ref_type keys_ref,
-                                ArrayParent*& keys_parent, std::size_t& keys_ndx);
-    std::size_t get_enumkeys_ndx(std::size_t column_ndx) const noexcept;
-    ref_type get_enumkeys_ref(std::size_t column_ndx, ArrayParent** keys_parent = 0,
-                              std::size_t* keys_ndx = 0) noexcept;
+    void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
+                                ArrayParent*& keys_parent, size_t& keys_ndx);
+    size_t get_enumkeys_ndx(size_t column_ndx) const noexcept;
+    ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = nullptr,
+                              size_t* keys_ndx = nullptr) noexcept;
 
     // Links
-    std::size_t get_opposite_link_table_ndx(std::size_t column_ndx) const noexcept;
-    void set_opposite_link_table_ndx(std::size_t column_ndx, std::size_t table_ndx);
+    size_t get_opposite_link_table_ndx(size_t column_ndx) const noexcept;
+    void set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx);
     bool has_backlinks() const noexcept;
-    void set_backlink_origin_column(std::size_t backlink_col_ndx, std::size_t origin_col_ndx);
-    std::size_t get_origin_column_ndx(std::size_t backlink_col_ndx) const  noexcept;
-    std::size_t find_backlink_column(std::size_t origin_table_ndx,
-                                     std::size_t origin_col_ndx) const noexcept;
+    void set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx);
+    size_t get_origin_column_ndx(size_t backlink_col_ndx) const noexcept;
+    size_t find_backlink_column(size_t origin_table_ndx,
+                                size_t origin_col_ndx) const noexcept;
 
     /// Get position in `Table::m_columns` of the specified column. It may be
     /// different from the specified logical column index due to the presence of
     /// search indexes, since their top refs are stored in Table::m_columns as
     /// well.
-    std::size_t get_column_ndx_in_parent(std::size_t column_ndx) const;
+    size_t get_column_ndx_in_parent(size_t column_ndx) const;
 
     //@{
     /// Compare two table specs for equality.
@@ -112,8 +113,8 @@ public:
 
     void destroy() noexcept;
 
-    std::size_t get_ndx_in_parent() const noexcept;
-    void set_ndx_in_parent(std::size_t) noexcept;
+    size_t get_ndx_in_parent() const noexcept;
+    void set_ndx_in_parent(size_t) noexcept;
 
 #ifdef REALM_DEBUG
     void verify() const; // Must be upper case to avoid conflict with macro in ObjC
@@ -156,23 +157,25 @@ private:
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    void update_from_parent(std::size_t old_baseline) noexcept;
+    void update_from_parent(size_t old_baseline) noexcept;
 
-    void set_parent(ArrayParent*, std::size_t ndx_in_parent) noexcept;
+    void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept;
 
-    void set_column_type(std::size_t column_ndx, ColumnType type);
-    void set_column_attr(std::size_t column_ndx, ColumnAttr attr);
+    void set_column_type(size_t column_ndx, ColumnType type);
+    void set_column_attr(size_t column_ndx, ColumnAttr attr);
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
     static MemRef create_empty_spec(Allocator&);
 
     struct ColumnInfo {
-        std::size_t m_column_ref_ndx = 0; ///< Index within Table::m_columns
+        size_t m_column_ref_ndx = 0; ///< Index within Table::m_columns
         bool m_has_search_index = false;
     };
 
-    ColumnInfo get_column_info(std::size_t column_ndx) const noexcept;
+    ColumnInfo get_column_info(size_t column_ndx) const noexcept;
+
+    size_t get_subspec_ndx_after(size_t column_ndx) const noexcept;
 
     // Returns false if the spec has no columns, otherwise it returns
     // true and sets `type` to the type of the first column.
@@ -180,7 +183,7 @@ private:
                                                ColumnType& type) noexcept;
 
     friend class Replication;
-
+    friend class Group;
     friend class Table;
 };
 
@@ -195,9 +198,9 @@ public:
 
 private:
     Array* const m_parent;
-    std::size_t const m_ndx_in_parent;
+    size_t const m_ndx_in_parent;
 
-    SubspecRef(Array* parent, std::size_t ndx_in_parent) noexcept;
+    SubspecRef(Array* parent, size_t ndx_in_parent) noexcept;
 
     friend class Spec;
     friend class ConstSubspecRef;
@@ -211,9 +214,9 @@ public:
 
 private:
     const Array* const m_parent;
-    std::size_t const m_ndx_in_parent;
+    size_t const m_ndx_in_parent;
 
-    ConstSubspecRef(const Array* parent, std::size_t ndx_in_parent) noexcept;
+    ConstSubspecRef(const Array* parent, size_t ndx_in_parent) noexcept;
 
     friend class Spec;
     friend class SubspecRef;
@@ -235,7 +238,7 @@ inline bool Spec::has_strong_link_columns() noexcept
     return m_has_strong_link_columns;
 }
 
-inline ref_type Spec::get_subspec_ref(std::size_t subspec_ndx) const noexcept
+inline ref_type Spec::get_subspec_ref(size_t subspec_ndx) const noexcept
 {
     REALM_ASSERT(subspec_ndx < m_subspecs.size());
 
@@ -266,28 +269,28 @@ inline Spec::Spec(Allocator& alloc) noexcept:
 {
 }
 
-inline SubspecRef Spec::get_subtable_spec(std::size_t column_ndx) noexcept
+inline SubspecRef Spec::get_subtable_spec(size_t column_ndx) noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
     REALM_ASSERT(get_column_type(column_ndx) == col_type_Table);
-    std::size_t subspec_ndx = get_subspec_ndx(column_ndx);
+    size_t subspec_ndx = get_subspec_ndx(column_ndx);
     return SubspecRef(&m_subspecs, subspec_ndx);
 }
 
-inline ConstSubspecRef Spec::get_subtable_spec(std::size_t column_ndx) const noexcept
+inline ConstSubspecRef Spec::get_subtable_spec(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
     REALM_ASSERT(get_column_type(column_ndx) == col_type_Table);
-    std::size_t subspec_ndx = get_subspec_ndx(column_ndx);
+    size_t subspec_ndx = get_subspec_ndx(column_ndx);
     return ConstSubspecRef(&m_subspecs, subspec_ndx);
 }
 
-inline SubspecRef Spec::get_subspec_by_ndx(std::size_t subspec_ndx) noexcept
+inline SubspecRef Spec::get_subspec_by_ndx(size_t subspec_ndx) noexcept
 {
     return SubspecRef(&m_subspecs, subspec_ndx);
 }
 
-inline ConstSubspecRef Spec::get_subspec_by_ndx(std::size_t subspec_ndx) const noexcept
+inline ConstSubspecRef Spec::get_subspec_by_ndx(size_t subspec_ndx) const noexcept
 {
     return const_cast<Spec*>(this)->get_subspec_by_ndx(subspec_ndx);
 }
@@ -316,12 +319,12 @@ inline void Spec::destroy() noexcept
     m_top.destroy_deep();
 }
 
-inline std::size_t Spec::get_ndx_in_parent() const noexcept
+inline size_t Spec::get_ndx_in_parent() const noexcept
 {
     return m_top.get_ndx_in_parent();
 }
 
-inline void Spec::set_ndx_in_parent(std::size_t ndx) noexcept
+inline void Spec::set_ndx_in_parent(size_t ndx) noexcept
 {
     m_top.set_ndx_in_parent(ndx);
 }
@@ -331,37 +334,37 @@ inline ref_type Spec::get_ref() const noexcept
     return m_top.get_ref();
 }
 
-inline void Spec::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) noexcept
+inline void Spec::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
 {
     m_top.set_parent(parent, ndx_in_parent);
 }
 
-inline void Spec::rename_column(std::size_t column_ndx, StringData new_name)
+inline void Spec::rename_column(size_t column_ndx, StringData new_name)
 {
     REALM_ASSERT(column_ndx < m_types.size());
     m_names.set(column_ndx, new_name);
 }
 
-inline std::size_t Spec::get_column_count() const noexcept
+inline size_t Spec::get_column_count() const noexcept
 {
     // This is the total count of columns, including backlinks (not public)
     return m_types.size();
 }
 
-inline std::size_t Spec::get_public_column_count() const noexcept
+inline size_t Spec::get_public_column_count() const noexcept
 {
     // Backlinks are the last columns, and do not have names, so getting
     // the number of names gives us the count of user facing columns
     return m_names.size();
 }
 
-inline ColumnType Spec::get_column_type(std::size_t ndx) const noexcept
+inline ColumnType Spec::get_column_type(size_t ndx) const noexcept
 {
     REALM_ASSERT(ndx < get_column_count());
     return ColumnType(m_types.get(ndx));
 }
 
-inline void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
+inline void Spec::set_column_type(size_t column_ndx, ColumnType type)
 {
     REALM_ASSERT(column_ndx < get_column_count());
 
@@ -374,13 +377,13 @@ inline void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
     update_has_strong_link_columns();
 }
 
-inline ColumnAttr Spec::get_column_attr(std::size_t ndx) const noexcept
+inline ColumnAttr Spec::get_column_attr(size_t ndx) const noexcept
 {
     REALM_ASSERT(ndx < get_column_count());
     return ColumnAttr(m_attr.get(ndx));
 }
 
-inline void Spec::set_column_attr(std::size_t column_ndx, ColumnAttr attr)
+inline void Spec::set_column_attr(size_t column_ndx, ColumnAttr attr)
 {
     REALM_ASSERT(column_ndx < get_column_count());
 
@@ -392,13 +395,13 @@ inline void Spec::set_column_attr(std::size_t column_ndx, ColumnAttr attr)
     update_has_strong_link_columns();
 }
 
-inline StringData Spec::get_column_name(std::size_t ndx) const noexcept
+inline StringData Spec::get_column_name(size_t ndx) const noexcept
 {
     REALM_ASSERT(ndx < get_column_count());
     return m_names.get(ndx);
 }
 
-inline std::size_t Spec::get_column_index(StringData name) const noexcept
+inline size_t Spec::get_column_index(StringData name) const noexcept
 {
     return m_names.find_first(name);
 }
@@ -431,7 +434,7 @@ inline bool Spec::operator!=(const Spec &s) const noexcept
 }
 
 
-inline SubspecRef::SubspecRef(Array* parent, std::size_t ndx_in_parent) noexcept:
+inline SubspecRef::SubspecRef(Array* parent, size_t ndx_in_parent) noexcept:
     m_parent(parent),
     m_ndx_in_parent(ndx_in_parent)
 {
@@ -444,7 +447,7 @@ inline SubspecRef::SubspecRef(const_cast_tag, ConstSubspecRef r) noexcept:
 }
 
 inline ConstSubspecRef::ConstSubspecRef(const Array* parent,
-                                        std::size_t ndx_in_parent) noexcept:
+                                        size_t ndx_in_parent) noexcept:
     m_parent(parent),
     m_ndx_in_parent(ndx_in_parent)
 {

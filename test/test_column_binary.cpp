@@ -40,12 +40,12 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(ColumnBinary_Basic)
+TEST(BinaryColumn_Basic)
 {
-    ref_type ref = BinaryColumn::create(Allocator::get_default());
+    ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
     BinaryColumn c(Allocator::get_default(), ref, true);
 
-    // TEST(ColumnBinary_MultiEmpty)
+    // TEST(BinaryColumn_MultiEmpty)
 
     c.add(BinaryData());
     c.add(BinaryData());
@@ -64,7 +64,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(0, c.get(5).size());
 
 
-    // TEST(ColumnBinary_Set)
+    // TEST(BinaryColumn_Set)
 
     c.set(0, BinaryData("hey"));
 
@@ -79,7 +79,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(0, c.get(5).size());
 
 
-    // TEST(ColumnBinary_Add)
+    // TEST(BinaryColumn_Add)
 
     c.clear();
 
@@ -98,7 +98,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(2, c.size());
 
 
-    // TEST(ColumnBinary_Set2)
+    // TEST(BinaryColumn_Set2)
 
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
@@ -153,7 +153,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(3, c.size());
 
 
-    // TEST(ColumnBinary_Insert)
+    // TEST(BinaryColumn_Insert)
 
     c.clear();
 
@@ -197,7 +197,7 @@ TEST(ColumnBinary_Basic)
     CHECK_EQUAL(6, c.size());
 
 
-    // TEST(ColumnBinary_Delete)
+    // TEST(BinaryColumn_Delete)
 
     c.clear();
 
@@ -234,7 +234,7 @@ TEST(ColumnBinary_Basic)
     CHECK(c.is_empty());
 
 
-    // TEST(ColumnBinary_Big)
+    // TEST(BinaryColumn_Big)
 
     c.clear();
 
@@ -281,14 +281,14 @@ TEST(ColumnBinary_Basic)
     }
 
 
-    // TEST(ColumnBinary_Destroy)
+    // TEST(BinaryColumn_Destroy)
 
     c.destroy();
 }
 
-TEST(ColumnBinary_Nulls)
+TEST(BinaryColumn_Nulls)
 {
-    ref_type ref = BinaryColumn::create(Allocator::get_default());
+    ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
     BinaryColumn c(Allocator::get_default(), ref, true);
 
     c.add(BinaryData());
@@ -351,6 +351,107 @@ TEST(ColumnBinary_Nulls)
     CHECK(c.get(2).ends_with(c.get(2)));
 
     c.destroy();
+}
+
+TEST(BinaryColumn_SwapRows)
+{
+    // Normal case
+    {
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+        BinaryColumn c(Allocator::get_default(), ref);
+
+        c.add(BinaryData("foo"));
+        c.add(BinaryData("bar"));
+        c.add(BinaryData("baz"));
+        c.add(BinaryData("quux"));
+
+        CHECK_EQUAL(c.get(1), BinaryData("bar"));
+        CHECK_EQUAL(c.get(2), BinaryData("baz"));
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), BinaryData("baz"));
+        CHECK_EQUAL(c.get(2), BinaryData("bar"));
+        CHECK_EQUAL(c.size(), 4);
+
+        c.destroy();
+    }
+
+    // First two elements
+    {
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+        BinaryColumn c(Allocator::get_default(), ref);
+
+        c.add(BinaryData("bar"));
+        c.add(BinaryData("baz"));
+        c.add(BinaryData("quux"));
+
+        c.swap_rows(0, 1);
+
+        CHECK_EQUAL(c.get(0), BinaryData("baz"));
+        CHECK_EQUAL(c.get(1), BinaryData("bar"));
+        CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
+    }
+
+    // Last two elements
+    {
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+        BinaryColumn c(Allocator::get_default(), ref);
+
+        c.add(BinaryData("bar"));
+        c.add(BinaryData("baz"));
+        c.add(BinaryData("quux"));
+
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), BinaryData("quux"));
+        CHECK_EQUAL(c.get(2), BinaryData("baz"));
+        CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
+    }
+
+    // Indices in wrong order
+    {
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+        BinaryColumn c(Allocator::get_default(), ref);
+
+        c.add(BinaryData("bar"));
+        c.add(BinaryData("baz"));
+        c.add(BinaryData("quux"));
+
+        c.swap_rows(2, 1);
+
+        CHECK_EQUAL(c.get(1), BinaryData("quux"));
+        CHECK_EQUAL(c.get(2), BinaryData("baz"));
+        CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
+    }
+
+    // Null values
+    {
+        bool nullable = true;
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+        BinaryColumn c(Allocator::get_default(), ref, nullable);
+
+        c.add(BinaryData("foo"));
+        c.add(BinaryData("bar"));
+        c.add(BinaryData());
+
+        CHECK(c.get(2).is_null());
+
+        c.swap_rows(2, 1);
+
+        CHECK(c.get(1).is_null());
+        CHECK_EQUAL(c.get(2).data(), BinaryData("bar").data());
+        CHECK_EQUAL(c.size(), 3); // size should not change
+
+        c.destroy();
+    }
 }
 
 #endif // TEST_COLUMN_BINARY
