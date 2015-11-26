@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.95.1 Release notes
 
 ### Bugfixes:
 * Fixed bug that would give false search results for queries on integer columns
