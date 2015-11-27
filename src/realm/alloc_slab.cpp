@@ -520,7 +520,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // processes with different opening modes.
     if (!cfg.read_only && !matches_section_boundary(size)) {
 
-        REALM_ASSERT_3(cfg.session_initiator, ||, !cfg.is_shared);
         size = get_upper_section_boundary(size);
         m_file.prealloc(0, size);
         // resizing the file (as we do here) without actually changing any internal

@@ -718,7 +718,9 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
         // - stop of the async daemon
         // - SharedGroup beginning/ending a session
         // - Waiting for and signalling database changes
+        // Since attach_file may write to the database file, we must also take the write mutex.
         {
+            RobustLockGuard lock_w(info->writemutex, &recover_from_dead_write_transact); // Throws
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
             // Even though we checked init_complete before grabbing the write mutex,
             // we do not need to check it again, because it is only changed under
@@ -896,6 +898,7 @@ bool SharedGroup::compact()
     }
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     SharedInfo* info = m_file_map.get_addr();
+    RobustLockGuard w_lock(info->writemutex, &recover_from_dead_write_transact); // Throws
     RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
     if (info->num_participants > 1)
         return false;

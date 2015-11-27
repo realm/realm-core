@@ -2,6 +2,9 @@
 
 ### Bugfixes:
 
+* Fixing a race condition between SlabAlloc::attach_file() and SharedGroup::commit().
+  In debug mode, the race would trigger an  assert "cfg.session_initiator || !cfg.is_shared", 
+  in release mode it could conceivably result in undefined behaviour.
 * Fixed bug where Query::average() would include the number of nulls in the 
   result.
 
