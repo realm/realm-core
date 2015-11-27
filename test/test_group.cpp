@@ -88,7 +88,7 @@ REALM_TABLE_3(TestTableGroup2,
 char buf[256];
 
 StringData create_string(unsigned char byte) {
-    
+
 
     for (size_t i = 0; i < sizeof(buf); i++)
         buf[i] = 'a' + (rand() % 20);
@@ -100,7 +100,7 @@ StringData create_string(unsigned char byte) {
 
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
-            CLEAR_TABLE, MOVE_TABLE,        
+            CLEAR_TABLE, MOVE_TABLE,
 
             COUNT};
 
@@ -123,35 +123,11 @@ DataType get_type(unsigned char c) {
     };
 
     unsigned char mod = c % 9;
-    
+
     return types[mod];
 }
 
 unsigned char ins[2000];
-
-
-ONLY(Table_InsertColurmnMaintainsBacklinkIndices)
-{
-    Group g;
-
-    TableRef t0 = g.add_table("hrnetprsafd");
-    TableRef t1 = g.add_table("qrsfdrpnkd");
-
-    t1->add_column_link(type_Link, "bbb", *t0);
-    t1->add_column_link(type_Link, "ccc", *t0);
-    t1->insert_column(0, type_Int, "aaa");
-
-    t1->add_empty_row();
-
-    t0->add_column(type_Int, "foo");
-    t0->add_empty_row();
-
-    t1->remove_column(0);
-    t1->set_link(0, 0, 0);
-    t1->remove_column(0);
-    t1->set_link(0, 0, 0);
-}
-
 
 
 TEST(Group_Fuzzy)
@@ -196,7 +172,7 @@ TEST(Group_Fuzzy)
                 /* **********************************************************************************/
 
 
-                
+
                 if (ins[i++] % COUNT == ADD_TABLE && g.size() < 1100) {
                     try {
                         g.add_table(create_string(ins[i++] % Group::max_table_name_length));
@@ -205,7 +181,7 @@ TEST(Group_Fuzzy)
                     i++;
                 }
 
-               
+
                 else if (ins[i++] % COUNT == INSERT_TABLE && g.size() < 1100) {
                     try {
                         size_t s0 = ins[i++] % (g.size() + 1);
@@ -254,7 +230,7 @@ TEST(Group_Fuzzy)
                     TableRef t = g.get_table(ins[i++] % g.size());
                     t->add_column(get_type(ins[i++]), create_string(ins[i++] % Group::max_table_name_length));
                 }
-                
+
 
                 else if (ins[i++] % COUNT == INSERT_COLUMN && g.size() > 0) {
                     size_t s3 = ins[i++] % g.size();
@@ -269,7 +245,7 @@ TEST(Group_Fuzzy)
                     t->insert_column(s0, d0, sd0);
                 }
 
-                
+
                 else if (ins[i++] == REMOVE_COLUMN && g.size() > 0) {
                     size_t s3 = ins[i++] % g.size();
                     TableRef t = g.get_table(s3);
@@ -283,7 +259,7 @@ TEST(Group_Fuzzy)
 
                     }
                 }
-                
+
 
                 else if (ins[i++] % COUNT == ADD_COLUMN_LINK && g.size() >= 1) {
                     size_t s0 = ins[i++] % g.size();
@@ -299,13 +275,13 @@ TEST(Group_Fuzzy)
                     t1->add_column_link(type_Link, sd0, *t2);
                 }
 
-                
+
                 else if (ins[i++] % COUNT == ADD_COLUMN_LINK_LIST && g.size() >= 2) {
                     TableRef t1 = g.get_table(ins[i++] % g.size());
                     TableRef t2 = g.get_table(ins[i++] % g.size());
                     t1->add_column_link(type_LinkList, create_string(ins[i++] % Group::max_table_name_length), *t2);
                 }
-               
+
 
 
 
@@ -363,9 +339,9 @@ TEST(Group_Fuzzy)
                         }
                     }
                 }
-                
 
-                
+
+
 
                 else if (ins[i++] % COUNT == REMOVE_ROW && g.size() > 0) {
                     TableRef t = g.get_table(ins[i++] % g.size());
@@ -373,7 +349,7 @@ TEST(Group_Fuzzy)
                         t->remove(ins[i++] % t->size());
                     }
                 }
-                
+
 
 
                 /* **********************************************************************************/
@@ -394,7 +370,7 @@ TEST(Group_Fuzzy)
             }
 
 
-        } 
+        }
 
 
 
