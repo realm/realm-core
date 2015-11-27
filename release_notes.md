@@ -26,7 +26,8 @@
 ### Bugfixes:
 * Fixed bug that would give false search results for queries on integer columns
   due to bug in bithacks deep inside Array::find()
-* Lorem ipsum.
+* Fixed bug where Query::average() would include the number of nulls in the 
+  result.
 
 ### Enhancements:
 
