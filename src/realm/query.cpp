@@ -2,7 +2,6 @@
 #include <algorithm>
 
 #include <realm/array.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/query.hpp>
 #include <realm/query_engine.hpp>
@@ -401,61 +400,61 @@ Query& Query::greater_int(size_t column_ndx1, size_t column_ndx2)
 // column vs column, float
 Query& Query::not_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return not_equal<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return less<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return greater<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return greater_equal<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return less_equal<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::equal_float(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<BasicColumn<float>>(column_ndx1, column_ndx2);
+    return equal<FloatColumn>(column_ndx1, column_ndx2);
 }
 
 // column vs column, double
 Query& Query::equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return equal<DoubleColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::less_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return less_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return less_equal<DoubleColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::greater_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return greater_equal<DoubleColumn>(column_ndx1, column_ndx2);
 }
 Query& Query::greater_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return greater<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return greater<DoubleColumn>(column_ndx1, column_ndx2);
 }
 Query& Query::less_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return less<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return less<DoubleColumn>(column_ndx1, column_ndx2);
 }
 
 Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
 {
-    return not_equal<BasicColumn<double>>(column_ndx1, column_ndx2);
+    return not_equal<DoubleColumn>(column_ndx1, column_ndx2);
 }
 
 // null vs column
@@ -715,7 +714,7 @@ template<Action action, typename T, typename R, class ColType>
             *resultcount = limit < (end - start) ? limit : (end - start);
         }
         // direct aggregate on the column
-        return (column.*aggregateMethod)(start, end, limit, return_ndx);
+        return (column.*aggregateMethod)(start, end, limit, action == act_Sum ? resultcount : return_ndx);
     }
     else {
 
@@ -809,7 +808,6 @@ int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, siz
         return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, resultcount, start, end, limit);
     }
     return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, resultcount, start, end, limit);
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
@@ -829,7 +827,6 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
 DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
@@ -838,7 +835,6 @@ DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t 
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
@@ -864,7 +860,6 @@ int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start,
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
     return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
@@ -884,7 +879,6 @@ DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t 
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
@@ -915,7 +909,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
 double Query::average_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return average<int64_t, true>(column_ndx, resultcount, start, end, limit);
+        return average<util::Optional<int64_t>, true>(column_ndx, resultcount, start, end, limit);
     }
     return average<int64_t, false>(column_ndx, resultcount, start, end, limit);
 }
@@ -1193,8 +1187,8 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
 #if REALM_MULTITHREAD_QUERY
 TableView Query::find_all_multi(size_t start, size_t end)
 {
-    (void)start;
-    (void)end;
+    static_cast<void>(start);
+    static_cast<void>(end);
 
     // Initialization
     init(*m_table);

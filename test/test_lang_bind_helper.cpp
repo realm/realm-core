@@ -135,8 +135,7 @@ public:
     {
     }
 
-    void prepare_changeset(const char* data, size_t size, Replication::version_type new_version)
-        override
+    void prepare_changeset(const char* data, size_t size, Replication::version_type new_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data+size, m_incoming_changeset.data());
@@ -154,8 +153,8 @@ public:
         m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
     }
 
-    void get_changesets(version_type begin_version, version_type end_version, BinaryData* buffer)
-        const noexcept override
+    void get_changesets(version_type begin_version, version_type end_version,
+                        BinaryData* buffer) const noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i != n; ++i) {
@@ -245,7 +244,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(type_Int, foo->get_column_type(0));
     CHECK_EQUAL(1, foo->size());
     CHECK_EQUAL(0, foo->get_int(0,0));
-
+    uint_fast64_t version = foo->get_version_counter();
 
     // Modify the table via the other SharedGroup
     {
@@ -260,6 +259,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);
+    CHECK(version != foo->get_version_counter());
     group.verify();
     CHECK_EQUAL(2, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(0));
@@ -372,22 +372,22 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 
     // Add the first table
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table_1");
         wt.commit();
     }
 
     // Create a SharedGroup to which we can apply a foreign transaction
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path));
-    SharedGroup sg(*hist);
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     // Add the second table in a "foreign" transaction
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table_2");
         wt.commit();
@@ -409,22 +409,22 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 
     // Add the table
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
     // Create a SharedGroup to which we can apply a foreign transaction
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path));
-    SharedGroup sg(*hist);
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     // remove the table in a "foreign" transaction
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.get_group().remove_table("table");
         wt.commit();
@@ -439,20 +439,20 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path));
-    SharedGroup sg(*hist);
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path));
-        SharedGroup sg_w(*hist_w);
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
         WriteTransaction wt(sg_w);
         for (int i = 0; i < 16; ++i) {
@@ -717,20 +717,528 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 
 TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 {
-    // FIXME: Exercise the mixed column
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 3 mixed columns and 3 rows
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_Mixed, "a");
+        table_w->add_column(type_Mixed, "b");
+        table_w->add_column(type_Mixed, "c");
+        table_w->add_empty_row(3);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    // Every cell must have integer type and be zero by default
+    ConstTableRef table = group.get_table("t");
+    for (size_t row_ndx = 0; row_ndx < 3; ++row_ndx) {
+        for (size_t col_ndx = 0; col_ndx < 3; ++col_ndx) {
+            CHECK_EQUAL(type_Int, table->get_mixed_type(col_ndx, row_ndx)) &&
+                CHECK_EQUAL(0, table->get_mixed(col_ndx, row_ndx).get_int());
+        }
+    }
+
+    using int_type = decltype (Mixed().get_int());
+
+    auto set_subtab = [this](TableRef table_w, size_t col_ndx, size_t row_ndx, int_type value) {
+        table_w->set_mixed(col_ndx, row_ndx, Mixed(Mixed::subtable_tag()));
+        TableRef subtab_w = table_w->get_subtable(col_ndx, row_ndx);
+        subtab_w->add_column(type_Int, "");
+        subtab_w->add_empty_row();
+        subtab_w->set_int(0, 0, value);
+    };
+
+    auto check_subtab = [this](ConstTableRef table, size_t col_ndx, size_t row_ndx, int_type value) {
+        ConstTableRef subtab = table->get_subtable(col_ndx, row_ndx);
+        return CHECK_EQUAL(1, subtab->get_column_count()) &&
+            CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
+            CHECK_EQUAL(1, subtab->size()) &&
+            CHECK_EQUAL(value, subtab->get_int(0, 0));
+    };
+
+    // Change value types (round 1 of 2)
+    char bin_1[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->set_mixed(0, 0, Mixed(int_type(2)));
+        table_w->set_mixed(0, 1, Mixed(true));
+        table_w->set_mixed(0, 2, Mixed(DateTime(3)));
+        table_w->set_mixed(1, 0, Mixed(4.0f));
+        table_w->set_mixed(1, 1, Mixed(5.0));
+        wt.get_group().verify();
+        table_w->set_mixed(1, 2, Mixed(StringData("Hadamard")));
+        table_w->set_mixed(2, 0, Mixed(BinaryData(bin_1)));
+        set_subtab(table_w, 2, 1, 6);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1)) &&
+        CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(DateTime(3), table->get_mixed(0, 2).get_datetime());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) &&
+        CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
+        CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_1), table->get_mixed(2, 0).get_binary());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(2, 1)) &&
+        check_subtab(table, 2, 1, 6);
+    CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
+
+    // Change value types (round 2 of 2)
+    char bin_2[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->set_mixed(0, 1, Mixed(20.0f));
+        table_w->set_mixed(0, 2, Mixed(false));
+        set_subtab(table_w, 1, 0, 30);
+        table_w->set_mixed(1, 1, Mixed(BinaryData(bin_2)));
+        table_w->set_mixed(1, 2, Mixed(int_type(40)));
+        table_w->set_mixed(2, 0, Mixed(50.0));
+        table_w->set_mixed(2, 1, Mixed(StringData("Banach")));
+        table_w->set_mixed(2, 2, Mixed(DateTime(60)));
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) &&
+        check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 2).get_datetime());
+
+    // Insert rows before
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->insert_empty_row(0, 8);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8+0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 8+0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 8+1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 8+1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 8+2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 8+2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 8+0)) &&
+        check_subtab(table, 1, 8+0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 8+1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 8+1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 8+2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 8+2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 8+0)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 8+0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 8+1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 8+1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 8+2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 8+2).get_datetime());
+
+    // Move rows by remove() (ordered removal)
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->remove(4);
+        table_w->remove(2);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6+0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 6+0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 6+1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 6+1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 6+2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 6+2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 6+0)) &&
+        check_subtab(table, 1, 6+0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 6+1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 6+1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 6+2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 6+2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 6+0)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 6+0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 6+1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 6+1).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 6+2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 6+2).get_datetime());
+
+    // Move rows by move_last_over() (unordered removal)
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->move_last_over(2); // 8 -> 2
+        table_w->move_last_over(4); // 7 -> 4
+        table_w->move_last_over(0); // 6 -> 0
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 4)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 4).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) &&
+        check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 4)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 4).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 4)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 2).get_datetime());
+
+    // Swap rows
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->swap_rows(4, 0);
+        table_w->swap_rows(2, 5);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 4)) &&
+        check_subtab(table, 1, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(1, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 4)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 5).get_datetime());
+
+    // Insert columns before
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->insert_column(0, type_Int,      "x1");
+        table_w->insert_column(0, type_DateTime, "x2");
+        table_w->insert_column(1, type_Float,    "x3");
+        table_w->insert_column(0, type_Double,   "x4");
+        table_w->insert_column(2, type_String,   "x5");
+        table_w->insert_column(1, type_Binary,   "x6");
+        table_w->insert_column(3, type_Table,    "x7");
+        table_w->insert_column(2, type_Mixed,    "x8");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0+8, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(0+8, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0+8, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0+8, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0+8, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0+8, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1+8, 4)) &&
+        check_subtab(table, 1+8, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1+8, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1+8, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1+8, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(1+8, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2+8, 4)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2+8, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2+8, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2+8, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2+8, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2+8, 5).get_datetime());
+
+    // Remove columns before
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->remove_column(4);
+        table_w->remove_column(2);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0+6, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(0+6, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0+6, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0+6, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0+6, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0+6, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1+6, 4)) &&
+        check_subtab(table, 1+6, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1+6, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1+6, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1+6, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(1+6, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2+6, 4)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2+6, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2+6, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2+6, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2+6, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(2+6, 5).get_datetime());
+
+    // Move columns around
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        DescriptorRef desc_w = table_w->get_descriptor();
+        using tf = _impl::TableFriend;
+        tf::move_column(*desc_w, 7, 2); // FIXME: Not yet publicly exposed
+        tf::move_column(*desc_w, 8, 4);
+        tf::move_column(*desc_w, 2, 7);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4)) &&
+        CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(8, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(8, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(8, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(8, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(7, 4)) &&
+        check_subtab(table, 7, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(7, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(7, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(7, 5)) &&
+        CHECK_EQUAL(40, table->get_mixed(7, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(3, 4)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(3, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
+    CHECK_EQUAL(type_DateTime, table->get_mixed_type(3, 5)) &&
+        CHECK_EQUAL(DateTime(60), table->get_mixed(3, 5).get_datetime());
 }
 
 
 TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
 {
-    // FIXME: Check introduction and modification of enumerated strings column
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 3 string columns, one primed for conversion to "unique string
+    // enumeration" representation
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_String, "a");
+        table_w->add_column(type_String, "b");
+        table_w->add_column(type_String, "c");
+        table_w->add_empty_row(1000);
+        for (int i = 0; i < 1000; ++i) {
+            std::ostringstream out;
+            out << i;
+            std::string str = out.str();
+            table_w->set_string(0, i, str);
+            table_w->set_string(1, i, "foo"); // Same value in all rows
+            table_w->set_string(2, i, str);
+        }
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    ConstTableRef table = group.get_table("t");
+    ConstDescriptorRef desc = table->get_descriptor();
+    CHECK_EQUAL(0, desc->get_num_unique_values(0));
+    CHECK_EQUAL(0, desc->get_num_unique_values(1)); // Not yet "optimized"
+    CHECK_EQUAL(0, desc->get_num_unique_values(2));
+
+    // Optimize
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->optimize();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(0, desc->get_num_unique_values(0));
+    CHECK_NOT_EQUAL(0, desc->get_num_unique_values(1)); // Must be "optimized" now
+    CHECK_EQUAL(0, desc->get_num_unique_values(2));
 }
 
 
 TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
 {
-    // FIXME: Check introduction and modification of search index
-    // FIXME: Check that it is correctly moved when columns are inserted or removed at lower column index.
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Create 5 columns, and make 3 of them indexed
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.add_table("t");
+        table_w->add_column(type_Int,    "i0");
+        table_w->add_column(type_String, "s1");
+        table_w->add_column(type_String, "s2");
+        table_w->add_column(type_Int,    "i3");
+        table_w->add_column(type_Int,    "i4");
+        table_w->add_search_index(0);
+        table_w->add_search_index(2);
+        table_w->add_search_index(4);
+        table_w->add_empty_row(8);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    ConstTableRef table = group.get_table("t");
+    CHECK(table->has_search_index(0));
+    CHECK_NOT(table->has_search_index(1));
+    CHECK(table->has_search_index(2));
+    CHECK_NOT(table->has_search_index(3));
+    CHECK(table->has_search_index(4));
+
+    // Remove the previous search indexes and add 2 new ones
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->add_empty_row(8);
+        table_w->remove_search_index(2);
+        table_w->add_search_index(3);
+        table_w->remove_search_index(0);
+        table_w->add_search_index(1);
+        table_w->remove_search_index(4);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_NOT(table->has_search_index(0));
+    CHECK(table->has_search_index(1));
+    CHECK_NOT(table->has_search_index(2));
+    CHECK(table->has_search_index(3));
+    CHECK_NOT(table->has_search_index(4));
+
+    // Add some searchable contents
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        int_fast64_t v = 7;
+        size_t n = table_w->size();
+        for (size_t i = 0; i < n; ++i) {
+//            std::cerr << i << " " << v << "\n";
+            std::ostringstream out;
+            out << v;
+            table_w->set_string(1, i, out.str());
+            table_w->set_int(3, i, v);
+            v = (v + 1581757577LL) % 1000;
+        }
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+
+    // Move the indexed columns by insertion
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->insert_column(2, type_Int, "x1");
+        table_w->insert_column(0, type_Int, "x2");
+        table_w->insert_column(3, type_Int, "x3");
+        table_w->insert_column(0, type_Int, "x4");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_NOT(table->has_search_index(2));
+    CHECK(table->has_search_index(3));
+    CHECK_NOT(table->has_search_index(6));
+    CHECK(table->has_search_index(7));
+    CHECK_NOT(table->has_search_index(8));
+    CHECK_EQUAL(12, table->find_first_string(3, "931"));
+    CHECK_EQUAL(4,  table->find_first_int(7, 315));
+
+    // Move the indexed columns by removal
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        table_w->remove_column(1);
+        table_w->remove_column(4);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_NOT(table->has_search_index(1));
+    CHECK(table->has_search_index(2));
+    CHECK_NOT(table->has_search_index(4));
+    CHECK(table->has_search_index(5));
+    CHECK_NOT(table->has_search_index(6));
+    CHECK_EQUAL(3,  table->find_first_string(2, "738"));
+    CHECK_EQUAL(13, table->find_first_int(5, 508));
+
+    // Move the indexed columns directly
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_w = wt.get_table("t");
+        DescriptorRef desc_w = table_w->get_descriptor();
+        using tf = _impl::TableFriend;
+        tf::move_column(*desc_w, 2, 5); // FIXME: Not yet publicly exposed
+        tf::move_column(*desc_w, 1, 6);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_NOT(table->has_search_index(6));
+    CHECK(table->has_search_index(4));
+    CHECK_NOT(table->has_search_index(2));
+    CHECK(table->has_search_index(3));
+    CHECK_NOT(table->has_search_index(5));
+    CHECK_EQUAL(12, table->find_first_string(4, "931"));
+    CHECK_EQUAL(4,  table->find_first_int(3, 315));
 }
 
 
@@ -6475,6 +6983,47 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     t_r->clear();
 }
 
+TEST(LangBindHelper_AdvanceReadTransact_TableClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->add_empty_row();
+        wt.commit();
+    }
+
+    ConstTableRef table = sg.begin_read().get_table("table");
+    TableView tv = table->where().find_all();
+    ConstRow row = table->get(0);
+    CHECK(row.is_attached());
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+        WriteTransaction wt(sg_w);
+        wt.get_table("table")->clear();
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK(!row.is_attached());
+
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK(!tv.is_in_sync());
+    CHECK(!tv.is_row_attached(0));
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+}
+
 namespace {
 // A base class for transaction log parsers so that tests which want to test
 // just a single part of the transaction log handling don't have to implement
@@ -6747,6 +7296,61 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    // Add some initial data and then begin a read transaction at that version
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("Table");
+        table->add_column(type_Int, "int");
+        table->add_empty_row();
+        table->set_int(0, 0, 10);
+        wt.commit();
+    }
+    const Group& g = sg.begin_read();
+
+    // Modify the data with a different SG so that we can determine which version
+    // the read transaction is using
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+        wt.get_table("Table")->set_int(0, 0, 20);
+        wt.commit();
+    }
+
+    struct ObserverError { };
+    try {
+        struct : NoOpTransactionLogParser {
+            using NoOpTransactionLogParser::NoOpTransactionLogParser;
+
+            bool set_int(size_t, size_t, size_t) const
+            {
+                throw ObserverError();
+            }
+        } parser(test_results);
+
+        LangBindHelper::advance_read(sg, *hist, parser);
+        CHECK(false); // Should not be reached
+    }
+    catch (ObserverError) {
+    }
+
+    // Should still see data from old version
+    CHECK_EQUAL(10, g.get_table("Table")->get_int(0, 0));
+
+    // Should be able to advance to the new version still
+    LangBindHelper::advance_read(sg, *hist);
+
+    // And see that version's data
+    CHECK_EQUAL(20, g.get_table("Table")->get_int(0, 0));
+}
+
+
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -6926,6 +7530,41 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
         LangBindHelper::rollback_and_continue_as_read(sg, *hist);
         group->verify();
         CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
+    }
+    group->verify();
+}
+
+
+// This issue was uncovered while looking into the RollbackCircularReferenceRemoval issue
+TEST(LangBindHelper_TableLinkingRemovalIssue)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef t1 = group->get_or_add_table("t1");
+        TableRef t2 = group->get_or_add_table("t2");
+        TableRef t3 = group->get_or_add_table("t3");
+        TableRef t4 = group->get_or_add_table("t4");
+        t1->add_column_link(type_Link, "l12", *t2);
+        t2->add_column_link(type_Link, "l23", *t3);
+        t3->add_column_link(type_Link, "l34", *t4);
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        CHECK_EQUAL(4, group->size());
+
+        group->remove_table("t1");
+        group->remove_table("t2");
+        group->remove_table("t3"); // CRASHES HERE
+        group->remove_table("t4");
+
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        CHECK_EQUAL(4, group->size());
     }
     group->verify();
 }
@@ -8252,7 +8891,7 @@ struct HandoverControl {
     {
         LockGuard lg(m_lock);
         //std::cout << "put " << h << std::endl;
-        while (m_handover != 0) m_changed.wait(lg);
+        while (m_handover != nullptr) m_changed.wait(lg);
         //std::cout << " -- put " << h << std::endl;
         m_handover = move(h);
         m_version = v;
@@ -8262,20 +8901,20 @@ struct HandoverControl {
     {
         LockGuard lg(m_lock);
         //std::cout << "get " << std::endl;
-        while (m_handover == 0) m_changed.wait(lg);
+        while (m_handover == nullptr) m_changed.wait(lg);
         //std::cout << " -- get " << m_handover << std::endl;
         h = move(m_handover);
         v = m_version;
-        m_handover = 0;
+        m_handover = nullptr;
         m_changed.notify_all();
     }
     bool try_get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
     {
         LockGuard lg(m_lock);
-        if (m_handover == 0) return false;
+        if (m_handover == nullptr) return false;
         h = move(m_handover);
         v = m_version;
-        m_handover = 0;
+        m_handover = nullptr;
         m_changed.notify_all();
         return true;
     }
@@ -8311,7 +8950,8 @@ void handover_writer(std::string path)
         LangBindHelper::commit_and_continue_as_read(sg);
         // improve chance of consumers running concurrently with
         // new writes:
-        sched_yield();
+        for (int n=0; n<10; ++n)
+            sched_yield();
     }
     LangBindHelper::promote_to_write(sg, *hist);
     table[0].first = 0; // <---- signals other threads to stop

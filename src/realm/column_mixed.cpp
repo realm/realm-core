@@ -61,7 +61,7 @@ void MixedColumn::ensure_binary_data_column()
     if (m_binary_data)
         return;
 
-    ref_type ref = BinaryColumn::create(m_array->get_alloc()); // Throws
+    ref_type ref = BinaryColumn::create(m_array->get_alloc(), 0, true); // Throws
     m_binary_data.reset(new BinaryColumn(m_array->get_alloc(), ref)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 2);
     m_array->add(ref); // Throws

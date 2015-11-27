@@ -60,7 +60,7 @@ public:
     {
     }
 
-    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = 0)
+    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = nullptr)
     {
         for (const Buffer<char>& changeset: m_changesets)
             apply_changeset(changeset.data(), changeset.size(), target, replay_logger);
@@ -799,6 +799,82 @@ TEST(Replication_NullInteger)
         CHECK(table2->is_null(0, 0));
         CHECK(!table2->is_null(0, 1));
         CHECK(table2->is_null(0, 2));
+    }
+}
+
+
+TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColumn)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("foo");
+        table1->add_column(type_Int, "a");
+        table1->add_column(type_Int, "c");
+        TableRef table2 = wt.add_table("foo2");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        wt.get_group().rename_table("foo", "bar");
+        auto bar = wt.get_table("bar");
+        bar->rename_column(0, "b");
+        _impl::TableFriend::move_column(*bar->get_descriptor(), 1, 0);
+        wt.get_group().move_table(1, 0);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef foo = rt.get_table("foo");
+        CHECK(!foo);
+        ConstTableRef bar = rt.get_table("bar");
+        CHECK(bar);
+        CHECK_EQUAL(1, bar->get_index_in_group());
+        CHECK_EQUAL(1, bar->get_column_index("b"));
+    }
+}
+
+
+TEST(Replication_Substrings)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_String, "string");
+        table->add_empty_row();
+        table->set_string(0, 0, "Hello, World!");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("table");
+        table->remove_substring(0, 0, 0, 6);
+        table->insert_substring(0, 0, 0, "Goodbye, Cruel");
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        auto table = rt.get_table("table");
+        CHECK_EQUAL("Goodbye, Cruel World!", table->get_string(0, 0));
     }
 }
 

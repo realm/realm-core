@@ -50,6 +50,7 @@ Searching: The main finding function is:
 
 #include <realm/util/meta.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/file_mapper.hpp>
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
 #include <realm/string_data.hpp>
@@ -714,7 +715,7 @@ public:
 
     // Called for each search result
     template<Action action, class Callback>
-    bool find_action(size_t index, int64_t value,
+    bool find_action(size_t index, util::Optional<int64_t> value,
                      QueryState<int64_t>* state, Callback callback) const;
 
     template<Action action, class Callback>
@@ -1019,6 +1020,8 @@ public:
 
     static const int header_size = 8; // Number of bytes used by header
 
+    // The encryption layer relies on headers always fitting within a single page.
+    static_assert(header_size == 8, "Header must always fit in entirely on a page");
 private:
     Array& operator=(const Array&); // not allowed
 protected:
@@ -1372,8 +1375,6 @@ public:
             return match<action, pattern>(index, indexpattern, *value);
         }
 
-        ++m_match_count;
-
         // If value is null, the only sensible actions are count, find_all, and return first.
         // Max, min, and sum should all have no effect.
         if (action == act_Count) {
@@ -1384,6 +1385,7 @@ public:
             Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
         }
         else if (action == act_ReturnFirst) {
+            m_match_count++;
             m_state = index;
             return false;
         }
@@ -1434,25 +1436,30 @@ public:
         static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
                       "Search action not supported");
 
-        ++m_match_count;
+        if (action == act_Count) {
+            ++m_match_count;
+        }
+        else if (!null::is_null_float(value)) {
+            ++m_match_count;
+            if (action == act_Max) {
+                if (value > m_state) {
+                    m_state = value;
+                    m_minmax_index = index;
+                }
+            }
+            else if (action == act_Min) {
+                if (value < m_state) {
+                    m_state = value;
+                    m_minmax_index = index;
+                }
+            }
+            else if (action == act_Sum)
+                m_state += value;
+            else {
+                REALM_ASSERT_DEBUG(false);
+            }
+        }
 
-        if (action == act_Max) {
-            if (value > m_state) {
-                m_state = value;
-                m_minmax_index = index;
-            }
-        }
-        else if (action == act_Min) {
-            if (value < m_state) {
-                m_state = value;
-                m_minmax_index = index;
-            }
-        }
-        else if (action == act_Sum)
-            m_state += value;
-        else {
-            REALM_ASSERT_DEBUG(false);
-        }
         return (m_limit > m_match_count);
     }
 };
@@ -2073,7 +2080,7 @@ inline MemRef Array::create_array(Type type, bool context_flag, size_t size, int
 
 inline bool Array::has_parent() const noexcept
 {
-    return m_parent != 0;
+    return m_parent != nullptr;
 }
 
 inline ArrayParent* Array::get_parent() const noexcept
@@ -2381,7 +2388,7 @@ computations for the given search criteria makes it feasible to construct such a
 // computation of these values will not be made. Only works if find_action() and find_action_pattern() rewritten as macros. Note: This problem has been fixed in
 // next upcoming array.hpp version
 template<Action action, class Callback>
-bool Array::find_action(size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const
+bool Array::find_action(size_t index, util::Optional<int64_t> value, QueryState<int64_t>* state, Callback callback) const
 {
     if (action == act_CallbackIdx)
         return callback(index);
@@ -2534,8 +2541,9 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
         // Huge speed optimizations are possible here! This is a very simple generic method.
         for (; start2 < end; start2++) {
             int64_t v = get<bitwidth>(start2 + 1);
-            if (c(v, value, v == get(0), find_null)) {
-                if (!find_action<action, Callback>(start2 + baseindex, v, state, callback))
+            if (c(v, value, v == get(0), find_null)) {                
+                util::Optional<int64_t> v2(v == get(0) ? util::none : util::make_optional(v));
+                if (!find_action<action, Callback>(start2 + baseindex, v2, state, callback))
                     return false; // tell caller to stop aggregating/search
             }
         }
@@ -2606,7 +2614,9 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
                 Array::minimum(res, start2, end2, &res_ndx);
 
             find_action<action, Callback>(res_ndx + baseindex, res, state, callback);
-            state->m_match_count += end2 - start2;
+            // find_action will increment match count by 1, so we need to `-1` from the number of elements that
+            // we performed the fast Array methods on.
+            state->m_match_count += end2 - start2 - 1;
 
         }
         else if (action == act_Count) {
@@ -2860,17 +2870,17 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
     }
     else if (width == 8) {
         // 88 ms:
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 4 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 5 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 6 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
-        if (gt ? static_cast<char>(chunk) > v : static_cast<char>(chunk) < v) {if (!find_action<action, Callback>( 7 + baseindex, static_cast<char>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 4 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 5 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 6 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;} chunk >>= 8;
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 7 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;} chunk >>= 8;
 
         //97 ms ms:
-        // if (gt ? static_cast<char>(chunk >> 0*8) > v : static_cast<char>(chunk >> 0*8) < v) return 0;
+        // if (gt ? static_cast<int8_t>(chunk >> 0*8) > v : static_cast<int8_t>(chunk >> 0*8) < v) return 0;
     }
     else if (width == 16) {
 
@@ -3401,7 +3411,8 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
     if (bitwidth == 1 || bitwidth == 2 || bitwidth == 4 || bitwidth == 8 || bitwidth == 16) {
         uint64_t magic = find_gtlt_magic<gt, bitwidth>(value);
 
-        // Bit hacks only work if searched item <= 127 for 'greater than' and item <= 128 for 'less than'
+        // Bit hacks only work if searched item has its most significant bit clear for 'greater than' or
+        // 'item <= 1 << bitwidth' for 'less than'
         if (value != int64_t((magic & mask)) && value >= 0 && bitwidth >= 2 && value <= static_cast<int64_t>((mask >> 1) - (gt ? 1 : 0))) {
             // 15 ms
             while (p < e) {
@@ -3410,12 +3421,10 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
                 const int64_t v = *p;
                 size_t idx;
 
-                // Bit hacks only works for positive items in chunk, so test their sign bits
+                // Bit hacks only works if all items in chunk have their most significant bit clear. Test this:
                 upper = upper & v;
 
-                if ((bitwidth > 4 ? !upper : true)) {
-                    // Assert that all values in chunk are positive.
-                    REALM_ASSERT(bitwidth <= 4 || ((lower_bits<bitwidth>() << (no0(bitwidth) - 1)) & value) == 0);
+                if (!upper) {
                     idx = find_gtlt_fast<gt, action, bitwidth, Callback>(v, magic, state, (p - reinterpret_cast<int64_t*>(m_data)) * 8 * 8 / no0(bitwidth) + baseindex, callback);
                 }
                 else

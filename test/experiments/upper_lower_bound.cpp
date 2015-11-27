@@ -7,7 +7,6 @@
 #include <realm/column.hpp>
 #include <realm.hpp>
 #include <realm/group_shared.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_mixed.hpp>

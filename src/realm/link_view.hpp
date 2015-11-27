@@ -231,7 +231,7 @@ inline bool LinkView::operator==(const LinkView& link_list) const noexcept
             link_list.m_row_indexes.is_empty();
     }
     return link_list.m_row_indexes.is_attached() &&
-        m_row_indexes.compare_int(link_list.m_row_indexes);
+        m_row_indexes.compare(link_list.m_row_indexes);
 }
 
 inline bool LinkView::operator!=(const LinkView& link_list) const noexcept

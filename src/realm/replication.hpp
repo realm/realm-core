@@ -93,8 +93,7 @@ public:
     /// Called by SharedGroup during a write transaction, when readlocks are
     /// recycled, to keep the commit log management in sync with what versions
     /// can possibly be interesting in the future.
-    virtual void set_last_version_seen_locally(version_type last_seen_version_number)
-        noexcept;
+    virtual void set_last_version_seen_locally(version_type last_seen_version_number) noexcept;
 
 
     //@{
@@ -207,7 +206,7 @@ public:
     /// \throw BadTransactLog If the transaction log could not be successfully
     /// parsed, or ended prematurely.
     static void apply_changeset(InputStream& transact_log, Group& target,
-                                util::Logger* logger = 0);
+                                util::Logger* logger = nullptr);
 
     virtual ~Replication() noexcept {}
 
@@ -292,7 +291,7 @@ protected:
     virtual void finalize_changeset() noexcept = 0;
 
     static void apply_changeset(const char* data, size_t size, SharedGroup& target,
-                                util::Logger* logger = 0);
+                                util::Logger* logger = nullptr);
 
 private:
     const std::string m_database_file;

@@ -23,9 +23,10 @@
 
 #include <realm/column.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/util/utf8.hpp>
 #include <realm/index_string.hpp>
+#include <realm/column_tpl.hpp>
+#include <realm/impl/sequential_getter.hpp>
 
 using namespace realm;
 
@@ -226,7 +227,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     else {
         // FIXME: This assumes that all non-count aggregates on nullable integer columns run with
         // the NotNull condition.
-        res = util::unwrap(first);
+        res = static_cast<R>(util::unwrap(first));
     }
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
@@ -251,16 +252,16 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         else {
             // FIXME: This assumes that all non-count aggregates on nullable integer columns run with
             // the NotNull condition.
-            auto unpacked = util::unwrap(v);
+            R unpacked = static_cast<R>(util::unwrap(v));
             if (function == act_Sum || function == act_Average) {
                 res += unpacked;
             }
-            else if (function == act_Max && static_cast<R>(unpacked) > res) {
+            else if (function == act_Max && unpacked > res) {
                 res = unpacked;
                 if (return_ndx)
                     *return_ndx = ss;
             }
-            else if (function == act_Min && static_cast<R>(unpacked) < res) {
+            else if (function == act_Min && unpacked < res) {
                 res = unpacked;
                 if (return_ndx)
                     *return_ndx = ss;
@@ -532,6 +533,14 @@ void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx
             break;
         m_row_indexes.set(it, to_row_ndx);
     }
+}
+
+
+void TableViewBase::adj_row_acc_clear() noexcept
+{
+    m_num_detached_refs = m_row_indexes.size();
+    for (size_t i = 0, size = m_row_indexes.size(); i < size; ++i)
+        m_row_indexes.set(i, -1);
 }
 
 

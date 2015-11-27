@@ -238,10 +238,11 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     else
         if [ -r "/proc/cpuinfo" ]; then
             NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
+            LIMIT_LOAD_AVERAGE=YES
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
-        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS -l$NUM_PROCESSORS" || exit 1
+        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS ${LIMIT_LOAD_AVERAGE:+-l$MAX_LOAD_AVERAGE}" || exit 1
         export MAKEFLAGS
 
         if ! [ "$UNITTEST_THREADS" ]; then
@@ -987,6 +988,7 @@ EOF
         sh build.sh build-osx || exit 1
         sh build.sh build-iphone || exit 1
         sh build.sh build-watchos || exit 1
+        sh build.sh build-tvos || exit 1
 
         echo "Copying files"
         tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
@@ -995,7 +997,7 @@ EOF
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
-        cp "$IPHONE_DIR"/*.a "$WATCHOS_DIR"/*.a "src/realm/librealm.a" "src/realm/librealm-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$IPHONE_DIR"/*.a "$WATCHOS_DIR"/*.a "$TVOS_DIR"/*.a "src/realm/librealm.a" "src/realm/librealm-dbg.a" "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }

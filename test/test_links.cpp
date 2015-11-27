@@ -173,6 +173,27 @@ TEST(Links_Basic)
 }
 
 
+TEST(Links_SetLinkLogicErrors)
+{
+    Group group;
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_Link, "a", *target);
+    origin->add_column(type_Int, "b");
+    origin->add_empty_row();
+    target->add_empty_row();
+
+    CHECK_LOGIC_ERROR(origin->set_link(2, 0, 0), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(origin->set_link(0, 1, 0), LogicError::row_index_out_of_range);
+    CHECK_LOGIC_ERROR(origin->set_link(0, 0, 1), LogicError::target_row_index_out_of_range);
+
+    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_link() does not properly check it yet.
+
+    group.remove_table("origin");
+    CHECK_LOGIC_ERROR(origin->set_link(0, 0, 0), LogicError::detached_accessor);
+}
+
+
 TEST(Links_Deletes)
 {
     Group group;
@@ -892,6 +913,20 @@ TEST(Links_LinkList_SwapRows)
     CHECK_EQUAL(0, target->get_backlink(2, *origin, col_link, 0));
     CHECK_EQUAL(2, target->get_backlink(2, *origin, col_link, 1));
     CHECK_EQUAL(1, target->get_backlink(2, *origin, col_link, 2));
+
+    // Release the accessor so we can test swapping when only one of
+    // the two rows has an accessor.
+    links0.reset();
+
+    // Row 0 has no accessor.
+    _impl::TableFriend::do_swap_rows(*origin, 0, 1);
+    CHECK_EQUAL(2, links1->get_origin_row_index());
+    CHECK_EQUAL(0, links2->get_origin_row_index());
+
+    // Row 1 has no accessor.
+    _impl::TableFriend::do_swap_rows(*origin, 0, 1);
+    CHECK_EQUAL(2, links1->get_origin_row_index());
+    CHECK_EQUAL(1, links2->get_origin_row_index());
 }
 
 TEST(Links_LinkList_TargetSwapRows)
@@ -1851,6 +1886,45 @@ TEST(Links_LinkList_Swap)
         CHECK_LOGIC_ERROR(f.link_list_2->swap(0,0), LogicError::link_index_out_of_range);
         f.group.verify();
     }
+}
+
+TEST(Links_LinkListAccessors_MoveOver)
+{
+    Group group;
+    TableRef origin = group.add_table("origin");
+    TableRef target = group.add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    origin->add_empty_row(4);
+    LinkViewRef links0 = origin->get_linklist(0, 0);
+    LinkViewRef links3 = origin->get_linklist(0, 3);
+
+    // FIXME: Table::move_over does not currently exist, so call through private API
+    // for now. Note that this only updates accessors, not the underlying rows.
+    using tf = _impl::TableFriend;
+
+    // Move a row with an attached accessor over one without.
+    tf::adj_acc_move_over(*origin, 0, 1);
+    tf::refresh_accessor_tree(*origin);
+    CHECK_EQUAL(1, links0->get_origin_row_index());
+    CHECK_EQUAL(3, links3->get_origin_row_index());
+
+    // Move a row without an attached accessor over a row that has one.
+    tf::adj_acc_move_over(*origin, 3, 2);
+    tf::refresh_accessor_tree(*origin);
+    CHECK_EQUAL(1, links0->get_origin_row_index());
+    CHECK_EQUAL(2, links3->get_origin_row_index());
+
+    // Move a row with an accessor over another row with an accessor.
+    tf::adj_acc_move_over(*origin, 2, 1);
+    tf::refresh_accessor_tree(*origin);
+    CHECK_EQUAL(false, links0->is_attached());
+    CHECK_EQUAL(1, links3->get_origin_row_index());
+
+    // Move a row with an accessor over itself.
+    tf::adj_acc_move_over(*origin, 1, 1);
+    tf::refresh_accessor_tree(*origin);
+    CHECK_EQUAL(false, links0->is_attached());
+    CHECK_EQUAL(false, links3->is_attached());
 }
 
 #endif // TEST_LINKS

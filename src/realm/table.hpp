@@ -495,16 +495,14 @@ public:
     // and clear_subtable() replaces the value with an empty table.)
     TableRef get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
-    size_t get_subtable_size(size_t column_ndx, size_t row_ndx)
-        const noexcept;
+    size_t get_subtable_size(size_t column_ndx, size_t row_ndx) const noexcept;
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
     size_t get_backlink_count(size_t row_ndx, const Table& origin,
-                                   size_t origin_col_ndx) const noexcept;
+                              size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin,
-                             size_t origin_col_ndx, size_t backlink_ndx) const
-        noexcept;
+                        size_t origin_col_ndx, size_t backlink_ndx) const noexcept;
 
 
     //@{
@@ -635,7 +633,16 @@ public:
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const IntegerColumn* viewrefs = nullptr) const;
 
-
+    /// Report the current versioning counter for the table. The versioning counter is guaranteed to
+    /// change when the contents of the table changes after advance_read() or promote_to_write(), or
+    /// immediately after calls to methods which change the table. The term "change" means "change of
+    /// value": The storage layout of the table may change, for example due to optimization, but this
+    /// is not considered a change of a value. This means that you *cannot* use a non-changing version
+    /// count to indicate that object addresses (e.g. strings, binary data) remain the same.
+    /// The versioning counter *may* change (but is not required to do so) when another table linked
+    /// from this table, or linking to this table, is changed. The version counter *may* also change
+    /// without any apparent reason.
+    uint_fast64_t get_version_counter() const noexcept;
 private:
     template<class T>
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
@@ -737,7 +744,7 @@ public:
 
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string,
-                 std::string>* renames = 0) const;
+                 std::string>* renames = nullptr) const;
     void to_string(std::ostream& out, size_t limit = 500) const;
     void row_to_string(size_t row_ndx, std::ostream& out) const;
 
@@ -1009,11 +1016,11 @@ private:
 
     // recursive methods called by to_json, to follow links
     void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-        std::vector<ref_type>& followed) const;
+                 std::vector<ref_type>& followed) const;
     void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
-        std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
+                     std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
     void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = nullptr) const;
+                     std::map<std::string, std::string>* renames = nullptr) const;
 
     // Detach accessor from underlying table. Caller must ensure that
     // a reference count exists upon return, for example by obtaining
@@ -1229,8 +1236,7 @@ private:
     void do_move_last_over(size_t row_ndx);
 
     // Precondition: 1 <= end - begin
-    size_t* record_subtable_path(size_t* begin,
-                                      size_t* end) const noexcept;
+    size_t* record_subtable_path(size_t* begin, size_t* end) const noexcept;
 
     /// Check if an accessor exists for the specified subtable. If it does,
     /// return a pointer to it, otherwise return null. This function assumes
@@ -1405,8 +1411,7 @@ protected:
     /// consistency can be assumed by this function.
     virtual void child_accessor_destroyed(Table* child) noexcept = 0;
 
-    virtual size_t* record_subtable_path(size_t* begin,
-                                              size_t* end) noexcept;
+    virtual size_t* record_subtable_path(size_t* begin, size_t* end) noexcept;
 
     friend class Table;
 };
@@ -1416,6 +1421,7 @@ protected:
 
 
 // Implementation:
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 
 inline void Table::bump_version(bool bump_global) const noexcept
@@ -1585,7 +1591,7 @@ public:
     Table* release() noexcept
     {
         Table* table = m_table;
-        m_table = 0;
+        m_table = nullptr;
         return table;
     }
 
@@ -1878,8 +1884,7 @@ inline bool Table::is_link_type(ColumnType col_type) noexcept
     return col_type == col_type_Link || col_type == col_type_LinkList;
 }
 
-inline size_t* Table::record_subtable_path(size_t* begin,
-                                                size_t* end) const noexcept
+inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const noexcept
 {
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     size_t index_in_parent = real_top.get_ndx_in_parent();
@@ -1891,8 +1896,7 @@ inline size_t* Table::record_subtable_path(size_t* begin,
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 
-inline size_t* Table::Parent::record_subtable_path(size_t* begin,
-                                                        size_t*) noexcept
+inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*) noexcept
 {
     return begin;
 }
@@ -2021,8 +2025,7 @@ public:
         table.discard_child_accessors();
     }
 
-    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx)
-        noexcept
+    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
     {
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
@@ -2235,8 +2238,7 @@ public:
         table.adj_erase_column(col_ndx);
     }
 
-    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2)
-        noexcept
+    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2) noexcept
     {
         table.adj_move_column(col_ndx_1, col_ndx_2);
     }
@@ -2293,8 +2295,7 @@ public:
         table.set_ndx_in_parent(ndx_in_parent);
     }
 
-    static void set_shared_subspec_ndx_in_parent(Table& table, size_t spec_ndx_in_parent)
-        noexcept
+    static void set_shared_subspec_ndx_in_parent(Table& table, size_t spec_ndx_in_parent) noexcept
     {
         table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }

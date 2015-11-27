@@ -95,6 +95,22 @@ void connect_socket(network::socket& socket, std::string port)
     }
 }
 
+void connect_sockets(network::socket& socket_1, network::socket& socket_2)
+{
+    network::io_service& service = socket_1.service();
+    network::acceptor acceptor(service);
+    network::endpoint ep = bind_acceptor(acceptor);
+    acceptor.listen();
+    std::error_code ec_1, ec_2;
+    acceptor.async_accept(socket_1, [&](std::error_code ec) { ec_1 = ec; });
+    socket_2.async_connect(ep, [&](std::error_code ec) { ec_2 = ec; });
+    service.run();
+    if (ec_1)
+        throw std::system_error(ec_1);
+    if (ec_2)
+        throw std::system_error(ec_2);
+}
+
 class bowl_of_stones_semaphore {
 public:
     bowl_of_stones_semaphore(int initial_number_of_stones = 0):
@@ -189,11 +205,11 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Start event loop execution in the background
     ThreadWrapper thread_1;
-    thread_1.start([&]() { service.run(); });
+    thread_1.start([&] { service.run(); });
 
     // Check that the event loop is actually running
     bowl_of_stones_semaphore bowl_1; // Empty
-    service.post([&]() { bowl_1.add_stone(); });
+    service.post([&] { bowl_1.add_stone(); });
     bowl_1.get_stone(); // Block until the stone is added
 
     // Stop the event loop
@@ -202,7 +218,7 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Check that the event loop remains in the stopped state
     int var = 381;
-    service.post([&]() { var = 824; });
+    service.post([&] { var = 824; });
     CHECK_EQUAL(var, 381);
     service.run(); // Still stopped, so run() must return immediately
     CHECK_EQUAL(var, 381);
@@ -211,15 +227,15 @@ TEST(Network_EventLoopStopAndReset_2)
     // background
     service.reset();
     ThreadWrapper thread_2;
-    thread_2.start([&]() { service.run(); });
+    thread_2.start([&] { service.run(); });
 
     // Check that the event loop is actually running
     bowl_of_stones_semaphore bowl_2; // Empty
-    service.post([&]() { bowl_2.add_stone(); });
+    service.post([&] { bowl_2.add_stone(); });
     bowl_2.get_stone(); // Block until the stone is added
 
     // Stop the event loop by canceling the blocking operation
-    service.post([&]() { acceptor.cancel(); });
+    service.post([&] { acceptor.cancel(); });
     CHECK_NOT(thread_2.join());
 
     CHECK_EQUAL(var, 824);
@@ -450,6 +466,144 @@ TEST(Network_CancelEmptyRead)
 }
 
 
+TEST(Network_AcceptorMixedAsyncSync)
+{
+    network::io_service service;
+    network::acceptor acceptor(service);
+    acceptor.open(network::protocol::ip_v4());
+    acceptor.listen();
+    network::endpoint ep = acceptor.local_endpoint();
+    auto connect = [ep] {
+        network::io_service service;
+        network::socket socket(service);
+        socket.connect(ep);
+    };
+
+    // Synchronous accept -> stay on blocking mode
+    {
+        ThreadWrapper thread;
+        thread.start(connect);
+        network::socket socket(service);
+        acceptor.accept(socket);
+        CHECK_NOT(thread.join());
+    }
+
+    // Asynchronous accept -> switch to nonblocking mode
+    {
+        ThreadWrapper thread;
+        thread.start(connect);
+        network::socket socket(service);
+        bool was_accepted = false;
+        auto accept_handler = [&](std::error_code ec) {
+            if (!ec)
+                was_accepted = true;
+        };
+        acceptor.async_accept(socket, accept_handler);
+        service.run();
+        CHECK(was_accepted);
+        CHECK_NOT(thread.join());
+    }
+
+    // Synchronous accept -> switch back to blocking mode
+    {
+        ThreadWrapper thread;
+        thread.start(connect);
+        network::socket socket(service);
+        acceptor.accept(socket);
+        CHECK_NOT(thread.join());
+    }
+}
+
+
+TEST(Network_SocketMixedAsyncSync)
+{
+    network::io_service acceptor_service;
+    network::acceptor acceptor(acceptor_service);
+    acceptor.open(network::protocol::ip_v4());
+    acceptor.listen();
+    network::endpoint ep = acceptor.local_endpoint();
+    auto accept_and_echo = [&] {
+        network::socket socket(acceptor_service);
+        acceptor.accept(socket);
+        network::buffered_input_stream in(socket);
+        size_t buffer_size = 1024;
+        std::unique_ptr<char[]> buffer(new char[buffer_size]);
+        size_t size = in.read_until(buffer.get(), buffer_size, '\n');
+        socket.write(buffer.get(), size);
+    };
+
+    {
+        ThreadWrapper thread;
+        thread.start(accept_and_echo);
+        network::io_service service;
+
+        // Synchronous connect -> stay in blocking mode
+        network::socket socket(service);
+        socket.connect(ep);
+        network::buffered_input_stream in(socket);
+
+        // Asynchronous write -> switch to nonblocking mode
+        const char* message = "Calabi–Yau\n";
+        bool was_written = false;
+        auto write_handler = [&](std::error_code ec, size_t) {
+            if (!ec)
+                was_written = true;
+        };
+        socket.async_write(message, strlen(message), write_handler);
+        service.run();
+        CHECK(was_written);
+
+        // Synchronous read -> switch back to blocking mode
+        size_t buffer_size = 1024;
+        std::unique_ptr<char[]> buffer(new char[buffer_size]);
+        std::error_code ec;
+        size_t size = in.read(buffer.get(), buffer_size, ec);
+        if (CHECK_EQUAL(ec, network::end_of_input)) {
+            if (CHECK_EQUAL(size, strlen(message)))
+                CHECK(std::equal(buffer.get(), buffer.get()+size, message));
+        }
+
+        CHECK_NOT(thread.join());
+    }
+
+    {
+        ThreadWrapper thread;
+        thread.start(accept_and_echo);
+        network::io_service service;
+
+        // Asynchronous connect -> switch to nonblocking mode
+        network::socket socket(service);
+        bool is_connected = false;
+        auto connect_handler = [&](std::error_code ec) {
+            if (!ec)
+                is_connected = true;
+        };
+        socket.async_connect(ep, connect_handler);
+        service.run();
+        CHECK(is_connected);
+        network::buffered_input_stream in(socket);
+
+        // Synchronous write -> switch back to blocking mode
+        const char* message = "The Verlinde Algebra And The Cohomology Of The Grassmannian\n";
+        socket.write(message, strlen(message));
+
+        // Asynchronous read -> swich once again to nonblocking mode
+        size_t buffer_size = 1024;
+        std::unique_ptr<char[]> buffer(new char[buffer_size]);
+        auto read_handler = [&](std::error_code ec, size_t size) {
+            if (CHECK_EQUAL(ec, network::end_of_input)) {
+                if (CHECK_EQUAL(size, strlen(message)))
+                    CHECK(std::equal(buffer.get(), buffer.get()+size, message));
+            }
+        };
+        in.async_read(buffer.get(), buffer_size, read_handler);
+        service.run();
+
+        CHECK_NOT(thread.join());
+    }
+}
+
+
 TEST(Network_DeadlineTimer)
 {
     network::io_service service;
@@ -576,6 +730,155 @@ TEST(Network_HandlerDealloc)
         input.async_read(buffer, sizeof buffer, [](std::error_code, size_t) {});
         socket_1.async_write(data, sizeof data, [](std::error_code, size_t) {});
     }
+}
+
+
+namespace {
+
+template<int size> struct PostReallocHandler {
+    PostReallocHandler(int& v):
+        var(v)
+    {
+    }
+    void operator()()
+    {
+        var = size;
+    }
+    int& var;
+    char strut[size];
+};
+
+} // unnamed namespace
+
+TEST(Network_PostRealloc)
+{
+    // Use progressively larger post handlers to check that memory reallocation
+    // works
+
+    network::io_service service;
+    int var = 0;
+    for (int i = 0; i < 3; ++i) {
+        service.post(PostReallocHandler<10>(var));
+        service.run();
+        CHECK_EQUAL(10, var);
+        service.post(PostReallocHandler<100>(var));
+        service.run();
+        CHECK_EQUAL(100, var);
+        service.post(PostReallocHandler<1000>(var));
+        service.run();
+        CHECK_EQUAL(1000, var);
+    }
+}
+
+
+namespace {
+
+struct AsyncReadWriteRealloc {
+    network::io_service service;
+    network::socket read_socket{service}, write_socket{service};
+    network::buffered_input_stream in{read_socket};
+    char read_buffer[3];
+    char write_buffer[3] = { '0', '1', '2' };
+    Random random{random_int<unsigned long>()}; // Seed from slow global generator
+
+    const size_t num_bytes_to_write = 65536;
+    size_t num_bytes_written = 0;
+    size_t num_bytes_read = 0;
+
+    template<int size> struct WriteHandler {
+        WriteHandler(AsyncReadWriteRealloc& s):
+            state(s)
+        {
+        }
+        void operator()(std::error_code ec, size_t n)
+        {
+            if (ec)
+                throw std::system_error(ec);
+            state.num_bytes_written += n;
+            state.initiate_write();
+        }
+        AsyncReadWriteRealloc& state;
+        char strut[size];
+    };
+
+    void initiate_write()
+    {
+        if (num_bytes_written >= num_bytes_to_write) {
+            write_socket.close();
+            return;
+        }
+        int v = random.draw_int_max(3);
+        size_t n = std::min(size_t(v), size_t(num_bytes_to_write - num_bytes_written));
+        switch (v) {
+            case 0:
+                write_socket.async_write(write_buffer, n, WriteHandler<1>(*this));
+                return;
+            case 1:
+                write_socket.async_write(write_buffer, n, WriteHandler<10>(*this));
+                return;
+            case 2:
+                write_socket.async_write(write_buffer, n, WriteHandler<100>(*this));
+                return;
+            case 3:
+                write_socket.async_write(write_buffer, n, WriteHandler<1000>(*this));
+                return;
+        }
+        REALM_ASSERT(false);
+    }
+
+    template<int size> struct ReadHandler {
+        ReadHandler(AsyncReadWriteRealloc& s):
+            state(s)
+        {
+        }
+        void operator()(std::error_code ec, size_t n)
+        {
+            if (ec && ec != network::end_of_input)
+                throw std::system_error(ec);
+            state.num_bytes_read += n;
+            if (ec != network::end_of_input)
+                state.initiate_read();
+        }
+        AsyncReadWriteRealloc& state;
+        char strut[size];
+    };
+
+    void initiate_read()
+    {
+        int v = random.draw_int_max(3);
+        size_t n = size_t(v);
+        switch (v) {
+            case 0:
+                in.async_read(read_buffer, n, ReadHandler<1>(*this));
+                return;
+            case 1:
+                in.async_read(read_buffer, n, ReadHandler<10>(*this));
+                return;
+            case 2:
+                in.async_read(read_buffer, n, ReadHandler<100>(*this));
+                return;
+            case 3:
+                in.async_read(read_buffer, n, ReadHandler<1000>(*this));
+                return;
+        }
+        REALM_ASSERT(false);
+    }
+};
+
+} // unnamed namespace
+
+TEST(Network_AsyncReadWriteRealloc)
+{
+    // Use progressively larger completion handlers to check that memory
+    // reallocation works
+
+    AsyncReadWriteRealloc state;
+    connect_sockets(state.read_socket, state.write_socket);
+    state.initiate_read();
+    state.initiate_write();
+    state.service.run();
+    CHECK_EQUAL(state.num_bytes_to_write, state.num_bytes_written);
+    CHECK_EQUAL(state.num_bytes_written, state.num_bytes_read);
 }
 
 

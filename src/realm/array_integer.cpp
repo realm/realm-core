@@ -6,6 +6,13 @@
 
 using namespace realm;
 
+
+void ArrayInteger::create(Array::Type type, bool context_flag)
+{
+    Array::create(type, context_flag, 0, 0);
+}
+
+
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
 template<size_t w>
@@ -74,6 +81,7 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, val
     dg.release();
     return r;
 }
+
 
 void ArrayIntNull::init_from_ref(ref_type ref) noexcept
 {

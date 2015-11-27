@@ -348,6 +348,28 @@ TEST(Table_StringOrBinaryTooBig)
 }
 
 
+TEST(Table_SetBinaryLogicErrors)
+{
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column(type_Binary, "a");
+    table->add_column(type_Int, "b");
+    table->add_empty_row();
+
+    BinaryData bd;
+    CHECK_LOGIC_ERROR(table->set_binary(2, 0, bd), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(table->set_binary(0, 1, bd), LogicError::row_index_out_of_range);
+    CHECK_LOGIC_ERROR(table->set_null(0, 0), LogicError::column_not_nullable);
+
+    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_binary() does not properly check it yet.
+
+    group.remove_table("table");
+    CHECK_LOGIC_ERROR(table->set_binary(0, 0, bd), LogicError::detached_accessor);
+
+    // Logic error LogicError::binary_too_big checked in Table_StringOrBinaryTooBig
+}
+
+
 TEST(Table_Floats)
 {
     Table table;
@@ -1118,8 +1140,8 @@ TEST(Table_6)
     }};
 
     RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
-        (void)b;
-        (void)a;
+        static_cast<void>(b);
+        static_cast<void>(a);
         //first.between(a, b);
         second == str || second.MatchRegEx(".*");
     }};
@@ -3567,8 +3589,7 @@ TEST(Table_Aggregates3)
 
         size_t count;
         size_t pos;
-        if (i == 1) {
-            // This i == 1 is the NULLABLE case where columns are nullable
+        if (nullable) {
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
@@ -3621,7 +3642,7 @@ TEST(Table_Aggregates3)
             CHECK_EQUAL(table->sum_float(1), 30.f);
             CHECK_APPROXIMATELY_EQUAL(table->sum_double(2), 1.1 + 2.2, 0.01);
         }
-        else {
+        else { // not nullable
             // max
             pos = 123;
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
@@ -3993,11 +4014,7 @@ TEST(Table_WriteSlice)
     // Run through a 3-D matrix of table sizes, slice offsets, and
     // slice sizes. Each test involves a table with columns of each
     // possible type.
-#ifdef REALM_DEBUG
-    int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 135 };
-#else
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187, 6561 };
-#endif
     int num_sizes = sizeof table_sizes / sizeof *table_sizes;
     for (int table_size_i = 0; table_size_i != num_sizes; ++table_size_i) {
         int table_size = table_sizes[table_size_i];
@@ -6112,6 +6129,29 @@ TEST(Table_EnumStringInsertEmptyRow)
 }
 
 
+TEST(Table_InsertColumnMaintainsBacklinkIndices)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("hrnetprsafd");
+    TableRef t1 = g.add_table("qrsfdrpnkd");
+
+    t1->add_column_link(type_Link, "bbb", *t0);
+    t1->add_column_link(type_Link, "ccc", *t0);
+    t1->insert_column(0, type_Int, "aaa");
+
+    t1->add_empty_row();
+
+    t0->add_column(type_Int, "foo");
+    t0->add_empty_row();
+
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
@@ -6522,7 +6562,7 @@ TEST(Table_AllocatorCapacityBug)
 
     // First a simple trigger of `Assertion failed: value <= 0xFFFFFFL [26000016, 16777215]`
     {
-        ref_type ref = BinaryColumn::create(Allocator::get_default());
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref, true);
 
         c.add(BinaryData(buf.get(), 13000000));
@@ -6555,6 +6595,28 @@ TEST(Table_AllocatorCapacityBug)
             }
         }
     }
+}
+
+
+// Exposes crash when setting a int, float or double that has its least significant bit set
+TEST(Table_MixedCrashValues)
+{
+    GROUP_TEST_PATH(path);
+    const char* encryption_key = nullptr;
+    Group group(path, encryption_key, Group::mode_ReadWrite);
+    TableRef table = group.add_table("t");
+    table->add_column(type_Mixed, "m");
+    table->add_empty_row(3);
+
+    table->set_mixed(0, 0, Mixed(int64_t(-1)));
+    table->set_mixed(0, 1, Mixed(2.0f));
+    table->set_mixed(0, 2, Mixed(2.0));
+
+    CHECK_EQUAL(table->get_mixed(0, 0).get_int(), int64_t(-1));
+    CHECK_EQUAL(table->get_mixed(0, 1).get_float(), 2.0f);
+    CHECK_EQUAL(table->get_mixed(0, 2).get_double(), 2.0);
+
+    group.verify();
 }
 
 

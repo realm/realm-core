@@ -827,16 +827,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\..\test\test_column_basic.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\..\test\test_column_binary.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
@@ -1153,8 +1143,6 @@
     <ClInclude Include="..\..\src\realm\column.hpp" />
     <ClInclude Include="..\..\src\realm\column_binary.hpp" />
     <ClInclude Include="..\..\src\realm\column_fwd.hpp" />
-    <ClInclude Include="..\..\src\realm\column_basic.hpp" />
-    <ClInclude Include="..\..\src\realm\column_basic_tpl.hpp" />
     <ClInclude Include="..\..\src\realm\column_mixed.hpp" />
     <ClInclude Include="..\..\src\realm\column_mixed_tpl.hpp" />
     <ClInclude Include="..\..\src\realm\column_string.hpp" />

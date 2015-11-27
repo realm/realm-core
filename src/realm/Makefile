@@ -3,7 +3,6 @@ util/features.h \
 util/meta.hpp \
 util/inspect.hpp \
 util/assert.hpp \
-util/encryption_not_supported_exception.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
 util/tuple.hpp \
@@ -25,6 +24,8 @@ util/uri.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/platform_specific_condvar.hpp \
+util/file_mapper.hpp \
+util/encrypted_file_mapping.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
@@ -92,8 +93,6 @@ array_blobs_big.hpp \
 array_string_long.hpp \
 column.hpp \
 column_tpl.hpp \
-column_basic.hpp \
-column_basic_tpl.hpp \
 column_binary.hpp \
 column_string_enum.hpp \
 column_string.hpp \

@@ -21,8 +21,17 @@
 #ifndef REALM_UTIL_INSPECT_HPP
 #define REALM_UTIL_INSPECT_HPP
 
+#include <string>
+
 namespace realm {
 namespace util {
+
+// LCOV_EXCL_START
+//
+// Because these are templated functions, every combination of output stream
+// type and value(s) type(s) generates a new function.  This makes LCOV/GCOVR
+// report over 70 functions in this file, with only 6.6% function coverage,
+// even though line coverage is at 100%.
 
 template<class OS, class T>
 void inspect_value(OS& os, const T& value)
@@ -60,6 +69,8 @@ void inspect_all(OS& os, First&& first, Args&&... args)
     }
     inspect_all(os, std::forward<Args>(args)...);
 }
+
+// LCOV_EXCL_STOP
 
 } // namespace util
 } // namespace realm

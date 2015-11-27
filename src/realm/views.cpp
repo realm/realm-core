@@ -1,3 +1,5 @@
+#include <realm/table.hpp>
+#include <realm/impl/sequential_getter.hpp>
 #include <realm/views.hpp>
 
 using namespace realm;

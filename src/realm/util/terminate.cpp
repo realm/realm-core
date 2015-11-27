@@ -22,6 +22,7 @@
 #include <realm/util/features.h>
 
 #if REALM_PLATFORM_APPLE
+#  include <asl.h>
 #  include <dlfcn.h>
 #  include <execinfo.h>
 #  include <CoreFoundation/CoreFoundation.h>
@@ -39,27 +40,47 @@
 extern "C" REALM_NORETURN REALM_NOINLINE
 void please_report_this_error_to_help_at_realm_dot_io();
 
+// LCOV_EXCL_START
 extern "C" REALM_NORETURN REALM_NOINLINE
 void please_report_this_error_to_help_at_realm_dot_io() {
     std::abort();
 }
+// LCOV_EXCL_STOP
 
 namespace {
 
 #if REALM_PLATFORM_APPLE
-void nslog(const char *message) {
-    CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
-    CFShow(str);
+void nslog(const char *message) noexcept
+{
+    // Standard error goes nowhere for applications managed by launchd, so log to ASL as well.
+    fputs(message, stderr);
+    asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 
     // Log the message to Crashlytics if it's loaded into the process
     void* addr = dlsym(RTLD_DEFAULT, "CLSLog");
     if (addr) {
+        CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
         auto fn = reinterpret_cast<void (*)(CFStringRef, ...)>(reinterpret_cast<size_t>(addr));
         fn(CFSTR("%@"), str);
+        CFRelease(str);
     }
-
-    CFRelease(str);
 }
+
+void(*termination_notification_callback)(const char*) noexcept = nslog;
+
+#elif REALM_PLATFORM_ANDROID
+
+void android_log(const char* message) noexcept
+{
+    __android_log_print(ANDROID_LOG_ERROR, "REALM", message);
+}
+
+void(*termination_notification_callback)(const char*) noexcept = android_log;
+
+#else
+
+void(*termination_notification_callback)(const char*) noexcept = nullptr;
+
 #endif
 
 } // unnamed namespace
@@ -67,6 +88,12 @@ void nslog(const char *message) {
 namespace realm {
 namespace util {
 
+void set_termination_notification_callback(void(*callback)(const char* ) noexcept) noexcept
+{
+    termination_notification_callback = callback;
+}
+
+// LCOV_EXCL_START
 REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
 {
 
@@ -85,11 +112,9 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
     std::cerr << ss.rdbuf() << '\n';
 #endif
 
-#if REALM_PLATFORM_APPLE
-    nslog(ss.str().c_str());
-#elif defined(__ANDROID__)
-    __android_log_print(ANDROID_LOG_ERROR, "REALM", ss.str().c_str());
-#endif
+    if (termination_notification_callback) {
+        termination_notification_callback(ss.str().c_str());
+    }
 
     please_report_this_error_to_help_at_realm_dot_io();
 }
@@ -103,6 +128,7 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line) 
 
     terminate_internal(ss);
 }
+// LCOV_EXCL_STOP
 
 } // namespace util
 } // namespace realm

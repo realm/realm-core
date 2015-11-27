@@ -42,7 +42,7 @@ public:
 
     Table* get_subtable_accessor(size_t) const noexcept override;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;
@@ -245,10 +245,12 @@ private:
 
 // Overriding virtual method of Column.
 inline void SubtableColumnBase::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                            size_t prior_num_rows)
+                                            size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
+    REALM_ASSERT(!insert_nulls);
+    static_cast<void>(insert_nulls);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     int_fast64_t value = 0;
@@ -404,8 +406,7 @@ inline void SubtableColumnBase::SubtableMap::add(size_t subtable_ndx, Table* tab
 }
 
 template<bool fix_ndx_in_parent>
-void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted)
-    noexcept
+void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
     typedef entries::iterator iter;
     iter end = m_entries.end();
@@ -420,8 +421,7 @@ void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num
 }
 
 template<bool fix_ndx_in_parent>
-bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased)
-    noexcept
+bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept
 {
     if (m_entries.empty())
         return false;
@@ -561,9 +561,9 @@ inline size_t* SubtableColumnBase::record_subtable_path(size_t* begin, size_t* e
     return _impl::TableFriend::record_subtable_path(*m_table, begin, end);
 }
 
-inline void SubtableColumnBase::
-update_table_accessors(const size_t* col_path_begin, const size_t* col_path_end,
-                       _impl::TableFriend::AccessorUpdater& updater)
+inline void SubtableColumnBase::update_table_accessors(const size_t* col_path_begin,
+                                                       const size_t* col_path_end,
+                                                       _impl::TableFriend::AccessorUpdater& updater)
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the

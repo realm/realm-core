@@ -56,6 +56,16 @@ struct ImplicitNull<int64_t> {
     static constexpr bool value = false;
 };
 
+template<>
+struct ImplicitNull<float> {
+    static constexpr bool value = true;
+};
+
+template<>
+struct ImplicitNull<double> {
+    static constexpr bool value = true;
+};
+
 // FIXME: Add specialization for ImplicitNull for float, double, StringData, BinaryData.
 
 struct ColumnTemplateBase
@@ -133,7 +143,7 @@ public:
     /// that reciprocal backlinks have already been removed. Non-link columns
     /// should ignore this argument.
 
-    virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows) = 0;
+    virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) = 0;
     virtual void erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                             bool broken_reciprocal_backlinks) = 0;
     virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
@@ -517,16 +527,13 @@ public:
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to ordinary integer comparison.
-    // FIXME: Rename
-    size_t lower_bound_int(T value) const noexcept;
-    // FIXME: Rename
-    size_t upper_bound_int(T value) const noexcept;
+    size_t lower_bound(T value) const noexcept;
+    size_t upper_bound(T value) const noexcept;
     //@}
 
     size_t find_gte(T target, size_t start) const;
 
-    // FIXME: Rename
-    bool compare_int(const Column&) const noexcept;
+    bool compare(const Column&) const noexcept;
 
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
                            size_t size = 0, T value = 0);
@@ -535,7 +542,7 @@ public:
     ref_type write(size_t, size_t, size_t,
                    _impl::OutputStream&) const override;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
 
@@ -773,10 +780,11 @@ template<class T>
 typename ColumnTypeTraits<T>::sum_type
 Column<T>::sum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
 {
-    if (std::is_same<T, util::Optional<int64_t>>::value)
-        return aggregate<T, int64_t, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
+    using sum_type = typename ColumnTypeTraits<T>::sum_type;
+    if (nullable)
+        return aggregate<T, sum_type, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
     else
-        return aggregate<T, int64_t, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
+        return aggregate<T, sum_type, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
 }
 
 template<class T>
@@ -1064,7 +1072,7 @@ size_t Column<T>::size() const noexcept
 template<class T>
 bool Column<T>::is_nullable() const noexcept
 {
-    return std::is_same<T, util::Optional<int64_t>>::value; // FIXME
+    return nullable;
 }
 
 template<class T>
@@ -1220,15 +1228,47 @@ void Column<T>::clear()
     clear_without_updating_index();
 }
 
+template<class T, class Enable = void> struct NullOrDefaultValue;
+template<class T> struct NullOrDefaultValue<T, typename std::enable_if<std::is_floating_point<T>::value>::type> {
+    static T null_or_default_value(bool is_null)
+    {
+        if (is_null) {
+            return null::get_null_float<T>();
+        }
+        else {
+            return T{};
+        }
+    }
+};
+template<class T> struct NullOrDefaultValue<util::Optional<T>, void> {
+    static util::Optional<T> null_or_default_value(bool is_null)
+    {
+        if (is_null) {
+            return util::none;
+        }
+        else {
+            return util::some<T>(T{});
+        }
+    }
+};
+template<class T> struct NullOrDefaultValue<T, typename std::enable_if<!ImplicitNull<T>::value>::type> {
+    static T null_or_default_value(bool is_null)
+    {
+        REALM_ASSERT(!is_null);
+        static_cast<void>(is_null);
+        return T{};
+    }
+};
+
 // Implementing pure virtual method of ColumnBase.
 template<class T>
-void Column<T>::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows)
+void Column<T>::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
-    T value{};
+    T value = NullOrDefaultValue<T>::null_or_default_value(insert_nulls);
     insert(row_ndx_2, value, num_rows_to_insert); // Throws
 }
 
@@ -1265,21 +1305,21 @@ void Column<T>::clear(size_t, bool)
 
 
 template<class T>
-size_t Column<T>::lower_bound_int(T value) const noexcept
+size_t Column<T>::lower_bound(T value) const noexcept
 {
-    static_assert(std::is_same<T, int64_t>::value, "lower_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
-        return get_root_array()->lower_bound_int(value);
+        auto root = static_cast<const LeafType*>(get_root_array());
+        return root->lower_bound(value);
     }
     return ColumnBase::lower_bound(*this, value);
 }
 
 template<class T>
-size_t Column<T>::upper_bound_int(T value) const noexcept
+size_t Column<T>::upper_bound(T value) const noexcept
 {
-    static_assert(std::is_same<T, int64_t>::value, "upper_bound_int only works for non-nullable integer columns.");
     if (root_is_leaf()) {
-        return get_root_array()->upper_bound_int(value);
+        auto root = static_cast<const LeafType*>(get_root_array());
+        return root->upper_bound(value);
     }
     return ColumnBase::upper_bound(*this, value);
 }
@@ -1305,7 +1345,7 @@ size_t Column<T>::find_gte(T target, size_t start) const
 
 
 template<class T>
-bool Column<T>::compare_int(const Column<T>& c) const noexcept
+bool Column<T>::compare(const Column<T>& c) const noexcept
 {
     size_t n = size();
     if (c.size() != n)

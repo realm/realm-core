@@ -67,7 +67,7 @@ public:
 
     void to_json_row(size_t row_ndx, std::ostream& out) const;
 
-    void insert_rows(size_t, size_t, size_t) override;
+    void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void swap_rows(size_t, size_t) override;
@@ -94,8 +94,15 @@ private:
     struct list_entry {
         size_t m_row_ndx;
         LinkView* m_list;
+        bool operator<(const list_entry& other) const { return m_row_ndx < other.m_row_ndx; }
     };
+
+    // The accessors stored in `m_list_accessors` are sorted by their row index. When an accessor is unregistered,
+    // its entry is replaced by a tombstone (an entry with a null `m_list`). These tombstones are pruned at a later
+    // time by `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost of `std::vector::erase` that
+    // would otherwise be incurred each time an accessor is removed.
     mutable std::vector<list_entry> m_list_accessors;
+    mutable bool m_list_accessors_contains_tombstones = false;
 
     LinkView* get_ptr(size_t row_ndx) const;
 
@@ -135,6 +142,9 @@ private:
 
     template<bool fix_ndx_in_parent>
     void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+
+    void prune_list_accessor_tombstones() noexcept;
+    void validate_list_accessors() const noexcept;
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
@@ -205,17 +215,6 @@ inline void LinkListColumn::set_null(size_t)
 inline void LinkListColumn::do_discard_child_accessors() noexcept
 {
     discard_child_accessors();
-}
-
-inline void LinkListColumn::unregister_linkview(const LinkView& list)
-{
-    auto end = m_list_accessors.end();
-    for (auto i = m_list_accessors.begin(); i != end; ++i) {
-        if (i->m_list == &list) {
-            m_list_accessors.erase(i);
-            return;
-        }
-    }
 }
 
 inline ref_type LinkListColumn::get_row_ref(size_t row_ndx) const noexcept

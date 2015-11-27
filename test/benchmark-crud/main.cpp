@@ -1,9 +1,9 @@
 #include <cstdlib>
 #include <algorithm>
+#include <memory>
 #include <iostream>
 
 #include <realm.hpp>
-#include <memory>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
@@ -57,8 +57,8 @@ int main()
 {
     const size_t target_size = 1100*1000L;
     const int num_tables = 50;
-    std::cout << "Number of tables: " << num_tables << std::endl;
-    std::cout << "Elements per table: " << target_size << std::endl;
+    std::cout << "Number of tables: " << num_tables << "\n";
+    std::cout << "Elements per table: " << target_size << "\n";
 
     std::vector<size_t> rising_order;
     std::vector<size_t> falling_order;
@@ -156,5 +156,5 @@ int main()
 
     results.submit_single("total_time", "Total time", timer_total);
 
-    std::cout << "dummy = "<<dummy<<" (to avoid over-optimization)"<<endl;
+    std::cout << "dummy = "<<dummy<<" (to avoid over-optimization)\n";
 }

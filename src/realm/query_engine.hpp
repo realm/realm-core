@@ -100,7 +100,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_binary.hpp>
-#include <realm/column_basic.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/array_basic.hpp>
@@ -205,7 +204,7 @@ public:
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
         }
         REALM_ASSERT_DEBUG(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
-        bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
+        bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, av);
         return cont;
     }
 
@@ -292,7 +291,7 @@ public:
         if (m_child) m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)  override
+    size_t find_first_local(size_t start, size_t end) override
     {
         // Simply return index of first table row which is >= start
         size_t r;
@@ -1574,7 +1573,7 @@ public:
         m_dT = 50.0;
     }
 
-    void init(const Table& table)  override
+    void init(const Table& table) override
     {
         m_compare->set_table();
         if (m_child)

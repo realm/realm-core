@@ -121,6 +121,7 @@ void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
     record_subtable_path(list.m_origin_column.get_target_table(), link_target_path_begin,
                          link_target_path_end);
     size_t link_target_levels = (link_target_path_end - link_target_path_begin) / 2;
+    static_cast<void>(link_target_levels);
     REALM_ASSERT_3(link_target_levels, ==, 0);
 
     m_encoder.select_link_list(col_ndx, row_ndx, link_target_path_begin[0]); // Throws
