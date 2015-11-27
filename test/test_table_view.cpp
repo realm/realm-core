@@ -1675,8 +1675,10 @@ TEST(TableView_Backlinks)
 TEST(TableView_Distinct)
 {
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
-    // If two rows are indentical for the given set of distinct-columns, then it is *random* which one is removed.
-    // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view
+    // If two rows are indentical for the given set of distinct-columns, then the last row is removed.
+    // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
+    // Each time you call distinct() it will first fetch the full original TableView contents and then apply
+    // distinct() on that. So it distinct() does not filter the result of the previous distinct().
 
     // distinct() is internally based on the existing sort() method which is well tested. Hence it's not required
     // to test distinct() with all possible Realm data types.
@@ -1734,16 +1736,6 @@ TEST(TableView_Distinct)
     CHECK_EQUAL(tv.get_source_ndx(2), 6);
     CHECK_EQUAL(tv.get_source_ndx(3), 4);
 
-    // Note here that our stable sort will sort the two "foo"s like row {4, 5}
-    tv = t.where().find_all();
-    tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0, 1});
-    CHECK_EQUAL(tv.get_source_ndx(0), 4);
-    CHECK_EQUAL(tv.get_source_ndx(1), 5);
-    CHECK_EQUAL(tv.get_source_ndx(2), 6);
-    CHECK_EQUAL(tv.get_source_ndx(3), 0);
-    CHECK_EQUAL(tv.get_source_ndx(4), 1);
-
     tv = t.where().find_all();
     tv.sort(0, false);
     tv.distinct(std::vector<size_t>{0});
@@ -1752,43 +1744,59 @@ TEST(TableView_Distinct)
     CHECK_EQUAL(tv.get_source_ndx(2), 0);
     CHECK_EQUAL(tv.get_source_ndx(3), 1);
 
-    // NOTE that the distinct() above has removed 3 rows! So following must end up like {"foo", "bar", "", null}
-    t.remove(0);
-    tv.sync_if_needed();
-    tv.distinct(std::vector<size_t>{0, 1});
-
-    // Note that we still have the sort(0, false) clause active
-    CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(tv.get_source_ndx(0), 3);
-    CHECK_EQUAL(tv.get_source_ndx(1), 5);
-    CHECK_EQUAL(tv.get_source_ndx(2), 1);
-    CHECK_EQUAL(tv.get_source_ndx(3), 0);
-
-    // Now try the float column. It has same values as the int column. The "foo, 400" row is included again due to
-    // now find_all().
+    // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = t.where().find_all();
     tv.sort(0, false);
     tv.distinct(std::vector<size_t>{0, 1});
-
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(tv.get_source_ndx(0), 3);
-    CHECK_EQUAL(tv.get_source_ndx(1), 4);
-    CHECK_EQUAL(tv.get_source_ndx(2), 5);
-    CHECK_EQUAL(tv.get_source_ndx(3), 1);
-    CHECK_EQUAL(tv.get_source_ndx(4), 0);
+    CHECK_EQUAL(tv.get_source_ndx(0), 4);
+    CHECK_EQUAL(tv.get_source_ndx(1), 5);
+    CHECK_EQUAL(tv.get_source_ndx(2), 6);
+    CHECK_EQUAL(tv.get_source_ndx(3), 0);
+    CHECK_EQUAL(tv.get_source_ndx(4), 1);
+
+
+    // Now try distinct on string+float column. The float column has the same values as the int column
+    // so the result should equal the test above
+    tv = t.where().find_all();
+    tv.sort(0, false);
+    tv.distinct(std::vector<size_t>{0, 1});
+    CHECK_EQUAL(tv.size(), 5);
+    CHECK_EQUAL(tv.get_source_ndx(0), 4);
+    CHECK_EQUAL(tv.get_source_ndx(1), 5);
+    CHECK_EQUAL(tv.get_source_ndx(2), 6);
+    CHECK_EQUAL(tv.get_source_ndx(3), 0);
+    CHECK_EQUAL(tv.get_source_ndx(4), 1);
+
 
     // Same as previous test, but with string column being Enum
-    t.optimize(true);
+    t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
     tv = t.where().find_all();
     tv.sort(0, false);
     tv.distinct(std::vector<size_t>{0, 1});
-
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(tv.get_source_ndx(0), 3);
-    CHECK_EQUAL(tv.get_source_ndx(1), 4);
-    CHECK_EQUAL(tv.get_source_ndx(2), 5);
-    CHECK_EQUAL(tv.get_source_ndx(3), 1);
-    CHECK_EQUAL(tv.get_source_ndx(4), 0);
+    CHECK_EQUAL(tv.get_source_ndx(0), 4);
+    CHECK_EQUAL(tv.get_source_ndx(1), 5);
+    CHECK_EQUAL(tv.get_source_ndx(2), 6);
+    CHECK_EQUAL(tv.get_source_ndx(3), 0);
+    CHECK_EQUAL(tv.get_source_ndx(4), 1);
+
+
+    // Now test sync_if_needed()
+    tv = t.where().find_all();
+    // "", null, "", null, "foo", "foo", "bar"
+    tv.sort(0, false);
+    // "foo", "foo", "bar", "", null, null
+    tv.distinct(std::vector<size_t>{0});
+    // "foo", "bar", "", null
+    t.remove(6); // remove "bar"
+    // access to tv undefined; may crash
+    tv.sync_if_needed();
+    // "foo", "", null
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_string(0, 0), "foo");
+    CHECK_EQUAL(tv.get_string(0, 1), "");
+    CHECK(tv.get_string(0, 2).is_null());
 }
 
 #endif // TEST_TABLE_VIEW
