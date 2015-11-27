@@ -24,8 +24,6 @@
 #include <tuple>
 
 namespace realm {
-namespace util {
-
 namespace _impl {
 
 template<size_t...> struct Indexes {};
@@ -42,6 +40,7 @@ auto call_with_tuple(F func, std::tuple<A...> args, Indexes<I...>)
 
 } // namespace _impl
 
+namespace util {
 
 template<class F, class... A>
 auto call_with_tuple(F func, std::tuple<A...> args)
