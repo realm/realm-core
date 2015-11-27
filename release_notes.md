@@ -5,6 +5,8 @@
 * Fixing a race condition between SlabAlloc::attach_file() and SharedGroup::commit().
   In debug mode, the race would trigger an  assert "cfg.session_initiator || !cfg.is_shared", 
   in release mode it could conceivably result in undefined behaviour.
+* Fixed bug where Query::average() would include the number of nulls in the 
+  result.
 
 ### API breaking changes:
 
@@ -12,7 +14,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Recycle memory allocated for asynchronous operations in the networking
+  subsystem (`util::network`).
 
 -----------
 
@@ -27,7 +30,6 @@
 ### Bugfixes:
 * Fixed bug that would give false search results for queries on integer columns
   due to bug in bithacks deep inside Array::find()
-* Lorem ipsum.
 
 ### Enhancements:
 
