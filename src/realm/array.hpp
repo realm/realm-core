@@ -709,7 +709,7 @@ public:
 
     // Called for each search result
     template<Action action, class Callback>
-    bool find_action(size_t index, int64_t value,
+    bool find_action(size_t index, util::Optional<int64_t> value,
                      QueryState<int64_t>* state, Callback callback) const;
 
     template<Action action, class Callback>
@@ -1369,8 +1369,6 @@ public:
             return match<action, pattern>(index, indexpattern, *value);
         }
 
-        ++m_match_count;
-
         // If value is null, the only sensible actions are count, find_all, and return first.
         // Max, min, and sum should all have no effect.
         if (action == act_Count) {
@@ -1381,6 +1379,7 @@ public:
             Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
         }
         else if (action == act_ReturnFirst) {
+            m_match_count++;
             m_state = index;
             return false;
         }
@@ -1431,25 +1430,30 @@ public:
         static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
                       "Search action not supported");
 
-        ++m_match_count;
+        if (action == act_Count) {
+            ++m_match_count;
+        }
+        else if (!null::is_null_float(value)) {
+            ++m_match_count;
+            if (action == act_Max) {
+                if (value > m_state) {
+                    m_state = value;
+                    m_minmax_index = index;
+                }
+            }
+            else if (action == act_Min) {
+                if (value < m_state) {
+                    m_state = value;
+                    m_minmax_index = index;
+                }
+            }
+            else if (action == act_Sum)
+                m_state += value;
+            else {
+                REALM_ASSERT_DEBUG(false);
+            }
+        }
 
-        if (action == act_Max) {
-            if (value > m_state) {
-                m_state = value;
-                m_minmax_index = index;
-            }
-        }
-        else if (action == act_Min) {
-            if (value < m_state) {
-                m_state = value;
-                m_minmax_index = index;
-            }
-        }
-        else if (action == act_Sum)
-            m_state += value;
-        else {
-            REALM_ASSERT_DEBUG(false);
-        }
         return (m_limit > m_match_count);
     }
 };
@@ -2378,7 +2382,7 @@ computations for the given search criteria makes it feasible to construct such a
 // computation of these values will not be made. Only works if find_action() and find_action_pattern() rewritten as macros. Note: This problem has been fixed in
 // next upcoming array.hpp version
 template<Action action, class Callback>
-bool Array::find_action(size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const
+bool Array::find_action(size_t index, util::Optional<int64_t> value, QueryState<int64_t>* state, Callback callback) const
 {
     if (action == act_CallbackIdx)
         return callback(index);
@@ -2531,8 +2535,9 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
         // Huge speed optimizations are possible here! This is a very simple generic method.
         for (; start2 < end; start2++) {
             int64_t v = get<bitwidth>(start2 + 1);
-            if (c(v, value, v == get(0), find_null)) {
-                if (!find_action<action, Callback>(start2 + baseindex, v, state, callback))
+            if (c(v, value, v == get(0), find_null)) {                
+                util::Optional<int64_t> v2(v == get(0) ? util::none : util::make_optional(v));
+                if (!find_action<action, Callback>(start2 + baseindex, v2, state, callback))
                     return false; // tell caller to stop aggregating/search
             }
         }
@@ -2603,7 +2608,9 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
                 Array::minimum(res, start2, end2, &res_ndx);
 
             find_action<action, Callback>(res_ndx + baseindex, res, state, callback);
-            state->m_match_count += end2 - start2;
+            // find_action will increment match count by 1, so we need to `-1` from the number of elements that
+            // we performed the fast Array methods on.
+            state->m_match_count += end2 - start2 - 1;
 
         }
         else if (action == act_Count) {

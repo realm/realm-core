@@ -1,13 +1,13 @@
 # NEXT RELEASE
 
 ### Bugfixes:
+
 * Fixed bug that would give false search results for queries on integer columns
   due to bug in bithacks deep inside Array::find()
 * Fixed incorrect handling of a race between a commit() and a new thread
   or process opening the database. In debug mode, the race would trigger an
   assert "cfg.session_initiator || !cfg.is_shared", in release mode it could
   conceivably result in undefined behaviour.
-* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -15,7 +15,7 @@
 
 ### Enhancements:
 
-* Added Table::get_version_counter() exposing the versioning counter for the Table
+* Lorem ipsum.
 
 -----------
 
@@ -25,25 +25,31 @@
 
 ----------------------------------------------
 
-# 0.95.0 Release notes
+# 0.95.2 Release notes
 
 ### Bugfixes:
 
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
+* Fixed bug where Query::average() would include the number of nulls in the 
+  result.
 
 ### Enhancements:
 
+* Recycle memory allocated for asynchronous operations in the networking
+  subsystem (`util::network`).
+
+----------------------------------------------
+
+# 0.95.1 Release notes
+
+### Bugfixes:
+* Fixed bug that would give false search results for queries on integer columns
+  due to bug in bithacks deep inside Array::find()
+
+### Enhancements:
+
+* Added Table::get_version_counter() exposing the versioning counter for the Table
 * Add `TableView::get_query()`.
 
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
