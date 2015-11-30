@@ -8959,6 +8959,7 @@ void handover_writer(std::string path)
     sg.end_read();
 }
 
+
 void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control,
                       TestResults* test_results_ptr, std::string path)
 {
@@ -9031,6 +9032,50 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
 }
 
 } // anonymous namespace
+
+
+namespace {
+
+void attacher(std::string path)
+{
+    for (int i=0; i<1000; ++i) {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        Group& g = const_cast<Group&>(sg.begin_read());
+        g.verify();
+        TheTable::Ref table = g.get_table<TheTable>("table");
+        LangBindHelper::promote_to_write(sg, *hist);
+        table[i].first = 1 + table[i*10].first;
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.verify();
+        sg.end_read();
+    }
+}
+} // anonymous namespace
+
+TEST(LangBindHelper_RacingAttachers)
+{
+    const int num_attachers = 10;
+    SHARED_GROUP_TEST_PATH(p);
+    std::string path(p);
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        Group& g = sg.begin_write();
+        TheTable::Ref table = g.add_table<TheTable>("table");
+        table->add_empty_row(10000);
+        sg.commit();
+    }
+    Thread attachers[num_attachers];
+    for (int i=0; i<num_attachers; ++i) {
+        attachers[i].start(bind(&attacher, path));
+    }
+    for (int i=0; i<num_attachers; ++i) {
+        attachers[i].join();
+    }
+}
+
+
 
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
