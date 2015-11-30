@@ -2,8 +2,6 @@
 
 ### Bugfixes:
 
-* Fixed bug that would give false search results for queries on integer columns
-  due to bug in bithacks deep inside Array::find()
 * Fixed incorrect handling of a race between a commit() and a new thread
   or process opening the database. In debug mode, the race would trigger an
   assert "cfg.session_initiator || !cfg.is_shared", in release mode it could
