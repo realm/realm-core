@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.95.2 Release notes
 
 ### Bugfixes:
 
@@ -8,20 +8,10 @@
 * Fixed bug where Query::average() would include the number of nulls in the 
   result.
 
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * Recycle memory allocated for asynchronous operations in the networking
   subsystem (`util::network`).
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
