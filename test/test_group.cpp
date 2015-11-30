@@ -2275,6 +2275,26 @@ TEST(Group_CascadeNotify_TableViewClear)
     CHECK(called);
 }
 
+ONLY(Group_AddEmptyRowCrash)
+{
+#if REALM_MAX_BPNODE_SIZE == 1000
+    size_t a = 1031996;
+    size_t b = 5;
+#elif REALM_MAX_BPNODE_SIZE == 4
+    size_t a = 18;
+    size_t b = 3;
+#endif
+
+    Group g;
+    g.insert_table(0, "table");
+    TableRef t = g.get_table(0);
+    // t->add_column(type_Int, "ints1"); // still crashes when this line is enabled
+    t->add_empty_row(a);
+    t->add_column(type_Int, "ints2");
+
+    // array.cpp:2008: [realm-core-0.95.2] Assertion failed: insert_ndx - 1 == REALM_MAX_BPNODE_SIZE [1032, 1000]
+    t->add_empty_row(b);  
+}
 
 
 #ifdef REALM_DEBUG
