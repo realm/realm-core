@@ -54,84 +54,127 @@ char get_next(std::istream& is)
     return byte;
 }
 
-void parse_and_apply_instructions(std::istream& is, Group& g)
+void parse_and_apply_instructions(std::istream& is, Group& g, util::Optional<std::ostream&> log)
 {
     while (!is.eof()) {
         char instr = get_next(is);
 
         if (instr % COUNT == ADD_TABLE && g.size() < 1100) {
-            g.add_table(create_string(get_next(is) % Group::max_table_name_length));
+            auto name = create_string(get_next(is) % Group::max_table_name_length);
+            if (log) {
+                *log << "g.add_table(\"" << name << "\");\n";
+            }
+            g.add_table(name);
         }
         else if (instr % COUNT == INSERT_TABLE && g.size() < 1100) {
             size_t s0 = get_next(is) % (g.size() + 1);
             StringData sd0 = create_string(get_next(is) % (Group::max_table_name_length - 10) + 5);
-
-            // os << "g.insert_table(" << s0 << ", \"" << sd0 << "\");\n";
+            if (log) {
+                *log << "g.insert_table(" << s0 << ", \"" << sd0 << "\");\n";
+            }
             g.insert_table(s0, sd0);
         }
         else if (instr % COUNT == REMOVE_TABLE && g.size() > 0) {
-            g.remove_table(get_next(is) % g.size());
+            size_t idx = get_next(is) % g.size();
+            if (log) {
+                *log << "g.remove_table(" << idx << ");\n";
+            }
+            g.remove_table(idx);
         }
         else if (instr % COUNT == CLEAR_TABLE && g.size() > 0) {
-            TableRef t = g.get_table(get_next(is) % g.size());
+            size_t idx = get_next(is) % g.size();
+            if (log) {
+                *log << "g.get_table(" << idx << ")->clear();\n";
+            }
+            TableRef t = g.get_table(idx);
             t->clear();
         }
         else if (instr % COUNT == MOVE_TABLE && g.size() >= 2) {
             size_t t1 = get_next(is) % g.size();
             size_t t2 = get_next(is) % g.size();
-            if(t1 != t2)
+            if(t1 != t2) {
+                if (log) {
+                    *log << "g.move_table(" << t1 << ", " << t2 << ");\n";
+                }
                 g.move_table(t1, t2);
+            }
         }
         else if (instr % COUNT == INSERT_ROW && g.size() > 0) {
-            TableRef t = g.get_table(get_next(is) % g.size());
-            t->insert_empty_row(get_next(is) % (t->size() + 1), get_next(is));
+            size_t table_idx = get_next(is) % g.size();
+            TableRef t = g.get_table(table_idx);
+            size_t row_ndx = get_next(is) % (t->size() + 1);
+            size_t num_rows = get_next(is);
+            if (log) {
+                *log << "g.get_table(" << table_idx << ")->insert_empty_row(" << row_ndx << ", " << num_rows << ");\n";
+            }
+            t->insert_empty_row(row_ndx, num_rows);
         }
         else if (instr % COUNT == ADD_EMPTY_ROW && g.size() > 0) {
-            TableRef t = g.get_table(get_next(is) % g.size());
-            t->add_empty_row(get_next(is));
+            size_t table_ndx = get_next(is) % g.size();
+            size_t num_rows = get_next(is);
+            if (log) {
+                *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows << ");\n";
+            }
+            TableRef t = g.get_table(table_ndx);
+            t->add_empty_row(num_rows);
         }
         else if (instr % COUNT == ADD_COLUMN && g.size() > 0) {
-            TableRef t = g.get_table(get_next(is) % g.size());
-            t->add_column(get_type(get_next(is)), create_string(get_next(is) % Group::max_table_name_length));
+            size_t table_ndx = get_next(is) % g.size();
+            DataType type = get_type(get_next(is));
+            auto name = create_string(get_next(is) % Group::max_table_name_length);
+            if (log) {
+                *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\");\n";
+            }
+            TableRef t = g.get_table(table_ndx);
+            t->add_column(type, name);
         }
         else if (instr % COUNT == INSERT_COLUMN && g.size() > 0) {
-            size_t s3 = get_next(is) % g.size();
-            TableRef t = g.get_table(s3);
-            size_t s0 = get_next(is) % (t->get_column_count() + 1);
-            DataType d0 = get_type(get_next(is));
-            StringData sd0 = create_string(get_next(is) % Group::max_table_name_length);
-            // os << "{TableRef t = g.get_table(" << s3 << ");\n";
-            // os << "t->insert_column(" << s0 << ", DataType(" << d0 << "), \"" << sd0 << "\");}\n";
-            t->insert_column(s0, d0, sd0);
+            size_t table_ndx = get_next(is) % g.size();
+            TableRef t = g.get_table(table_ndx);
+            size_t col_ndx = get_next(is) % (t->get_column_count() + 1);
+            DataType type = get_type(get_next(is));
+            auto name = create_string(get_next(is) % Group::max_table_name_length);
+            if (log) {
+                *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\");\n";
+            }
+            t->insert_column(col_ndx, type, name);
         }
         else if (get_next(is) == REMOVE_COLUMN && g.size() > 0) {
-            size_t s3 = get_next(is) % g.size();
-            TableRef t = g.get_table(s3);
+            size_t table_ndx = get_next(is) % g.size();
+            TableRef t = g.get_table(table_ndx);
             if (t->get_column_count() > 0) {
-                size_t s0 = get_next(is) % t->get_column_count();
-                // os << "{TableRef t = g.get_table(" << s3 << ");\n";
-                // os << "t->remove_column(" << s0 << ");}\n";
-                t->remove_column(s0);
+                size_t col_ndx = get_next(is) % t->get_column_count();
+                if (log) {
+                    *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << ");\n";
+                }
+                t->remove_column(col_ndx);
             }
         }
         else if (instr % COUNT == ADD_COLUMN_LINK && g.size() >= 1) {
-            size_t s0 = get_next(is) % g.size();
-            size_t s1 = get_next(is) % g.size();
-            TableRef t1 = g.get_table(s0);
-            TableRef t2 = g.get_table(s1);
-            StringData sd0 = create_string(get_next(is) % Group::max_table_name_length);
-            // os << "{TableRef t1 = g.get_table(" << s0 << ");\n";
-            // os << "TableRef t2 = g.get_table(" << s1 << ");\n";
-            // os << "t1->add_column_link(type_Link, \"" << sd0 << "\", *t2);}\n";
-            t1->add_column_link(type_Link, sd0, *t2);
+            size_t table_ndx_1 = get_next(is) % g.size();
+            size_t table_ndx_2 = get_next(is) % g.size();
+            TableRef t1 = g.get_table(table_ndx_1);
+            TableRef t2 = g.get_table(table_ndx_2);
+            StringData name = create_string(get_next(is) % Group::max_table_name_length);
+            if (log) {
+                *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_Link, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
+            }
+            t1->add_column_link(type_Link, name, *t2);
         }
         else if (instr % COUNT == ADD_COLUMN_LINK_LIST && g.size() >= 2) {
-            TableRef t1 = g.get_table(get_next(is) % g.size());
-            TableRef t2 = g.get_table(get_next(is) % g.size());
-            t1->add_column_link(type_LinkList, create_string(get_next(is) % Group::max_table_name_length), *t2);
+            size_t table_ndx_1 = get_next(is) % g.size();
+            size_t table_ndx_2 = get_next(is) % g.size();
+            TableRef t1 = g.get_table(table_ndx_1);
+            TableRef t2 = g.get_table(table_ndx_2);
+            StringData name = create_string(get_next(is) % Group::max_table_name_length);
+            if (log) {
+                *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_LinkList, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
+            }
+            t1->add_column_link(type_LinkList, name, *t2);
         }
         else if (instr % COUNT == SET && g.size() > 0) {
-            TableRef t = g.get_table(get_next(is) % g.size());
+            size_t table_ndx = get_next(is) % g.size();
+            TableRef t = g.get_table(table_ndx);
             if (t->get_column_count() > 0 && t->size() > 0) {
                 size_t c = get_next(is) % t->get_column_count();
                 size_t r = get_next(is) % t->size();
@@ -139,31 +182,63 @@ void parse_and_apply_instructions(std::istream& is, Group& g)
                 DataType d = t->get_column_type(c);
 
                 if (d == type_String) {
-                    t->set_string(c, r, create_string(get_next(is)));
+                    auto string = create_string(get_next(is));
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->set_string(" << c << ", " << r << ", \"" << string << "\");\n";
+                    }
+                    t->set_string(c, r, string);
                 }
                 else if (d == type_Binary) {
-                    StringData sd = create_string(get_next(is));
+                    auto sd = create_string(get_next(is));
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->set_binary(" << c << ", " << r << ", BinaryData{\"" << sd << "\", " << sd.size() << "});\n";
+                    }
                     t->set_binary(c, r, BinaryData(sd.data(), sd.size()));
                 }
                 else if (d == type_Int) {
+                    int64_t value = get_next(is);
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
+                    }
                     t->set_int(c, r, get_next(is));
                 }
                 else if (d == type_DateTime) {
-                    t->set_datetime(c, r, DateTime(get_next(is)));
+                    DateTime value{get_next(is)};
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
+                    }
+                    t->set_datetime(c, r, value);
                 }
                 else if (d == type_Bool) {
-                    t->set_bool(c, r, get_next(is) % 2 == 0);
+                    bool value = get_next(is) % 2 == 0;
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->set_bool(" << c << ", " << r << ", " << value << ");\n";
+                    }
+                    t->set_bool(c, r, value);
                 }
                 else if (d == type_Float) {
-                    t->set_float(c, r, get_next(is));
+                    float value = get_next(is);
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->set_float(" << c << ", " << r << ", " << value << ");\n";
+                    }
+                    t->set_float(c, r, value);
                 }
                 else if (d == type_Double) {
-                    t->set_double(c, r, get_next(is));
+                    double value = get_next(is);
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->set_double(" << c << ", " << r << ", " << value << ");\n";
+                    }
+                    t->set_double(c, r, value);
                 }
                 else if (d == type_Link) {
                     TableRef target = t->get_link_target(c);
-                    if (target->size() > 0)
-                        t->set_link(c, r, get_next(is) % target->size());
+                    if (target->size() > 0) {
+                        size_t target_row = get_next(is) % target->size();
+                        if (log) {
+                            *log << "g.get_table(" << table_ndx << ")->set_link(" << c << ", " << r << ", " << target_row << ");\n";
+                        }
+                        t->set_link(c, r, target_row);
+                    }
                 }
                 else if (d == type_LinkList) {
                     TableRef target = t->get_link_target(c);
@@ -185,22 +260,45 @@ void parse_and_apply_instructions(std::istream& is, Group& g)
             }
         }
         else if (instr % COUNT == REMOVE_ROW && g.size() > 0) {
-            TableRef t = g.get_table(get_next(is) % g.size());
+            size_t table_ndx = get_next(is) % g.size();
+            TableRef t = g.get_table(table_ndx);
             if (t->size() > 0) {
-                t->remove(get_next(is) % t->size());
+                size_t row_ndx = get_next(is) % t->size();
+                if (log) {
+                    *log << "g.get_table(" << table_ndx << ")->remove(" << row_ndx << ");\n";
+                }
+                t->remove(row_ndx);
             }
         }
     }
 }
 
+void usage(const char* argv[])
+{
+        fprintf(stderr, "Usage: %s <LOGFILE> [--log]\n(where <LOGFILE> is a instruction file that will be replayed.)\nPass --log to have code printed to stdout producing the same instructions.", argv[0]);
+        exit(1);
+}
+
 int main(int argc, const char* argv[])
 {
-    if (argc == 1) {
-        fprintf(stderr, "Usage: %s <LOGFILE>\n(where <LOGFILE> is a instruction file that will be replayed.)", argv[0]);
-        exit(1);
+    util::Optional<std::ostream&> log;
+
+    size_t file_arg = size_t(-1);
+    for (size_t i = 1; i < size_t(argc); ++i) {
+        std::string arg = argv[i];
+        if (arg == "--log") {
+            log = util::some<std::ostream&>(std::cout);
+        }
+        else {
+            file_arg = i;
+        }
     }
 
-    std::ifstream in{argv[1]};
+    if (file_arg == size_t(-1)) {
+        usage(argv);
+    }
+
+    std::ifstream in{argv[file_arg]};
     if (!in.is_open()) {
         fprintf(stderr, "Could not open file for reading: %s\n", argv[1]);
         exit(1);
@@ -216,7 +314,16 @@ int main(int argc, const char* argv[])
     Group group;
 
     try {
-        parse_and_apply_instructions(in, group);
+        if (log) {
+            time_t t = time(0);
+            tm t0;
+            localtime_r(&t, &t0);
+            char buffer[100] = {0};
+            strftime(buffer, sizeof(buffer), "%c", &t0);
+            *log << "// Test case generated by " << argv[0] << " on " << buffer << ".\n";
+            *log << "Group g;\n";
+        }
+        parse_and_apply_instructions(in, group, log);
     }
     catch (const EndOfFile&) {
         return 0;
