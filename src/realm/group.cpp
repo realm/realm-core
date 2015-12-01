@@ -362,7 +362,7 @@ void Group::create_and_insert_table(size_t table_ndx, StringData name)
             return old_table_ndx + 1;
         }
         return old_table_ndx;
-    });
+    }); // Throws
 
     if (Replication* repl = m_alloc.get_replication())
         repl->insert_group_level_table(table_ndx, prior_size, name); // Throws
@@ -472,17 +472,17 @@ void Group::remove_table(size_t table_ndx)
     m_table_accessors[table_ndx] = m_table_accessors[last_ndx];
     m_table_accessors.pop_back();
 
+    tf::detach(*table);
+    tf::unbind_ptr(*table);
+
     if (last_ndx != table_ndx) {
         update_table_indices([&](size_t old_table_ndx) {
             if (old_table_ndx == last_ndx) {
                 return table_ndx;
             }
             return old_table_ndx;
-        });
+        }); // Throws
     }
-
-    tf::detach(*table);
-    tf::unbind_ptr(*table);
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
@@ -1528,7 +1528,7 @@ void Group::update_table_indices(F&& map_function)
                 size_t table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
                 size_t new_table_ndx = map_function(table_ndx);
                 if (new_table_ndx != table_ndx) {
-                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx);
+                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throw
                     spec_changed = true;
                 }
             }
@@ -1540,7 +1540,7 @@ void Group::update_table_indices(F&& map_function)
     }
 
     // Update accessors.
-    refresh_dirty_accessors();
+    refresh_dirty_accessors(); // Throws
 
     // Table's specs might have changed, so they need to be reinitialized.
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
