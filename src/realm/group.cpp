@@ -1528,7 +1528,7 @@ void Group::update_table_indices(F&& map_function)
                 size_t table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
                 size_t new_table_ndx = map_function(table_ndx);
                 if (new_table_ndx != table_ndx) {
-                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throw
+                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throws
                     spec_changed = true;
                 }
             }
