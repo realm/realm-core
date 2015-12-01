@@ -134,6 +134,13 @@ public:
     ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
+    /// Please note that attach_file can fail to attach to a file due to a collision
+    /// with a writer extending the file. This can only happen if the caller is *not*
+    /// the session initiator. When this happens, attach_file() throws SlabAlloc::Retry,
+    /// and the caller must retry the call. The caller should check if it has become
+    /// the session initiator before retrying. This can happen if the conflicting thread
+    /// (or process) terminates or crashes before the next retry.
+    ///
     /// \throw util::File::AccessError
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& path, Config& cfg);

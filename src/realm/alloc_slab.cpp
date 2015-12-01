@@ -467,7 +467,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     size_t size;
     bool did_create = false;
 
-    // We now try to establish a resonable state of the file before mapping it.
+    // We can only safely mmap the file, if its size matches a section. If not,
+    // we must change the size to match before mmaping it.
     // This can fail due to a race with a concurrent commmit, in which case we
     // must throw allowing the caller to retry, but the common case is to succeed
     // at first attempt
@@ -528,7 +529,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             // If the file is opened read-only, we cannot extend it. This is not a problem,
             // because for a read-only file we assume that it will not change while we use it.
             // This assumption obviously will not hold, if the file is shared by multiple
-            // processes with different opening modes.
+            // processes or threads with different opening modes.
             ;
         }
         else {
