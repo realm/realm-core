@@ -530,6 +530,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             // because for a read-only file we assume that it will not change while we use it.
             // This assumption obviously will not hold, if the file is shared by multiple
             // processes or threads with different opening modes.
+            // Currently, there is no way to detect if this assumption is violated.
             ;
         }
         else {
