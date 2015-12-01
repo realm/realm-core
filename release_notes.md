@@ -1,22 +1,8 @@
-# NEXT RELEASE
+# 0.95.3 Release notes
 
 ### Bugfixes:
 
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* Reverted what was presumably a fix for a race between commit and opening the database (0.95.2).
 
 ----------------------------------------------
 
@@ -26,6 +12,7 @@
 
 * Fixed bug where Query::average() would include the number of nulls in the 
   result.
+* Presumably fixed a race between commit and opening the database.
 
 ### Enhancements:
 
