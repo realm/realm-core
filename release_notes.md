@@ -6,7 +6,10 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Primary key support has been removed. Instead, new instructions have been
+  introduced: SetIntUnique, SetStringUnique. To implement primary keys, callers
+  should manually check the PK constraint and then emit these instructions in
+  place of the regular SetInt and SetString instructions.
 
 ### Enhancements:
 
