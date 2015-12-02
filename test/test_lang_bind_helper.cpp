@@ -2437,9 +2437,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
+        parent_w->add_search_index(0);
         parent_w->add_empty_row(2);
         parent_w->set_int(0, 0, 27);
         parent_w->set_int(0, 1, 227);
+        parent_w->set_int_unique(0, 1, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);
@@ -7097,10 +7099,12 @@ public:
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
     bool set_int(size_t, size_t, int_fast64_t) { return false; }
+    bool set_int_unique(size_t, size_t, int_fast64_t) { return false; }
     bool set_bool(size_t, size_t, bool) { return false; }
     bool set_float(size_t, size_t, float) { return false; }
     bool set_double(size_t, size_t, double) { return false; }
     bool set_string(size_t, size_t, StringData) { return false; }
+    bool set_string_unique(size_t, size_t, StringData) { return false; }
     bool set_binary(size_t, size_t, BinaryData) { return false; }
     bool set_date_time(size_t, size_t, DateTime) { return false; }
     bool set_table(size_t, size_t) { return false; }
@@ -9429,6 +9433,69 @@ TEST(LangBindHelper_HandoverLinkView)
         CHECK_EQUAL(2, tv.size());
         CHECK_EQUAL(0, tv.get_source_ndx(0));
         CHECK_EQUAL(2, tv.get_source_ndx(1));
+    }
+}
+
+
+TEST(LangBindHelper_HandoverDistinctView)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    sg.begin_read();
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        // Untyped interface
+        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
+        std::unique_ptr<SharedGroup::Handover<TableView> > handover2;
+        {
+            TableView tv1;
+            TableView tv2;
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            TableRef table = group_w.add_table("table2");
+            table->add_column(type_Int, "first");
+            table->add_empty_row(2);
+            table->set_int(0, 0, 100);
+            table->set_int(0, 1, 100);
+
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            tv1 = table->where().find_all();
+            tv1.distinct(0);
+            CHECK(tv1.size() == 1);
+            CHECK(tv1.get_source_ndx(0) == 0);
+            CHECK(tv1.is_attached());
+           
+            handover2 = sg_w.export_for_handover(tv1, ConstSourcePayload::Copy);
+            CHECK(tv1.is_attached());
+        }
+        {
+            LangBindHelper::advance_read(sg, *hist, vid);
+            sg_w.close();
+            // importing tv1:
+            std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover2)));
+            CHECK(tv2->is_in_sync());
+            CHECK(tv2->is_attached());
+
+            CHECK_EQUAL(tv2->size(), 1);
+            CHECK_EQUAL(tv2->get_source_ndx(0), 0);
+
+            // distinct property must remain through handover such that second row is kept being omitted
+            // after sync_if_needed()
+            tv2->sync_if_needed();
+            CHECK_EQUAL(tv2->size(), 1);
+            CHECK_EQUAL(tv2->get_source_ndx(0), 0);
+
+            // Remove distinct property
+            tv2->distinct(std::vector<size_t>());
+            tv2->sync_if_needed();
+            CHECK_EQUAL(tv2->size(), 2);
+        }
     }
 }
 

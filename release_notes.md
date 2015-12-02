@@ -9,11 +9,18 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Primary key support has been removed. Instead, new instructions have been
+  introduced: SetIntUnique, SetStringUnique. To implement primary keys, callers
+  should manually check the PK constraint and then emit these instructions in
+  place of the regular SetInt and SetString instructions.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added TableView::distinct() method. It obeys TableView::sync_if_needed().
+  A call to distinct() will first fully populate the TableView and then perform
+  a distinct algorithm on that (i.e. it will *not* add a secondary distinct filter
+  to any earlier filter applied). See more in TEST(TableView_Distinct) in 
+  test_table_view.cpp.
 
 -----------
 
@@ -23,12 +30,21 @@
 
 ----------------------------------------------
 
+# 0.95.3 Release notes
+
+### Bugfixes:
+
+* Reverted what was presumably a fix for a race between commit and opening the database (0.95.2).
+
+----------------------------------------------
+
 # 0.95.2 Release notes
 
 ### Bugfixes:
 
 * Fixed bug where Query::average() would include the number of nulls in the 
   result.
+* Presumably fixed a race between commit and opening the database.
 
 ### Enhancements:
 
