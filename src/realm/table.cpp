@@ -54,11 +54,12 @@
 /// only on some parts of the internal accessors states, and only on some parts
 /// of the structural state.
 ///
-/// This level of consistency is guaranteed, and it is also the **maximum** that
-/// may be assumed by the application after a library function fails by throwing
-/// an unexpected exception (such as std::bad_alloc). It is also the **minimum**
-/// level of consistency that is required to be able to properly destroy the
-/// accessor objects (manually, or as a result of stack unwinding).
+/// This level of consistency is guaranteed at all times, and it is also the
+/// **maximum** that may be assumed by the application after a library function
+/// fails by throwing an unexpected exception (such as std::bad_alloc). It is
+/// also the **minimum** level of consistency that is required to be able to
+/// properly destroy the accessor objects (manually, or as a result of stack
+/// unwinding).
 ///
 /// It is supposed to be a library-wide invariant that an accessor hierarchy is
 /// at least minimally consistent, but so far, only some parts of the library

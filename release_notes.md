@@ -2,8 +2,7 @@
 
 ### Bugfixes:
 
-* Fixed bug where Query::average() would include the number of nulls in the 
-  result.
+* Lorem ipsum.
 
 ### API breaking changes:
 
@@ -11,14 +10,36 @@
 
 ### Enhancements:
 
-* Recycle memory allocated for asynchronous operations in the networking
-  subsystem (`util::network`).
+* Lorem ipsum.
 
 -----------
 
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.95.3 Release notes
+
+### Bugfixes:
+
+* Reverted what was presumably a fix for a race between commit and opening the database (0.95.2).
+
+----------------------------------------------
+
+# 0.95.2 Release notes
+
+### Bugfixes:
+
+* Fixed bug where Query::average() would include the number of nulls in the 
+  result.
+* Presumably fixed a race between commit and opening the database.
+
+### Enhancements:
+
+* Recycle memory allocated for asynchronous operations in the networking
+  subsystem (`util::network`).
 
 ----------------------------------------------
 
