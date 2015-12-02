@@ -60,7 +60,7 @@ public:
     {
     }
 
-    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = 0)
+    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = nullptr)
     {
         for (const Buffer<char>& changeset: m_changesets)
             apply_changeset(changeset.data(), changeset.size(), target, replay_logger);
@@ -799,6 +799,48 @@ TEST(Replication_NullInteger)
         CHECK(table2->is_null(0, 0));
         CHECK(!table2->is_null(0, 1));
         CHECK(table2->is_null(0, 2));
+    }
+}
+
+
+TEST(Replication_SetUnique)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "c1");
+        table1->add_column(type_String, "c2");
+        table1->add_column(type_Int, "c3", true);
+        table1->add_column(type_String, "c4", true);
+        table1->add_search_index(0);
+        table1->add_search_index(1);
+        table1->add_search_index(2);
+        table1->add_search_index(3);
+        table1->add_empty_row(2);
+        table1->set_int_unique(0, 0, 123);
+        table1->set_string_unique(1, 0, "Hello, World!");
+        table1->set_int_unique(2, 0, 123);
+        table1->set_string_unique(3, 0, "Hello, World!");
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK_EQUAL(table2->get_int(0, 0), 123);
+        CHECK_EQUAL(table2->get_string(1, 0), "Hello, World!");
+        CHECK_EQUAL(table2->get_int(2, 0), 123);
+        CHECK_EQUAL(table2->get_string(3, 0), "Hello, World!");
     }
 }
 

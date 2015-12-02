@@ -245,7 +245,7 @@ public:
         std::cout << "--- Done" << std::endl;
     }
 
-    void expand_to(uint_fast32_t new_entries)  noexcept
+    void expand_to(uint_fast32_t new_entries) noexcept
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
@@ -262,7 +262,7 @@ public:
         // dump();
     }
 
-    static size_t compute_required_space(uint_fast32_t num_entries)  noexcept
+    static size_t compute_required_space(uint_fast32_t num_entries) noexcept
     {
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
@@ -270,22 +270,22 @@ public:
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const  noexcept
+    uint_fast32_t get_num_entries() const noexcept
     {
         return entries;
     }
 
-    uint_fast32_t last() const  noexcept
+    uint_fast32_t last() const noexcept
     {
         return put_pos.load(std::memory_order_acquire);
     }
 
-    const ReadCount& get(uint_fast32_t idx) const  noexcept
+    const ReadCount& get(uint_fast32_t idx) const noexcept
     {
         return data[idx];
     }
 
-    const ReadCount& get_last() const  noexcept
+    const ReadCount& get_last() const noexcept
     {
         return get(last());
     }
@@ -309,36 +309,36 @@ public:
         return r;
     }
 
-    const ReadCount& get_oldest() const  noexcept
+    const ReadCount& get_oldest() const noexcept
     {
         return get(old_pos.load(std::memory_order_relaxed));
     }
 
-    bool is_full() const  noexcept
+    bool is_full() const noexcept
     {
         uint_fast32_t idx = get(last()).next;
         return idx == old_pos.load(std::memory_order_relaxed);
     }
 
-    uint_fast32_t next() const  noexcept
+    uint_fast32_t next() const noexcept
     { // do not call this if the buffer is full!
         uint_fast32_t idx = get(last()).next;
         return idx;
     }
 
-    ReadCount& get_next()  noexcept
+    ReadCount& get_next() noexcept
     {
         REALM_ASSERT(!is_full());
         return data[ next() ];
     }
 
-    void use_next()  noexcept
+    void use_next() noexcept
     {
         atomic_dec(get_next().count); // .store_release(0);
         put_pos.store(next(), std::memory_order_release);
     }
 
-    void cleanup()  noexcept
+    void cleanup() noexcept
     {   // invariant: entry held by put_pos has count > 1.
         // std::cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();

@@ -17,6 +17,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 namespace {
+#define BASE_SIZE 3600
 
 /**
   This bechmark suite represents a number of common use cases,
@@ -34,8 +35,8 @@ namespace {
 
 const size_t min_repetitions = 10;
 const size_t max_repetitions = 1000;
-const double min_duration_s = 0.05;
-const double min_warmup_time_s = 0.01;
+const double min_duration_s = 0.1;
+const double min_warmup_time_s = 0.05;
 
 struct Benchmark
 {
@@ -91,8 +92,8 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         BenchmarkWithStringsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
-        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
-        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
+        t->add_empty_row(BASE_SIZE * 4);
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << rand();
             t->set_string(0, i, ss.str());
@@ -110,9 +111,9 @@ struct BenchmarkWithLongStrings : BenchmarkWithStrings {
         t->insert_empty_row(0);
         // This should be enough to upgrade the entire array:
         t->set_string(0, 0, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
-        t->set_string(0, REALM_MAX_BPNODE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE * 2, "A really long string, longer than 63 bytes at least, I guess......");
+        t->set_string(0, BASE_SIZE * 3, "A really long string, longer than 63 bytes at least, I guess......");
         tr.commit();
     }
 };
@@ -140,9 +141,9 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
         BenchmarkWithIntsTable::before_all(group);
         WriteTransaction tr(group);
         TableRef t = tr.get_table("IntOnly");
-        t->add_empty_row(REALM_MAX_BPNODE_SIZE * 4);
+        t->add_empty_row(BASE_SIZE * 4);
         Random r;
-        for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; ++i) {
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             t->set_int(0, i, r.draw_int<int64_t>());
         }
         tr.commit();
@@ -181,6 +182,17 @@ struct BenchmarkSort : BenchmarkWithStrings {
         ConstTableRef table = tr.get_table("StringOnly");
         ConstTableView view = table->get_sorted_view(0);
     }
+};
+
+struct BenchmarkEmptyCommit : Benchmark {
+    const char* name() const { return "EmptyCommit"; }
+
+    void operator()(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        tr.commit();
+    }
+
 };
 
 struct BenchmarkSortInt : BenchmarkWithInts {
@@ -315,16 +327,52 @@ struct BenchmarkQueryNot : Benchmark {
     }
 };
 
+struct BenchmarkGetLinkList : Benchmark {
+    const char* name() const { return "GetLinkList"; }
+    static const size_t rows = 10000;
 
+    void before_all(SharedGroup& group)
+    {
+        WriteTransaction tr(group);
+        TableRef destination_table = tr.add_table(std::string(name()) + "_Destination");
+        TableRef table = tr.add_table(name());
+        table->add_column_link(type_LinkList, "linklist", *destination_table);
+        table->add_empty_row(rows);
+        tr.commit();
+    }
 
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table(name());
+        std::vector<ConstLinkViewRef> linklists(rows);
+        for (size_t i = 0; i < rows; ++i) {
+            linklists[i] = table->get_linklist(0, i);
+        }
+        for (size_t i = 0; i < rows; ++i) {
+            table->get_linklist(0, i);
+        }
+        for (size_t i = 0; i < rows; ++i) {
+            linklists[i].reset();
+        }
+    }
+
+    void after_all(SharedGroup& group)
+    {
+        Group& g = group.begin_write();
+        g.remove_table(name());
+        g.remove_table(std::string(name()) + "_Destination");
+        group.commit();
+    }
+};
 
 const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
 {
     switch (level) {
-        case SharedGroup::durability_Full: return "Full";
+        case SharedGroup::durability_Full:    return "Full   ";
         case SharedGroup::durability_MemOnly: return "MemOnly";
 #ifndef _WIN32
-        case SharedGroup::durability_Async: return "Async";
+        case SharedGroup::durability_Async:   return "Async  ";
 #endif
     }
     return nullptr;
@@ -351,8 +399,14 @@ void run_benchmark(BenchmarkResults& results)
 {
     typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
     std::vector<config_pair> configs;
-    configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
+
     configs.push_back(config_pair(SharedGroup::durability_MemOnly, nullptr));
+#if REALM_ENABLE_ENCRYPTION
+    configs.push_back(config_pair(SharedGroup::durability_MemOnly, crypt_key(true)));
+#endif
+
+    configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
+
 #if REALM_ENABLE_ENCRYPTION
     configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
 #endif
@@ -420,6 +474,7 @@ void run_benchmark(BenchmarkResults& results)
 
         results.finish(ident, lead_text_ss.str());
     }
+    std::cout << std::endl;
 }
 
 } // anonymous namespace
@@ -431,6 +486,7 @@ int benchmark_common_tasks_main()
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
+    run_benchmark<BenchmarkEmptyCommit>(results);
     run_benchmark<AddTable>(results);
     run_benchmark<BenchmarkQuery>(results);
     run_benchmark<BenchmarkQueryNot>(results);
@@ -439,10 +495,13 @@ int benchmark_common_tasks_main()
     run_benchmark<BenchmarkSortInt>(results);
     run_benchmark<BenchmarkInsert>(results);
     run_benchmark<BenchmarkGetString>(results);
+
     run_benchmark<BenchmarkSetString>(results);
+
     run_benchmark<BenchmarkCreateIndex>(results);
     run_benchmark<BenchmarkGetLongString>(results);
     run_benchmark<BenchmarkSetLongString>(results);
+    run_benchmark<BenchmarkGetLinkList>(results);
 
     return 0;
 }

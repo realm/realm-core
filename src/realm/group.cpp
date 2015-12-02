@@ -83,7 +83,6 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     // Make all dynamically allocated memory (space beyond the attached file) as
     // available free-space.
     reset_free_space_tracking(); // Throws
-
     SlabAlloc::DetachGuard dg(m_alloc);
     attach(top_ref); // Throws
     dg.release(); // Do not detach allocator from file
@@ -148,6 +147,7 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
         m_alloc.remap(new_file_size); // Throws
     }
 
+    m_alloc.invalidate_cache();
     update_refs(new_top_ref, old_baseline);
 }
 
@@ -362,7 +362,7 @@ void Group::create_and_insert_table(size_t table_ndx, StringData name)
             return old_table_ndx + 1;
         }
         return old_table_ndx;
-    });
+    }); // Throws
 
     if (Replication* repl = m_alloc.get_replication())
         repl->insert_group_level_table(table_ndx, prior_size, name); // Throws
@@ -472,17 +472,17 @@ void Group::remove_table(size_t table_ndx)
     m_table_accessors[table_ndx] = m_table_accessors[last_ndx];
     m_table_accessors.pop_back();
 
+    tf::detach(*table);
+    tf::unbind_ptr(*table);
+
     if (last_ndx != table_ndx) {
         update_table_indices([&](size_t old_table_ndx) {
             if (old_table_ndx == last_ndx) {
                 return table_ndx;
             }
             return old_table_ndx;
-        });
+        }); // Throws
     }
-
-    tf::detach(*table);
-    tf::unbind_ptr(*table);
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
@@ -778,7 +778,7 @@ void Group::commit()
     // commit
 
     // Mark all managed space (beyond the attached file) as free.
-    m_alloc.reset_free_space_tracking(); // Throws
+    reset_free_space_tracking(); // Throws
 
     size_t old_baseline = m_alloc.get_baseline();
 
@@ -1176,6 +1176,11 @@ public:
         return true; // No-op
     }
 
+    bool set_int_unique(size_t, size_t, int_fast64_t) noexcept
+    {
+        return true; // No-op
+    }
+
     bool set_bool(size_t, size_t, bool) noexcept
     {
         return true; // No-op
@@ -1192,6 +1197,11 @@ public:
     }
 
     bool set_string(size_t, size_t, StringData) noexcept
+    {
+        return true; // No-op
+    }
+
+    bool set_string_unique(size_t, size_t, StringData) noexcept
     {
         return true; // No-op
     }
@@ -1521,20 +1531,26 @@ void Group::update_table_indices(F&& map_function)
         spec.init_from_parent();
 
         size_t num_cols = spec.get_column_count();
+        bool spec_changed = false;
         for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
             ColumnType type = spec.get_column_type(col_ndx);
             if (tf::is_link_type(type) || type == col_type_BackLink) {
                 size_t table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
                 size_t new_table_ndx = map_function(table_ndx);
                 if (new_table_ndx != table_ndx) {
-                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx);
+                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throws
+                    spec_changed = true;
                 }
             }
+        }
+
+        if (spec_changed && !m_table_accessors.empty() && m_table_accessors[i] != nullptr) {
+            tf::mark(*m_table_accessors[i]);
         }
     }
 
     // Update accessors.
-    refresh_dirty_accessors();
+    refresh_dirty_accessors(); // Throws
 
     // Table's specs might have changed, so they need to be reinitialized.
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
@@ -1616,6 +1632,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
         m_alloc.remap(new_file_size); // Throws
     }
 
+    m_alloc.invalidate_cache();
     m_top.detach(); // Soft detach
     attach(new_top_ref); // Throws
     refresh_dirty_accessors(); // Throws

@@ -228,19 +228,6 @@ public:
     /// index. The search index cannot be removed from the primary key of a
     /// table.
     ///
-    /// has_primary_key() returns true if, and only if a primary key has been
-    /// added to this table. Rather than throwing, it returns false if the table
-    /// accessor is detached.
-    ///
-    /// try_add_primary_key() tries to add a primary key to this table, by
-    /// forming it from the specified column. It fails and returns false if the
-    /// specified column has duplicate values, otherwise it returns true. The
-    /// specified column must already have a search index. This table must have
-    /// no preexisting primary key.
-    ///
-    /// remove_primary_key() removes a previously added primary key. It is an
-    /// error if this table has no primary key.
-    ///
     /// This table must be a root table; that is, it must have an independent
     /// descriptor. Freestanding tables, group-level tables, and subtables in a
     /// column of type 'mixed' are all examples of root tables. See add_column()
@@ -252,9 +239,6 @@ public:
 //    void remove_search_index(size_t col_ndx);
     void add_search_index(size_t column_ndx);
     void remove_search_index(size_t column_ndx);
-    bool has_primary_key() const noexcept;
-    bool try_add_primary_key(size_t column_ndx);
-    void remove_primary_key();
 
     //@}
 
@@ -461,6 +445,7 @@ public:
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
+    void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
     template<class E>
@@ -468,6 +453,7 @@ public:
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
@@ -495,16 +481,14 @@ public:
     // and clear_subtable() replaces the value with an empty table.)
     TableRef get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
-    size_t get_subtable_size(size_t column_ndx, size_t row_ndx)
-        const noexcept;
+    size_t get_subtable_size(size_t column_ndx, size_t row_ndx) const noexcept;
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
     size_t get_backlink_count(size_t row_ndx, const Table& origin,
-                                   size_t origin_col_ndx) const noexcept;
+                              size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin,
-                             size_t origin_col_ndx, size_t backlink_ndx) const
-        noexcept;
+                        size_t origin_col_ndx, size_t backlink_ndx) const noexcept;
 
 
     //@{
@@ -606,22 +590,6 @@ public:
     TableView      get_backlink_view(size_t row_ndx, Table *src_table,
                                      size_t src_col_ndx);
 
-    //@{
-
-    /// Find the row with the specified primary key.
-    ///
-    /// It is an error to call any of these function on a table that has no
-    /// primary key, or to call one of them for a column with a mismatching
-    /// type.
-
-    RowExpr find_pkey_int(int_fast64_t pkey_value);
-    ConstRowExpr find_pkey_int(int_fast64_t pkey_value) const;
-
-    RowExpr find_pkey_string(StringData pkey_value);
-    ConstRowExpr find_pkey_string(StringData pkey_value) const;
-
-    //@}
-
 
     // Pivot / aggregate operation types. Experimental! Please do not document method publicly.
     enum AggrType {
@@ -635,7 +603,16 @@ public:
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const IntegerColumn* viewrefs = nullptr) const;
 
-
+    /// Report the current versioning counter for the table. The versioning counter is guaranteed to
+    /// change when the contents of the table changes after advance_read() or promote_to_write(), or
+    /// immediately after calls to methods which change the table. The term "change" means "change of
+    /// value": The storage layout of the table may change, for example due to optimization, but this
+    /// is not considered a change of a value. This means that you *cannot* use a non-changing version
+    /// count to indicate that object addresses (e.g. strings, binary data) remain the same.
+    /// The versioning counter *may* change (but is not required to do so) when another table linked
+    /// from this table, or linking to this table, is changed. The version counter *may* also change
+    /// without any apparent reason.
+    uint_fast64_t get_version_counter() const noexcept;
 private:
     template<class T>
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
@@ -737,7 +714,7 @@ public:
 
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string,
-                 std::string>* renames = 0) const;
+                 std::string>* renames = nullptr) const;
     void to_string(std::ostream& out, size_t limit = 500) const;
     void row_to_string(size_t row_ndx, std::ostream& out) const;
 
@@ -857,7 +834,6 @@ private:
     column_accessors m_cols;
 
     mutable size_t m_ref_count;
-    mutable const StringIndex* m_primary_key;
 
     // If this table is a root table (has independent descriptor),
     // then Table::m_descriptor refers to the accessor of its
@@ -943,10 +919,6 @@ private:
     void init(ConstSubspecRef shared_spec, ArrayParent* parent_column,
               size_t parent_row_ndx);
 
-    void reveal_primary_key() const;
-    size_t do_find_pkey_int(int_fast64_t) const;
-    size_t do_find_pkey_string(StringData) const;
-
     static void do_insert_column(Descriptor&, size_t col_ndx, DataType type,
                                  StringData name, Table* link_target_table, bool nullable = false);
     static void do_insert_column_unless_exists(Descriptor&, size_t col_ndx, DataType type,
@@ -1009,11 +981,11 @@ private:
 
     // recursive methods called by to_json, to follow links
     void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-        std::vector<ref_type>& followed) const;
+                 std::vector<ref_type>& followed) const;
     void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
-        std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
+                     std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
     void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = nullptr) const;
+                     std::map<std::string, std::string>* renames = nullptr) const;
 
     // Detach accessor from underlying table. Caller must ensure that
     // a reference count exists upon return, for example by obtaining
@@ -1229,8 +1201,7 @@ private:
     void do_move_last_over(size_t row_ndx);
 
     // Precondition: 1 <= end - begin
-    size_t* record_subtable_path(size_t* begin,
-                                      size_t* end) const noexcept;
+    size_t* record_subtable_path(size_t* begin, size_t* end) const noexcept;
 
     /// Check if an accessor exists for the specified subtable. If it does,
     /// return a pointer to it, otherwise return null. This function assumes
@@ -1405,8 +1376,7 @@ protected:
     /// consistency can be assumed by this function.
     virtual void child_accessor_destroyed(Table* child) noexcept = 0;
 
-    virtual size_t* record_subtable_path(size_t* begin,
-                                              size_t* end) noexcept;
+    virtual size_t* record_subtable_path(size_t* begin, size_t* end) noexcept;
 
     friend class Table;
 };
@@ -1416,6 +1386,7 @@ protected:
 
 
 // Implementation:
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 
 inline void Table::bump_version(bool bump_global) const noexcept
@@ -1585,7 +1556,7 @@ public:
     Table* release() noexcept
     {
         Table* table = m_table;
-        m_table = 0;
+        m_table = nullptr;
         return table;
     }
 
@@ -1803,42 +1774,6 @@ inline bool Table::is_group_level() const noexcept
     return bool(get_parent_group());
 }
 
-inline Table::RowExpr Table::find_pkey_int(int_fast64_t value)
-{
-    Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return RowExpr(table, row_ndx);
-}
-
-inline Table::ConstRowExpr Table::find_pkey_int(int_fast64_t value) const
-{
-    const Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return ConstRowExpr(table, row_ndx);
-}
-
-inline Table::RowExpr Table::find_pkey_string(StringData value)
-{
-    Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return RowExpr(table, row_ndx);
-}
-
-inline Table::ConstRowExpr Table::find_pkey_string(StringData value) const
-{
-    const Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return ConstRowExpr(table, row_ndx);
-}
-
 inline bool Table::operator==(const Table& t) const
 {
     return m_spec == t.m_spec && compare_rows(t); // Throws
@@ -1878,8 +1813,7 @@ inline bool Table::is_link_type(ColumnType col_type) noexcept
     return col_type == col_type_Link || col_type == col_type_LinkList;
 }
 
-inline size_t* Table::record_subtable_path(size_t* begin,
-                                                size_t* end) const noexcept
+inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const noexcept
 {
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     size_t index_in_parent = real_top.get_ndx_in_parent();
@@ -1891,8 +1825,7 @@ inline size_t* Table::record_subtable_path(size_t* begin,
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 
-inline size_t* Table::Parent::record_subtable_path(size_t* begin,
-                                                        size_t*) noexcept
+inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*) noexcept
 {
     return begin;
 }
@@ -2021,8 +1954,7 @@ public:
         table.discard_child_accessors();
     }
 
-    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx)
-        noexcept
+    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
     {
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
@@ -2235,8 +2167,7 @@ public:
         table.adj_erase_column(col_ndx);
     }
 
-    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2)
-        noexcept
+    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2) noexcept
     {
         table.adj_move_column(col_ndx_1, col_ndx_2);
     }
@@ -2293,8 +2224,7 @@ public:
         table.set_ndx_in_parent(ndx_in_parent);
     }
 
-    static void set_shared_subspec_ndx_in_parent(Table& table, size_t spec_ndx_in_parent)
-        noexcept
+    static void set_shared_subspec_ndx_in_parent(Table& table, size_t spec_ndx_in_parent) noexcept
     {
         table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }

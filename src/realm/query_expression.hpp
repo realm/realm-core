@@ -2103,7 +2103,7 @@ public:
 
     const Table* get_table() const override
     {
-        return m_column.get_table();
+        return m_link_map.m_tables[0];
     }
 
     void set_table() override
@@ -2159,7 +2159,7 @@ public:
 
     const Table* get_table() const override
     {
-        return m_column.get_table();
+        return m_link_map.m_tables[0];
     }
 
     void set_table() override

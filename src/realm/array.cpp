@@ -178,7 +178,6 @@ size_t Array::bit_width(int64_t v)
 void Array::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.m_addr;
-
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs             = get_hasrefs_from_header(header);
@@ -613,9 +612,8 @@ void Array::insert(size_t ndx, int_fast64_t value)
         // when byte sized and no expansion, use memmove
 // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        char* base = reinterpret_cast<char*>(m_data);
-        char* src_begin = base + ndx*w;
-        char* src_end   = base + m_size*w;
+        char* src_begin = m_data + ndx*w;
+        char* src_end   = m_data + m_size*w;
         char* dst_end   = src_end + w;
         std::copy_backward(src_begin, src_end, dst_end);
     }
@@ -3194,6 +3192,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
 
         mem_2.m_ref  = child_ref;
         mem_2.m_addr = alloc.translate(child_ref);
+        // inform encryption layer on next loop iteration
     }
 }
 
@@ -3397,6 +3396,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
         // 'root' may be destroyed at this point
         destroy_inner_bptree_node(root_mem, first_value, alloc);
         char* child_header = alloc.translate(child_ref);
+        // destroy_singlet.... will take care of informing the encryption layer
         MemRef child_mem(child_header, child_ref);
         destroy_singlet_bptree_branch(child_mem, alloc, handler);
         return;
@@ -3484,6 +3484,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
         REALM_ASSERT_3(num_children, >=, 2);
         child_ref = get_as_ref(child_ref_ndx);
         child_header = m_alloc.translate(child_ref);
+        // destroy_singlet.... will take care of informing the encryption layer
         child_mem = MemRef(child_header, child_ref);
         erase(child_ref_ndx); // Throws
         destroy_singlet_bptree_branch(child_mem, m_alloc, handler);
