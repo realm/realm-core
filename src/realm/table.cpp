@@ -1602,8 +1602,6 @@ void Table::add_search_index(size_t col_ndx)
     if (has_search_index(col_ndx))
         return;
 
-    REALM_ASSERT(!m_primary_key);
-
     // Create the index
     ColumnBase& col = get_column_base(col_ndx);
     StringIndex* index = col.create_search_index(); // Throws
@@ -1641,9 +1639,6 @@ void Table::remove_search_index(size_t col_ndx)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    if (REALM_UNLIKELY(m_primary_key))
-        throw LogicError(LogicError::is_primary_key);
-
     if (!has_search_index(col_ndx))
         return;
 
@@ -1667,120 +1662,6 @@ void Table::remove_search_index(size_t col_ndx)
 
     if (Replication* repl = get_repl())
         repl->remove_search_index(this, col_ndx); // Throws
-}
-
-
-bool Table::has_primary_key() const noexcept
-{
-    // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        ColumnAttr attr = m_spec.get_column_attr(i);
-        if (attr & col_attr_PrimaryKey)
-            return true;
-    }
-    return false;
-}
-
-
-bool Table::try_add_primary_key(size_t col_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    if (REALM_UNLIKELY(has_primary_key()))
-        throw LogicError(LogicError::has_primary_key);
-
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
-
-    if (REALM_UNLIKELY(!has_search_index(col_ndx)))
-        throw LogicError(LogicError::no_search_index);
-
-    // FIXME: Also check that there are no null values
-    // (NoNullConstraintViolation).
-    ColumnType type = get_real_column_type(col_ndx);
-    ColumnBase& col = get_column_base(col_ndx);
-    if (type == col_type_String) {
-        StringColumn& col_2 = static_cast<StringColumn&>(col);
-        StringIndex& index = *col_2.get_search_index();
-        if (index.has_duplicate_values())
-            return false;
-        index.set_allow_duplicate_values(false);
-    }
-    else if (type == col_type_StringEnum) {
-        StringEnumColumn& col_2 = static_cast<StringEnumColumn&>(col);
-        StringIndex& index = *col_2.get_search_index();
-        if (index.has_duplicate_values())
-            return false;
-        index.set_allow_duplicate_values(false);
-    }
-    else if (type == col_type_Int) {
-        IntegerColumn& col_2 = static_cast<IntegerColumn&>(col);
-        StringIndex& index = *col_2.get_search_index();
-        if (index.has_duplicate_values())
-            return false;
-        index.set_allow_duplicate_values(false);
-    }
-    else {
-        // Impossible case, because we know that a search index was already
-        // added.
-        REALM_ASSERT(false);
-    }
-
-    int attr = m_spec.get_column_attr(col_ndx);
-    attr |= col_attr_Unique | col_attr_PrimaryKey;
-    m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->add_primary_key(this, col_ndx); // Throws
-
-    return true;
-}
-
-
-void Table::remove_primary_key()
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    size_t num_cols = m_cols.size();
-    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
-        int attr = m_spec.get_column_attr(col_ndx);
-        if (attr & col_attr_PrimaryKey) {
-            attr &= ~(col_attr_Unique | col_attr_PrimaryKey);
-            m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-            m_primary_key = nullptr;
-
-            ColumnType type = get_real_column_type(col_ndx);
-            ColumnBase& col = get_column_base(col_ndx);
-            if (type == col_type_String) {
-                StringColumn& col_2 = static_cast<StringColumn&>(col);
-                StringIndex& index = *col_2.get_search_index();
-                index.set_allow_duplicate_values(true);
-            }
-            else if (type == col_type_StringEnum) {
-                StringEnumColumn& col_2 = static_cast<StringEnumColumn&>(col);
-                StringIndex& index = *col_2.get_search_index();
-                index.set_allow_duplicate_values(true);
-            }
-            else {
-                REALM_ASSERT(false);
-            }
-
-            if (Replication* repl = get_repl())
-                repl->remove_primary_key(this); // Throws
-            return;
-        }
-    }
-
-    throw LogicError(LogicError::no_primary_key);
 }
 
 
@@ -2649,6 +2530,44 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 }
 
 
+void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    if (!has_search_index(col_ndx)) {
+        throw LogicError{LogicError::no_search_index};
+    }
+
+    if (is_nullable(col_ndx)) {
+        auto& col = get_column_int_null(col_ndx);
+        size_t found = col.find_first(value);
+        if (found != not_found) {
+            if (found == ndx)
+                found = col.find_first(value, found + 1);
+            if (found != not_found)
+                throw LogicError{LogicError::unique_constraint_violation};
+        }
+        col.set(ndx, value);
+    }
+    else {
+        auto& col = get_column(col_ndx);
+        size_t found = col.find_first(value);
+        if (found != not_found) {
+            if (found == ndx)
+                found = col.find_first(value, found + 1);
+            if (found != not_found)
+                throw LogicError{LogicError::unique_constraint_violation};
+        }
+        col.set(ndx, value);
+    }
+
+    if (Replication* repl = get_repl())
+        repl->set_int_unique(this, col_ndx, ndx, value); // Throws
+}
+
+
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2827,6 +2746,41 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
         repl->set_string(this, col_ndx, ndx, value); // Throws
 }
 
+
+void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
+{
+    if (REALM_UNLIKELY(value.size() > max_string_size))
+        throw LogicError(LogicError::string_too_big);
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
+    // column, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
+
+    if (!has_search_index(col_ndx))
+        throw LogicError(LogicError::no_search_index);
+
+    bump_version();
+
+    StringColumn& col = get_column_string(col_ndx);
+    size_t found = col.find_first(value);
+    if (found != not_found) {
+        if (found == ndx)
+            found = col.find_first(value, found + 1);
+        if (found != not_found)
+            throw LogicError{LogicError::unique_constraint_violation};
+    }
+    col.set_string(ndx, value); // Throws
+
+    if (Replication* repl = get_repl())
+        repl->set_string_unique(this, col_ndx, ndx, value); // Throws
+}
 
 void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
 {
@@ -3403,63 +3357,6 @@ DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
         return column.maximum(0, npos, npos, return_ndx);
     }
 }
-
-
-void Table::reveal_primary_key() const
-{
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        ColumnAttr attr = m_spec.get_column_attr(i);
-        if (attr & col_attr_PrimaryKey) {
-            ColumnType type = m_spec.get_column_type(i);
-            const ColumnBase& col = get_column_base(i);
-            if (type == col_type_String) {
-                const StringColumn& col_2 = static_cast<const StringColumn&>(col);
-                m_primary_key = col_2.get_search_index();
-                return;
-            }
-            if (type == col_type_StringEnum) {
-                const StringEnumColumn& col_2 = static_cast<const StringEnumColumn&>(col);
-                m_primary_key = col_2.get_search_index();
-                return;
-            }
-            REALM_ASSERT(false);
-            return;
-        }
-    }
-    throw LogicError(LogicError::no_primary_key);
-}
-
-
-size_t Table::do_find_pkey_int(int_fast64_t) const
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(!m_primary_key))
-        reveal_primary_key(); // Throws
-
-    // FIXME: Implement this when integer indexes become available. For now, all
-    // search indexes are of string type.
-    throw LogicError(LogicError::type_mismatch);
-}
-
-
-size_t Table::do_find_pkey_string(StringData value) const
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(!m_primary_key))
-        reveal_primary_key(); // Throws
-
-    // FIXME: In case of datatype mismatch throw LogicError::type_mismatch. For
-    // now, all search indexes are of string type.
-
-    size_t row_ndx = m_primary_key->find_first(value); // Throws
-    return row_ndx;
-}
-
 
 namespace {
 
@@ -4246,7 +4143,7 @@ public:
             for (size_t i = 0; i != n; ++i) {
                 int attr = spec.get_column_attr(i);
                 // Remove any index specifying attributes
-                attr &= ~(col_attr_Indexed | col_attr_Unique | col_attr_PrimaryKey);
+                attr &= ~(col_attr_Indexed | col_attr_Unique);
                 spec.set_column_attr(i, ColumnAttr(attr)); // Throws
             }
             bool deep = true; // Deep
@@ -5345,8 +5242,6 @@ void Table::refresh_accessor_tree()
 
 void Table::refresh_column_accessors(size_t col_ndx_begin)
 {
-    m_primary_key = nullptr;
-
     // Index of column in Table::m_columns, which is not always equal to the
     // 'logical' column index.
     size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(col_ndx_begin);
@@ -5422,9 +5317,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         }
 
         if (has_search_index) {
-            bool is_primary_key = (attr & col_attr_PrimaryKey) != 0;
-            REALM_ASSERT(has_search_index || !is_primary_key);
-            bool allow_duplicate_values = !is_primary_key;
+            bool allow_duplicate_values = true;
             if (col->has_search_index()) {
                 col->set_search_index_allow_duplicate_values(allow_duplicate_values);
             }

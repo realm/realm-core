@@ -49,10 +49,12 @@ enum Instruction {
     instr_MoveGroupLevelTable   = 45,
     instr_SelectTable           =  4,
     instr_SetInt                =  5,
+    instr_SetIntUnique          = 31,
     instr_SetBool               =  6,
     instr_SetFloat              =  7,
     instr_SetDouble             =  8,
     instr_SetString             =  9,
+    instr_SetStringUnique       = 32,
     instr_SetBinary             = 10,
     instr_SetDateTime           = 11,
     instr_SetTable              = 12,
@@ -77,8 +79,6 @@ enum Instruction {
     instr_MoveColumn            = 46, // Move column in selected descriptor                // FIXME: Reenumerate
     instr_AddSearchIndex        = 29, // Add a search index to a column
     instr_RemoveSearchIndex     = 30, // Remove a search index from a column
-    instr_AddPrimaryKey         = 31, // Add a primary key to a table
-    instr_RemovePrimaryKey      = 32, // Remove primary key from a table
     instr_SetLinkType           = 33, // Strong/weak
     instr_SelectLinkList        = 34,
     instr_LinkListSet           = 35, // Assign to link list entry
@@ -147,10 +147,12 @@ public:
     bool swap_rows(size_t, size_t) { return true; }
     bool clear_table() { return true; }
     bool set_int(size_t, size_t, int_fast64_t) { return true; }
+    bool set_int_unique(size_t, size_t, int_fast64_t) { return true; }
     bool set_bool(size_t, size_t, bool) { return true; }
     bool set_float(size_t, size_t, float) { return true; }
     bool set_double(size_t, size_t, double) { return true; }
     bool set_string(size_t, size_t, StringData) { return true; }
+    bool set_string_unique(size_t, size_t, StringData) { return true; }
     bool set_binary(size_t, size_t, BinaryData) { return true; }
     bool set_date_time(size_t, size_t, DateTime) { return true; }
     bool set_table(size_t, size_t) { return true; }
@@ -171,8 +173,6 @@ public:
     bool move_column(size_t, size_t) { return true; }
     bool add_search_index(size_t) { return true; }
     bool remove_search_index(size_t) { return true; }
-    bool add_primary_key(size_t) { return true; }
-    bool remove_primary_key() { return true; }
     bool set_link_type(size_t, LinkType) { return true; }
 
     // Must have linklist selected:
@@ -212,11 +212,14 @@ public:
                     bool unordered);
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     bool clear_table();
+
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t);
+    bool set_int_unique(size_t col_ndx, size_t row_ndx, int_fast64_t);
     bool set_bool(size_t col_ndx, size_t row_ndx, bool);
     bool set_float(size_t col_ndx, size_t row_ndx, float);
     bool set_double(size_t col_ndx, size_t row_ndx, double);
     bool set_string(size_t col_ndx, size_t row_ndx, StringData);
+    bool set_string_unique(size_t col_ndx, size_t row_ndx, StringData);
     bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData);
     bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime);
     bool set_table(size_t col_ndx, size_t row_ndx);
@@ -237,8 +240,6 @@ public:
     bool move_column(size_t col_ndx_1, size_t col_ndx_2);
     bool add_search_index(size_t col_ndx);
     bool remove_search_index(size_t col_ndx);
-    bool add_primary_key(size_t col_ndx);
-    bool remove_primary_key();
     bool set_link_type(size_t col_ndx, LinkType);
 
     // Must have linklist selected:
@@ -312,10 +313,12 @@ public:
     void move_column(const Descriptor&, size_t from, size_t to);
 
     void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
+    void set_int_unique(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
     void set_bool(const Table*, size_t col_ndx, size_t ndx, bool value);
     void set_float(const Table*, size_t col_ndx, size_t ndx, float value);
     void set_double(const Table*, size_t col_ndx, size_t ndx, double value);
     void set_string(const Table*, size_t col_ndx, size_t ndx, StringData value);
+    void set_string_unique(const Table*, size_t col_ndx, size_t ndx, StringData value);
     void set_binary(const Table*, size_t col_ndx, size_t ndx, BinaryData value);
     void set_date_time(const Table*, size_t col_ndx, size_t ndx, DateTime value);
     void set_table(const Table*, size_t col_ndx, size_t ndx);
@@ -339,8 +342,6 @@ public:
     void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
     void add_search_index(const Table*, size_t col_ndx);
     void remove_search_index(const Table*, size_t col_ndx);
-    void add_primary_key(const Table*, size_t col_ndx);
-    void remove_primary_key(const Table*);
     void set_link_type(const Table*, size_t col_ndx, LinkType);
     void clear_table(const Table*);
     void optimize_table(const Table*);
@@ -950,6 +951,19 @@ inline void TransactLogConvenientEncoder::set_int(const Table* t, size_t col_ndx
     m_encoder.set_int(col_ndx, ndx, value); // Throws
 }
 
+inline bool TransactLogEncoder::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    append_simple_instr(instr_SetIntUnique, util::tuple(col_ndx, ndx, value));
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_int_unique(const Table* t, size_t col_ndx,
+                                                         size_t ndx, int_fast64_t value)
+{
+    select_table(t); // Throws
+    m_encoder.set_int_unique(col_ndx, ndx, value); // Throws
+}
+
 inline bool TransactLogEncoder::set_bool(size_t col_ndx, size_t ndx, bool value)
 {
     append_simple_instr(instr_SetBool, util::tuple(col_ndx, ndx, value)); // Throws
@@ -1005,6 +1019,24 @@ inline void TransactLogConvenientEncoder::set_string(const Table* t, size_t col_
 {
     select_table(t); // Throws
     m_encoder.set_string(col_ndx, ndx, value); // Throws
+}
+
+inline bool TransactLogEncoder::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
+{
+    if (value.is_null()) {
+        set_null(col_ndx, ndx); // Throws
+    }
+    else {
+        append_string_instr(instr_SetStringUnique, util::tuple(col_ndx, ndx), value); // Throws
+    }
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_string_unique(const Table* t, size_t col_ndx,
+                                                            size_t ndx, StringData value)
+{
+    select_table(t); // Throws
+    m_encoder.set_string_unique(col_ndx, ndx, value); // Throws
 }
 
 inline bool TransactLogEncoder::set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
@@ -1223,33 +1255,6 @@ inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, si
     m_encoder.remove_search_index(col_ndx); // Throws
 }
 
-
-inline bool TransactLogEncoder::add_primary_key(size_t col_ndx)
-{
-    append_simple_instr(instr_AddPrimaryKey, util::tuple(col_ndx)); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::add_primary_key(const Table* t, size_t col_ndx)
-{
-    select_table(t); // Throws
-    m_encoder.add_primary_key(col_ndx); // Throws
-}
-
-
-inline bool TransactLogEncoder::remove_primary_key()
-{
-    append_simple_instr(instr_RemovePrimaryKey, util::tuple()); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::remove_primary_key(const Table* t)
-{
-    select_table(t); // Throws
-    m_encoder.remove_primary_key(); // Throws
-}
-
-
 inline bool TransactLogEncoder::set_link_type(size_t col_ndx, LinkType link_type)
 {
     append_simple_instr(instr_SetLinkType, util::tuple(col_ndx, int(link_type))); // Throws
@@ -1466,6 +1471,17 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_SetIntUnique: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            // FIXME: Don't depend on the existence of int64_t,
+            // but don't allow values to use more than 64 bits
+            // either.
+            int_fast64_t value = read_int<int64_t>(); // Throws
+            if (!handler.set_int_unique(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
         case instr_SetBool: {
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
@@ -1495,6 +1511,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t row_ndx = read_int<size_t>(); // Throws
             StringData value = read_string(m_string_buffer); // Throws
             if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetStringUnique: {
+            std::size_t col_ndx = read_int<std::size_t>(); // Throws
+            std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            StringData value = read_string(m_string_buffer); // Throws
+            if (!handler.set_string_unique(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
@@ -1696,17 +1720,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_RemoveSearchIndex: {
             size_t col_ndx = read_int<size_t>(); // Throws
             if (!handler.remove_search_index(col_ndx)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_AddPrimaryKey: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            if (!handler.add_primary_key(col_ndx)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_RemovePrimaryKey: {
-            if (!handler.remove_primary_key()) // Throws
                 parser_error();
             return;
         }
@@ -2143,6 +2156,13 @@ public:
         return true;
     }
 
+    bool set_int_unique(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t value)
+    {
+        m_encoder.set_int_unique(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
     bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
     {
         m_encoder.set_bool(col_ndx, row_ndx, value);
@@ -2167,6 +2187,13 @@ public:
     bool set_string(size_t col_ndx, size_t row_ndx, StringData value)
     {
         m_encoder.set_string(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_string_unique(std::size_t col_ndx, std::size_t row_ndx, StringData value)
+    {
+        m_encoder.set_string_unique(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }
@@ -2236,16 +2263,6 @@ public:
     }
 
     bool remove_search_index(size_t)
-    {
-        return true; // No-op
-    }
-
-    bool add_primary_key(size_t)
-    {
-        return true; // No-op
-    }
-
-    bool remove_primary_key()
     {
         return true; // No-op
     }

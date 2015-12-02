@@ -2437,9 +2437,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
+        parent_w->add_search_index(0);
         parent_w->add_empty_row(2);
         parent_w->set_int(0, 0, 27);
         parent_w->set_int(0, 1, 227);
+        parent_w->set_int_unique(0, 1, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);
@@ -7097,10 +7099,12 @@ public:
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
     bool set_int(size_t, size_t, int_fast64_t) { return false; }
+    bool set_int_unique(size_t, size_t, int_fast64_t) { return false; }
     bool set_bool(size_t, size_t, bool) { return false; }
     bool set_float(size_t, size_t, float) { return false; }
     bool set_double(size_t, size_t, double) { return false; }
     bool set_string(size_t, size_t, StringData) { return false; }
+    bool set_string_unique(size_t, size_t, StringData) { return false; }
     bool set_binary(size_t, size_t, BinaryData) { return false; }
     bool set_date_time(size_t, size_t, DateTime) { return false; }
     bool set_table(size_t, size_t) { return false; }
