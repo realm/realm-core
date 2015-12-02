@@ -1675,7 +1675,7 @@ TEST(TableView_Backlinks)
 TEST(TableView_Distinct)
 {
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
-    // If two rows are indentical for the given set of distinct-columns, then the last row is removed.
+    // If multiple rows are indentical for the given set of distinct-columns, then only the first is kept.
     // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
     // Each time you call distinct() it will first fetch the full original TableView contents and then apply
     // distinct() on that. So it distinct() does not filter the result of the previous distinct().
@@ -1785,18 +1785,44 @@ TEST(TableView_Distinct)
     // Now test sync_if_needed()
     tv = t.where().find_all();
     // "", null, "", null, "foo", "foo", "bar"
+    
     tv.sort(0, false);
-    // "foo", "foo", "bar", "", null, null
+    // "foo", "foo", "bar", "", "", null, null
+
+    CHECK_EQUAL(tv.size(), 7);
+    CHECK_EQUAL(tv.get_string(0, 0), "foo");
+    CHECK_EQUAL(tv.get_string(0, 1), "foo");
+    CHECK_EQUAL(tv.get_string(0, 2), "bar");
+    CHECK_EQUAL(tv.get_string(0, 3), "");
+    CHECK_EQUAL(tv.get_string(0, 4), "");
+    CHECK(tv.get_string(0, 5).is_null());
+    CHECK(tv.get_string(0, 6).is_null());
+
     tv.distinct(std::vector<size_t>{0});
     // "foo", "bar", "", null
+
     t.remove(6); // remove "bar"
     // access to tv undefined; may crash
+
     tv.sync_if_needed();
     // "foo", "", null
+
     CHECK_EQUAL(tv.size(), 3);
     CHECK_EQUAL(tv.get_string(0, 0), "foo");
     CHECK_EQUAL(tv.get_string(0, 1), "");
     CHECK(tv.get_string(0, 2).is_null());
+
+    // Remove distinct property by providing empty column list. Now TableView should look like it
+    // did just after our last tv.sort(0, false) above, but after having executed table.remove(6)
+    tv.distinct(std::vector<size_t>{});
+    // "foo", "foo", "", "", null, null
+    CHECK_EQUAL(tv.size(), 6);
+    CHECK_EQUAL(tv.get_string(0, 0), "foo");
+    CHECK_EQUAL(tv.get_string(0, 1), "foo");
+    CHECK_EQUAL(tv.get_string(0, 2), "");
+    CHECK_EQUAL(tv.get_string(0, 3), "");
+    CHECK(tv.get_string(0, 4).is_null());
+    CHECK(tv.get_string(0, 5).is_null());
 }
 
 #endif // TEST_TABLE_VIEW
