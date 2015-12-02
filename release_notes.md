@@ -13,7 +13,11 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added TableView::distinct() method. It obeys TableView::sync_if_needed().
+  A call to distinct() will first fully populate the TableView and then perform
+  a distinct algorithm on that (i.e. it will *not* add a secondary distinct filter
+  to any earlier filter applied). See more in TEST(TableView_Distinct) in 
+  test_table_view.cpp.
 
 -----------
 
