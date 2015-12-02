@@ -2437,9 +2437,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
+        parent_w->add_search_index(0);
         parent_w->add_empty_row(2);
         parent_w->set_int(0, 0, 27);
         parent_w->set_int(0, 1, 227);
+        parent_w->set_int_unique(0, 1, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);

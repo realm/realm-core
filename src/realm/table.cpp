@@ -2541,15 +2541,23 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 
     if (is_nullable(col_ndx)) {
         auto& col = get_column_int_null(col_ndx);
-        if (col.find_first(value) != not_found) {
-            throw LogicError{LogicError::unique_constraint_violation};
+        size_t found = col.find_first(value);
+        if (found != not_found) {
+            if (found == ndx)
+                found = col.find_first(value, found + 1);
+            if (found != not_found)
+                throw LogicError{LogicError::unique_constraint_violation};
         }
         col.set(ndx, value);
     }
     else {
         auto& col = get_column(col_ndx);
-        if (col.find_first(value) != not_found) {
-            throw LogicError{LogicError::unique_constraint_violation};
+        size_t found = col.find_first(value);
+        if (found != not_found) {
+            if (found == ndx)
+                found = col.find_first(value, found + 1);
+            if (found != not_found)
+                throw LogicError{LogicError::unique_constraint_violation};
         }
         col.set(ndx, value);
     }
@@ -2760,9 +2768,13 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     bump_version();
 
     StringColumn& col = get_column_string(col_ndx);
-    if (col.find_first(value) != not_found)
-        throw LogicError(LogicError::unique_constraint_violation);
-
+    size_t found = col.find_first(value);
+    if (found != not_found) {
+        if (found == ndx)
+            found = col.find_first(value, found + 1);
+        if (found != not_found)
+            throw LogicError{LogicError::unique_constraint_violation};
+    }
     col.set_string(ndx, value); // Throws
 
     if (Replication* repl = get_repl())
