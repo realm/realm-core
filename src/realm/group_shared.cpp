@@ -720,6 +720,19 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
         // - Waiting for and signalling database changes
         {
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+            // we need a thread-local copy of the number of ringbuffer entries in order
+            // to later detect concurrent expansion of the ringbuffer.
+            m_local_max_entry = info->readers.get_num_entries();
+
+            // We need to map the info file once more for the readers part
+            // since that part can be resized and as such remapped which
+            // could move our mutexes (which we don't want to risk moving while
+            // they are locked)
+            size_t info_size =
+                sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
+            m_reader_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
+            File::UnmapGuard fug_2(m_reader_map);
+
             // Even though we checked init_complete before grabbing the write mutex,
             // we do not need to check it again, because it is only changed under
             // an exclusive file lock, and we checked it under a shared file lock
@@ -802,8 +815,8 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 #endif
 
                 info->latest_version_number = version;
-                info->init_versioning(top_ref, file_size, version);
-
+                SharedInfo* r_info = m_reader_map.get_addr();
+                r_info->init_versioning(top_ref, file_size, version);
             }
             else { // not the session initiator!
 #ifndef _WIN32
@@ -834,17 +847,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             // std::cerr << "daemon should be ready" << std::endl;
 #endif
 #endif
-            // we need a thread-local copy of the number of ringbuffer entries in order
-            // to detect concurrent expansion of the ringbuffer.
-            m_local_max_entry = 0;
-
-            // We need to map the info file once more for the readers part
-            // since that part can be resized and as such remapped which
-            // could move our mutexes (which we don't want to risk moving while
-            // they are locked)
-            m_reader_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
-            File::UnmapGuard fug_2(m_reader_map);
-
             // Set initial version so we can track if other instances
             // change the db
             m_readlock.m_version = get_current_version();
