@@ -458,8 +458,8 @@ void Group::remove_table(size_t table_ndx)
     ref_type ref = m_tables.get(table_ndx);
 
     // Remove table and move all successive tables
-    m_tables.erase(table_ndx);
-    m_table_names.erase(table_ndx);
+    m_tables.erase(table_ndx); // Throws
+    m_table_names.erase(table_ndx); // Throws
     m_table_accessors.erase(m_table_accessors.begin() + table_ndx);
 
     tf::detach(*table);
