@@ -797,16 +797,15 @@ inline void TransactLogConvenientEncoder::insert_group_level_table(size_t table_
     m_encoder.insert_group_level_table(table_ndx, num_tables, name); // Throws
 }
 
-inline bool TransactLogEncoder::erase_group_level_table(size_t table_ndx, size_t num_tables)
+inline bool TransactLogEncoder::erase_group_level_table(size_t table_ndx, size_t prior_num_tables)
 {
-    append_simple_instr(instr_EraseGroupLevelTable, util::tuple(table_ndx, num_tables)); // Throws
+    append_simple_instr(instr_EraseGroupLevelTable, util::tuple(table_ndx, prior_num_tables)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::erase_group_level_table(size_t table_ndx,
-                                                                  size_t num_tables)
+inline void TransactLogConvenientEncoder::erase_group_level_table(size_t table_ndx, size_t prior_num_tables)
 {
-    m_encoder.erase_group_level_table(table_ndx, num_tables); // Throws
+    m_encoder.erase_group_level_table(table_ndx, prior_num_tables); // Throws
 }
 
 inline bool TransactLogEncoder::rename_group_level_table(size_t table_ndx, StringData new_name)
@@ -1818,8 +1817,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_EraseGroupLevelTable: {
             size_t table_ndx  = read_int<size_t>(); // Throws
-            size_t num_tables = read_int<size_t>(); // Throws
-            if (!handler.erase_group_level_table(table_ndx, num_tables)) // Throws
+            size_t prior_num_tables = read_int<size_t>(); // Throws
+            if (!handler.erase_group_level_table(table_ndx, prior_num_tables)) // Throws
                 parser_error();
             return;
         }

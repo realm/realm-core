@@ -481,9 +481,9 @@ void Group::remove_table(size_t table_ndx)
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
 
-    size_t num_tables_before_remove = m_tables.size() + 1;
+    size_t prior_num_tables = m_tables.size() + 1;
     if (Replication* repl = m_alloc.get_replication())
-        repl->erase_group_level_table(table_ndx, num_tables_before_remove); // Throws
+        repl->erase_group_level_table(table_ndx, prior_num_tables); // Throws
 }
 
 
