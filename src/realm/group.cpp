@@ -462,6 +462,9 @@ void Group::remove_table(size_t table_ndx)
     m_table_names.erase(table_ndx);
     m_table_accessors.erase(m_table_accessors.begin() + table_ndx);
 
+    tf::detach(*table);
+    tf::unbind_ptr(*table);
+
     // Unless the removed table is the last, update all indices of tables after
     // the removed table.
     bool last_table_removed = table_ndx == m_tables.size();
@@ -474,9 +477,6 @@ void Group::remove_table(size_t table_ndx)
             return old_table_ndx;
         }); // Throws
     }
-
-    tf::detach(*table);
-    tf::unbind_ptr(*table);
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
