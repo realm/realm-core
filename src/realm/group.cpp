@@ -1013,15 +1013,13 @@ public:
                        m_group.m_table_accessors.size() == num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
-            // for end-insertions, table_ndx will be equal to num_tables
-            m_group.m_table_accessors.push_back(nullptr); // Throws
-            size_t last_ndx = num_tables;
-            m_group.m_table_accessors[last_ndx] = m_group.m_table_accessors[table_ndx];
-            m_group.m_table_accessors[table_ndx] = nullptr;
-            if (Table* moved_table = m_group.m_table_accessors[last_ndx]) {
-                typedef _impl::TableFriend tf;
-                tf::mark(*moved_table);
-                tf::mark_opposite_link_tables(*moved_table);
+            m_group.m_table_accessors.insert(m_group.m_table_accessors.begin() + table_ndx, nullptr);
+            for (auto i = table_ndx + 1; i < m_group.m_table_accessors.size(); ++i) {
+                if (Table* moved_table = m_group.m_table_accessors[i]) {
+                    typedef _impl::TableFriend tf;
+                    tf::mark(*moved_table);
+                    tf::mark_opposite_link_tables(*moved_table);
+                }
             }
         }
 
