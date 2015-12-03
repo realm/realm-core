@@ -23,7 +23,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Changed `Group::create_and_insert_table` and `Group::remove_table` from
+  _move-last-over_ to preserve table ordering within the group.
 
 ----------------------------------------------
 
