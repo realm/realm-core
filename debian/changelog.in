@@ -1,3 +1,10 @@
+librealm (0.95.4~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Fri, 04 Dec 2015 16:42:17 +0100
+
+
 librealm (0.95.3~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.
