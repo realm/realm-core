@@ -467,6 +467,137 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+
+        TableRef table = wt.add_table("table1");
+        table->add_column(type_Int, "col");
+
+        table = wt.add_table("table2");
+        table->add_column(type_Float, "col1");
+        table->add_column(type_Float, "col2");
+
+        wt.commit();
+    }
+
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    ReadTransaction rt(sg);
+
+    ConstTableRef table1 = rt.get_table("table1");
+    ConstTableRef table2 = rt.get_table("table2");
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+        WriteTransaction wt(sg_w);
+        wt.get_group().insert_table(0, "new table");
+
+        wt.get_table("table1")->add_empty_row();
+        wt.get_table("table2")->add_empty_row(2);
+
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK_EQUAL(table1->size(), 1);
+    CHECK_EQUAL(table2->size(), 2);
+    CHECK_EQUAL(rt.get_table("new table")->size(), 0);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_InsertTableOrdered)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+
+        wt.add_table("table1");
+        wt.add_table("table2");
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table2"));
+        wt.commit();
+    }
+
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    ReadTransaction rt(sg);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+        CHECK_EQUAL(wt.get_group().size(), 2);
+        wt.get_group().insert_table(0, "table0");
+        CHECK_EQUAL(wt.get_group().size(), 3);
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table0"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(2), wt.get_table("table2"));
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK_EQUAL(rt.get_table(0), rt.get_table("table0"));
+    CHECK_EQUAL(rt.get_table(1), rt.get_table("table1"));
+    CHECK_EQUAL(rt.get_table(2), rt.get_table("table2"));
+    CHECK_EQUAL(rt.get_group().size(), 3);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+
+        wt.add_table("table0");
+        wt.add_table("table1");
+        wt.add_table("table2");
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table0"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(2), wt.get_table("table2"));
+        wt.commit();
+    }
+
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    ReadTransaction rt(sg);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+        CHECK_EQUAL(wt.get_group().size(), 3);
+        wt.get_group().remove_table(0);
+        CHECK_EQUAL(wt.get_group().size(), 2);
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table2"));
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK_EQUAL(rt.get_table(0), rt.get_table("table1"));
+    CHECK_EQUAL(rt.get_table(1), rt.get_table("table2"));
+    CHECK_EQUAL(rt.get_group().size(), 2);
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);

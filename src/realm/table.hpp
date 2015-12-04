@@ -2209,9 +2209,9 @@ public:
 
     typedef Table::AccessorUpdater AccessorUpdater;
     static void update_accessors(Table& table, const size_t* col_path_begin,
-                                 const size_t* col_path_end, AccessorUpdater& updatder)
+                                 const size_t* col_path_end, AccessorUpdater& updater)
     {
-        table.update_accessors(col_path_begin, col_path_end, updatder); // Throws
+        table.update_accessors(col_path_begin, col_path_end, updater); // Throws
     }
 
     static void refresh_accessor_tree(Table& table)

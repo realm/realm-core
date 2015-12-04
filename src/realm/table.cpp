@@ -5102,7 +5102,7 @@ void Table::adj_insert_column(size_t col_ndx)
     bool not_degenerate = m_columns.is_attached();
     if (not_degenerate) {
         REALM_ASSERT_3(col_ndx, <=, m_cols.size());
-        m_cols.insert(m_cols.begin() + col_ndx, 0); // Throws
+        m_cols.insert(m_cols.begin() + col_ndx, nullptr); // Throws
     }
 }
 

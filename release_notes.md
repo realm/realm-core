@@ -30,7 +30,9 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Changed `Group::remove_table`, `Group::TransactAdvancer::insert_group_level_table`
+  and `Group::TransactAdvancer::erase_group_level_table` from _move-last-over_ to
+  preserve table ordering within the group.
 
 ----------------------------------------------
 
