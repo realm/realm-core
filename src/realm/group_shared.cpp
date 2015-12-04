@@ -814,7 +814,11 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                 }
 #endif
 
+                // Initially there is a single version in the file
+                info->number_of_versions = 1;
+
                 info->latest_version_number = version;
+
                 SharedInfo* r_info = m_reader_map.get_addr();
                 r_info->init_versioning(top_ref, file_size, version);
             }
@@ -860,9 +864,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
             // make our presence noted:
             ++info->num_participants;
-
-            // Initially there is a single version in the file
-            info->number_of_versions = 1;
 
             // Initially wait_for_change is enabled
             m_wait_for_change_enabled = true;
