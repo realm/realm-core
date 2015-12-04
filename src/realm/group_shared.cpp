@@ -1181,6 +1181,7 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
             // remapping takes time, so retry with a fresh entry
             continue;
         }
+        r_info = m_reader_map.get_addr();
         const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
         // if the entry is stale and has been cleared by the cleanup process,
         // we need to start all over again. This is extremely unlikely, but possible.
@@ -1204,6 +1205,7 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
             // remapping takes time, so retry with a fresh entry
             continue;
         }
+        r_info = m_reader_map.get_addr();
         const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
 
         // if the entry is stale and has been cleared by the cleanup process,
