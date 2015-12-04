@@ -2,7 +2,14 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed incorrect handling of a race between a commit() and a new thread
+  or process opening the database. In debug mode, the race would trigger an
+  assert "cfg.session_initiator || !cfg.is_shared", in release mode it could
+  conceivably result in undefined behaviour.
+* Fixed a segmentation fault in SharedGroup::do_open_2
+* Fixed a bug en ringbuffer handling that could cause readers to get a wrong
+  top pointer - causing later asserts regarding the size of the top array, or
+  asserts reporting mismatch between versions.
 
 ### API breaking changes:
 

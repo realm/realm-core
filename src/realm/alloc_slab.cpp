@@ -463,14 +463,18 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_file.set_encryption_key(cfg.encryption_key);
     File::CloseGuard fcg(m_file);
 
-    size_t initial_size = m_initial_section_size;
-
     size_t initial_size_of_file;
+    size_t size;
+    bool did_create = false;
+
+    // We can only safely mmap the file, if its size matches a section. If not,
+    // we must change the size to match before mmaping it.
+    // This can fail due to a race with a concurrent commmit, in which case we
+    // must throw allowing the caller to retry, but the common case is to succeed
+    // at first attempt
 
     // The size of a database file must not exceed what can be encoded in
     // size_t.
-    size_t size;
-    bool did_create = false;
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file.get_size(), size)))
         throw InvalidDatabase("Realm file too large", path);
 
@@ -495,6 +499,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_file.write(data, sizeof empty_file_header); // Throws
 
         // Pre-alloc initial space
+        size_t initial_size = m_initial_section_size;
         m_file.prealloc(0, initial_size); // Throws
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
@@ -502,31 +507,56 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         size = initial_size;
     }
 
-    // We must now make sure the filesize matches a page boundary...
+    // We must now make sure the filesize matches a mmap boundary...
     // first, save the original filesize for use during validation and
     // (potentially) conversion from streaming format.
     initial_size_of_file = size;
 
-    // next extend the file to a mmapping boundary (unless already there)
-    // The file must be extended prior to being mmapped, as extending it after mmap has
-    // undefined behavior.
-    // The mapping of the first part of the file *must* be contiguous, because
-    // we do not know if the file was created by a version of the code, that took
-    // the section boundaries into account. If it wasn't we cannot map it in sections
-    // without risking datastructures that cross a mapping boundary.
-    // If the file is opened read-only, we cannot extend it. This is not a problem,
-    // because for a read-only file we assume that it will not change while we use it.
-    // This assumption obviously will not hold, if the file is shared by multiple
-    // processes with different opening modes.
-    if (!cfg.read_only && !matches_section_boundary(size)) {
+    if (!matches_section_boundary(size)) {
 
-        REALM_ASSERT_3(cfg.session_initiator, ||, !cfg.is_shared);
-        size = get_upper_section_boundary(size);
-        m_file.prealloc(0, size);
-        // resizing the file (as we do here) without actually changing any internal
-        // datastructures to reflect the additional free space will work, because the
-        // free space management relies on the logical filesize and disregards the
-        // actual size of the file.
+        // The file size did not match a section boundary.
+        // We must extend the file to a section boundary (unless already there)
+        // The file must be extended to match in size prior to being mmapped,
+        // as extending it after mmap has undefined behavior.
+
+        // The mapping of the first part of the file *must* be contiguous, because
+        // we do not know if the file was created by a version of the code, that took
+        // the section boundaries into account. If it wasn't we cannot map it in sections
+        // without risking datastructures that cross a mapping boundary.
+
+        if (cfg.read_only) {
+
+            // If the file is opened read-only, we cannot extend it. This is not a problem,
+            // because for a read-only file we assume that it will not change while we use it.
+            // This assumption obviously will not hold, if the file is shared by multiple
+            // processes or threads with different opening modes.
+            // Currently, there is no way to detect if this assumption is violated.
+            ;
+        }
+        else {
+
+            if (cfg.session_initiator || !cfg.is_shared) {
+
+                // We can only safely extend the file if we're the session initiator, or if
+                // the file isn't shared at all.
+
+                // resizing the file (as we do here) without actually changing any internal
+                // datastructures to reflect the additional free space will work, because the
+                // free space management relies on the logical filesize and disregards the
+                // actual size of the file.
+                size = get_upper_section_boundary(size);
+                m_file.prealloc(0, size);
+            }
+            else {
+                // Getting here, we have a file of a size that will not work, and without being
+                // allowed to extend it.
+                // This can happen in the case where a concurrent commit is extending the file,
+                // and we observe it part-way (file extension is not atomic). If so, we
+                // need to start all over. The alternative would be to synchronize with commit,
+                // and we generally try to avoid this when possible.
+                throw Retry();
+            }
+        }
     }
 
     ref_type top_ref;
