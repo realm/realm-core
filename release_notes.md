@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed Row accessor updating after an unordered TableView::clear().
 
 ### API breaking changes:
 

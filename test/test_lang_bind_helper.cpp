@@ -7157,6 +7157,45 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     CHECK_EQUAL(tv.size(), 0);
 }
 
+TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->add_empty_row(3);
+        table->set_int(0, 0, 0);
+        table->set_int(0, 1, 1);
+        table->set_int(0, 2, 2);
+        wt.commit();
+    }
+
+    ConstTableRef table = sg.begin_read().get_table("table");
+    ConstRow row = table->get(2);
+    CHECK_EQUAL(row.get_int(0), 2);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+        // Remove the first row via unordered removal, resulting in the '2' row
+        // moving to index 0 (with ordered removal it would instead move to index 1)
+        WriteTransaction wt(sg_w);
+        wt.get_table("table")->where().equal(0, 0).find_all().clear(RemoveMode::unordered);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK(row.is_attached());
+    CHECK_EQUAL(row.get_int(0), 2);
+}
+
 namespace {
 // A base class for transaction log parsers so that tests which want to test
 // just a single part of the transaction log handling don't have to implement
