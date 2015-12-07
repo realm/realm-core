@@ -244,7 +244,7 @@ class TestList::ExecContext {
 public:
     SharedContext* m_shared;
     Mutex m_mutex;
-	std::atomic<long long> m_num_checks;
+    std::atomic<long long> m_num_checks;
     long long m_num_failed_checks;
     long m_num_failed_tests;
     bool m_errors_seen;
