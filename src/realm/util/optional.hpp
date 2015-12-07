@@ -172,8 +172,8 @@ public:
     using value_type = T&;
     using target_type = typename std::decay<T>::type;
 
-    constexpr Optional() {}
-    constexpr Optional(None) : Optional() {}
+    constexpr Optional() : m_ptr(nullptr) {}
+    constexpr Optional(None) : m_ptr(nullptr) {}
     Optional(const Optional<T&>& other) = default;
     template<class U>
     Optional(const Optional<U&>& other) : m_ptr(other.m_ptr) {}

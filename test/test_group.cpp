@@ -27,7 +27,7 @@ static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 
 using namespace realm;
 using namespace realm::util;
-
+using namespace std;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -2276,6 +2276,34 @@ TEST(Group_CascadeNotify_TableViewClear)
 }
 
 
+// Runs the fuzzy test in test/fuzzy/fuzz_group.cpp for a short while. It's intended to be ran by AFL
+// but this unit test just uses a random generator for its input.
+ONLY(Group_Fuzzy)
+{
+    srand(time(0));
+    for (int64_t counter = 0; ; counter++) 
+    {
+        string instructions;
+        for (size_t t = 0; t < 100000; t++) {
+            instructions += static_cast<char>(fastrand());
+        }
+
+        void parse_and_apply_instructions(string& in, Group& g, util::Optional<std::ostream&> log);
+        Group g;
+        //    stringstream os;
+/*
+        char input[] = {             
+            0x20
+        };
+        instructions = string(input, input + sizeof(input));
+*/
+
+        parse_and_apply_instructions(instructions, g, util::none);
+//        parse_and_apply_instructions(instructions, g, cerr);
+//        cerr << "\n\n\n\n\n\n";
+
+    }
+}
 
 #ifdef REALM_DEBUG
 #ifdef REALM_TO_DOT

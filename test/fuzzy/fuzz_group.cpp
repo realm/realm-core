@@ -8,6 +8,7 @@
 
 using namespace realm;
 using namespace realm::util;
+using namespace std;
 
 struct EndOfFile {};
 
@@ -21,7 +22,7 @@ std::string create_string(unsigned char byte)
 
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
-            CLEAR_TABLE, MOVE_TABLE,
+            CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
 
             COUNT};
 
@@ -39,315 +40,309 @@ DataType get_type(unsigned char c)
         type_Mixed
     };
 
-    unsigned char mod = c % 9;
-
+    unsigned char mod = c % (sizeof(types) / sizeof(DataType));
     return types[mod];
 }
 
-char get_next(std::istream& is)
+struct State {
+    std::string str;
+    size_t pos;
+};
+
+unsigned char get_next(State s)
 {
-    if (is.eof()) {
+    if (s.pos == s.str.size()) {
         throw EndOfFile{};
     }
-    char byte;
-    is >> byte;
+    char byte = s.str[s.pos];
+    s.pos++;
     return byte;
 }
 
-void parse_and_apply_instructions(std::istream& is, Group& g, util::Optional<std::ostream&> log)
-{
-    while (!is.eof()) {
-        char instr = get_next(is);
-
-        if (instr % COUNT == ADD_TABLE && g.size() < 1100) {
-            auto name = create_string(get_next(is) % Group::max_table_name_length);
-            if (log) {
-                *log << "g.add_table(\"" << name << "\");\n";
-            }
-            g.add_table(name);
-        }
-        else if (instr % COUNT == INSERT_TABLE && g.size() < 1100) {
-            size_t s0 = get_next(is) % (g.size() + 1);
-            StringData sd0 = create_string(get_next(is) % (Group::max_table_name_length - 10) + 5);
-            if (log) {
-                *log << "g.insert_table(" << s0 << ", \"" << sd0 << "\");\n";
-            }
-            g.insert_table(s0, sd0);
-        }
-        else if (instr % COUNT == REMOVE_TABLE && g.size() > 0) {
-            size_t idx = get_next(is) % g.size();
-            if (log) {
-                *log << "g.remove_table(" << idx << ");\n";
-            }
-            g.remove_table(idx);
-        }
-        else if (instr % COUNT == CLEAR_TABLE && g.size() > 0) {
-            size_t idx = get_next(is) % g.size();
-            if (log) {
-                *log << "g.get_table(" << idx << ")->clear();\n";
-            }
-            TableRef t = g.get_table(idx);
-            t->clear();
-        }
-        else if (instr % COUNT == MOVE_TABLE && g.size() >= 2) {
-            size_t t1 = get_next(is) % g.size();
-            size_t t2 = get_next(is) % g.size();
-            if(t1 != t2) {
-                if (log) {
-                    *log << "g.move_table(" << t1 << ", " << t2 << ");\n";
-                }
-                g.move_table(t1, t2);
-            }
-        }
-        else if (instr % COUNT == INSERT_ROW && g.size() > 0) {
-            size_t table_idx = get_next(is) % g.size();
-            TableRef t = g.get_table(table_idx);
-            size_t row_ndx = get_next(is) % (t->size() + 1);
-            size_t num_rows = get_next(is);
-            if (log) {
-                *log << "g.get_table(" << table_idx << ")->insert_empty_row(" << row_ndx << ", " << num_rows << ");\n";
-            }
-            t->insert_empty_row(row_ndx, num_rows);
-        }
-        else if (instr % COUNT == ADD_EMPTY_ROW && g.size() > 0) {
-            size_t table_ndx = get_next(is) % g.size();
-            size_t num_rows = get_next(is);
-            if (log) {
-                *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows << ");\n";
-            }
-            TableRef t = g.get_table(table_ndx);
-            t->add_empty_row(num_rows);
-        }
-        else if (instr % COUNT == ADD_COLUMN && g.size() > 0) {
-            size_t table_ndx = get_next(is) % g.size();
-            DataType type = get_type(get_next(is));
-            auto name = create_string(get_next(is) % Group::max_table_name_length);
-            if (log) {
-                *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\");\n";
-            }
-            TableRef t = g.get_table(table_ndx);
-            t->add_column(type, name);
-        }
-        else if (instr % COUNT == INSERT_COLUMN && g.size() > 0) {
-            size_t table_ndx = get_next(is) % g.size();
-            TableRef t = g.get_table(table_ndx);
-            size_t col_ndx = get_next(is) % (t->get_column_count() + 1);
-            DataType type = get_type(get_next(is));
-            auto name = create_string(get_next(is) % Group::max_table_name_length);
-            if (log) {
-                *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\");\n";
-            }
-            t->insert_column(col_ndx, type, name);
-        }
-        else if (get_next(is) == REMOVE_COLUMN && g.size() > 0) {
-            size_t table_ndx = get_next(is) % g.size();
-            TableRef t = g.get_table(table_ndx);
-            if (t->get_column_count() > 0) {
-                size_t col_ndx = get_next(is) % t->get_column_count();
-                if (log) {
-                    *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << ");\n";
-                }
-                t->remove_column(col_ndx);
-            }
-        }
-        else if (instr % COUNT == ADD_COLUMN_LINK && g.size() >= 1) {
-            size_t table_ndx_1 = get_next(is) % g.size();
-            size_t table_ndx_2 = get_next(is) % g.size();
-            TableRef t1 = g.get_table(table_ndx_1);
-            TableRef t2 = g.get_table(table_ndx_2);
-            StringData name = create_string(get_next(is) % Group::max_table_name_length);
-            if (log) {
-                *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_Link, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
-            }
-            t1->add_column_link(type_Link, name, *t2);
-        }
-        else if (instr % COUNT == ADD_COLUMN_LINK_LIST && g.size() >= 2) {
-            size_t table_ndx_1 = get_next(is) % g.size();
-            size_t table_ndx_2 = get_next(is) % g.size();
-            TableRef t1 = g.get_table(table_ndx_1);
-            TableRef t2 = g.get_table(table_ndx_2);
-            StringData name = create_string(get_next(is) % Group::max_table_name_length);
-            if (log) {
-                *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_LinkList, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
-            }
-            t1->add_column_link(type_LinkList, name, *t2);
-        }
-        else if (instr % COUNT == SET && g.size() > 0) {
-            size_t table_ndx = get_next(is) % g.size();
-            TableRef t = g.get_table(table_ndx);
-            if (t->get_column_count() > 0 && t->size() > 0) {
-                size_t c = get_next(is) % t->get_column_count();
-                size_t r = get_next(is) % t->size();
-
-                DataType d = t->get_column_type(c);
-
-                if (d == type_String) {
-                    auto string = create_string(get_next(is));
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->set_string(" << c << ", " << r << ", \"" << string << "\");\n";
-                    }
-                    t->set_string(c, r, string);
-                }
-                else if (d == type_Binary) {
-                    auto sd = create_string(get_next(is));
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->set_binary(" << c << ", " << r << ", BinaryData{\"" << sd << "\", " << sd.size() << "});\n";
-                    }
-                    t->set_binary(c, r, BinaryData(sd.data(), sd.size()));
-                }
-                else if (d == type_Int) {
-                    int64_t value = get_next(is);
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
-                    }
-                    t->set_int(c, r, get_next(is));
-                }
-                else if (d == type_DateTime) {
-                    DateTime value{get_next(is)};
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
-                    }
-                    t->set_datetime(c, r, value);
-                }
-                else if (d == type_Bool) {
-                    bool value = get_next(is) % 2 == 0;
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->set_bool(" << c << ", " << r << ", " << value << ");\n";
-                    }
-                    t->set_bool(c, r, value);
-                }
-                else if (d == type_Float) {
-                    float value = get_next(is);
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->set_float(" << c << ", " << r << ", " << value << ");\n";
-                    }
-                    t->set_float(c, r, value);
-                }
-                else if (d == type_Double) {
-                    double value = get_next(is);
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->set_double(" << c << ", " << r << ", " << value << ");\n";
-                    }
-                    t->set_double(c, r, value);
-                }
-                else if (d == type_Link) {
-                    TableRef target = t->get_link_target(c);
-                    if (target->size() > 0) {
-                        size_t target_row = get_next(is) % target->size();
-                        if (log) {
-                            *log << "g.get_table(" << table_ndx << ")->set_link(" << c << ", " << r << ", " << target_row << ");\n";
-                        }
-                        t->set_link(c, r, target_row);
-                    }
-                }
-                else if (d == type_LinkList) {
-                    TableRef target = t->get_link_target(c);
-                    if (target->size() > 0) {
-                        LinkViewRef links = t->get_linklist(c, r);
-
-/*
-                        // either add or set, 50/50 probability
-                        if (links->size() > 0 && get_next(is) > 128) {
-                            links->set(get_next(is) % links->size(), get_next(is) % target->size());
-                        }
-                        else {
-                            links->add(get_next(is) % target->size());
-                        }
-*/
-
-                    }
-                }
-            }
-        }
-        else if (instr % COUNT == REMOVE_ROW && g.size() > 0) {
-            size_t table_ndx = get_next(is) % g.size();
-            TableRef t = g.get_table(table_ndx);
-            if (t->size() > 0) {
-                size_t row_ndx = get_next(is) % t->size();
-                if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->remove(" << row_ndx << ");\n";
-                }
-                t->remove(row_ndx);
-            }
-        }
-    }
-}
-
-void usage(const char* argv[])
-{
-        fprintf(stderr, "Usage: %s <LOGFILE> [--log]\n(where <LOGFILE> is a instruction file that will be replayed.)\nPass --log to have code printed to stdout producing the same instructions.", argv[0]);
-        exit(1);
-}
-
-int main(int argc, const char* argv[])
-{
-    util::Optional<std::ostream&> log;
-
-    size_t file_arg = size_t(-1);
-    for (size_t i = 1; i < size_t(argc); ++i) {
-        std::string arg = argv[i];
-        if (arg == "--log") {
-            log = util::some<std::ostream&>(std::cout);
-        }
-        else {
-            file_arg = i;
-        }
-    }
-
-    if (file_arg == size_t(-1)) {
-        usage(argv);
-    }
-
-    std::ifstream in{argv[file_arg]};
-    if (!in.is_open()) {
-        fprintf(stderr, "Could not open file for reading: %s\n", argv[1]);
-        exit(1);
-    }
-
-    test_util::unit_test::TestDetails test_details;
-    test_details.test_index = 0;
-    test_details.suite_name = "FuzzyTest";
-    test_details.test_name = "TransactLogApplier";
-    test_details.file_name = __FILE__;
-    test_details.line_number = __LINE__;
-
-    Group group;
-
-    try {
-        if (log) {
-            time_t t = time(0);
-            tm t0;
-#ifndef _MSC_VER
-            localtime_r(&t, &t0);
-            char buffer[100] = {0};
-            strftime(buffer, sizeof(buffer), "%c", &t0);
-            *log << "// Test case generated by " << argv[0] << " on " << buffer << ".\n";
-#endif
-            *log << "Group g;\n";
-        }
-        parse_and_apply_instructions(in, group, log);
-    }
-    catch (const EndOfFile&) {
-        return 0;
-    }
-    catch (const LogicError&) {
-        return 0;
-    }
-    catch (const TableNameInUse&) {
-        return 0;
-    }
-    catch (const NoSuchTable&) {
-        return 0;
-    }
-    catch (const CrossTableLinkTarget&) {
-        return 0;
-    }
-    catch (const DescriptorMismatch&) {
-        return 0;
-    }
-    catch (const FileFormatUpgradeRequired&) {
-        return 0;
-    }
-
+int64_t get_int64(std::string& in, size_t& pos) {
     return 0;
 }
+
+void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std::ostream&> log)
+{
+    // Temporary limit due to bug in add_empty_row()
+    size_t EMPTY_ROW_MAX = 2;
+
+    try {
+        State s;
+        s.str = in;
+        s.pos = 0;
+ 
+        size_t pos = 0;
+        for (;;) {
+            char instr = get_next(s) % COUNT;
+
+            if (instr == ADD_TABLE && g.size() < 1100) {
+                auto name = create_string(get_next(s) % Group::max_table_name_length);
+                if (log) {
+                    *log << "g.add_table(\"" << name << "\");\n";
+                }
+                try {
+                    g.add_table(name);
+                }
+                catch (const TableNameInUse&) {
+                }
+            }
+            else if (instr == INSERT_TABLE && g.size() < 1100) {
+                size_t s0 = get_next(s) % (g.size() + 1);
+                string sd0 = create_string(get_next(s) % (Group::max_table_name_length - 10) + 5);
+                if (log) {
+                    *log << "g.insert_table(" << s0 << ", \"" << sd0 << "\");\n";
+                }
+                g.insert_table(s0, sd0);
+            }
+            else if (instr == REMOVE_TABLE && g.size() > 0) {
+                size_t idx = get_next(s) % g.size();
+                if (log) {
+                    *log << "g.remove_table(" << idx << ");\n";
+                }
+                try {
+                    g.remove_table(idx);
+                }
+                catch (const CrossTableLinkTarget&) {
+                }
+            }
+            else if (instr == CLEAR_TABLE && g.size() > 0) {
+                size_t idx = get_next(s) % g.size();
+                if (log) {
+                    *log << "g.get_table(" << idx << ")->clear();\n";
+                }
+                g.get_table(idx)->clear();
+            }
+            else if (instr == MOVE_TABLE && g.size() >= 2) {
+                size_t t1 = get_next(s) % g.size();
+                size_t t2 = get_next(s) % g.size();
+                if (t1 != t2) {
+                    if (log) {
+                        *log << "g.move_table(" << t1 << ", " << t2 << ");\n";
+                    }
+                    g.move_table(t1, t2);
+                }
+            }
+            else if (instr == INSERT_ROW && g.size() > 0) {
+                size_t table_idx = get_next(s) % g.size();
+                size_t row_ndx = get_next(s) % (g.get_table(table_idx)->size() + 1);
+                size_t num_rows = get_next(s);
+                if (log) {
+                    *log << "g.get_table(" << table_idx << ")->insert_empty_row(" << row_ndx << ", " << num_rows % EMPTY_ROW_MAX << ");\n";
+                }
+                g.get_table(table_idx)->insert_empty_row(row_ndx, num_rows % EMPTY_ROW_MAX);
+            }
+            else if (instr == ADD_EMPTY_ROW && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                size_t num_rows = get_next(s);
+                if (log) {
+                    *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % EMPTY_ROW_MAX << ");\n";
+                }
+                g.get_table(table_ndx)->add_empty_row(num_rows % EMPTY_ROW_MAX);
+            }
+            else if (instr == ADD_COLUMN && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                DataType type = get_type(get_next(s));
+                string name = create_string(get_next(s) % Group::max_table_name_length);
+                // Mixed and Subtable cannot be nullable. For other types, chose nullability randomly
+                bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
+                if (log) {
+                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\"," << nullable << ");\n";
+                }
+                g.get_table(table_ndx)->add_column(type, name, nullable);
+            }
+            else if (instr == INSERT_COLUMN && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                size_t col_ndx = get_next(s) % (g.get_table(table_ndx)->get_column_count() + 1);
+                DataType type = get_type(get_next(s));
+                string name = create_string(get_next(s) % Group::max_table_name_length);
+                bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
+                if (log) {
+                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\"," << nullable << ");\n";
+                }
+                g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
+            }
+            else if (instr == REMOVE_COLUMN && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 0) {
+                    size_t col_ndx = get_next(s) % t->get_column_count();
+                    if (log) {
+                        *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << ");\n";
+                    }
+                    t->remove_column(col_ndx);
+                }
+            }
+            else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 0) {
+                    size_t col_ndx = get_next(s) % t->get_column_count();
+                    DataType dt = t->get_column_type(col_ndx);
+                    if (dt != type_Float && dt != type_Double && dt != type_Link && dt != type_LinkList && dt != type_Table && dt != type_Mixed && dt != type_Binary) {
+                        t->add_search_index(col_ndx);
+                        
+                        if (log) {
+                            *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << ");\n";
+                        }
+                    }
+                }
+            }
+            else if (instr == REMOVE_SEARCH_INDEX && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 0) {
+                    size_t col_ndx = get_next(s) % t->get_column_count();
+                    // We don't need to check if the column is of a type that is indexable or if it has index on or off
+                    // because Realm will just do a no-op at worst (no exception or assert).
+                    t->remove_search_index(col_ndx);
+
+                    if (log) {
+                        *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_search_index(" << col_ndx << ");\n";
+                    }
+                }
+            }
+            else if (instr == ADD_COLUMN_LINK && g.size() >= 1) {
+                size_t table_ndx_1 = get_next(s) % g.size();
+                size_t table_ndx_2 = get_next(s) % g.size();
+                TableRef t1 = g.get_table(table_ndx_1);
+                TableRef t2 = g.get_table(table_ndx_2);
+                string name = create_string(get_next(s) % Group::max_table_name_length);
+                if (log) {
+                    *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_Link, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
+                }
+                t1->add_column_link(type_Link, name, *t2);
+            }
+            else if (instr == INSERT_COLUMN_LINK && g.size() >= 1) {
+                size_t table_ndx_1 = get_next(s) % g.size();
+                size_t table_ndx_2 = get_next(s) % g.size();
+                size_t col_ndx = get_next(s) % (g.get_table(table_ndx_1)->get_column_count() + 1);
+                TableRef t1 = g.get_table(table_ndx_1);
+                TableRef t2 = g.get_table(table_ndx_2);
+                string name = create_string(get_next(s) % Group::max_table_name_length);
+                if (log) {
+                    *log << "g.get_table(" << table_ndx_1 << ")->insert_column_link(" << col_ndx << ", type_Link, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
+                }
+                t1->insert_column_link(col_ndx, type_Link, name, *t2);
+            }
+            else if (instr == ADD_COLUMN_LINK_LIST && g.size() >= 2) {
+                size_t table_ndx_1 = get_next(s) % g.size();
+                size_t table_ndx_2 = get_next(s) % g.size();
+                TableRef t1 = g.get_table(table_ndx_1);
+                TableRef t2 = g.get_table(table_ndx_2);
+                string name = create_string(get_next(s) % Group::max_table_name_length);
+                if (log) {
+                    *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_LinkList, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
+                }
+                t1->add_column_link(type_LinkList, name, *t2);
+            }
+            else if (instr == SET && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 0 && t->size() > 0) {
+                    size_t c = get_next(s) % t->get_column_count();
+                    size_t r = get_next(s) % t->size();
+
+                    // With equal probability, either set to null or to a value
+                    if (get_next(s) % 2 == 0 && t->is_nullable(c)) {
+                        t->set_null(c, r);
+                        if (log) {
+                            *log << "g.get_table(" << table_ndx << ")->set_null(" << c << ", " << r << ");\n";
+                        }
+                    }
+                    else {
+                        DataType d = t->get_column_type(c);
+                        if (d == type_String) {
+                            string str = create_string(get_next(s));
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_string(" << c << ", " << r << ", \"" << str << "\");\n";
+                            }
+                            t->set_string(c, r, str);
+                        }
+                        else if (d == type_Binary) {
+                            string str = create_string(get_next(s));
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_binary(" << c << ", " << r << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
+                            }
+                            t->set_binary(c, r, BinaryData(str));
+                        }
+                        else if (d == type_Int) {
+                            int64_t value = get_next(s);
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
+                            }
+                            t->set_int(c, r, get_next(s));
+                        }
+                        else if (d == type_DateTime) {
+                            DateTime value{ get_next(s) };
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
+                            }
+                            t->set_datetime(c, r, value);
+                        }
+                        else if (d == type_Bool) {
+                            bool value = get_next(s) % 2 == 0;
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_bool(" << c << ", " << r << ", " << value << ");\n";
+                            }
+                            t->set_bool(c, r, value);
+                        }
+                        else if (d == type_Float) {
+                            float value = get_next(s);
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_float(" << c << ", " << r << ", " << value << ");\n";
+                            }
+                            t->set_float(c, r, value);
+                        }
+                        else if (d == type_Double) {
+                            double value = get_next(s);
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_double(" << c << ", " << r << ", " << value << ");\n";
+                            }
+                            t->set_double(c, r, value);
+                        }
+                        else if (d == type_Link) {
+                            TableRef target = t->get_link_target(c);
+                            if (target->size() > 0) {
+                                size_t target_row = get_next(s) % target->size();
+                                if (log) {
+                                    *log << "g.get_table(" << table_ndx << ")->set_link(" << c << ", " << r << ", " << target_row << ");\n";
+                                }
+                                t->set_link(c, r, target_row);
+                            }
+                        }
+                        else if (d == type_LinkList) {
+                            TableRef target = t->get_link_target(c);
+                            if (target->size() > 0) {
+                                LinkViewRef links = t->get_linklist(c, r);
+
+                                // either add or set, 50/50 probability
+                                if (links->size() > 0 && get_next(s) > 128) {
+                                    links->set(get_next(s) % links->size(), get_next(s) % target->size());
+                                }
+                                else {
+                                    links->add(get_next(s) % target->size());
+                                }
+                            }
+                        }
+                    }
+                }
+            }               
+            else if (instr == REMOVE_ROW && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    size_t row_ndx = get_next(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->remove(" << row_ndx << ");\n";
+                    }
+                    t->remove(row_ndx);
+                }
+            }
+        }
+    }
+    catch (const EndOfFile&) {
+    }
+}
+
