@@ -467,6 +467,137 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+
+        TableRef table = wt.add_table("table1");
+        table->add_column(type_Int, "col");
+
+        table = wt.add_table("table2");
+        table->add_column(type_Float, "col1");
+        table->add_column(type_Float, "col2");
+
+        wt.commit();
+    }
+
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    ReadTransaction rt(sg);
+
+    ConstTableRef table1 = rt.get_table("table1");
+    ConstTableRef table2 = rt.get_table("table2");
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+        WriteTransaction wt(sg_w);
+        wt.get_group().insert_table(0, "new table");
+
+        wt.get_table("table1")->add_empty_row();
+        wt.get_table("table2")->add_empty_row(2);
+
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK_EQUAL(table1->size(), 1);
+    CHECK_EQUAL(table2->size(), 2);
+    CHECK_EQUAL(rt.get_table("new table")->size(), 0);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_InsertTableOrdered)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+
+        wt.add_table("table1");
+        wt.add_table("table2");
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table2"));
+        wt.commit();
+    }
+
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    ReadTransaction rt(sg);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+        CHECK_EQUAL(wt.get_group().size(), 2);
+        wt.get_group().insert_table(0, "table0");
+        CHECK_EQUAL(wt.get_group().size(), 3);
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table0"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(2), wt.get_table("table2"));
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK_EQUAL(rt.get_table(0), rt.get_table("table0"));
+    CHECK_EQUAL(rt.get_table(1), rt.get_table("table1"));
+    CHECK_EQUAL(rt.get_table(2), rt.get_table("table2"));
+    CHECK_EQUAL(rt.get_group().size(), 3);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+
+        wt.add_table("table0");
+        wt.add_table("table1");
+        wt.add_table("table2");
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table0"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(2), wt.get_table("table2"));
+        wt.commit();
+    }
+
+    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    ReadTransaction rt(sg);
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg_w);
+        CHECK_EQUAL(wt.get_group().size(), 3);
+        wt.get_group().remove_table(0);
+        CHECK_EQUAL(wt.get_group().size(), 2);
+        CHECK_EQUAL(wt.get_table(0), wt.get_table("table1"));
+        CHECK_EQUAL(wt.get_table(1), wt.get_table("table2"));
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, *hist);
+
+    CHECK_EQUAL(rt.get_table(0), rt.get_table("table1"));
+    CHECK_EQUAL(rt.get_table(1), rt.get_table("table2"));
+    CHECK_EQUAL(rt.get_group().size(), 2);
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2437,9 +2568,11 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
+        parent_w->add_search_index(0);
         parent_w->add_empty_row(2);
         parent_w->set_int(0, 0, 27);
         parent_w->set_int(0, 1, 227);
+        parent_w->set_int_unique(0, 1, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg, hist);
@@ -7097,10 +7230,12 @@ public:
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
     bool set_int(size_t, size_t, int_fast64_t) { return false; }
+    bool set_int_unique(size_t, size_t, int_fast64_t) { return false; }
     bool set_bool(size_t, size_t, bool) { return false; }
     bool set_float(size_t, size_t, float) { return false; }
     bool set_double(size_t, size_t, double) { return false; }
     bool set_string(size_t, size_t, StringData) { return false; }
+    bool set_string_unique(size_t, size_t, StringData) { return false; }
     bool set_binary(size_t, size_t, BinaryData) { return false; }
     bool set_date_time(size_t, size_t, DateTime) { return false; }
     bool set_table(size_t, size_t) { return false; }
@@ -8959,6 +9094,7 @@ void handover_writer(std::string path)
     sg.end_read();
 }
 
+
 void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control,
                       TestResults* test_results_ptr, std::string path)
 {
@@ -9031,6 +9167,50 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
 }
 
 } // anonymous namespace
+
+
+namespace {
+
+void attacher(std::string path)
+{
+    for (int i=0; i<1000; ++i) {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        Group& g = const_cast<Group&>(sg.begin_read());
+        g.verify();
+        TheTable::Ref table = g.get_table<TheTable>("table");
+        LangBindHelper::promote_to_write(sg, *hist);
+        table[i].first = 1 + table[i*10].first;
+        LangBindHelper::commit_and_continue_as_read(sg);
+        g.verify();
+        sg.end_read();
+    }
+}
+} // anonymous namespace
+
+TEST(LangBindHelper_RacingAttachers)
+{
+    const int num_attachers = 10;
+    SHARED_GROUP_TEST_PATH(p);
+    std::string path(p);
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        Group& g = sg.begin_write();
+        TheTable::Ref table = g.add_table<TheTable>("table");
+        table->add_empty_row(10000);
+        sg.commit();
+    }
+    Thread attachers[num_attachers];
+    for (int i=0; i<num_attachers; ++i) {
+        attachers[i].start(bind(&attacher, path));
+    }
+    for (int i=0; i<num_attachers; ++i) {
+        attachers[i].join();
+    }
+}
+
+
 
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
@@ -9384,6 +9564,69 @@ TEST(LangBindHelper_HandoverLinkView)
         CHECK_EQUAL(2, tv.size());
         CHECK_EQUAL(0, tv.get_source_ndx(0));
         CHECK_EQUAL(2, tv.get_source_ndx(1));
+    }
+}
+
+
+TEST(LangBindHelper_HandoverDistinctView)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    sg.begin_read();
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        // Untyped interface
+        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
+        std::unique_ptr<SharedGroup::Handover<TableView> > handover2;
+        {
+            TableView tv1;
+            TableView tv2;
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            TableRef table = group_w.add_table("table2");
+            table->add_column(type_Int, "first");
+            table->add_empty_row(2);
+            table->set_int(0, 0, 100);
+            table->set_int(0, 1, 100);
+
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            tv1 = table->where().find_all();
+            tv1.distinct(0);
+            CHECK(tv1.size() == 1);
+            CHECK(tv1.get_source_ndx(0) == 0);
+            CHECK(tv1.is_attached());
+           
+            handover2 = sg_w.export_for_handover(tv1, ConstSourcePayload::Copy);
+            CHECK(tv1.is_attached());
+        }
+        {
+            LangBindHelper::advance_read(sg, *hist, vid);
+            sg_w.close();
+            // importing tv1:
+            std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover2)));
+            CHECK(tv2->is_in_sync());
+            CHECK(tv2->is_attached());
+
+            CHECK_EQUAL(tv2->size(), 1);
+            CHECK_EQUAL(tv2->get_source_ndx(0), 0);
+
+            // distinct property must remain through handover such that second row is kept being omitted
+            // after sync_if_needed()
+            tv2->sync_if_needed();
+            CHECK_EQUAL(tv2->size(), 1);
+            CHECK_EQUAL(tv2->get_source_ndx(0), 0);
+
+            // Remove distinct property
+            tv2->distinct(std::vector<size_t>());
+            tv2->sync_if_needed();
+            CHECK_EQUAL(tv2->size(), 2);
+        }
     }
 }
 
