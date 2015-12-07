@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* New default constructor added to `BasicRowExpr<>`. A default constructed
+  instance is in the detached state.
 
 -----------
 

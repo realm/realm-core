@@ -5287,6 +5287,14 @@ TEST(Table_RowAccessorDetach)
 }
 
 
+TEST(Table_RowAccessor_DetachedRowExpr)
+{
+    // Check that it is possible to create a detached RowExpr from scratch.
+    BasicRowExpr<Table> row;
+    CHECK_NOT(row.is_attached());
+}
+
+
 TEST(Table_RowAccessorCopyAndAssign)
 {
     Table table;
