@@ -503,6 +503,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                         Array::destroy_deep(child, alloc);
                         throw;
                     }
+                    ++num_children;
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
                 new_inner_node.add(1 + 2*v); // Throws

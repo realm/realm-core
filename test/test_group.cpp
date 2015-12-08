@@ -2276,6 +2276,28 @@ TEST(Group_CascadeNotify_TableViewClear)
 }
 
 
+TEST(Group_AddEmptyRowCrash)
+{
+    // Exposes former bug in ColumnBase::build().
+
+    size_t a = REALM_MAX_BPNODE_SIZE*REALM_MAX_BPNODE_SIZE;
+    size_t b = REALM_MAX_BPNODE_SIZE;
+
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column(type_Int, "i1");
+    table->add_empty_row(a);
+
+    table->add_empty_row(1); // Introduces 3rd level of B+-tree
+
+    table->add_column(type_Int, "i2"); // Calls ColumnBase::create() with size = a+1
+
+    table->add_empty_row(b - 1);
+
+    // array.cpp:2008: [realm-core-0.95.4] Assertion failed: insert_ndx - 1 == REALM_MAX_BPNODE_SIZE [b+1, b]
+    table->add_empty_row(1);
+}
+
 
 #ifdef REALM_DEBUG
 #ifdef REALM_TO_DOT
