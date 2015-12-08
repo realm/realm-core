@@ -228,19 +228,6 @@ public:
     /// index. The search index cannot be removed from the primary key of a
     /// table.
     ///
-    /// has_primary_key() returns true if, and only if a primary key has been
-    /// added to this table. Rather than throwing, it returns false if the table
-    /// accessor is detached.
-    ///
-    /// try_add_primary_key() tries to add a primary key to this table, by
-    /// forming it from the specified column. It fails and returns false if the
-    /// specified column has duplicate values, otherwise it returns true. The
-    /// specified column must already have a search index. This table must have
-    /// no preexisting primary key.
-    ///
-    /// remove_primary_key() removes a previously added primary key. It is an
-    /// error if this table has no primary key.
-    ///
     /// This table must be a root table; that is, it must have an independent
     /// descriptor. Freestanding tables, group-level tables, and subtables in a
     /// column of type 'mixed' are all examples of root tables. See add_column()
@@ -252,9 +239,6 @@ public:
 //    void remove_search_index(size_t col_ndx);
     void add_search_index(size_t column_ndx);
     void remove_search_index(size_t column_ndx);
-    bool has_primary_key() const noexcept;
-    bool try_add_primary_key(size_t column_ndx);
-    void remove_primary_key();
 
     //@}
 
@@ -461,6 +445,7 @@ public:
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
+    void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
     template<class E>
@@ -468,6 +453,7 @@ public:
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
@@ -604,22 +590,6 @@ public:
     TableView      get_backlink_view(size_t row_ndx, Table *src_table,
                                      size_t src_col_ndx);
 
-    //@{
-
-    /// Find the row with the specified primary key.
-    ///
-    /// It is an error to call any of these function on a table that has no
-    /// primary key, or to call one of them for a column with a mismatching
-    /// type.
-
-    RowExpr find_pkey_int(int_fast64_t pkey_value);
-    ConstRowExpr find_pkey_int(int_fast64_t pkey_value) const;
-
-    RowExpr find_pkey_string(StringData pkey_value);
-    ConstRowExpr find_pkey_string(StringData pkey_value) const;
-
-    //@}
-
 
     // Pivot / aggregate operation types. Experimental! Please do not document method publicly.
     enum AggrType {
@@ -633,7 +603,16 @@ public:
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const IntegerColumn* viewrefs = nullptr) const;
 
-
+    /// Report the current versioning counter for the table. The versioning counter is guaranteed to
+    /// change when the contents of the table changes after advance_read() or promote_to_write(), or
+    /// immediately after calls to methods which change the table. The term "change" means "change of
+    /// value": The storage layout of the table may change, for example due to optimization, but this
+    /// is not considered a change of a value. This means that you *cannot* use a non-changing version
+    /// count to indicate that object addresses (e.g. strings, binary data) remain the same.
+    /// The versioning counter *may* change (but is not required to do so) when another table linked
+    /// from this table, or linking to this table, is changed. The version counter *may* also change
+    /// without any apparent reason.
+    uint_fast64_t get_version_counter() const noexcept;
 private:
     template<class T>
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
@@ -855,7 +834,6 @@ private:
     column_accessors m_cols;
 
     mutable size_t m_ref_count;
-    mutable const StringIndex* m_primary_key;
 
     // If this table is a root table (has independent descriptor),
     // then Table::m_descriptor refers to the accessor of its
@@ -940,10 +918,6 @@ private:
               bool skip_create_column_accessors = false);
     void init(ConstSubspecRef shared_spec, ArrayParent* parent_column,
               size_t parent_row_ndx);
-
-    void reveal_primary_key() const;
-    size_t do_find_pkey_int(int_fast64_t) const;
-    size_t do_find_pkey_string(StringData) const;
 
     static void do_insert_column(Descriptor&, size_t col_ndx, DataType type,
                                  StringData name, Table* link_target_table, bool nullable = false);
@@ -1412,6 +1386,7 @@ protected:
 
 
 // Implementation:
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 
 inline void Table::bump_version(bool bump_global) const noexcept
@@ -1797,42 +1772,6 @@ inline TableRef Table::get_parent_table(size_t* column_ndx_out) noexcept
 inline bool Table::is_group_level() const noexcept
 {
     return bool(get_parent_group());
-}
-
-inline Table::RowExpr Table::find_pkey_int(int_fast64_t value)
-{
-    Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return RowExpr(table, row_ndx);
-}
-
-inline Table::ConstRowExpr Table::find_pkey_int(int_fast64_t value) const
-{
-    const Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return ConstRowExpr(table, row_ndx);
-}
-
-inline Table::RowExpr Table::find_pkey_string(StringData value)
-{
-    Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return RowExpr(table, row_ndx);
-}
-
-inline Table::ConstRowExpr Table::find_pkey_string(StringData value) const
-{
-    const Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return ConstRowExpr(table, row_ndx);
 }
 
 inline bool Table::operator==(const Table& t) const
@@ -2270,9 +2209,9 @@ public:
 
     typedef Table::AccessorUpdater AccessorUpdater;
     static void update_accessors(Table& table, const size_t* col_path_begin,
-                                 const size_t* col_path_end, AccessorUpdater& updatder)
+                                 const size_t* col_path_end, AccessorUpdater& updater)
     {
-        table.update_accessors(col_path_begin, col_path_end, updatder); // Throws
+        table.update_accessors(col_path_begin, col_path_end, updater); // Throws
     }
 
     static void refresh_accessor_tree(Table& table)

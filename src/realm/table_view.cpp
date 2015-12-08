@@ -18,9 +18,9 @@
  *
  **************************************************************************/
 
+#include <unordered_set>
+
 #include <realm/table_view.hpp>
-
-
 #include <realm/column.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/util/utf8.hpp>
@@ -613,6 +613,90 @@ void TableViewBase::sync_distinct_view(size_t column)
     }
 }
 
+void TableViewBase::distinct(size_t column)
+{
+    distinct(std::vector<size_t> { column });
+}
+
+/// Remove rows that are duplicated with respect to the column set passed as argument. 
+/// Will keep original sorting order so that you can both have a distinct and sorted view.
+void TableViewBase::distinct(std::vector<size_t> columns)
+{
+    m_distinct_columns.clear();
+    const_cast<TableViewBase*>(this)->do_sync();
+    m_distinct_columns = columns;
+
+    if (m_distinct_columns.size() == 0)
+        return;
+
+    // Step 1: First copy original TableView into a vector
+    std::vector<size_t> original;
+    original.resize(size());
+    std::vector<bool> ascending;
+    for (size_t r = 0; r < size(); r++) {
+        original[r] = m_row_indexes.get(r);
+        ascending.push_back(true);
+    }
+
+    // Step 2: Now sort ascending using the same column set that was passed to distinct()
+    Sorter s(columns, ascending);
+    sort(s);
+
+    // Step 3: Create column accessors for all columns in the column set. 
+    std::vector<const ColumnTemplateBase*> m_columns;
+    std::vector<const StringEnumColumn*> m_columns_enum;
+    m_columns.resize(columns.size());
+    m_columns_enum.resize(columns.size());
+
+    for (size_t i = 0; i < columns.size(); i++) {
+        const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
+        // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting 
+        // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used 
+        // in a couple of other places in Core too.
+        const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
+        REALM_ASSERT(ctb);
+        if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&cb))
+            m_columns_enum[i] = cse;
+        else
+            m_columns[i] = ctb;
+
+        REALM_ASSERT(ctb);
+    }
+
+    // Step 4: Build a list of all duplicated rows that need to be removed
+    std::unordered_set<size_t> remove;
+    for (size_t r = 1; r < size(); r++) {
+        bool identical = true;
+        for (size_t c = 0; c < m_distinct_columns.size(); c++) {
+
+            int cmp;
+            size_t r1 = m_row_indexes.get(r);
+            size_t r2 = m_row_indexes.get(r - 1);
+            if (const StringEnumColumn* cse = m_columns_enum[c])
+                cmp = cse->compare_values(r1, r2);
+            else
+                cmp = m_columns[c]->compare_values(r1, r2);
+
+            if (cmp != 0) {
+                identical = false;
+                break;
+            }
+        }
+        if (identical) {
+            remove.insert(m_row_indexes.get(r));
+        }
+    }
+
+    // Step 5: Add all elements from the original TableView, but skip those in the duplicate-list
+    m_row_indexes.clear();
+    for (size_t i = 0; i < original.size(); i++) {
+        if (remove.find(original[i]) == remove.end()) {
+            m_row_indexes.add(original[i]);
+        }
+    }
+}
+
+
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
 {
@@ -685,6 +769,9 @@ void TableViewBase::do_sync()
     }
     if (m_auto_sort)
         re_sort();
+
+    if (m_distinct_columns.size() > 0)
+        distinct(m_distinct_columns);
 
     m_last_seen_version = outside_version();
 }

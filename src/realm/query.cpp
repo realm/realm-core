@@ -714,7 +714,7 @@ template<Action action, typename T, typename R, class ColType>
             *resultcount = limit < (end - start) ? limit : (end - start);
         }
         // direct aggregate on the column
-        return (column.*aggregateMethod)(start, end, limit, return_ndx);
+        return (column.*aggregateMethod)(start, end, limit, action == act_Sum ? resultcount : return_ndx);
     }
     else {
 
@@ -808,7 +808,6 @@ int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, siz
         return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, resultcount, start, end, limit);
     }
     return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, resultcount, start, end, limit);
-    return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, resultcount, start, end, limit);
 }
 double Query::sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
@@ -828,7 +827,6 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
 DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
@@ -837,7 +835,6 @@ DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t 
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
@@ -863,7 +860,6 @@ int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start,
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
     return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
@@ -883,7 +879,6 @@ DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t 
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
@@ -914,7 +909,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
 double Query::average_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return average<int64_t, true>(column_ndx, resultcount, start, end, limit);
+        return average<util::Optional<int64_t>, true>(column_ndx, resultcount, start, end, limit);
     }
     return average<int64_t, false>(column_ndx, resultcount, start, end, limit);
 }
