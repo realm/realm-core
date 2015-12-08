@@ -17,7 +17,7 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Upgraded to OpenSSL 1.0.1q (Android).
 
 ----------------------------------------------
 
