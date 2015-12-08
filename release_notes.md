@@ -7,7 +7,8 @@
   (too shallow) B+-tree. This is a bug that could have been triggered through
   proper use of our bindings in their current form. In particular, it would be
   triggere when adding a new attribute to a class that already has a
-  sufficiently large number of objects in it (> REALM_MAX_BPNODE_SIZE = 1000).
+  sufficiently large number of objects in it (> REALM_MAX_BPNODE_SIZE^2 =
+  1,000,000).
 
 ### API breaking changes:
 
