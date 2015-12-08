@@ -2284,6 +2284,7 @@ TEST(Group_Fuzzy)
     //string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
 //    string filename = "d:/crash3";
 
+    // Predeclarations for methods in fuzz_group.cpp
     int run_fuzzy(int argc, const char* argv[]);
     void parse_and_apply_instructions(string& in, Group& g, util::Optional<std::ostream&> log);
 
