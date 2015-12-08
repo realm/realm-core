@@ -73,6 +73,10 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
     const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
 
+    // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
+    // max_rows is not exceeded *prior* to executing add_empty_row.
+    const size_t max_rows = 100000;
+
     try {
         State s;
         s.str = in;
@@ -140,10 +144,12 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
             else if (instr == ADD_EMPTY_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 size_t num_rows = get_next(s);
-                if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % add_empty_row_max << ");\n";
+                if (g.get_table(table_ndx)->size() + num_rows < max_rows) {
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % add_empty_row_max << ");\n";
+                    }
+                    g.get_table(table_ndx)->add_empty_row(num_rows % add_empty_row_max);
                 }
-                g.get_table(table_ndx)->add_empty_row(num_rows % add_empty_row_max);
             }
             else if (instr == ADD_COLUMN && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
