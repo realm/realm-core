@@ -70,9 +70,7 @@ int64_t get_int64(State& s) {
 
 void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std::ostream&> log)
 {
-    // FIXME: Temporary limit due to bug in add_empty_row(). Update: Turns out add_empty_row() bug
-    // can be triggered even with this very low argument value...
-    const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE / 2;
+    const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
     const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
 
     try {
