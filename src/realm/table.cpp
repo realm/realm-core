@@ -2126,7 +2126,6 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
             if (repl) {
                 size_t num_rows_to_erase = 1;
                 size_t prior_num_rows = m_size;
-                bool is_move_last_over = false;
                 repl->erase_rows(this, row_ndx, num_rows_to_erase, prior_num_rows,
                                  is_move_last_over); // Throws
             }
