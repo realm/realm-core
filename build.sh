@@ -899,8 +899,12 @@ EOF
                              no-sock no-ssl2 no-ssl3 no-err no-krb5 no-engine \
                              no-srtp no-speed -DOPENSSL_NO_SHA512 \
                              -DOPENSSL_NO_SHA0 -w -fPIC || exit 1
-                    $MAKE depend
                     $MAKE clean
+                ) || exit 1
+
+                (
+                    cd openssl
+                    $MAKE depend
                 ) || exit 1
 
                 PATH="$path" CC="$cc" CFLAGS="$cflags_arch" $MAKE -C "openssl" build_crypto|| exit 1
