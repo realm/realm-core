@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed Row accessor updating after an unordered TableView::clear().
 
 ### API breaking changes:
 
@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* New default constructor added to `BasicRowExpr<>`. A default constructed
+  instance is in the detached state.
 
 -----------
 
@@ -20,12 +21,59 @@
 
 ----------------------------------------------
 
+# 0.95.4 Release notes
+
+### Bugfixes:
+
+* Fixed incorrect handling of a race between a commit() and a new thread
+  or process opening the database. In debug mode, the race would trigger an
+  assert "cfg.session_initiator || !cfg.is_shared", in release mode it could
+  conceivably result in undefined behaviour.
+* Fixed a segmentation fault in SharedGroup::do_open_2
+* Fixed a bug en ringbuffer handling that could cause readers to get a wrong
+  top pointer - causing later asserts regarding the size of the top array, or
+  asserts reporting mismatch between versions.
+
+### API breaking changes:
+
+* Primary key support has been removed. Instead, new instructions have been
+  introduced: SetIntUnique, SetStringUnique. To implement primary keys, callers
+  should manually check the PK constraint and then emit these instructions in
+  place of the regular SetInt and SetString instructions.
+
+### Enhancements:
+
+* Added TableView::distinct() method. It obeys TableView::sync_if_needed().
+  A call to distinct() will first fully populate the TableView and then perform
+  a distinct algorithm on that (i.e. it will *not* add a secondary distinct filter
+  to any earlier filter applied). See more in TEST(TableView_Distinct) in 
+  test_table_view.cpp.
+
+-----------
+
+### Internals:
+
+* Changed `Group::remove_table`, `Group::TransactAdvancer::insert_group_level_table`
+  and `Group::TransactAdvancer::erase_group_level_table` from _move-last-over_ to
+  preserve table ordering within the group.
+
+----------------------------------------------
+
+# 0.95.3 Release notes
+
+### Bugfixes:
+
+* Reverted what was presumably a fix for a race between commit and opening the database (0.95.2).
+
+----------------------------------------------
+
 # 0.95.2 Release notes
 
 ### Bugfixes:
 
 * Fixed bug where Query::average() would include the number of nulls in the 
   result.
+* Presumably fixed a race between commit and opening the database.
 
 ### Enhancements:
 
