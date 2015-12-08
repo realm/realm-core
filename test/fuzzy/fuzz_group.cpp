@@ -49,7 +49,7 @@ struct State {
     size_t pos;
 };
 
-unsigned char get_next(State s)
+unsigned char get_next(State& s)
 {
     if (s.pos == s.str.size()) {
         throw EndOfFile{};
@@ -59,14 +59,21 @@ unsigned char get_next(State s)
     return byte;
 }
 
-int64_t get_int64(std::string& in, size_t& pos) {
-    return 0;
+int64_t get_int64(State& s) {
+    int64_t v = 0;
+    for (size_t t = 0; t < 8; t++) {
+        unsigned char c = get_next(s);
+        *(reinterpret_cast<signed char*>(&v) + t) = c;
+    }
+    return v;
 }
 
 void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std::ostream&> log)
 {
-    // Temporary limit due to bug in add_empty_row()
-    size_t EMPTY_ROW_MAX = 2;
+    // FIXME: Temporary limit due to bug in add_empty_row(). Update: Turns out add_empty_row() bug
+    // can be triggered even with this very low argument value...
+    const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE / 2;
+    const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
 
     try {
         State s;
@@ -77,7 +84,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
         for (;;) {
             char instr = get_next(s) % COUNT;
 
-            if (instr == ADD_TABLE && g.size() < 1100) {
+            if (instr == ADD_TABLE && g.size() < max_tables) {
                 auto name = create_string(get_next(s) % Group::max_table_name_length);
                 if (log) {
                     *log << "g.add_table(\"" << name << "\");\n";
@@ -88,7 +95,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 catch (const TableNameInUse&) {
                 }
             }
-            else if (instr == INSERT_TABLE && g.size() < 1100) {
+            else if (instr == INSERT_TABLE && g.size() < max_tables) {
                 size_t s0 = get_next(s) % (g.size() + 1);
                 string sd0 = create_string(get_next(s) % (Group::max_table_name_length - 10) + 5);
                 if (log) {
@@ -129,17 +136,17 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 size_t row_ndx = get_next(s) % (g.get_table(table_idx)->size() + 1);
                 size_t num_rows = get_next(s);
                 if (log) {
-                    *log << "g.get_table(" << table_idx << ")->insert_empty_row(" << row_ndx << ", " << num_rows % EMPTY_ROW_MAX << ");\n";
+                    *log << "g.get_table(" << table_idx << ")->insert_empty_row(" << row_ndx << ", " << num_rows % add_empty_row_max << ");\n";
                 }
-                g.get_table(table_idx)->insert_empty_row(row_ndx, num_rows % EMPTY_ROW_MAX);
+                g.get_table(table_idx)->insert_empty_row(row_ndx, num_rows % add_empty_row_max);
             }
             else if (instr == ADD_EMPTY_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 size_t num_rows = get_next(s);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % EMPTY_ROW_MAX << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % add_empty_row_max << ");\n";
                 }
-                g.get_table(table_ndx)->add_empty_row(num_rows % EMPTY_ROW_MAX);
+                g.get_table(table_ndx)->add_empty_row(num_rows % add_empty_row_max);
             }
             else if (instr == ADD_COLUMN && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
@@ -268,7 +275,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                             t->set_binary(c, r, BinaryData(str));
                         }
                         else if (d == type_Int) {
-                            int64_t value = get_next(s);
+                            int64_t value = get_int64(s);
                             if (log) {
                                 *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
                             }
@@ -344,5 +351,87 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
     }
     catch (const EndOfFile&) {
     }
+}
+
+
+void usage(const char* argv[])
+{
+    fprintf(stderr, "Usage: %s <LOGFILE> [--log]\n(where <LOGFILE> is a instruction file that will be replayed.)\nPass --log to have code printed to stdout producing the same instructions.", argv[0]);
+    exit(1);
+}
+
+
+int run_fuzzy(int argc, const char* argv[])
+{
+    util::Optional<std::ostream&> log;
+
+    size_t file_arg = size_t(-1);
+    for (size_t i = 1; i < size_t(argc); ++i) {
+        std::string arg = argv[i];
+        if (arg == "--log") {
+            log = util::some<std::ostream&>(std::cout);
+        }
+        else {
+            file_arg = i;
+        }
+    }
+
+    if (file_arg == size_t(-1)) {
+        usage(argv);
+    }
+
+    std::ifstream in(argv[file_arg], ios::in | ios::binary);
+    if (!in.is_open()) {
+        fprintf(stderr, "Could not open file for reading: %s\n", argv[1]);
+        exit(1);
+    }
+
+    test_util::unit_test::TestDetails test_details;
+    test_details.test_index = 0;
+    test_details.suite_name = "FuzzyTest";
+    test_details.test_name = "TransactLogApplier";
+    test_details.file_name = __FILE__;
+    test_details.line_number = __LINE__;
+
+    Group group;
+
+    try {
+        if (log) {
+            time_t t = time(0);
+            tm t0;
+#ifndef _MSC_VER // fixme
+            localtime_r(&t, &t0);
+            char buffer[100] = { 0 };
+            strftime(buffer, sizeof(buffer), "%c", &t0);
+            *log << "// Test case generated by " << argv[0] << " on " << buffer << ".\n";
+#endif
+            *log << "Group g;\n";
+        }
+        std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
+        parse_and_apply_instructions(contents, group, log);
+    }
+    catch (const EndOfFile&) {
+        return 0;
+    }
+    catch (const LogicError&) {
+        return 0;
+    }
+    catch (const TableNameInUse&) {
+        return 0;
+    }
+    catch (const NoSuchTable&) {
+        return 0;
+    }
+    catch (const CrossTableLinkTarget&) {
+        return 0;
+    }
+    catch (const DescriptorMismatch&) {
+        return 0;
+    }
+    catch (const FileFormatUpgradeRequired&) {
+        return 0;
+    }
+
+    return 0;
 }
 
