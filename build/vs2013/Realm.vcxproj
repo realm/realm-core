@@ -670,7 +670,7 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">Default</CompileAs>
     </ClCompile>
     <ClCompile Include="..\..\test\fuzzy\afl.cpp" />
-    <ClCompile Include="..\..\test\fuzzy\fuzz_group.cpp" />
+    <ClCompile Include="..\..\test\fuzz_group.cpp" />
     <ClCompile Include="..\..\test\large_tests\test_column_large.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>

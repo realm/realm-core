@@ -1,7 +1,7 @@
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/commit_log.hpp>
-#include "../test.hpp"
+#include "test.hpp"
 
 #include <stdio.h>
 #include <fstream>
@@ -28,7 +28,7 @@ enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, IN
 
 DataType get_type(unsigned char c)
 {
-    DataType types[9] = {
+    DataType types[] = {
         type_Int,
         type_Bool,
         type_Float,
@@ -80,7 +80,6 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
         s.str = in;
         s.pos = 0;
  
-        size_t pos = 0;
         for (;;) {
             char instr = get_next(s) % COUNT;
 

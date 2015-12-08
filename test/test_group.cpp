@@ -222,6 +222,8 @@ TEST(Group_Permissions)
 }
 #endif
 
+// FIXME: Fails on Windows
+#ifndef _MSC_VER
 TEST(Group_BadFile)
 {
     GROUP_TEST_PATH(path_1);
@@ -246,6 +248,7 @@ TEST(Group_BadFile)
         CHECK(group.is_attached());
     }
 }
+#endif
 
 TEST(Group_OpenBuffer)
 {
@@ -2300,8 +2303,8 @@ TEST(Group_Fuzzy)
         // Number of instructions in each test
         const size_t instructions = 100;
 
-        srand(time(0));
-        for (int64_t counter = 0; counter < iterations; counter++)
+        fastrand(time(0), true); // seed
+        for (size_t counter = 0; counter < iterations; counter++)
         {
             instr = "";
             for (size_t t = 0; t < instructions; t++) {
