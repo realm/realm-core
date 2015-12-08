@@ -2,7 +2,12 @@
 
 ### Bugfixes:
 
-* Fixed Row accessor updating after an unordered TableView::clear().
+* Fixed Row accessor updating after an unordered `TableView::clear()`.
+* Fixed bug in `ColumnBase::build()` which would cause it to produce an invalid
+  (too shallow) B+-tree. This is a bug that could have been triggered through
+  proper use of our bindings in their current form. In particular, it would be
+  triggere when adding a new attribute to a class that already has a
+  sufficiently large number of objects in it (> REALM_MAX_BPNODE_SIZE = 1000).
 
 ### API breaking changes:
 
@@ -46,7 +51,7 @@
 * Added TableView::distinct() method. It obeys TableView::sync_if_needed().
   A call to distinct() will first fully populate the TableView and then perform
   a distinct algorithm on that (i.e. it will *not* add a secondary distinct filter
-  to any earlier filter applied). See more in TEST(TableView_Distinct) in 
+  to any earlier filter applied). See more in TEST(TableView_Distinct) in
   test_table_view.cpp.
 
 -----------
