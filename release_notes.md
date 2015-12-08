@@ -2,7 +2,7 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed Row accessor updating after an unordered TableView::clear().
 
 ### API breaking changes:
 
@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* New default constructor added to `BasicRowExpr<>`. A default constructed
+  instance is in the detached state.
 
 -----------
 
