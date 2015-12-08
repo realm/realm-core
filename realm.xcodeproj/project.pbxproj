@@ -198,6 +198,7 @@
 		425ED13319BDC371006C0DAE /* shared_ptr.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 425ED13219BDC371006C0DAE /* shared_ptr.hpp */; };
 		42F862D319BDE3460053C134 /* views.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 42F862D119BDE3460053C134 /* views.cpp */; };
 		42F862D419BDE3460053C134 /* views.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 42F862D219BDE3460053C134 /* views.hpp */; };
+		484814A61C172F390007CDD7 /* fuzz_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 484814A51C172F390007CDD7 /* fuzz_group.cpp */; };
 		485231141B2E9118003C72AF /* misc_errors.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 485231131B2E9118003C72AF /* misc_errors.hpp */; };
 		485231161B2E914D003C72AF /* misc_errors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 485231151B2E914D003C72AF /* misc_errors.cpp */; };
 		485231181B2E918F003C72AF /* basic_system_errors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 485231171B2E918F003C72AF /* basic_system_errors.cpp */; };
@@ -819,6 +820,7 @@
 		425ED13219BDC371006C0DAE /* shared_ptr.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = shared_ptr.hpp; sourceTree = "<group>"; };
 		42F862D119BDE3460053C134 /* views.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = views.cpp; path = realm/views.cpp; sourceTree = "<group>"; };
 		42F862D219BDE3460053C134 /* views.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = views.hpp; path = realm/views.hpp; sourceTree = "<group>"; };
+		484814A51C172F390007CDD7 /* fuzz_group.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = fuzz_group.cpp; sourceTree = "<group>"; };
 		485231131B2E9118003C72AF /* misc_errors.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = misc_errors.hpp; sourceTree = "<group>"; };
 		485231151B2E914D003C72AF /* misc_errors.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = misc_errors.cpp; sourceTree = "<group>"; };
 		485231171B2E918F003C72AF /* basic_system_errors.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = basic_system_errors.cpp; sourceTree = "<group>"; };
@@ -1246,6 +1248,7 @@
 				3647DFF314209CE600D56FD7 /* main.cpp */,
 				3647DFF414209CE600D56FD7 /* Makefile */,
 				5219EB6F18FB030900FF9232 /* test_all.cpp */,
+				484814A51C172F390007CDD7 /* fuzz_group.cpp */,
 				5219EB7018FB030900FF9232 /* test_all.hpp */,
 				368063391446D12A00283774 /* test_alloc.cpp */,
 				36E6089E145AE7DD00CCC3E8 /* test_array_binary.cpp */,
@@ -2176,6 +2179,7 @@
 				52D7C4891852A01700633748 /* terminate.cpp in Sources */,
 				52D7C48B1852A01700633748 /* thread.cpp in Sources */,
 				3F967AFA1AA4C00800005C38 /* transact_log.cpp in Sources */,
+				484814A61C172F390007CDD7 /* fuzz_group.cpp in Sources */,
 				522EA519192C4D3C002AD3B6 /* unicode.cpp in Sources */,
 				365CCE75157CC37D00172BF8 /* utilities.cpp in Sources */,
 				80ADCCE918A23DD00049D472 /* version.cpp in Sources */,
