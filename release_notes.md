@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.95.5 Release notes
 
 ### Bugfixes:
 
@@ -10,20 +10,10 @@
   sufficiently large number of objects in it (> REALM_MAX_BPNODE_SIZE^2 =
   1,000,000).
 
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * New default constructor added to `BasicRowExpr<>`. A default constructed
   instance is in the detached state.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
