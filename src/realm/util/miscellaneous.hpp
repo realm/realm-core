@@ -20,26 +20,29 @@
 #ifndef REALM_UTIL_MISCELLANEOUS_HPP
 #define REALM_UTIL_MISCELLANEOUS_HPP
 
+#include <type_traits>
+
 namespace realm {
 namespace util {
 
+// FIXME: Replace this with std::add_const_t when we switch over to C++14 by
+// default.
+/// \brief Adds const qualifier, unless T already has the const qualifier
+template <class T>
+using add_const_t = typename std::add_const<T>::type;
+
 // FIXME: Replace this with std::as_const when we switch over to C++17 by
 // default.
+/// \brief Forms an lvalue reference to const T
 template <class T>
-const T& as_const(const T& v) noexcept
+constexpr add_const_t<T>& as_const(T& v) noexcept
 {
     return v;
 }
 
-// FIXME: C++17 also defines
-//
-//     template <class T>
-//     const T& as_const(const T&&) = delete;
-//
-// Though, we are unsure as to why. As we do not understand the underlying
-// reason for this deleted function, we are choosing not to add it in our
-// codebase. If somebody understands the reasoning, feel free to add it (with
-// comments).
+/// \brief Disallows rvalue arguments
+template <class T>
+add_const_t<T>& as_const(const T&&) = delete;
 
 } // namespace util
 } // namespace realm
