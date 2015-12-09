@@ -10069,4 +10069,54 @@ TEST(LangBindHelper_Compact)
     }
 }
 
+ONLY(LangBindHelper_LinkTest)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    size_t N = 5;
+
+    {
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction w(sg_w);
+        
+        TableRef table1 = w.get_or_add_table("table1");
+        TableRef table2 = w.get_or_add_table("table2");
+        table1->add_column_link(type_LinkList, "link", *table2);
+        table2->add_column(type_Int, "Int");
+
+        for(size_t i = 0; i < N; ++i) {
+            table2->add_empty_row();
+            table2->set_int(0, i, i);
+        }
+
+        table1->add_empty_row();
+        LinkViewRef lvr = table1->get_linklist(0, 0);
+        for(size_t i = 0; i < N; ++i) {
+            lvr->add(i);
+        }
+        w.commit();
+        sg_w.close();
+    }
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        Group& g = const_cast<Group&>(sg.begin_read());
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef table1 = g.get_table("table1");
+        TableView view = table1->where().find_all();
+        Query query = static_cast<Query>(view.get_query()).get_table()->where(table1->get_linklist(0, 0));
+        TableView view2 = query.find_all();
+        CHECK_EQUAL(N, view2.size());
+        table1->move_last_over(0);
+        CHECK(view2.is_attached());
+        CHECK_EQUAL(N, view2.size());
+        LangBindHelper::commit_and_continue_as_read(sg);
+        CHECK(view2.is_attached());
+        view2.sync_if_needed();
+        CHECK(view2.is_attached());
+        sg.close();
+    }
+}
+
 #endif
