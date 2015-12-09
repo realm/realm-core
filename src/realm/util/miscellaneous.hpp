@@ -31,6 +31,16 @@ const T& as_const(const T& v) noexcept
     return v;
 }
 
+// FIXME: C++17 also defines
+//
+//     template <class T>
+//     const T& as_const(const T&&) = delete;
+//
+// Though, we are unsure as to why. As we do not understand the underlying
+// reason for this deleted function, we are choosing not to add it in our
+// codebase. If somebody understands the reasoning, feel free to add it (with
+// comments).
+
 } // namespace util
 } // namespace realm
 
