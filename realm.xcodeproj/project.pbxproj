@@ -198,7 +198,6 @@
 		425ED13319BDC371006C0DAE /* shared_ptr.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 425ED13219BDC371006C0DAE /* shared_ptr.hpp */; };
 		42F862D319BDE3460053C134 /* views.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 42F862D119BDE3460053C134 /* views.cpp */; };
 		42F862D419BDE3460053C134 /* views.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 42F862D219BDE3460053C134 /* views.hpp */; };
-		484814A61C172F390007CDD7 /* fuzz_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 484814A51C172F390007CDD7 /* fuzz_group.cpp */; };
 		485231141B2E9118003C72AF /* misc_errors.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 485231131B2E9118003C72AF /* misc_errors.hpp */; };
 		485231161B2E914D003C72AF /* misc_errors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 485231151B2E914D003C72AF /* misc_errors.cpp */; };
 		485231181B2E918F003C72AF /* basic_system_errors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 485231171B2E918F003C72AF /* basic_system_errors.cpp */; };
@@ -287,6 +286,8 @@
 		651AEEA61B31945F0048C8EE /* test_upgrade_database_1000_1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */; };
 		651AEEA71B31945F0048C8EE /* test_upgrade_database_1000_2.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */; };
 		651AEEA81B31945F0048C8EE /* test_upgrade_database_1000_3.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */; };
+		656341F81C18C508006EE446 /* fuzz_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 484814A51C172F390007CDD7 /* fuzz_group.cpp */; };
+		656341F91C18C50A006EE446 /* fuzz_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 484814A51C172F390007CDD7 /* fuzz_group.cpp */; };
 		6579EEB91B4E89B6004DE3D8 /* disable_sync_to_disk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */; };
 		6579EEBA1B4E89B7004DE3D8 /* disable_sync_to_disk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */; };
 		6589FF2D1B4D6806001B6239 /* test_upgrade_database_4_4.realm in Resources */ = {isa = PBXBuildFile; fileRef = 65BC7FA01B4D63E70070E98D /* test_upgrade_database_4_4.realm */; };
@@ -1245,10 +1246,10 @@
 				F4D0FC281B00F4010040956A /* benchmark-common-tasks-ios */,
 				3FCA03C51A44F57A009067D0 /* CoreFoundation.framework */,
 				52F2E0E017D5F8F500415958 /* large_tests */,
+				484814A51C172F390007CDD7 /* fuzz_group.cpp */,
 				3647DFF314209CE600D56FD7 /* main.cpp */,
 				3647DFF414209CE600D56FD7 /* Makefile */,
 				5219EB6F18FB030900FF9232 /* test_all.cpp */,
-				484814A51C172F390007CDD7 /* fuzz_group.cpp */,
 				5219EB7018FB030900FF9232 /* test_all.hpp */,
 				368063391446D12A00283774 /* test_alloc.cpp */,
 				36E6089E145AE7DD00CCC3E8 /* test_array_binary.cpp */,
@@ -2179,7 +2180,6 @@
 				52D7C4891852A01700633748 /* terminate.cpp in Sources */,
 				52D7C48B1852A01700633748 /* thread.cpp in Sources */,
 				3F967AFA1AA4C00800005C38 /* transact_log.cpp in Sources */,
-				484814A61C172F390007CDD7 /* fuzz_group.cpp in Sources */,
 				522EA519192C4D3C002AD3B6 /* unicode.cpp in Sources */,
 				365CCE75157CC37D00172BF8 /* utilities.cpp in Sources */,
 				80ADCCE918A23DD00049D472 /* version.cpp in Sources */,
@@ -2242,6 +2242,7 @@
 				65BB23001AD80EA30097170F /* test_upgrade_database.cpp in Sources */,
 				52A32B4817D4E89100DD22CC /* test_utf8.cpp in Sources */,
 				65F666F51BFD013A00749FA2 /* test_util_inspect.cpp in Sources */,
+				656341F81C18C508006EE446 /* fuzz_group.cpp in Sources */,
 				80ADCCEE18A23E2D0049D472 /* test_version.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2430,6 +2431,7 @@
 				65F666F91BFD014000749FA2 /* test_util_error.cpp in Sources */,
 				65F666FB1BFD014000749FA2 /* test_util_stringbuffer.cpp in Sources */,
 				F45013E11B01027F00CD4A7E /* test_array_string_long.cpp in Sources */,
+				656341F91C18C50A006EE446 /* fuzz_group.cpp in Sources */,
 				F45013E21B01027F00CD4A7E /* test_basic_utils.cpp in Sources */,
 				F45013E31B01027F00CD4A7E /* test_binary_data.cpp in Sources */,
 				F45013E41B01027F00CD4A7E /* test_column.cpp in Sources */,
