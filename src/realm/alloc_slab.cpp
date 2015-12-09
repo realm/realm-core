@@ -793,7 +793,7 @@ void SlabAlloc::remap(size_t file_size)
             new_mappings[j] = std::move(m_additional_mappings[j]);
         m_additional_mappings = std::move(new_mappings);
     }
-    for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
+    for (size_t k = m_num_additional_mappings; k < num_additional_mappings; ++k)
     {
         auto section_start_offset = get_section_base(k + m_first_additional_mapping);
         auto section_size = get_section_base(1 + k + m_first_additional_mapping) - section_start_offset;
