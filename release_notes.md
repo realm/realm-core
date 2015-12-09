@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed incorrect initialization of TableViews from queries on LinkViews
+  resulting in `TableView::is_in_sync()` being incorrect until the first time
+  it is brought back into sync.
 
 ### API breaking changes:
 

@@ -9513,6 +9513,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
 
         // tv.m_table == table1
         tv = q.find_all(); // tv = { 0, 2 }
+        CHECK(tv.is_in_sync());
 
         // TableView tv2 = lvr->get_sorted_view(0);
         LangBindHelper::commit_and_continue_as_read(sg_w);
@@ -9524,6 +9525,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         sg_w.close();
         std::unique_ptr<TableView> tv( sg.import_from_handover(move(handover)) ); // <-- import tv
 
+        CHECK(tv->is_in_sync());
         CHECK_EQUAL(2, tv->size());
         CHECK_EQUAL(0, tv->get_source_ndx(0));
         CHECK_EQUAL(2, tv->get_source_ndx(1));
