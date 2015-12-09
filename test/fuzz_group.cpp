@@ -193,7 +193,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                         t->add_search_index(col_ndx);
                         
                         if (log) {
-                            *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << ");\n";
+                            *log << "TableRef t = g.get_table(" << table_ndx << "); t->add_search_index(" << col_ndx << ");\n";
                         }
                     }
                 }
@@ -286,7 +286,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                         else if (d == type_DateTime) {
                             DateTime value{ get_next(s) };
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_datetime(" << c << ", " << r << ", " << value << ");\n";
                             }
                             t->set_datetime(c, r, value);
                         }
