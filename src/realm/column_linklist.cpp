@@ -616,9 +616,9 @@ void LinkListColumn::update_from_parent(size_t old_baseline) noexcept
 
     prune_list_accessor_tombstones();
 
-    auto end = m_list_accessors.end();
-    for (auto i = m_list_accessors.begin(); i != end; ++i)
-        i->m_list->update_from_parent(old_baseline);
+    for (auto&& list_accessor : m_list_accessors) {
+        list_accessor.m_list->update_from_parent(old_baseline);
+    }
 }
 
 
