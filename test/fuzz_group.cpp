@@ -85,7 +85,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
             char instr = get_next(s) % COUNT;
 
             if (instr == ADD_TABLE && g.size() < max_tables) {
-                auto name = create_string(get_next(s) % Group::max_table_name_length);
+                std::string name = create_string(get_next(s) % Group::max_table_name_length);
                 if (log) {
                     *log << "g.add_table(\"" << name << "\");\n";
                 }
