@@ -440,10 +440,11 @@ ConstDescriptorRef Table::get_subdescriptor(size_t col_ndx) const
 DescriptorRef Table::get_subdescriptor(const path_vec& path)
 {
     DescriptorRef desc = get_descriptor(); // Throws
-    typedef path_vec::const_iterator iter;
-    iter end = path.end();
-    for (iter i = path.begin(); i != end; ++i)
-        desc = desc->get_subdescriptor(*i); // Throws
+
+    for (const auto& path_part : path) {
+        desc = desc->get_subdescriptor(path_part); // Throws
+    }
+
     return desc;
 }
 
@@ -1320,10 +1321,9 @@ void Table::move_registered_view(const TableViewBase* old_addr,
 void Table::discard_views() noexcept
 {
     LockGuard lock(m_accessor_mutex);
-    typedef views::const_iterator iter;
-    iter end = m_views.end();
-    for (iter i = m_views.begin(); i != end; ++i)
-        (*i)->detach();
+    for (const auto& view : m_views) {
+        view->detach();
+    }
     m_views.clear();
 }
 
@@ -2159,8 +2159,9 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
 
     // Iterate over a copy of `rows` since cascading deletes mutate it
     auto copy = state.rows;
-    for (auto const& row : copy)
+    for (auto const& row : copy) {
         cascade_break_backlinks_to(row.row_ndx, state); // Throws
+    }
 
     if (Group* g = get_parent_group())
         _impl::GroupFriend::send_cascade_notification(*g, state);

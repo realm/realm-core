@@ -74,11 +74,9 @@ void Descriptor::detach() noexcept
 void Descriptor::detach_subdesc_accessors() noexcept
 {
     if (!m_subdesc_map.empty()) {
-        typedef subdesc_map::const_iterator iter;
-        iter end = m_subdesc_map.end();
-        for (iter i = m_subdesc_map.begin(); i != end; ++i) {
+        for (const auto& subdesc : m_subdesc_map) {
             // Must hold a reliable reference count while detaching
-            DescriptorRef desc(i->m_subdesc);
+            DescriptorRef desc(subdesc.m_subdesc);
             desc->detach();
         }
         m_subdesc_map.clear();
@@ -111,14 +109,14 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const noexce
             return 0; // Not enough space in path buffer
         const Descriptor* parent = desc->m_parent.get();
         size_t column_ndx = not_found;
-        typedef subdesc_map::iterator iter;
-        iter end = parent->m_subdesc_map.end();
-        for (iter i = parent->m_subdesc_map.begin(); i != end; ++i) {
-            if (i->m_subdesc == desc) {
-                column_ndx = i->m_column_ndx;
+
+        for (const auto& subdesc : parent->m_subdesc_map) {
+            if (subdesc.m_subdesc == desc) {
+                column_ndx = subdesc.m_column_ndx;
                 break;
             }
         }
+
         REALM_ASSERT_3(column_ndx, !=, not_found);
         *--begin_2 = column_ndx;
         desc = parent;
@@ -130,12 +128,11 @@ Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
 
-    typedef subdesc_map::iterator iter;
-    iter end = m_subdesc_map.end();
-    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx == column_ndx)
-            return i->m_subdesc;
+    for (const auto& subdesc : m_subdesc_map) {
+        if (subdesc.m_column_ndx == column_ndx)
+            return subdesc.m_subdesc;
     }
+
     return 0;
 }
 

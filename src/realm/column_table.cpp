@@ -127,22 +127,19 @@ Table* SubtableColumnBase::get_parent_table(size_t* column_ndx_out) noexcept
 
 Table* SubtableColumnBase::SubtableMap::find(size_t subtable_ndx) const noexcept
 {
-    typedef entries::const_iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i)
-        if (i->m_subtable_ndx == subtable_ndx)
-            return i->m_table;
+    for (const auto& entry : m_entries) {
+        if (entry.m_subtable_ndx == subtable_ndx)
+            return entry.m_table;
+    }
     return 0;
 }
 
 
 bool SubtableColumnBase::SubtableMap::detach_and_remove_all() noexcept
 {
-    typedef entries::const_iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i) {
+    for (const auto& entry : m_entries) {
         // Must hold a counted reference while detaching
-        TableRef table(i->m_table);
+        TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
         tf::detach(*table);
     }
@@ -195,10 +192,9 @@ bool SubtableColumnBase::SubtableMap::remove(Table* subtable) noexcept
 void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline) const noexcept
 {
     typedef _impl::TableFriend tf;
-    typedef entries::const_iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i)
-        tf::update_from_parent(*i->m_table, old_baseline);
+    for (const auto& entry : m_entries) {
+        tf::update_from_parent(*entry.m_table, old_baseline);
+    }
 }
 
 
@@ -206,11 +202,9 @@ void SubtableColumnBase::SubtableMap::update_accessors(const size_t* col_path_be
                                                        const size_t* col_path_end,
                                                        _impl::TableFriend::AccessorUpdater& updater)
 {
-    typedef entries::const_iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i) {
+    for (const auto& entry : m_entries) {
         // Must hold a counted reference while updating
-        TableRef table(i->m_table);
+        TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
         tf::update_accessors(*table, col_path_begin, col_path_end, updater);
     }
@@ -219,10 +213,8 @@ void SubtableColumnBase::SubtableMap::update_accessors(const size_t* col_path_be
 
 void SubtableColumnBase::SubtableMap::recursive_mark() noexcept
 {
-    typedef entries::const_iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i) {
-        TableRef table(i->m_table);
+    for (const auto& entry : m_entries) {
+        TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
         tf::recursive_mark(*table);
     }
@@ -231,14 +223,12 @@ void SubtableColumnBase::SubtableMap::recursive_mark() noexcept
 
 void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_parent)
 {
-    typedef entries::const_iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i) {
+    for (const auto& entry : m_entries) {
         // Must hold a counted reference while refreshing
-        TableRef table(i->m_table);
+        TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
         tf::set_shared_subspec_ndx_in_parent(*table, spec_ndx_in_parent);
-        tf::set_ndx_in_parent(*table, i->m_subtable_ndx);
+        tf::set_ndx_in_parent(*table, entry.m_subtable_ndx);
         if (tf::is_marked(*table)) {
             tf::refresh_accessor_tree(*table);
             bool bump_global = false;
