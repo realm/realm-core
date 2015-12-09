@@ -3934,8 +3934,9 @@ TableView Table::get_range_view(size_t begin, size_t end)
     TableView ctv(*this);
     if (m_columns.is_attached()) {
         IntegerColumn& refs = ctv.m_row_indexes;
-        for (size_t i = begin; i < end; ++i)
+        for (size_t i = begin; i < end; ++i) {
             refs.add(i);
+        }
     }
     return ctv;
 }
@@ -4272,8 +4273,10 @@ inline void out_datetime(std::ostream& out, DateTime value)
 inline void out_binary(std::ostream& out, const BinaryData bin)
 {
     const char* p = bin.data();
-    for (size_t i = 0; i < bin.size(); ++i)
+
+    for (size_t i = 0; i < bin.size(); ++i) {
         out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
+    }
 }
 
 template<class T>
@@ -4504,8 +4507,9 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
     widths.push_back(row_ndx_width);
 
     // Empty space over row numbers
-    for (size_t i = 0; i < row_ndx_width+1; ++i)
+    for (size_t i = 0; i < row_ndx_width + 1; ++i) {
         out << " ";
+    }
 
     // Write header
     for (size_t col = 0; col < column_count; ++col) {
