@@ -189,7 +189,10 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 if (t->get_column_count() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     DataType type = t->get_column_type(col_ndx);
-                    if (type != type_Float && type != type_Double && type != type_Link && type != type_LinkList && type != type_Table && type != type_Mixed && type != type_Binary) {
+                    bool supports_search_index = (type != type_Float && type != type_Double && type != type_Link &&
+                                                  type != type_LinkList && type != type_Table && type != type_Mixed &&
+                                                  type != type_Binary);
+                    if (supports_search_index) {
                         if (log) {
                             *log << "TableRef t = g.get_table(" << table_ndx << "); t->add_search_index(" << col_ndx << ");\n";
                         }
