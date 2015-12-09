@@ -23,8 +23,10 @@
 namespace realm {
 namespace util {
 
+// FIXME: Replace this with std::as_const when we switch over to C++17 by
+// default.
 template <class T>
-const T& as_const(const T& v)
+const T& as_const(const T& v) noexcept
 {
     return v;
 }
