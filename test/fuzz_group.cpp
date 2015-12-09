@@ -190,11 +190,10 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     DataType dt = t->get_column_type(col_ndx);
                     if (dt != type_Float && dt != type_Double && dt != type_Link && dt != type_LinkList && dt != type_Table && dt != type_Mixed && dt != type_Binary) {
-                        t->add_search_index(col_ndx);
-                        
                         if (log) {
                             *log << "TableRef t = g.get_table(" << table_ndx << "); t->add_search_index(" << col_ndx << ");\n";
                         }
+                        t->add_search_index(col_ndx);
                     }
                 }
             }
@@ -205,11 +204,10 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     // We don't need to check if the column is of a type that is indexable or if it has index on or off
                     // because Realm will just do a no-op at worst (no exception or assert).
-                    t->remove_search_index(col_ndx);
-
                     if (log) {
                         *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_search_index(" << col_ndx << ");\n";
                     }
+                    t->remove_search_index(col_ndx);
                 }
             }
             else if (instr == ADD_COLUMN_LINK && g.size() >= 1) {
@@ -255,10 +253,10 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
 
                     // With equal probability, either set to null or to a value
                     if (get_next(s) % 2 == 0 && t->is_nullable(c)) {
-                        t->set_null(c, r);
                         if (log) {
                             *log << "g.get_table(" << table_ndx << ")->set_null(" << c << ", " << r << ");\n";
                         }
+                        t->set_null(c, r);
                     }
                     else {
                         DataType d = t->get_column_type(c);
