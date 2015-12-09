@@ -909,7 +909,7 @@ bool SlabAlloc::is_all_free() const
             return false;
         if (slab_size != chunk->size)
             return false;
-        slab_ref = slab->ref_end;
+        slab_ref = slab.ref_end;
     }
     return true;
 }
@@ -936,7 +936,7 @@ void SlabAlloc::print() const
 
     size_t free = 0;
     for (auto&& free_block : as_const(m_free_space)) {
-        free += free_block.size();
+        free += free_block.size;
     }
 
     size_t allocated = allocated_for_slabs - free;
@@ -947,7 +947,7 @@ void SlabAlloc::print() const
         ref_type first_ref = m_baseline;
 
         for (auto&& slab : as_const(m_slabs)) {
-            if (slab != m_slabs.front())
+            if (&slab != &m_slabs.front())
                 std::cout << ", ";
 
             ref_type last_ref = slab.ref_end - 1;
@@ -962,7 +962,7 @@ void SlabAlloc::print() const
     if (!m_free_space.empty()) {
         std::cout << "FreeSpace: ";
         for (auto&& free_block : as_const(m_free_space)) {
-            if (free_block != m_free_space.front())
+            if (&free_block != &m_free_space.front())
                 std::cout << ", ";
 
             ref_type last_ref = free_block.ref + free_block.size - 1;
@@ -973,7 +973,7 @@ void SlabAlloc::print() const
     if (!m_free_read_only.empty()) {
         std::cout << "FreeSpace (ro): ";
         for (auto&& free_block : as_const(m_free_read_only)) {
-            if (free_block != m_free_read_only.front())
+            if (&free_block != &m_free_read_only.front())
                 std::cout << ", ";
 
             ref_type last_ref = free_block.ref + free_block.size - 1;
