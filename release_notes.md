@@ -1,3 +1,26 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Add `test_util::to_string()` for convenience. std::to_string() is not
+  available via all Android NDK toolchains.
+
+----------------------------------------------
+
 # 0.95.5 Release notes
 
 ### Bugfixes:

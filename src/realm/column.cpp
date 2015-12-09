@@ -15,7 +15,6 @@
 #include <realm/index_string.hpp>
 #include <realm/array_integer.hpp>
 
-using namespace std;
 using namespace realm;
 using namespace realm::util;
 
@@ -317,7 +316,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             size_t next_level_elems_per_child = m_max_elems_per_child;
             if (int_multiply_with_overflow_detect(next_level_elems_per_child,
                                                   REALM_MAX_BPNODE_SIZE))
-                throw runtime_error("Overflow in number of elements per child");
+                throw std::runtime_error("Overflow in number of elements per child");
             m_prev_parent_level.reset(new ParentLevel(alloc, m_out,
                                                       next_level_elems_per_child)); // Throws
         }
@@ -385,8 +384,8 @@ public:
         else {
             // Slice the leaf
             Allocator& slice_alloc = Allocator::get_default();
-            size_t begin = max(leaf_begin, m_begin);
-            size_t end   = min(leaf_end,   m_end);
+            size_t begin = std::max(leaf_begin, m_begin);
+            size_t end   = std::min(leaf_end,   m_end);
             size_t offset = begin - leaf_begin;
             size = end - begin;
             MemRef mem =
@@ -474,7 +473,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 {
     size_t rest_size = *rest_size_ptr;
     size_t orig_rest_size = rest_size;
-    size_t leaf_size = min(size_t(REALM_MAX_BPNODE_SIZE), rest_size);
+    size_t leaf_size = std::min(size_t(REALM_MAX_BPNODE_SIZE), rest_size);
     rest_size -= leaf_size;
     ref_type node = handler.create_leaf(leaf_size);
     size_t height = 1;
@@ -579,18 +578,18 @@ public:
     const ColumnBase& m_column;
     LeafToDot(const ColumnBase& column): m_column(column) {}
     void to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                ostream& out) override
+                std::ostream& out) override
     {
         m_column.leaf_to_dot(mem, parent, ndx_in_parent, out);
     }
 };
 
-void ColumnBaseSimple::tree_to_dot(ostream& out) const
+void ColumnBaseSimple::tree_to_dot(std::ostream& out) const
 {
     ColumnBase::bptree_to_dot(get_root_array(), out);
 }
 
-void ColumnBase::bptree_to_dot(const Array* root, ostream& out) const
+void ColumnBase::bptree_to_dot(const Array* root, std::ostream& out) const
 {
     LeafToDot handler(*this);
     root->bptree_to_dot(out, handler);
@@ -598,7 +597,7 @@ void ColumnBase::bptree_to_dot(const Array* root, ostream& out) const
 
 void ColumnBase::dump_node_structure() const
 {
-    do_dump_node_structure(cerr, 0);
+    do_dump_node_structure(std::cerr, 0);
 }
 
 namespace realm {
@@ -609,9 +608,9 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << setw(indent) << "" << "Integer leaf (ref: "<<leaf.get_ref()<<", "
+    out << std::setw(indent) << "" << "Integer leaf (ref: "<<leaf.get_ref()<<", "
         "size: "<<leaf.size()<<")\n";
-    ostringstream out_2;
+    std::ostringstream out_2;
     for (size_t i = 0; i != leaf.size(); ++i) {
         if (i != 0) {
             out_2 << ", ";
@@ -622,7 +621,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         }
         out_2 << leaf.get(i);
     }
-    out << setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
+    out << std::setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
 }
 
 } // namespace _impl
