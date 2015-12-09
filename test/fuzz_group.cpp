@@ -188,8 +188,8 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 TableRef t = g.get_table(table_ndx);
                 if (t->get_column_count() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
-                    DataType dt = t->get_column_type(col_ndx);
-                    if (dt != type_Float && dt != type_Double && dt != type_Link && dt != type_LinkList && dt != type_Table && dt != type_Mixed && dt != type_Binary) {
+                    DataType type = t->get_column_type(col_ndx);
+                    if (type != type_Float && type != type_Double && type != type_Link && type != type_LinkList && type != type_Table && type != type_Mixed && type != type_Binary) {
                         if (log) {
                             *log << "TableRef t = g.get_table(" << table_ndx << "); t->add_search_index(" << col_ndx << ");\n";
                         }
@@ -248,81 +248,81 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
                 if (t->get_column_count() > 0 && t->size() > 0) {
-                    size_t c = get_next(s) % t->get_column_count();
-                    size_t r = get_next(s) % t->size();
+                    size_t col_ndx = get_next(s) % t->get_column_count();
+                    size_t row_ndx = get_next(s) % t->size();
 
                     // With equal probability, either set to null or to a value
-                    if (get_next(s) % 2 == 0 && t->is_nullable(c)) {
+                    if (get_next(s) % 2 == 0 && t->is_nullable(col_ndx)) {
                         if (log) {
-                            *log << "g.get_table(" << table_ndx << ")->set_null(" << c << ", " << r << ");\n";
+                            *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx << ");\n";
                         }
-                        t->set_null(c, r);
+                        t->set_null(col_ndx, row_ndx);
                     }
                     else {
-                        DataType d = t->get_column_type(c);
-                        if (d == type_String) {
+                        DataType type = t->get_column_type(col_ndx);
+                        if (type == type_String) {
                             std::string str = create_string(get_next(s));
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_string(" << c << ", " << r << ", \"" << str << "\");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_string(" << col_ndx << ", " << row_ndx << ", \"" << str << "\");\n";
                             }
-                            t->set_string(c, r, str);
+                            t->set_string(col_ndx, row_ndx, str);
                         }
-                        else if (d == type_Binary) {
+                        else if (type == type_Binary) {
                             std::string str = create_string(get_next(s));
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_binary(" << c << ", " << r << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
                             }
-                            t->set_binary(c, r, BinaryData(str));
+                            t->set_binary(col_ndx, row_ndx, BinaryData(str));
                         }
-                        else if (d == type_Int) {
+                        else if (type == type_Int) {
                             int64_t value = get_int64(s);
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_int(" << c << ", " << r << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_int(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
-                            t->set_int(c, r, get_next(s));
+                            t->set_int(col_ndx, row_ndx, get_next(s));
                         }
-                        else if (d == type_DateTime) {
+                        else if (type == type_DateTime) {
                             DateTime value{ get_next(s) };
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_datetime(" << c << ", " << r << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_datetime(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
-                            t->set_datetime(c, r, value);
+                            t->set_datetime(col_ndx, row_ndx, value);
                         }
-                        else if (d == type_Bool) {
+                        else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_bool(" << c << ", " << r << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_bool(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
-                            t->set_bool(c, r, value);
+                            t->set_bool(col_ndx, row_ndx, value);
                         }
-                        else if (d == type_Float) {
+                        else if (type == type_Float) {
                             float value = get_next(s);
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_float(" << c << ", " << r << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_float(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
-                            t->set_float(c, r, value);
+                            t->set_float(col_ndx, row_ndx, value);
                         }
-                        else if (d == type_Double) {
+                        else if (type == type_Double) {
                             double value = get_next(s);
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_double(" << c << ", " << r << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_double(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
-                            t->set_double(c, r, value);
+                            t->set_double(col_ndx, row_ndx, value);
                         }
-                        else if (d == type_Link) {
-                            TableRef target = t->get_link_target(c);
+                        else if (type == type_Link) {
+                            TableRef target = t->get_link_target(col_ndx);
                             if (target->size() > 0) {
                                 size_t target_row = get_next(s) % target->size();
                                 if (log) {
-                                    *log << "g.get_table(" << table_ndx << ")->set_link(" << c << ", " << r << ", " << target_row << ");\n";
+                                    *log << "g.get_table(" << table_ndx << ")->set_link(" << col_ndx << ", " << row_ndx << ", " << target_row << ");\n";
                                 }
-                                t->set_link(c, r, target_row);
+                                t->set_link(col_ndx, row_ndx, target_row);
                             }
                         }
-                        else if (d == type_LinkList) {
-                            TableRef target = t->get_link_target(c);
+                        else if (type == type_LinkList) {
+                            TableRef target = t->get_link_target(col_ndx);
                             if (target->size() > 0) {
-                                LinkViewRef links = t->get_linklist(c, r);
+                                LinkViewRef links = t->get_linklist(col_ndx, row_ndx);
 
                                 // either add or set, 50/50 probability
                                 if (links->size() > 0 && get_next(s) > 128) {
