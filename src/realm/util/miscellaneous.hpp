@@ -23,7 +23,7 @@
 namespace realm {
 namespace util {
 
-template <typename T>
+template <class T>
 const T& as_const(const T& v)
 {
     return v;
