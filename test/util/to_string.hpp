@@ -17,25 +17,26 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef REALM_TEST_UTIL_TEST_ONLY_HPP
-#define REALM_TEST_UTIL_TEST_ONLY_HPP
+#ifndef REALM_TEST_UTIL_TO_STRING_HPP
+#define REALM_TEST_UTIL_TO_STRING_HPP
 
-#include "unit_test.hpp"
-
-#define ONLY(name) \
-    realm::test_util::SetTestOnly realm_set_test_only__##name(#name); \
-    TEST(name)
+#include <locale>
+#include <string>
+#include <sstream>
 
 namespace realm {
 namespace test_util {
 
-struct SetTestOnly {
-    SetTestOnly(const char* test_name);
-};
-
-const char* get_test_only();
+template<class T> std::string to_string(const T& v)
+{
+    std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    out << v; // Throws
+    return out.str();
+}
 
 } // namespace test_util
 } // namespace realm
 
-#endif // REALM_TEST_UTIL_TEST_ONLY_HPP
+#endif // REALM_TEST_UTIL_TO_STRING_HPP
