@@ -62,7 +62,7 @@ extern uint64_t unit_test_random_seed;
 
 
 namespace {
-    
+
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 REALM_TABLE_4(TestTableGroup,

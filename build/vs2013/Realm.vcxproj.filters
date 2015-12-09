@@ -117,6 +117,7 @@
     <ClCompile Include="..\..\src\realm\disable_sync_to_disk.cpp" />
     <ClCompile Include="..\..\test\test_priority_queue.cpp" />
     <ClCompile Include="..\..\test\fuzz_group.cpp" />
+    <ClCompile Include="..\..\test\fuzzy\afl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
