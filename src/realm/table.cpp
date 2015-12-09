@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include <realm/util/features.h>
+#include <realm/util/miscellaneous.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
@@ -441,7 +442,7 @@ DescriptorRef Table::get_subdescriptor(const path_vec& path)
 {
     DescriptorRef desc = get_descriptor(); // Throws
 
-    for (const auto& path_part : path) {
+    for (auto&& path_part : as_const(path)) {
         desc = desc->get_subdescriptor(path_part); // Throws
     }
 
@@ -1321,7 +1322,7 @@ void Table::move_registered_view(const TableViewBase* old_addr,
 void Table::discard_views() noexcept
 {
     LockGuard lock(m_accessor_mutex);
-    for (const auto& view : m_views) {
+    for (auto&& view : as_const(m_views)) {
         view->detach();
     }
     m_views.clear();

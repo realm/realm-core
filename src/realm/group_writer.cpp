@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 
+#include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group_shared.hpp>
@@ -185,7 +186,7 @@ ref_type GroupWriter::write_group()
     // clobering the previous database version. Note, however, that this risk
     // would only have been present in the non-transactionl case where there is
     // no version tracking on the free-space chunks.
-    for (const auto& free_space : new_free_space) {
+    for (auto&& free_space : as_const(new_free_space)) {
         ref_type ref = free_space.ref;
         size_t size  = free_space.size;
         // We always want to keep the list of free space in sorted order (by
