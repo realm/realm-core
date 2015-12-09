@@ -96,49 +96,49 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 }
             }
             else if (instr == INSERT_TABLE && g.size() < max_tables) {
-                size_t s0 = get_next(s) % (g.size() + 1);
-                std::string sd0 = create_string(get_next(s) % (Group::max_table_name_length - 10) + 5);
+                size_t table_ndx = get_next(s) % (g.size() + 1);
+                std::string name = create_string(get_next(s) % (Group::max_table_name_length - 10) + 5);
                 if (log) {
-                    *log << "g.insert_table(" << s0 << ", \"" << sd0 << "\");\n";
+                    *log << "g.insert_table(" << table_ndx << ", \"" << name << "\");\n";
                 }
-                g.insert_table(s0, sd0);
+                g.insert_table(table_ndx, name);
             }
             else if (instr == REMOVE_TABLE && g.size() > 0) {
-                size_t idx = get_next(s) % g.size();
+                size_t table_ndx = get_next(s) % g.size();
                 if (log) {
-                    *log << "g.remove_table(" << idx << ");\n";
+                    *log << "g.remove_table(" << table_ndx << ");\n";
                 }
                 try {
-                    g.remove_table(idx);
+                    g.remove_table(table_ndx);
                 }
                 catch (const CrossTableLinkTarget&) {
                 }
             }
             else if (instr == CLEAR_TABLE && g.size() > 0) {
-                size_t idx = get_next(s) % g.size();
+                size_t table_ndx = get_next(s) % g.size();
                 if (log) {
-                    *log << "g.get_table(" << idx << ")->clear();\n";
+                    *log << "g.get_table(" << table_ndx << ")->clear();\n";
                 }
-                g.get_table(idx)->clear();
+                g.get_table(table_ndx)->clear();
             }
             else if (instr == MOVE_TABLE && g.size() >= 2) {
-                size_t t1 = get_next(s) % g.size();
-                size_t t2 = get_next(s) % g.size();
-                if (t1 != t2) {
+                size_t from_ndx = get_next(s) % g.size();
+                size_t to_ndx = get_next(s) % g.size();
+                if (from_ndx != to_ndx) {
                     if (log) {
-                        *log << "g.move_table(" << t1 << ", " << t2 << ");\n";
+                        *log << "g.move_table(" << from_ndx << ", " << to_ndx << ");\n";
                     }
-                    g.move_table(t1, t2);
+                    g.move_table(from_ndx, to_ndx);
                 }
             }
             else if (instr == INSERT_ROW && g.size() > 0) {
-                size_t table_idx = get_next(s) % g.size();
-                size_t row_ndx = get_next(s) % (g.get_table(table_idx)->size() + 1);
+                size_t table_ndx = get_next(s) % g.size();
+                size_t row_ndx = get_next(s) % (g.get_table(table_ndx)->size() + 1);
                 size_t num_rows = get_next(s);
                 if (log) {
-                    *log << "g.get_table(" << table_idx << ")->insert_empty_row(" << row_ndx << ", " << num_rows % add_empty_row_max << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->insert_empty_row(" << row_ndx << ", " << num_rows % add_empty_row_max << ");\n";
                 }
-                g.get_table(table_idx)->insert_empty_row(row_ndx, num_rows % add_empty_row_max);
+                g.get_table(table_ndx)->insert_empty_row(row_ndx, num_rows % add_empty_row_max);
             }
             else if (instr == ADD_EMPTY_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
