@@ -121,6 +121,7 @@ TEST(Alloc_AttachFile)
     }
 }
 
+
 // FIXME: Fails on Windows
 #ifndef _MSC_VER
 TEST(Alloc_BadFile)
@@ -154,6 +155,7 @@ TEST(Alloc_BadFile)
     }
 }
 #endif
+
 
 TEST(Alloc_AttachBuffer)
 {

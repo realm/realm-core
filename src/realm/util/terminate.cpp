@@ -123,7 +123,6 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line) 
 {
     std::stringstream ss;
     ss << file << ":" << line << ": " REALM_VER_CHUNK " " << message << '\n';
-
     terminate_internal(ss);
 }
 // LCOV_EXCL_STOP
