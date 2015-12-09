@@ -29,6 +29,8 @@ using namespace realm;
 using namespace realm::util;
 using namespace std;
 
+extern uint64_t unit_test_random_seed;
+
 // Test independence and thread-safety
 // -----------------------------------
 //
@@ -60,7 +62,7 @@ using namespace std;
 
 
 namespace {
-
+    
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 REALM_TABLE_4(TestTableGroup,
@@ -2303,7 +2305,7 @@ TEST(Group_Fuzzy)
         // Number of instructions in each test
         const size_t instructions = 100;
 
-        fastrand(time(0), true); // seed
+        fastrand(unit_test_random_seed, true); // seed
         for (size_t counter = 0; counter < iterations; counter++)
         {
             instr = "";

@@ -33,6 +33,10 @@ using namespace realm::util;
 using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
+// Random seed for various random number generators used by fuzzying unit tests. FIXME: Only
+// fastrand() is using this constant so far. Make unit tests that use random.cpp use it too.
+// It is initialized in 
+uint64_t unit_test_random_seed;
 
 namespace {
 
@@ -161,20 +165,21 @@ void display_build_config()
 
     std::cout <<
         "\n"
-        "Realm version: "<<Version::get_version()<<"\n"
-        "  with Debug "<<with_debug<<"\n"
+        "Realm version: " << Version::get_version() << "\n"
+        "  with Debug " << with_debug << "\n"
         "\n"
-        "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
+        "REALM_MAX_BPNODE_SIZE = " << REALM_MAX_BPNODE_SIZE << "\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
-        "sizeof (size_t) * 8 = " << (sizeof (size_t) * 8) << "\n"
+        "sizeof (size_t) * 8 = " << (sizeof(size_t) * 8) << "\n"
         "\n"
-        "Compiler supported SSE (auto detect):       "<<compiler_sse<<"\n"
-        "This CPU supports SSE (auto detect):        "<<cpu_sse<<"\n"
-        "Compiler supported AVX (auto detect):       "<<compiler_avx<<"\n"
-        "This CPU supports AVX (AVX1) (auto detect): "<<cpu_avx<<"\n"
-        "\n";
+        "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
+        "This CPU supports SSE (auto detect):        " << cpu_sse << "\n"
+        "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
+        "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
+        "\n"
+        "Unit test random seed:                      " << unit_test_random_seed << "\n";
 }
 
 
@@ -295,7 +300,11 @@ bool run_tests()
     }
     else {
         const char* str = getenv("UNITTEST_PROGRESS");
+#ifdef _MSC_VER
+        bool report_progress = true;
+#else
         bool report_progress = str && strlen(str) != 0;
+#endif
         reporter.reset(new CustomReporter(report_progress));
     }
 
@@ -366,6 +375,10 @@ int test_all(int argc, char* argv[])
     set_test_resource_path("../../test/");
     set_test_path_prefix("../../test/");
 #endif
+
+    // See description at its definition. You can set this variable to a constant instead of
+    // time(0) to reproduce a crash that happend with a specific seed.
+    unit_test_random_seed = time(0);
 
     fix_max_open_files();
     fix_async_daemon_path();

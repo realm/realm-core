@@ -1188,6 +1188,7 @@
     <ClInclude Include="..\..\src\realm\version.hpp" />
     <ClInclude Include="..\..\src\realm\views.hpp" />
     <ClInclude Include="..\..\src\win32\pthread\pthread.h" />
+    <ClInclude Include="..\..\test\test.hpp" />
     <ClInclude Include="..\..\test\util\jsmn.hpp" />
     <ClInclude Include="..\..\test\util\verified_integer.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
