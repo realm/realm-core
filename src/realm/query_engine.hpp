@@ -1281,7 +1281,7 @@ public:
         m_was_match.resize(m_conditions.size(), false);
 
         std::vector<ParentNode*> v;
-        for (auto& condition : m_conditions) {
+        for (auto&& condition : m_conditions) {
             condition->init(table);
             v.clear();
             condition->gather_children(v);

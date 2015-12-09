@@ -1014,7 +1014,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
         update_backlink_columns.emplace_back(target_table, backlink_col_ndx, new_col_ndx); // Throws
     }
 
-    for (auto& t: update_backlink_columns) {
+    for (auto&& t : update_backlink_columns) {
         Spec& target_spec = std::get<0>(t)->m_spec;
         target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
     }
@@ -4972,14 +4972,14 @@ void Table::adj_acc_clear_root_table() noexcept
 
     discard_row_accessors();
 
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->adj_acc_clear_root_table();
+    for (auto&& column : m_cols) {
+        if (column != nullptr) {
+            column->adj_acc_clear_root_table();
+        }
     }
 
     // Adjust rows in tableviews after removal of all rows
-    for (auto& view : m_views) {
+    for (auto&& view : m_views) {
         view->adj_row_acc_clear();
     }
 }
