@@ -182,6 +182,8 @@ template<class T>
 class BasicRowExpr:
         public RowFuncs<T, BasicRowExpr<T>> {
 public:
+    BasicRowExpr() noexcept;
+
     template<class U>
     BasicRowExpr(const BasicRowExpr<U>&) noexcept;
 
@@ -647,6 +649,13 @@ inline size_t RowFuncs<T,R>::row_ndx() const noexcept
     return static_cast<const R*>(this)->impl_get_row_ndx();
 }
 
+
+template<class T>
+inline BasicRowExpr<T>::BasicRowExpr() noexcept:
+    m_table(0),
+    m_row_ndx(0)
+{
+}
 
 template<class T>
 template<class U>

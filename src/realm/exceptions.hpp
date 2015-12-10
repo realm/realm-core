@@ -152,17 +152,6 @@ public:
         // Indicates that an involved column lacks a search index.
         no_search_index,
 
-        // Indicates that an involved table lacks a primary key.
-        no_primary_key,
-
-        // Indicates that an attempt was made to add a primary key to a table that
-        // already had a primary key.
-        has_primary_key,
-
-        /// Indicates that a modification to a column was attempted that cannot
-        /// be done because the column is the primary key of the table.
-        is_primary_key,
-
         /// Indicates that a modification was attempted that would have produced a
         /// duplicate primary value.
         unique_constraint_violation,

@@ -46,12 +46,6 @@ const char* LogicError::what() const noexcept
             return "Target table row index out of range";
         case no_search_index:
             return "Column has no search index";
-        case no_primary_key:
-            return "Table has no primary key";
-        case is_primary_key:
-            return "Column is the primary key of the table";
-        case has_primary_key:
-            return "Primary key already added";
         case unique_constraint_violation:
             return "Unique constraint violation";
         case column_not_nullable:

@@ -714,7 +714,7 @@ template<Action action, typename T, typename R, class ColType>
             *resultcount = limit < (end - start) ? limit : (end - start);
         }
         // direct aggregate on the column
-        return (column.*aggregateMethod)(start, end, limit, return_ndx);
+        return (column.*aggregateMethod)(start, end, limit, action == act_Sum ? resultcount : return_ndx);
     }
     else {
 
