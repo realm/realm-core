@@ -408,7 +408,7 @@ inline void SubtableColumnBase::SubtableMap::add(size_t subtable_ndx, Table* tab
 template<bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
-    for (auto&& entry : m_entries) {
+    for (auto& entry : m_entries) {
         if (entry.m_subtable_ndx >= row_ndx) {
             entry.m_subtable_ndx += num_rows_inserted;
             typedef _impl::TableFriend tf;
@@ -489,7 +489,7 @@ template<bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     using tf = _impl::TableFriend;
-    for (auto&& entry : m_entries) {
+    for (auto& entry : m_entries) {
         if (REALM_UNLIKELY(entry.m_subtable_ndx == row_ndx_1)) {
             entry.m_subtable_ndx = row_ndx_2;
             if (fix_ndx_in_parent)

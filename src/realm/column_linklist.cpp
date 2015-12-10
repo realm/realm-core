@@ -404,7 +404,7 @@ void LinkListColumn::to_json_row(size_t row_ndx, std::ostream& out) const
 void LinkListColumn::discard_child_accessors() noexcept
 {
     validate_list_accessors();
-    for (auto&& entry : m_list_accessors) {
+    for (auto& entry : m_list_accessors) {
         if (entry.m_list)
             entry.m_list->detach();
     }
@@ -418,7 +418,7 @@ void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 
     LinkColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     m_column_ndx = col_ndx;
-    for (auto&& entry : m_list_accessors)
+    for (auto& entry : m_list_accessors)
         entry.m_list->refresh_accessor_tree(entry.m_row_ndx);
 }
 
@@ -616,7 +616,7 @@ void LinkListColumn::update_from_parent(size_t old_baseline) noexcept
 
     prune_list_accessor_tombstones();
 
-    for (auto&& list_accessor : m_list_accessors) {
+    for (auto& list_accessor : m_list_accessors) {
         list_accessor.m_list->update_from_parent(old_baseline);
     }
 }

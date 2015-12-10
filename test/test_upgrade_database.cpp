@@ -742,13 +742,13 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
 
     util::Thread t[10];
 
-    for (auto&& tt : t) {
+    for (auto& tt : t) {
         tt.start([&]() {
             SharedGroup sg(temp_copy);
         });
     }
 
-    for (auto&& tt : t)
+    for (auto& tt : t)
         tt.join();
 }
 

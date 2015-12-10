@@ -76,7 +76,7 @@ void Descriptor::detach() noexcept
 void Descriptor::detach_subdesc_accessors() noexcept
 {
     if (!m_subdesc_map.empty()) {
-        for (auto&& subdesc : as_const(m_subdesc_map)) {
+        for (auto& subdesc : as_const(m_subdesc_map)) {
             // Must hold a reliable reference count while detaching
             DescriptorRef desc(subdesc.m_subdesc);
             desc->detach();
@@ -112,7 +112,7 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const noexce
         const Descriptor* parent = desc->m_parent.get();
         size_t column_ndx = not_found;
 
-        for (auto&& subdesc : as_const(parent->m_subdesc_map)) {
+        for (auto& subdesc : as_const(parent->m_subdesc_map)) {
             if (subdesc.m_subdesc == desc) {
                 column_ndx = subdesc.m_column_ndx;
                 break;
@@ -130,7 +130,7 @@ Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
 
-    for (auto&& subdesc : as_const(m_subdesc_map)) {
+    for (auto& subdesc : as_const(m_subdesc_map)) {
         if (subdesc.m_column_ndx == column_ndx)
             return subdesc.m_subdesc;
     }
@@ -143,7 +143,7 @@ void Descriptor::adj_insert_column(size_t col_ndx) noexcept
 {
     // Adjust the column indexes of subdescriptor accessors at higher
     // column indexes.
-    for (auto&& subdesc : m_subdesc_map) {
+    for (auto& subdesc : m_subdesc_map) {
         if (subdesc.m_column_ndx >= col_ndx)
             ++subdesc.m_column_ndx;
     }
@@ -175,7 +175,7 @@ void Descriptor::adj_erase_column(size_t col_ndx) noexcept
 
 void Descriptor::adj_move_column(size_t from, size_t to) noexcept
 {
-    for (auto&& subdesc : m_subdesc_map) {
+    for (auto& subdesc : m_subdesc_map) {
         if (subdesc.m_column_ndx == from) {
             subdesc.m_column_ndx = to;
         }

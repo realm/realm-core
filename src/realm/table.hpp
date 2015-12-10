@@ -1401,7 +1401,7 @@ inline void Table::bump_version(bool bump_global) const noexcept
         if (const Table* parent = get_parent_table_ptr())
             parent->bump_version(false);
         // Recurse through linked tables, use m_mark to avoid infinite recursion
-        for (auto&& column : m_cols) {
+        for (auto& column : m_cols) {
             // We may meet a null pointer in place of a backlink column, pending
             // replacement with a new one. This can happen ONLY when creation of
             // the corresponding forward link column in the origin table is
