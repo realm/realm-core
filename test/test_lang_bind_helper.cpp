@@ -9321,6 +9321,7 @@ TEST(LangBindHelper_HandoverLinkView)
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<LinkView> > handover;
+    std::unique_ptr<SharedGroup::Handover<LinkView> > handover2;
     SharedGroup::VersionID vid;
     {
 
@@ -9363,11 +9364,37 @@ TEST(LangBindHelper_HandoverLinkView)
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
         handover = sg_w.export_linkview_for_handover(lvr);
+        handover2 = sg_w.export_linkview_for_handover(lvr);
     }
     {
         LangBindHelper::advance_read(sg, *hist, vid);
-        sg_w.close();
+        // sg_w.close();
         LinkViewRef lvr = sg.import_linkview_from_handover(move(handover)); // <-- import lvr
+        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+
+        // q.m_table = table1
+        // q.m_view = lvr
+        TableRef table1 = group.get_table("table1");
+        Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+
+        // tv.m_table == table1
+        TableView tv;
+        tv = q.find_all(); // tv = { 0, 2 }
+
+
+        CHECK_EQUAL(2, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        CHECK_EQUAL(2, tv.get_source_ndx(1));
+    }
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        // Change table1 and verify that the change does not propagate through the handed-over linkview
+        TableRef table1 = group_w.get_table("table1");
+        table1->set_int(0,0,50);
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+    }
+    {
+        LinkViewRef lvr = sg.import_linkview_from_handover(move(handover2)); // <-- import lvr
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
         // q.m_table = table1
@@ -9548,7 +9575,8 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
 
     {
-      realm::Query query = table1->where().and_query(table1->link(col_link2).column<String>(1) == "nabil");
+        realm::Query query = table1->link(col_link2).column<String>(1) == "nabil";
+        //realm::Query query = table1->where().and_query(table1->link(col_link2).column<String>(1) == "nabil");
       handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
       handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
     }
