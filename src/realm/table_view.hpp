@@ -332,10 +332,8 @@ protected:
     // If this TableView was created from a LinkView, then this reference points to it. Otherwise it's 0
     mutable ConstLinkViewRef m_linkview_source;
 
-    mutable uint_fast64_t m_last_seen_version;
-
     // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
-    size_t m_distinct_column_source;
+    size_t m_distinct_column_source = npos;
 
     // If m_distinct_columns.size() > 0, it means that this TableView has had called TableView::distinct() and
     // must only contain unique rows with respect to that column set of the parent table
@@ -353,6 +351,8 @@ protected:
     size_t m_start;
     size_t m_end;
     size_t m_limit;
+
+    mutable uint_fast64_t m_last_seen_version = 0;
 
     size_t m_num_detached_refs = 0;
     /// Construct null view (no memory allocated).
@@ -760,10 +760,7 @@ inline size_t TableViewBase::find_by_source_ndx(size_t source_ndx) const noexcep
 }
 
 inline TableViewBase::TableViewBase():
-    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), // Throws
-    m_last_seen_version(0),
-    m_distinct_column_source(npos),
-    m_auto_sort(false)
+    RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()) // Throws
 {
     ref_type ref = IntegerColumn::create(m_row_indexes.get_alloc()); // Throws
     m_row_indexes.get_root_array()->init_from_ref(ref);
@@ -772,10 +769,8 @@ inline TableViewBase::TableViewBase():
 inline TableViewBase::TableViewBase(Table* parent):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
-    m_last_seen_version(m_table ? m_table->m_version : 0),
-    m_distinct_column_source(npos),
-    m_auto_sort(false)
-    {
+    m_last_seen_version(m_table ? m_table->m_version : 0)
+{
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
     // a free-standing container, and beause `IntegerColumn` does not conform to the
     // RAII idiom (nor should it).
@@ -789,13 +784,11 @@ inline TableViewBase::TableViewBase(Table* parent):
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()), // Throws
     m_table(parent->get_table_ref()),
-    m_last_seen_version(m_table ? m_table->m_version : 0),
-    m_distinct_column_source(npos),
-    m_auto_sort(false),
     m_query(query),
     m_start(start),
     m_end(end),
-    m_limit(limit)
+    m_limit(limit),
+    m_last_seen_version(outside_version())
 {
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
     // a free-standing container, and beause `IntegerColumn` does not conform to the
@@ -813,9 +806,7 @@ inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t c
     m_linked_table(linked_table->get_table_ref()), // Throws
     m_linked_column(column),
     m_linked_row(row_ndx),
-    m_last_seen_version(m_table ? m_table->m_version : 0),
-    m_distinct_column_source(npos),
-    m_auto_sort(false)
+    m_last_seen_version(m_table ? m_table->m_version : 0)
 {
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
     // a free-standing container, and beause `IntegerColumn` does not conform to the
@@ -834,7 +825,6 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(tv.m_linkview_source),
-    m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
     m_distinct_columns(std::move(tv.m_distinct_columns)),
     m_sorting_predicate(std::move(tv.m_sorting_predicate)),
@@ -843,6 +833,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_start(tv.m_start),
     m_end(tv.m_end),
     m_limit(tv.m_limit),
+    m_last_seen_version(tv.m_last_seen_version),
     m_num_detached_refs(tv.m_num_detached_refs)
     {
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
@@ -864,9 +855,6 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(std::move(tv.m_linkview_source)),
-    // if we are created from a table view which is outdated, take care to use the outdated
-    // version number so that we can later trigger a sync if needed.
-    m_last_seen_version(tv.m_last_seen_version),
     m_distinct_column_source(tv.m_distinct_column_source),
     m_distinct_columns(std::move(tv.m_distinct_columns)),
     m_sorting_predicate(std::move(tv.m_sorting_predicate)),
@@ -875,6 +863,9 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     m_start(tv.m_start),
     m_end(tv.m_end),
     m_limit(tv.m_limit),
+    // if we are created from a table view which is outdated, take care to use the outdated
+    // version number so that we can later trigger a sync if needed.
+    m_last_seen_version(tv.m_last_seen_version),
     m_num_detached_refs(tv.m_num_detached_refs)
 {
     if (m_table)
