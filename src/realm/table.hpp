@@ -366,11 +366,6 @@ public:
     /// may also cause linked rows to be cascade-removed, but in this respect,
     /// the effect is exactly as if each row had been removed individually. See
     /// Descriptor::set_link_type() for details.
-    ///
-    /// It is an error to call add_empty_row() or insert_empty_row() on a table
-    /// with a primary key, if that would result in a violation the implied
-    /// *unique constraint* of the primary key. The consequenses of doing so are
-    /// unspecified.
 
     size_t add_empty_row(size_t num_rows = 1);
     void insert_empty_row(size_t row_ndx, size_t num_rows = 1);
@@ -379,7 +374,19 @@ public:
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
-
+    //@}
+    
+    //@{
+    /// Replaces all links to \a row_ndx with links to \a replacement_row_ndx.
+    ///
+    /// replace_row_and_move_last_over() replaces all links to one row with another
+    /// and removes the replaced row without traversing the database for links a
+    /// second time. The operation assumes that the table is unordered, and it may
+    /// therefore be used on tables with link columns.
+    ///
+    /// \sa{Table::move_last_over}
+    void replace_row(size_t row_ndx, size_t replacement_row_ndx);
+    void replace_row_and_move_last_over(size_t row_ndx, size_t replacement_row_ndx);
     //@}
 
     // Get cell values

@@ -6504,5 +6504,55 @@ TEST(Table_MixedCrashValues)
 }
 
 
+TEST(Table_ReplaceRow_Links)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("t0");
+    TableRef t1 = g.add_table("t1");
+    t0->add_column_link(type_Link, "link", *t1);
+    t1->add_column(type_Int, "int");
+    t0->add_empty_row(10);
+    t1->add_empty_row(10);
+    for (int i = 0; i < 10; ++i) {
+        t0->set_link(0, i, i);
+        t1->set_int(0, i, i);
+    }
+
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
+    t1->replace_row(0, 9);
+    CHECK_EQUAL(t0->get_link(0, 0), 9);
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
+}
+
+
+TEST(Table_ReplaceRow_LinkLists)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("t0");
+    TableRef t1 = g.add_table("t1");
+    t0->add_column_link(type_LinkList, "linklist", *t1);
+    t1->add_column(type_Int, "int");
+    t0->add_empty_row(10);
+    t1->add_empty_row(10);
+    for (int i = 0; i < 10; ++i) {
+        auto links = t0->get_linklist(0, i);
+        links->add(i);
+        links->add((i + 1) % 10);
+        t1->set_int(0, i, i);
+    }
+
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
+    t1->replace_row(0, 9);
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->get(1).get_index(), 1);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->size(), 2);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->get(0).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
+}
+
 
 #endif // TEST_TABLE
