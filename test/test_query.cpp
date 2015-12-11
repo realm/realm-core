@@ -7855,6 +7855,65 @@ TEST(Query_DeepLink)
     CHECK_EQUAL(N, view.size());
 }
 
+TEST(Query_ResultsPostDelete)
+{
+    Group group;
+    
+    TableRef dog = group.add_table("dog");
+    TableRef breeder = group.add_table("breeder");
+    
+    size_t col_breeders = dog->add_column_link(type_LinkList, "breeders", *breeder);
+    size_t col_id = breeder->add_column(type_Int, "id");
+    
+    breeder->add_empty_row();
+    size_t breeder_row = 0;
+    breeder->set_int(col_id, breeder_row, 0);
+    
+    ConstRow row = dog->get_link_target(col_breeders)->get(0);
+    Query q = dog->where().links_to(col_breeders, row);
+    
+    dog->add_empty_row();
+    breeder->move_last_over(breeder_row);
+
+    CHECK_EQUAL(0, q.count());
+}
+
+TEST(Query_ResultsPostDelete_MovedItems)
+{
+    Group group;
+    
+    TableRef dog = group.add_table("dog");
+    TableRef breeder = group.add_table("breeder");
+    
+    size_t col_breeder = dog->add_column_link(type_Link, "breeder", *breeder);
+    size_t col_id = breeder->add_column(type_Int, "id");
+    
+    breeder->add_empty_row();
+    size_t breeder_row = 0;
+    breeder->set_int(col_id, breeder_row, 0);
+
+    ConstTableRef target_table = dog->get_link_target( col_breeder );
+    
+    breeder->add_empty_row();
+    size_t second_breeder_row = 1;
+    breeder->set_int(col_id, second_breeder_row, 1);
+    
+    Query q = dog->where().links_to(col_breeder, target_table->get(0));
+    
+    dog->add_empty_row();
+    size_t dog_row = 0;
+    dog->set_link(col_breeder, dog_row, breeder_row);
+    
+    dog->add_empty_row();
+    size_t second_dog_row = 0;
+    dog->set_link(col_breeder, second_dog_row, second_breeder_row);
+
+    breeder->move_last_over(breeder_row);
+
+    size_t count = q.count();
+    CHECK_EQUAL(0, count);
+}
+
 // Triggers bug in compare_relation()
 TEST(Query_BrokenFindGT)
 {

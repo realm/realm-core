@@ -42,6 +42,7 @@
 #include <realm/handover_defs.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/descriptor_fwd.hpp>
+#include <realm/row.hpp>
 
 namespace realm {
 
@@ -95,7 +96,7 @@ public:
     Query& operator=(Query&&);
 
     // Find links that point to a specific target row
-    Query& links_to(size_t column_ndx, size_t target_row);
+    Query& links_to(size_t column_ndx, const ConstRow& target_row);
 
     // Conditions: null
     Query& equal(size_t column_ndx, null);

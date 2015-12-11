@@ -1598,11 +1598,11 @@ public:
     util::SharedPtr<Expression> m_compare;
 };
 
-
 class LinksToNode : public ParentNode {
 public:
-    LinksToNode(size_t origin_column_index, size_t target_row) : m_origin_column(origin_column_index),
-                                                                 m_target_row(target_row)
+    LinksToNode(size_t origin_column_index, const ConstRow& target_row) :
+        m_origin_column(origin_column_index),
+        m_target_row(target_row)
     {
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1620,24 +1620,27 @@ public:
         size_t ret = realm::npos; // superfluous init, but gives warnings otherwise
         DataType type = m_table->get_column_type(m_origin_column);
 
+        if(m_target_row.is_attached() == false)
+            return realm::npos;
+
         if (type == type_Link) {
             LinkColumnBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
             LinkColumn& cl = static_cast<LinkColumn&>(clb);
-            ret = cl.find_first(m_target_row + 1, start, end); // LinkColumn stores link to row N as the integer N + 1
+            ret = cl.find_first(m_target_row.get_index() + 1, start, end); // LinkColumn stores link to row N as the integer N + 1
         }
         else if (type == type_LinkList) {
             LinkColumnBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
             LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
+
             for (size_t i = start; i < end; i++) {
                 LinkViewRef lv = cll.get(i);
-                ret = lv->find(m_target_row);
+                ret = lv->find(m_target_row.get_index());
                 if (ret != not_found)
                     return i;
             }
         }
-        else {
+        else
             REALM_ASSERT(false);
-        }
 
         return ret;
     }
@@ -1648,9 +1651,8 @@ public:
     }
 
     size_t m_origin_column;
-    size_t m_target_row;
+    const ConstRow m_target_row;
 };
-
 
 } // namespace realm
 
