@@ -10071,4 +10071,50 @@ TEST(LangBindHelper_Compact)
     }
 }
 
+TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction w(sg_w);
+        TableRef table = w.add_table("test");
+        table->add_column(type_Double, "double");
+        table->add_empty_row(3);
+        table->set_double(0, 0, 1234);
+        table->set_double(0, 1, -5678);
+        table->set_double(0, 2, 1000);
+        w.commit();
+    }
+
+    std::unique_ptr<ClientHistory> hist_r(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    ReadTransaction r(sg_r);
+    ConstTableRef table_r = r.get_table("test");
+
+    TableView view = table_r->where().find_all();
+
+    {
+        WriteTransaction w(sg_w);
+        w.get_table("test")->clear();
+        w.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r, *hist_r);
+
+    CHECK_EQUAL(false, view.is_in_sync());
+    size_t ndx = not_found;
+    double min = view.minimum_double(0, &ndx);
+    CHECK_EQUAL(0, min);
+    CHECK_EQUAL(not_found, ndx);
+
+    view.sync_if_needed();
+
+    ndx = not_found;
+    min = view.minimum_double(0, &ndx);
+    CHECK_EQUAL(0, min);
+    CHECK_EQUAL(not_found, ndx);
+}
+
 #endif
