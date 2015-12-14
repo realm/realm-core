@@ -140,6 +140,27 @@ void fix_async_daemon_path()
 #endif // _WIN32
 }
 
+void set_random_seed()
+{
+    // Select random seed for the random generator that some of our unit tests are using
+    unit_test_random_seed = 1234567;
+    const char* str = getenv("UNITTEST_RANDOM_SEED");
+    if (str && strlen(str) != 0) {
+        if (strcmp(str, "random") == 0) {
+            unit_test_random_seed = produce_nondeterministic_random_seed();
+        }
+        else {
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+            in >> unit_test_random_seed;
+            bool bad = !in || in.get() != std::char_traits<char>::eof();
+            if (bad)
+                throw std::runtime_error("Bad random seed");
+        }
+        random_seed(unit_test_random_seed);
+    }
+}
 
 void display_build_config()
 {
@@ -179,7 +200,8 @@ void display_build_config()
         "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
         "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
         "\n"
-        "Unit test random seed:                      " << unit_test_random_seed << "\n";
+        "Unit test random seed:                      " << unit_test_random_seed << "\n"
+        "\n";
 }
 
 
@@ -253,27 +275,6 @@ private:
 
 bool run_tests()
 {
-    {
-        const char* str = getenv("UNITTEST_RANDOM_SEED");
-        if (str && strlen(str) != 0) {
-            unsigned long seed;
-            if (strcmp(str, "random") == 0) {
-                seed = produce_nondeterministic_random_seed();
-            }
-            else {
-                std::istringstream in(str);
-                in.imbue(std::locale::classic());
-                in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-                in >> seed;
-                bool bad = !in || in.get() != std::char_traits<char>::eof();
-                if (bad)
-                    throw std::runtime_error("Bad random seed");
-            }
-            std::cout << "Random seed: "<<seed<<"\n\n";
-            random_seed(seed);
-        }
-    }
-
     {
         const char* str = getenv("UNITTEST_KEEP_FILES");
         if (str && strlen(str) != 0)
@@ -376,12 +377,11 @@ int test_all(int argc, char* argv[])
     set_test_path_prefix("../../test/");
 #endif
 
-    // See description at its definition. You can set this variable to a constant instead of
-    // time(0) to reproduce a crash that happend with a specific seed.
-    unit_test_random_seed = time(0);
+    set_random_seed();
 
     fix_max_open_files();
     fix_async_daemon_path();
+
     display_build_config();
 
     bool success = run_tests();
