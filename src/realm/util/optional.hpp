@@ -173,7 +173,7 @@ public:
     using target_type = typename std::decay<T>::type;
 
     constexpr Optional() {}
-    constexpr Optional(None) : Optional() {}
+    constexpr Optional(None) {} // FIXME: Was a delegating constructor, but not fully supported in VS2015
     Optional(const Optional<T&>& other) = default;
     template<class U>
     Optional(const Optional<U&>& other) : m_ptr(other.m_ptr) {}
