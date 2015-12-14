@@ -33,9 +33,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
-// Random seed for various random number generators used by fuzzying unit tests. FIXME: Only
-// fastrand() is using this constant so far. Make unit tests that use random.cpp use it too.
-// It is initialized in 
+// Random seed for various random number generators used by fuzzying unit tests.
 uint64_t unit_test_random_seed;
 
 namespace {
