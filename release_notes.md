@@ -20,6 +20,16 @@
 
 * Add `test_util::to_string()` for convenience. std::to_string() is not
   available via all Android NDK toolchains.
+* Regular assertions (REALM_ASSERT()) are no longer enabled by default in
+  release mode. Note that this is a reversion back to the "natural" state of
+  affairs, after a period of having them enabled by default in release mode. The
+  Cocoa binding was the primary target when the assertions were enabled a while
+  back, and steps were taken to explicitely disable those assertions in the
+  Android binding to avoid a performance-wise impact there. It is believed that
+  the assertions are no longer needed in the Cocoa binding, but in case they
+  are, the right approach, going forward, is to enable them specifically for the
+  Cocoa binding. Note that with these changes, the Android binding no longer
+  needs to explicitely disable regular assertions in release mode.
 
 ----------------------------------------------
 
