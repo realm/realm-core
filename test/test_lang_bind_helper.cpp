@@ -10093,24 +10093,26 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     ReadTransaction r(sg_r);
     ConstTableRef table_r = r.get_table("test");
 
+    // Create a table view with all refs detached.
     TableView view = table_r->where().find_all();
-
     {
         WriteTransaction w(sg_w);
         w.get_table("test")->clear();
         w.commit();
     }
-
     LangBindHelper::advance_read(sg_r, *hist_r);
 
+    // Verify that an aggregate on the view with detached refs gives the expected result.
     CHECK_EQUAL(false, view.is_in_sync());
     size_t ndx = not_found;
     double min = view.minimum_double(0, &ndx);
     CHECK_EQUAL(0, min);
     CHECK_EQUAL(not_found, ndx);
 
+    // Sync the view to discard the detached refs.
     view.sync_if_needed();
 
+    // Verify that an aggregate on the view still gives the expected result.
     ndx = not_found;
     min = view.minimum_double(0, &ndx);
     CHECK_EQUAL(0, min);
