@@ -229,6 +229,7 @@
     <ClInclude Include="..\..\src\realm\util\inspect.hpp" />
     <ClInclude Include="..\..\src\realm\impl\sequential_getter.hpp" />
     <ClInclude Include="..\..\test\test.hpp" />
+    <ClInclude Include="..\..\test\fuzz_group.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

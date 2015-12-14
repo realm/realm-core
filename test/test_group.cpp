@@ -22,6 +22,7 @@ static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
+#include "fuzz_group.hpp"
 #include "test.hpp"
 #include "crypt_key.hpp"
 
@@ -2287,10 +2288,6 @@ TEST(Group_Fuzzy)
     std::string filename = "";
     //std::string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
 //    std::string filename = "d:/crash3";
-
-    // Predeclarations for methods in fuzz_group.cpp
-    int run_fuzzy(int argc, const char* argv[]);
-    void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std::ostream&> log);
 
     std::string instr;
     if (filename != "") {
