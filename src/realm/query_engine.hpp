@@ -1575,7 +1575,7 @@ public:
 
     void init(const Table& table) override
     {
-        m_compare->set_table();
+        m_compare->set_table(const_cast<Table*>(&table));
         if (m_child)
             m_child->init(table);
     }

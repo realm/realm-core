@@ -9861,6 +9861,8 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
     {
         realm::Query query = table1->link(col_link2).column<String>(1) == "nabil";
+        realm::TableView tv4 = query.find_all();
+
         //realm::Query query = table1->where().and_query(table1->link(col_link2).column<String>(1) == "nabil");
       handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
       handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
@@ -9886,6 +9888,7 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
     {
         std::unique_ptr<Query> q2(sg.import_from_handover(move(handoverQuery2)));
+
         realm::TableView tv2 = q2->find_all();
         match = tv2.size();
         CHECK_EQUAL(0, match);// THIS IS FAILING IT's RETURNING 1!!
