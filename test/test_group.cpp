@@ -2299,6 +2299,20 @@ TEST(Group_AddEmptyRowCrash)
 }
 
 
+ONLY(Group_AddEmptyRowCrash_2) {
+    // Exposes another bug in add_empty_row() (another than Group_AddEmptyRowCrash)
+    // Set REALM_MAX_BPNODE_SIZE = 4 for it to crash
+    REALM_ASSERT(REALM_MAX_BPNODE_SIZE == 4);
+    Group g;
+    TableRef t = g.insert_table(0, "table");
+    t->add_column(DataType(7), "A");
+    t->insert_empty_row(0, 162);
+    t->add_column(DataType(7), "B");
+    t->add_empty_row(230);
+    t->add_empty_row(222);
+}
+
+
 #ifdef REALM_DEBUG
 #ifdef REALM_TO_DOT
 
