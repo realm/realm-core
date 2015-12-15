@@ -8374,7 +8374,6 @@ TEST(Query_MaximumSumAverage)
     }
 }
 
-
 TEST(Query_ReferDeletedLinkView)
 {
     // This would segfault because the query refers a LinkView that had been removed by move_last_over
@@ -8397,7 +8396,107 @@ TEST(Query_ReferDeletedLinkView)
     // the LinkView through multiple levels!
     CHECK(tv.is_attached());
 }
+
+TEST(Query_SubQueries)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    table2->add_column(type_Int, "col1");
+    table2->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    table2->add_empty_row();
+    table2->set_int(0, 0, 400);
+    table2->set_string(1, 0, "hello");
+    table2->add_empty_row();
+    table2->set_int(0, 1, 500);
+    table2->set_string(1, 1, "world");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 2, "!");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 1, "world");
+
+
+    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+
+    // set some links
+    LinkViewRef links1;
+
+    links1 = table1->get_linklist(col_link2, 0);
+    links1->add(1);
+
+    links1 = table1->get_linklist(col_link2, 1);
+    links1->add(1);
+    links1->add(2);
+
+
+    size_t match;
+    Query q;
+
+    // The linked rows for rows 0 and 2 all match ("world", 500). Row 2 does by virtue of having no rows.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500).count() == table1->column<LinkList>(col_link2).count();
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // No linked rows match ("world, 600).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 600).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 0 and 1 both have at least one linked row that matches ("world", 500).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Row 1 has at least one linked row that matches ("!", 600).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "!" && table2->column<Int>(0) == 600).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Row 1 has two linked rows that contain either "world" or 600.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600).count() == 2;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 0 and 2 have at most one linked row that contains either "world" or 600. Row 2 does by virtue of having no rows.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600).count() <= 1;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
 #endif // TEST_QUERY
-
-
-

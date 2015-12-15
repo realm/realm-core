@@ -133,6 +133,8 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/util/optional.hpp>
 #include <realm/impl/sequential_getter.hpp>
 
+#include <numeric>
+
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
 // unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Undef
@@ -582,7 +584,7 @@ public:
 #endif
         {
             // Return query_expression.hpp node
-            return new Compare<Cond, typename Common<R, float>::type>(clone_subexpr(), right.clone());
+            return new Compare<Cond, typename Common<L, R>::type>(clone_subexpr(), right.clone());
         }
     }
 
@@ -1893,6 +1895,8 @@ public:
         return SubColumns<C>(Columns<C>(column, m_link_map.m_table), m_link_map);
     }
 
+    LinkMap link_map() const { return m_link_map; }
+
 private:
     Columns(size_t column, const Table* table, const std::vector<size_t>& links):
         m_link_map(table, links), m_table(table)
@@ -2244,6 +2248,58 @@ public:
 
 private:
     Columns<T> m_column;
+    LinkMap m_link_map;
+};
+
+class SubQueryCount : public Subexpr2<Int> {
+public:
+    SubQueryCount(Query q, LinkMap link_map) : m_query(q), m_link_map(link_map) { }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<SubQueryCount>(*this);
+    }
+
+    const Table* get_table() const override
+    {
+        return m_link_map.m_tables[0];
+    }
+
+    void set_table() override { }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        std::vector<size_t> links = m_link_map.get_links(index);
+        std::sort(links.begin(), links.end());
+
+        size_t count = std::accumulate(links.begin(), links.end(), 0, [this](size_t running_count, size_t link){
+            return running_count + m_query.count(link, link + 1, 1);
+        });
+
+        destination.import(Value<Int>(false, 1, count));
+    }
+
+private:
+    Query m_query;
+    LinkMap m_link_map;
+};
+
+// The unused template parameter is a hack to avoid a circular dependency between table.hpp and query_expression.hpp.
+template<class>
+class SubQuery {
+public:
+    SubQuery(Columns<Link> link_column, Query query) : m_query(query), m_link_map(link_column.link_map())
+    {
+        REALM_ASSERT(m_link_map.m_table == query.get_table());
+    }
+
+    SubQueryCount count() const
+    {
+        return SubQueryCount(m_query, m_link_map);
+    }
+
+private:
+    Query m_query;
     LinkMap m_link_map;
 };
 
