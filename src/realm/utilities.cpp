@@ -275,11 +275,10 @@ int fast_popcount64(int64_t x)
 }
 
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
-uint64_t fastrand(uint64_t max, bool is_seed) 
+uint64_t fastrand(uint64_t max) 
 {
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
-    static std::atomic<uint64_t> state(is_seed ? max : 1);
-    
+    static std::atomic<uint64_t> state(1);
     // Thread safe increment to prevent two threads from producing the same value if called at the exact same time
     state.fetch_add(1, std::memory_order_release); 
     uint64_t x = state.load(std::memory_order_acquire);

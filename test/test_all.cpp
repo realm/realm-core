@@ -33,8 +33,6 @@ using namespace realm::util;
 using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
-// Random seed for various random number generators used by fuzzying unit tests.
-uint64_t unit_test_random_seed;
 
 namespace {
 
@@ -138,27 +136,6 @@ void fix_async_daemon_path()
 #endif // _WIN32
 }
 
-void set_random_seed()
-{
-    // Select random seed for the random generator that some of our unit tests are using
-    unit_test_random_seed = 1234567;
-    const char* str = getenv("UNITTEST_RANDOM_SEED");
-    if (str && strlen(str) != 0) {
-        if (strcmp(str, "random") == 0) {
-            unit_test_random_seed = produce_nondeterministic_random_seed();
-        }
-        else {
-            std::istringstream in(str);
-            in.imbue(std::locale::classic());
-            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-            in >> unit_test_random_seed;
-            bool bad = !in || in.get() != std::char_traits<char>::eof();
-            if (bad)
-                throw std::runtime_error("Bad random seed");
-        }
-        random_seed(unit_test_random_seed);
-    }
-}
 
 void display_build_config()
 {
@@ -184,21 +161,19 @@ void display_build_config()
 
     std::cout <<
         "\n"
-        "Realm version: " << Version::get_version() << "\n"
-        "  with Debug " << with_debug << "\n"
+        "Realm version: "<<Version::get_version()<<"\n"
+        "  with Debug "<<with_debug<<"\n"
         "\n"
-        "REALM_MAX_BPNODE_SIZE = " << REALM_MAX_BPNODE_SIZE << "\n"
+        "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
-        "sizeof (size_t) * 8 = " << (sizeof(size_t) * 8) << "\n"
+        "sizeof (size_t) * 8 = " << (sizeof (size_t) * 8) << "\n"
         "\n"
-        "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
-        "This CPU supports SSE (auto detect):        " << cpu_sse << "\n"
-        "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
-        "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
-        "\n"
-        "Unit test random seed:                      " << unit_test_random_seed << "\n"
+        "Compiler supported SSE (auto detect):       "<<compiler_sse<<"\n"
+        "This CPU supports SSE (auto detect):        "<<cpu_sse<<"\n"
+        "Compiler supported AVX (auto detect):       "<<compiler_avx<<"\n"
+        "This CPU supports AVX (AVX1) (auto detect): "<<cpu_avx<<"\n"
         "\n";
 }
 
@@ -274,6 +249,27 @@ private:
 bool run_tests()
 {
     {
+        const char* str = getenv("UNITTEST_RANDOM_SEED");
+        if (str && strlen(str) != 0) {
+            unsigned long seed;
+            if (strcmp(str, "random") == 0) {
+                seed = produce_nondeterministic_random_seed();
+            }
+            else {
+                std::istringstream in(str);
+                in.imbue(std::locale::classic());
+                in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+                in >> seed;
+                bool bad = !in || in.get() != std::char_traits<char>::eof();
+                if (bad)
+                    throw std::runtime_error("Bad random seed");
+            }
+            std::cout << "Random seed: "<<seed<<"\n\n";
+            random_seed(seed);
+        }
+    }
+
+    {
         const char* str = getenv("UNITTEST_KEEP_FILES");
         if (str && strlen(str) != 0)
             keep_test_files();
@@ -299,11 +295,7 @@ bool run_tests()
     }
     else {
         const char* str = getenv("UNITTEST_PROGRESS");
-#ifdef _MSC_VER
-        bool report_progress = true;
-#else
         bool report_progress = str && strlen(str) != 0;
-#endif
         reporter.reset(new CustomReporter(report_progress));
     }
 
@@ -375,11 +367,8 @@ int test_all(int argc, char* argv[])
     set_test_path_prefix("../../test/");
 #endif
 
-    set_random_seed();
-
     fix_max_open_files();
     fix_async_daemon_path();
-
     display_build_config();
 
     bool success = run_tests();
