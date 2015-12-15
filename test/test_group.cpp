@@ -2287,7 +2287,7 @@ TEST(Group_Fuzzy)
     // a very simple fuzz test that just uses a random generator for generating Realm actions.
     std::string filename = "";
     //std::string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
-//    std::string filename = "d:/crash3";
+    //std::string filename = "d:/crash3";
 
     std::string instr;
     if (filename != "") {
@@ -2301,7 +2301,11 @@ TEST(Group_Fuzzy)
         // Number of instructions in each test
         const size_t instructions = 100;
 
-        fastrand(unit_test_random_seed, true); // seed
+        // You can use your own seed if you have observed a crashing unit test that 
+        // printed out some specific seed (the "Unit test random seed:" part that appears).
+        //fastrand(534653645, true);
+        fastrand(unit_test_random_seed, true);
+
         for (size_t counter = 0; counter < iterations; counter++)
         {
             instr = "";
@@ -2309,7 +2313,10 @@ TEST(Group_Fuzzy)
                 instr += static_cast<char>(fastrand());
             }
             Group g;
-            parse_and_apply_instructions(instr, g, util::none);
+            // If using std::cerr, you can copy/paste the console output into a unit test
+            // to get a reproduction test case
+            parse_and_apply_instructions(instr, g, std::cerr);
+            //parse_and_apply_instructions(instr, g, util::none);
         }
     }
 }

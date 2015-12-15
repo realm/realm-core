@@ -80,7 +80,12 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
         State s;
         s.str = in;
         s.pos = 0;
- 
+
+        if (log) {
+            *log << "\n\n\n----------------------------------------------------------------------\n";
+            *log << "Group g;\n\n";
+        }
+
         for (;;) {
             char instr = get_next(s) % COUNT;
 
@@ -106,7 +111,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
             else if (instr == REMOVE_TABLE && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 if (log) {
-                    *log << "g.remove_table(" << table_ndx << ");\n";
+                    *log << "try { g.remove_table(" << table_ndx << "); } catch(...) { }\n";
                 }
                 try {
                     g.remove_table(table_ndx);
@@ -157,7 +162,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 // Mixed and Subtable cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\"," << nullable << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\"," << (nullable ? "true" : "false") << ");\n";
                 }
                 g.get_table(table_ndx)->add_column(type, name, nullable);
             }
@@ -168,7 +173,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 std::string name = create_string(get_next(s) % Group::max_table_name_length);
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\"," << nullable << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\"," << (nullable ? "true" : "false") << ");\n";
                 }
                 g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
             }
@@ -178,7 +183,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 if (t->get_column_count() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     if (log) {
-                        *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << ");\n";
+                        *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << "); }\n";
                     }
                     t->remove_column(col_ndx);
                 }
@@ -194,7 +199,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                                                   type != type_Binary);
                     if (supports_search_index) {
                         if (log) {
-                            *log << "TableRef t = g.get_table(" << table_ndx << "); t->add_search_index(" << col_ndx << ");\n";
+                            *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->add_search_index(" << col_ndx << "); }\n";
                         }
                         t->add_search_index(col_ndx);
                     }
@@ -208,7 +213,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                     // We don't need to check if the column is of a type that is indexable or if it has index on or off
                     // because Realm will just do a no-op at worst (no exception or assert).
                     if (log) {
-                        *log << "TableRef t = g.get_table(" << table_ndx << "); t->remove_search_index(" << col_ndx << ");\n";
+                        *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->remove_search_index(" << col_ndx << "); }\n";
                     }
                     t->remove_search_index(col_ndx);
                 }
@@ -411,7 +416,7 @@ int run_fuzzy(int argc, const char* argv[])
             *log << "Group g;\n";
         }
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-        parse_and_apply_instructions(contents, group, log);
+        parse_and_apply_instructions(contents, group, std::cerr);
     }
     catch (const EndOfFile&) {
         return 0;
