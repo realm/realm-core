@@ -2299,8 +2299,7 @@ TEST(Group_AddEmptyRowCrash)
 }
 
 
-ONLY(Group_AddEmptyRowCrash_2) {
-    // Exposes another bug in add_empty_row() (another than Group_AddEmptyRowCrash)
+TEST(Group_AddEmptyRowCrash_2) {
     // Set REALM_MAX_BPNODE_SIZE = 4 for it to crash
     REALM_ASSERT(REALM_MAX_BPNODE_SIZE == 4);
     Group g;
@@ -2309,9 +2308,25 @@ ONLY(Group_AddEmptyRowCrash_2) {
     t->insert_empty_row(0, 162);
     t->add_column(DataType(7), "B");
     t->add_empty_row(230);
+
+    // Triggers "column_link.cpp:54: Assertion failed: prior_num_rows == size()"
     t->add_empty_row(222);
 }
 
+ONLY(Group_AddEmptyRowCrash_3)
+{
+    // Set REALM_MAX_BPNODE_SIZE = 4 for it to crash
+    REALM_ASSERT(REALM_MAX_BPNODE_SIZE == 4);
+    Group g;
+    g.insert_table(0, "A");
+    g.add_table("B");
+    g.get_table(1)->insert_empty_row(0, 17);
+    g.get_table(0)->add_column_link(type_LinkList, "link", *g.get_table(1));
+    g.get_table(1)->insert_empty_row(17, 1);
+
+    // Triggers "alloc.hpp:213: Assertion failed: v % 8 == 0"
+    g.verify();
+}
 
 #ifdef REALM_DEBUG
 #ifdef REALM_TO_DOT
