@@ -3385,6 +3385,60 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_ReplaceRow)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a continuous read transaction
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+
+    // Add some tables and rows.
+    {
+        WriteTransaction wt(sg_w);
+        TableRef t0 = wt.add_table("t0");
+        TableRef t1 = wt.add_table("t1");
+        t0->add_column(type_Int, "i");
+        t1->add_column_link(type_Link, "l", *t0);
+        t0->add_empty_row(10);
+        t1->add_empty_row(10);
+        t1->set_link(0, 0, 0);
+        t1->set_link(0, 1, 1);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+
+    ConstRow row_int_0_replaced_by_row_2  = group.get_table(0)->get(0);
+    ConstRow row_link_0_replaced_by_row_2 = group.get_table(1)->get(0);
+    CHECK_EQUAL(row_link_0_replaced_by_row_2.get_link(0), 0);
+
+    // Replace some rows, with and without links.
+    {
+        WriteTransaction wt(sg_w);
+        TableRef t0 = wt.get_table("t0");
+        TableRef t1 = wt.get_table("t1");
+        t0->replace_row(0, 2);
+        t1->replace_row(0, 2);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+
+    CHECK(row_int_0_replaced_by_row_2.is_attached());
+    CHECK(row_link_0_replaced_by_row_2.is_attached());
+
+    CHECK_EQUAL(row_int_0_replaced_by_row_2.get_index(), 2);
+    CHECK_EQUAL(row_link_0_replaced_by_row_2.get_index(), 2);
+    CHECK_EQUAL(row_link_0_replaced_by_row_2.get_link(0), 2);
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_Links)
 {
     // This test checks that all the links-related stuff works across
