@@ -2240,7 +2240,7 @@ void Table::do_replace_row(size_t row_ndx, size_t replacement_row_ndx)
     size_t backlink_col_end   = m_spec.get_column_count();
     for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
         if (m_spec.get_column_type(col_ndx) != col_type_BackLink) {
-            continue;
+            continue; // Future-proofing; the only non-public columns today are backlink columns.
         }
 
         auto& col = get_column_backlink(col_ndx);
