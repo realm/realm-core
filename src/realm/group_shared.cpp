@@ -1665,6 +1665,8 @@ std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_hand
     if (accessor.get()) {
         result->patch.reset(new Table::Handover_patch);
         result->patch->m_table_num = accessor.get()->get_index_in_group();
+        result->clone = 0;
+        result->version = get_version_of_current_transaction();
     }
     return result;
 }
