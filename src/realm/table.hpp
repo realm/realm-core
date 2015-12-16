@@ -879,6 +879,7 @@ private:
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    void do_replace_row(size_t row_ndx, size_t replacement_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
 
@@ -1237,6 +1238,7 @@ private:
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
     void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_acc_replace_row(size_t row_ndx, size_t replacement_row_ndx) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -2028,6 +2030,11 @@ public:
         table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
     }
 
+    static void do_replace_row(Table& table, size_t row_ndx, size_t replacement_row_ndx)
+    {
+        table.do_replace_row(row_ndx, replacement_row_ndx); // Throws
+    }
+
     static void do_clear(Table& table)
     {
         bool broken_reciprocal_backlinks = false;
@@ -2150,6 +2157,11 @@ public:
                                   size_t to_row_ndx) noexcept
     {
         table.adj_acc_move_over(from_row_ndx, to_row_ndx);
+    }
+
+    static void adj_acc_replace_row(Table& table, size_t row_ndx, size_t replacement_row_ndx) noexcept
+    {
+        table.adj_acc_replace_row(row_ndx, replacement_row_ndx);
     }
 
     static void adj_acc_clear_root_table(Table& table) noexcept

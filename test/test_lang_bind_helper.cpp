@@ -3407,6 +3407,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ReplaceRow)
         t1->add_empty_row(10);
         t1->set_link(0, 0, 0);
         t1->set_link(0, 1, 1);
+        t1->set_link(0, 2, 0);
         wt.commit();
     }
 
@@ -7314,6 +7315,7 @@ public:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
     bool erase_rows(size_t, size_t, size_t, bool) { return false; }
     bool swap_rows(size_t, size_t) { return false; }
+    bool replace_row(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
     bool link_list_set(size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t) { return false; }

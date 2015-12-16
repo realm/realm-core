@@ -257,6 +257,18 @@ public:
         return true;
     }
 
+    bool replace_row(size_t row_ndx, size_t replacement_row_ndx)
+    {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
+        if (REALM_UNLIKELY(row_ndx >= m_table->size() || replacement_row_ndx >= m_table->size()))
+            return false;
+        log("table->replace_row(%1, %2);", row_ndx, replacement_row_ndx); // Throws
+        using tf = _impl::TableFriend;
+        tf::do_replace_row(*m_table, row_ndx, replacement_row_ndx); // Throws
+        return true;
+    }
+
     bool select_table(size_t group_level_ndx, int levels, const size_t* path)
     {
         if (REALM_UNLIKELY(group_level_ndx >= m_group.size()))

@@ -1153,6 +1153,15 @@ public:
         return true;
     }
 
+    bool replace_row(size_t row_ndx, size_t replacement_row_ndx) noexcept
+    {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
+        using tf = _impl::TableFriend;
+        tf::adj_acc_replace_row(*m_table, row_ndx, replacement_row_ndx);
+        return true;
+    }
+
     bool clear_table() noexcept
     {
         typedef _impl::TableFriend tf;
