@@ -305,7 +305,13 @@ public:
 
     virtual std::unique_ptr<Subexpr> clone() const = 0;
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
+    // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
+    // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
+    // then Query::m_table is set to this table, and set_table() is called on all Columns and LinkMaps in
+    // the query expression tree so that they can set/update their internals as required. 
+    // 
+    // During thread-handover of a Query, set_table() is also called to make objects point at the new table
+    // instead of the old one from the old thread.
     virtual void set_table(const Table*) {}
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -1386,14 +1392,16 @@ class LinkMap
 {
 public:
     LinkMap() : m_table(nullptr) {}
-    LinkMap(const Table* table, const std::vector<size_t>& columns)
+    LinkMap(const Table* table, const std::vector<size_t>& columns) : m_link_column_indexes(columns)
     {
-        m_link_column_indexes = columns;
         set_table(table);
     }
 
     void set_table(const Table* table) 
     {
+        if (table == m_table)
+            return;
+
         m_tables.clear();
         m_link_columns.clear();
         m_link_types.clear();
@@ -1975,7 +1983,7 @@ public:
         return make_subexpr<Columns<T>>(*this);
     }
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
+    // See comment in base class
     void set_table(const Table* table) override
     {
         m_link_map.set_table(table);
@@ -2311,7 +2319,7 @@ public:
     UnaryOperator(UnaryOperator&&) = default;
     UnaryOperator& operator=(UnaryOperator&&) = default;
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
+    // See comment in base class
     void set_table(const Table* table) override
     {
         m_left->set_table(table);
@@ -2367,7 +2375,7 @@ public:
     Operator(Operator&&) = default;
     Operator& operator=(Operator&&) = default;
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
+    // See comment in base class
     void set_table(const Table* table) override
     {
         m_left->set_table(table);
@@ -2426,7 +2434,7 @@ public:
         delete[] m_compare_string;
     }
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
+    // See comment in base class
     void set_table(const Table* table) override
     {
         m_left->set_table(table);
