@@ -9796,7 +9796,9 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     }
 }
 
-
+// Test that we can handover a query involving links, and that after the
+// handover export, the handover is completely decoupled from later changes
+// done on accessors belonging to the exporting shared group
 TEST(LangBindHelper_HandoverWithLinkQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -9808,6 +9810,7 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
+    // First setup data so that we can do a query on links
     LangBindHelper::promote_to_write(sg_w, *hist_w);
     TableRef table1 = group_w.add_table("table1");
     TableRef table2 = group_w.add_table("table2");
@@ -9860,12 +9863,14 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
 
     {
+        // Do a query (which will have zero results) and export it twice.
+        // To test separation, we'll later modify state at the exporting side,
+        // and verify that the two different imports still get identical results
         realm::Query query = table1->link(col_link2).column<String>(1) == "nabil";
         realm::TableView tv4 = query.find_all();
 
-        //realm::Query query = table1->where().and_query(table1->link(col_link2).column<String>(1) == "nabil");
-      handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
-      handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+        handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+        handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
     }
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction();// vid == 2
@@ -9877,21 +9882,23 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
         CHECK_EQUAL(0, match);
     }
 
-
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
-        table2->add_empty_row();
-        table2->set_int(0, 3, 700);
-        table2->set_string(1, 3, "nabil");
-        links1 = table1->get_linklist(col_link2, 2);
-        links1->add(3);
-        LangBindHelper::commit_and_continue_as_read(sg_w);
+    // On the exporting side, change the data such that the query will now have
+    // non-zero results if evaluated in that context.
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    table2->add_empty_row();
+    table2->set_int(0, 3, 700);
+    table2->set_string(1, 3, "nabil");
+    links1 = table1->get_linklist(col_link2, 2);
+    links1->add(3);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
 
     {
+        // Import query and evaluate in the old context. This should *not* be
+        // affected by the change done above on the exporting side.
         std::unique_ptr<Query> q2(sg.import_from_handover(move(handoverQuery2)));
-
         realm::TableView tv2 = q2->find_all();
         match = tv2.size();
-        CHECK_EQUAL(0, match);// THIS IS FAILING IT's RETURNING 1!!
+        CHECK_EQUAL(0, match);
     }
 }
 
@@ -10199,6 +10206,54 @@ TEST(LangBindHelper_Compact)
         CHECK_EQUAL(N, table->size());
         sg.close();
     }
+}
+
+TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction w(sg_w);
+        TableRef table = w.add_table("test");
+        table->add_column(type_Double, "double");
+        table->add_empty_row(3);
+        table->set_double(0, 0, 1234);
+        table->set_double(0, 1, -5678);
+        table->set_double(0, 2, 1000);
+        w.commit();
+    }
+
+    std::unique_ptr<ClientHistory> hist_r(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    ReadTransaction r(sg_r);
+    ConstTableRef table_r = r.get_table("test");
+
+    // Create a table view with all refs detached.
+    TableView view = table_r->where().find_all();
+    {
+        WriteTransaction w(sg_w);
+        w.get_table("test")->clear();
+        w.commit();
+    }
+    LangBindHelper::advance_read(sg_r, *hist_r);
+
+    // Verify that an aggregate on the view with detached refs gives the expected result.
+    CHECK_EQUAL(false, view.is_in_sync());
+    size_t ndx = not_found;
+    double min = view.minimum_double(0, &ndx);
+    CHECK_EQUAL(0, min);
+    CHECK_EQUAL(not_found, ndx);
+
+    // Sync the view to discard the detached refs.
+    view.sync_if_needed();
+
+    // Verify that an aggregate on the view still gives the expected result.
+    ndx = not_found;
+    min = view.minimum_double(0, &ndx);
+    CHECK_EQUAL(0, min);
+    CHECK_EQUAL(not_found, ndx);
 }
 
 #endif
