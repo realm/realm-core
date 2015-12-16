@@ -1654,3 +1654,32 @@ LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<
     return result;
 }
 
+
+std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_handover(const TableRef& accessor)
+{
+    LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading) {
+        throw LogicError(LogicError::wrong_transact_state);
+    }
+    std::unique_ptr<Handover<Table>> result(new Handover<Table>());
+    if (accessor.get()) {
+        result->patch.reset(new Table::Handover_patch);
+        result->patch->m_table_num = accessor.get()->get_index_in_group();
+    }
+    return result;
+}
+
+
+TableRef SharedGroup::import_table_from_handover(std::unique_ptr<Handover<Table>> handover)
+{
+    if (handover->version != get_version_of_current_transaction()) {
+        throw BadVersion();
+    }
+    if (handover->patch) {
+        TableRef result(m_group.get_table(handover->patch->m_table_num));
+        handover->patch.reset();
+        return result;
+    }
+    return TableRef();
+}
+

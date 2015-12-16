@@ -764,6 +764,7 @@ public:
 #endif
 
     class Parent;
+    typedef Table_Handover_patch Handover_patch;
 
 protected:
     /// Get a pointer to the accessor of the specified subtable. The

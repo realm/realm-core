@@ -495,6 +495,10 @@ public:
     std::unique_ptr<Handover<LinkView>> export_linkview_for_handover(const LinkViewRef& accessor);
     LinkViewRef import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover);
 
+    // likewise for Tables.
+    std::unique_ptr<Handover<Table>> export_table_for_handover(const TableRef& accessor);
+    TableRef import_table_from_handover(std::unique_ptr<Handover<Table>> handover);
+
 private:
     struct SharedInfo;
     struct ReadCount;

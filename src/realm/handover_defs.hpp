@@ -29,6 +29,10 @@ enum class MutableSourcePayload { Move };
 
 struct TableView_Handover_patch;
 
+struct Table_Handover_patch {
+    size_t m_table_num;
+};
+
 struct LinkView_Handover_patch {
     size_t m_table_num;
     size_t m_col_num;
