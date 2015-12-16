@@ -9860,6 +9860,7 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
     std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery;
     std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery2;
+    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery_int;
 
 
     {
@@ -9871,6 +9872,10 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
         handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+
+        // Also query on int (through links) to add coverage on a different path
+        realm::Query query_int = table1->link(col_link2).column<Int>(0) == 600;
+        handoverQuery_int = sg_w.export_for_handover(query_int, ConstSourcePayload::Copy);
     }
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction();// vid == 2
@@ -9880,6 +9885,11 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
         realm::TableView tv = q->find_all();
         match = tv.size();
         CHECK_EQUAL(0, match);
+
+        std::unique_ptr<Query> q_int(sg.import_from_handover(move(handoverQuery_int)));
+        realm::TableView tv_int = q_int->find_all();
+        match = tv_int.size();
+        CHECK_EQUAL(1, match);
     }
 
     // On the exporting side, change the data such that the query will now have
