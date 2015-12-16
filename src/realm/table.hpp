@@ -384,6 +384,9 @@ public:
     /// second time. The operation assumes that the table is unordered, and it may
     /// therefore be used on tables with link columns.
     ///
+    /// All accessors to \a row_ndx will be updated to become accessors to
+    /// \a replacement_row_ndx.
+    ///
     /// \sa{Table::move_last_over}
     void replace_row(size_t row_ndx, size_t replacement_row_ndx);
     void replace_row_and_move_last_over(size_t row_ndx, size_t replacement_row_ndx);
