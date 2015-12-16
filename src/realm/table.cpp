@@ -2093,6 +2093,47 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     remove_backlink_broken_rows(state); // Throws
 }
 
+void Table::replace_row(size_t row_ndx, size_t replacement_row_ndx)
+{
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_EX(row_ndx < m_size, row_ndx, m_size);
+
+    // Replace links through backlink columns
+    size_t backlink_col_start = m_spec.get_public_column_count();
+    size_t backlink_col_end   = m_spec.get_column_count();
+    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
+        if (m_spec.get_column_type(col_ndx) != col_type_BackLink) {
+            continue;
+        }
+
+        auto& col = get_column_backlink(col_ndx);
+        auto& origin_table = col.get_origin_table();
+        size_t origin_col_ndx = col.get_origin_column_index();
+        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
+        while (col.get_backlink_count(row_ndx) > 0) {
+            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
+
+            if (origin_col_type == col_type_Link) {
+                origin_table.set_link(origin_col_ndx, origin_row_ndx, replacement_row_ndx);
+            }
+            else if (origin_col_type == col_type_LinkList) {
+                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
+                for (size_t j = 0; j < links->size(); ++j) {
+                    if (links->get(j).get_index() == row_ndx) {
+                        links->set(j, replacement_row_ndx);
+                    }
+                }
+            }
+        }
+    }
+
+    adj_row_acc_replace_row(row_ndx, replacement_row_ndx);
+    bump_version();
+
+    if (Replication* repl = get_repl()) {
+        //repl->replace_row(this, row_ndx, replacement_row_ndx);
+    }
+}
 
 void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over)
 {
@@ -5058,6 +5099,23 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
         }
         else if (row->m_row_ndx == row_ndx_2) {
             row->m_row_ndx = row_ndx_1;
+        }
+        row = row->m_next;
+    }
+}
+
+
+void Table::adj_row_acc_replace_row(size_t row_ndx, size_t replacement_row_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    LockGuard lock(m_accessor_mutex);
+    RowBase* row = m_row_accessors;
+    while (row) {
+        if (row->m_row_ndx == row_ndx) {
+            row->m_row_ndx = replacement_row_ndx;
         }
         row = row->m_next;
     }
