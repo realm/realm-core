@@ -1450,7 +1450,7 @@ public:
         return std::find(m_link_types.begin(), m_link_types.end(), type_LinkList) == m_link_types.end();
     }
 
-    const Table* m_table;
+    const Table* m_table = nullptr;
     std::vector<const LinkColumnBase*> m_link_columns;
     std::vector<const Table*> m_tables;
     std::vector<size_t> m_link_column_indexes;
