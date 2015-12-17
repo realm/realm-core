@@ -57,13 +57,13 @@ void RowBase::impl_detach() noexcept
 RowBase::RowBase(const RowBase& source, Handover_patch& patch)
     : m_table(TableRef())
 {
-    patch.table_num = source.m_table->get_index_in_group();
+    Table::generate_patch(source.m_table, patch.m_table);
     patch.row_ndx = source.m_row_ndx;
 }
 
 void RowBase::apply_patch(Handover_patch& patch, Group& group)
 {
-    m_table = group.get_table(patch.table_num);
+    m_table = Table::create_from_and_consume_patch(patch.m_table, group);
     m_table->register_row_accessor(this);
     m_row_ndx = patch.row_ndx;
 }

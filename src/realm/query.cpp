@@ -94,10 +94,7 @@ Query::~Query() noexcept
 Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
     : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
 {
-    patch.m_has_table = bool(source.m_table);
-    if (patch.m_has_table) {
-        patch.m_table_num = source.m_table.get()->get_index_in_group();
-    }
+    Table::generate_patch(source.m_table, patch.m_table);
     if (source.m_source_table_view) {
         m_source_table_view =
             source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
@@ -116,10 +113,7 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
 Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode)
     : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
 {
-    patch.m_has_table = bool(source.m_table);
-    if (patch.m_has_table) {
-        patch.m_table_num = source.m_table.get()->get_index_in_group();
-    }
+    Table::generate_patch(source.m_table, patch.m_table);
     if (source.m_source_table_view) {
         m_source_table_view =
             source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
@@ -165,8 +159,10 @@ void Query::apply_patch(Handover_patch& patch, Group& group)
     }
     m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, group);
     m_view = m_source_link_view.get();
-    if (patch.m_has_table) {
-        set_table(group.get_table(patch.m_table_num));
+    // not going through Table::create_from_and_consume_patch because we need to use
+    // set_table() to update all table references
+    if (patch.m_table) {
+        set_table(group.get_table(patch.m_table->m_table_num));
     }
 }
 

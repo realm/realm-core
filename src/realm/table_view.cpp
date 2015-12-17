@@ -40,14 +40,10 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
       m_query(src.m_query, patch.query_patch, mode)
 {
     patch.was_in_sync = src.is_in_sync();
-    patch.table_num = src.m_table->get_index_in_group();
-    patch.linked_table_num = src.m_linked_table ? src.m_linked_table->get_index_in_group() : npos;
+    Table::generate_patch(src.m_table, patch.m_table);
+    Table::generate_patch(src.m_linked_table, patch.linked_table);
     patch.linked_column = src.m_linked_column;
     patch.linked_row = src.m_linked_row;
-    // must be group level table!
-    if (patch.table_num == npos) {
-        throw std::runtime_error("TableView handover failed: not a group level table");
-    }
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
     src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
@@ -74,14 +70,10 @@ TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
         patch.was_in_sync = false;
     else
         patch.was_in_sync = src.is_in_sync();
-    patch.table_num = src.m_table->get_index_in_group();
-    patch.linked_table_num = src.m_linked_table ? src.m_linked_table->get_index_in_group() : npos;
+    Table::generate_patch(src.m_table, patch.m_table);
+    Table::generate_patch(src.m_linked_table, patch.linked_table);
     patch.linked_column = src.m_linked_column;
     patch.linked_row = src.m_linked_row;
-    // must be group level table!
-    if (patch.table_num == npos) {
-        throw std::runtime_error("TableView handover failed: not a group level table");
-    }
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
     m_last_seen_version = 0;
@@ -96,15 +88,13 @@ TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
 
 void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
 {
-    TableRef tr = group.get_table(patch.table_num);
-    m_table = tr;
-    tr->register_view(this);
+    m_table = Table::create_from_and_consume_patch(patch.m_table, group);
+    m_table->register_view(this);
     m_query.apply_patch(patch.query_patch, group);
     m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
 
-    if (patch.linked_table_num != npos) {
-        TableRef linked_tr = group.get_table(patch.linked_table_num);
-        m_linked_table = linked_tr;
+    if (patch.linked_table) {
+        m_linked_table = Table::create_from_and_consume_patch(patch.linked_table, group);
         m_linked_column = patch.linked_column;
         m_linked_row = patch.linked_row;
     }
