@@ -9538,7 +9538,7 @@ TEST(LangBindHelper_HandoverTableRef)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    Group& group = const_cast<Group&>(sg.begin_read());
+    sg.begin_read();
 
     std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
@@ -9556,6 +9556,8 @@ TEST(LangBindHelper_HandoverTableRef)
     {
         LangBindHelper::advance_read(sg, *hist, vid);
         TableRef table2 = sg.import_table_from_handover(move(handover));
+        CHECK(table2->is_attached());
+        CHECK(table2->size() == 0);
     }
 }
 
