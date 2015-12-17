@@ -1,3 +1,53 @@
+# NEXT RELEASE
+
+### Bugfixes:
+
+* Fixed incorrect initialization of TableViews from queries on LinkViews
+  resulting in `TableView::is_in_sync()` being incorrect until the first time
+  it is brought back into sync.
+* Fixed `TableView` aggregate methods to give the correct result when called on
+  a table view that at one point had detached refs but has since been synced.
+* Fixed a bug in handover of Queries which use links. The bug was incomplete
+  cloning of the underlying data structure. This bug goes unnoticed as long
+  as the original datastructure is intact and is only seen if the original
+  datastructure is deleted or changed before the handed over query is re-executed
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Add `test_util::to_string()` for convenience. std::to_string() is not
+  available via all Android NDK toolchains.
+
+----------------------------------------------
+
+# 0.95.5 Release notes
+
+### Bugfixes:
+
+* Fixed Row accessor updating after an unordered `TableView::clear()`.
+* Fixed bug in `ColumnBase::build()` which would cause it to produce an invalid
+  (too shallow) B+-tree. This is a bug that could have been triggered through
+  proper use of our bindings in their current form. In particular, it would have
+  been triggered when adding a new attribute to a class that already has a
+  sufficiently large number of objects in it (> REALM_MAX_BPNODE_SIZE^2 =
+  1,000,000).
+
+### Enhancements:
+
+* New default constructor added to `BasicRowExpr<>`. A default constructed
+  instance is in the detached state.
+
+----------------------------------------------
+
 # 0.95.4 Release notes
 
 ### Bugfixes:
@@ -23,7 +73,7 @@
 * Added TableView::distinct() method. It obeys TableView::sync_if_needed().
   A call to distinct() will first fully populate the TableView and then perform
   a distinct algorithm on that (i.e. it will *not* add a secondary distinct filter
-  to any earlier filter applied). See more in TEST(TableView_Distinct) in 
+  to any earlier filter applied). See more in TEST(TableView_Distinct) in
   test_table_view.cpp.
 
 -----------

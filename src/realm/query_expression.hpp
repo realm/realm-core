@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -293,7 +293,7 @@ public:
     Expression() { }
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
-    virtual void set_table() = 0;
+    virtual void set_table(const Table* table) = 0;
     virtual const Table* get_table() const = 0;
     virtual ~Expression() {}
 };
@@ -305,8 +305,14 @@ public:
 
     virtual std::unique_ptr<Subexpr> clone() const = 0;
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    virtual void set_table() {}
+    // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
+    // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
+    // then Query::m_table is set to this table, and set_table() is called on all Columns and LinkMaps in
+    // the query expression tree so that they can set/update their internals as required. 
+    // 
+    // During thread-handover of a Query, set_table() is also called to make objects point at the new table
+    // instead of the old one from the old thread.
+    virtual void set_table(const Table*) {}
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
@@ -1386,22 +1392,33 @@ class LinkMap
 {
 public:
     LinkMap() : m_table(nullptr) {}
-    LinkMap(const Table* table, const std::vector<size_t>& columns)
+    LinkMap(const Table* table, const std::vector<size_t>& columns) : m_link_column_indexes(columns)
     {
-        for (size_t t = 0; t < columns.size(); t++) {
+        set_table(table);
+    }
+
+    void set_table(const Table* table) 
+    {
+        if (table == m_table)
+            return;
+
+        m_tables.clear();
+        m_link_columns.clear();
+        m_link_types.clear();
+        for (size_t t = 0; t < m_link_column_indexes.size(); t++) {
             // Link column can be either LinkList or single Link
-            ColumnType type = table->get_real_column_type(columns[t]);
+            ColumnType type = table->get_real_column_type(m_link_column_indexes[t]);
             if (type == col_type_LinkList) {
-                const LinkListColumn& cll = table->get_column_link_list(columns[t]);
+                const LinkListColumn& cll = table->get_column_link_list(m_link_column_indexes[t]);
                 m_tables.push_back(table);
-                m_link_columns.push_back(&(table->get_column_link_list(columns[t])));
+                m_link_columns.push_back(&(table->get_column_link_list(m_link_column_indexes[t])));
                 m_link_types.push_back(realm::type_LinkList);
                 table = &cll.get_target_table();
             }
             else {
-                const LinkColumn& cl = table->get_column_link(columns[t]);
+                const LinkColumn& cl = table->get_column_link(m_link_column_indexes[t]);
                 m_tables.push_back(table);
-                m_link_columns.push_back(&(table->get_column_link(columns[t])));
+                m_link_columns.push_back(&(table->get_column_link(m_link_column_indexes[t])));
                 m_link_types.push_back(realm::type_Link);
                 table = &cl.get_target_table();
             }
@@ -1433,9 +1450,10 @@ public:
         return std::find(m_link_types.begin(), m_link_types.end(), type_LinkList) == m_link_types.end();
     }
 
-    const Table* m_table;
+    const Table* m_table = nullptr;
     std::vector<const LinkColumnBase*> m_link_columns;
     std::vector<const Table*> m_tables;
+    std::vector<size_t> m_link_column_indexes;
 
 private:
     void map_links(size_t column, size_t row, LinkMapFunction& lm)
@@ -1520,6 +1538,11 @@ public:
 
     explicit Columns(size_t column): m_column(column)
     {
+    }
+
+    void set_table(const Table* table) override
+    {
+        m_link_map.set_table(table);
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -1705,6 +1728,11 @@ public:
         return m_table;
     }
 
+    void set_table(const Table* table) override
+    {
+        m_link_map.set_table(table);
+    }
+
     virtual void evaluate(size_t index, ValueBase& destination) override
     {
         Value<BinaryData>& d = static_cast<Value<BinaryData>&>(destination);
@@ -1771,8 +1799,9 @@ public:
     {
     }
 
-    void set_table() override
+    void set_table(const Table* table) override
     {
+        m_link_map.set_table(table);
     }
 
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
@@ -1817,7 +1846,10 @@ public:
         return m_link_map.m_tables[0];
     }
 
-    void set_table() override { }
+    void set_table(const Table* table) override
+    {
+        m_link_map.set_table(table);
+    }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
@@ -1875,6 +1907,11 @@ private:
     Columns(size_t column, const Table* table): m_table(table)
     {
         static_cast<void>(column);
+    }
+
+    void set_table(const Table* table) override
+    {
+        m_link_map.set_table(table);
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -1946,9 +1983,11 @@ public:
         return make_subexpr<Columns<T>>(*this);
     }
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table() override
+    // See comment in base class
+    void set_table(const Table* table) override
     {
+        m_link_map.set_table(table);
+
         const ColumnBase* c;
         if (!links_exist()) {
             m_nullable = m_table->is_nullable(m_column);
@@ -2106,9 +2145,10 @@ public:
         return m_link_map.m_tables[0];
     }
 
-    void set_table() override
+    void set_table(const Table* table) override
     {
-        m_column.set_table();
+        m_link_map.set_table(table);
+        m_column.set_table(table);
     }
 
     void evaluate(size_t, ValueBase&) override
@@ -2162,9 +2202,10 @@ public:
         return m_link_map.m_tables[0];
     }
 
-    void set_table() override
+    void set_table(const Table* table) override
     {
-        m_column.set_table();
+        m_link_map.set_table(table);
+        m_column.set_table(table);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2278,10 +2319,10 @@ public:
     UnaryOperator(UnaryOperator&&) = default;
     UnaryOperator& operator=(UnaryOperator&&) = default;
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table() override
+    // See comment in base class
+    void set_table(const Table* table) override
     {
-        m_left->set_table();
+        m_left->set_table(table);
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -2334,11 +2375,11 @@ public:
     Operator(Operator&&) = default;
     Operator& operator=(Operator&&) = default;
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table() override
+    // See comment in base class
+    void set_table(const Table* table) override
     {
-        m_left->set_table();
-        m_right->set_table();
+        m_left->set_table(table);
+        m_right->set_table(table);
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
@@ -2393,11 +2434,11 @@ public:
         delete[] m_compare_string;
     }
 
-    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
-    void set_table() override
+    // See comment in base class
+    void set_table(const Table* table) override
     {
-        m_left->set_table();
-        m_right->set_table();
+        m_left->set_table(table);
+        m_right->set_table(table);
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and

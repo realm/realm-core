@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -356,8 +356,6 @@ private:
 
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
-
-    bool supports_export_for_handover() { return m_view == 0; };
 
     bool has_conditions() const { return m_groups.size() > 0 && m_groups[0].m_root_node; }
     ParentNode* root_node() const

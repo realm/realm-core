@@ -661,13 +661,12 @@ TEST(Network_DeadlineTimer_Special)
     network::deadline_timer timer_4(service);
     network::deadline_timer timer_5(service);
     network::deadline_timer timer_6(service);
-    using namespace std;
-    timer_1.async_wait(chrono::seconds(3), [](error_code) { cerr << "*3*\n";   });
-    timer_2.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2*\n";   });
-    timer_3.async_wait(chrono::seconds(3), [](error_code) { cerr << "*3-2*\n"; });
-    timer_4.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2-2*\n"; });
-    timer_5.async_wait(chrono::seconds(1), [](error_code) { cerr << "*1*\n";   });
-    timer_6.async_wait(chrono::seconds(2), [](error_code) { cerr << "*2-3*\n"; });
+    timer_1.async_wait(std::chrono::seconds(3), [](error_code) { std::cerr << "*3*\n";   });
+    timer_2.async_wait(std::chrono::seconds(2), [](error_code) { std::cerr << "*2*\n";   });
+    timer_3.async_wait(std::chrono::seconds(3), [](error_code) { std::cerr << "*3-2*\n"; });
+    timer_4.async_wait(std::chrono::seconds(2), [](error_code) { std::cerr << "*2-2*\n"; });
+    timer_5.async_wait(std::chrono::seconds(1), [](error_code) { std::cerr << "*1*\n";   });
+    timer_6.async_wait(std::chrono::seconds(2), [](error_code) { std::cerr << "*2-3*\n"; });
     service.run();
 }
 */

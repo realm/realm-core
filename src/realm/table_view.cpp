@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -98,10 +98,6 @@ void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
 {
     TableRef tr = group.get_table(patch.table_num);
     m_table = tr;
-    if (patch.was_in_sync)
-        m_last_seen_version = tr->m_version;
-    else
-        m_last_seen_version = -1;
     tr->register_view(this);
     m_query.apply_patch(patch.query_patch, group);
     m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
@@ -112,6 +108,11 @@ void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
         m_linked_column = patch.linked_column;
         m_linked_row = patch.linked_row;
     }
+
+    if (patch.was_in_sync)
+        m_last_seen_version = outside_version();
+    else
+        m_last_seen_version = -1;
 }
 
 // Searching
@@ -767,6 +768,8 @@ void TableViewBase::do_sync()
         // SO: fake that we're up to date BEFORE calling find_all.
         m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
     }
+    m_num_detached_refs = 0;
+
     if (m_auto_sort)
         re_sort();
 

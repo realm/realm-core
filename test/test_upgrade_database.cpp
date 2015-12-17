@@ -17,6 +17,7 @@
 #include <realm/version.hpp>
 
 #include "test.hpp"
+#include "util/to_string.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -73,7 +74,8 @@ using namespace realm::util;
 
 TEST(Upgrade_Database_2_3)
 {
-    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        test_util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
     // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
     // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
@@ -101,7 +103,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            string str = std::to_string(i);
+            string str = test_util::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -149,7 +151,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            std::string str = std::to_string(i);
+            std::string str = test_util::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -171,7 +173,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            std::string str = std::to_string(i);
+            std::string str = test_util::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -199,7 +201,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            std::string str = std::to_string(i);
+            std::string str = test_util::to_string(i);
             StringData sd(str);
             size_t f = t->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -219,7 +221,7 @@ TEST(Upgrade_Database_2_3)
         for (int i = 0; i < 1000; i++) {
             // These tests utilize the Integer and String index. That will crash if the database is still
             // in version 2 format, because the on-disk format of index has changed in version 3.
-            std::string str = std::to_string(i);
+            std::string str = test_util::to_string(i);
             StringData sd(str);
             size_t f = t2->find_first_string(0, sd);
             CHECK_EQUAL(f, i);
@@ -244,7 +246,7 @@ TEST(Upgrade_Database_2_3)
       for (int i = 0; i < 1000; i++) {
           // These tests utilize the Integer and String index. That will crash if the database is still
           // in version 2 format, because the on-disk format of index has changed in version 3.
-          std::string str = std::to_string(i);
+          std::string str = test_util::to_string(i);
           StringData sd(str);
           size_t f = t->find_first_string(0, sd);
           CHECK_EQUAL(f, i);
@@ -283,7 +285,8 @@ TEST(Upgrade_Database_2_3)
 // that all have been modified by null support
 TEST(Upgrade_Database_2_Backwards_Compatible)
 {
-    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        test_util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -421,7 +424,8 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 // Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
 TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 {
-    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        test_util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -558,7 +562,8 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 // Test reading/writing of old version 2 BinaryColumn.
 TEST(Upgrade_Database_Binary)
 {
-    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        test_util::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -643,7 +648,8 @@ TEST(Upgrade_Database_Binary)
 // Test upgrading a database with single column containing strings with embedded NULs
 TEST(Upgrade_Database_Strings_With_NUL)
 {
-    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        test_util::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
 
     // entries in this array must have length == index
     const char* const nul_strings[] = {
@@ -717,7 +723,8 @@ TEST(Upgrade_Database_Strings_With_NUL)
 #if TEST_READ_UPGRADE_MODE
 TEST(Upgrade_Database_2_3_Writes_New_File_Format)
 {
-    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        test_util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
     CHECK_OR_RETURN(File::copy(path, temp_copy));
@@ -735,7 +742,8 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
     // method will sleep 0.2 second between the non-threadsafe and the threadsafe test, to ensure that two threads opening
     // the same database file will both think the database needs upgrade in the first check.
 
-    const std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" + std::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        test_util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
     CHECK_OR_RETURN(File::copy(path, temp_copy));
