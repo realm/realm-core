@@ -31,11 +31,6 @@ fi
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-# enable assertions in release builds by default
-if [ -z ${REALM_ENABLE_ASSERTIONS+x} ]; then
-    export REALM_ENABLE_ASSERTIONS=1
-fi
-
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui replication"
 
