@@ -29,6 +29,29 @@
 
 ----------------------------------------------
 
+# 0.95.6
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Upgraded Android toolchain to R10E and gcc to 4.9 for all architectures.
+
+----------------------------------------------
+
+
 # 0.95.5 Release notes
 
 ### Bugfixes:
