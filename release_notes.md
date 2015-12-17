@@ -5,6 +5,12 @@
 * Fixed incorrect initialization of TableViews from queries on LinkViews
   resulting in `TableView::is_in_sync()` being incorrect until the first time
   it is brought back into sync.
+* Fixed `TableView` aggregate methods to give the correct result when called on
+  a table view that at one point had detached refs but has since been synced.
+* Fixed a bug in handover of Queries which use links. The bug was incomplete
+  cloning of the underlying data structure. This bug goes unnoticed as long
+  as the original datastructure is intact and is only seen if the original
+  datastructure is deleted or changed before the handed over query is re-executed
 
 ### API breaking changes:
 
