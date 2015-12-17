@@ -9531,6 +9531,8 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         CHECK_EQUAL(2, tv->get_source_ndx(1));
     }
 }
+
+
 TEST(LangBindHelper_HandoverLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -9543,6 +9545,7 @@ TEST(LangBindHelper_HandoverLinkView)
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<LinkView> > handover;
+    std::unique_ptr<SharedGroup::Handover<LinkView> > handover2;
     SharedGroup::VersionID vid;
     {
 
@@ -9585,10 +9588,10 @@ TEST(LangBindHelper_HandoverLinkView)
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
         handover = sg_w.export_linkview_for_handover(lvr);
+        handover2 = sg_w.export_linkview_for_handover(lvr);
     }
     {
         LangBindHelper::advance_read(sg, *hist, vid);
-        sg_w.close();
         LinkViewRef lvr = sg.import_linkview_from_handover(move(handover)); // <-- import lvr
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
@@ -9601,6 +9604,30 @@ TEST(LangBindHelper_HandoverLinkView)
         TableView tv;
         tv = q.find_all(); // tv = { 0, 2 }
 
+
+        CHECK_EQUAL(2, tv.size());
+        CHECK_EQUAL(0, tv.get_source_ndx(0));
+        CHECK_EQUAL(2, tv.get_source_ndx(1));
+    }
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        // Change table1 and verify that the change does not propagate through the handed-over linkview
+        TableRef table1 = group_w.get_table("table1");
+        table1->set_int(0, 0, 50);
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+    }
+    {
+        LinkViewRef lvr = sg.import_linkview_from_handover(move(handover2)); // <-- import lvr
+        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+
+        // q.m_table = table1
+        // q.m_view = lvr
+        TableRef table1 = group.get_table("table1");
+        Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+
+        // tv.m_table == table1
+        TableView tv;
+        tv = q.find_all(); // tv = { 0, 2 }
 
         CHECK_EQUAL(2, tv.size());
         CHECK_EQUAL(0, tv.get_source_ndx(0));
@@ -9768,6 +9795,117 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
         }
     }
 }
+
+// Test that we can handover a query involving links, and that after the
+// handover export, the handover is completely decoupled from later changes
+// done on accessors belonging to the exporting shared group
+TEST(LangBindHelper_HandoverWithLinkQueries)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    sg.begin_read();
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    // First setup data so that we can do a query on links
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    TableRef table1 = group_w.add_table("table1");
+    TableRef table2 = group_w.add_table("table2");
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    table2->add_column(type_Int, "col1");
+    table2->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    table2->add_empty_row();
+    table2->set_int(0, 0, 400);
+    table2->set_string(1, 0, "hello");
+    table2->add_empty_row();
+    table2->set_int(0, 1, 500);
+    table2->set_string(1, 1, "world");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 2, "!");
+
+
+    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+
+    // set some links
+    LinkViewRef links1;
+
+    links1 = table1->get_linklist(col_link2, 0);
+    links1->add(1);
+
+    links1 = table1->get_linklist(col_link2, 1);
+    links1->add(1);
+    links1->add(2);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    size_t match;
+
+    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery;
+    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery2;
+    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery_int;
+
+
+    {
+        // Do a query (which will have zero results) and export it twice.
+        // To test separation, we'll later modify state at the exporting side,
+        // and verify that the two different imports still get identical results
+        realm::Query query = table1->link(col_link2).column<String>(1) == "nabil";
+        realm::TableView tv4 = query.find_all();
+
+        handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+        handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+    }
+
+    SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction();// vid == 2
+    {
+        LangBindHelper::advance_read(sg, *hist, vid);
+        std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
+        realm::TableView tv = q->find_all();
+        match = tv.size();
+        CHECK_EQUAL(0, match);
+    }
+
+    // On the exporting side, change the data such that the query will now have
+    // non-zero results if evaluated in that context.
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    table2->add_empty_row();
+    table2->set_int(0, 3, 700);
+    table2->set_string(1, 3, "nabil");
+    links1 = table1->get_linklist(col_link2, 2);
+    links1->add(3);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    {
+        // Import query and evaluate in the old context. This should *not* be
+        // affected by the change done above on the exporting side.
+        std::unique_ptr<Query> q2(sg.import_from_handover(move(handoverQuery2)));
+        realm::TableView tv2 = q2->find_all();
+        match = tv2.size();
+        CHECK_EQUAL(0, match);
+    }
+}
+
+
+
+
 
 REALM_TABLE_1(MyTable, first,  Int)
 
