@@ -9531,6 +9531,8 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         CHECK_EQUAL(2, tv->get_source_ndx(1));
     }
 }
+
+
 TEST(LangBindHelper_HandoverLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -9590,7 +9592,6 @@ TEST(LangBindHelper_HandoverLinkView)
     }
     {
         LangBindHelper::advance_read(sg, *hist, vid);
-        // sg_w.close();
         LinkViewRef lvr = sg.import_linkview_from_handover(move(handover)); // <-- import lvr
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
@@ -9612,7 +9613,7 @@ TEST(LangBindHelper_HandoverLinkView)
         LangBindHelper::promote_to_write(sg_w, *hist_w);
         // Change table1 and verify that the change does not propagate through the handed-over linkview
         TableRef table1 = group_w.get_table("table1");
-        table1->set_int(0,0,50);
+        table1->set_int(0, 0, 50);
         LangBindHelper::commit_and_continue_as_read(sg_w);
     }
     {
@@ -9627,7 +9628,6 @@ TEST(LangBindHelper_HandoverLinkView)
         // tv.m_table == table1
         TableView tv;
         tv = q.find_all(); // tv = { 0, 2 }
-
 
         CHECK_EQUAL(2, tv.size());
         CHECK_EQUAL(0, tv.get_source_ndx(0));
@@ -9872,10 +9872,6 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
         handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
-
-        // Also query on int (through links) to add coverage on a different path
-        realm::Query query_int = table1->link(col_link2).column<Int>(0) == 600;
-        handoverQuery_int = sg_w.export_for_handover(query_int, ConstSourcePayload::Copy);
     }
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction();// vid == 2
@@ -9885,11 +9881,6 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
         realm::TableView tv = q->find_all();
         match = tv.size();
         CHECK_EQUAL(0, match);
-
-        std::unique_ptr<Query> q_int(sg.import_from_handover(move(handoverQuery_int)));
-        realm::TableView tv_int = q_int->find_all();
-        match = tv_int.size();
-        CHECK_EQUAL(1, match);
     }
 
     // On the exporting side, change the data such that the query will now have
