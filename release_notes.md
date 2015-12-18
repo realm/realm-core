@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.95.6 Release notes
 
 ### Bugfixes:
 
@@ -17,10 +17,6 @@
   cloning of the underlying data structure. This bug goes unnoticed as long
   as the original datastructure is intact and is only seen if the original
   datastructure is deleted or changed before the handed over query is re-executed
-
-### API breaking changes:
-
-* Lorem ipsum.
 
 ### Enhancements:
 
@@ -42,27 +38,6 @@
   are, the right approach, going forward, is to enable them specifically for the
   Cocoa binding. Note that with these changes, the Android binding no longer
   needs to explicitely disable regular assertions in release mode.
-
-----------------------------------------------
-
-# 0.95.6
-
-### Bugfixes:
-
-* Lorem ipsum.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
 * Upgraded Android toolchain to R10E and gcc to 4.9 for all architectures.
 
 ----------------------------------------------
