@@ -750,6 +750,7 @@ EOF
     "build-osx")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
+        export REALM_COCOA="1"
         (
             cd src/realm
             REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
