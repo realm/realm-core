@@ -203,13 +203,19 @@ realm_import_SOURCES = importer_tool.cpp
 realm_import_LIBS    = librealm.a
 
 CONFIG_H = util/config.h
-CONFIG_SH = $(CONFIG_H:.h=.sh)
-EXTRA_CLEAN += $(CONFIG_H)
+CONFIG_ANDROID_H = util/config_android.h
+CONFIG_COCOA_H = util/config_cocoa.h
+CONFIG_SH = util/config.sh
+EXTRA_CLEAN += $(CONFIG_H) $(CONFIG_ANDROID_H) $(CONFIG_COCOA_H)
 ifneq ($(REALM_HAVE_CONFIG),)
-nobase_subinclude_HEADERS += $(CONFIG_H)
-GENERATED_SOURCES += $(CONFIG_H)
+nobase_subinclude_HEADERS += $(CONFIG_H) $(CONFIG_ANDROID_H) $(CONFIG_COCOA_H)
+GENERATED_SOURCES += $(CONFIG_H) $(CONFIG_ANDROID_H) $(CONFIG_COCOA_H)
 $(CONFIG_H): ../config.mk $(CONFIG_SH)
 	$(SHELL) $(CONFIG_SH) $< $@
+$(CONFIG_ANDROID_H): ../config.mk $(CONFIG_SH)
+	$(SHELL) $(CONFIG_SH) $< $@ android
+$(CONFIG_COCOA_H): ../config.mk $(CONFIG_SH)
+	$(SHELL) $(CONFIG_SH) $< $@ cocoa
 endif
 
 

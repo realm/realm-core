@@ -2,6 +2,7 @@
 
 source="$1"
 target="$2"
+profile="$3"
 
 get_config_param()
 {
@@ -62,8 +63,14 @@ fi
 enable_encryption="$(get_config_param "ENABLE_ENCRYPTION")" || exit 1
 if [ "$enable_encryption" = "yes" ]; then
     enable_encryption="1"
-else
+elif [ "$enable_encryption" = "no" ]; then
     enable_encryption="0"
+else # "$enable_encryption" = "auto"
+    if [ "$profile" = "android" -o "$profile" = "cocoa" ]; then
+        enable_encryption="1"
+    else
+        enable_encryption="0"
+    fi
 fi
 
 enable_assertions="$(get_config_param "ENABLE_ASSERTIONS")" || exit 1

@@ -201,7 +201,7 @@ download_openssl()
 
     local enabled
     enabled="$(get_config_param "ENABLE_ENCRYPTION")" || return 1
-    if [ "$enabled" != "yes" ]; then
+    if [ "$enabled" = "no" ]; then
         return 0
     fi
 
@@ -254,10 +254,11 @@ if [ "$IS_REDHAT_DERIVATIVE" ]; then
     PLATFORM_HAS_LIBRARY_PATH_ISSUE="1"
 fi
 
-build_apple()
+build_cocoa()
 {
     auto_configure || exit 1
     export REALM_HAVE_CONFIG="1"
+    export REALM_COCOA="1"
     sdks_avail="$(get_config_param "$available_sdks_config_key")" || exit 1
     if [ "$sdks_avail" != "yes" ]; then
         echo "ERROR: Required $name SDKs are not available" 1>&2
@@ -606,9 +607,11 @@ case "$MODE" in
             enable_alloc_set_zero="yes"
         fi
 
-        enable_encryption="no"
-        if [ "$REALM_ENABLE_ENCRYPTION" ]; then
+        enable_encryption="auto"
+        if [ "$REALM_ENABLE_ENCRYPTION" = "yes" ]; then
             enable_encryption="yes"
+        elif [ "$REALM_ENABLE_ENCRYPTION" = "no" ]; then
+            enable_encryption="no"
         fi
 
         enable_assertions="no"
@@ -768,11 +771,11 @@ EOF
         export all_caps_name='IOS'
         export platform_suffix='-bitcode'
         export enable_bitcode='yes'
-        build_apple
+        build_cocoa
 
         export platform_suffix='-no-bitcode'
         export enable_bitcode='no'
-        build_apple
+        build_cocoa
         ;;
 
     "build-watchos")
@@ -788,7 +791,7 @@ EOF
         export all_caps_name='WATCHOS'
         export platform_suffix=''
         export enable_bitcode='yes'
-        build_apple
+        build_cocoa
         ;;
 
     "build-tvos")
@@ -804,7 +807,7 @@ EOF
         export all_caps_name='TVOS'
         export platform_suffix=''
         export enable_bitcode='yes'
-        build_apple
+        build_cocoa
         ;;
 
     "build-android")
@@ -878,7 +881,7 @@ EOF
             # Build OpenSSL if needed
             repodir=$(pwd)
             libcrypto_name="libcrypto-$denom.a"
-            if ! [ -f "$ANDROID_DIR/$libcrypto_name" ] && [ "$enable_encryption" = "yes" ]; then
+            if ! [ -f "$ANDROID_DIR/$libcrypto_name" ] && [ "$enable_encryption" != "no" ]; then
                 (
                     cd openssl
                     export MACHINE=$target
@@ -904,7 +907,7 @@ EOF
             # Build realm
             PATH="$path" CC="$cc" $MAKE -C "src/realm" CC_IS="gcc" BASE_DENOM="$denom" CFLAGS_ARCH="$cflags_arch" "librealm-$denom.a" "librealm-$denom-dbg.a" || exit 1
 
-            if [ "$enable_encryption" = "yes" ]; then
+            if [ "$enable_encryption" != "no" ]; then
                 # Merge OpenSSL and Realm into one static library
                 for lib_name in "librealm-$denom.a" "librealm-$denom-dbg.a"; do
                     (
@@ -955,7 +958,7 @@ EOF
         dir_name="core-$realm_version"
         file_name="realm-core-android-$realm_version.tar.gz"
         tar_files='librealm*'
-        if [ "$enable_encryption" = "yes" ]; then
+        if [ "$enable_encryption" != "no" ]; then
             tar_files='librealm* *.txt'
         fi
 

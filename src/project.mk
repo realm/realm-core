@@ -55,6 +55,26 @@ ifneq ($(REALM_HAVE_CONFIG),)
   PROJECT_CFLAGS += -DREALM_HAVE_CONFIG
 endif
 
+ifneq ($(REALM_ANDROID),)
+  PROJECT_CFLAGS += -DREALM_ANDROID
+endif
+
+ifneq ($(REALM_COCOA),)
+  PROJECT_CFLAGS += -DREALM_COCOA
+endif
+
+ifeq ($(REALM_ANDROID)$(REALM_COCOA),)
+  ENABLE_ENCRYPTION_BY_DEFAULT = 1
+endif
+
+ifeq ($(ENABLE_ENCRYPTION),auto)
+  ifneq ($(ENABLE_ENCRYPTION_BY_DEFAULT),)
+    ENABLE_ENCRYPTION = yes
+  else
+    ENABLE_ENCRYPTION = no
+  endif
+endif
+
 PROJECT_CFLAGS_DEBUG = -DREALM_DEBUG
 PROJECT_CFLAGS_COVER = -DREALM_DEBUG -DREALM_COVER \
                        -fno-inline -fno-inline-small-functions \
