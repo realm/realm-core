@@ -228,9 +228,10 @@ protected:
     void impl_detach() noexcept;
     RowBase() { };
 
-    typedef RowBase_Handover_patch Handover_patch;
-    RowBase(const RowBase& source, Handover_patch& patch);
-    void apply_patch(Handover_patch& patch, Group& group);
+    using HandoverPatch = RowBaseHandoverPatch;
+
+    RowBase(const RowBase& source, HandoverPatch& patch);
+    void apply_patch(HandoverPatch& patch, Group& group);
 private:
     RowBase* m_prev = nullptr; // nullptr if first, undefined if detached.
     RowBase* m_next = nullptr; // nullptr if last, undefined if detached.
@@ -308,25 +309,25 @@ private:
     template<class>
     friend class BasicRow;
 
-    std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<Handover_patch>& patch) const
+    std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<HandoverPatch>& patch) const
     {
-        patch.reset(new Handover_patch);
+        patch.reset(new HandoverPatch);
         std::unique_ptr<BasicRow<T>> retval(new BasicRow<T>(*this, *patch));
         return retval;
     }
 
-    void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
     {
         apply_patch(*patch, group);
         patch.reset();
     }
 
-    void apply_patch(Handover_patch& patch, Group& group)
+    void apply_patch(HandoverPatch& patch, Group& group)
     {
         RowBase::apply_patch(patch, group);
     }
 
-    BasicRow(const BasicRow<T>& source, Handover_patch& patch)
+    BasicRow(const BasicRow<T>& source, HandoverPatch& patch)
         : RowBase(source, patch)
     {
     }

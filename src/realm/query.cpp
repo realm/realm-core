@@ -91,7 +91,7 @@ Query::~Query() noexcept
         delete m_source_table_view;
 }
 
-Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
+Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
     : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
 {
     Table::generate_patch(source.m_table, patch.m_table);
@@ -110,7 +110,7 @@ Query::Query(Query& source, Handover_patch& patch, MutableSourcePayload mode)
     m_groups = source.m_groups;
 }
 
-Query::Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode)
+Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
 {
     Table::generate_patch(source.m_table, patch.m_table);
@@ -152,7 +152,7 @@ void Query::set_table(TableRef tr)
 }
 
 
-void Query::apply_patch(Handover_patch& patch, Group& group)
+void Query::apply_patch(HandoverPatch& patch, Group& group)
 {
     if (m_source_table_view) {
         m_source_table_view->apply_and_consume_patch(patch.table_view_data, group);

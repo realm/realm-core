@@ -5356,10 +5356,10 @@ bool Table::is_cross_table_link_target() const noexcept
 }
 
 
-void Table::generate_patch(const TableRef& ref, std::unique_ptr<Handover_patch>& patch)
+void Table::generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch)
 {
     if (ref.get()) {
-        patch.reset(new Table::Handover_patch);
+        patch.reset(new Table::HandoverPatch);
         patch->m_table_num = ref.get()->get_index_in_group();
         // must be group level table!
         if (patch->m_table_num == npos) {
@@ -5372,7 +5372,7 @@ void Table::generate_patch(const TableRef& ref, std::unique_ptr<Handover_patch>&
 }
 
 
-TableRef Table::create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
 {
     if (patch) {
         TableRef result(group.get_table(patch->m_table_num));

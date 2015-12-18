@@ -54,14 +54,14 @@ void RowBase::impl_detach() noexcept
     }
 }
 
-RowBase::RowBase(const RowBase& source, Handover_patch& patch)
+RowBase::RowBase(const RowBase& source, HandoverPatch& patch)
     : m_table(TableRef())
 {
     Table::generate_patch(source.m_table, patch.m_table);
     patch.row_ndx = source.m_row_ndx;
 }
 
-void RowBase::apply_patch(Handover_patch& patch, Group& group)
+void RowBase::apply_patch(HandoverPatch& patch, Group& group)
 {
     m_table = Table::create_from_and_consume_patch(patch.m_table, group);
     m_table->register_row_accessor(this);

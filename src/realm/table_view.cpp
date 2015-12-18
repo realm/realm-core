@@ -30,7 +30,7 @@
 
 using namespace realm;
 
-TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
+TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
                              MutableSourcePayload mode)
     : RowIndexes(src, mode),
       m_linked_table(TableRef()),
@@ -57,7 +57,7 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
     m_num_detached_refs = 0;
 }
 
-TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
+TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
                              ConstSourcePayload mode)
     : RowIndexes(src, mode),
       m_linked_table(TableRef()),
@@ -86,7 +86,7 @@ TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
     m_num_detached_refs = 0;
 }
 
-void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
+void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 {
     m_table = Table::create_from_and_consume_patch(patch.m_table, group);
     m_table->register_view(this);

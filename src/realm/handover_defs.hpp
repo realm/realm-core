@@ -27,39 +27,39 @@ namespace realm {
 enum class ConstSourcePayload { Copy, Stay };
 enum class MutableSourcePayload { Move };
 
-struct TableView_Handover_patch;
+struct TableViewHandoverPatch;
 
-struct Table_Handover_patch {
+struct TableHandoverPatch {
     size_t m_table_num;
 };
 
-struct LinkView_Handover_patch {
-    std::unique_ptr<Table_Handover_patch> m_table;
+struct LinkViewHandoverPatch {
+    std::unique_ptr<TableHandoverPatch> m_table;
     size_t m_col_num;
     size_t m_row_ndx;
 };
 
-struct Query_Handover_patch {
-    std::unique_ptr<Table_Handover_patch> m_table;
-    std::unique_ptr<TableView_Handover_patch> table_view_data;
-    std::unique_ptr<LinkView_Handover_patch> link_view_data;
-    ~Query_Handover_patch() {};
+struct QueryHandoverPatch {
+    std::unique_ptr<TableHandoverPatch> m_table;
+    std::unique_ptr<TableViewHandoverPatch> table_view_data;
+    std::unique_ptr<LinkViewHandoverPatch> link_view_data;
+    ~QueryHandoverPatch() {};
 };
 
-struct TableView_Handover_patch {
-    std::unique_ptr<Table_Handover_patch> m_table;
-    std::unique_ptr<Table_Handover_patch> linked_table;
+struct TableViewHandoverPatch {
+    std::unique_ptr<TableHandoverPatch> m_table;
+    std::unique_ptr<TableHandoverPatch> linked_table;
     size_t linked_column;
     size_t linked_row;
     bool was_in_sync;
-    Query_Handover_patch query_patch;
-    std::unique_ptr<LinkView_Handover_patch> linkview_patch;
-    ~TableView_Handover_patch() { }
+    QueryHandoverPatch query_patch;
+    std::unique_ptr<LinkViewHandoverPatch> linkview_patch;
+    ~TableViewHandoverPatch() { }
 };
 
 
-struct RowBase_Handover_patch {
-    std::unique_ptr<Table_Handover_patch> m_table;
+struct RowBaseHandoverPatch {
+    std::unique_ptr<TableHandoverPatch> m_table;
     size_t row_ndx;
 };
 

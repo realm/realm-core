@@ -764,9 +764,9 @@ public:
 #endif
 
     class Parent;
-    typedef Table_Handover_patch Handover_patch;
-    static void generate_patch(const TableRef& ref, std::unique_ptr<Handover_patch>& patch);
-    static TableRef create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group);
+    using HandoverPatch = TableHandoverPatch;
+    static void generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch);
+    static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
 protected:
     /// Get a pointer to the accessor of the specified subtable. The

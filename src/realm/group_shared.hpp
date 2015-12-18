@@ -825,7 +825,7 @@ private:
 
 template<typename T>
 struct SharedGroup::Handover {
-    std::unique_ptr<typename T::Handover_patch> patch;
+    std::unique_ptr<typename T::HandoverPatch> patch;
     std::unique_ptr<T> clone;
     VersionID version;
 };
