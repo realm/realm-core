@@ -8949,8 +8949,6 @@ TEST(LangBindHelper_HandoverPartialQuery)
         // Untyped interface
         std::unique_ptr<SharedGroup::Handover<Query> > handover;
         {
-            sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
-            sg_w.begin_read();
             LangBindHelper::promote_to_write(sg_w, *hist_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
