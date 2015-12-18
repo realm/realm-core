@@ -2360,6 +2360,36 @@ TEST(Group_AddEmptyRowCrash)
 }
 
 
+TEST_IF(Group_AddEmptyRowCrash_2, REALM_MAX_BPNODE_SIZE == 4)
+{
+    // Set REALM_MAX_BPNODE_SIZE = 4 for it to crash
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column(type_Int, "A");
+    table->add_empty_row(147);
+    table->add_column(type_Int, "B");
+    table->add_empty_row(110);
+
+    // column.hpp:1267: [realm-core-0.95.5] Assertion failed: prior_num_rows == size()
+    table->add_empty_row();
+}
+
+
+TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
+{
+    // Set REALM_MAX_BPNODE_SIZE = 4 for it to crash
+    Group g;
+    g.insert_table(0, "A");
+    g.add_table("B");
+    g.get_table(1)->insert_empty_row(0, 17);
+    g.get_table(0)->add_column_link(type_LinkList, "link", *g.get_table(1));
+    g.get_table(1)->insert_empty_row(17, 1);
+
+    // Triggers "alloc.hpp:213: Assertion failed: v % 8 == 0"
+    g.verify();
+}
+
+
 #ifdef REALM_DEBUG
 #ifdef REALM_TO_DOT
 

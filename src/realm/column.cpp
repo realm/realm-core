@@ -473,7 +473,8 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 {
     size_t rest_size = *rest_size_ptr;
     size_t orig_rest_size = rest_size;
-    size_t leaf_size = std::min(size_t(REALM_MAX_BPNODE_SIZE), rest_size);
+    size_t elems_per_child = REALM_MAX_BPNODE_SIZE;
+    size_t leaf_size = std::min(elems_per_child, rest_size);
     rest_size -= leaf_size;
     ref_type node = handler.create_leaf(leaf_size);
     size_t height = 1;
@@ -486,7 +487,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
             Array new_inner_node(alloc);
             new_inner_node.create(Array::type_InnerBptreeNode); // Throws
             try {
-                int_fast64_t v = orig_rest_size - rest_size; // elems_per_child
+                int_fast64_t v = elems_per_child;
                 new_inner_node.add(1 + 2*v); // Throws
                 v = node; // FIXME: Dangerous cast here (unsigned -> signed)
                 new_inner_node.add(v); // Throws
@@ -513,6 +514,8 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
             }
             node = new_inner_node.get_ref();
             ++height;
+            // Overflow is impossible here is all nodes will have elems_per_child <= orig_rest_size
+            elems_per_child *= REALM_MAX_BPNODE_SIZE;
         }
     }
     catch (...) {
