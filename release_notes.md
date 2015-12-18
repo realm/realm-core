@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Corrected a bug which caused handover of a query with a restricting
+  view to loose the restricting view.
 
 ### API breaking changes:
 
