@@ -105,14 +105,6 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
-/*
-    if (m_source_link_view)
-        m_view = m_source_link_view.get();
-    else if (m_source_table_view)
-        m_view = m_source_table_view;
-    else
-        m_view = nullptr;
-*/
     m_groups = source.m_groups;
 }
 
@@ -130,14 +122,6 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
-/*
-    if (m_source_link_view)
-        m_view = m_source_link_view.get();
-    else if (m_source_table_view)
-        m_view = m_source_table_view;
-    else
-        m_view = nullptr;
-*/
     m_groups = source.m_groups;
 }
 
