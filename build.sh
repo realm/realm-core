@@ -31,11 +31,6 @@ fi
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-# enable assertions in release builds by default
-if [ -z ${REALM_ENABLE_ASSERTIONS+x} ]; then
-    export REALM_ENABLE_ASSERTIONS=1
-fi
-
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui replication"
 
@@ -847,7 +842,7 @@ EOF
             if [ "$target" = "arm" -o "$target" = "arm-v7a" ]; then
                 arch="arm"
                 android_prefix="arm"
-                android_toolchain="arm-linux-androideabi-4.8"
+                android_toolchain="arm-linux-androideabi-4.9"
             elif [ "$target" = "arm64" ]; then
                 arch="arm64"
                 android_prefix="aarch64"
@@ -855,11 +850,11 @@ EOF
             elif [ "$target" = "mips" ]; then
                 arch="mips"
                 android_prefix="mipsel"
-                android_toolchain="mipsel-linux-android-4.8"
+                android_toolchain="mipsel-linux-android-4.9"
             elif [ "$target" = "x86" ]; then
                 arch="x86"
                 android_prefix="i686"
-                android_toolchain="x86-4.8"
+                android_toolchain="x86-4.9"
             elif [ "$target" = "x86_64" ]; then
                 arch="x86_64"
                 android_prefix="x86_64"

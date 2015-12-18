@@ -13,6 +13,10 @@
   bindings in their current form. In particular, it would have been triggered
   when adding a new attribute to a class that already has a sufficiently large
   number of objects in it (> REALM_MAX_BPNODE_SIZE^2 = 1,000,000).
+* Fixed a bug in handover of Queries which use links. The bug was incomplete
+  cloning of the underlying data structure. This bug goes unnoticed as long
+  as the original datastructure is intact and is only seen if the original
+  datastructure is deleted or changed before the handed over query is re-executed
 
 ### API breaking changes:
 
@@ -28,8 +32,41 @@
 
 * Add `test_util::to_string()` for convenience. std::to_string() is not
   available via all Android NDK toolchains.
+* Regular assertions (REALM_ASSERT()) are no longer enabled by default in
+  release mode. Note that this is a reversion back to the "natural" state of
+  affairs, after a period of having them enabled by default in release mode. The
+  Cocoa binding was the primary target when the assertions were enabled a while
+  back, and steps were taken to explicitely disable those assertions in the
+  Android binding to avoid a performance-wise impact there. It is believed that
+  the assertions are no longer needed in the Cocoa binding, but in case they
+  are, the right approach, going forward, is to enable them specifically for the
+  Cocoa binding. Note that with these changes, the Android binding no longer
+  needs to explicitely disable regular assertions in release mode.
 
 ----------------------------------------------
+
+# 0.95.6
+
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Upgraded Android toolchain to R10E and gcc to 4.9 for all architectures.
+
+----------------------------------------------
+
 
 # 0.95.5 Release notes
 
