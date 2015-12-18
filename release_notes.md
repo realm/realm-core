@@ -18,7 +18,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added support for handing over TableRefs from one thread to another.
 
 -----------
 

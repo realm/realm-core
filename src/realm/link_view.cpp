@@ -27,11 +27,11 @@
 
 using namespace realm;
 
-void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Handover_patch>& patch)
+void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch)
 {
     if (bool(ref)) {
-        patch.reset(new Handover_patch);
-        patch->m_table_num = ref->m_origin_table->get_index_in_group();
+        patch.reset(new HandoverPatch);
+        Table::generate_patch(ref->m_origin_table, patch->m_table);
         patch->m_col_num = ref->m_origin_column.m_column_ndx;
         patch->m_row_ndx = ref->get_origin_row_index();
     }
@@ -40,10 +40,10 @@ void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Hando
 }
 
 
-LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group) 
+LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group) 
 {
     if (patch) {
-        TableRef tr(group.get_table(patch->m_table_num));
+        TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);
         LinkViewRef result = tr->get_linklist(patch->m_col_num, patch->m_row_ndx);
         patch.reset();
         return result;
