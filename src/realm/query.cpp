@@ -105,8 +105,14 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
-    m_view = m_source_link_view.get();
-
+/*
+    if (m_source_link_view)
+        m_view = m_source_link_view.get();
+    else if (m_source_table_view)
+        m_view = m_source_table_view;
+    else
+        m_view = nullptr;
+*/
     m_groups = source.m_groups;
 }
 
@@ -124,8 +130,14 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
-    m_view = m_source_link_view.get();
-
+/*
+    if (m_source_link_view)
+        m_view = m_source_link_view.get();
+    else if (m_source_table_view)
+        m_view = m_source_table_view;
+    else
+        m_view = nullptr;
+*/
     m_groups = source.m_groups;
 }
 
@@ -158,7 +170,12 @@ void Query::apply_patch(HandoverPatch& patch, Group& group)
         m_source_table_view->apply_and_consume_patch(patch.table_view_data, group);
     }
     m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, group);
-    m_view = m_source_link_view.get();
+    if (m_source_link_view)
+        m_view = m_source_link_view.get();
+    else if (m_source_table_view)
+        m_view = m_source_table_view;
+    else
+        m_view = nullptr;
     // not going through Table::create_from_and_consume_patch because we need to use
     // set_table() to update all table references
     if (patch.m_table) {
