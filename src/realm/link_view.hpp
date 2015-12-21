@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -108,9 +108,9 @@ private:
     LinkListColumn& m_origin_column;
     mutable size_t m_ref_count;
 
-    typedef LinkView_Handover_patch Handover_patch;
-    static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Handover_patch>& patch);
-    static LinkViewRef create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group);
+    using HandoverPatch = LinkViewHandoverPatch;
+    static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch);
+    static LinkViewRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
     // constructor (protected since it can only be used by friends)
     LinkView(Table* origin_table, LinkListColumn&, size_t row_ndx);

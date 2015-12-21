@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -1575,7 +1575,7 @@ public:
 
     void init(const Table& table) override
     {
-        m_compare->set_table();
+        m_compare->set_table(&table);
         if (m_child)
             m_child->init(table);
     }

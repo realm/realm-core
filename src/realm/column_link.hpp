@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -172,12 +172,12 @@ inline void LinkColumn::do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
     ++target_row_ndx_1;
     ++target_row_ndx_2;
 
-    size_t value = LinkColumnBase::get(row_ndx);
+    uint64_t value = LinkColumnBase::get_uint(row_ndx);
     if (value == target_row_ndx_1) {
-        LinkColumnBase::set(row_ndx, target_row_ndx_2);
+        LinkColumnBase::set_uint(row_ndx, target_row_ndx_2);
     }
     else if (value == target_row_ndx_2) {
-        LinkColumnBase::set(row_ndx, target_row_ndx_1);
+        LinkColumnBase::set_uint(row_ndx, target_row_ndx_1);
     }
 }
 

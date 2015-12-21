@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -1651,6 +1651,30 @@ LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<
     }
     // move data
     LinkViewRef result = LinkView::create_from_and_consume_patch(handover->patch, m_group);
+    return result;
+}
+
+
+std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_handover(const TableRef& accessor)
+{
+    LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading) {
+        throw LogicError(LogicError::wrong_transact_state);
+    }
+    std::unique_ptr<Handover<Table>> result(new Handover<Table>());
+    Table::generate_patch(accessor, result->patch);
+    result->clone = 0;
+    result->version = get_version_of_current_transaction();
+    return result;
+}
+
+
+TableRef SharedGroup::import_table_from_handover(std::unique_ptr<Handover<Table>> handover)
+{
+    if (handover->version != get_version_of_current_transaction()) {
+        throw BadVersion();
+    }
+    TableRef result = Table::create_from_and_consume_patch(handover->patch, m_group);
     return result;
 }
 

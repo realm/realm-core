@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2013] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -25,7 +25,7 @@
 
 #define REALM_VER_MAJOR 0
 #define REALM_VER_MINOR 95
-#define REALM_VER_PATCH 4
+#define REALM_VER_PATCH 6
 #define REALM_PRODUCT_NAME "realm-core"
 
 #define REALM_QUOTE2(X) #X
