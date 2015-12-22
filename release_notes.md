@@ -1,23 +1,9 @@
-# NEXT RELEASE
+# 0.95.7 Release notes
 
 ### Bugfixes:
 
 * Corrected a bug which caused handover of a query with a restricting
   view to loose the restricting view.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
