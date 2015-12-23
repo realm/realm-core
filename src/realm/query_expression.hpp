@@ -2265,7 +2265,10 @@ public:
         return m_link_map.m_tables[0];
     }
 
-    void set_table() override { }
+    void set_table(const Table* table) override
+    {
+        m_link_map.set_table(table);
+    }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
