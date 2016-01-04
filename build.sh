@@ -1079,6 +1079,25 @@ EOF
         exit 0
         ;;
 
+    "tsan"|"tsan-debug")
+        # Run test suite with GCC's thread sanitizer enabled.
+        # To get symbolized stack traces (file names and line numbers) with GCC, you at least version 4.9.
+        check_mode="$(printf "%s\n" "$MODE" | sed 's/tsan/check/')" || exit 1
+        auto_configure || exit 1
+        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        export REALM_HAVE_CONFIG="1"
+        error=""
+        if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=thread" EXTRA_LDFLAGS="-fsanitize=thread" "$check_mode"; then
+            error="1"
+        fi
+        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        if [ "$error" ]; then
+            exit 1
+        fi
+        echo "Test passed"
+        exit 0
+        ;;
+
     "build-test-ios-app")
         # For more documentation, see test/ios/README.md.
 
@@ -2947,6 +2966,13 @@ EOF
         # Run by Jenkins as part of the core pipeline whenever master changes.
         REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
         sh build.sh asan-debug || exit 1
+        exit 0
+        ;;
+
+    "jenkins-pipeline-thread-sanitizer")
+        # Run by Jenkins as part of the core pipeline whenever master changes.
+        REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        sh build.sh tsan-debug || exit 1
         exit 0
         ;;
 
