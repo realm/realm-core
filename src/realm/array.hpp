@@ -488,6 +488,7 @@ public:
     /// Add signed \a diff to all elements that are greater than, or equal to \a
     /// limit.
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
+    template <size_t width> void adjust_ge(int_fast64_t limit, int_fast64_t diff);
 
     //@{
     /// These are similar in spirit to std::move() and std::move_backward from
@@ -1721,14 +1722,19 @@ inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
         adjust(i, diff); // Throws
 }
 
-inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
+template <size_t width> void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
-        int_fast64_t v = get(i);
+        int_fast64_t v = get<width>(i);
         if (v >= limit)
-            set(i, int64_t(v + diff)); // Throws
+            set<width>(i, int64_t(v + diff)); // Throws
     }
+}
+
+inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
+{
+    REALM_TEMPEX(adjust_ge, m_width, (limit, diff));
 }
 
 

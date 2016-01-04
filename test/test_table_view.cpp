@@ -1825,4 +1825,23 @@ TEST(TableView_Distinct)
     CHECK(tv.get_string(0, 5).is_null());
 }
 
+ONLY(TableView_ClearSpeed)
+{
+    const size_t rows = 300000;
+    Table tbl;
+    tbl.add_column(type_String, "s", true);
+    tbl.add_empty_row(rows);
+
+    tbl.add_search_index(0);
+
+    for (size_t t = 0; t < rows / 3; t += 3) {
+        tbl.set_string(0, t + 0, StringData("foo"));
+        tbl.set_string(0, t + 1, StringData("bar"));
+        tbl.set_string(0, t + 2, StringData("hello"));
+    }
+
+    TableView tv = (tbl.column<String>(0) == "foo").find_all();
+    tv.clear();
+}
+
 #endif // TEST_TABLE_VIEW
