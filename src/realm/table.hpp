@@ -381,7 +381,7 @@ public:
     /// All accessors to \a row_ndx will be updated to become accessors to
     /// \a replacement_row_ndx.
     ///
-    /// \sa{Table::move_last_over}
+    /// \sa Table::move_last_over()
     void replace_row(size_t row_ndx, size_t replacement_row_ndx);
 
     // Get cell values
