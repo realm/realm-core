@@ -376,7 +376,6 @@ public:
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     //@}
     
-    //@{
     /// Replaces all links to \a row_ndx with links to \a replacement_row_ndx.
     ///
     /// All accessors to \a row_ndx will be updated to become accessors to
@@ -384,7 +383,6 @@ public:
     ///
     /// \sa{Table::move_last_over}
     void replace_row(size_t row_ndx, size_t replacement_row_ndx);
-    //@}
 
     // Get cell values
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
