@@ -1825,6 +1825,9 @@ TEST(TableView_Distinct)
     CHECK(tv.get_string(0, 5).is_null());
 }
 
+/*
+// This can be used to benchmark the speed of TableView::clear() for an ordered Table
+// which is indexed.
 ONLY(TableView_ClearSpeed)
 {
     const size_t rows = 300000;
@@ -1843,5 +1846,6 @@ ONLY(TableView_ClearSpeed)
     TableView tv = (tbl.column<String>(0) == "foo").find_all();
     tv.clear();
 }
+*/
 
 #endif // TEST_TABLE_VIEW
