@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Optimized speed of TableView::clear() on an indexed and ordered Table.
+  A quick benchmark showed a 68 -> 19 second reduction of time.
 
 -----------
 
