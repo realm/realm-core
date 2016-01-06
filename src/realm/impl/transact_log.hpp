@@ -67,7 +67,7 @@ enum Instruction {
     instr_InsertEmptyRows       = 17,
     instr_EraseRows             = 18, // Remove (multiple) rows
     instr_SwapRows              = 19,
-    instr_ReplaceRow            = 47, // Replace references to row A with references to row B
+    instr_SubsumeIdentity       = 47, // Replace links and accessors pointing to row A with references to row B
     instr_ClearTable            = 20, // Remove all rows in selected table
     instr_OptimizeTable         = 21,
     instr_SelectDescriptor      = 22, // Select descriptor from currently selected root table
@@ -146,7 +146,7 @@ public:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
     bool swap_rows(size_t, size_t) { return true; }
-    bool replace_row(size_t, size_t) { return true; }
+    bool subsume_identity(size_t, size_t) { return true; }
     bool clear_table() { return true; }
     bool set_int(size_t, size_t, int_fast64_t) { return true; }
     bool set_int_unique(size_t, size_t, int_fast64_t) { return true; }
@@ -213,7 +213,7 @@ public:
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool unordered);
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2);
-    bool replace_row(size_t row_ndx, size_t replacement_row_ndx);
+    bool subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx);
     bool clear_table();
 
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t);
@@ -343,7 +343,7 @@ public:
                     bool is_move_last_over);
 
     void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
-    void replace_row(const Table*, size_t row_ndx, size_t replacement_row_ndx);
+    void subsume_identity(const Table*, size_t row_ndx, size_t subsumed_by_row_ndx);
     void add_search_index(const Table*, size_t col_ndx);
     void remove_search_index(const Table*, size_t col_ndx);
     void set_link_type(const Table*, size_t col_ndx, LinkType);
@@ -1233,17 +1233,17 @@ inline void TransactLogConvenientEncoder::swap_rows(const Table* t, size_t row_n
     m_encoder.swap_rows(row_ndx_1, row_ndx_2);
 }
 
-inline bool TransactLogEncoder::replace_row(size_t row_ndx, size_t replacement_row_ndx)
+inline bool TransactLogEncoder::subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
 {
-    append_simple_instr(instr_ReplaceRow, util::tuple(row_ndx, replacement_row_ndx)); // Throws
+    append_simple_instr(instr_SubsumeIdentity, util::tuple(row_ndx, subsumed_by_row_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::replace_row(const Table* t, size_t row_ndx,
-                                                      size_t replacement_row_ndx)
+inline void TransactLogConvenientEncoder::subsume_identity(const Table* t, size_t row_ndx,
+                                                      size_t subsumed_by_row_ndx)
 {
     select_table(t); // Throws
-    m_encoder.replace_row(row_ndx, replacement_row_ndx);
+    m_encoder.subsume_identity(row_ndx, subsumed_by_row_ndx);
 }
 
 inline bool TransactLogEncoder::add_search_index(size_t col_ndx)
@@ -1641,10 +1641,10 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_ReplaceRow: {
+        case instr_SubsumeIdentity: {
             size_t row_ndx = read_int<size_t>(); // Throws
-            size_t replacement_row_ndx = read_int<size_t>(); // Throws
-            if (!handler.replace_row(row_ndx, replacement_row_ndx)) // Throws
+            size_t subsumed_by_row_ndx = read_int<size_t>(); // Throws
+            if (!handler.subsume_identity(row_ndx, subsumed_by_row_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -2172,10 +2172,10 @@ public:
         return true;
     }
 
-    bool replace_row(size_t row_ndx, size_t replacement_row_ndx)
+    bool subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
     {
         static_cast<void>(row_ndx);
-        static_cast<void>(replacement_row_ndx);
+        static_cast<void>(subsumed_by_row_ndx);
         // There is no instruction we can generate here to change back.
         return true;
     }

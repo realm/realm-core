@@ -1153,12 +1153,12 @@ public:
         return true;
     }
 
-    bool replace_row(size_t row_ndx, size_t replacement_row_ndx) noexcept
+    bool subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
         using tf = _impl::TableFriend;
-        tf::adj_acc_replace_row(*m_table, row_ndx, replacement_row_ndx);
+        tf::adj_acc_subsume_identity(*m_table, row_ndx, subsumed_by_row_ndx);
         return true;
     }
 

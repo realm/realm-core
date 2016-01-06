@@ -6504,7 +6504,7 @@ TEST(Table_MixedCrashValues)
 }
 
 
-TEST(Table_ReplaceRow_Links)
+TEST(Table_SubsumeIdentity_Links)
 {
     Group g;
 
@@ -6521,14 +6521,14 @@ TEST(Table_ReplaceRow_Links)
 
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
-    t1->replace_row(0, 9);
+    t1->subsume_identity(0, 9);
     CHECK_EQUAL(replaced_row.get_index(), 9);
     CHECK_EQUAL(t0->get_link(0, 0), 9);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
 }
 
 
-TEST(Table_ReplaceRow_LinkLists)
+TEST(Table_SubsumeIdentity_LinkLists)
 {
     Group g;
 
@@ -6547,7 +6547,7 @@ TEST(Table_ReplaceRow_LinkLists)
 
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
-    t1->replace_row(0, 9);
+    t1->subsume_identity(0, 9);
     CHECK_EQUAL(replaced_row.get_index(), 9);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
     CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);

@@ -886,7 +886,7 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
 }
 
 
-TEST(Replication_ReplaceRow)
+TEST(Replication_SubsumeIdentity)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -905,7 +905,7 @@ TEST(Replication_ReplaceRow)
         t0->add_empty_row(2);
         t1->add_empty_row(2);
         t1->set_link(0, 0, 0);
-        t0->replace_row(0, 1);
+        t0->subsume_identity(0, 1);
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger.get());

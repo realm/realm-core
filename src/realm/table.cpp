@@ -2093,44 +2093,15 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     remove_backlink_broken_rows(state); // Throws
 }
 
-void Table::replace_row(size_t row_ndx, size_t replacement_row_ndx)
+void Table::subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_EX(row_ndx < m_size, row_ndx, m_size);
 
-    // Replace links through backlink columns, generating SetLink instructions.
-    size_t backlink_col_start = m_spec.get_public_column_count();
-    size_t backlink_col_end   = m_spec.get_column_count();
-    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
-        if (m_spec.get_column_type(col_ndx) != col_type_BackLink) {
-            continue; // Future-proofing; the only non-public columns today are backlink columns.
-        }
-
-        auto& col = get_column_backlink(col_ndx);
-        auto& origin_table = col.get_origin_table();
-        size_t origin_col_ndx = col.get_origin_column_index();
-        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
-        while (col.get_backlink_count(row_ndx) > 0) {
-            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
-
-            if (origin_col_type == col_type_Link) {
-                origin_table.set_link(origin_col_ndx, origin_row_ndx, replacement_row_ndx);
-            }
-            else if (origin_col_type == col_type_LinkList) {
-                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
-                for (size_t j = 0; j < links->size(); ++j) {
-                    if (links->get(j).get_index() == row_ndx) {
-                        links->set(j, replacement_row_ndx);
-                    }
-                }
-            }
-        }
-    }
-
-    do_replace_row(row_ndx, replacement_row_ndx);
+    do_subsume_identity(row_ndx, subsumed_by_row_ndx);
 
     if (Replication* repl = get_repl()) {
-        repl->replace_row(this, row_ndx, replacement_row_ndx);
+        repl->subsume_identity(this, row_ndx, subsumed_by_row_ndx);
     }
 }
 
@@ -2262,9 +2233,40 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 }
 
 
-void Table::do_replace_row(size_t row_ndx, size_t replacement_row_ndx)
+void Table::do_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
 {
-    adj_row_acc_replace_row(row_ndx, replacement_row_ndx);
+    // Replace links through backlink columns, WITHOUT generating SetLink instructions.
+    // FIXME: Consider whether it is OK to ignore cascading behavior here, as we do.
+    size_t backlink_col_start = m_spec.get_public_column_count();
+    size_t backlink_col_end   = m_spec.get_column_count();
+    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
+        if (m_spec.get_column_type(col_ndx) != col_type_BackLink) {
+            continue; // Future-proofing; the only non-public columns today are backlink columns.
+        }
+
+        auto& col = get_column_backlink(col_ndx);
+        auto& origin_table = col.get_origin_table();
+        size_t origin_col_ndx = col.get_origin_column_index();
+        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
+        while (col.get_backlink_count(row_ndx) > 0) {
+            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
+
+            if (origin_col_type == col_type_Link) {
+                origin_table.do_set_link(origin_col_ndx, origin_row_ndx, subsumed_by_row_ndx);
+            }
+            else if (origin_col_type == col_type_LinkList) {
+                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
+                for (size_t j = 0; j < links->size(); ++j) {
+                    using llf = _impl::LinkListFriend;
+                    if (links->get(j).get_index() == row_ndx) {
+                        llf::do_set(*links, j, subsumed_by_row_ndx);
+                    }
+                }
+            }
+        }
+    }
+
+    adj_row_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
     bump_version();
 }
 
@@ -4995,15 +4997,15 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_acc_replace_row(size_t row_ndx, size_t replacement_row_ndx) noexcept
+void Table::adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    adj_row_acc_replace_row(row_ndx, replacement_row_ndx);
+    adj_row_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
 
-    // No need to adjust accessors by row, because all the effects of replace_row
+    // No need to adjust accessors by row, because all the effects of subsume_identity
     // have already been applied as set_link instructions.
 }
 
@@ -5125,7 +5127,7 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_row_acc_replace_row(size_t row_ndx, size_t replacement_row_ndx) noexcept
+void Table::adj_row_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -5135,7 +5137,7 @@ void Table::adj_row_acc_replace_row(size_t row_ndx, size_t replacement_row_ndx) 
     RowBase* row = m_row_accessors;
     while (row) {
         if (row->m_row_ndx == row_ndx) {
-            row->m_row_ndx = replacement_row_ndx;
+            row->m_row_ndx = subsumed_by_row_ndx;
         }
         row = row->m_next;
     }

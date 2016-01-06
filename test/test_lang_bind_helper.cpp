@@ -3385,7 +3385,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
 }
 
 
-TEST(LangBindHelper_AdvanceReadTransact_ReplaceRow)
+TEST(LangBindHelper_AdvanceReadTransact_SubsumeIdentity)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
@@ -3423,8 +3423,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ReplaceRow)
         WriteTransaction wt(sg_w);
         TableRef t0 = wt.get_table("t0");
         TableRef t1 = wt.get_table("t1");
-        t0->replace_row(0, 2);
-        t1->replace_row(0, 2);
+        t0->subsume_identity(0, 2);
+        t1->subsume_identity(0, 2);
         wt.commit();
     }
 
@@ -7315,7 +7315,7 @@ public:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
     bool erase_rows(size_t, size_t, size_t, bool) { return false; }
     bool swap_rows(size_t, size_t) { return false; }
-    bool replace_row(size_t, size_t) { return false; }
+    bool subsume_identity(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
     bool link_list_set(size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t) { return false; }
