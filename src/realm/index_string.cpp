@@ -680,19 +680,24 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 REALM_ASSERT(old_pos != not_found);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
 
-                // shift each entry between the old and new position over one
+                // The payload-value exists in multiple rows, and these rows indexes are stored in an IntegerColumn. 
+                // They must be in increasing order, so we cannot just use "set()". We must delete the old row index 
+                // and insert the new at the correct position computed above.
                 if (new_pos < old_pos) {
-                    for (size_t i = old_pos; i > new_pos; --i)
-                        sub.set(i, sub.get(i - 1));
+                    sub.insert_without_updating_index(new_pos, new_row_ndx, 1);
+                    sub.erase_without_updating_index(old_pos + 1, old_pos + 1 == sub.size() - 1);
                 }
                 else if (new_pos > old_pos) {
                     // we're removing the old entry from before the new entry,
                     // so shift back one
                     --new_pos;
-                    for (size_t i = old_pos; i < new_pos; ++i)
-                        sub.set(i, sub.get(i + 1));
+                    sub.erase_without_updating_index(old_pos, false);
+                    sub.insert_without_updating_index(new_pos, new_row_ndx, 1);
                 }
-                sub.set(new_pos, new_row_ndx);
+                else {
+                    sub.set(new_pos, new_row_ndx);
+                }
+
             }
         }
     }
