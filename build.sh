@@ -257,6 +257,7 @@ fi
 build_apple()
 {
     auto_configure || exit 1
+    export REALM_ENABLE_ASSERTIONS="yes"
     export REALM_HAVE_CONFIG="1"
     sdks_avail="$(get_config_param "$available_sdks_config_key")" || exit 1
     if [ "$sdks_avail" != "yes" ]; then
