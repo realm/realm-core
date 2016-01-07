@@ -80,6 +80,7 @@ public:
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
+    void adj_acc_subsume_identity(size_t, size_t) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -142,6 +143,9 @@ private:
 
     template<bool fix_ndx_in_parent>
     void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+
+    template<bool fix_ndx_in_parent>
+    void adj_subsume_identity(size_t, size_t) noexcept;
 
     void prune_list_accessor_tombstones() noexcept;
     void validate_list_accessors() const noexcept;

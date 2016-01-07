@@ -46,6 +46,11 @@ inline void MixedColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_nd
     m_data->adj_acc_move_over(from_row_ndx, to_row_ndx);
 }
 
+inline void MixedColumn::adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+{
+    m_data->adj_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+}
+
 inline void MixedColumn::adj_acc_clear_root_table() noexcept
 {
     m_data->adj_acc_clear_root_table();

@@ -460,6 +460,15 @@ void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexc
 }
 
 
+void LinkListColumn::adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+{
+    LinkColumnBase::adj_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+
+    const bool fix_ndx_in_parent = true;
+    adj_subsume_identity<fix_ndx_in_parent>(row_ndx, subsumed_by_row_ndx);
+}
+
+
 template<bool fix_ndx_in_parent>
 void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
@@ -599,6 +608,40 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
     }
 
     validate_list_accessors();
+}
+
+
+template<bool fix_ndx_in_parent>
+void LinkListColumn::adj_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+{
+    prune_list_accessor_tombstones();
+
+    auto begin = m_list_accessors.begin();
+    auto end   = m_list_accessors.end();
+
+    auto it = std::lower_bound(begin, end, list_entry{row_ndx, nullptr});
+    bool found = (it != end && it->m_row_ndx == row_ndx);
+
+    auto destination = std::lower_bound(begin, end, list_entry{subsumed_by_row_ndx, nullptr});
+
+    if (found) {
+        size_t num_affected = 0;
+        while (it != end && it->m_row_ndx == row_ndx) {
+            it->m_row_ndx = subsumed_by_row_ndx;
+            if (fix_ndx_in_parent) {
+                it->m_list->set_origin_row_index(subsumed_by_row_ndx);
+            }
+            ++num_affected;
+        }
+
+        // Maintain order:
+        if (it < destination) {
+            std::rotate(it, it + num_affected, destination);
+        }
+        else if (it > destination) {
+            std::rotate(destination, it, it + num_affected);
+        }
+    }
 }
 
 

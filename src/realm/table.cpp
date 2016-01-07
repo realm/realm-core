@@ -2266,7 +2266,7 @@ void Table::do_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
         }
     }
 
-    adj_row_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+    adj_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
     bump_version();
 }
 
@@ -5005,8 +5005,12 @@ void Table::adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
 
     adj_row_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
 
-    // No need to adjust accessors by row, because all the effects of subsume_identity
-    // have already been applied as set_link instructions.
+    // Adjust subtable/linklist/mixed accessors after subsume identity
+    size_t n = m_cols.size();
+    for (size_t i = 0; i < n; ++i) {
+        if (ColumnBase* col = m_cols[i])
+            col->adj_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+    }
 }
 
 

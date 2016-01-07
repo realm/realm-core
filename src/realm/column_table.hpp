@@ -54,6 +54,7 @@ public:
     void adj_acc_move_over(size_t, size_t) noexcept override;
     void adj_acc_clear_root_table() noexcept override;
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
+    void adj_acc_subsume_identity(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
@@ -98,6 +99,8 @@ protected:
         bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
         template<bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+        template<bool fix_ndx_in_parent>
+        void adj_subsume_identity(size_t row_ndx, size_t subsumed_by) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
@@ -375,6 +378,12 @@ inline void SubtableColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_n
     m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
 }
 
+inline void SubtableColumnBase::adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+{
+    const bool fix_ndx_in_parent = true;
+    m_subtable_map.adj_subsume_identity<fix_ndx_in_parent>(row_ndx, subsumed_by_row_ndx);
+}
+
 inline Table* SubtableColumnBase::get_subtable_accessor(size_t row_ndx) const noexcept
 {
     // This function must assume no more than minimal consistency of the
@@ -502,6 +511,20 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
             e.m_subtable_ndx = row_ndx_1;
             if (fix_ndx_in_parent)
                 tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+        }
+    }
+}
+
+template<bool fix_ndx_in_parent>
+void SubtableColumnBase::SubtableMap::adj_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+{
+    using tf = _impl::TableFriend;
+    for (entry& e: m_entries) {
+        if (e.m_subtable_ndx == row_ndx) {
+            e.m_subtable_ndx = subsumed_by_row_ndx;
+            if (fix_ndx_in_parent) {
+                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+            }
         }
     }
 }

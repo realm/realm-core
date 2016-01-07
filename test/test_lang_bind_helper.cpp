@@ -8765,6 +8765,62 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     sg_w.end_read();
 }
 
+
+TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnSubsumeIdentity)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<ClientHistory> hist{make_client_history(path, crypt_key())};
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    const Group& group = sg.begin_read();
+
+    // Create some tables and rows.
+    LangBindHelper::promote_to_write(sg, *hist);
+    Group& group_w = const_cast<Group&>(group);
+    TableRef t0 = group_w.add_table("t0");
+    TableRef t1 = group_w.add_table("t1");
+    t0->add_column(type_Int, "i");
+    t1->add_column_link(type_Link, "l", *t0);
+    t1->add_column_link(type_LinkList, "ll", *t0);
+    DescriptorRef t1t;
+    t1->add_column(type_Table, "t", &t1t);
+    t1t->add_column(type_Int, "t1ti");
+    t1->add_column(type_Mixed, "m");
+    t0->add_empty_row(10);
+    t1->add_empty_row(10);
+    for (size_t i = 0; i < 10; ++i) {
+        t0->set_int(0, i, int_fast64_t(i));
+        t1->set_mixed_subtable(3, i, nullptr);
+    }
+    LangBindHelper::commit_and_continue_as_read(sg);
+    group.verify();
+
+    Row r = t0->get(0);
+    CHECK_EQUAL(r.get_int(0), 0);
+
+    // Check that row accessors are updated.
+    LangBindHelper::promote_to_write(sg, *hist);
+    t0->subsume_identity(0, 9);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    CHECK_EQUAL(r.get_int(0), 9);
+
+    // Check that LinkView accessors, Subtable accessors, and Subtable accessors
+    // inside of Mixed columns are updated.
+    LinkViewRef l0 = t1->get_linklist(1, 0);
+    TableRef st0 = t1->get_subtable(2, 0);
+    TableRef mt0 = t1->get_subtable(3, 0);
+    CHECK_EQUAL(l0->get_origin_row_index(), 0);
+    LangBindHelper::promote_to_write(sg, *hist);
+    t1->subsume_identity(0, 9);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    CHECK_EQUAL(l0->get_origin_row_index(), 9);
+    CHECK_EQUAL(st0->get_parent_row_index(), 9);
+    CHECK_EQUAL(mt0->get_parent_row_index(), 9);
+}
+
+
 TEST(LangBindHelper_MemOnly)
 {
     SHARED_GROUP_TEST_PATH(path);
