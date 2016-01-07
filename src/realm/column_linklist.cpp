@@ -614,6 +614,8 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
 template<bool fix_ndx_in_parent>
 void LinkListColumn::adj_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
 {
+    static_cast<void>(subsumed_by_row_ndx);
+
     prune_list_accessor_tombstones();
 
     auto begin = m_list_accessors.begin();
@@ -622,26 +624,15 @@ void LinkListColumn::adj_subsume_identity(size_t row_ndx, size_t subsumed_by_row
     auto it = std::lower_bound(begin, end, list_entry{row_ndx, nullptr});
     bool found = (it != end && it->m_row_ndx == row_ndx);
 
-    auto destination = std::lower_bound(begin, end, list_entry{subsumed_by_row_ndx, nullptr});
-
     if (found) {
-        size_t num_affected = 0;
-        while (it != end && it->m_row_ndx == row_ndx) {
-            it->m_row_ndx = subsumed_by_row_ndx;
-            if (fix_ndx_in_parent) {
-                it->m_list->set_origin_row_index(subsumed_by_row_ndx);
-            }
-            ++num_affected;
-        }
-
-        // Maintain order:
-        if (it < destination) {
-            std::rotate(it, it + num_affected, destination);
-        }
-        else if (it > destination) {
-            std::rotate(destination, it, it + num_affected);
-        }
+        // Detach any accessors to the subsumed row.
+        LinkViewRef list(it->m_list);
+        list->detach();
+        it->m_list = nullptr;
+        m_list_accessors_contains_tombstones = true;
     }
+
+    validate_list_accessors();
 }
 
 

@@ -8806,7 +8806,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnSubsumeIdentity)
     CHECK_EQUAL(r.get_int(0), 9);
 
     // Check that LinkView accessors, Subtable accessors, and Subtable accessors
-    // inside of Mixed columns are updated.
+    // inside of Mixed columns are detached.
     LinkViewRef l0 = t1->get_linklist(1, 0);
     TableRef st0 = t1->get_subtable(2, 0);
     TableRef mt0 = t1->get_subtable(3, 0);
@@ -8815,9 +8815,9 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnSubsumeIdentity)
     t1->subsume_identity(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
-    CHECK_EQUAL(l0->get_origin_row_index(), 9);
-    CHECK_EQUAL(st0->get_parent_row_index(), 9);
-    CHECK_EQUAL(mt0->get_parent_row_index(), 9);
+    CHECK(!l0->is_attached());
+    CHECK(!st0->is_attached());
+    CHECK(!mt0->is_attached());
 }
 
 

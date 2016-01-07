@@ -518,13 +518,16 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
 template<bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
 {
+    static_cast<void>(subsumed_by_row_ndx);
+
     using tf = _impl::TableFriend;
-    for (entry& e: m_entries) {
+    for (auto it = m_entries.begin(); it != m_entries.end(); ++it) {
+        entry& e = *it;
         if (e.m_subtable_ndx == row_ndx) {
-            e.m_subtable_ndx = subsumed_by_row_ndx;
-            if (fix_ndx_in_parent) {
-                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
-            }
+            TableRef table(e.m_table);
+            tf::detach(*table);
+            m_entries.erase(it);
+            break;
         }
     }
 }
