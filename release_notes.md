@@ -6,7 +6,8 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Any attempt to use a deleted LinkView vill now throw 
+  `DeletedLinkView` instead of segfaulting
 
 ### Enhancements:
 
