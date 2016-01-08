@@ -770,7 +770,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                 continue;
             }
 
-            size_t file_size = alloc.get_baseline();
+            size_t file_size = alloc.get_mapped_size();
 
             if (begin_new_session) {
 
@@ -942,7 +942,7 @@ bool SharedGroup::compact()
     cfg.session_initiator = true;
     cfg.encryption_key = m_key;
     ref_type top_ref = alloc.attach_file(m_db_path, cfg);
-    size_t file_size = alloc.get_baseline();
+    size_t file_size = alloc.get_mapped_size();
 
     // update the versioning info to match
     SharedInfo* r_info = m_reader_map.get_addr();

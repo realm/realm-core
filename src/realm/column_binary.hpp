@@ -78,7 +78,7 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;
-    void update_from_parent(size_t) noexcept override;
+    void update_from_parent() noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG
@@ -157,23 +157,23 @@ inline bool BinaryColumn::is_nullable() const noexcept
     return m_nullable;
 }
 
-inline void BinaryColumn::update_from_parent(size_t old_baseline) noexcept
+inline void BinaryColumn::update_from_parent() noexcept
 {
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
-            leaf->update_from_parent(old_baseline);
+            leaf->update_from_parent();
             return;
         }
         // Big blobs root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-        leaf->update_from_parent(old_baseline);
+        leaf->update_from_parent();
         return;
     }
     // Non-leaf root
-    m_array->update_from_parent(old_baseline);
+    m_array->update_from_parent();
 }
 
 inline BinaryData BinaryColumn::get(size_t ndx) const noexcept

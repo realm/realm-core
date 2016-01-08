@@ -141,14 +141,12 @@ Group::~Group() noexcept
 
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
 {
-    size_t old_baseline = m_alloc.get_baseline();
-
-    if (new_file_size > old_baseline) {
+    if (new_file_size > m_alloc.get_mapped_size()) {
         m_alloc.remap(new_file_size); // Throws
     }
 
     m_alloc.invalidate_cache();
-    update_refs(new_top_ref, old_baseline);
+    update_refs(new_top_ref);
 }
 
 
@@ -200,7 +198,7 @@ void Group::attach(ref_type top_ref)
 
         // The 3rd slot in m_top is `1 + 2 * logical_file_size`, and the logical
         // file size must never exceed actual file size.
-        REALM_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
+        REALM_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_mapped_size());
     }
 }
 
@@ -226,7 +224,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
     reset_free_space_tracking(); // Throws
 
     // Update memory mapping if database file has grown
-    if (new_file_size > m_alloc.get_baseline())
+    if (new_file_size > m_alloc.get_mapped_size())
         m_alloc.remap(new_file_size); // Throws
 
     attach(new_top_ref); // Throws
@@ -775,22 +773,22 @@ void Group::commit()
     // Mark all managed space (beyond the attached file) as free.
     reset_free_space_tracking(); // Throws
 
-    size_t old_baseline = m_alloc.get_baseline();
+    size_t old_size = m_alloc.get_mapped_size();
 
     // Remap file if it has grown
     size_t new_file_size = out.get_file_size();
-    if (new_file_size > old_baseline) {
+    if (new_file_size > old_size) {
         m_alloc.remap(new_file_size); // Throws
     }
 
     out.commit(top_ref); // Throws
 
     // Recursively update refs in all active tables (columns, arrays..)
-    update_refs(top_ref, old_baseline);
+    update_refs(top_ref);
 }
 
 
-void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
+void Group::update_refs(ref_type top_ref) noexcept
 {
     // After Group::commit() we will always have free space tracking
     // info.
@@ -803,17 +801,18 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
     // remains unchanged across a commit if the new ref is equal to
     // the old ref and the ref is below the previous baseline.
 
-    if (top_ref < old_baseline && m_top.get_ref() == top_ref)
+    ref_type old_top_ref = m_top.get_ref();
+    if (m_alloc.is_read_only(old_top_ref) && (old_top_ref == top_ref))
         return;
 
     m_top.init_from_ref(top_ref);
 
     // Now we can update it's child arrays
-    m_table_names.update_from_parent(old_baseline);
+    m_table_names.update_from_parent();
 
     // If m_tables has not been modfied we don't
     // need to update attached table accessors
-    if (!m_tables.update_from_parent(old_baseline))
+    if (!m_tables.update_from_parent())
         return;
 
     // Update all attached table accessors including those attached to
@@ -823,7 +822,7 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         typedef _impl::TableFriend tf;
         if (Table* table = *i)
-            tf::update_from_parent(*table, old_baseline);
+            tf::update_from_parent(*table);
     }
 }
 
@@ -1618,7 +1617,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     reset_free_space_tracking(); // Throws
 
     // Update memory mapping if database file has grown
-    if (new_file_size > m_alloc.get_baseline()) {
+    if (new_file_size > m_alloc.get_mapped_size()) {
         m_alloc.remap(new_file_size); // Throws
     }
 
@@ -1751,7 +1750,7 @@ void Group::verify() const
             table->verify();
         }
     }
-
+#if 0
     size_t logical_file_size = to_size_t(m_top.get(2) / 2);
     size_t ref_begin = sizeof (SlabAlloc::Header);
     ref_type immutable_ref_end = logical_file_size;
@@ -1846,6 +1845,7 @@ void Group::verify() const
     // At this point we have accounted for all memory managed by the slab
     // allocator
     mem_usage_1.check_total_coverage();
+#endif
 }
 
 

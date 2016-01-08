@@ -13,15 +13,15 @@ MixedColumn::~MixedColumn() noexcept
 }
 
 
-void MixedColumn::update_from_parent(size_t old_baseline) noexcept
+void MixedColumn::update_from_parent() noexcept
 {
-    if (!get_root_array()->update_from_parent(old_baseline))
+    if (!get_root_array()->update_from_parent())
         return;
 
-    m_types->update_from_parent(old_baseline);
-    m_data->update_from_parent(old_baseline);
+    m_types->update_from_parent();
+    m_data->update_from_parent();
     if (m_binary_data)
-        m_binary_data->update_from_parent(old_baseline);
+        m_binary_data->update_from_parent();
 }
 
 void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)

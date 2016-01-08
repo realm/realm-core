@@ -235,14 +235,14 @@ public:
     /// attached to a file. Doing so will result in undefined behavior.
     void reserve_disk_space(size_t size_in_bytes);
 
-    /// Get the size of the attached database file or buffer in number
-    /// of bytes. This size is not affected by new allocations. After
+    /// Get the size of the attached database file or buffer.
+    /// This value is not affected by new allocations. After
     /// attachment, it can only be modified by a call to remap().
     ///
     /// It is an error to call this function on a detached allocator,
     /// or one that was attached using attach_empty(). Doing so will
     /// result in undefined behavior.
-    size_t get_baseline() const noexcept;
+    size_t get_mapped_size() const noexcept;
 
     /// Get the total amount of managed memory. This is the baseline plus the
     /// sum of the sizes of the allocated slabs. It includes any free space.
@@ -350,6 +350,7 @@ private:
     util::File::Map<char> m_initial_mapping;
     char* m_data = nullptr;
     size_t m_initial_mapping_size = 0;
+    size_t m_full_mapping_size = 0;
     // additional sections beyond those covered by the initial mapping, are
     // managed as separate mmap allocations, each covering one section.
     size_t m_first_additional_mapping = 0;
@@ -497,12 +498,6 @@ inline bool SlabAlloc::is_attached() const noexcept
 inline bool SlabAlloc::nonempty_attachment() const noexcept
 {
     return is_attached() && m_data;
-}
-
-inline size_t SlabAlloc::get_baseline() const noexcept
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    return m_baseline;
 }
 
 inline void SlabAlloc::resize_file(size_t new_file_size)

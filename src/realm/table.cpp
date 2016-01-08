@@ -4220,29 +4220,29 @@ void Table::write(std::ostream& out, size_t offset, size_t size, StringData over
 }
 
 
-void Table::update_from_parent(size_t old_baseline) noexcept
+void Table::update_from_parent() noexcept
 {
     REALM_ASSERT(is_attached());
 
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
-        if (!m_top.update_from_parent(old_baseline))
+        if (!m_top.update_from_parent())
             return;
     }
 
-    m_spec.update_from_parent(old_baseline);
+    m_spec.update_from_parent();
 
     if (!m_columns.is_attached())
         return; // Degenerate subtable
 
-    if (!m_columns.update_from_parent(old_baseline))
+    if (!m_columns.update_from_parent())
         return;
 
     // Update column accessors
     size_t n = m_cols.size();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase* column = m_cols[i];
-        column->update_from_parent(old_baseline);
+        column->update_from_parent();
     }
 }
 

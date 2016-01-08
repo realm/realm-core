@@ -56,10 +56,10 @@ void ColumnBaseWithIndex::set_ndx_in_parent(size_t ndx) noexcept
     }
 }
 
-void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) noexcept
+void ColumnBaseWithIndex::update_from_parent() noexcept
 {
     if (m_search_index) {
-        m_search_index->update_from_parent(old_baseline);
+        m_search_index->update_from_parent();
     }
 }
 

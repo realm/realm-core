@@ -131,7 +131,7 @@ private:
 
     void refresh_accessor_tree(size_t new_row_ndx) noexcept;
 
-    void update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     Replication* get_repl() noexcept;
     void repl_unselect() noexcept;
@@ -333,10 +333,10 @@ inline void LinkView::refresh_accessor_tree(size_t new_row_ndx) noexcept
     }
 }
 
-inline void LinkView::update_from_parent(size_t old_baseline) noexcept
+inline void LinkView::update_from_parent() noexcept
 {
     if (m_row_indexes.is_attached())
-        m_row_indexes.update_from_parent(old_baseline);
+        m_row_indexes.update_from_parent();
 }
 
 inline Replication* LinkView::get_repl() noexcept

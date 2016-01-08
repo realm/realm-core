@@ -136,7 +136,7 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;
-    void update_from_parent(size_t old_baseline) noexcept override;
+    void update_from_parent() noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG

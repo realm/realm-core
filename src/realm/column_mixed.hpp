@@ -136,7 +136,7 @@ public:
     void move_last_row_over(size_t, size_t, bool) override;
     void swap_rows(size_t, size_t) override;
     void clear(size_t, bool) override;
-    void update_from_parent(size_t) noexcept override;
+    void update_from_parent() noexcept override;
     void adj_acc_insert_rows(size_t, size_t) noexcept override;
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;

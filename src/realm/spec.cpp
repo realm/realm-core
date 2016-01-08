@@ -59,20 +59,20 @@ void Spec::update_has_strong_link_columns() noexcept
 }
 
 
-void Spec::update_from_parent(size_t old_baseline) noexcept
+void Spec::update_from_parent() noexcept
 {
-    if (!m_top.update_from_parent(old_baseline))
+    if (!m_top.update_from_parent())
         return;
 
-    m_types.update_from_parent(old_baseline);
-    m_names.update_from_parent(old_baseline);
-    m_attr.update_from_parent(old_baseline);
+    m_types.update_from_parent();
+    m_names.update_from_parent();
+    m_attr.update_from_parent();
 
     if (m_top.size() > 3)
-        m_subspecs.update_from_parent(old_baseline);
+        m_subspecs.update_from_parent();
 
     if (m_top.size() > 4)
-        m_enumkeys.update_from_parent(old_baseline);
+        m_enumkeys.update_from_parent();
 }
 
 

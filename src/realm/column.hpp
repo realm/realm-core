@@ -217,7 +217,7 @@ public:
     /// Called in the context of Group::commit() and
     /// SharedGroup::commit_and_continue_as_read()() to ensure that attached
     /// table and link list accessors stay valid across a commit.
-    virtual void update_from_parent(size_t old_baseline) noexcept = 0;
+    virtual void update_from_parent() noexcept = 0;
 
     //@{
 
@@ -363,7 +363,7 @@ public:
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept final { m_array->set_parent(parent, ndx_in_parent); }
     size_t get_ndx_in_parent() const noexcept final { return m_array->get_ndx_in_parent(); }
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept final { m_array->set_ndx_in_parent(ndx_in_parent); }
-    void update_from_parent(size_t old_baseline) noexcept override { m_array->update_from_parent(old_baseline); }
+    void update_from_parent() noexcept override { m_array->update_from_parent(); }
     MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
 
 protected:
@@ -391,7 +391,7 @@ class ColumnBaseWithIndex : public ColumnBase {
 public:
     ~ColumnBaseWithIndex() noexcept override {}
     void set_ndx_in_parent(size_t ndx) noexcept override;
-    void update_from_parent(size_t old_baseline) noexcept override;
+    void update_from_parent() noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
     void move_assign(ColumnBaseWithIndex& col) noexcept;
     void destroy() noexcept override;
@@ -441,7 +441,7 @@ public:
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override;
     size_t get_ndx_in_parent() const noexcept final;
     void set_ndx_in_parent(size_t ndx) noexcept final;
-    void update_from_parent(size_t old_baseline) noexcept override;
+    void update_from_parent() noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
     void detach() noexcept final;
     bool is_attached() const noexcept final;
@@ -1051,10 +1051,10 @@ MemRef Column<T>::get_mem() const noexcept
 }
 
 template<class T>
-void Column<T>::update_from_parent(size_t old_baseline) noexcept
+void Column<T>::update_from_parent() noexcept
 {
-    ColumnBaseWithIndex::update_from_parent(old_baseline);
-    m_tree.update_from_parent(old_baseline);
+    ColumnBaseWithIndex::update_from_parent();
+    m_tree.update_from_parent();
 }
 
 template<class T>

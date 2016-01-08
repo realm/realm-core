@@ -62,7 +62,6 @@ public:
     FooAlloc():
         m_offset(8)
     {
-        m_baseline = 8;
     }
 
     ~FooAlloc() noexcept
@@ -76,7 +75,7 @@ public:
         REALM_ASSERT(!addr);
         addr = new char[size]; // Throws
         m_offset += size;
-        return MemRef(addr, ref);
+        return MemRef(addr, ref+2); //set bit 1 to indicate writable
     }
 
     void do_free(ref_type ref, const char* addr) noexcept override

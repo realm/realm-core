@@ -48,7 +48,7 @@ public:
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept;
     size_t get_ndx_in_parent() const noexcept;
     void set_ndx_in_parent(size_t ndx) noexcept;
-    void update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
     MemRef clone_deep(Allocator& alloc) const;
 
     // BpTree interface:
@@ -238,9 +238,9 @@ void BpTreeBase::set_ndx_in_parent(size_t ndx) noexcept
 }
 
 inline
-void BpTreeBase::update_from_parent(size_t old_baseline) noexcept
+void BpTreeBase::update_from_parent() noexcept
 {
-    m_root->update_from_parent(old_baseline);
+    m_root->update_from_parent();
 }
 
 inline

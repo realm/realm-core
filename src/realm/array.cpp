@@ -230,7 +230,7 @@ void Array::set_type(Type type)
 }
 
 
-bool Array::update_from_parent(size_t old_baseline) noexcept
+bool Array::update_from_parent() noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     REALM_ASSERT_DEBUG(m_parent);
@@ -243,7 +243,7 @@ bool Array::update_from_parent(size_t old_baseline) noexcept
     // the old ref and the ref is below the previous baseline.
 
     ref_type new_ref = m_parent->get_child_ref(m_ndx_in_parent);
-    if (new_ref == m_ref && new_ref < old_baseline)
+    if (new_ref == m_ref && m_alloc.is_read_only(new_ref))
         return false; // Has not changed
 
     init_from_ref(new_ref);

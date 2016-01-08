@@ -305,7 +305,7 @@ public:
     ///
     /// Returns true if, and only if the array has changed. If the array has not
     /// changed, then its children are guaranteed to also not have changed.
-    bool update_from_parent(size_t old_baseline) noexcept;
+    bool update_from_parent() noexcept;
 
     /// Change the type of an already attached array node.
     ///

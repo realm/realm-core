@@ -240,35 +240,35 @@ void StringColumn::set_search_index_allow_duplicate_values(bool allow) noexcept
 }
 
 
-void StringColumn::update_from_parent(size_t old_baseline) noexcept
+void StringColumn::update_from_parent() noexcept
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
             ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
-            leaf->update_from_parent(old_baseline);
+            leaf->update_from_parent();
         }
         else {
             bool is_big = m_array->get_context_flag();
             if (!is_big) {
                 // Medium strings root leaf
                 ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
-                leaf->update_from_parent(old_baseline);
+                leaf->update_from_parent();
             }
             else {
                 // Big strings root leaf
                 ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-                leaf->update_from_parent(old_baseline);
+                leaf->update_from_parent();
             }
         }
     }
     else {
         // Non-leaf root
-        m_array->update_from_parent(old_baseline);
+        m_array->update_from_parent();
     }
     if (m_search_index)
-        m_search_index->update_from_parent(old_baseline);
+        m_search_index->update_from_parent();
 }
 
 

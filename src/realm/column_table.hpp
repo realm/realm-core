@@ -48,7 +48,7 @@ public:
     void clear(size_t, bool) override;
     void swap_rows(size_t, size_t) override;
     void discard_subtable_accessor(size_t) noexcept override;
-    void update_from_parent(size_t) noexcept override;
+    void update_from_parent() noexcept override;
     void adj_acc_insert_rows(size_t, size_t) noexcept override;
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;
@@ -85,7 +85,7 @@ protected:
         // Returns true if, and only if the entry was found and removed, and it
         // was the last entry in the map.
         bool remove(Table*) noexcept;
-        void update_from_parent(size_t old_baseline) const noexcept;
+        void update_from_parent() const noexcept;
         template<bool fix_ndx_in_parent>
         void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept;
         // Returns true if, and only if an entry was found and removed, and it

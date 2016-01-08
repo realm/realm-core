@@ -975,7 +975,7 @@ private:
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    void update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     // Support function for conversions
     void to_string_header(std::ostream& out, std::vector<size_t>& widths) const;
@@ -1937,9 +1937,9 @@ public:
         table.m_top.set_parent(parent, ndx_in_parent);
     }
 
-    static void update_from_parent(Table& table, size_t old_baseline) noexcept
+    static void update_from_parent(Table& table) noexcept
     {
-        table.update_from_parent(old_baseline);
+        table.update_from_parent();
     }
 
     static void detach(Table& table) noexcept

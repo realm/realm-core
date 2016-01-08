@@ -200,14 +200,14 @@ MemRef SlabAlloc::do_alloc(size_t size)
                     std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
-                char* addr = translate(ref);
+                char* addr = translate(ref+2);
 #if REALM_ENABLE_ALLOC_SET_ZERO
                 std::fill(addr, addr+size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
-                return MemRef(addr, ref);
+                return MemRef(addr, ref+2);
             }
         }
     }
@@ -216,13 +216,12 @@ MemRef SlabAlloc::do_alloc(size_t size)
     size_t new_size = ((size-1) | 255) + 1; // Round up to nearest multiple of 256
     ref_type ref;
     if (m_slabs.empty()) {
-        ref = m_baseline;
+        ref = 0;
     }
     else {
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
         // Make it at least as big as twice the previous slab
-        ref_type prev_ref_end = m_slabs.size() == 1 ? m_baseline :
-            to_size_t(m_slabs[m_slabs.size()-2].ref_end);
+        ref_type prev_ref_end = m_slabs.size() == 1 ? 0 : to_size_t(m_slabs[m_slabs.size()-2].ref_end);
         size_t min_size = 2 * (curr_ref_end - prev_ref_end);
         if (new_size < min_size)
             new_size = min_size;
@@ -260,7 +259,8 @@ MemRef SlabAlloc::do_alloc(size_t size)
     malloc_debug_map[ref] = malloc(1);
 #endif
 
-    return MemRef(slab.addr, ref);
+    // set bit 1 on blocks in writable memory
+    return MemRef(slab.addr, ref+2);
 }
 
 
@@ -271,6 +271,11 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
     chunks& free_space = read_only ? m_free_read_only : m_free_space;
+
+    // From here on, we use the real offset, so if it was in writable
+    // memory, we need to clear bit 1 of the ref.
+    if (!read_only)
+        ref -= 2;
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
     free(malloc_debug_map[ref]);
@@ -343,6 +348,11 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     }
 }
 
+size_t SlabAlloc::get_mapped_size() const noexcept
+{
+    return m_full_mapping_size;
+}
+
 
 MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
@@ -390,7 +400,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     if (cache[cache_index].ref == ref && cache[cache_index].version == version)
         return cache[cache_index].addr;
 
-    if (ref < m_baseline) {
+    if (is_read_only(ref)) {
 
         const util::File::Map<char>* map;
 
@@ -416,11 +426,14 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     }
     else {
         typedef slabs::const_iterator iter;
-        iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
+        ref_type offset = ref-2; // clear bit 1 to get true offset
+        // use 'offset' to search slabs and to compute address, but
+        // use 'ref' for indexing into the cache
+        iter i = upper_bound(m_slabs.begin(), m_slabs.end(), offset, &ref_less_than_slab_ref_end);
         REALM_ASSERT_DEBUG(i != m_slabs.end());
 
-        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
-        addr = i->addr + (ref - slab_ref);
+        ref_type slab_ref = i == m_slabs.begin() ? 0 : (i-1)->ref_end;
+        addr = i->addr + (offset - slab_ref);
     }
     cache[cache_index].addr = addr;
     cache[cache_index].ref = ref;
@@ -607,8 +620,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         m_data        = map.get_addr();
         m_initial_mapping = std::move(map);
-        m_baseline    = size;
         m_initial_mapping_size = size;
+        m_full_mapping_size = size;
         m_first_additional_mapping = get_section_index(m_initial_mapping_size);
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
 
@@ -690,8 +703,8 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     }
 
     m_data        = data;
-    m_baseline    = size;
     m_initial_mapping_size = size;
+    m_full_mapping_size = size;
     m_attach_mode = attach_UsersBuffer;
 
     // Below this point (assignment to `m_attach_mode`), nothing must throw.
@@ -713,9 +726,9 @@ void SlabAlloc::attach_empty()
     // Below this point (assignment to `m_attach_mode`), nothing must throw.
 
     // No ref must ever be less that the header size, so we will use that as the
-    // baseline here.
-    m_baseline = sizeof (Header);
-    m_initial_mapping_size = m_baseline;
+    // mapping size here.
+    m_initial_mapping_size = sizeof (Header);
+    m_full_mapping_size = m_initial_mapping_size;
 }
 
 
@@ -769,7 +782,8 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
 
 size_t SlabAlloc::get_total_size() const noexcept
 {
-    return m_slabs.empty() ? m_baseline : m_slabs.back().ref_end;
+    size_t in_slab_size = m_slabs.empty() ? 0 : m_slabs.back().ref_end;
+    return m_full_mapping_size + in_slab_size;
 }
 
 
@@ -786,7 +800,7 @@ void SlabAlloc::reset_free_space_tracking()
 
     // Rebuild free list to include all slabs
     Chunk chunk;
-    chunk.ref = m_baseline;
+    chunk.ref = 0;
     typedef slabs::const_iterator iter;
     iter end = m_slabs.end();
     for (iter i = m_slabs.begin(); i != end; ++i) {
@@ -806,11 +820,11 @@ void SlabAlloc::remap(size_t file_size)
     REALM_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
-    REALM_ASSERT_DEBUG(m_baseline <= file_size);
+    REALM_ASSERT_DEBUG(m_full_mapping_size <= file_size);
 
     // Extend mapping by adding sections
     REALM_ASSERT_DEBUG(matches_section_boundary(file_size));
-    m_baseline = file_size;
+    m_full_mapping_size = file_size;
     auto num_sections = get_section_index(file_size);
     auto num_additional_mappings = num_sections - m_first_additional_mapping;
 
@@ -929,7 +943,7 @@ bool SlabAlloc::is_all_free() const
         return false;
 
     // Verify that free space matches slabs
-    ref_type slab_ref = m_baseline;
+    ref_type slab_ref = 0;
     typedef slabs::const_iterator iter;
     iter end = m_slabs.end();
     for (iter slab = m_slabs.begin(); slab != end; ++slab) {
@@ -965,18 +979,19 @@ void SlabAlloc::verify() const
 
 void SlabAlloc::print() const
 {
-    size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
+    size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end;
 
     size_t free = 0;
     for (size_t i = 0; i < m_free_space.size(); ++i)
         free += m_free_space[i].size;
 
     size_t allocated = allocated_for_slabs - free;
-    std::cout << "Attached: " << (m_data ? m_baseline : 0) << " Allocated: " << allocated << "\n";
+    std::cout << "Attached: " << (m_data ? m_full_mapping_size : 0) 
+              << " Allocated: " << allocated << "\n";
 
     if (!m_slabs.empty()) {
         std::cout << "Slabs: ";
-        ref_type first_ref = m_baseline;
+        ref_type first_ref = 0;
         typedef slabs::const_iterator iter;
         for (iter i = m_slabs.begin(); i != m_slabs.end(); ++i) {
             if (i != m_slabs.begin())

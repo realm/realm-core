@@ -116,7 +116,7 @@ public:
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
-    bool update_from_parent(size_t old_baseline) noexcept;
+    bool update_from_parent() noexcept;
 
 private:
     ArrayInteger m_offsets;
@@ -239,14 +239,14 @@ inline size_t ArrayBinary::get_size_from_header(const char* header,
     return Array::get_size_from_header(offsets_header);
 }
 
-inline bool ArrayBinary::update_from_parent(size_t old_baseline) noexcept
+inline bool ArrayBinary::update_from_parent() noexcept
 {
-    bool res = Array::update_from_parent(old_baseline);
+    bool res = Array::update_from_parent();
     if (res) {
-        m_blob.update_from_parent(old_baseline);
-        m_offsets.update_from_parent(old_baseline);
+        m_blob.update_from_parent();
+        m_offsets.update_from_parent();
         if (!legacy_array_type())
-            m_nulls.update_from_parent(old_baseline);
+            m_nulls.update_from_parent();
     }
     return res;
 }

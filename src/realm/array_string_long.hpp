@@ -95,7 +95,7 @@ public:
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
-    bool update_from_parent(size_t old_baseline) noexcept;
+    bool update_from_parent() noexcept;
 private:
     ArrayInteger m_offsets;
     ArrayBlob m_blob;
@@ -200,14 +200,14 @@ inline void ArrayStringLong::destroy()
     Array::destroy();
 }
 
-inline bool ArrayStringLong::update_from_parent(size_t old_baseline) noexcept
+inline bool ArrayStringLong::update_from_parent() noexcept
 {
-    bool res = Array::update_from_parent(old_baseline);
+    bool res = Array::update_from_parent();
     if (res) {
-        m_blob.update_from_parent(old_baseline);
-        m_offsets.update_from_parent(old_baseline);
+        m_blob.update_from_parent();
+        m_offsets.update_from_parent();
         if (m_nullable)
-            m_nulls.update_from_parent(old_baseline);
+            m_nulls.update_from_parent();
     }
     return res;
 }

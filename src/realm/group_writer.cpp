@@ -86,7 +86,7 @@ GroupWriter::GroupWriter(Group& group):
         }
     }
 
-    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_baseline()); // Throws
+    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_mapped_size()); // Throws
 }
 
 

@@ -35,6 +35,8 @@ class Allocator;
 class Replication;
 
 using ref_type = size_t;
+// The allocators reserve bit 1 to indicate if the referenced memory
+// is wriable or not.
 
 ref_type to_ref(int64_t) noexcept;
 
@@ -120,8 +122,6 @@ public:
     Replication* get_replication() noexcept;
 
 protected:
-    size_t m_baseline = 0; // Separation line between immutable and mutable refs.
-
     Replication* m_replication;
 
 #ifdef REALM_DEBUG
@@ -202,7 +202,6 @@ inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) no
 inline int_fast64_t from_ref(ref_type v) noexcept
 {
     // Check that v is divisible by 8 (64-bit aligned).
-    REALM_ASSERT_DEBUG(v % 8 == 0);
     return util::from_twos_compl<int_fast64_t>(v);
 }
 
@@ -210,7 +209,6 @@ inline ref_type to_ref(int_fast64_t v) noexcept
 {
     REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<ref_type>(v));
     // Check that v is divisible by 8 (64-bit aligned).
-    REALM_ASSERT_DEBUG(v % 8 == 0);
     return ref_type(v);
 }
 
@@ -274,8 +272,7 @@ inline char* Allocator::translate(ref_type ref) const noexcept
 inline bool Allocator::is_read_only(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(ref != 0);
-    REALM_ASSERT_DEBUG(m_baseline != 0); // Attached SlabAlloc
-    return ref < m_baseline;
+    return (ref & (ref_type)0x2) == 0; // bit 1 indicates writable
 }
 
 inline Allocator::Allocator() noexcept:

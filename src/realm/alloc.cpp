@@ -39,7 +39,6 @@ class DefaultAllocator: public realm::Allocator {
 public:
     DefaultAllocator()
     {
-        m_baseline = 1; // Zero is not available
     }
 
     MemRef do_alloc(size_t size) override
@@ -52,7 +51,8 @@ public:
 #if REALM_ENABLE_ALLOC_SET_ZERO
         std::fill(addr, addr+size, 0);
 #endif
-        return MemRef(addr, reinterpret_cast<size_t>(addr));
+        // set bit 1 of ref to indicate writable memory
+        return MemRef(addr, reinterpret_cast<size_t>(addr)+2);
     }
 
     MemRef do_realloc(ref_type, const char* addr, size_t old_size,
@@ -68,7 +68,8 @@ public:
 #else
         static_cast<void>(old_size);
 #endif
-        return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
+        // set bit 1 of ref to indicate writable memory
+        return MemRef(new_addr, reinterpret_cast<size_t>(new_addr)+2);
     }
 
     void do_free(ref_type, const char* addr) noexcept override

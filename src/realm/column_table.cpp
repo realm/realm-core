@@ -6,10 +6,10 @@
 using namespace realm;
 using namespace realm::util;
 
-void SubtableColumnBase::update_from_parent(size_t old_baseline) noexcept
+void SubtableColumnBase::update_from_parent() noexcept
 {
-    IntegerColumn::update_from_parent(old_baseline);
-    m_subtable_map.update_from_parent(old_baseline);
+    IntegerColumn::update_from_parent();
+    m_subtable_map.update_from_parent();
 }
 
 
@@ -192,13 +192,13 @@ bool SubtableColumnBase::SubtableMap::remove(Table* subtable) noexcept
 }
 
 
-void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline) const noexcept
+void SubtableColumnBase::SubtableMap::update_from_parent() const noexcept
 {
     typedef _impl::TableFriend tf;
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
     for (iter i = m_entries.begin(); i != end; ++i)
-        tf::update_from_parent(*i->m_table, old_baseline);
+        tf::update_from_parent(*i->m_table);
 }
 
 

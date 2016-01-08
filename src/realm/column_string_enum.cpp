@@ -50,10 +50,10 @@ void StringEnumColumn::adjust_keys_ndx_in_parent(int diff) noexcept
     m_keys.get_root_array()->adjust_ndx_in_parent(diff);
 }
 
-void StringEnumColumn::update_from_parent(size_t old_baseline) noexcept
+void StringEnumColumn::update_from_parent() noexcept
 {
-    IntegerColumn::update_from_parent(old_baseline);
-    m_keys.update_from_parent(old_baseline);
+    IntegerColumn::update_from_parent();
+    m_keys.update_from_parent();
 }
 
 bool StringEnumColumn::is_nullable() const noexcept
