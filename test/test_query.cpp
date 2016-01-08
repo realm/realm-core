@@ -8345,6 +8345,11 @@ TEST(Query_ReferDeltedLinkView)
     CHECK_THROW(q.find_all(), DeletedLinkView);
     CHECK(!links->is_attached());
     CHECK_THROW(tv.sync_if_needed(), DeletedLinkView);
+    
+    // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
+    // the LinkView through multiple levels!
+    CHECK(tv->is_attached());
+    
 }
 #endif // TEST_QUERY
 
