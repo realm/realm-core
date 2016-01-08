@@ -8349,7 +8349,6 @@ TEST(Query_ReferDeltedLinkView)
     // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
     // the LinkView through multiple levels!
     CHECK(tv.is_attached());
-    
 }
 #endif // TEST_QUERY
 
