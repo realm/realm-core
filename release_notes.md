@@ -6,8 +6,8 @@
 
 ### API breaking changes:
 
-* Any attempt to use a deleted LinkView vill now throw 
-  `DeletedLinkView` instead of segfaulting
+* Any attempt to use a deleted LinkView (such as executing a query that
+  depends on it) vill now throw `DeletedLinkView` instead of segfaulting
 
 ### Enhancements:
 
