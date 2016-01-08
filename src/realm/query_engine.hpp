@@ -1264,7 +1264,7 @@ public:
 
     OrNode(const OrNode& other) : ParentNode(other)
     {
-        for (auto& condition : util::as_const(other.m_conditions)) {
+        for (const auto& condition : other.m_conditions) {
             m_conditions.emplace_back(condition->clone());
         }
     }

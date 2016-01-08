@@ -236,7 +236,7 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
 
 void Group::detach_table_accessors() noexcept
 {
-    for (auto& table_accessor : as_const(m_table_accessors)) {
+    for (const auto& table_accessor : m_table_accessors) {
         if (Table* t = table_accessor) {
             typedef _impl::TableFriend tf;
             tf::detach(*t);
@@ -822,7 +822,7 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
 
     // Update all attached table accessors including those attached to
     // subtables.
-    for (auto& table_accessor : as_const(m_table_accessors)) {
+    for (const auto& table_accessor : m_table_accessors) {
         typedef _impl::TableFriend tf;
         if (Table* table = table_accessor)
             tf::update_from_parent(*table, old_baseline);
@@ -1550,7 +1550,7 @@ void Group::update_table_indices(F&& map_function)
     refresh_dirty_accessors(); // Throws
 
     // Table's specs might have changed, so they need to be reinitialized.
-    for (auto& table_accessor : as_const(m_table_accessors)) {
+    for (const auto& table_accessor : m_table_accessors) {
         if (Table* t = table_accessor) {
             tf::get_spec(*t).init_from_parent();
         }
@@ -1814,7 +1814,7 @@ void Group::verify() const
 
     // Check the concistency of the allocation of the immutable memory that has
     // been marked as free after the file was opened
-    for (auto& free_block : as_const(m_alloc.m_free_read_only)) {
+    for (const auto& free_block : m_alloc.m_free_read_only) {
         mem_usage_2.add_immutable(free_block.ref, free_block.size);
     }
     mem_usage_2.canonicalize();
@@ -1824,7 +1824,7 @@ void Group::verify() const
 
     // Check the concistency of the allocation of the mutable memory that has
     // been marked as free
-    for (auto& free_block : as_const(m_alloc.m_free_space)) {
+    for (const auto& free_block : m_alloc.m_free_space) {
         mem_usage_2.add_mutable(free_block.ref, free_block.size);
     }
     mem_usage_2.canonicalize();

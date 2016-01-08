@@ -442,7 +442,7 @@ DescriptorRef Table::get_subdescriptor(const path_vec& path)
 {
     DescriptorRef desc = get_descriptor(); // Throws
 
-    for (auto& path_part : as_const(path)) {
+    for (const auto& path_part : path) {
         desc = desc->get_subdescriptor(path_part); // Throws
     }
 
@@ -1322,7 +1322,7 @@ void Table::move_registered_view(const TableViewBase* old_addr,
 void Table::discard_views() noexcept
 {
     LockGuard lock(m_accessor_mutex);
-    for (auto& view : as_const(m_views)) {
+    for (const auto& view : m_views) {
         view->detach();
     }
     m_views.clear();

@@ -760,7 +760,7 @@ void SlabAlloc::reset_free_space_tracking()
     Chunk chunk;
     chunk.ref = m_baseline;
 
-    for (auto& slab : as_const(m_slabs)) {
+    for (const auto& slab : m_slabs) {
         chunk.size = slab.ref_end - chunk.ref;
         m_free_space.push_back(chunk); // Throws
         chunk.ref = slab.ref_end;
@@ -901,7 +901,7 @@ bool SlabAlloc::is_all_free() const
 
     // Verify that free space matches slabs
     ref_type slab_ref = m_baseline;
-    for (auto& slab : as_const(m_slabs)) {
+    for (const auto& slab : m_slabs) {
         size_t slab_size = slab.ref_end - slab_ref;
         chunks::const_iterator chunk =
             find_if(m_free_space.begin(), m_free_space.end(), ChunkRefEq(slab_ref));
@@ -918,7 +918,7 @@ bool SlabAlloc::is_all_free() const
 void SlabAlloc::verify() const
 {
     // Make sure that all free blocks fit within a slab
-    for (auto& chunk : as_const(m_free_space)) {
+    for (const auto& chunk : m_free_space) {
         slabs::const_iterator slab =
             upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
         REALM_ASSERT(slab != m_slabs.end());
@@ -935,7 +935,7 @@ void SlabAlloc::print() const
     size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
 
     size_t free = 0;
-    for (auto& free_block : as_const(m_free_space)) {
+    for (const auto& free_block : m_free_space) {
         free += free_block.size;
     }
 
@@ -946,7 +946,7 @@ void SlabAlloc::print() const
         std::cout << "Slabs: ";
         ref_type first_ref = m_baseline;
 
-        for (auto& slab : as_const(m_slabs)) {
+        for (const auto& slab : m_slabs) {
             if (&slab != &m_slabs.front())
                 std::cout << ", ";
 
@@ -961,7 +961,7 @@ void SlabAlloc::print() const
 
     if (!m_free_space.empty()) {
         std::cout << "FreeSpace: ";
-        for (auto& free_block : as_const(m_free_space)) {
+        for (const auto& free_block : m_free_space) {
             if (&free_block != &m_free_space.front())
                 std::cout << ", ";
 
@@ -972,7 +972,7 @@ void SlabAlloc::print() const
     }
     if (!m_free_read_only.empty()) {
         std::cout << "FreeSpace (ro): ";
-        for (auto& free_block : as_const(m_free_read_only)) {
+        for (const auto& free_block : m_free_read_only) {
             if (&free_block != &m_free_read_only.front())
                 std::cout << ", ";
 

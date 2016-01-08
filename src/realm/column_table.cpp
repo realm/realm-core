@@ -129,7 +129,7 @@ Table* SubtableColumnBase::get_parent_table(size_t* column_ndx_out) noexcept
 
 Table* SubtableColumnBase::SubtableMap::find(size_t subtable_ndx) const noexcept
 {
-    for (auto& entry : as_const(m_entries)) {
+    for (const auto& entry : m_entries) {
         if (entry.m_subtable_ndx == subtable_ndx)
             return entry.m_table;
     }
@@ -139,7 +139,7 @@ Table* SubtableColumnBase::SubtableMap::find(size_t subtable_ndx) const noexcept
 
 bool SubtableColumnBase::SubtableMap::detach_and_remove_all() noexcept
 {
-    for (auto& entry : as_const(m_entries)) {
+    for (const auto& entry : m_entries) {
         // Must hold a counted reference while detaching
         TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
@@ -194,7 +194,7 @@ bool SubtableColumnBase::SubtableMap::remove(Table* subtable) noexcept
 void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline) const noexcept
 {
     typedef _impl::TableFriend tf;
-    for (auto& entry : as_const(m_entries)) {
+    for (const auto& entry : m_entries) {
         tf::update_from_parent(*entry.m_table, old_baseline);
     }
 }
@@ -204,7 +204,7 @@ void SubtableColumnBase::SubtableMap::update_accessors(const size_t* col_path_be
                                                        const size_t* col_path_end,
                                                        _impl::TableFriend::AccessorUpdater& updater)
 {
-    for (auto& entry : as_const(m_entries)) {
+    for (const auto& entry : m_entries) {
         // Must hold a counted reference while updating
         TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
@@ -215,7 +215,7 @@ void SubtableColumnBase::SubtableMap::update_accessors(const size_t* col_path_be
 
 void SubtableColumnBase::SubtableMap::recursive_mark() noexcept
 {
-    for (auto& entry : as_const(m_entries)) {
+    for (const auto& entry : m_entries) {
         TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
         tf::recursive_mark(*table);
@@ -225,7 +225,7 @@ void SubtableColumnBase::SubtableMap::recursive_mark() noexcept
 
 void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_parent)
 {
-    for (auto& entry : as_const(m_entries)) {
+    for (const auto& entry : m_entries) {
         // Must hold a counted reference while refreshing
         TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
