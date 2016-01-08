@@ -3431,12 +3431,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SubsumeIdentity)
     LangBindHelper::advance_read(sg, hist);
     group.verify();
 
-    CHECK(row_int_0_replaced_by_row_2.is_attached());
-    CHECK(row_link_0_replaced_by_row_2.is_attached());
-
-    CHECK_EQUAL(row_int_0_replaced_by_row_2.get_index(), 2);
-    CHECK_EQUAL(row_link_0_replaced_by_row_2.get_index(), 2);
-    CHECK_EQUAL(row_link_0_replaced_by_row_2.get_link(0), 2);
+    CHECK(!row_int_0_replaced_by_row_2.is_attached());
+    CHECK(!row_link_0_replaced_by_row_2.is_attached());
 }
 
 
@@ -8798,12 +8794,12 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnSubsumeIdentity)
     Row r = t0->get(0);
     CHECK_EQUAL(r.get_int(0), 0);
 
-    // Check that row accessors are updated.
+    // Check that row accessors are detached.
     LangBindHelper::promote_to_write(sg, *hist);
     t0->subsume_identity(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
-    CHECK_EQUAL(r.get_int(0), 9);
+    CHECK(!r.is_attached());
 
     // Check that LinkView accessors, Subtable accessors, and Subtable accessors
     // inside of Mixed columns are detached.

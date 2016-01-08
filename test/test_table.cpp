@@ -6522,7 +6522,7 @@ TEST(Table_SubsumeIdentity_Links)
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
     t1->subsume_identity(0, 9);
-    CHECK_EQUAL(replaced_row.get_index(), 9);
+    CHECK(!replaced_row.is_attached());
     CHECK_EQUAL(t0->get_link(0, 0), 9);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
 }
@@ -6548,7 +6548,7 @@ TEST(Table_SubsumeIdentity_LinkLists)
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
     t1->subsume_identity(0, 9);
-    CHECK_EQUAL(replaced_row.get_index(), 9);
+    CHECK(!replaced_row.is_attached());
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
     CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);
     CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 9);

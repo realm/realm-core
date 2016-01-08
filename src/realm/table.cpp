@@ -5137,13 +5137,17 @@ void Table::adj_row_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
+    static_cast<void>(subsumed_by_row_ndx);
+
     LockGuard lock(m_accessor_mutex);
     RowBase* row = m_row_accessors;
     while (row) {
+        RowBase* next = row->m_next;
         if (row->m_row_ndx == row_ndx) {
-            row->m_row_ndx = subsumed_by_row_ndx;
+            row->m_table.reset();
+            do_unregister_row_accessor(row);
         }
-        row = row->m_next;
+        row = next;
     }
 }
 
