@@ -20,6 +20,8 @@
 
 * Add `test_util::to_string()` for convenience. std::to_string() is not
   available via all Android NDK toolchains.
+* New operation: SubsumeIdentity. It replaces all links to one row with
+  links to a different row.
 
 ----------------------------------------------
 
