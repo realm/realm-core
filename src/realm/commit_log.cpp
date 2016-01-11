@@ -102,6 +102,7 @@ public:
     void refresh_accessor_tree(ref_type hist_ref) override
     {
         REALM_ASSERT(hist_ref == 0);
+        static_cast<void>(hist_ref);
     }
 
 protected:
