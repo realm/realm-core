@@ -2316,7 +2316,9 @@ TEST(Group_Fuzzy)
             for (size_t t = 0; t < instructions; t++) {
                 char c = static_cast<char>(fastrand());
                 instr += c;
-                fastlog += std::to_string(static_cast<int>(c));
+                std::string tmp;
+                test_util::unit_test::to_string(static_cast<int>(c), tmp);
+                fastlog += tmp;
                 if (t + 1 < instructions) {
                     fastlog += ", ";
                 }
