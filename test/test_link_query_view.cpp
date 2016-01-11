@@ -544,7 +544,6 @@ TEST(LinkList_QueryFindLinkTarget)
     CHECK_EQUAL(1, match);
 
     match = table1->link(col_link3).find_first_link(3);
-
     CHECK_EQUAL(not_found, match);
 
 
@@ -576,54 +575,51 @@ TEST(LinkList_QueryFindLinkTarget)
     tv = table1->link(col_link3).find_all_link(3);
     CHECK_EQUAL(0, tv.size());
 
-    // find on query with Link
-    ConstTableRef target_table = table1->get_link_target(col_link2);
 
-    match = table1->where().links_to(col_link2, target_table->get(1)).find();
+    // find on query with Link
+    match = table1->where().links_to(col_link2, table2->get(1)).find();
     CHECK_EQUAL(0, match);
 
-    match = table1->where().links_to(col_link2, target_table->get(2)).find();
+    match = table1->where().links_to(col_link2, table2->get(2)).find();
     CHECK_EQUAL(1, match);
 
-    match = table1->where().links_to(col_link2, target_table->get(3)).find();
+    match = table1->where().links_to(col_link2, table2->get(3)).find();
     CHECK_EQUAL(not_found, match);
 
 
     // find_all on query with Link
-    tv = table1->where().links_to(col_link2, target_table->get(2)).find_all();
+    tv = table1->where().links_to(col_link2, table2->get(2)).find_all();
     CHECK_EQUAL(1, tv.size());
     CHECK_EQUAL(1, tv.get_source_ndx(0));
 
-    tv = table1->where().links_to(col_link2, target_table->get(1)).find_all();
+    tv = table1->where().links_to(col_link2, table2->get(1)).find_all();
     CHECK_EQUAL(1, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
 
-    tv = table1->where().links_to(col_link2, target_table->get(3)).find_all();
+    tv = table1->where().links_to(col_link2, table2->get(3)).find_all();
     CHECK_EQUAL(0, tv.size());
 
     // find on query with LinkList
-    target_table = table1->get_link_target( col_link3 );
-
-    match = table1->where().links_to(col_link3, target_table->get(1)).find();
+    match = table1->where().links_to(col_link3, table2->get(1)).find();
     CHECK_EQUAL(0, match);
 
-    match = table1->where().links_to(col_link3, target_table->get(2)).find();
+    match = table1->where().links_to(col_link3, table2->get(2)).find();
     CHECK_EQUAL(1, match);
 
-    match = table1->where().links_to(col_link3, target_table->get(3)).find();
+    match = table1->where().links_to(col_link3, table2->get(3)).find();
     CHECK_EQUAL(not_found, match);
 
     // find_all on query with LinkList
-    tv = table1->where().links_to(col_link3, target_table->get(2)).find_all();
+    tv = table1->where().links_to(col_link3, table2->get(2)).find_all();
     CHECK_EQUAL(1, tv.size());
     CHECK_EQUAL(1, tv.get_source_ndx(0));
 
-    tv = table1->where().links_to(col_link3, target_table->get(1)).find_all();
+    tv = table1->where().links_to(col_link3, table2->get(1)).find_all();
     CHECK_EQUAL(2, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
     CHECK_EQUAL(1, tv.get_source_ndx(1));
 
-    tv = table1->where().links_to(col_link3, target_table->get(3)).find_all();
+    tv = table1->where().links_to(col_link3, table2->get(3)).find_all();
     CHECK_EQUAL(0, tv.size());
 }
 
@@ -1254,8 +1250,7 @@ TEST(Link_FirstResultPastRow1000)
 
     link_table->set_link(0, 1000, 0);
 
-    ConstRow target_row = link_table->get_link_target( 0 )->get( 0 );
-    TableView tv = link_table->where().links_to(0, target_row).find_all();
+    TableView tv = link_table->where().links_to(0, data_table->get(0)).find_all();
     CHECK_EQUAL(1, tv.size());
 }
 

@@ -3392,11 +3392,8 @@ size_t Table::find_first(size_t col_ndx, T value) const
 
 size_t Table::find_first_link(size_t target_row_index) const
 {
-    ConstRow target_row = get_link_target( m_link_chain[0] )->get( target_row_index );
-    if (!target_row.is_attached())
-        return not_found;
-    
-    size_t ret = where().links_to(m_link_chain[0], target_row ).find();
+    auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
+    size_t ret = where().links_to(m_link_chain[0], target_row).find();
     m_link_chain.clear();
     return ret;
 }
@@ -3469,8 +3466,7 @@ TableView Table::find_all(size_t col_ndx, T value)
 
 TableView Table::find_all_link(size_t target_row_index)
 {
-    ConstRow target_row = get_link_target( m_link_chain[0] )->get( target_row_index );
-    
+    auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
     TableView tv = where().links_to(m_link_chain[0], target_row).find_all();
     m_link_chain.clear();
     return tv;

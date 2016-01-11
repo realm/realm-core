@@ -1598,6 +1598,7 @@ public:
     util::SharedPtr<Expression> m_compare;
 };
 
+
 class LinksToNode : public ParentNode {
 public:
     LinksToNode(size_t origin_column_index, const ConstRow& target_row) :
@@ -1617,16 +1618,16 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        size_t ret = realm::npos; // superfluous init, but gives warnings otherwise
-        DataType type = m_table->get_column_type(m_origin_column);
+        if (!m_target_row.is_attached())
+            return not_found;
 
-        if(m_target_row.is_attached() == false)
-            return realm::npos;
+        DataType type = m_table->get_column_type(m_origin_column);
+        REALM_ASSERT(type == type_Link || type == type_LinkList);
 
         if (type == type_Link) {
             LinkColumnBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
             LinkColumn& cl = static_cast<LinkColumn&>(clb);
-            ret = cl.find_first(m_target_row.get_index() + 1, start, end); // LinkColumn stores link to row N as the integer N + 1
+            return cl.find_first(m_target_row.get_index() + 1, start, end); // LinkColumn stores link to row N as the integer N + 1
         }
         else if (type == type_LinkList) {
             LinkColumnBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
@@ -1634,15 +1635,12 @@ public:
 
             for (size_t i = start; i < end; i++) {
                 LinkViewRef lv = cll.get(i);
-                ret = lv->find(m_target_row.get_index());
-                if (ret != not_found)
+                if (lv->find(m_target_row.get_index()) != not_found)
                     return i;
             }
         }
-        else
-            REALM_ASSERT(false);
 
-        return ret;
+        return not_found;
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -1650,7 +1648,7 @@ public:
         return std::unique_ptr<ParentNode>(new LinksToNode(*this));
     }
 
-    size_t m_origin_column;
+    const size_t m_origin_column;
     const ConstRow m_target_row;
 };
 
