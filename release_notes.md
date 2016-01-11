@@ -10,8 +10,8 @@
 
 ### Enhancements:
 
-* Optimized speed of TableView::clear() on an indexed and ordered Table.
-  A quick benchmark showed a 68 -> 19 second reduction of time.
+* Optimized speed of TableView::clear() on an indexed unordered Table. A clear()
+  that before took several minutes with 300000 rows now takes a few seconds.
 
 -----------
 
