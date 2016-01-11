@@ -74,8 +74,9 @@ namespace _impl {
 // FIXME: we should not use size_t for memory mapped members, but one where the
 // size is guaranteed
 
-class WriteLogCollector: public ClientHistory {
+class WriteLogCollector: public Replication, private _impl::ContinTransactHistory {
 public:
+    using version_type = _impl::ContinTransactHistory::version_type;
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
     std::string do_get_database_path() override { return m_database_name; }
     void do_initiate_transact(SharedGroup&, version_type) override;
@@ -92,6 +93,16 @@ public:
 
     void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
     BinaryData get_uncommitted_changes() noexcept override;
+
+    _impl::ContinTransactHistory* get_history() override
+    {
+        return this;
+    }
+
+    void refresh_accessor_tree(ref_type hist_ref) override
+    {
+        REALM_ASSERT(hist_ref == 0);
+    }
 
 protected:
     // file and memory mappings are always multiples of this size
@@ -702,11 +713,11 @@ WriteLogCollector::WriteLogCollector(const std::string& database_name,
 } // namespace _impl
 
 
-std::unique_ptr<ClientHistory> make_client_history(const std::string& database_name,
+std::unique_ptr<Replication> make_client_history(const std::string& database_name,
                                                    const char* encryption_key)
 {
-    return std::unique_ptr<ClientHistory>(new _impl::WriteLogCollector(database_name,
-                                                                       encryption_key));
+    return std::unique_ptr<Replication>(new _impl::WriteLogCollector(database_name,
+                                                                     encryption_key));
 }
 
 

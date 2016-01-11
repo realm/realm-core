@@ -557,6 +557,13 @@ private:
     /// updated by Group::commit(), the 4th and 5th entry is present. In files
     /// updated by way of a transaction (SharedGroup::commit()), the 4th, 5th,
     /// 6th, and 7th entry is present.
+    ///
+    /// When a group accessor is attached to a newly created file or an empty
+    /// memory buffer where there is no top array yet, `m_top`, `m_tables`, and
+    /// `m_table_names` with be left in the detached state until the initiation
+    /// of the first write transaction. In particular, they will remain in the
+    /// detached state during read transactions that precede the first write
+    /// transaction.
     Array m_top;
     ArrayInteger m_tables;
     ArrayString m_table_names;
@@ -566,6 +573,7 @@ private:
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
 
+    bool m_attached = false;
     const bool m_is_shared;
 
     std::function<void (const CascadeNotification&)> m_notify_handler;
@@ -577,21 +585,26 @@ private:
     void init_array_parents() noexcept;
 
     /// If `top_ref` is not zero, attach this group accessor to the specified
-    /// underlying node structure. If `top_ref` is zero, create a new node
-    /// structure that represents an empty group, and attach this group accessor
-    /// to it. It is an error to call this function on an already attached group
-    /// accessor.
-    void attach(ref_type top_ref);
+    /// underlying node structure. If `top_ref` is zero and \a
+    /// create_group_when_missing is true, create a new node structure that
+    /// represents an empty group, and attach this group accessor to it. It is
+    /// an error to call this function on an already attached group accessor.
+    void attach(ref_type top_ref, bool create_group_when_missing);
 
     /// Detach this group accessor from the underlying node structure. If this
     /// group accessors is already in the detached state, this function does
     /// nothing (idempotency).
     void detach() noexcept;
 
-    void attach_shared(ref_type new_top_ref, size_t new_file_size);
+    /// \param writable Must be set to true when, and only when attaching for a
+    /// write transaction.
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable);
+
+    void create_empty_group();
 
     void reset_free_space_tracking();
 
+    void remap(size_t new_file_size);
     void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size);
 
     /// Recursively update refs stored in all cached array
@@ -651,8 +664,7 @@ private:
     Replication* get_replication() const noexcept;
     void set_replication(Replication*) noexcept;
     class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, size_t new_file_size,
-                          _impl::NoCopyInputStream&);
+    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
     template<class F>
     void update_table_indices(F&& map_function);
@@ -672,6 +684,7 @@ private:
     void send_cascade_notification(const CascadeNotification& notification) const;
     void send_schema_change_notification() const;
 
+    static ref_type get_sync_history_ref(Allocator&, ref_type top_ref) noexcept;
     void set_sync_history_parent(Array& sync_history_root);
 
     friend class Table;
@@ -700,7 +713,8 @@ inline Group::Group():
     init_array_parents();
     m_alloc.attach_empty(); // Throws
     ref_type top_ref = 0; // Instantiate a new empty group
-    attach(top_ref); // Throws
+    bool create_group_when_missing = true;
+    attach(top_ref, create_group_when_missing); // Throws
 }
 
 inline Group::Group(const std::string& file, const char* key, OpenMode mode):
@@ -753,23 +767,25 @@ inline Group::Group(shared_tag) noexcept:
 
 inline bool Group::is_attached() const noexcept
 {
-    return m_top.is_attached();
+    return m_attached;
 }
 
 inline bool Group::is_empty() const noexcept
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    REALM_ASSERT(m_table_names.is_attached());
-    return m_table_names.is_empty();
+    if (m_table_names.is_attached())
+        return m_table_names.is_empty();
+    return true;
 }
 
 inline size_t Group::size() const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    REALM_ASSERT(m_table_names.is_attached());
-    return m_table_names.size();
+    if (m_table_names.is_attached())
+        return m_table_names.size();
+    return 0;
 }
 
 inline StringData Group::get_table_name(size_t table_ndx) const
@@ -789,9 +805,9 @@ inline size_t Group::find_table(StringData name) const noexcept
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
-    REALM_ASSERT(m_table_names.is_attached());
-    size_t ndx = m_table_names.find_first(name);
-    return ndx;
+    if (m_table_names.is_attached())
+        return m_table_names.find_first(name);
+    return not_found;
 }
 
 inline TableRef Group::get_table(size_t table_ndx)
@@ -1040,6 +1056,17 @@ inline void Group::send_schema_change_notification() const
         m_schema_change_handler();
 }
 
+inline ref_type Group::get_sync_history_ref(Allocator& alloc, ref_type top_ref) noexcept
+{
+    if (top_ref != 0) {
+        Array top(alloc);
+        top.init_from_ref(top_ref);
+        if (top.size() > s_sync_history_ndx_in_parent)
+            return top.get_as_ref(s_sync_history_ndx_in_parent);
+    }
+    return 0;
+ }
+
 inline void Group::set_sync_history_parent(Array& sync_history_root)
 {
     REALM_ASSERT(m_top.is_attached());
@@ -1165,14 +1192,20 @@ public:
         group.detach();
     }
 
-    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size)
+    static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size,
+                              bool writable)
     {
-        group.attach_shared(new_top_ref, new_file_size); // Throws
+        group.attach_shared(new_top_ref, new_file_size, writable); // Throws
     }
 
     static void reset_free_space_tracking(Group& group)
     {
         group.reset_free_space_tracking(); // Throws
+    }
+
+    static void remap(Group& group, size_t new_file_size)
+    {
+        group.remap(new_file_size); // Throws
     }
 
     static void remap_and_update_refs(Group& group, ref_type new_top_ref, size_t new_file_size)
@@ -1184,6 +1217,17 @@ public:
                                  _impl::NoCopyInputStream& in)
     {
         group.advance_transact(new_top_ref, new_file_size, in); // Throws
+    }
+
+    static void create_empty_group_when_missing(Group& group)
+    {
+        if (!group.m_top.is_attached())
+            group.create_empty_group(); // Throws
+    }
+
+    static ref_type get_sync_history_ref(Allocator& alloc, ref_type top_ref) noexcept
+    {
+        return Group::get_sync_history_ref(alloc, top_ref);
     }
 
     static void set_sync_history_parent(Group& group, Array& sync_history_root)

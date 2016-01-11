@@ -251,7 +251,7 @@ public:
     /// allocator. Doing so will result in undefined behavior.
     size_t get_total_size() const noexcept;
 
-    /// Mark all managed memory (except the attached file) as free
+    /// Mark all mutable memory (ref-space outside the attached file) as free
     /// space.
     void reset_free_space_tracking();
 
@@ -270,6 +270,11 @@ public:
     /// boundary between two sections.
     void remap(size_t file_size);
 
+    /// Returns true initially, and after a call to reset_free_space_tracking()
+    /// up until the point of the first call to SlabAlloc::alloc(). Note that a
+    /// call to SlabAlloc::alloc() corresponds to a mutation event.
+    bool is_free_space_clean() const noexcept;
+
 #ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
     void verify() const override;
@@ -285,6 +290,7 @@ protected:
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
     void invalidate_cache() noexcept;
+
 private:
     enum AttachMode {
         attach_None,        // Nothing is attached
@@ -503,6 +509,11 @@ inline size_t SlabAlloc::get_baseline() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_baseline;
+}
+
+inline bool SlabAlloc::is_free_space_clean() const noexcept
+{
+    return m_free_space_state == free_space_Clean;
 }
 
 inline void SlabAlloc::resize_file(size_t new_file_size)

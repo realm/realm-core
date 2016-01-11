@@ -163,11 +163,13 @@ inline void BinaryColumn::update_from_parent(size_t old_baseline) noexcept
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
+            REALM_ASSERT(dynamic_cast<ArrayBinary*>(m_array.get()));
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
             leaf->update_from_parent(old_baseline);
             return;
         }
         // Big blobs root leaf
+        REALM_ASSERT(dynamic_cast<ArrayBigBlobs*>(m_array.get()));
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         leaf->update_from_parent(old_baseline);
         return;

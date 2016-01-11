@@ -79,13 +79,15 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     cfg.no_create = mode == mode_ReadWriteNoCreate;
     cfg.encryption_key = encryption_key;
     ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
+    SlabAlloc::DetachGuard dg(m_alloc);
 
     // Make all dynamically allocated memory (space beyond the attached file) as
     // available free-space.
     reset_free_space_tracking(); // Throws
-    SlabAlloc::DetachGuard dg(m_alloc);
-    attach(top_ref); // Throws
-    dg.release(); // Do not detach allocator from file
+
+    bool create_group_when_missing = true;
+    attach(top_ref, create_group_when_missing); // Throws
+    dg.release(); // Do not detach after all
 
     // SlabAlloc::validate_buffer() ensures this.
     REALM_ASSERT_RELEASE(m_alloc.m_file_format == SlabAlloc::library_file_format);
@@ -111,8 +113,10 @@ void Group::open(BinaryData buffer, bool take_ownership)
     reset_free_space_tracking(); // Throws
 
     SlabAlloc::DetachGuard dg(m_alloc);
-    attach(top_ref); // Throws
-    dg.release(); // Do not detach allocator from file
+    bool create_group_when_missing = true;
+    attach(top_ref, create_group_when_missing); // Throws
+    dg.release(); // Do not detach after all
+
     if (take_ownership)
         m_alloc.own_buffer();
 
@@ -139,6 +143,14 @@ Group::~Group() noexcept
 }
 
 
+void Group::remap(size_t new_file_size)
+{
+    size_t old_baseline = m_alloc.get_baseline();
+    if (new_file_size > old_baseline)
+        m_alloc.remap(new_file_size); // Throws
+}
+
+
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
 {
     size_t old_baseline = m_alloc.get_baseline();
@@ -152,7 +164,7 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
 }
 
 
-void Group::attach(ref_type top_ref)
+void Group::attach(ref_type top_ref, bool create_group_when_missing)
 {
     REALM_ASSERT(!m_top.is_attached());
 
@@ -162,27 +174,7 @@ void Group::attach(ref_type top_ref)
     m_tables.detach();
     m_table_names.detach();
 
-    bool create_empty_group = (top_ref == 0);
-    if (create_empty_group) {
-        m_top.create(Array::type_HasRefs); // Throws
-        _impl::DeepArrayDestroyGuard dg_top(&m_top);
-        {
-            m_table_names.create(); // Throws
-            _impl::DestroyGuard<ArrayString> dg(&m_table_names);
-            m_top.add(m_table_names.get_ref()); // Throws
-            dg.release();
-        }
-        {
-            m_tables.create(Array::type_HasRefs); // Throws
-            _impl::DestroyGuard<ArrayInteger> dg(&m_tables);
-            m_top.add(m_tables.get_ref()); // Throws
-            dg.release();
-        }
-        size_t initial_logical_file_size = sizeof (SlabAlloc::Header);
-        m_top.add(1 + 2*initial_logical_file_size); // Throws
-        dg_top.release();
-    }
-    else {
+    if (top_ref != 0) {
         m_top.init_from_ref(top_ref);
         size_t top_size = m_top.size();
         static_cast<void>(top_size);
@@ -202,6 +194,11 @@ void Group::attach(ref_type top_ref)
         // file size must never exceed actual file size.
         REALM_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
     }
+    else if (create_group_when_missing) {
+        create_empty_group(); // Throws
+    }
+
+    m_attached = true;
 }
 
 
@@ -212,11 +209,13 @@ void Group::detach() noexcept
 
     m_table_names.detach();
     m_tables.detach();
-    m_top.detach(); // This marks the group accessor as detached
+    m_top.detach();
+
+    m_attached = false;
 }
 
 
-void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
+void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
     REALM_ASSERT_3(new_top_ref, <, new_file_size);
     REALM_ASSERT(!is_attached());
@@ -229,7 +228,15 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
     if (new_file_size > m_alloc.get_baseline())
         m_alloc.remap(new_file_size); // Throws
 
-    attach(new_top_ref); // Throws
+    // When `new_top_ref` is null, ask attach() to create a new node structure
+    // for an empty group, but only during the initiation of write
+    // transactions. When the transaction being initiated is a read transaction,
+    // we instead have to leave array accessors m_top, m_tables, and
+    // m_table_names in their detached state, as there are no underlying array
+    // nodes to attached them to. In the case of write transactions, the nodes
+    // have to be created, as they have to be ready for being modified.
+    bool create_group_when_missing = writable;
+    attach(new_top_ref, create_group_when_missing); // Throws
 }
 
 
@@ -244,6 +251,28 @@ void Group::detach_table_accessors() noexcept
             tf::unbind_ptr(*t);
         }
     }
+}
+
+
+void Group::create_empty_group()
+{
+    m_top.create(Array::type_HasRefs); // Throws
+    _impl::DeepArrayDestroyGuard dg_top(&m_top);
+    {
+        m_table_names.create(); // Throws
+        _impl::DestroyGuard<ArrayString> dg(&m_table_names);
+        m_top.add(m_table_names.get_ref()); // Throws
+        dg.release();
+    }
+    {
+        m_tables.create(Array::type_HasRefs); // Throws
+        _impl::DestroyGuard<ArrayInteger> dg(&m_tables);
+        m_top.add(m_tables.get_ref()); // Throws
+        dg.release();
+    }
+    size_t initial_logical_file_size = sizeof (SlabAlloc::Header);
+    m_top.add(1 + 2*initial_logical_file_size); // Throws
+    dg_top.release();
 }
 
 
@@ -274,6 +303,8 @@ Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher)
 
 Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
 {
+    if (!m_table_names.is_attached())
+        return 0;
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         return 0;
@@ -325,6 +356,7 @@ Table* Group::do_get_or_insert_table(size_t table_ndx, StringData name, DescMatc
 Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
                                   DescSetter desc_setter, bool* was_added)
 {
+    REALM_ASSERT(m_table_names.is_attached());
     Table* table;
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found) {
@@ -1613,10 +1645,6 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     TransactAdvancer advancer(*this, schema_changed);
     parser.parse(in, advancer); // Throws
 
-    // Make all dynamically allocated memory (space beyond the attached file) as
-    // available free-space.
-    reset_free_space_tracking(); // Throws
-
     // Update memory mapping if database file has grown
     if (new_file_size > m_alloc.get_baseline()) {
         m_alloc.remap(new_file_size); // Throws
@@ -1624,7 +1652,8 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 
     m_alloc.invalidate_cache();
     m_top.detach(); // Soft detach
-    attach(new_top_ref); // Throws
+    bool create_group_when_missing = false; // See Group::attach_shared().
+    attach(new_top_ref, create_group_when_missing); // Throws
     refresh_dirty_accessors(); // Throws
 
     if (schema_changed)
@@ -1742,6 +1771,11 @@ void Group::verify() const
 
     m_alloc.verify();
 
+    if (!m_top.is_attached()) {
+        REALM_ASSERT(m_alloc.is_free_space_clean());
+        return;
+    }
+
     // Verify tables
     {
         size_t n = m_tables.size();
@@ -1758,7 +1792,7 @@ void Group::verify() const
     ref_type mutable_ref_end = m_alloc.get_total_size();
     ref_type baseline = m_alloc.get_baseline();
 
-    // Check the concistency of the allocation of used memory
+    // Check the consistency of the allocation of used memory
     MemUsageVerifier mem_usage_1(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     m_top.report_memory_usage(mem_usage_1);
     mem_usage_1.canonicalize();

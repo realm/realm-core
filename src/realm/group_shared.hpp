@@ -30,7 +30,7 @@
 #include <realm/util/platform_specific_condvar.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
-#include <realm/history.hpp>
+#include <realm/impl/history.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/replication.hpp>
 
@@ -141,13 +141,15 @@ public:
     /// constructed in the unattached state.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr,
+                         bool allow_file_format_upgrade = true);
 
     /// \brief Same as calling the corrsponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr,
+                         bool allow_file_format_upgrade = true);
 
     struct unattached_tag {};
 
@@ -270,10 +272,11 @@ public:
     // Transactions:
 
     struct VersionID {
-        uint_fast64_t version;
-        uint_fast32_t index;
+        uint_fast64_t version = 0; // FIXME: Change to std::numeric_limits<version_type>::max()
+        uint_fast32_t index   = 0;
 
-        explicit VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
+        VersionID() {}
+        VersionID(uint_fast64_t version, uint_fast32_t index)
         {
             this->version = version;
             this->index = index;
@@ -287,7 +290,7 @@ public:
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
 
-    using version_type = History::version_type;
+    using version_type = _impl::ContinTransactHistory::version_type;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
@@ -503,20 +506,17 @@ private:
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
-        uint_fast64_t   m_version;
-        uint_fast32_t   m_reader_idx;
-        ref_type        m_top_ref;
-        size_t          m_file_size;
-        // FIXME: Bad initialization as size_t is not necessarily equal to uint_fast64_t.
-        ReadLockInfo() : m_version(std::numeric_limits<size_t>::max()),
-                         m_reader_idx(0), m_top_ref(0), m_file_size(0) {};
+        uint_fast64_t   m_version    = std::numeric_limits<size_t>::max(); // FIXME: Bad initialization as size_t is not necessarily equal to uint_fast64_t.
+        uint_fast32_t   m_reader_idx = 0;
+        ref_type        m_top_ref    = 0;
+        size_t          m_file_size  = 0;
     };
     class ReadLockUnlockGuard;
 
     // Member variables
-    Group      m_group;
-    ReadLockInfo m_readlock;
-    uint_fast32_t   m_local_max_entry;
+    Group m_group;
+    ReadLockInfo m_read_lock;
+    uint_fast32_t m_local_max_entry;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
@@ -556,24 +556,25 @@ private:
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
-    // Grab the latest readlock and update readlock info. Compare latest against
-    // current (before updating) and determine if the version is the same as before.
-    // As a side effect update memory mapping to ensure that the ringbuffer entries
-    // referenced in the readlock info is accessible.
-    // The caller may provide an uninitialized readlock in which case same_as_before
-    // is given an undefined value.
-    void grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before);
+    /// Grab a read lock on the spapshot associated with the specified
+    /// version. If `version_id == VersionID()`, a read lock will be grabbed on
+    /// the latest available snapshot. Fails if the snapshot is no longer
+    /// available.
+    ///
+    /// As a side effect update memory mapping to ensure that the ringbuffer entries
+    /// referenced in the readlock info is accessible.
+    ///
+    /// FIXME: It needs to be made more clear exactly under which conditions
+    /// this function fails. Also, why is it useful to promise anything about
+    /// detection of bad versions? Can we really promise enough to make such a
+    /// promise useful to the caller?
+    void grab_read_lock(ReadLockInfo&, VersionID);
 
-    // Try to grab a readlock for a specific version. Fails if the version is no longer
-    // accessible.
-    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before,
-                                VersionID specific_version);
+    // Release a specific read lock. The read lock MUST have been obtained by a
+    // call to grab_read_lock().
+    void release_read_lock(ReadLockInfo&) noexcept;
 
-    // Release a specific readlock. The readlock info MUST have been obtained by a
-    // call to grab_latest_readlock() or grab_specific_readlock().
-    void release_readlock(ReadLockInfo& readlock) noexcept;
-
-    void do_begin_read(VersionID);
+    void do_begin_read(VersionID, bool writable);
     void do_end_read() noexcept;
     void do_begin_write();
     version_type do_commit();
@@ -599,19 +600,18 @@ private:
 
     //@{
     /// See LangBindHelper.
-    template<class O>
-    void advance_read(History&, O* observer, VersionID);
-
-    template<class O>
-    void promote_to_write(History&, O* observer);
+    template<class O> void advance_read(O* observer, VersionID);
+    template<class O> void promote_to_write(O* observer);
     void commit_and_continue_as_read();
-    template<class O>
-    void rollback_and_continue_as_read(History&, O* observer);
+    template<class O> void rollback_and_continue_as_read(O* observer);
     //@}
 
-    // Advance the readlock to the given version and return the transaction logs
-    // between the old version and the given version, or nullptr if none.
-    std::unique_ptr<BinaryData[]> advance_readlock(History&, VersionID specific_version);
+    template<class O> void do_advance_read(O* observer, VersionID, _impl::ContinTransactHistory&);
+
+    /// If there is an assocoated \ref Replication object, then this function
+    /// returns `repl->get_history()` where `repl` is that Replication object,
+    /// otherwise this function returns null.
+    _impl::ContinTransactHistory* get_history();
 
     int get_file_format() const noexcept;
 
@@ -811,7 +811,7 @@ public:
     ~ReadLockUnlockGuard() noexcept
     {
         if (m_read_lock)
-            m_shared_group.release_readlock(*m_read_lock);
+            m_shared_group.release_read_lock(*m_read_lock);
     }
     void release() noexcept
     {
@@ -888,58 +888,48 @@ std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup
     return result;
 }
 
-
 template<class O>
-inline void SharedGroup::advance_read(History& history, O* observer, VersionID version)
+inline void SharedGroup::advance_read(O* observer, VersionID version_id)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    util::LockGuard lg(m_handover_lock);
-    ReadLockInfo old_readlock = m_readlock;
-    std::unique_ptr<BinaryData[]> changesets = advance_readlock(history, version); // Throws
-    ReadLockUnlockGuard rlug(*this, old_readlock);
-    if (!changesets)
-        return;
-    size_t num_changesets = size_t(m_readlock.m_version - old_readlock.m_version);
-    const BinaryData* changesets_begin = changesets.get();
-    const BinaryData* changesets_end = changesets_begin + num_changesets;
+    // It is an error if the new version precedes the currently bound one.
+    if (version_id.version != 0 && version_id.version < m_read_lock.m_version)
+        throw LogicError(LogicError::bad_version);
 
-    if (observer) {
-        try {
-            _impl::TransactLogParser parser;
-            _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-            parser.parse(in, *observer); // Throws
-            observer->parse_complete(); // Throws
-        }
-        catch (...) {
-            release_readlock(m_readlock);
-            m_readlock = old_readlock;
-            rlug.release();
-            throw;
-        }
-    }
+    _impl::ContinTransactHistory* hist = get_history(); // Throws
+    if (!hist)
+        throw LogicError(LogicError::no_history);
 
-    _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-    using gf = _impl::GroupFriend;
-    gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size, in); // Throws
+    do_advance_read(observer, version_id, *hist); // Throws
 }
 
 template<class O>
-inline void SharedGroup::promote_to_write(History& history, O* observer)
+inline void SharedGroup::promote_to_write(O* observer)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
+
+    _impl::ContinTransactHistory* hist = get_history(); // Throws
+    if (!hist)
+        throw LogicError(LogicError::no_history);
 
     do_begin_write(); // Throws
     try {
         VersionID version = VersionID(); // Latest
-        advance_read(history, observer, version); // Throws
+        do_advance_read(observer, version, *hist); // Throws
 
         Replication* repl = m_group.get_replication();
-        REALM_ASSERT(repl);
-        version_type current_version = m_readlock.m_version;
+        REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
+        version_type current_version = m_read_lock.m_version;
         repl->initiate_transact(*this, current_version); // Throws
+
+        // If the group has no top array (top_ref == 0), create a new node
+        // structure for an empty group now, to be ready for modifications. See
+        // also Group::attach_shared().
+        using gf = _impl::GroupFriend;
+        gf::create_empty_group_when_missing(m_group); // Throws
     }
     catch (...) {
         do_end_write();
@@ -949,40 +939,15 @@ inline void SharedGroup::promote_to_write(History& history, O* observer)
     m_transact_stage = transact_Writing;
 }
 
-inline void SharedGroup::commit_and_continue_as_read()
-{
-    if (m_transact_stage != transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    util::LockGuard lg(m_handover_lock);
-    do_commit(); // Throws
-
-    // advance readlock but dont update accessors:
-    // As this is done under lock, along with the addition above of the newest commit,
-    // we know for certain that the readlock we will grab WILL refer to our own newly
-    // completed commit.
-    release_readlock(m_readlock);
-
-    bool dummy;
-    grab_latest_readlock(m_readlock, dummy); // Throws
-
-    do_end_write();
-
-    // Free memory that was allocated during the write transaction.
-    using gf = _impl::GroupFriend;
-    gf::reset_free_space_tracking(m_group); // Throws
-
-    // Remap file if it has grown, and update refs in underlying node structure
-    gf::remap_and_update_refs(m_group, m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
-
-    m_transact_stage = transact_Reading;
-}
-
 template<class O>
-inline void SharedGroup::rollback_and_continue_as_read(History& history, O* observer)
+inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
+
+    _impl::ContinTransactHistory* hist = get_history(); // Throws
+    if (!hist)
+        throw LogicError(LogicError::no_history);
 
     util::LockGuard lg(m_handover_lock);
 
@@ -990,7 +955,7 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
     using gf = _impl::GroupFriend;
     gf::reset_free_space_tracking(m_group); // Throws
 
-    BinaryData uncommitted_changes = history.get_uncommitted_changes();
+    BinaryData uncommitted_changes = hist->get_uncommitted_changes();
 
     // FIXME: We are currently creating two transaction log parsers, one here,
     // and one in advance_transact(). That is wasteful as the parser creation is
@@ -1006,17 +971,76 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
         observer->parse_complete(); // Throws
     }
 
+    ref_type top_ref = m_read_lock.m_top_ref;
+    size_t file_size = m_read_lock.m_file_size;
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
-    gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size,
-                         reversed_in); // Throws
+    gf::advance_transact(m_group, top_ref, file_size, reversed_in); // Throws
 
     do_end_write();
 
     Replication* repl = gf::get_replication(m_group);
-    REALM_ASSERT(repl);
+    REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
     repl->abort_transact(*this);
 
     m_transact_stage = transact_Reading;
+}
+
+template<class O>
+inline void SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::ContinTransactHistory& hist)
+{
+    util::LockGuard lg(m_handover_lock); // FIXME: Finn, is this the right place to grab a lock on m_handover_lock?
+    ReadLockInfo new_read_lock;
+    grab_read_lock(new_read_lock, version_id); // Throws
+    REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
+    if (new_read_lock.m_version == m_read_lock.m_version) {
+        release_read_lock(new_read_lock);
+        return;
+    }
+
+    ReadLockUnlockGuard g(*this, new_read_lock);
+    {
+        // FIXME: Can this entire block be done inside a virtual function that replaces (or still is) ContinTransactHistory::refresh_accessor_tree()?
+        using gf = _impl::GroupFriend;
+        size_t new_file_size = new_read_lock.m_file_size;
+        gf::remap(m_group, new_file_size);
+        Allocator& alloc = gf::get_alloc(m_group);
+        ref_type top_ref = new_read_lock.m_top_ref;
+        ref_type hist_ref = gf::get_sync_history_ref(alloc, top_ref);
+        hist.refresh_accessor_tree(hist_ref); // Throws
+    }
+
+    if (observer) {
+        // This has to happen within the original snapshot and while it is still
+        // in a fully functional state.
+        _impl::TransactLogParser parser;
+        version_type old_version = m_read_lock.m_version;
+        version_type new_version = new_read_lock.m_version;
+        _impl::ChangesetInputStream in(hist, old_version, new_version);
+        parser.parse(in, *observer); // Throws
+        observer->parse_complete(); // Throws
+    }
+
+    // The old read lock must be retaind for as long as the history of
+    // changesets is accessed (until Group::advance_transact() returns). This
+    // ensures that the oldest needed changeset remains in the history, even
+    // when the history is implemented as a separate unversioned entity outside
+    // the Realm (i.e., the old implementation). On the other hand, if, in the
+    // future, it can be assumed, that the history is always implemented as a
+    // versioned entity, that is part of the Realm state, then it will no longer
+    // be necessary to retain the old read lock beyond this point.
+
+    {
+        version_type old_version = m_read_lock.m_version;
+        version_type new_version = new_read_lock.m_version;
+        ref_type new_top_ref = new_read_lock.m_top_ref;
+        size_t new_file_size = new_read_lock.m_file_size;
+        _impl::ChangesetInputStream in(hist, old_version, new_version);
+        m_group.advance_transact(new_top_ref, new_file_size, in); // Throws
+    }
+
+    g.release();
+    release_read_lock(m_read_lock);
+    m_read_lock = new_read_lock;
 }
 
 inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
@@ -1064,6 +1088,14 @@ inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
     }
 }
 
+inline _impl::ContinTransactHistory* SharedGroup::get_history()
+{
+    using gf = _impl::GroupFriend;
+    if (Replication* repl = gf::get_replication(m_group))
+        return repl->get_history();
+    return 0;
+}
+
 inline int SharedGroup::get_file_format() const noexcept
 {
     return m_group.get_file_format();
@@ -1080,15 +1112,15 @@ public:
     }
 
     template<class O>
-    static void advance_read(SharedGroup& sg, History& hist, O* obs, SharedGroup::VersionID ver)
+    static void advance_read(SharedGroup& sg, O* obs, SharedGroup::VersionID ver)
     {
-        sg.advance_read(hist, obs, ver); // Throws
+        sg.advance_read(obs, ver); // Throws
     }
 
     template<class O>
-    static void promote_to_write(SharedGroup& sg, History& hist, O* obs)
+    static void promote_to_write(SharedGroup& sg, O* obs)
     {
-        sg.promote_to_write(hist, obs); // Throws
+        sg.promote_to_write(obs); // Throws
     }
 
     static void commit_and_continue_as_read(SharedGroup& sg)
@@ -1097,9 +1129,9 @@ public:
     }
 
     template<class O>
-    static void rollback_and_continue_as_read(SharedGroup& sg, History& hist, O* obs)
+    static void rollback_and_continue_as_read(SharedGroup& sg, O* obs)
     {
-        sg.rollback_and_continue_as_read(hist, obs); // Throws
+        sg.rollback_and_continue_as_read(obs); // Throws
     }
 
     static void async_daemon_open(SharedGroup& sg, const std::string& file)

@@ -776,7 +776,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 void SlabAlloc::reset_free_space_tracking()
 {
     invalidate_cache();
-    if (m_free_space_state == free_space_Clean)
+    if (is_free_space_clean())
         return;
 
     // Free all scratch space (done after all data has
@@ -805,7 +805,7 @@ void SlabAlloc::remap(size_t file_size)
 {
     REALM_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
-    REALM_ASSERT_DEBUG(m_free_space_state == free_space_Clean);
+    REALM_ASSERT_DEBUG(is_free_space_clean());
     REALM_ASSERT_DEBUG(m_baseline <= file_size);
 
     // Extend mapping by adding sections

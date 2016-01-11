@@ -32,7 +32,7 @@
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/history.hpp>
+#include <realm/impl/history.hpp>
 #include <realm/impl/transact_log.hpp>
 
 namespace realm {
@@ -49,7 +49,7 @@ class Replication: public _impl::TransactLogConvenientEncoder, protected _impl::
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
-    using version_type = History::version_type;
+    using version_type = _impl::ContinTransactHistory::version_type;
     using InputStream = _impl::NoCopyInputStream;
     class TransactLogApplier;
     class Interrupted; // Exception
@@ -208,6 +208,13 @@ public:
     static void apply_changeset(InputStream& transact_log, Group& target,
                                 util::Logger* logger = nullptr);
 
+    /// Returns an object that gives access to the history of changesets in a
+    /// way that allows for continuous transactions (Group::advance_transact()
+    /// in particular). If this function returns null, continuous transactions
+    /// are not supported via the associated SharedGroup object. This function
+    /// always returns null unless it is overridden by a subclass.
+    virtual _impl::ContinTransactHistory* get_history();
+
     virtual ~Replication() noexcept {}
 
 protected:
@@ -313,6 +320,8 @@ private:
 };
 
 
+
+
 // Implementation:
 
 inline Replication::Replication():
@@ -373,6 +382,11 @@ inline void Replication::interrupt() noexcept
 inline void Replication::clear_interrupt() noexcept
 {
     do_clear_interrupt();
+}
+
+inline _impl::ContinTransactHistory* Replication::get_history()
+{
+    return 0;
 }
 
 inline TrivialReplication::TrivialReplication(const std::string& database_file):

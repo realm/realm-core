@@ -56,6 +56,8 @@ const char* LogicError::what() const noexcept
         case wrong_transact_state:
             return "Wrong transactional state (no active transaction, wrong type of transaction, "
                 "or transaction already in progress)";
+        case no_history:
+            return "Continuous transaction through SharedGroup object without history information";
     }
     return "Unknown error";
     // LCOV_EXCL_STOP (LogicError messages)
