@@ -685,7 +685,8 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 // and insert the new at the correct position computed above.
                 if (new_pos < old_pos) {
                     sub.insert_without_updating_index(new_pos, new_row_ndx, 1);
-                    sub.erase_without_updating_index(old_pos + 1, old_pos + 1 == sub.size() - 1);
+                    bool is_last = old_pos + 1 == sub.size() - 1;
+                    sub.erase_without_updating_index(old_pos + 1, is_last);
                 }
                 else if (new_pos > old_pos) {
                     // we're removing the old entry from before the new entry,
