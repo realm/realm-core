@@ -24,7 +24,7 @@ test_stl_DEPS     = util
 
 check_PROGRAMS = realm-tests
 
-TESTS := $(wildcard test_*.cpp large_tests/*.cpp fuzz_group.cpp)
+TESTS := $(wildcard test_*.cpp large_tests/*.cpp fuzz_*.cpp)
 
 realm_tests_SOURCES = $(TESTS) main.cpp
 realm_tests_LIBS    = util/test-util.a
