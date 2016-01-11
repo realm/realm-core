@@ -6,7 +6,10 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `LangBindHelper::advance_read()` and friends no longer take a history
+  argument. Access to the history is now gained automatically via
+  `Replaication::get_history()`. Application and bindings should simply delete
+  the history argument at each call site.
 
 ### Enhancements:
 
