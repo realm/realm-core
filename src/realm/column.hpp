@@ -1280,8 +1280,7 @@ void Column<T>::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t pr
 
 // Implementing pure virtual method of ColumnBase.
 template<class T>
-void Column<T>::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
-                              bool)
+void Column<T>::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);

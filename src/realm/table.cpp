@@ -5444,6 +5444,33 @@ bool Table::is_cross_table_link_target() const noexcept
 }
 
 
+void Table::generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch)
+{
+    if (ref.get()) {
+        patch.reset(new Table::HandoverPatch);
+        patch->m_table_num = ref.get()->get_index_in_group();
+        // must be group level table!
+        if (patch->m_table_num == npos) {
+            throw std::runtime_error("Table handover failed: not a group level table");
+        }
+    }
+    else {
+        patch.reset();
+    }
+}
+
+
+TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
+{
+    if (patch) {
+        TableRef result(group.get_table(patch->m_table_num));
+        patch.reset();
+        return result;
+    }
+    return TableRef();
+}
+
+
 #ifdef REALM_DEBUG
 
 void Table::verify() const
@@ -5638,6 +5665,5 @@ void Table::dump_node_structure(std::ostream& out, int level) const
         column.do_dump_node_structure(out, level+2);
     }
 }
-
 
 #endif // REALM_DEBUG

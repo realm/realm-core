@@ -2,9 +2,9 @@
 
 ### Bugfixes:
 
-* Fixed incorrect initialization of TableViews from queries on LinkViews
-  resulting in `TableView::is_in_sync()` being incorrect until the first time
-  it is brought back into sync.
+* Fixed error when opening encrypted streaming-form files which would be
+  resized on open due to the size not aligning with a chunked mapping section
+  boundary.
 
 ### API breaking changes:
 
@@ -12,7 +12,49 @@
 
 ### Enhancements:
 
+* Optimized speed of TableView::clear() on an indexed unordered Table. A clear()
+  that before took several minutes with 300000 rows now takes a few seconds.
+
+-----------
+
+### Internals:
+
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.95.7 Release notes
+
+### Bugfixes:
+
+* Corrected a bug which caused handover of a query with a restricting
+  view to loose the restricting view.
+
+----------------------------------------------
+
+# 0.95.6 Release notes
+
+### Bugfixes:
+
+* Fixed incorrect initialization of TableViews from queries on LinkViews
+  resulting in `TableView::is_in_sync()` being incorrect until the first time
+  it is brought back into sync.
+* Fixed `TableView` aggregate methods to give the correct result when called on
+  a table view that at one point had detached refs but has since been synced.
+* Fixed another bug in `ColumnBase::build()` which would cause it to produce an
+  invalid B+-tree (incorrect number of elements per child in the compact
+  form). This is a bug that could have been triggered through proper use of our
+  bindings in their current form. In particular, it would have been triggered
+  when adding a new attribute to a class that already has a sufficiently large
+  number of objects in it (> REALM_MAX_BPNODE_SIZE^2 = 1,000,000).
+* Fixed a bug in handover of Queries which use links. The bug was incomplete
+  cloning of the underlying data structure. This bug goes unnoticed as long
+  as the original datastructure is intact and is only seen if the original
+  datastructure is deleted or changed before the handed over query is re-executed
+
+### Enhancements:
+
+* Added support for handing over TableRefs from one thread to another.
 
 -----------
 
@@ -22,8 +64,20 @@
   available via all Android NDK toolchains.
 * New operation: SubsumeIdentity. It replaces all links to one row with
   links to a different row.
+* Regular assertions (REALM_ASSERT()) are no longer enabled by default in
+  release mode. Note that this is a reversion back to the "natural" state of
+  affairs, after a period of having them enabled by default in release mode. The
+  Cocoa binding was the primary target when the assertions were enabled a while
+  back, and steps were taken to explicitely disable those assertions in the
+  Android binding to avoid a performance-wise impact there. It is believed that
+  the assertions are no longer needed in the Cocoa binding, but in case they
+  are, the right approach, going forward, is to enable them specifically for the
+  Cocoa binding. Note that with these changes, the Android binding no longer
+  needs to explicitely disable regular assertions in release mode.
+* Upgraded Android toolchain to R10E and gcc to 4.9 for all architectures.
 
 ----------------------------------------------
+
 
 # 0.95.5 Release notes
 

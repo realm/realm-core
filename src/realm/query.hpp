@@ -288,33 +288,33 @@ protected:
     static bool  comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
 
 public:
-    typedef Query_Handover_patch Handover_patch;
+    using HandoverPatch = QueryHandoverPatch;
 
-    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch,
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
                                                       ConstSourcePayload mode) const
     {
-        patch.reset(new Handover_patch);
+        patch.reset(new HandoverPatch);
         std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
         return retval;
     }
 
-    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<Handover_patch>& patch,
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
                                                       MutableSourcePayload mode)
     {
-        patch.reset(new Handover_patch);
+        patch.reset(new HandoverPatch);
         std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
         return retval;
     }
 
-    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    virtual void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
     {
         apply_patch(*patch, group);
         patch.reset();
     }
 
-    void apply_patch(Handover_patch& patch, Group& group);
-    Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode);
-    Query(Query& source, Handover_patch& patch, MutableSourcePayload mode);
+    void apply_patch(HandoverPatch& patch, Group& group);
+    Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode);
+    Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode);
 private:
     void fetch_descriptor();
 
@@ -356,8 +356,6 @@ private:
 
     void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
-
-    bool supports_export_for_handover() { return m_view == 0; };
 
     bool has_conditions() const { return m_groups.size() > 0 && m_groups[0].m_root_node; }
     ParentNode* root_node() const

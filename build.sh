@@ -31,11 +31,6 @@ fi
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-# enable assertions in release builds by default
-if [ -z ${REALM_ENABLE_ASSERTIONS+x} ]; then
-    export REALM_ENABLE_ASSERTIONS=1
-fi
-
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui replication"
 
@@ -847,7 +842,7 @@ EOF
             if [ "$target" = "arm" -o "$target" = "arm-v7a" ]; then
                 arch="arm"
                 android_prefix="arm"
-                android_toolchain="arm-linux-androideabi-4.8"
+                android_toolchain="arm-linux-androideabi-4.9"
             elif [ "$target" = "arm64" ]; then
                 arch="arm64"
                 android_prefix="aarch64"
@@ -855,11 +850,11 @@ EOF
             elif [ "$target" = "mips" ]; then
                 arch="mips"
                 android_prefix="mipsel"
-                android_toolchain="mipsel-linux-android-4.8"
+                android_toolchain="mipsel-linux-android-4.9"
             elif [ "$target" = "x86" ]; then
                 arch="x86"
                 android_prefix="i686"
-                android_toolchain="x86-4.8"
+                android_toolchain="x86-4.9"
             elif [ "$target" = "x86_64" ]; then
                 arch="x86_64"
                 android_prefix="x86_64"
@@ -1074,6 +1069,25 @@ EOF
         export REALM_HAVE_CONFIG="1"
         error=""
         if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode"; then
+            error="1"
+        fi
+        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        if [ "$error" ]; then
+            exit 1
+        fi
+        echo "Test passed"
+        exit 0
+        ;;
+
+    "tsan"|"tsan-debug")
+        # Run test suite with GCC's thread sanitizer enabled.
+        # To get symbolized stack traces (file names and line numbers) with GCC, you at least version 4.9.
+        check_mode="$(printf "%s\n" "$MODE" | sed 's/tsan/check/')" || exit 1
+        auto_configure || exit 1
+        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
+        export REALM_HAVE_CONFIG="1"
+        error=""
+        if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=thread" EXTRA_LDFLAGS="-fsanitize=thread" "$check_mode"; then
             error="1"
         fi
         touch "$CONFIG_MK" || exit 1 # Force complete rebuild
@@ -2952,6 +2966,13 @@ EOF
         # Run by Jenkins as part of the core pipeline whenever master changes.
         REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
         sh build.sh asan-debug || exit 1
+        exit 0
+        ;;
+
+    "jenkins-pipeline-thread-sanitizer")
+        # Run by Jenkins as part of the core pipeline whenever master changes.
+        REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config || exit 1
+        sh build.sh tsan-debug || exit 1
         exit 0
         ;;
 
