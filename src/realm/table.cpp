@@ -5174,10 +5174,10 @@ void Table::mark_link_target_tables(size_t col_ndx_begin) noexcept
     REALM_ASSERT(is_attached());
     REALM_ASSERT(!m_columns.is_attached() || col_ndx_begin <= m_cols.size());
 
-    for (auto& column : m_cols) {
-        if (column != nullptr) {
-            column->mark(ColumnBase::mark_LinkTargets);
-        }
+    size_t n = m_cols.size();
+    for (size_t i = col_ndx_begin; i < n; ++i) {
+        if (ColumnBase* col = m_cols[i])
+            col->mark(ColumnBase::mark_LinkTargets);
     }
 }
 
