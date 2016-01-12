@@ -7,6 +7,7 @@
 
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
+#include <realm/util/miscellaneous.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/utilities.hpp>
@@ -235,10 +236,8 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size)
 
 void Group::detach_table_accessors() noexcept
 {
-    typedef table_accessors::const_iterator iter;
-    iter end = m_table_accessors.end();
-    for (iter i = m_table_accessors.begin(); i != end; ++i) {
-        if (Table* t = *i) {
+    for (const auto& table_accessor : m_table_accessors) {
+        if (Table* t = table_accessor) {
             typedef _impl::TableFriend tf;
             tf::detach(*t);
             tf::unbind_ptr(*t);
@@ -818,11 +817,9 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
 
     // Update all attached table accessors including those attached to
     // subtables.
-    typedef table_accessors::const_iterator iter;
-    iter end = m_table_accessors.end();
-    for (iter i = m_table_accessors.begin(); i != end; ++i) {
+    for (const auto& table_accessor : m_table_accessors) {
         typedef _impl::TableFriend tf;
-        if (Table* table = *i)
+        if (Table* table = table_accessor)
             tf::update_from_parent(*table, old_baseline);
     }
 }
@@ -1543,8 +1540,8 @@ void Group::update_table_indices(F&& map_function)
     refresh_dirty_accessors(); // Throws
 
     // Table's specs might have changed, so they need to be reinitialized.
-    for (size_t i = 0; i < m_table_accessors.size(); ++i) {
-        if (Table* t = m_table_accessors[i]) {
+    for (const auto& table_accessor : m_table_accessors) {
+        if (Table* t = table_accessor) {
             tf::get_spec(*t).init_from_parent();
         }
     }
@@ -1807,11 +1804,8 @@ void Group::verify() const
 
     // Check the concistency of the allocation of the immutable memory that has
     // been marked as free after the file was opened
-    {
-        typedef SlabAlloc::chunks::const_iterator iter;
-        iter end = m_alloc.m_free_read_only.end();
-        for (iter i = m_alloc.m_free_read_only.begin(); i != end; ++i)
-            mem_usage_2.add_immutable(i->ref, i->size);
+    for (const auto& free_block : m_alloc.m_free_read_only) {
+        mem_usage_2.add_immutable(free_block.ref, free_block.size);
     }
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
@@ -1820,11 +1814,8 @@ void Group::verify() const
 
     // Check the concistency of the allocation of the mutable memory that has
     // been marked as free
-    {
-        typedef SlabAlloc::chunks::const_iterator iter;
-        iter end = m_alloc.m_free_space.end();
-        for (iter i = m_alloc.m_free_space.begin(); i != end; ++i)
-            mem_usage_2.add_mutable(i->ref, i->size);
+    for (const auto& free_block : m_alloc.m_free_space) {
+        mem_usage_2.add_mutable(free_block.ref, free_block.size);
     }
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);

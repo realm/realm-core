@@ -262,7 +262,7 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
     if (c.size() != n)
         return false;
 
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         DataType type = get_type(i);
         if (c.get_type(i) != type)
             return false;

@@ -126,7 +126,7 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
 
     // Compute total:
     r.total = 0;
-    for (auto s: samples) {
+    for (double s : samples) {
         r.total += s;
     }
 
@@ -151,7 +151,7 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
     if (r.rep > 1) {
         double mean = r.avg();
         double sum_variance = 0.0;
-        for (auto s: samples) {
+        for (double s : samples) {
             double x = s - mean;
             sum_variance += x * x;
         }
