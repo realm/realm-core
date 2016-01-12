@@ -2608,7 +2608,7 @@ void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
         move_last_over(found);
 
         // Since we removed an element, we need to re-check the element that was just
-        // into the "found" spot by move_last_over.
+        // moved into the "found" spot by move_last_over.
         --found;
     }
 
