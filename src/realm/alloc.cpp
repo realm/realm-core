@@ -79,6 +79,10 @@ public:
 
     char* do_translate(ref_type ref) const noexcept override
     {
+        // adjust for ref in writable area (bit 1 set)
+        if (ref & 0x2) {
+            ref -= 2;
+        }
         return reinterpret_cast<char*>(ref);
     }
 

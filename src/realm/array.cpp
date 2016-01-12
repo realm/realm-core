@@ -357,6 +357,7 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
     uint_fast32_t dummy_checksum = 0x01010101UL;
     ref_type new_ref = out.write_array(header, size, dummy_checksum); // Throws
     REALM_ASSERT_3(new_ref % 8, ==, 0); // 8-byte alignment
+    // NOTE: Above assertion also checks that refs are in read-only memory (bit 1 clear)
     return new_ref;
 }
 

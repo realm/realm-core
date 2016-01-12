@@ -116,6 +116,8 @@ ref_type GroupWriter::write_group()
     top.set(1, value_2); // Throws
 
     if (top.size() >= 8) {
+        // FIXME: Are refs correctly handled here? Refs pointing inside
+        // the file must have bit 0 cleared.
         if (ref_type sync_history_ref = top.get_as_ref(7)) {
             Allocator& alloc = top.get_alloc();
             ref_type new_sync_history_ref =
@@ -223,6 +225,7 @@ ref_type GroupWriter::write_group()
                  Array::wtype_Bits);
 
     // Calculate write positions
+    REALM_ASSERT((reserve_pos & 0x2) == 0);
     ref_type reserve_ref        = to_ref(reserve_pos);
     ref_type free_positions_ref = reserve_ref;
     ref_type free_sizes_ref     = free_positions_ref + free_positions_size;
@@ -550,6 +553,7 @@ void GroupWriter::write_array_at(ref_type ref, const char* data, size_t size)
 {
     size_t pos = size_t(ref);
 
+    REALM_ASSERT((ref & 0x2) == 0);
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
     REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = m_file_map.get_addr() + pos;

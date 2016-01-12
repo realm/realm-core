@@ -199,7 +199,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
                 if (m_debug_out)
                     std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
-
+                // must set bit 1 in ref, as all refs obtained here are in writable memory
                 char* addr = translate(ref+2);
 #if REALM_ENABLE_ALLOC_SET_ZERO
                 std::fill(addr, addr+size, 0);
@@ -259,7 +259,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     malloc_debug_map[ref] = malloc(1);
 #endif
 
-    // set bit 1 on blocks in writable memory
+    // set bit 1 in refs to blocks in writable memory
     return MemRef(slab.addr, ref+2);
 }
 
@@ -414,6 +414,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
             size_t section_index = get_section_index(ref);
             size_t mapping_index = section_index - m_first_additional_mapping;
             size_t section_offset = ref - get_section_base(section_index);
+            REALM_ASSERT_DEBUG(get_section_base(0)==0);
             REALM_ASSERT_DEBUG(m_additional_mappings);
             REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
             map = &m_additional_mappings[mapping_index];
@@ -435,9 +436,9 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
         ref_type slab_ref = i == m_slabs.begin() ? 0 : (i-1)->ref_end;
         addr = i->addr + (offset - slab_ref);
     }
-    cache[cache_index].addr = addr;
-    cache[cache_index].ref = ref;
-    cache[cache_index].version = version;
+    //cache[cache_index].addr = addr;
+    //cache[cache_index].ref = ref;
+    //cache[cache_index].version = version;
     REALM_ASSERT_DEBUG(addr != nullptr);
     return addr;
 }

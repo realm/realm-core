@@ -75,12 +75,14 @@ public:
         REALM_ASSERT(!addr);
         addr = new char[size]; // Throws
         m_offset += size;
-        return MemRef(addr, ref+2); //set bit 1 to indicate writable
+        return MemRef(addr, ref +2); //set bit 1 to indicate writable
     }
 
     void do_free(ref_type ref, const char* addr) noexcept override
     {
         typedef std::map<ref_type, char*>::iterator iter;
+        if (ref & 0x2) 
+            ref -= 2;
         iter i = m_map.find(ref);
         REALM_ASSERT(i != m_map.end());
         char* addr_2 = i->second;
@@ -93,6 +95,8 @@ public:
     char* do_translate(ref_type ref) const noexcept override
     {
         typedef std::map<ref_type, char*>::const_iterator iter;
+        if (ref & 0x2) 
+            ref -= 2;
         iter i = m_map.find(ref);
         REALM_ASSERT(i != m_map.end());
         char* addr = i->second;
