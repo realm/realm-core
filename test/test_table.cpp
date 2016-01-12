@@ -1453,8 +1453,13 @@ TEST(Table_SetIntUnique)
     table.set_int_unique(0, 0, 123);
     table.set_int_unique(1, 0, 123);
 
-    CHECK_LOGIC_ERROR(table.set_int_unique(0, 1, 123), LogicError::unique_constraint_violation);
-    CHECK_LOGIC_ERROR(table.set_int_unique(1, 1, 123), LogicError::unique_constraint_violation);
+    // Check that conflicting SetIntUniques result in rows being deleted.
+    table.set_int_unique(0, 1, 123);
+    CHECK_EQUAL(table.size(), 9);
+    table.set_int_unique(1, 1, 123);
+    CHECK_EQUAL(table.size(), 9);
+    table.set_int_unique(1, 2, 123);
+    CHECK_EQUAL(table.size(), 8);
 }
 
 
@@ -1472,10 +1477,13 @@ TEST(Table_SetStringUnique)
 
     table.set_string_unique(1, 0, "bar");
 
-    CHECK_LOGIC_ERROR(table.set_string_unique(1, 1, "bar"), LogicError::unique_constraint_violation);
+    // Check that conflicting SetStringUniques result in rows being deleted.
+    table.set_string_unique(1, 1, "bar");
+    CHECK_EQUAL(table.size(), 9);
     CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, realm::null()), LogicError::column_not_nullable);
 
-    CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, realm::null()), LogicError::unique_constraint_violation);
+    table.set_string_unique(2, 0, realm::null());
+    CHECK_EQUAL(table.size(), 8);
 }
 
 

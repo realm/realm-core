@@ -620,6 +620,8 @@ private:
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
     template<class T>
     TableView find_all(size_t column_ndx, T value);
+    template<class ColType, class T>
+    void do_set_unique(ColType& column, size_t row_ndx, T&& value);
 public:
 
 

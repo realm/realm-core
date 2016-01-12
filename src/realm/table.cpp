@@ -2579,6 +2579,32 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 }
 
 
+template<class ColType, class T>
+void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
+{
+    size_t found = col.find_first(value);
+    if (found != not_found) {
+        if (found == ndx)
+            found = col.find_first(value, found + 1);
+        if (found != not_found) {
+            // Primary Key constraint violation!
+            // RESOLUTION: Let the new row subsume the identity of the old row,
+            // and delete the old row.
+            subsume_identity(found, ndx);
+
+            if ((ndx + 1) == size()) {
+                // Row will be moved by move_last_over, adjust index.
+                ndx = found;
+            }
+
+            move_last_over(found);
+        }
+    }
+
+    col.set(ndx, value);
+}
+
+
 void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2591,25 +2617,11 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 
     if (is_nullable(col_ndx)) {
         auto& col = get_column_int_null(col_ndx);
-        size_t found = col.find_first(value);
-        if (found != not_found) {
-            if (found == ndx)
-                found = col.find_first(value, found + 1);
-            if (found != not_found)
-                throw LogicError{LogicError::unique_constraint_violation};
-        }
-        col.set(ndx, value);
+        do_set_unique(col, ndx, value); // Throws
     }
     else {
         auto& col = get_column(col_ndx);
-        size_t found = col.find_first(value);
-        if (found != not_found) {
-            if (found == ndx)
-                found = col.find_first(value, found + 1);
-            if (found != not_found)
-                throw LogicError{LogicError::unique_constraint_violation};
-        }
-        col.set(ndx, value);
+        do_set_unique(col, ndx, value); // Throws
     }
 
     if (Replication* repl = get_repl())
@@ -2818,14 +2830,7 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     bump_version();
 
     StringColumn& col = get_column_string(col_ndx);
-    size_t found = col.find_first(value);
-    if (found != not_found) {
-        if (found == ndx)
-            found = col.find_first(value, found + 1);
-        if (found != not_found)
-            throw LogicError{LogicError::unique_constraint_violation};
-    }
-    col.set_string(ndx, value); // Throws
+    do_set_unique(col, ndx, value); // Throws
 
     if (Replication* repl = get_repl())
         repl->set_string_unique(this, col_ndx, ndx, value); // Throws
