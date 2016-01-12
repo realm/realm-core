@@ -186,6 +186,31 @@ TEST(Group_DoubleOpening)
     }
 }
 
+TEST(Group_OpenUnencryptedFileWithKey)
+{
+    GROUP_TEST_PATH(path);
+    {
+        Group group(path, nullptr, Group::mode_ReadWrite);
+
+        // We want the file to be exactly three pages in size so that trying to
+        // read the footer would use the first non-zero field of the header as
+        // the IV
+        TableRef table = group.get_or_add_table("table");
+        table->add_column(type_String, "str");
+        std::string data(page_size() - 100, '\1');
+        table->add_empty_row(2);
+        table->set_string(0, 0, data);
+        table->set_string(0, 1, data);
+
+        group.commit();
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        CHECK_THROW(group.open(path, crypt_key(true), Group::mode_ReadWrite), InvalidDatabase);
+    }
+}
+
 #ifndef _WIN32
 TEST(Group_Permissions)
 {

@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed terminate() being called rather than InvalidDatabase being thrown when
+  a non-enrypted file that begins with four zero bytes was opened as an
+  encrypted file.
 
 ### API breaking changes:
 
