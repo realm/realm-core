@@ -2582,23 +2582,34 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 template<class ColType, class T>
 void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
 {
-    size_t found = col.find_first(value);
-    if (found != not_found) {
-        if (found == ndx)
-            found = col.find_first(value, found + 1);
-        if (found != not_found) {
-            // Primary Key constraint violation!
-            // RESOLUTION: Let the new row subsume the identity of the old row,
-            // and delete the old row.
-            subsume_identity(found, ndx);
+    size_t found = not_found;
+    while (true) {
+        // Deliberate overflow; first iteration will start from 0, because not_found == size_t(-1).
+        found = col.find_first(value, found + 1);
 
-            if ((ndx + 1) == size()) {
-                // Row will be moved by move_last_over, adjust index.
-                ndx = found;
-            }
-
-            move_last_over(found);
+        if (found == ndx) {
+            // SetUnique is idempotent.
+            continue;
         }
+        else if (found == not_found) {
+            break;
+        }
+
+        // Primary Key constraint violation!
+        // RESOLUTION: Let the new row subsume the identity of the old row,
+        // and delete the old row.
+        subsume_identity(found, ndx);
+
+        if (ndx == size() - 1) {
+            // Row will be moved by move_last_over, adjust index.
+            ndx = found;
+        }
+
+        move_last_over(found);
+
+        // Since we removed an element, we need to re-check the element that was just
+        // into the "found" spot by move_last_over.
+        --found;
     }
 
     col.set(ndx, value);

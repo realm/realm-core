@@ -1469,21 +1469,21 @@ TEST(Table_SetStringUnique)
     table.add_column(type_Int, "ints");
     table.add_column(type_String, "strings");
     table.add_column(type_String, "strings_nullable", true);
-    table.add_empty_row(10);
+    table.add_empty_row(10); // all duplicates!
 
     CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, "foo"), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, "foo"), LogicError::no_search_index);
     table.add_search_index(1);
     table.add_search_index(2);
 
     table.set_string_unique(1, 0, "bar");
 
-    // Check that conflicting SetStringUniques result in rows being deleted.
+    // Check that conflicting SetStringUniques result in rows with duplicate values being deleted.
     table.set_string_unique(1, 1, "bar");
-    CHECK_EQUAL(table.size(), 9);
-    CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, realm::null()), LogicError::column_not_nullable);
+    CHECK_EQUAL(table.size(), 9); // Only duplicates of "bar" are removed.
 
     table.set_string_unique(2, 0, realm::null());
-    CHECK_EQUAL(table.size(), 8);
+    CHECK_EQUAL(table.size(), 1);
 }
 
 
