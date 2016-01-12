@@ -271,12 +271,14 @@ public:
 #endif // !REALM_PLATFORM_APPLE
     // Transactions:
 
+    using version_type = _impl::ContinTransactHistory::version_type;
+
     struct VersionID {
-        uint_fast64_t version = 0; // FIXME: Change to std::numeric_limits<version_type>::max()
+        version_type version = std::numeric_limits<version_type>::max();
         uint_fast32_t index   = 0;
 
         VersionID() {}
-        VersionID(uint_fast64_t version, uint_fast32_t index)
+        VersionID(version_type version, uint_fast32_t index)
         {
             this->version = version;
             this->index = index;
@@ -289,8 +291,6 @@ public:
         bool operator>(const VersionID& other) { return version > other.version; }
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
-
-    using version_type = _impl::ContinTransactHistory::version_type;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
@@ -506,7 +506,7 @@ private:
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
-        uint_fast64_t   m_version    = std::numeric_limits<size_t>::max(); // FIXME: Bad initialization as size_t is not necessarily equal to uint_fast64_t.
+        uint_fast64_t   m_version    = std::numeric_limits<version_type>::max();
         uint_fast32_t   m_reader_idx = 0;
         ref_type        m_top_ref    = 0;
         size_t          m_file_size  = 0;
@@ -895,7 +895,7 @@ inline void SharedGroup::advance_read(O* observer, VersionID version_id)
         throw LogicError(LogicError::wrong_transact_state);
 
     // It is an error if the new version precedes the currently bound one.
-    if (version_id.version != 0 && version_id.version < m_read_lock.m_version)
+    if (version_id.version < m_read_lock.m_version)
         throw LogicError(LogicError::bad_version);
 
     _impl::ContinTransactHistory* hist = get_history(); // Throws

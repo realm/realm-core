@@ -1188,7 +1188,7 @@ void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
 
 void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 {
-    if (version_id.version == 0) {
+    if (version_id.version == std::numeric_limits<version_type>::max()) {
         for (;;) {
             SharedInfo* r_info = m_reader_map.get_addr();
             read_lock.m_reader_idx = r_info->readers.last();
@@ -1354,7 +1354,7 @@ void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 
 void SharedGroup::do_end_read() noexcept
 {
-    REALM_ASSERT(m_read_lock.m_version != std::numeric_limits<size_t>::max());
+    REALM_ASSERT(m_read_lock.m_version != std::numeric_limits<version_type>::max());
     release_read_lock(m_read_lock);
     using gf = _impl::GroupFriend;
     gf::detach(m_group);
