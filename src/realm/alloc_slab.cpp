@@ -564,7 +564,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
         // we'll read header and (potentially) footer
         realm::util::encryption_read_barrier(map, 0, sizeof(Header));
-        realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
+        realm::util::encryption_read_barrier(map, initial_size_of_file - sizeof(Header), sizeof(Header));
 
         if (!cfg.skip_validate) {
             // Verify the data structures

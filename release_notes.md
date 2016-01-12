@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed error when opening encrypted streaming-form files which would be
+  resized on open due to the size not aligning with a chunked mapping section
+  boundary.
 
 ### API breaking changes:
 
