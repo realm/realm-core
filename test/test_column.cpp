@@ -623,12 +623,12 @@ TEST(Column_LowerUpperBound)
     col.destroy();
 }
 
-TEST(Column_SwapRows)
+TEST_TYPES(Column_SwapRows, IntegerColumn, IntNullColumn)
 {
     // Normal case
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn c(Allocator::get_default(), col_ref);
+        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
+        TEST_TYPE c(Allocator::get_default(), col_ref);
 
         c.add(-21);
         c.add(30);
@@ -650,8 +650,8 @@ TEST(Column_SwapRows)
 
     // First two elements
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn c(Allocator::get_default(), col_ref);
+        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
+        TEST_TYPE c(Allocator::get_default(), col_ref);
 
         c.add(30);
         c.add(10);
@@ -668,8 +668,8 @@ TEST(Column_SwapRows)
 
     // Last two elements
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn c(Allocator::get_default(), col_ref);
+        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
+        TEST_TYPE c(Allocator::get_default(), col_ref);
 
         c.add(5);
         c.add(30);
@@ -686,8 +686,8 @@ TEST(Column_SwapRows)
 
     // Indices in wrong order
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn c(Allocator::get_default(), col_ref);
+        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
+        TEST_TYPE c(Allocator::get_default(), col_ref);
 
         c.add(5);
         c.add(30);
@@ -700,6 +700,22 @@ TEST(Column_SwapRows)
         CHECK_EQUAL(c.size(), 3); // size should not change
 
         c.destroy();
+    }
+
+    // With search index
+    {
+        ref_type col_ref = TEST_TYPE::create(Allocator::get_default());
+        TEST_TYPE c(Allocator::get_default(), col_ref);
+
+        auto search_index = c.create_search_index();
+        c.add({});
+        c.add({});
+        c.add({});
+
+        c.swap_rows(1, 2);
+
+        c.destroy();
+        search_index->destroy();
     }
 }
 

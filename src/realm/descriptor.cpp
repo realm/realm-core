@@ -2,6 +2,8 @@
 #include <realm/descriptor.hpp>
 #include <realm/column_string.hpp>
 
+#include <realm/util/miscellaneous.hpp>
+
 using namespace realm;
 using namespace realm::util;
 
@@ -74,11 +76,9 @@ void Descriptor::detach() noexcept
 void Descriptor::detach_subdesc_accessors() noexcept
 {
     if (!m_subdesc_map.empty()) {
-        typedef subdesc_map::const_iterator iter;
-        iter end = m_subdesc_map.end();
-        for (iter i = m_subdesc_map.begin(); i != end; ++i) {
+        for (const auto& subdesc : m_subdesc_map) {
             // Must hold a reliable reference count while detaching
-            DescriptorRef desc(i->m_subdesc);
+            DescriptorRef desc(subdesc.m_subdesc);
             desc->detach();
         }
         m_subdesc_map.clear();
@@ -111,14 +111,14 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const noexce
             return 0; // Not enough space in path buffer
         const Descriptor* parent = desc->m_parent.get();
         size_t column_ndx = not_found;
-        typedef subdesc_map::iterator iter;
-        iter end = parent->m_subdesc_map.end();
-        for (iter i = parent->m_subdesc_map.begin(); i != end; ++i) {
-            if (i->m_subdesc == desc) {
-                column_ndx = i->m_column_ndx;
+
+        for (const auto& subdesc : parent->m_subdesc_map) {
+            if (subdesc.m_subdesc == desc) {
+                column_ndx = subdesc.m_column_ndx;
                 break;
             }
         }
+
         REALM_ASSERT_3(column_ndx, !=, not_found);
         *--begin_2 = column_ndx;
         desc = parent;
@@ -130,12 +130,11 @@ Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
 
-    typedef subdesc_map::iterator iter;
-    iter end = m_subdesc_map.end();
-    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx == column_ndx)
-            return i->m_subdesc;
+    for (const auto& subdesc : m_subdesc_map) {
+        if (subdesc.m_column_ndx == column_ndx)
+            return subdesc.m_subdesc;
     }
+
     return 0;
 }
 
@@ -144,11 +143,9 @@ void Descriptor::adj_insert_column(size_t col_ndx) noexcept
 {
     // Adjust the column indexes of subdescriptor accessors at higher
     // column indexes.
-    typedef subdesc_map::iterator iter;
-    iter end = m_subdesc_map.end();
-    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx >= col_ndx)
-            ++i->m_column_ndx;
+    for (auto& subdesc : m_subdesc_map) {
+        if (subdesc.m_column_ndx >= col_ndx)
+            ++subdesc.m_column_ndx;
     }
 }
 
@@ -178,24 +175,21 @@ void Descriptor::adj_erase_column(size_t col_ndx) noexcept
 
 void Descriptor::adj_move_column(size_t from, size_t to) noexcept
 {
-    using iter = subdesc_map::iterator;
-    iter end = m_subdesc_map.end();
-
-    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_column_ndx == from) {
-            i->m_column_ndx = to;
+    for (auto& subdesc : m_subdesc_map) {
+        if (subdesc.m_column_ndx == from) {
+            subdesc.m_column_ndx = to;
         }
         else {
             if (from < to) {
                 // Moving up:
-                if (i->m_column_ndx > from && i->m_column_ndx <= to) {
-                    --i->m_column_ndx;
+                if (subdesc.m_column_ndx > from && subdesc.m_column_ndx <= to) {
+                    --subdesc.m_column_ndx;
                 }
             }
             else if (from > to) {
                 // Moving down:
-                if (i->m_column_ndx < from && i->m_column_ndx >= to) {
-                    ++i->m_column_ndx;
+                if (subdesc.m_column_ndx < from && subdesc.m_column_ndx >= to) {
+                    ++subdesc.m_column_ndx;
                 }
             }
         }

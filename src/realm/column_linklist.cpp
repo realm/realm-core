@@ -181,7 +181,7 @@ void LinkListColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         }
     }
 
-    for (auto target_row: update_target_backlinks) {
+    for (size_t target_row : update_target_backlinks) {
         m_backlink_column->swap_backlinks(target_row, row_ndx_1, row_ndx_2);
     }
 
@@ -650,9 +650,9 @@ void LinkListColumn::update_from_parent(size_t old_baseline) noexcept
 
     prune_list_accessor_tombstones();
 
-    auto end = m_list_accessors.end();
-    for (auto i = m_list_accessors.begin(); i != end; ++i)
-        i->m_list->update_from_parent(old_baseline);
+    for (auto& list_accessor : m_list_accessors) {
+        list_accessor.m_list->update_from_parent(old_baseline);
+    }
 }
 
 

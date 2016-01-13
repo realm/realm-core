@@ -26,6 +26,8 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 
+#include <realm/util/miscellaneous.hpp>
+
 using namespace realm;
 
 
@@ -329,7 +331,7 @@ void BacklinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         unique_origin_rows.insert(origin_row_ndx);
     });
 
-    for (auto& origin_row: unique_origin_rows) {
+    for (const auto& origin_row : unique_origin_rows) {
         m_origin_column->do_swap_link(origin_row, row_ndx_1, row_ndx_2);
     }
 

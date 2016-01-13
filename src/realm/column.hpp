@@ -1202,8 +1202,14 @@ void Column<T>::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     if (has_search_index()) {
         T value_1 = get(row_ndx_1);
         T value_2 = get(row_ndx_2);
-        m_search_index->update_ref(value_1, row_ndx_1, row_ndx_2);
-        m_search_index->update_ref(value_2, row_ndx_2, row_ndx_1);
+        size_t size = this->size();
+        bool row_ndx_1_is_last = row_ndx_1 == size - 1;
+        bool row_ndx_2_is_last = row_ndx_2 == size - 1;
+        m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last);
+        m_search_index->insert(row_ndx_1, value_2, 1, row_ndx_1_is_last);
+
+        m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last);
+        m_search_index->insert(row_ndx_2, value_1, 1, row_ndx_2_is_last);
     }
 
     swap_rows_without_updating_index(row_ndx_1, row_ndx_2);
