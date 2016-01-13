@@ -186,6 +186,7 @@ TEST(Group_DoubleOpening)
     }
 }
 
+#if REALM_ENABLE_ENCRYPTION
 TEST(Group_OpenUnencryptedFileWithKey)
 {
     GROUP_TEST_PATH(path);
@@ -210,6 +211,7 @@ TEST(Group_OpenUnencryptedFileWithKey)
         CHECK_THROW(group.open(path, crypt_key(true), Group::mode_ReadWrite), InvalidDatabase);
     }
 }
+#endif // REALM_ENABLE_ENCRYPTION
 
 #ifndef _WIN32
 TEST(Group_Permissions)
