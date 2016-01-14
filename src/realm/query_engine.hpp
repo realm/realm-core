@@ -314,7 +314,7 @@ public:
     }
 
     ListviewNode(const ListviewNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches), m_tv(from.m_tv), m_max(from.m_max), m_next(from.m_next), m_size(from.m_size)
+        : ParentNode(from, patches), m_max(from.m_max), m_next(from.m_next), m_size(from.m_size), m_tv(from.m_tv)
     {
     }
 
