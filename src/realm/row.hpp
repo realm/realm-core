@@ -231,6 +231,8 @@ protected:
     using HandoverPatch = RowBaseHandoverPatch;
 
     RowBase(const RowBase& source, HandoverPatch& patch);
+public:
+    static void generate_patch(const RowBase& source, HandoverPatch& patch);
     void apply_patch(HandoverPatch& patch, Group& group);
 private:
     RowBase* m_prev = nullptr; // nullptr if first, undefined if detached.
@@ -309,11 +311,18 @@ private:
     template<class>
     friend class BasicRow;
 
+public:
     std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<HandoverPatch>& patch) const
     {
         patch.reset(new HandoverPatch);
         std::unique_ptr<BasicRow<T>> retval(new BasicRow<T>(*this, *patch));
         return retval;
+    }
+
+    static void generate_patch(const BasicRow& row, std::unique_ptr<HandoverPatch>& patch)
+    {
+        patch.reset(new HandoverPatch);
+        RowBase::generate_patch(row, *patch);
     }
 
     void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
@@ -327,6 +336,7 @@ private:
         RowBase::apply_patch(patch, group);
     }
 
+private:
     BasicRow(const BasicRow<T>& source, HandoverPatch& patch)
         : RowBase(source, patch)
     {

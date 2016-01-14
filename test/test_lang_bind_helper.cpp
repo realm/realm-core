@@ -10029,6 +10029,82 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 }
 
 
+TEST(LangBindHelper_HandoverQueryLinksTo)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    sg.begin_read();
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryOr;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAnd;
+
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+
+        TableRef source = group_w.add_table("source");
+        TableRef target = group_w.add_table("target");
+
+        size_t col_link = source->add_column_link(type_Link, "link", *target);
+        size_t col_name = target->add_column(type_String, "name");
+
+        target->add_empty_row(3);
+        target->set_string(col_name, 0, "A");
+        target->set_string(col_name, 1, "B");
+        target->set_string(col_name, 2, "C");
+
+        source->add_empty_row(3);
+        source->set_link(col_link, 0, 0);
+        source->set_link(col_link, 1, 1);
+        source->set_link(col_link, 2, 2);
+
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+
+        realm::Query query = source->where().links_to(col_link, target->get(0));
+        handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+
+        realm::Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
+        handoverQueryOr = sg_w.export_for_handover(queryOr, ConstSourcePayload::Copy);
+
+        realm::Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
+        handoverQueryAnd = sg_w.export_for_handover(queryAnd, ConstSourcePayload::Copy);
+    }
+
+    SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
+    {
+        // Import the queries into the read-only shared group.
+        LangBindHelper::advance_read(sg, *hist, vid);
+        std::unique_ptr<Query> query(sg.import_from_handover(move(handoverQuery)));
+        std::unique_ptr<Query> queryOr(sg.import_from_handover(move(handoverQueryOr)));
+        std::unique_ptr<Query> queryAnd(sg.import_from_handover(move(handoverQueryAnd)));
+
+        CHECK_EQUAL(1, query->count());
+        CHECK_EQUAL(2, queryOr->count());
+        CHECK_EQUAL(1, queryAnd->count());
+
+
+        // Remove the linked-to row.
+        {
+            LangBindHelper::promote_to_write(sg_w, *hist_w);
+
+            TableRef target = group_w.get_table("target");
+            target->move_last_over(0);
+
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+        }
+
+        // Verify that the queries against the read-only shared group gives the same results.
+        CHECK_EQUAL(1, query->count());
+        CHECK_EQUAL(2, queryOr->count());
+        CHECK_EQUAL(1, queryAnd->count());
+    }
+}
+
 
 
 

@@ -1628,6 +1628,11 @@ public:
 };
 
 
+struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
+    std::unique_ptr<RowBaseHandoverPatch> m_target_row;
+    size_t m_origin_column;
+};
+
 class LinksToNode : public ParentNode {
 public:
     LinksToNode(size_t origin_column_index, const ConstRow& target_row) :
@@ -1677,13 +1682,36 @@ public:
         return std::unique_ptr<ParentNode>(new LinksToNode(*this, patches));
     }
 
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        REALM_ASSERT(patches.size());
+        auto abstract_patch = std::move(patches.back());
+        patches.pop_back();
+
+        auto patch = dynamic_cast<LinksToNodeHandoverPatch*>(abstract_patch.get());
+        REALM_ASSERT(patch);
+
+        m_origin_column = patch->m_origin_column;
+        m_target_row.apply_and_consume_patch(patch->m_target_row, group);
+
+        ParentNode::apply_handover_patch(patches, group);
+    }
+
 private:
     size_t m_origin_column;
     ConstRow m_target_row;
 
     LinksToNode(const LinksToNode& source, QueryNodeHandoverPatches* patches) : ParentNode(source, patches),
-         m_origin_column(source.m_origin_column), m_target_row(source.m_target_row)
+         m_origin_column(patches ? npos : source.m_origin_column),
+         m_target_row(patches ? ConstRow() : source.m_target_row)
     {
+        if (!patches)
+            return;
+
+        std::unique_ptr<LinksToNodeHandoverPatch> patch(new LinksToNodeHandoverPatch);
+        patch->m_origin_column = source.m_origin_column;
+        ConstRow::generate_patch(source.m_target_row, patch->m_target_row);
+        patches->emplace_back(patch.release());
     }
 };
 
