@@ -8328,7 +8328,7 @@ TEST(Query_MaximumSumAverage)
 }
 
 
-TEST(Query_ReferDeltedLinkView)
+TEST(Query_ReferDeletedLinkView)
 {
     // This would segfault because the query refers a LinkView that had been removed by move_last_over
     // It will now throw an exception instead.
