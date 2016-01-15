@@ -123,6 +123,7 @@ protected:
 
     friend class CondVar;
     friend class PlatformSpecificCondVar;
+    friend class EmulatedRobustMutex;
 };
 
 

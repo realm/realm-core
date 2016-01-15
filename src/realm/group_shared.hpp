@@ -28,6 +28,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_specific_condvar.hpp>
+#include <realm/util/emulated_robust_mutex.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/history.hpp>
@@ -532,6 +533,9 @@ private:
     TransactStage m_transact_stage;
     util::Mutex m_handover_lock;
 #ifndef _WIN32
+    util::EmulatedRobustMutex m_writemutex;
+    util::EmulatedRobustMutex m_balancemutex;
+    util::EmulatedRobustMutex m_controlmutex;
     util::PlatformSpecificCondVar m_room_to_write;
     util::PlatformSpecificCondVar m_work_to_do;
     util::PlatformSpecificCondVar m_daemon_becomes_ready;
