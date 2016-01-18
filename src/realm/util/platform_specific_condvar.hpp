@@ -24,7 +24,7 @@
 // Enable this only on platforms where it might be needed
 // currently none!
 //#if REALM_PLATFORM_APPLE
-//#define REALM_CONDVAR_EMULATION
+#define REALM_CONDVAR_EMULATION
 //#endif
 
 // Condvar Emulation is linked to RobustMutex emulation

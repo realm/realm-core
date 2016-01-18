@@ -66,7 +66,6 @@ PlatformSpecificCondVar::~PlatformSpecificCondVar() noexcept
 
 void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string path, size_t offset_of_condvar)
 {
-    REALM_ASSERT(m_shared_part == nullptr);
     close();
     m_shared_part = &shared_part;
     static_cast<void>(path);
