@@ -782,19 +782,19 @@ void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
 }
 
 
-inline bool TransactLogEncoder::insert_group_level_table(size_t table_ndx, size_t num_tables,
+inline bool TransactLogEncoder::insert_group_level_table(size_t table_ndx, size_t prior_num_tables,
                                                          StringData name)
 {
-    append_string_instr(instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables),
+    append_string_instr(instr_InsertGroupLevelTable, util::tuple(table_ndx, prior_num_tables),
                         name); // Throws
     return true;
 }
 
 inline void TransactLogConvenientEncoder::insert_group_level_table(size_t table_ndx,
-                                                                   size_t num_tables,
+                                                                   size_t prior_num_tables,
                                                                    StringData name)
 {
-    m_encoder.insert_group_level_table(table_ndx, num_tables, name); // Throws
+    m_encoder.insert_group_level_table(table_ndx, prior_num_tables, name); // Throws
 }
 
 inline bool TransactLogEncoder::erase_group_level_table(size_t table_ndx, size_t prior_num_tables)

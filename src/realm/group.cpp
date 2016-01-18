@@ -347,7 +347,7 @@ void Group::create_and_insert_table(size_t table_ndx, StringData name)
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    size_t prior_size = m_tables.size();
+    size_t prior_num_tables = m_tables.size();
     m_tables.insert(table_ndx, ref); // Throws
     m_table_names.insert(table_ndx, name); // Throws
 
@@ -364,7 +364,7 @@ void Group::create_and_insert_table(size_t table_ndx, StringData name)
     }); // Throws
 
     if (Replication* repl = m_alloc.get_replication())
-        repl->insert_group_level_table(table_ndx, prior_size, name); // Throws
+        repl->insert_group_level_table(table_ndx, prior_num_tables, name); // Throws
 }
 
 
