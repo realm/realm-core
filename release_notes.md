@@ -2,7 +2,10 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Added emulation of robust mutexes on platforms which do not
+  provide the full posix API for it. This prevents a situation
+  where a crash in one process holding the lock, would leave 
+  the database locked.
 
 ### API breaking changes:
 
