@@ -475,10 +475,6 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura):
 
 namespace {
 
-void recover_from_dead_write_transact()
-{
-    // Nothing needs to be done
-}
 
 #ifdef REALM_ASYNC_DAEMON
 
@@ -706,6 +702,12 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
         File::UnmapGuard fug_1(m_file_map);
         SharedInfo* info = m_file_map.get_addr();
 
+#ifndef _WIN32
+        m_writemutex.set_shared_part(info->shared_writemutex,m_db_path,"wm");
+        m_balancemutex.set_shared_part(info->shared_balancemutex,m_db_path,"bm");
+        m_controlmutex.set_shared_part(info->shared_controlmutex,m_db_path,"cm");
+#endif
+
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
         if (!m_controlmutex.is_valid())
@@ -830,9 +832,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
             }
 #ifndef _WIN32
-            m_writemutex.set_shared_part(info->shared_writemutex,m_db_path,"wm");
-            m_balancemutex.set_shared_part(info->shared_balancemutex,m_db_path,"bm");
-            m_controlmutex.set_shared_part(info->shared_controlmutex,m_db_path,"cm");
             m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_db_path,0);
             m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
             m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
@@ -847,7 +846,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                     }
                     // FIXME: It might be more robust to sleep a little, then restart the loop
                     // std::cerr << "Waiting for daemon" << std::endl;
-                    m_daemon_becomes_ready.wait(m_controlmutex, &recover_from_dead_write_transact, 0);
+                    m_daemon_becomes_ready.wait(m_controlmutex, 0);
                     // std::cerr << " - notified" << std::endl;
                 }
             }
@@ -1046,7 +1045,7 @@ bool SharedGroup::wait_for_change()
     SharedInfo* info = m_file_map.get_addr();
     EmulatedRobustMutex::LockGuard lock(m_controlmutex);
     while (m_readlock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
-        m_new_commit_available.wait(m_controlmutex, &recover_from_dead_write_transact, 0);
+        m_new_commit_available.wait(m_controlmutex, 0);
     }
     return m_readlock.m_version != info->latest_version_number;
 }
@@ -1159,7 +1158,7 @@ void SharedGroup::do_async_commits()
             }
 
             // no timeout support if the condvars are only emulated, so this will assert
-            m_work_to_do.wait(m_balancemutex, &recover_from_dead_write_transact, &ts);
+            m_work_to_do.wait(m_balancemutex, &ts);
         }
         m_balancemutex.unlock();
 
@@ -1378,7 +1377,7 @@ void SharedGroup::do_begin_write()
             m_work_to_do.notify();
         // if we are out of write slots, wait for the sync daemon to catch up
         while (info->free_write_slots <= 0) {
-            m_room_to_write.wait(m_balancemutex, recover_from_dead_write_transact);
+            m_room_to_write.wait(m_balancemutex, 0);
         }
 
         info->free_write_slots--;

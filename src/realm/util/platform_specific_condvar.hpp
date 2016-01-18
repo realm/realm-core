@@ -27,8 +27,12 @@
 //#define REALM_CONDVAR_EMULATION
 //#endif
 
+// Condvar Emulation is linked to RobustMutex emulation
+
+
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#include <realm/util/emulated_robust_mutex.hpp>
 #include <stdint.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -91,10 +95,9 @@ public:
     static void init_shared_part(SharedPart& shared_part);
 
     /// Wait for another thread to call notify() or notify_all().
-    void wait(LockGuard& l) noexcept;
+    void wait(EmulatedRobustMutex::LockGuard& l) noexcept;
 
-    template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = nullptr);
+    void wait(EmulatedRobustMutex& m, const struct timespec* tp);
     /// If any threads are waiting for this condition, wake up at least one.
     void notify() noexcept;
 
@@ -126,8 +129,8 @@ private:
 
 // Implementation:
 
-
-inline void PlatformSpecificCondVar::wait(LockGuard& l) noexcept
+/*
+inline void PlatformSpecificCondVar::wait(EmulatedRobustMutex::LockGuard& l) noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
@@ -153,15 +156,9 @@ inline void PlatformSpecificCondVar::wait(LockGuard& l) noexcept
     m_shared_part->wait(l);
 #endif
 }
+*/
 
-
-
-
-
-
-
-template<class Func>
-inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
+inline void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec* tp)
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
@@ -188,7 +185,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
         // if wait returns due to a signal, we must retry:
         if (r == EINTR)
             continue;
-        m.lock(recover_func);
+        m.lock();
         if (m_shared_part->signal_counter != my_counter)
             break;
 
@@ -197,7 +194,7 @@ inline void PlatformSpecificCondVar::wait(RobustMutex& m, Func recover_func, con
         m.unlock();
     }
 #else
-    m_shared_part->wait(m, recover_func, tp);
+    m_shared_part->wait(*m.m_shared_part, [](){}, tp);
 #endif
 }
 
