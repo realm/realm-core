@@ -21,13 +21,6 @@
 #ifndef REALM_UTIL_PLATFORM_SPECIFIC_CONDVAR
 #define REALM_UTIL_PLATFORM_SPECIFIC_CONDVAR
 
-// Enable this only on platforms where it might be needed
-// currently none!
-//#if REALM_PLATFORM_APPLE
-#define REALM_CONDVAR_EMULATION
-//#endif
-
-// Condvar Emulation is linked to RobustMutex emulation
 
 
 #include <realm/util/features.h>
@@ -37,6 +30,13 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <semaphore.h>
+
+// Condvar Emulation is required if RobustMutex emulation is enabled
+#ifdef REALM_ROBUST_MUTEX_EMULATION
+#define REALM_CONDVAR_EMULATION
+#endif
+
+
 
 namespace realm {
 namespace util {
