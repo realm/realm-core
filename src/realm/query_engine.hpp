@@ -92,6 +92,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/meta.hpp>
+#include <realm/util/miscellaneous.hpp>
 #include <realm/unicode.hpp>
 #include <realm/utilities.hpp>
 #include <realm/table.hpp>
@@ -1263,8 +1264,9 @@ public:
 
     OrNode(const OrNode& other) : ParentNode(other)
     {
-        for (const auto& condition : other.m_conditions)
+        for (const auto& condition : other.m_conditions) {
             m_conditions.emplace_back(condition->clone());
+        }
     }
 
     void init(const Table& table) override

@@ -6221,12 +6221,15 @@ void create_columns(TableRef table, bool nullable = true)
 
 bool equals(TableView& tv, std::vector<size_t> indexes)
 {
-    if (static_cast<int>(tv.size()) != indexes.end() - indexes.begin())
+    if (static_cast<int>(tv.size()) != indexes.end() - indexes.begin()) {
         return false;
+    }
 
-    for (auto it = indexes.begin(); it != indexes.end(); ++it)
-        if (tv.get_source_ndx(it - indexes.begin()) != *it)
-        return false;
+    for (auto it = indexes.begin(); it != indexes.end(); ++it) {
+        if (tv.get_source_ndx(it - indexes.begin()) != *it) {
+            return false;
+        }
+    }
 
     return true;
 }

@@ -10,7 +10,7 @@ include $(PREBUILT_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 # build unit test and native activity - and link with core
-TESTS := $(wildcard ../../test_*.cpp ../../large_tests/*.cpp ../../util/*.cpp)
+TESTS := $(wildcard ../../test_*.cpp ../../large_tests/*.cpp ../../util/*.cpp ../../fuzz_*.cpp)
 
 LOCAL_MODULE     := native-activity
 LOCAL_SRC_FILES  := $(TESTS) main.cpp

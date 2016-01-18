@@ -6,6 +6,9 @@
   provide the full posix API for it. This prevents a situation
   where a crash in one process holding the lock, would leave 
   the database locked.
+* Fixed error when opening encrypted streaming-form files which would be
+  resized on open due to the size not aligning with a chunked mapping section
+  boundary.
 
 ### API breaking changes:
 
@@ -13,7 +16,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Optimized speed of TableView::clear() on an indexed unordered Table. A clear()
+  that before took several minutes with 300000 rows now takes a few seconds.
 
 -----------
 

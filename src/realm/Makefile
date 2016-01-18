@@ -27,6 +27,7 @@ util/platform_specific_condvar.hpp \
 util/emulated_robust_mutex.hpp \
 util/file_mapper.hpp \
 util/encrypted_file_mapping.hpp \
+util/miscellaneous.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \

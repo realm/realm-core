@@ -206,9 +206,9 @@ public:
     Ringbuffer() noexcept
     {
         entries = init_readers_size;
-        for (int i=0; i < init_readers_size; i++) {
+        for (int i = 0; i < init_readers_size; i++) {
             data[i].version = 1;
-            data[i].count.store( 1, std::memory_order_relaxed );
+            data[i].count.store(1, std::memory_order_relaxed);
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
@@ -251,7 +251,7 @@ public:
         // dump();
         for (uint_fast32_t i = entries; i < new_entries; i++) {
             data[i].version = 1;
-            data[i].count.store( 1, std::memory_order_relaxed );
+            data[i].count.store(1, std::memory_order_relaxed);
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
@@ -496,7 +496,7 @@ void spawn_daemon(const std::string& file)
 
         // close all descriptors:
         int i;
-        for (i=m-1;i>=0;--i)
+        for (i = m - 1; i >= 0; --i)
             close(i);
         i = ::open("/dev/null",O_RDWR);
 #ifdef REALM_ENABLE_LOGFILE

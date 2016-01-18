@@ -598,6 +598,42 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
+{
+    // Verify that the table accessor of a link-opposite table is refreshed even
+    // when the origin table is created in the same transaction as the link
+    // column is added to it. This case is slightly involved, as there is a rule
+    // that requires the two opposite table accessors of a link column (origin
+    // and target sides) to either both exist or both not exist. On the other
+    // hand, tables accessors are normally not created during
+    // Group::advance_transact() for newly created tables.
+
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg_w);
+        TableRef a = wt.get_or_add_table("a");
+        wt.commit();
+    }
+
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    ConstTableRef a = rt.get_table("a");
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef a = wt.get_table("a");
+        TableRef b = wt.get_or_add_table("b");
+        b->add_column_link(type_Link, "foo", *a);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -10327,6 +10363,45 @@ TEST(LangBindHelper_Compact)
     {
         std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        ReadTransaction r(sg);
+        ConstTableRef table = r.get_table("test");
+        CHECK_EQUAL(N, table->size());
+        sg.close();
+    }
+}
+
+TEST(LangBindHelper_CompactLargeEncryptedFile)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // We need to ensure that the size of the compacted file does not line up
+    // with the chunked-memory-mapping section boundaries, so that the file is
+    // resized on open. This targets the gap between 32 and 36 pages by writing
+    // 32 pages of data and assuming that the file overhead will be greater than
+    // zero bytes and less than four pages.
+    std::vector<char> data(realm::util::page_size());
+    const size_t N = 32;
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_or_add_table("test");
+        table->add_column(type_String, "string");
+        for (size_t i = 0; i < N; ++i) {
+            table->add_empty_row();
+            table->set_string(0, i, StringData(data.data(), data.size()));
+        }
+        wt.commit();
+
+        CHECK_EQUAL(true, sg.compact());
+
+        sg.close();
+    }
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
