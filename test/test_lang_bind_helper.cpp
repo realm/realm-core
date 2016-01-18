@@ -7780,6 +7780,37 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
 }
 
 
+// This issue was uncovered while looking into the RollbackCircularReferenceRemoval issue
+TEST(LangBindHelper_RollbackTableRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef alpha = group->get_or_add_table("alpha");
+        TableRef beta = group->get_or_add_table("beta");
+        beta->add_column_link(type_Link, "alpha-1", *alpha);
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+        TableRef alpha = group->get_table("alpha");
+        TableRef beta = group->get_table("beta");
+        group->remove_table("beta");
+        CHECK_NOT(group->has_table("beta"));
+
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+
+    }
+    group->verify();
+}
+
+
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
