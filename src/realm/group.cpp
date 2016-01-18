@@ -1245,10 +1245,10 @@ public:
         // get_link_target_table_accessor() will return null if the
         // m_table->m_cols[col_ndx] is null, but this can happen only when the
         // column was inserted earlier during this transaction advance, and in
-        // that case, we have already marked the target table accesor dirty.
+        // that case, we have already marked the target table accessor dirty.
 
-        typedef _impl::TableFriend tf;
         if (m_table) {
+            using tf = _impl::TableFriend;
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
                 tf::mark(*target);
         }
@@ -1316,18 +1316,29 @@ public:
     bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx, size_t)
     {
         if (m_table) {
-            typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
+            using tf = _impl::TableFriend;
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
-
-            // See comments on link handling in TransactAdvancer::set_link().
-            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-            tf::adj_add_column(*target); // Throws
-            tf::mark(*target);
         }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
+        // Since insertion of a link column also modifies the target table by
+        // adding a backlink column there, the target table accessor needs to be
+        // marked dirty if it exists. Normally, the target table accesssor
+        // exists if, and only if the origin table accessor exists, but during
+        // Group::advance_transact() there will be times where this is not the
+        // case. Only after the final phase that updates all dirty accessors
+        // will this be guaranteed to be true again. See also the comments on
+        // link handling in TransactAdvancer::set_link().
+        if (link_target_table_ndx < m_group.m_table_accessors.size()) {
+            if (Table* target = m_group.m_table_accessors[link_target_table_ndx]) {
+                using tf = _impl::TableFriend;
+                tf::adj_add_column(*target); // Throws
+                tf::mark(*target);
+            }
+        }
+        if (m_desc) {
+            using df = _impl::DescriptorFriend;
             df::adj_insert_column(*m_desc, col_ndx);
+        }
 
         m_schema_changed = true;
 
@@ -1352,23 +1363,29 @@ public:
 
     bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
+        // For link columns we need to handle the backlink column first in case
+        // the target table is the same as the origin table (because the
+        // backlink column occurs after regular columns.)
+        //
+        // Please also see comments on special handling of link columns in
+        // TransactAdvancer::insert_link_column() and
+        // TransactAdvancer::set_link().
+        if (link_target_table_ndx < m_group.m_table_accessors.size()) {
+            if (Table* target = m_group.m_table_accessors[link_target_table_ndx]) {
+                using tf = _impl::TableFriend;
+                tf::adj_erase_column(*target, backlink_col_ndx); // Throws
+                tf::mark(*target);
+            }
+        }
         if (m_table) {
-            typedef _impl::TableFriend tf;
-
-            // For link columns we need to handle the backlink column first in
-            // case the target table is the same as the origin table (because
-            // the backlink column occurs after regular columns.) Also see
-            // comments on link handling in TransactAdvancer::set_link().
-            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-            tf::adj_erase_column(*target, backlink_col_ndx); // Throws
-            tf::mark(*target);
-
             EraseColumnUpdater updater(col_ndx);
+            using tf = _impl::TableFriend;
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
+        if (m_desc) {
+            using df = _impl::DescriptorFriend;
             df::adj_erase_column(*m_desc, col_ndx);
+        }
 
         m_schema_changed = true;
 

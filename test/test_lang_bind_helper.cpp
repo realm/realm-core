@@ -598,6 +598,42 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
+{
+    // Verify that the table accessor of a link-opposite table is refreshed even
+    // when the origin table is created in the same transaction as the link
+    // column is added to it. This case is slightly involved, as there is a rule
+    // that requires the two opposite table accessors of a link column (origin
+    // and target sides) to either both exist or both not exist. On the other
+    // hand, tables accessors are normally not created during
+    // Group::advance_transact() for newly created tables.
+
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg_w);
+        TableRef a = wt.get_or_add_table("a");
+        wt.commit();
+    }
+
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    ConstTableRef a = rt.get_table("a");
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef a = wt.get_table("a");
+        TableRef b = wt.get_or_add_table("b");
+        b->add_column_link(type_Link, "foo", *a);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
