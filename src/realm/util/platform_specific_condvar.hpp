@@ -94,9 +94,6 @@ public:
     /// all sharing a common SharedPart instance, which must be in shared memory.
     static void init_shared_part(SharedPart& shared_part);
 
-    /// Wait for another thread to call notify() or notify_all().
-    void wait(EmulatedRobustMutex::LockGuard& l) noexcept;
-
     void wait(EmulatedRobustMutex& m, const struct timespec* tp);
     /// If any threads are waiting for this condition, wake up at least one.
     void notify() noexcept;
@@ -129,34 +126,6 @@ private:
 
 // Implementation:
 
-/*
-inline void PlatformSpecificCondVar::wait(EmulatedRobustMutex::LockGuard& l) noexcept
-{
-    REALM_ASSERT(m_shared_part);
-#ifdef REALM_CONDVAR_EMULATION
-    m_shared_part->waiters++;
-    uint64_t my_counter = m_shared_part->signal_counter;
-    l.m_mutex.unlock();
-    for (;;) {
-        int r = sem_wait(m_sem);
-
-        // retry if wait was interrupted by a signal
-        if (r == EINTR)
-            continue;
-
-        l.m_mutex.lock();
-        if (m_shared_part->signal_counter != my_counter)
-            break;
-
-        // notification wasn't meant for us, hand in on and wait for another
-        sem_post(m_sem);
-        l.m_mutex.unlock();
-    }
-#else
-    m_shared_part->wait(l);
-#endif
-}
-*/
 
 inline void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec* tp)
 {
