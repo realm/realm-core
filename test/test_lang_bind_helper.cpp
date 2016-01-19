@@ -7713,6 +7713,46 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 }
 
 
+TEST(LangBindHelper_RollbackCircularReferenceRemoval)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef alpha = group->get_or_add_table("alpha");
+        TableRef beta = group->get_or_add_table("beta");
+        alpha->add_column_link(type_Link, "beta-1", *beta);
+        beta->add_column_link(type_Link, "alpha-1", *alpha);
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+        TableRef alpha = group->get_table("alpha");
+        TableRef beta = group->get_table("beta");
+
+        CHECK_THROW(group->remove_table("alpha"), CrossTableLinkTarget);
+        beta->remove_column(0);
+        alpha->remove_column(0);
+        group->remove_table("beta");
+        CHECK_NOT(group->has_table("beta"));
+
+        // Version 1: This crashes
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+
+//        // Version 2: This works
+//        LangBindHelper::commit_and_continue_as_read(sg);
+//        CHECK_EQUAL(1, group->size());
+
+    }
+    group->verify();
+}
+
+
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 {
     SHARED_GROUP_TEST_PATH(path);
