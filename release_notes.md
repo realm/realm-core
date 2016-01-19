@@ -20,7 +20,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Regular assertions (`REALM_ASSERT()`) are now enabled by default when building
+  in release mode on Apple platforms.
 
 ----------------------------------------------
 
