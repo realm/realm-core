@@ -450,6 +450,11 @@ uint64_t TableViewBase::outside_version() const
     LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
     if (lvp) {
         // This TableView was created by a Query that had a LinkViewRef inside its .where() clause
+        if (!lvp->is_attached()) {
+            // LinkView has been deleted from the Table
+            throw(DeletedLinkView());
+        }
+
         return lvp->get_origin_table().m_version;
     }
 
@@ -463,7 +468,7 @@ uint64_t TableViewBase::outside_version() const
     }
 }
 
-bool TableViewBase::is_in_sync() const noexcept
+bool TableViewBase::is_in_sync() const
 {
     check_cookie();
 

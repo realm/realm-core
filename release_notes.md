@@ -8,7 +8,8 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Any attempt to use a deleted LinkView (such as executing a query that
+  depends on it) will now throw `DeletedLinkView` instead of segfaulting
 
 ### Enhancements:
 

@@ -58,6 +58,11 @@ public:
     const char* what() const noexcept override;
 };
 
+/// Thrown if you attempt to execute a query that depends on a deleted LinkView
+class DeletedLinkView : public std::exception {
+public:
+    const char* what() const noexcept override;
+};
 
 /// The \c FileFormatUpgradeRequired exception can be thrown by the \c
 /// SharedGroup constructor when opening a database that uses a deprecated file
@@ -208,6 +213,11 @@ inline const char* DescriptorMismatch::what() const noexcept
 inline const char* FileFormatUpgradeRequired::what() const noexcept
 {
     return "Database upgrade required but prohibited";
+}
+
+inline const char* DeletedLinkView::what() const noexcept
+{
+    return "Attempt to use a LinkView that has been deleted";
 }
 
 inline LogicError::LogicError(LogicError::ErrorKind kind):
