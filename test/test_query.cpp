@@ -6221,12 +6221,15 @@ void create_columns(TableRef table, bool nullable = true)
 
 bool equals(TableView& tv, std::vector<size_t> indexes)
 {
-    if (static_cast<int>(tv.size()) != indexes.end() - indexes.begin())
+    if (static_cast<int>(tv.size()) != indexes.end() - indexes.begin()) {
         return false;
+    }
 
-    for (auto it = indexes.begin(); it != indexes.end(); ++it)
-        if (tv.get_source_ndx(it - indexes.begin()) != *it)
-        return false;
+    for (auto it = indexes.begin(); it != indexes.end(); ++it) {
+        if (tv.get_source_ndx(it - indexes.begin()) != *it) {
+            return false;
+        }
+    }
 
     return true;
 }
@@ -8327,6 +8330,29 @@ TEST(Query_MaximumSumAverage)
     }
 }
 
+
+TEST(Query_ReferDeletedLinkView)
+{
+    // This would segfault because the query refers a LinkView that had been removed by move_last_over
+    // It will now throw an exception instead.
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column_link(type_LinkList, "children", *table);
+    table->add_empty_row();
+    LinkViewRef links = table->get_linklist(0, 0);
+    Query q = table->where(links);
+    TableView tv = q.find_all();
+    
+    table->move_last_over(0);
+
+    CHECK_THROW(q.find_all(), DeletedLinkView);
+    CHECK(!links->is_attached());
+    CHECK_THROW(tv.sync_if_needed(), DeletedLinkView);
+    
+    // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
+    // the LinkView through multiple levels!
+    CHECK(tv.is_attached());
+}
 #endif // TEST_QUERY
 
 

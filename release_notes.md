@@ -2,11 +2,14 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed error when opening encrypted streaming-form files which would be
+  resized on open due to the size not aligning with a chunked mapping section
+  boundary.
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Any attempt to use a deleted LinkView (such as executing a query that
+  depends on it) will now throw `DeletedLinkView` instead of segfaulting
 
 ### Enhancements:
 

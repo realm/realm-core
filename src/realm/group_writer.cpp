@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 
+#include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group_shared.hpp>
@@ -185,24 +186,20 @@ ref_type GroupWriter::write_group()
     // clobering the previous database version. Note, however, that this risk
     // would only have been present in the non-transactionl case where there is
     // no version tracking on the free-space chunks.
-    {
-        typedef SlabAlloc::chunks::const_iterator iter;
-        iter end = new_free_space.end();
-        for (iter i = new_free_space.begin(); i != end; ++i) {
-            ref_type ref = i->ref;
-            size_t size  = i->size;
-            // We always want to keep the list of free space in sorted order (by
-            // ascending position) to facilitate merge of adjacent segments. We
-            // can find the correct insert postion by binary search
-            size_t ndx = m_free_positions.lower_bound_int(ref);
-            m_free_positions.insert(ndx, ref); // Throws
-            m_free_lengths.insert(ndx, size); // Throws
-            if (is_shared)
-                m_free_versions.insert(ndx, m_current_version); // Throws
-            // Adjust reserve_ndx if necessary
-            if (ndx <= reserve_ndx)
-                ++reserve_ndx;
-        }
+    for (const auto& free_space : new_free_space) {
+        ref_type ref = free_space.ref;
+        size_t size  = free_space.size;
+        // We always want to keep the list of free space in sorted order (by
+        // ascending position) to facilitate merge of adjacent segments. We
+        // can find the correct insert postion by binary search
+        size_t ndx = m_free_positions.lower_bound_int(ref);
+        m_free_positions.insert(ndx, ref); // Throws
+        m_free_lengths.insert(ndx, size); // Throws
+        if (is_shared)
+            m_free_versions.insert(ndx, m_current_version); // Throws
+        // Adjust reserve_ndx if necessary
+        if (ndx <= reserve_ndx)
+            ++reserve_ndx;
     }
 
     // Before we calculate the actual sizes of the free-list arrays, we must
