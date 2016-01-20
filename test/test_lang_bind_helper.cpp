@@ -1,20 +1,7 @@
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
-
 #include <map>
 #include <sstream>
 
-#include <limits.h>
-#include <stdint.h>
-
-#ifdef _WIN32
-#define INTMAX_MAX _I64_MAX
-#endif
-
-#include <mutex>
-
-
-//#include <thread>
-		
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
@@ -43,17 +30,7 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestResults;
-using namespace std;
 
-void SLEEP(size_t ms)
-{
-#ifdef _WIN32
-    Sleep(ms);
-#else
-    usleep(ms * 1000);
-#endif
-
-}
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -618,6 +595,42 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
     CHECK_EQUAL(rt.get_table(0), rt.get_table("table1"));
     CHECK_EQUAL(rt.get_table(1), rt.get_table("table2"));
     CHECK_EQUAL(rt.get_group().size(), 2);
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
+{
+    // Verify that the table accessor of a link-opposite table is refreshed even
+    // when the origin table is created in the same transaction as the link
+    // column is added to it. This case is slightly involved, as there is a rule
+    // that requires the two opposite table accessors of a link column (origin
+    // and target sides) to either both exist or both not exist. On the other
+    // hand, tables accessors are normally not created during
+    // Group::advance_transact() for newly created tables.
+
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg_w);
+        TableRef a = wt.get_or_add_table("a");
+        wt.commit();
+    }
+
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    ConstTableRef a = rt.get_table("a");
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef a = wt.get_table("a");
+        TableRef b = wt.get_or_add_table("b");
+        b->add_column_link(type_Link, "foo", *a);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
 }
 
 
@@ -7700,6 +7713,46 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 }
 
 
+TEST(LangBindHelper_RollbackCircularReferenceRemoval)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef alpha = group->get_or_add_table("alpha");
+        TableRef beta = group->get_or_add_table("beta");
+        alpha->add_column_link(type_Link, "beta-1", *beta);
+        beta->add_column_link(type_Link, "alpha-1", *alpha);
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+        TableRef alpha = group->get_table("alpha");
+        TableRef beta = group->get_table("beta");
+
+        CHECK_THROW(group->remove_table("alpha"), CrossTableLinkTarget);
+        beta->remove_column(0);
+        alpha->remove_column(0);
+        group->remove_table("beta");
+        CHECK_NOT(group->has_table("beta"));
+
+        // Version 1: This crashes
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+
+        //        // Version 2: This works
+        //        LangBindHelper::commit_and_continue_as_read(sg);
+        //        CHECK_EQUAL(1, group->size());
+
+    }
+    group->verify();
+}
+
+
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -10051,151 +10104,8 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
     }
 }
 
- 
-// Test that we can handover a query involving links, and that after the
-// handover export, the handover is completely decoupled from later changes
-// done on accessors belonging to the exporting shared group
-ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
-{
-    const size_t threads = 10;
-
-    size_t numberOfOwner = 500;
-    size_t numberOfDogsPerOwner = 100;
-
-    std::vector<SharedGroup::VersionID> vids;
-    std::vector < std::unique_ptr<SharedGroup::Handover<Query> > > qs;
-    std::mutex mu;
-
-    std::atomic<bool> end_signal = false;
-
-    SHARED_GROUP_TEST_PATH(path);
-
-    {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-        sg.begin_read();
-
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
-        Group& group_w = const_cast<Group&>(sg_w.begin_read());
-
-        // First setup data so that we can do a query on links
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
-
-        TableRef owner = group_w.add_table("Owner");
-        TableRef dog = group_w.add_table("Dog");
-
-        owner->add_column(type_String, "name");
-        owner->add_column_link(type_LinkList, "link", *dog);
-
-        dog->add_column(type_String, "name");
-        dog->add_column_link(type_Link, "link", *owner);
-
-        for (int i = 0; i < numberOfOwner; i++) {
-
-            size_t r = owner->add_empty_row();
-            owner->set_string(0, r, string("owner") + std::to_string(i));
-
-            for (int j = 0; j < numberOfDogsPerOwner; j++) {
-                size_t r = dog->add_empty_row();
-                dog->set_string(0, r, string("dog") + std::to_string(i * numberOfOwner + j));
-                dog->set_link(1, r, i);
-                LinkViewRef ll = owner->get_linklist(1, i);
-                ll->add(r);
-            }
-        }
-
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-    }
 
 
-    auto async = [&]() {
-    // Async thread
-    //************************************************************************************************
-        cerr << "  THREAD ENTRY\n";
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-        sg.begin_read();
-
-        while (!end_signal) {
-            millisleep(100);
-
-            mu.lock();
-            if (qs.size() > 0) {
-                SharedGroup::VersionID v = move(vids[vids.size() - 1]);
-                vids.pop_back();
-                std::unique_ptr<SharedGroup::Handover<Query> > qptr = move(qs[qs.size() - 1]);
-                qs.pop_back();
-                cerr << "  Consumed\n";
-                mu.unlock();
-
-                LangBindHelper::advance_read(sg, *hist, v);
-                std::unique_ptr<Query> q(sg.import_from_handover(move(qptr)));
-
-                realm::TableView tv = q->find_all();
-                cerr << "            query results = " << std::to_string(tv.size()) + "\n";
-            }
-            else {
-                mu.unlock();
-            }
-        }
-
-    //************************************************************************************************
-    };
-    
-      
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    Group& group = const_cast<Group&>(sg.begin_read());
-
-    // Create and export query
-    TableRef owner = group.get_table("Owner");
-    TableRef dog = group.get_table("Dog");
-
-    realm::Query query = dog->link(1).column<String>(0) == "owner" + std::to_string(rand() % numberOfOwner);
-
-    Thread slaves[threads];
-    for (int i = 0; i != threads; ++i) {
-        slaves[i].start([=] { async(); });
-    }
-
-
-    // Main thread
-    //************************************************************************************************
-    for (size_t iter = 0; iter < 100; iter++) {
-        LangBindHelper::promote_to_write(sg, *hist);
-        LangBindHelper::commit_and_continue_as_read(sg);
-
-        mu.lock();
-
-        for (size_t t = 0; t < 10; t++) {
-            
-            Query q1 = query;
-            Query q2 = query;
-
-            q1.find_all();
-            q2.find_all();
-
-            Query q3 = q1.and_query(q2);
-            q3.find_all();
-            
-            if (qs.size() < 100) {
-                // < 100 in order to limit memory usage
-                qs.push_back(sg.export_for_handover(query, MutableSourcePayload::Move));
-                vids.push_back(sg.get_version_of_current_transaction());
-            }
-            cerr << "Created 10\n";
-        }
-        mu.unlock();
-
-        millisleep(100);
-    }
-    //************************************************************************************************
-
-    end_signal = true;
-    for (int i = 0; i != threads; ++i)
-        slaves[i].join();
-}
 
 
 REALM_TABLE_1(MyTable, first, Int)
@@ -10493,6 +10403,45 @@ TEST(LangBindHelper_Compact)
     {
         std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        ReadTransaction r(sg);
+        ConstTableRef table = r.get_table("test");
+        CHECK_EQUAL(N, table->size());
+        sg.close();
+    }
+}
+
+TEST(LangBindHelper_CompactLargeEncryptedFile)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    // We need to ensure that the size of the compacted file does not line up
+    // with the chunked-memory-mapping section boundaries, so that the file is
+    // resized on open. This targets the gap between 32 and 36 pages by writing
+    // 32 pages of data and assuming that the file overhead will be greater than
+    // zero bytes and less than four pages.
+    std::vector<char> data(realm::util::page_size());
+    const size_t N = 32;
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_or_add_table("test");
+        table->add_column(type_String, "string");
+        for (size_t i = 0; i < N; ++i) {
+            table->add_empty_row();
+            table->set_string(0, i, StringData(data.data(), data.size()));
+        }
+        wt.commit();
+
+        CHECK_EQUAL(true, sg.compact());
+
+        sg.close();
+    }
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
