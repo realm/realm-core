@@ -10051,7 +10051,7 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
     }
 }
 
-
+ 
 // Test that we can handover a query involving links, and that after the
 // handover export, the handover is completely decoupled from later changes
 // done on accessors belonging to the exporting shared group
