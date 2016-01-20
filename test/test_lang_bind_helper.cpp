@@ -1,6 +1,15 @@
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
 #include <map>
 #include <sstream>
+#include <string>
+
+// To make std::mutex work in Windows
+#ifdef _WIN32
+#define INTMAX_MAX _I64_MAX
+#endif
+
+#include <mutex>
+#include <atomic>
 
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
@@ -31,6 +40,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestResults;
 
+using namespace std;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -10495,6 +10505,149 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     min = view.minimum_double(0, &ndx);
     CHECK_EQUAL(0, min);
     CHECK_EQUAL(not_found, ndx);
+}
+
+
+ONLY(LangBindHelper_HandoverFuzzyTest)
+{
+    const size_t threads = 10;
+
+    size_t numberOfOwner = 500;
+    size_t numberOfDogsPerOwner = 100;
+
+    std::vector<SharedGroup::VersionID> vids;
+    std::vector < std::unique_ptr<SharedGroup::Handover<Query> > > qs;
+    std::mutex mu;
+
+    std::atomic<bool> end_signal(false);
+
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        sg.begin_read();
+
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+        // First setup data so that we can do a query on links
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+
+        TableRef owner = group_w.add_table("Owner");
+        TableRef dog = group_w.add_table("Dog");
+
+        owner->add_column(type_String, "name");
+        owner->add_column_link(type_LinkList, "link", *dog);
+
+        dog->add_column(type_String, "name");
+        dog->add_column_link(type_Link, "link", *owner);
+
+        for (size_t i = 0; i < numberOfOwner; i++) {
+
+            size_t r = owner->add_empty_row();
+            owner->set_string(0, r, string("owner") + std::to_string(i));
+
+            for (size_t j = 0; j < numberOfDogsPerOwner; j++) {
+                size_t r = dog->add_empty_row();
+                dog->set_string(0, r, string("dog") + std::to_string(i * numberOfOwner + j));
+                dog->set_link(1, r, i);
+                LinkViewRef ll = owner->get_linklist(1, i);
+                ll->add(r);
+            }
+        }
+
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+    }
+
+
+    auto async = [&]() {
+        // Async thread
+        //************************************************************************************************
+        cerr << "  THREAD ENTRY\n";
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        sg.begin_read();
+
+        while (!end_signal) {
+            millisleep(100);
+
+            mu.lock();
+            if (qs.size() > 0) {
+                SharedGroup::VersionID v = move(vids[vids.size() - 1]);
+                vids.pop_back();
+                std::unique_ptr<SharedGroup::Handover<Query> > qptr = move(qs[qs.size() - 1]);
+                qs.pop_back();
+                cerr << "  Consumed\n";
+                mu.unlock();
+
+                LangBindHelper::advance_read(sg, *hist, v);
+                std::unique_ptr<Query> q(sg.import_from_handover(move(qptr)));
+
+                realm::TableView tv = q->find_all();
+                cerr << "            query results = " << std::to_string(tv.size()) + "\n";
+            }
+            else {
+                mu.unlock();
+            }
+        }
+
+        //************************************************************************************************
+    };
+
+
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group = const_cast<Group&>(sg.begin_read());
+
+    // Create and export query
+    TableRef owner = group.get_table("Owner");
+    TableRef dog = group.get_table("Dog");
+
+    realm::Query query = dog->link(1).column<String>(0) == "owner" + std::to_string(rand() % numberOfOwner);
+
+    Thread slaves[threads];
+    for (int i = 0; i != threads; ++i) {
+        slaves[i].start([=] { async(); });
+    }
+
+
+    // Main thread
+    //************************************************************************************************
+    for (size_t iter = 0; iter < 10; iter++) {
+        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::commit_and_continue_as_read(sg);
+
+        mu.lock();
+
+        for (size_t t = 0; t < 5; t++) {
+
+            Query q1 = query;
+            Query q2 = query;
+
+            q1.find_all();
+            q2.find_all();
+
+            Query q3 = q1.and_query(q2);
+            q3.find_all();
+
+            if (qs.size() < 100) {
+                // < 100 in order to limit memory usage
+                qs.push_back(sg.export_for_handover(query, MutableSourcePayload::Move));
+                vids.push_back(sg.get_version_of_current_transaction());
+            }
+            cerr << "Created 10\n";
+        }
+        mu.unlock();
+
+        millisleep(100);
+    }
+    //************************************************************************************************
+
+    end_signal = true;
+    for (int i = 0; i != threads; ++i)
+        slaves[i].join();
 }
 
 #endif
