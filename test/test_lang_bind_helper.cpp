@@ -10546,7 +10546,7 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
         dog->add_column(type_String, "name");
         dog->add_column_link(type_Link, "link", *owner);
 
-        for (int i = 0; i < numberOfOwner; i++) {
+        for (size_t i = 0; i < numberOfOwner; i++) {
 
             size_t r = owner->add_empty_row();
             owner->set_string(0, r, string("owner") + std::to_string(i));
