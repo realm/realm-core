@@ -230,6 +230,14 @@ public:
         m_dT = from.m_dT;
         m_probes = from.m_probes;
         m_matches = from.m_matches;
+        /*
+        const ExpressionNode* x = dynamic_cast<const ExpressionNode* >(&from);
+        if (x) {
+            ExpressionNode* tx = dynamic_cast<ExpressionNode*>(this);
+            Expression& e = tx->m_compare;
+        }
+
+        */
     }
 
     virtual std::unique_ptr<ParentNode> clone() const = 0;
@@ -1588,7 +1596,16 @@ public:
 
     std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new ExpressionNode(*this));
+        std::unique_ptr<ParentNode> ret;
+        ret = std::unique_ptr<ParentNode>(new ExpressionNode(*this));
+
+        Expression* e = m_compare.get();
+        Compare* c = static_cast<Compare*>(e);
+
+        return ret;
+
+//        ExpressionNode* e = static_cast<ExpressionNode*>(ret.get());
+//        return ret;
     }
 
     ExpressionNode(const ExpressionNode&) = default;

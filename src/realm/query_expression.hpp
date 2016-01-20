@@ -1459,6 +1459,8 @@ private:
     void map_links(size_t column, size_t row, LinkMapFunction& lm)
     {
         bool last = (column + 1 == m_link_columns.size());
+        REALM_ASSERT(column < m_link_types.size());
+
         if (m_link_types[column] == type_Link) {
             const LinkColumn& cl = *static_cast<const LinkColumn*>(m_link_columns[column]);
             size_t r = to_size_t(cl.get(row));
