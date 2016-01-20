@@ -9,6 +9,7 @@
 #endif
 
 #include <mutex>
+#include <atomic>
 
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
@@ -10521,7 +10522,7 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
     std::vector < std::unique_ptr<SharedGroup::Handover<Query> > > qs;
     std::mutex mu;
 
-    std::atomic<bool> end_signal = false;
+    std::atomic<bool> end_signal(false);
 
     SHARED_GROUP_TEST_PATH(path);
 
@@ -10551,7 +10552,7 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
             size_t r = owner->add_empty_row();
             owner->set_string(0, r, string("owner") + std::to_string(i));
 
-            for (int j = 0; j < numberOfDogsPerOwner; j++) {
+            for (size_t j = 0; j < numberOfDogsPerOwner; j++) {
                 size_t r = dog->add_empty_row();
                 dog->set_string(0, r, string("dog") + std::to_string(i * numberOfOwner + j));
                 dog->set_link(1, r, i);

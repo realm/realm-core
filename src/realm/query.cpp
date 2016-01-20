@@ -65,7 +65,7 @@ Query::Query(const Query& copy)
     m_source_table_view = copy.m_source_table_view;
     m_owns_source_table_view = false;
     m_current_descriptor = copy.m_current_descriptor;
-    execution_mutex = copy.execution_mutex;
+    m_execution_mutex = copy.m_execution_mutex;
 }
 
 Query& Query::operator = (const Query& source)
@@ -76,7 +76,7 @@ Query& Query::operator = (const Query& source)
         m_view = source.m_view;
         m_source_link_view = source.m_source_link_view;
         m_source_table_view = source.m_source_table_view;
-        execution_mutex = source.execution_mutex;
+        m_execution_mutex = source.m_execution_mutex;
         if (m_table)
             fetch_descriptor();
     }
@@ -107,7 +107,7 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
     m_groups = source.m_groups;
-    execution_mutex = source.execution_mutex;
+    m_execution_mutex = source.m_execution_mutex;
 }
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
@@ -125,7 +125,7 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
     m_groups = source.m_groups;
-    execution_mutex = source.execution_mutex;
+    m_execution_mutex = source.m_execution_mutex;
 }
 
 Query::Query(Expression* expr) : Query()
@@ -1023,8 +1023,8 @@ Query& Query::end_subtable()
 // todo, add size_t end? could be useful
 size_t Query::find(size_t begin)
 {
-    std::cerr << (size_t)execution_mutex.get() << "\n";
-    util::LockGuard lock(*(execution_mutex.get()));
+    std::cerr << (size_t)m_execution_mutex.get() << "\n";
+    util::LockGuard lock(*(m_execution_mutex.get()));
 
     if (m_table->is_degenerate())
         return not_found;
@@ -1059,8 +1059,8 @@ size_t Query::find(size_t begin)
 
 void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit) const
 {
-    std::cerr << (size_t)execution_mutex.get() << "\n";
-    util::LockGuard lock(*(execution_mutex.get()));
+    std::cerr << (size_t)m_execution_mutex.get() << "\n";
+    util::LockGuard lock(*(m_execution_mutex.get()));
 
     if (limit == 0 || m_table->is_degenerate())
         return;
@@ -1112,8 +1112,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
-    std::cerr << (size_t)execution_mutex.get() << "\n";
-    util::LockGuard lock(*(execution_mutex.get()));
+    std::cerr << (size_t)m_execution_mutex.get() << "\n";
+    util::LockGuard lock(*(m_execution_mutex.get()));
 
     if(limit == 0 || m_table->is_degenerate())
         return 0;
@@ -1150,8 +1150,8 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(size_t start, size_t end, size_t limit)
 {
-    std::cerr << (size_t)execution_mutex.get() << "\n";
-    util::LockGuard lock(*(execution_mutex.get()));
+    std::cerr << (size_t)m_execution_mutex.get() << "\n";
+    util::LockGuard lock(*(m_execution_mutex.get()));
 
     if(limit == 0 || m_table->is_degenerate())
         return 0;
