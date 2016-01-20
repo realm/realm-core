@@ -1598,14 +1598,7 @@ public:
     {
         std::unique_ptr<ParentNode> ret;
         ret = std::unique_ptr<ParentNode>(new ExpressionNode(*this));
-
-        Expression* e = m_compare.get();
-        Compare* c = static_cast<Compare*>(e);
-
         return ret;
-
-//        ExpressionNode* e = static_cast<ExpressionNode*>(ret.get());
-//        return ret;
     }
 
     ExpressionNode(const ExpressionNode&) = default;

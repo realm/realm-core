@@ -10066,6 +10066,7 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
     std::vector < std::unique_ptr<SharedGroup::Handover<Query> > > qs;
     std::mutex mu;
 
+    std::atomic<bool> end_signal = false;
 
     SHARED_GROUP_TEST_PATH(path);
 
@@ -10083,11 +10084,11 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
 
         TableRef owner = group_w.add_table("Owner");
         TableRef dog = group_w.add_table("Dog");
-        // add some more columns to table1 and table2
-        owner->add_column(type_String, "name");
-        dog->add_column(type_String, "name");
 
+        owner->add_column(type_String, "name");
         owner->add_column_link(type_LinkList, "link", *dog);
+
+        dog->add_column(type_String, "name");
         dog->add_column_link(type_Link, "link", *owner);
 
         for (int i = 0; i < numberOfOwner; i++) {
@@ -10116,8 +10117,8 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
 
-        for (;;) {
-            SLEEP(100);
+        while (!end_signal) {
+            millisleep(100);
 
             mu.lock();
             if (qs.size() > 0) {
@@ -10151,9 +10152,7 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
     TableRef owner = group.get_table("Owner");
     TableRef dog = group.get_table("Dog");
 
-    realm::Query query = dog->link(1).column<String>(0) == "owner200" + std::to_string(rand() % numberOfOwner);
-    //realm::Query query = owner->column<String>(0) == "owner" + std::to_string(rand() % numberOfOwner);
-
+    realm::Query query = dog->link(1).column<String>(0) == "owner" + std::to_string(rand() % numberOfOwner);
 
     Thread slaves[threads];
     for (int i = 0; i != threads; ++i) {
@@ -10163,41 +10162,37 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
 
     // Main thread
     //************************************************************************************************
-    for (;;) {
+    for (size_t iter = 0; iter < 100; iter++) {
         LangBindHelper::promote_to_write(sg, *hist);
-
-/*
-        TableRef dog = group.get_table("Dog");
-        size_t r = dog->add_empty_row();
-        dog->set_string(0, r, "new dog");
-        TableRef owner = group.get_table("Owner");
-        size_t to = rand() % owner->size();
-        dog->set_link(1, r, to);
-        LinkViewRef ll = owner->get_linklist(1, to);
-        ll->add(r);
-*/
-
         LangBindHelper::commit_and_continue_as_read(sg);
 
         mu.lock();
 
         for (size_t t = 0; t < 10; t++) {
+            
             Query q1 = query;
             Query q2 = query;
 
             q1.find_all();
             q2.find_all();
 
-            qs.push_back(sg.export_for_handover(query, MutableSourcePayload::Move));
-            vids.push_back(sg.get_version_of_current_transaction());
+            Query q3 = q1.and_query(q2);
+            q3.find_all();
+            
+            if (qs.size() < 100) {
+                // < 100 in order to limit memory usage
+                qs.push_back(sg.export_for_handover(query, MutableSourcePayload::Move));
+                vids.push_back(sg.get_version_of_current_transaction());
+            }
             cerr << "Created 10\n";
         }
         mu.unlock();
 
-        SLEEP(100);
+        millisleep(100);
     }
     //************************************************************************************************
 
+    end_signal = true;
     for (int i = 0; i != threads; ++i)
         slaves[i].join();
 }

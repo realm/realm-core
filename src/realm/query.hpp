@@ -388,6 +388,8 @@ private:
     LinkViewRef m_source_link_view; // link views are refcounted and shared.
     TableViewBase* m_source_table_view; // table views are not refcounted, and not owned by the query.
     bool m_owns_source_table_view; // <--- except when indicated here
+
+    mutable std::shared_ptr<util::Mutex> execution_mutex = std::shared_ptr<util::Mutex>(new util::Mutex());
 };
 
 // Implementation:

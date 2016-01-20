@@ -225,6 +225,9 @@ struct PlacementDelete {
     }
 };
 
+// FIXME: May overwrap for large number of miliseconds (~4000 seconds)
+void millisleep(size_t milliseconds);
+
 } // namespace realm
 
 #endif // REALM_UTILITIES_HPP
