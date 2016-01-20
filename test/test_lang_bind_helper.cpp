@@ -10508,10 +10508,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 }
 
 
-// Test that we can handover a query involving links, and that after the
-// handover export, the handover is completely decoupled from later changes
-// done on accessors belonging to the exporting shared group
-ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
+ONLY(LangBindHelper_HandoverFuzzyTest)
 {
     const size_t threads = 10;
 
@@ -10618,13 +10615,13 @@ ONLY(LangBindHelper_HandoverWithLinkQueriesDestroyedTable)
 
     // Main thread
     //************************************************************************************************
-    for (size_t iter = 0; iter < 100; iter++) {
+    for (size_t iter = 0; iter < 10; iter++) {
         LangBindHelper::promote_to_write(sg, *hist);
         LangBindHelper::commit_and_continue_as_read(sg);
 
         mu.lock();
 
-        for (size_t t = 0; t < 10; t++) {
+        for (size_t t = 0; t < 5; t++) {
 
             Query q1 = query;
             Query q2 = query;
