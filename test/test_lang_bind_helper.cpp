@@ -2159,7 +2159,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->insert_column(2, type_Int, "dummy_2");
         parent_w->insert_empty_row(2);
         parent_w->set_mixed(3, 2, "Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphio"
-            "paraomelitokatakechyÂ­menokichlepikossyphophattoperisteralektryonopte"
+            "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
             "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(3, 3);
