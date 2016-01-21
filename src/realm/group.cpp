@@ -1068,6 +1068,12 @@ public:
     bool select_table(size_t group_level_ndx, int levels, const size_t* path) noexcept
     {
         m_table.reset();
+        // The list of table accessors must either be empty or correctly reflect
+        // the number of tables prior to this instruction (see
+        // Group::do_get_table()). An empty list means that no table accessors
+        // have been created yet (all entries are null).
+        REALM_ASSERT(m_group.m_table_accessors.empty() ||
+                     group_level_ndx < m_group.m_table_accessors.size());
         if (group_level_ndx < m_group.m_table_accessors.size()) {
             if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
                 const size_t* path_begin = path;
