@@ -1685,7 +1685,7 @@ public:
     void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
     {
         REALM_ASSERT(patches.size());
-        auto abstract_patch = std::move(patches.back());
+        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
         patches.pop_back();
 
         auto patch = dynamic_cast<LinksToNodeHandoverPatch*>(abstract_patch.get());
