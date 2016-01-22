@@ -10510,7 +10510,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 
 ONLY(LangBindHelper_HandoverFuzzyTest)
 {
-    const size_t threads = 50;
+    const size_t threads = 5;
 
     size_t numberOfOwner = 500;
     size_t numberOfDogsPerOwner = 100;
@@ -10571,7 +10571,7 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
         sg.begin_read();
 
         while (!end_signal) {
-            millisleep(1);
+           // millisleep(10);
 
             mu.lock();
             if (qs.size() > 0) {
@@ -10586,8 +10586,8 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
 
                 LangBindHelper::advance_read(sg, *hist, v);
                 std::unique_ptr<Query> q(sg.import_from_handover(move(qptr)));
-
                 realm::TableView tv = q->find_all();
+
                 cerr << "            query results = " << std::to_string(tv.size()) + "\n";
             }
             else {
@@ -10613,23 +10613,25 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
     }
     // Main thread
     //************************************************************************************************
-    for (size_t iter = 0; iter < 1000; iter++) {
-        LangBindHelper::promote_to_write(sg, *hist);
-        LangBindHelper::commit_and_continue_as_read(sg);
+    for (size_t iter = 0; iter < 10000; iter++) {
+
 
         mu.lock();
 
-        for (size_t t = 0; t < 50; t++) {
-            if (qs.size() < 200) {
-                // < 100 in order to limit memory usage
+        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::commit_and_continue_as_read(sg);
+
+
+        if (qs.size() < 100) {
+            for (size_t t = 0; t < 5; t++) {
                 qs.push_back(sg.export_for_handover(query, MutableSourcePayload::Move));
                 vids.push_back(sg.get_version_of_current_transaction());
             }
-            cerr << "Created 10\n";
+                cerr << "Created 5\n";
         }
         mu.unlock();
 
-        millisleep(1);
+        millisleep(10);
     }
     //************************************************************************************************
 

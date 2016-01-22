@@ -1421,6 +1421,9 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 
 Query& Query::and_query(const Query& q)
 {
+    if (!has_conditions())
+        m_execution_mutex = q.m_execution_mutex;
+
     add_node(q.root_node()->clone());
 
     if (q.m_source_link_view) {
@@ -1433,6 +1436,9 @@ Query& Query::and_query(const Query& q)
 
 Query& Query::and_query(Query&& q)
 {
+    if (!has_conditions())
+        m_execution_mutex = q.m_execution_mutex;
+
     add_node(std::move(q.m_groups[0].m_root_node));
 
     if (q.m_source_link_view) {
