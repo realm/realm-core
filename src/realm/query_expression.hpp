@@ -195,26 +195,6 @@ StringData only_string(StringData in)
     return in;
 }
 
-// Modify in to refer to a deep clone of the data it points to, if applicable,
-// and return a pointer which must be deleted if non-NULL
-template<class T>
-char* in_place_deep_clone(T* in)
-{
-    static_cast<void>(in);
-    return 0;
-}
-
-char* in_place_deep_clone(StringData* in)
-{
-    if (in->is_null())
-        return nullptr;
-
-    char* payload = new char[in->size()];
-    memcpy(payload, in->data(), in->size());
-    *in = StringData(payload, in->size());
-    return payload;
-}
-
 } // anonymous namespace
 
 template<class T>struct Plus {
@@ -336,6 +316,7 @@ template<class T>
 class Columns;
 template<class T>
 class Value;
+class ConstantStringValue;
 template<class T>
 class Subexpr2;
 template<class oper, class TLeft = Subexpr, class TRight = Subexpr>
@@ -412,13 +393,10 @@ Query create(L left, const Subexpr2<R>& right)
     else
 #endif
     {
-        // If we're searching for a string, create a deep copy of the search string
-        // which will be deleted by the Compare instance.
-        char* compare_string = in_place_deep_clone(&left);
-
         // Return query_expression.hpp node
         using CommonType = typename Common<L, R>::type;
-        return new Compare<Cond, CommonType>(make_subexpr<Value<L>>(left), right.clone(), compare_string);
+        using ValueType = typename std::conditional<std::is_same<L, StringData>::value, ConstantStringValue, Value<L>>::type;
+        return new Compare<Cond, CommonType>(make_subexpr<ValueType>(left), right.clone());
     }
 }
 
@@ -1146,6 +1124,23 @@ public:
     NullableVector<T> m_storage;
 };
 
+class ConstantStringValue : public Value<StringData>
+{
+public:
+    ConstantStringValue(const StringData& string) : Value(),
+        m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
+    {
+        init(false, ValueBase::default_size, m_string);
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<ConstantStringValue>(*this);
+    }
+
+private:
+    util::Optional<std::string> m_string;
+};
 
 // All overloads where left-hand-side is L:
 //
@@ -2483,14 +2478,9 @@ template<class TCond, class T, class TLeft, class TRight>
 class Compare : public Expression
 {
 public:
-    Compare(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right, const char* compare_string = nullptr) :
-        m_left(std::move(left)), m_right(std::move(right)), m_compare_string(compare_string)
+    Compare(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right) :
+        m_left(std::move(left)), m_right(std::move(right))
     {
-    }
-
-    ~Compare()
-    {
-        delete[] m_compare_string;
     }
 
     // See comment in base class
@@ -2538,11 +2528,6 @@ public:
 private:
     std::unique_ptr<TLeft> m_left;
     std::unique_ptr<TRight> m_right;
-
-    // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in
-    // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this
-    // Compare object is destructed and the copy is no longer needed.
-    const char* m_compare_string;
 };
 
 }
