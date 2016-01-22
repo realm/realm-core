@@ -38,17 +38,19 @@ EXTENSIONS="java python ruby objc node php c gui replication"
 PLATFORMS="iphone"
 
 IPHONE_EXTENSIONS="objc"
-IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
-IPHONE_DIR="iphone-lib"
+IPHONE_SDKS="iphoneos iphonesimulator"
+IPHONE_DIR="ios-lib"
 
-WATCHOS_PLATFORMS="WatchOS WatchSimulator"
+WATCHOS_SDKS="watchos watchsimulator"
 WATCHOS_DIR="watchos-lib"
 
-TVOS_PLATFORMS="AppleTVOS AppleTVSimulator"
+TVOS_SDKS="appletvos appletvsimulator"
 TVOS_DIR="tvos-lib"
 
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
+
+CONFIG_VERSION=1
 
 
 usage()
@@ -263,43 +265,42 @@ build_apple()
         echo "ERROR: Required $name SDKs are not available" 1>&2
         exit 1
     fi
-    temp_dir="$(mktemp -d /tmp/realm.build-$short_name.XXXX)" || exit 1
+    temp_dir="$(mktemp -d /tmp/realm.build-$os_name.XXXX)" || exit 1
     mkdir "$temp_dir/platforms" || exit 1
     xcode_home="$(get_config_param "XCODE_HOME")" || exit 1
     sdks="$(get_config_param "$sdks_config_key")" || exit 1
     for x in $sdks; do
-        platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
-        sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
-        archs="$(printf "%s\n" "$x" | cut -d: -f3 | sed 's/,/ /g')" || exit 1
+        sdk="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
+        archs="$(printf "%s\n" "$x" | cut -d: -f2 | sed 's/,/ /g')" || exit 1
         cflags_arch="-stdlib=libc++"
         for y in $archs; do
             word_list_append "cflags_arch" "-arch $y" || exit 1
         done
-        if [ "$platform" = "$bitcode_platform" ]; then
+        if [ "$sdk" = "${sdk%simulator}" ]; then
             word_list_append "cflags_arch" "-mstrict-align" || exit 1
             word_list_append "cflags_arch" "-m$os_name-version-min=$min_version" || exit 1
             if [ "$enable_bitcode" = "yes" ]; then
                 word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
             fi
         else
-            word_list_append "cflags_arch" "-m$simulator_name-simulator-version-min=$min_version" || exit 1
+            word_list_append "cflags_arch" "-m$os_name-version-min=$min_version" || exit 1
             if [ "$enable_bitcode" = "yes" ]; then
                 word_list_append "cflags_arch" "-fembed-bitcode-marker" || exit 1
             fi
         fi
-        sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-        tag="$platform$platform_suffix"
-        $MAKE -C "src/realm" "librealm-$tag.a" "librealm-$tag-dbg.a" BASE_DENOM="$tag" CFLAGS_ARCH="$cflags_arch -isysroot '$sdk_root'" || exit 1
+        tag="$sdk$platform_suffix"
+        CXX="xcrun -sdk $sdk c++" $MAKE -C "src/realm" "librealm-$tag.a" "librealm-$tag-dbg.a" BASE_DENOM="$tag" CFLAGS_ARCH="$cflags_arch" COMPILER_IS_GCC_LIKE=YES || exit 1
         mkdir "$temp_dir/platforms/$tag" || exit 1
         cp "src/realm/librealm-$tag.a"     "$temp_dir/platforms/$tag/librealm.a"     || exit 1
         cp "src/realm/librealm-$tag-dbg.a" "$temp_dir/platforms/$tag/librealm-dbg.a" || exit 1
     done
-    REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-$simulator_name" "realm-config-$simulator_name-dbg" BASE_DENOM="$simulator_name" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_$all_caps_name" AR="libtool" ARFLAGS="-o" || exit 1
+    all_caps_name=$(echo "$os_name" | tr "[:upper:]" "[:lower:]")
+    REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-$os_name" "realm-config-$os_name-dbg" BASE_DENOM="$os_name" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_$all_caps_name" AR="libtool" ARFLAGS="-o" || exit 1
     mkdir -p "$dir" || exit 1
-    echo "Creating '$dir/librealm-$simulator_name$platform_suffix.a'"
-    libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$dir/librealm-$simulator_name$platform_suffix.a"     || exit 1
-    echo "Creating '$dir/librealm-$simulator_name-dbg.a'"
-    libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$dir/librealm-$simulator_name$platform_suffix-dbg.a" || exit 1
+    echo "Creating '$dir/librealm-$os_name$platform_suffix.a'"
+    libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$dir/librealm-$os_name$platform_suffix.a"     || exit 1
+    echo "Creating '$dir/librealm-$os_name-dbg.a'"
+    libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$dir/librealm-$os_name$platform_suffix-dbg.a" || exit 1
     echo "Copying headers to '$dir/include'"
     mkdir -p "$dir/include" || exit 1
     cp "src/realm.hpp" "$dir/include/" || exit 1
@@ -309,7 +310,7 @@ build_apple()
     (cd "$REALM_HOME/$dir/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
     for x in "realm-config" "realm-config-dbg"; do
         echo "Creating '$dir/$x'"
-        y="$(printf "%s\n" "$x" | sed "s/realm-config/realm-config-$simulator_name/")" || exit 1
+        y="$(printf "%s\n" "$x" | sed "s/realm-config/realm-config-$os_name/")" || exit 1
         cp "src/realm/$y" "$REALM_HOME/$dir/$x" || exit 1
     done
     rm -rf "$temp_dir"
@@ -321,99 +322,28 @@ find_apple_sdks()
 {
     sdks=""
     if [ "$xcode_home" != "none" ]; then
-        for x in $PLATFORMS; do
-            platform_home="$xcode_home/Platforms/$x.platform"
-            if ! [ -e "$platform_home/Info.plist" ]; then
-                echo "Failed to find '$platform_home/Info.plist'"
-                exit 1
+        for x in $SDKS; do
+            xcodebuild -version -sdk $x > /dev/null || exit 1
+            if [ "$x" = "iphonesimulator" ]; then
+                archs="i386,x86_64"
+            elif [ "$x" = "iphoneos" ]; then
+                archs="armv7,armv7s,arm64"
+            elif [ "$x" = "watchsimulator" ]; then
+                archs="i386"
+            elif [ "$x" = "watchos" ]; then
+                archs="armv7k"
+            elif [ "$x" = "appletvsimulator" ]; then
+                archs="x86_64"
+            elif [ "$x" = "appletvos" ]; then
+                archs="arm64"
             else
-                sdk="$(find_apple_sdk "$platform_home")" || exit 1
-                if ! [ "$sdk" ]; then
-                    echo "Found no SDKs in '$platform_home'"
-                    exit 1
-                else
-                    if [ "$x" = "iPhoneSimulator" ]; then
-                        archs="i386,x86_64"
-                    elif [ "$x" = "iPhoneOS" ]; then
-                        archs="armv7,armv7s,arm64"
-                    elif [ "$x" = "WatchSimulator" ]; then
-                        archs="i386"
-                    elif [ "$x" = "WatchOS" ]; then
-                        archs="armv7k"
-                    elif [ "$x" = "AppleTVSimulator" ]; then
-                        archs="x86_64"
-                    elif [ "$x" = "AppleTVOS" ]; then
-                        archs="arm64"
-                    else
-                        continue
-                    fi
-                    word_list_append "sdks" "$x:$sdk:$archs" || exit 1
-                fi
+                continue
             fi
+            word_list_append "sdks" "$x:$archs" || exit 1
         done
     fi
     echo "$sdks"
     return 0
-}
-
-find_apple_sdk()
-{
-    local platform_home sdks highest_version highest_version_dir ambiguous dir settings version higher version_in_dir_1 version_in_dir_2 sorted new_highest_version
-    platform_home="$1"
-    sdks="$platform_home/Developer/SDKs"
-    highest_version=""
-    highest_version_dir=""
-    ambiguous=""
-    cd "$sdks" || return 1
-    for dir in *; do
-        settings="$sdks/$dir/SDKSettings"
-        version="$(defaults read "$sdks/$dir/SDKSettings" Version)" || return 1
-        if ! printf "%s\n" "$version" | grep -q '^[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,3\}$'; then
-            echo "Uninterpretable 'Version' '$version' in '$settings'" 1>&2
-            return 1
-        fi
-        higher=""
-        if ! [ "$highest_version" ]; then
-            highest_version="$version"
-            highest_version_dir="$dir"
-        elif [ "$version" = "$highest_version" ]; then
-            # In Xcode 6.0.1 it seems that it is important that the iPhone SDK
-            # version is present in the SDK directory name. In some cases,
-            # however, the SDK dirctory does not contain that version. Instead
-            # there is a symbolic link whose name does contain it. The following
-            # logic tries to lure out the right name variant without making too
-            # many assumtions.
-            version_in_dir_1="0"
-            version_in_dir_2="0"
-            if printf "%s\n" "$dir" | grep -q -F "$version"; then
-                version_in_dir_1="1"
-            fi
-            if printf "%s\n" "$highest_version_dir" | grep -q -F "$version"; then
-                version_in_dir_2="1"
-            fi
-            if [ "$version_in_dir_1" -eq "$version_in_dir_2" ]; then
-                ambiguous="1"
-            elif [ "$version_in_dir_1" -gt "$version_in_dir_2" ]; then
-                higher="1"
-            fi
-        else
-            sorted="$(printf "%s\n%s\n" "$version" "$highest_version" | sort -t . -k 1,1nr -k 2,2nr -k 3,3nr -k 4,4nr)" || return 1
-            new_highest_version="$(printf "%s\n" "$sorted" | head -n 1)" || return 1
-            if [ "$new_highest_version" = "$version" ]; then
-                higher="1"
-            fi
-        fi
-        if [ "$higher" ]; then
-            highest_version="$version"
-            highest_version_dir="$dir"
-            ambiguous=""
-        fi
-    done
-    if [ "$ambiguous" ]; then
-        echo "Ambiguous highest SDK version '$highest_version' in '$sdks'" 1>&2
-        return 1
-    fi
-    printf "%s\n" "$highest_version_dir"
 }
 
 # Find the path of most recent version of the installed Android NDKs
@@ -479,10 +409,14 @@ auto_configure()
     cd "$REALM_HOME" || return 1
     if [ -e "$CONFIG_MK" ]; then
         require_config || return 1
-    else
-        echo "No configuration found. Running 'sh build.sh config' for you."
-        sh build.sh config || return 1
+        config_version="$(get_config_param "CONFIG_VERSION")" || exit 1
+        if [ "$config_version" == "$CONFIG_VERSION" ]; then
+            return 0
+        fi
     fi
+
+    echo "No configuration found. Running 'sh build.sh config' for you."
+    sh build.sh config || return 1
 }
 
 get_config_param()
@@ -635,21 +569,21 @@ case "$MODE" in
 
         # Find iPhone SDKs
         iphone_sdks_avail="no"
-        iphone_sdks="$(PLATFORMS="$IPHONE_PLATFORMS" find_apple_sdks)"
+        iphone_sdks="$(SDKS="$IPHONE_SDKS" find_apple_sdks)"
         if [ "$iphone_sdks" != "" ]; then
             iphone_sdks_avail="yes"
         fi
 
         # Find watchOS SDKs
         watchos_sdks_avail="no"
-        watchos_sdks="$(PLATFORMS="$WATCHOS_PLATFORMS" find_apple_sdks)"
+        watchos_sdks="$(SDKS="$WATCHOS_SDKS" find_apple_sdks)"
         if [ "$watchos_sdks" != "" ]; then
             watchos_sdks_avail="yes"
         fi
 
         # Find tvOS SDKs
         tvos_sdks_avail="no"
-        tvos_sdks="$(PLATFORMS="$TVOS_PLATFORMS" find_apple_sdks)"
+        tvos_sdks="$(SDKS="$TVOS_SDKS" find_apple_sdks)"
         if [ "$tvos_sdks" != "" ]; then
             tvos_sdks_avail="yes"
         fi
@@ -662,6 +596,7 @@ case "$MODE" in
         fi
 
         cat >"$CONFIG_MK" <<EOF
+CONFIG_VERSION        = ${CONFIG_VERSION}
 REALM_VERSION         = $realm_version
 INSTALL_PREFIX        = $install_prefix
 INSTALL_EXEC_PREFIX   = $install_exec_prefix
@@ -696,7 +631,7 @@ EOF
         export REALM_HAVE_CONFIG="1"
         $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
-            for x in $IPHONE_PLATFORMS $WATCHOS_PLATFORMS $TVOS_PLATFORMS; do
+            for x in $IPHONE_SDKS $WATCHOS_SDKS $TVOS_SDKS; do
                 $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
             done
             $MAKE -C "src/realm" clean BASE_DENOM="ios" || exit 1
@@ -757,15 +692,11 @@ EOF
 
     "build-iphone")
         export name='iPhone'
-        export short_name='iphone'
         export available_sdks_config_key='IPHONE_SDKS_AVAIL'
         export min_version='7.0'
-        export simulator_name='ios'
-        export os_name='iphoneos'
-        export bitcode_platform='iPhoneOS'
+        export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
         export dir="$IPHONE_DIR"
-        export all_caps_name='IOS'
         export platform_suffix='-bitcode'
         export enable_bitcode='yes'
         build_apple
@@ -777,15 +708,11 @@ EOF
 
     "build-watchos")
         export name='watchOS'
-        export short_name='watchos'
         export available_sdks_config_key='WATCHOS_SDKS_AVAIL'
         export min_version='2.0'
-        export simulator_name='watchos'
         export os_name='watchos'
-        export bitcode_platform='WatchOS'
         export sdks_config_key='WATCHOS_SDKS'
         export dir="$WATCHOS_DIR"
-        export all_caps_name='WATCHOS'
         export platform_suffix=''
         export enable_bitcode='yes'
         build_apple
@@ -793,15 +720,11 @@ EOF
 
     "build-tvos")
         export name='tvOS'
-        export short_name='tvos'
         export available_sdks_config_key='TVOS_SDKS_AVAIL'
         export min_version='9.0'
-        export simulator_name='tvos'
         export os_name='tvos'
-        export bitcode_platform='AppleTVOS'
         export sdks_config_key='TVOS_SDKS'
         export dir="$TVOS_DIR"
-        export all_caps_name='TVOS'
         export platform_suffix=''
         export enable_bitcode='yes'
         build_apple

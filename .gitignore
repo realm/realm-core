@@ -58,7 +58,7 @@ Static library*/
 
 # sh build.sh build-cocoa
 /core-*.zip
-/iphone-lib/
+/ios-lib/
 /watchos-lib/
 /tvos-lib/
 
