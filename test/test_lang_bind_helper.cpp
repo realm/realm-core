@@ -10510,7 +10510,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 
 ONLY(LangBindHelper_HandoverFuzzyTest)
 {
-    const size_t threads = 10;
+    const size_t threads = 50;
 
     size_t numberOfOwner = 500;
     size_t numberOfDogsPerOwner = 100;
@@ -10571,14 +10571,16 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
         sg.begin_read();
 
         while (!end_signal) {
-            millisleep(100);
+            millisleep(1);
 
             mu.lock();
             if (qs.size() > 0) {
-                SharedGroup::VersionID v = move(vids[vids.size() - 1]);
-                vids.pop_back();
-                std::unique_ptr<SharedGroup::Handover<Query> > qptr = move(qs[qs.size() - 1]);
-                qs.pop_back();
+
+                SharedGroup::VersionID v = move(vids[0]);
+                vids.erase(vids.begin());
+                std::unique_ptr<SharedGroup::Handover<Query> > qptr = move(qs[0]);
+                qs.erase(qs.begin());
+
                 cerr << "  Consumed\n";
                 mu.unlock();
 
@@ -10592,10 +10594,8 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
                 mu.unlock();
             }
         }
-
         //************************************************************************************************
     };
-
 
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
@@ -10611,28 +10611,16 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
     for (int i = 0; i != threads; ++i) {
         slaves[i].start([=] { async(); });
     }
-
-
     // Main thread
     //************************************************************************************************
-    for (size_t iter = 0; iter < 10; iter++) {
+    for (size_t iter = 0; iter < 1000; iter++) {
         LangBindHelper::promote_to_write(sg, *hist);
         LangBindHelper::commit_and_continue_as_read(sg);
 
         mu.lock();
 
-        for (size_t t = 0; t < 5; t++) {
-
-            Query q1 = query;
-            Query q2 = query;
-
-            q1.find_all();
-            q2.find_all();
-
-            Query q3 = q1.and_query(q2);
-            q3.find_all();
-
-            if (qs.size() < 100) {
+        for (size_t t = 0; t < 50; t++) {
+            if (qs.size() < 200) {
                 // < 100 in order to limit memory usage
                 qs.push_back(sg.export_for_handover(query, MutableSourcePayload::Move));
                 vids.push_back(sg.get_version_of_current_transaction());
@@ -10641,7 +10629,7 @@ ONLY(LangBindHelper_HandoverFuzzyTest)
         }
         mu.unlock();
 
-        millisleep(100);
+        millisleep(1);
     }
     //************************************************************************************************
 
