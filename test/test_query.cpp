@@ -8382,14 +8382,26 @@ TEST(Query_ReferDeletedLinkView)
     Group group;
     TableRef table = group.add_table("table");
     table->add_column_link(type_LinkList, "children", *table);
+    table->add_column(type_Int, "age");
     table->add_empty_row();
     LinkViewRef links = table->get_linklist(0, 0);
-    Query q = table->where(links);
+
+    // Query with no conds takes a short cut code path, so test that too
+    Query q_no_conds = table->where(links);
+    Query q = table->where(links).equal(1, 10);
+
     TableView tv = q.find_all();
     
     table->move_last_over(0);
 
     CHECK_THROW(q.find_all(), DeletedLinkView);
+    CHECK_THROW(q.find(), DeletedLinkView);
+    CHECK_THROW(q.count(), DeletedLinkView);
+
+    CHECK_THROW(q_no_conds.find_all(), DeletedLinkView);
+    CHECK_THROW(q_no_conds.find(), DeletedLinkView);
+    CHECK_THROW(q_no_conds.count(), DeletedLinkView);
+
     CHECK(!links->is_attached());
     CHECK_THROW(tv.sync_if_needed(), DeletedLinkView);
     
