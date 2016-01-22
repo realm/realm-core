@@ -37,6 +37,9 @@ EXTENSIONS="java python ruby objc node php c gui replication"
 # Auxiliary platforms
 PLATFORMS="iphone"
 
+OSX_SDKS="macosx"
+OSX_DIR="macosx-lib"
+
 IPHONE_EXTENSIONS="objc"
 IPHONE_SDKS="iphoneos iphonesimulator"
 IPHONE_DIR="ios-lib"
@@ -277,8 +280,10 @@ build_apple()
             word_list_append "cflags_arch" "-arch $y" || exit 1
         done
         if [ "$sdk" = "${sdk%simulator}" ]; then
-            word_list_append "cflags_arch" "-mstrict-align" || exit 1
             word_list_append "cflags_arch" "-m$os_name-version-min=$min_version" || exit 1
+            if [ "$sdk" != "macosx" ]; then
+                word_list_append "cflags_arch" "-mstrict-align" || exit 1
+            fi
             if [ "$enable_bitcode" = "yes" ]; then
                 word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
             fi
@@ -336,6 +341,8 @@ find_apple_sdks()
                 archs="x86_64"
             elif [ "$x" = "appletvos" ]; then
                 archs="arm64"
+            elif [ "$x" = "macosx" ]; then
+                archs="i386,x86_64"
             else
                 continue
             fi
@@ -567,6 +574,13 @@ case "$MODE" in
             fi
         fi
 
+        # Find OS X SDKs
+        osx_sdks_avail="no"
+        osx_sdks="$(SDKS="$OSX_SDKS" find_apple_sdks)"
+        if [ "$osx_sdks" != "" ]; then
+            osx_sdks_avail="yes"
+        fi
+
         # Find iPhone SDKs
         iphone_sdks_avail="no"
         iphone_sdks="$(SDKS="$IPHONE_SDKS" find_apple_sdks)"
@@ -610,6 +624,8 @@ ENABLE_ASSERTIONS     = $enable_assertions
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home
+OSX_SDKS              = ${osx_sdks:-none}
+OSX_SDKS_AVAIL        = $osx_sdks_avail
 IPHONE_SDKS           = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
 WATCHOS_SDKS          = ${watchos_sdks:-none}
@@ -631,18 +647,18 @@ EOF
         export REALM_HAVE_CONFIG="1"
         $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
-            for x in $IPHONE_SDKS $WATCHOS_SDKS $TVOS_SDKS; do
+            for x in $OSX_SDKS $IPHONE_SDKS $WATCHOS_SDKS $TVOS_SDKS; do
                 $MAKE -C "src/realm" clean BASE_DENOM="$x" || exit 1
             done
             $MAKE -C "src/realm" clean BASE_DENOM="ios" || exit 1
             $MAKE -C "src/realm" clean BASE_DENOM="watch" || exit 1
             $MAKE -C "src/realm" clean BASE_DENOM="tv" || exit 1
-            for dir in "$IPHONE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
+            for dir in "$OSX_DIR" "$IPHONE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
                 if [ -e "$dir" ]; then
                     echo "Removing '$dir'"
                     rm -rf "$dir/include" || exit 1
-                    rm -f "$dir/librealm-*.a" || exit 1
-                    rm -f "$dir/realm-config*" || exit 1
+                    rm -f "$dir/"librealm-*.a || exit 1
+                    rm -f "$dir"/realm-config* || exit 1
                     rmdir "$dir" || exit 1
                 fi
             done
@@ -680,14 +696,15 @@ EOF
         ;;
 
     "build-osx")
-        auto_configure || exit 1
-        export REALM_HAVE_CONFIG="1"
-        (
-            cd src/realm
-            REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
-            REALM_ENABLE_FAT_BINARIES="1" $MAKE librealm-dbg.a EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
-        ) || exit 1
-        exit 0
+        export name='OS X'
+        export available_sdks_config_key='OSX_SDKS_AVAIL'
+        export min_version='10.8'
+        export os_name='macosx'
+        export sdks_config_key='OSX_SDKS'
+        export dir="$OSX_DIR"
+        export platform_suffix=''
+        export enable_bitcode='no'
+        build_apple
         ;;
 
     "build-iphone")
@@ -915,7 +932,7 @@ EOF
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
         cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
-        cp "$IPHONE_DIR"/*.a "$WATCHOS_DIR"/*.a "$TVOS_DIR"/*.a "src/realm/librealm.a" "src/realm/librealm-dbg.a" "$tmpdir/$BASENAME" || exit 1
+        cp "$IPHONE_DIR"/*.a "$WATCHOS_DIR"/*.a "$TVOS_DIR"/*.a "$OSX_DIR"/*.a "$tmpdir/$BASENAME" || exit 1
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
