@@ -278,7 +278,9 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
     virtual const Table* get_table() const = 0;
-    virtual std::unique_ptr<Expression> clone() const = 0;
+
+    virtual std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const = 0;
+    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&) { }
 };
 
 template<typename T, typename... Args>
@@ -292,7 +294,8 @@ class Subexpr
 public:
     virtual ~Subexpr() {}
 
-    virtual std::unique_ptr<Subexpr> clone() const = 0;
+    virtual std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const = 0;
+    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&) { }
 
     // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
     // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
@@ -1123,7 +1126,7 @@ public:
         return not_found; // no match
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Value<T>>(*this);
     }
@@ -1140,7 +1143,7 @@ public:
         init(false, ValueBase::default_size, m_string);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<ConstantStringValue>(*this);
     }
@@ -1549,7 +1552,7 @@ public:
         m_link_map.set_table(table);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
     {
         return make_subexpr<Columns<StringData>>(*this);
     }
@@ -1722,7 +1725,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<BinaryData>>(*this);
     }
@@ -1832,7 +1835,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<Expression> clone() const override
+    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
     {
         return std::unique_ptr<Expression>(new UnaryLinkCompare(*this));
     }
@@ -1847,7 +1850,7 @@ class LinkCount : public Subexpr2<Int> {
 public:
     LinkCount(LinkMap link_map): m_link_map(link_map) { }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<LinkCount>(*this);
     }
@@ -1927,7 +1930,7 @@ private:
         m_link_map.set_table(table);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<Link>>(*this);
     }
@@ -1991,7 +1994,7 @@ public:
         return *this;
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<T>>(*this);
     }
@@ -2148,7 +2151,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<SubColumns<T>>(*this);
     }
@@ -2205,7 +2208,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<SubColumnAggregate>(*this);
     }
@@ -2260,14 +2263,13 @@ private:
     LinkMap m_link_map;
 };
 
+struct SubQueryCountHandoverPatch : QueryNodeHandoverPatch {
+    QueryHandoverPatch m_query;
+};
+
 class SubQueryCount : public Subexpr2<Int> {
 public:
     SubQueryCount(Query q, LinkMap link_map) : m_query(q), m_link_map(link_map) { }
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return make_subexpr<SubQueryCount>(*this);
-    }
 
     const Table* get_table() const override
     {
@@ -2289,6 +2291,11 @@ public:
         });
 
         destination.import(Value<Int>(false, 1, count));
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return make_subexpr<SubQueryCount>(*this);
     }
 
 private:
@@ -2375,7 +2382,11 @@ class UnaryOperator : public Subexpr2<typename oper::type>
 public:
     UnaryOperator(std::unique_ptr<TLeft> left) : m_left(std::move(left)) {}
 
-    UnaryOperator(const UnaryOperator& other) : m_left(other.m_left->clone()) {}
+    UnaryOperator(const UnaryOperator& other, QueryNodeHandoverPatches* patches) :
+        m_left(other.m_left->clone(patches))
+    {
+    }
+
     UnaryOperator& operator=(const UnaryOperator& other)
     {
         if (this != &other) {
@@ -2410,9 +2421,14 @@ public:
         destination.import(result);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return make_subexpr<UnaryOperator>(*this);
+        return make_subexpr<UnaryOperator>(*this, patches);
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_left->apply_handover_patch(patches, group);
     }
 
 private:
@@ -2430,7 +2446,11 @@ public:
     {
     }
 
-    Operator(const Operator& other) : m_left(other.m_left->clone()), m_right(other.m_right->clone()) {}
+    Operator(const Operator& other, QueryNodeHandoverPatches* patches) : m_left(other.m_left->clone(patches)),
+        m_right(other.m_right->clone(patches))
+    {
+    }
+
     Operator& operator=(const Operator& other)
     {
         if (this != &other) {
@@ -2476,9 +2496,15 @@ public:
         destination.import(result);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return make_subexpr<Operator>(*this);
+        return make_subexpr<Operator>(*this, patches);
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_right->apply_handover_patch(patches, group);
+        m_left->apply_handover_patch(patches, group);
     }
 
 private:
@@ -2539,14 +2565,20 @@ public:
         return not_found; // no match
     }
 
-
-    std::unique_ptr<Expression> clone() const override
+    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<Expression>(new Compare(*this));
+        return std::unique_ptr<Expression>(new Compare(*this, patches));
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_right->apply_handover_patch(patches, group);
+        m_left->apply_handover_patch(patches, group);
     }
 
 private:
-    Compare(const Compare& other) : m_left(other.m_left->clone()), m_right(other.m_right->clone())
+    Compare(const Compare& other, QueryNodeHandoverPatches* patches) : m_left(other.m_left->clone(patches)),
+        m_right(other.m_right->clone(patches))
     {
     }
 

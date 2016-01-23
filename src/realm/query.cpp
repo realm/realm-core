@@ -179,6 +179,7 @@ void Query::apply_patch(HandoverPatch& patch, Group& group)
         if (auto& root_node = it->m_root_node)
             root_node->apply_handover_patch(patch.m_node_data, group);
     }
+    REALM_ASSERT(patch.m_node_data.empty());
 }
 
 void Query::add_expression_node(std::unique_ptr<Expression> expression)

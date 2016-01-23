@@ -1618,8 +1618,14 @@ public:
         return std::unique_ptr<ParentNode>(new ExpressionNode(*this, patches));
     }
 
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_expression->apply_handover_patch(patches, group);
+    }
+
+private:
     ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
-        m_expression(from.m_expression->clone())
+        m_expression(from.m_expression->clone(patches))
     {
     }
 
