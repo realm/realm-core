@@ -2293,12 +2293,34 @@ public:
         destination.import(Value<Int>(false, 1, count));
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
+        if (patches)
+            return std::unique_ptr<Subexpr>(new SubQueryCount(*this, patches));
+
         return make_subexpr<SubQueryCount>(*this);
     }
 
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        REALM_ASSERT(patches.size());
+        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
+        patches.pop_back();
+
+        auto patch = dynamic_cast<SubQueryCountHandoverPatch*>(abstract_patch.get());
+        REALM_ASSERT(patch);
+
+        m_query.apply_patch(patch->m_query, group);
+    }
+
 private:
+    SubQueryCount(const SubQueryCount& other, QueryNodeHandoverPatches* patches) : m_link_map(other.m_link_map)
+    {
+        std::unique_ptr<SubQueryCountHandoverPatch> patch(new SubQueryCountHandoverPatch);
+        m_query = Query(other.m_query, patch->m_query, ConstSourcePayload::Copy);
+        patches->emplace_back(patch.release());
+    }
+
     Query m_query;
     LinkMap m_link_map;
 };
