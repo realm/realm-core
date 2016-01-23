@@ -273,12 +273,19 @@ class Expression
 {
 public:
     Expression() { }
+    virtual ~Expression() {}
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
     virtual const Table* get_table() const = 0;
-    virtual ~Expression() {}
+    virtual std::unique_ptr<Expression> clone() const = 0;
 };
+
+template<typename T, typename... Args>
+std::unique_ptr<Expression> make_expression(Args&&... args)
+{
+    return std::unique_ptr<Expression>(new T(std::forward<Args>(args)...));
+}
 
 class Subexpr
 {
@@ -396,7 +403,7 @@ Query create(L left, const Subexpr2<R>& right)
         // Return query_expression.hpp node
         using CommonType = typename Common<L, R>::type;
         using ValueType = typename std::conditional<std::is_same<L, StringData>::value, ConstantStringValue, Value<L>>::type;
-        return new Compare<Cond, CommonType>(make_subexpr<ValueType>(left), right.clone());
+        return make_expression<Compare<Cond, CommonType>>(make_subexpr<ValueType>(left), right.clone());
     }
 }
 
@@ -562,7 +569,7 @@ public:
 #endif
         {
             // Return query_expression.hpp node
-            return new Compare<Cond, typename Common<L, R>::type>(clone_subexpr(), right.clone());
+            return make_expression<Compare<Cond, typename Common<L, R>::type>>(clone_subexpr(), right.clone());
         }
     }
 
@@ -1653,9 +1660,9 @@ template<class S, class I>
 Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_sensitive)
 {
     if (case_sensitive)
-        return new Compare<S, StringData>(right.clone(), left.clone());
+        return make_expression<Compare<S, StringData>>(right.clone(), left.clone());
     else
-        return new Compare<I, StringData>(right.clone(), left.clone());
+        return make_expression<Compare<I, StringData>>(right.clone(), left.clone());
 }
 
 // Columns<String> == Columns<String>
@@ -1825,7 +1832,14 @@ public:
         return not_found;
     }
 
+    std::unique_ptr<Expression> clone() const override
+    {
+        return std::unique_ptr<Expression>(new UnaryLinkCompare(*this));
+    }
+
 private:
+    UnaryLinkCompare(const UnaryLinkCompare&) = default;
+
     mutable LinkMap m_link_map;
 };
 
@@ -1869,14 +1883,14 @@ public:
         if (m_link_map.m_link_columns.size() > 1)
             throw std::runtime_error("Combining link() and is_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
-        return new UnaryLinkCompare<false>(m_link_map);
+        return make_expression<UnaryLinkCompare<false>>(m_link_map);
     }
 
     Query is_not_null() {
         if (m_link_map.m_link_columns.size() > 1)
             throw std::runtime_error("Combining link() and is_not_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
-        return new UnaryLinkCompare<true>(m_link_map);
+        return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }
 
     LinkCount count() const
@@ -2525,7 +2539,17 @@ public:
         return not_found; // no match
     }
 
+
+    std::unique_ptr<Expression> clone() const override
+    {
+        return std::unique_ptr<Expression>(new Compare(*this));
+    }
+
 private:
+    Compare(const Compare& other) : m_left(other.m_left->clone()), m_right(other.m_right->clone())
+    {
+    }
+
     std::unique_ptr<TLeft> m_left;
     std::unique_ptr<TRight> m_right;
 };
