@@ -1145,10 +1145,15 @@ public:
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
-        return make_subexpr<ConstantStringValue>(*this);
+        return std::unique_ptr<Subexpr>(new ConstantStringValue(*this));
     }
 
 private:
+    ConstantStringValue(const ConstantStringValue& other) : Value(), m_string(other.m_string)
+    {
+        init(other.m_from_link_list, other.m_values, m_string);
+    }
+
     util::Optional<std::string> m_string;
 };
 
