@@ -2236,7 +2236,14 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 void Table::do_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
 {
     // Replace links through backlink columns, WITHOUT generating SetLink instructions.
-    // FIXME: Consider whether it is OK to ignore cascading behavior here, as we do.
+    //
+    // This bypasses handling of cascading rows, and we have decided that this is OK, because
+    // SubsumeIdentity is always followed by MoveLastOver, so breaking the last strong link
+    // to a row that is being subsumed will have no observable effect, while honoring the
+    // cascading behavior would complicate the calling code somewhat (having to take
+    // into account whether or not the row was removed as a consequence of cascade, leading
+    // to bugs in case this was forgotten).
+
     size_t backlink_col_start = m_spec.get_public_column_count();
     size_t backlink_col_end   = m_spec.get_column_count();
     for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
