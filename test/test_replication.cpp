@@ -888,6 +888,9 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
 
 TEST(Replication_SubsumeIdentity)
 {
+    // Test that SubsumeIdentity has the same effect whether called directly
+    // or applied via TransactLogApplier.
+
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
