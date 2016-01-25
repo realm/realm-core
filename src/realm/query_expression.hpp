@@ -1554,6 +1554,7 @@ public:
 
     void set_table(const Table* table) override
     {
+        m_table = table;
         m_link_map.set_table(table);
     }
 
@@ -1742,6 +1743,7 @@ public:
 
     void set_table(const Table* table) override
     {
+        m_table = table;
         m_link_map.set_table(table);
     }
 
@@ -1932,6 +1934,7 @@ private:
 
     void set_table(const Table* table) override
     {
+        m_table = table;
         m_link_map.set_table(table);
     }
 
@@ -2007,6 +2010,7 @@ public:
     // See comment in base class
     void set_table(const Table* table) override
     {
+        m_table = table;
         m_link_map.set_table(table);
 
         const ColumnBase* c;
@@ -2169,7 +2173,7 @@ public:
     void set_table(const Table* table) override
     {
         m_link_map.set_table(table);
-        m_column.set_table(table);
+        m_column.set_table(m_link_map.m_table);
     }
 
     void evaluate(size_t, ValueBase&) override
@@ -2226,7 +2230,7 @@ public:
     void set_table(const Table* table) override
     {
         m_link_map.set_table(table);
-        m_column.set_table(table);
+        m_column.set_table(m_link_map.m_table);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
