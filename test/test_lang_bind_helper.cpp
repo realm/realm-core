@@ -38,7 +38,6 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestResults;
-using namespace std;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -10685,11 +10684,11 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         for (size_t i = 0; i < numberOfOwner; i++) {
 
             size_t r = owner->add_empty_row();
-            owner->set_string(0, r, string("owner") + std::to_string(i));
+            owner->set_string(0, r, std::string("owner") + std::to_string(i));
 
             for (size_t j = 0; j < numberOfDogsPerOwner; j++) {
                 size_t r = dog->add_empty_row();
-                dog->set_string(0, r, string("dog") + std::to_string(i * numberOfOwner + j));
+                dog->set_string(0, r, std::string("dog") + std::to_string(i * numberOfOwner + j));
                 dog->set_link(1, r, i);
                 LinkViewRef ll = owner->get_linklist(1, i);
                 ll->add(r);
@@ -10712,7 +10711,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
             vector_mutex.lock();
             if (qs.size() > 0) {
 
-                SharedGroup::VersionID v = move(vids[0]);
+                SharedGroup::VersionID v = std::move(vids[0]);
                 vids.erase(vids.begin());
                 std::unique_ptr<SharedGroup::Handover<Query> > qptr = move(qs[0]);
                 qs.erase(qs.begin());
