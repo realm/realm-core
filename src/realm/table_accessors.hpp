@@ -846,15 +846,22 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, int64_t> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
-        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<int64_t>::m_column = col_idx;
-        Columns<int64_t>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    // Constructor for when Taboid is a Table
+    template <typename T=Taboid, typename std::enable_if<std::is_base_of<Table, T>::value, void*>::type = nullptr>
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), Columns(col_idx, t->get_impl())
+    {
+    }
+
+    // Constructor for when Taboid is a TableView
+    template <typename T=Taboid, typename std::enable_if<!std::is_base_of<Table, T>::value, void*>::type = nullptr>
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t)
+    {
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
     virtual std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const
     {
+        REALM_ASSERT((std::is_base_of<Table, Taboid>::value));
         return make_subexpr<Columns<int64_t>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
@@ -918,15 +925,22 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
-        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<float>::m_column = col_idx;
-        Columns<float>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    // Constructor for when Taboid is a Table
+    template <typename T=Taboid, typename std::enable_if<std::is_base_of<Table, T>::value, void*>::type = nullptr>
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), Columns(col_idx, t->get_impl())
+    {
+    }
+
+    // Constructor for when Taboid is a TableView
+    template <typename T=Taboid, typename std::enable_if<!std::is_base_of<Table, T>::value, void*>::type = nullptr>
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t)
+    {
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
     virtual std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const
     {
+        REALM_ASSERT((std::is_base_of<Table, Taboid>::value));
         return make_subexpr<Columns<float>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
@@ -996,15 +1010,22 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
-        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<double>::m_column = col_idx;
-        Columns<double>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    // Constructor for when Taboid is a Table
+    template <typename T=Taboid, typename std::enable_if<std::is_base_of<Table, T>::value, void*>::type = nullptr>
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), Columns(col_idx, t->get_impl())
+    {
+    }
+
+    // Constructor for when Taboid is a TableView
+    template <typename T=Taboid, typename std::enable_if<!std::is_base_of<Table, T>::value, void*>::type = nullptr>
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t)
+    {
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
     virtual std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const
     {
+        REALM_ASSERT((std::is_base_of<Table, Taboid>::value));
         return make_subexpr<Columns<double>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
@@ -1172,10 +1193,16 @@ class ColumnAccessor<Taboid, col_idx, StringData>:
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, StringData> Base;
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
-        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<StringData>::m_column = col_idx;
-        Columns<StringData>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    // Constructor for when Taboid is a Table
+    template <typename T=Taboid, typename std::enable_if<std::is_base_of<Table, T>::value, void*>::type = nullptr>
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), Columns(col_idx, t->get_impl())
+    {
+    }
+
+    // Constructor for when Taboid is a TableView
+    template <typename T=Taboid, typename std::enable_if<!std::is_base_of<Table, T>::value, void*>::type = nullptr>
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t)
+    {
     }
 
     size_t count(StringData value) const
