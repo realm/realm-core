@@ -6540,7 +6540,8 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_float(1, 0)));
     CHECK(std::isnan(table->get_float(1, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+// signaling_NaN() broken in VS2015, and broken in 32bit intel
+#if !defined(_WIN32) && !REALM_ARCHITECTURE_X86
     CHECK(null::is_signaling(table->get_float(1, 0)));
 #endif
 
@@ -6556,7 +6557,8 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_double(3, 0)));
     CHECK(std::isnan(table->get_double(3, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+// signaling_NaN() broken in VS2015, and broken in 32bit intel
+#if !defined(_WIN32) && !REALM_ARCHITECTURE_X86
     CHECK(null::is_signaling(table->get_double(3, 0)));
     CHECK(!null::is_signaling(table->get_double(3, 1)));
 #endif
