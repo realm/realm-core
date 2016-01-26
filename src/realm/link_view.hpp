@@ -48,7 +48,7 @@ public:
 
     // Size info
     bool is_empty() const noexcept;
-    size_t size() const noexcept;
+    size_t size() const;
 
     bool operator==(const LinkView&) const noexcept;
     bool operator!=(const LinkView&) const noexcept;
@@ -210,9 +210,12 @@ inline bool LinkView::is_empty() const noexcept
     return m_row_indexes.is_empty();
 }
 
-inline size_t LinkView::size() const noexcept
+inline size_t LinkView::size() const
 {
-    REALM_ASSERT(is_attached());
+    // FIXME: This throw only exists in order to make Query throw if it depends on a deleted LinkList. The size()
+    // method happens to be the first method executed in various places.
+    if(!is_attached())
+        throw(DeletedLinkView());
 
     if (!m_row_indexes.is_attached())
         return 0;

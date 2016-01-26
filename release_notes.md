@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed crash in Query::count(), Query::find() and other Query methods, if it 
+  depended on a deleted LinkList. Will now throw DeletedLinkView instead
 
 ### API breaking changes:
 
