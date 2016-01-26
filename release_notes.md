@@ -2,6 +2,38 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.95.9 Release notes
+
+### Bugfixes:
+
+* Fixed terminate() being called rather than InvalidDatabase being thrown when
+  a non-enrypted file that begins with four zero bytes was opened as an
+  encrypted file.
+
+----------------------------------------------
+
+# 0.95.8 Release notes
+
+### Bugfixes:
+
 * Fixed error when opening encrypted streaming-form files which would be
   resized on open due to the size not aligning with a chunked mapping section
   boundary.
@@ -18,12 +50,6 @@
 
 * Optimized speed of TableView::clear() on an indexed unordered Table. A clear()
   that before took several minutes with 300000 rows now takes a few seconds.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 

@@ -7855,6 +7855,50 @@ TEST(Query_DeepLink)
     CHECK_EQUAL(N, view.size());
 }
 
+TEST(Query_LinksToDeletedOrMovedRow)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    size_t col_link = source->add_column_link(type_Link, "link", *target);
+    size_t col_name = target->add_column(type_String, "name");
+
+    target->add_empty_row(3);
+    target->set_string(col_name, 0, "A");
+    target->set_string(col_name, 1, "B");
+    target->set_string(col_name, 2, "C");
+
+    source->add_empty_row(3);
+    source->set_link(col_link, 0, 0);
+    source->set_link(col_link, 1, 1);
+    source->set_link(col_link, 2, 2);
+
+    Query qA = source->where().links_to(col_link, target->get(0));
+    Query qB = source->where().links_to(col_link, target->get(1));
+    Query qC = source->where().links_to(col_link, target->get(2));
+
+    // Move row C over row A. Row C is now at position 0, and row A has been removed.
+    target->move_last_over(0);
+
+    // Row A should not be found as it has been removed.
+    TableView tvA = qA.find_all();
+    CHECK_EQUAL(0, tvA.size());
+
+    // Row B should be found as it was not changed.
+    TableView tvB = qB.find_all();
+    CHECK_EQUAL(1, tvB.size());
+    CHECK_EQUAL(1, tvB[0].get_link(col_link));
+    CHECK_EQUAL("B", target->get_string(col_name, tvB[0].get_link(col_link)));
+
+    // Row C should still be found, despite having been moved.
+    TableView tvC = qC.find_all();
+    CHECK_EQUAL(1, tvC.size());
+    CHECK_EQUAL(0, tvC[0].get_link(col_link));
+    CHECK_EQUAL("C", target->get_string(col_name, tvC[0].get_link(col_link)));
+}
+
 // Triggers bug in compare_relation()
 TEST(Query_BrokenFindGT)
 {

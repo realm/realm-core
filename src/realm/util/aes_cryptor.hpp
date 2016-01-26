@@ -48,8 +48,7 @@ public:
 
     void set_file_size(off_t new_size);
 
-    bool try_read(int fd, off_t pos, char* dst, size_t size);
-    bool read(int fd, off_t pos, char* dst, size_t size) noexcept;
+    bool read(int fd, off_t pos, char* dst, size_t size);
     void write(int fd, off_t pos, const char* src, size_t size) noexcept;
 
 private:
