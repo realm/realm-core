@@ -1,24 +1,10 @@
-# NEXT RELEASE
+# 0.95.9 Release notes
 
 ### Bugfixes:
 
 * Fixed terminate() being called rather than InvalidDatabase being thrown when
   a non-enrypted file that begins with four zero bytes was opened as an
   encrypted file.
-
-### API breaking changes:
-
-* Lorem ipsum.
-
-### Enhancements:
-
-* Lorem ipsum.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
