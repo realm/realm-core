@@ -10201,8 +10201,6 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
-    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryOr;
-    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAnd;
 
     {
         LangBindHelper::promote_to_write(sg_w, *hist_w);
