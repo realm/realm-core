@@ -288,6 +288,9 @@ public:
     // "live" or "reactive" views are implemented by calling sync_if_needed
     // before any of the other access-methods whenever the view may have become
     // outdated.
+    //
+    // This method will throw a DeletedLinkView exception if the TableView 
+    // depends on a LinkList that was deleted from its table.
     uint_fast64_t sync_if_needed() const;
 
     // Set this undetached TableView to be a distinct view, and sync immediately.

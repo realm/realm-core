@@ -40,8 +40,11 @@
 
 ### API breaking changes:
 
-* Any attempt to use a deleted LinkView (such as executing a query that
-  depends on it) will now throw `DeletedLinkView` instead of segfaulting
+* Any attempt to execute a query that depends on a LinkList that has been
+  deleted from its table will now throw `DeletedLinkView` instead of
+  segfaulting. No other changes has been made; you must still verify 
+  LinkViewRef::is_attached() before calling any methods on a LinkViewRef, as 
+  usual.
 
 ### Enhancements:
 

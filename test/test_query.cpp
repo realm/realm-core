@@ -8396,6 +8396,10 @@ TEST(Query_ReferDeletedLinkView)
     // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
     // the LinkView through multiple levels!
     CHECK(tv.is_attached());
+
+    // Before executing any methods on a LinkViewRef, you must still always check is_attached(). If you
+    // call links->add() on a deleted LinkViewRef (where is_attached() == false), it will assert
+    CHECK(!links->is_attached());
 }
 #endif // TEST_QUERY
 
