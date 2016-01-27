@@ -8382,16 +8382,24 @@ TEST(Query_ReferDeletedLinkView)
     Group group;
     TableRef table = group.add_table("table");
     table->add_column_link(type_LinkList, "children", *table);
+    table->add_column(type_Int, "age");
     table->add_empty_row();
+    table->set_int(1, 0, 123);
     LinkViewRef links = table->get_linklist(0, 0);
     Query q = table->where(links);
     TableView tv = q.find_all();
     
     table->move_last_over(0);
 
-    CHECK_THROW(q.find_all(), DeletedLinkView);
+    CHECK_EQUAL(q.find_all().size(), 0);
+    CHECK_EQUAL(q.sum_int(1), 0);
+    CHECK_EQUAL(q.count(), 0);
+    size_t rows;
+    q.average_int(1, &rows);
+    CHECK_EQUAL(rows, 0);
+
     CHECK(!links->is_attached());
-    CHECK_THROW(tv.sync_if_needed(), DeletedLinkView);
+    tv.sync_if_needed();
     
     // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
     // the LinkView through multiple levels!

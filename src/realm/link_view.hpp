@@ -202,7 +202,8 @@ inline bool LinkView::is_attached() const noexcept
 
 inline bool LinkView::is_empty() const noexcept
 {
-    REALM_ASSERT(is_attached());
+    if (!is_attached())
+        return true;
 
     if (!m_row_indexes.is_attached())
         return true;
@@ -212,7 +213,8 @@ inline bool LinkView::is_empty() const noexcept
 
 inline size_t LinkView::size() const noexcept
 {
-    REALM_ASSERT(is_attached());
+    if (!is_attached())
+        return 0;
 
     if (!m_row_indexes.is_attached())
         return 0;
