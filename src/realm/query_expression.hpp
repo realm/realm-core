@@ -2278,7 +2278,7 @@ struct SubQueryCountHandoverPatch : QueryNodeHandoverPatch {
 
 class SubQueryCount : public Subexpr2<Int> {
 public:
-    SubQueryCount(Query q, LinkMap link_map) : m_query(q), m_link_map(link_map) { }
+    SubQueryCount(Query q, LinkMap link_map) : m_query(std::move(q)), m_link_map(std::move(link_map)) { }
 
     const Table* get_table() const override
     {
@@ -2338,9 +2338,9 @@ private:
 template<class>
 class SubQuery {
 public:
-    SubQuery(Columns<Link> link_column, Query query) : m_query(query), m_link_map(link_column.link_map())
+    SubQuery(Columns<Link> link_column, Query query) : m_query(std::move(query)), m_link_map(link_column.link_map())
     {
-        REALM_ASSERT(m_link_map.m_table == query.get_table());
+        REALM_ASSERT(m_link_map.m_table == m_query.get_table());
     }
 
     SubQueryCount count() const
