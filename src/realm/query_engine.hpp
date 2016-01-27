@@ -1595,7 +1595,7 @@ private:
 class ExpressionNode: public ParentNode {
 
 public:
-    ExpressionNode(Expression* compare) : m_compare(util::SharedPtr<Expression>(compare))
+    ExpressionNode(std::unique_ptr<Expression> expression) : m_expression(std::move(expression))
     {
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1603,15 +1603,14 @@ public:
 
     void init(const Table& table) override
     {
-        m_compare->set_table(&table);
+        m_expression->set_table(&table);
         if (m_child)
             m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        size_t res = m_compare->find_first(start, end);
-        return res;
+        return m_expression->find_first(start, end);
     }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
@@ -1619,12 +1618,18 @@ public:
         return std::unique_ptr<ParentNode>(new ExpressionNode(*this, patches));
     }
 
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_expression->apply_handover_patch(patches, group);
+    }
+
+private:
     ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
-        m_compare(from.m_compare)
+        m_expression(from.m_expression->clone(patches))
     {
     }
 
-    util::SharedPtr<Expression> m_compare;
+    std::unique_ptr<Expression> m_expression;
 };
 
 

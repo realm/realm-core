@@ -133,11 +133,12 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     }
 }
 
-Query::Query(Expression* expr) : Query()
+Query::Query(std::unique_ptr<Expression> expr) : Query()
 {
-    add_expression_node(expr);
     if (auto table = const_cast<Table*>(expr->get_table()))
         set_table(table->get_table_ref());
+
+    add_expression_node(std::move(expr));
 }
 
 void Query::set_table(TableRef tr)
@@ -178,11 +179,12 @@ void Query::apply_patch(HandoverPatch& patch, Group& group)
         if (auto& root_node = it->m_root_node)
             root_node->apply_handover_patch(patch.m_node_data, group);
     }
+    REALM_ASSERT(patch.m_node_data.empty());
 }
 
-void Query::add_expression_node(Expression* compare)
+void Query::add_expression_node(std::unique_ptr<Expression> expression)
 {
-    add_node(std::unique_ptr<ParentNode>(new ExpressionNode(compare)));
+    add_node(std::unique_ptr<ParentNode>(new ExpressionNode(std::move(expression))));
 }
 
 // Binary

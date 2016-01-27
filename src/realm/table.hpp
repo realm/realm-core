@@ -53,6 +53,8 @@ class LinkListColumn;
 class BacklinkColumn;
 template<class>
 class Columns;
+template<class>
+class SubQuery;
 
 struct Link {};
 typedef Link LinkList;
@@ -326,6 +328,9 @@ public:
 
     template<class T>
     Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
+
+    template <class T>
+    SubQuery<T> column(size_t column, Query subquery);
 
     // Table size and deletion
     bool is_empty() const noexcept;
@@ -1657,6 +1662,13 @@ inline Columns<T> Table::column(size_t column)
 
     m_link_chain.clear();
     return Columns<T>(column, this, tmp);
+}
+
+template<class T>
+SubQuery<T> Table::column(size_t column_ndx, Query subquery)
+{
+    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list column");
+    return SubQuery<T>(column<T>(column_ndx), std::move(subquery));
 }
 
 // For use by queries

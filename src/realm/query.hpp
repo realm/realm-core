@@ -88,7 +88,7 @@ public:
     Query(const Table& table, std::unique_ptr<TableViewBase>);
     Query(const Table& table, const LinkViewRef& lv);
     Query();
-    Query(Expression*);
+    Query(std::unique_ptr<Expression>);
     virtual ~Query() noexcept;
 
     Query(const Query& copy);
@@ -321,7 +321,7 @@ public:
 private:
     void fetch_descriptor();
 
-    void add_expression_node(Expression*);
+    void add_expression_node(std::unique_ptr<Expression>);
 
     template<class ColumnType>
     Query& equal(size_t column_ndx1, size_t column_ndx2);
