@@ -1417,21 +1417,30 @@ public:
         m_base_table = table;
         m_link_columns.clear();
         m_link_types.clear();
+        m_only_unary_links = true;
 
         for (size_t link_column_index : m_link_column_indexes) {
             // Link column can be either LinkList or single Link
             ColumnType type = table->get_real_column_type(link_column_index);
+            REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
+            m_link_types.push_back(type);
+
             if (type == col_type_LinkList) {
                 const LinkListColumn& cll = table->get_column_link_list(link_column_index);
                 m_link_columns.push_back(&cll);
-                m_link_types.push_back(realm::type_LinkList);
+                m_only_unary_links = false;
                 table = &cll.get_target_table();
             }
-            else {
+            else if (type == col_type_Link) {
                 const LinkColumn& cl = table->get_column_link(link_column_index);
                 m_link_columns.push_back(&cl);
-                m_link_types.push_back(realm::type_Link);
                 table = &cl.get_target_table();
+            }
+            else if (type == col_type_BackLink) {
+                const BacklinkColumn& bl = table->get_column_backlink(link_column_index);
+                m_link_columns.push_back(&bl);
+                m_only_unary_links = false;
+                table = &bl.get_origin_table();
             }
         }
 
@@ -1459,7 +1468,7 @@ public:
 
     bool only_unary_links() const
     {
-        return std::find(m_link_types.begin(), m_link_types.end(), type_LinkList) == m_link_types.end();
+        return m_only_unary_links;
     }
 
     const Table* base_table() const
@@ -1472,13 +1481,14 @@ public:
         return m_target_table;
     }
 
-    std::vector<const LinkColumnBase*> m_link_columns;
+    std::vector<const ColumnBase*> m_link_columns;
 
 private:
     void map_links(size_t column, size_t row, LinkMapFunction& lm)
     {
         bool last = (column + 1 == m_link_columns.size());
-        if (m_link_types[column] == type_Link) {
+        ColumnType type = m_link_types[column];
+        if (type == col_type_Link) {
             const LinkColumn& cl = *static_cast<const LinkColumn*>(m_link_columns[column]);
             size_t r = to_size_t(cl.get(row));
             if (r == 0)
@@ -1492,7 +1502,7 @@ private:
             else
                 map_links(column + 1, r, lm);
         }
-        else {
+        else if (type == col_type_LinkList) {
             const LinkListColumn& cll = *static_cast<const LinkListColumn*>(m_link_columns[column]);
             ConstLinkViewRef lvr = cll.get(row);
             for (size_t t = 0; t < lvr->size(); t++) {
@@ -1506,6 +1516,19 @@ private:
                     map_links(column + 1, r, lm);
             }
         }
+        else if (type == col_type_BackLink) {
+            const BacklinkColumn& bl = *static_cast<const BacklinkColumn*>(m_link_columns[column]);
+            size_t count = bl.get_backlink_count(row);
+            for (size_t i = 0; i < count; ++i) {
+                size_t r = bl.get_backlink(row, i);
+                if (last) {
+                    bool continue2 = lm.consume(r);
+                    if (!continue2)
+                        return;
+                } else
+                    map_links(column + 1, r, lm);
+            }
+        }
     }
 
 
@@ -1516,9 +1539,10 @@ private:
     }
 
     std::vector<size_t> m_link_column_indexes;
-    std::vector<realm::DataType> m_link_types;
+    std::vector<ColumnType> m_link_types;
     const Table* m_base_table = nullptr;
     const Table* m_target_table = nullptr;
+    bool m_only_unary_links = true;
 };
 
 template<class T, class S, class I>
@@ -1868,7 +1892,7 @@ private:
 template<typename T>
 class SubColumns;
 
-// This is for LinkList too because we have 'typedef List LinkList'
+// This is for LinkList and BackLink too since they're declared as typedefs of Link.
 template <> class Columns<Link> : public Subexpr2<Link>
 {
 public:
