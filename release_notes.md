@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Handing over a query that includes an expression node will now avoid
+  sharing the expression nodes between `Query` instances. This prevents
+  data races that could give incorrect results or crashes.
 
 ### API breaking changes:
 
@@ -10,7 +12,9 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Subqueries are now supported via `Table::column(size_t, Query)`.
+  This allows for queries based on the number of rows in the linked table
+  that match the given subquery.
 
 -----------
 
