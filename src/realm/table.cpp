@@ -3744,7 +3744,7 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
 {
     const Table* table = this;
     for (size_t t = 0; t < link_chain.size(); t++) {
-        // Link column can be either LinkList or single Link
+        // Link column can be a single Link, LinkList, or BackLink.
         ColumnType type = table->get_real_column_type(link_chain[t]);
         if (type == col_type_LinkList) {
             const LinkListColumn& cll = table->get_column_link_list(link_chain[t]);
@@ -3753,6 +3753,10 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
         else if (type == col_type_Link) {
             const LinkColumn& cl = table->get_column_link(link_chain[t]);
             table = &cl.get_target_table();
+        }
+        else if (type == col_type_BackLink) {
+            const BacklinkColumn& bl = table->get_column_backlink(link_chain[t]);
+            table = &bl.get_origin_table();
         }
         else {
             // Only last column in link chain is allowed to be non-link
