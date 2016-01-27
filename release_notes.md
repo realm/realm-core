@@ -6,7 +6,13 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Important for language bindings: Any method on Query and TableView that
+  depends on a deleted LinkView will now return sane return values; 
+  Query::find() returns npos, Query::find_all() returns empty TableView,
+  Query::count() returns 0, TableView::sum() returns 0 (TableView created
+  from LinkView::get_sorted_view). So they will no longer throw
+  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in 
+  test_query.cpp for more info.
 
 ### Enhancements:
 

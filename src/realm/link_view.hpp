@@ -46,8 +46,10 @@ public:
     ~LinkView() noexcept;
     bool is_attached() const noexcept;
 
-    // Size info
+    /// This method will return true if the LinkView is detached (no assert).
     bool is_empty() const noexcept;
+
+    /// This method will return 0 if the LinkView is detached (no assert).
     size_t size() const noexcept;
 
     bool operator==(const LinkView&) const noexcept;
