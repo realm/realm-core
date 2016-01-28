@@ -1,4 +1,30 @@
-# NEXT RELEASE
+# 0.96.0 Release notes
+
+### Bugfixes:
+
+* Handing over a query that includes an expression node will now avoid
+  sharing the expression nodes between `Query` instances. This prevents
+  data races that could give incorrect results or crashes.
+
+### Enhancements:
+
+* Subqueries are now supported via `Table::column(size_t, Query)`.
+  This allows for queries based on the number of rows in the linked table
+  that match the given subquery.
+
+----------------------------------------------
+
+# 0.95.9 Release notes
+
+### Bugfixes:
+
+* Fixed terminate() being called rather than InvalidDatabase being thrown when
+  a non-enrypted file that begins with four zero bytes was opened as an
+  encrypted file.
+
+----------------------------------------------
+
+# 0.95.8 Release notes
 
 ### Bugfixes:
 
@@ -12,18 +38,16 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Any attempt to execute a query that depends on a LinkList that has been
+  deleted from its table will now throw `DeletedLinkView` instead of
+  segfaulting. No other changes has been made; you must still verify 
+  LinkViewRef::is_attached() before calling any methods on a LinkViewRef, as 
+  usual.
 
 ### Enhancements:
 
 * Optimized speed of TableView::clear() on an indexed unordered Table. A clear()
   that before took several minutes with 300000 rows now takes a few seconds.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 

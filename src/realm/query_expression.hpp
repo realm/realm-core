@@ -133,6 +133,8 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/util/optional.hpp>
 #include <realm/impl/sequential_getter.hpp>
 
+#include <numeric>
+
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit
 // unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Undef
@@ -191,26 +193,6 @@ StringData only_string(T in)
 StringData only_string(StringData in)
 {
     return in;
-}
-
-// Modify in to refer to a deep clone of the data it points to, if applicable,
-// and return a pointer which must be deleted if non-NULL
-template<class T>
-char* in_place_deep_clone(T* in)
-{
-    static_cast<void>(in);
-    return 0;
-}
-
-char* in_place_deep_clone(StringData* in)
-{
-    if (in->is_null())
-        return nullptr;
-
-    char* payload = new char[in->size()];
-    memcpy(payload, in->data(), in->size());
-    *in = StringData(payload, in->size());
-    return payload;
 }
 
 } // anonymous namespace
@@ -291,19 +273,29 @@ class Expression
 {
 public:
     Expression() { }
+    virtual ~Expression() {}
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
     virtual const Table* get_table() const = 0;
-    virtual ~Expression() {}
+
+    virtual std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const = 0;
+    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&) { }
 };
+
+template<typename T, typename... Args>
+std::unique_ptr<Expression> make_expression(Args&&... args)
+{
+    return std::unique_ptr<Expression>(new T(std::forward<Args>(args)...));
+}
 
 class Subexpr
 {
 public:
     virtual ~Subexpr() {}
 
-    virtual std::unique_ptr<Subexpr> clone() const = 0;
+    virtual std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const = 0;
+    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&) { }
 
     // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
     // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
@@ -334,6 +326,7 @@ template<class T>
 class Columns;
 template<class T>
 class Value;
+class ConstantStringValue;
 template<class T>
 class Subexpr2;
 template<class oper, class TLeft = Subexpr, class TRight = Subexpr>
@@ -410,13 +403,10 @@ Query create(L left, const Subexpr2<R>& right)
     else
 #endif
     {
-        // If we're searching for a string, create a deep copy of the search string
-        // which will be deleted by the Compare instance.
-        char* compare_string = in_place_deep_clone(&left);
-
         // Return query_expression.hpp node
         using CommonType = typename Common<L, R>::type;
-        return new Compare<Cond, CommonType>(make_subexpr<Value<L>>(left), right.clone(), compare_string);
+        using ValueType = typename std::conditional<std::is_same<L, StringData>::value, ConstantStringValue, Value<L>>::type;
+        return make_expression<Compare<Cond, CommonType>>(make_subexpr<ValueType>(left), right.clone());
     }
 }
 
@@ -582,7 +572,7 @@ public:
 #endif
         {
             // Return query_expression.hpp node
-            return new Compare<Cond, typename Common<R, float>::type>(clone_subexpr(), right.clone());
+            return make_expression<Compare<Cond, typename Common<L, R>::type>>(clone_subexpr(), right.clone());
         }
     }
 
@@ -1136,7 +1126,7 @@ public:
         return not_found; // no match
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Value<T>>(*this);
     }
@@ -1144,6 +1134,28 @@ public:
     NullableVector<T> m_storage;
 };
 
+class ConstantStringValue : public Value<StringData>
+{
+public:
+    ConstantStringValue(const StringData& string) : Value(),
+        m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
+    {
+        init(false, ValueBase::default_size, m_string);
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantStringValue(*this));
+    }
+
+private:
+    ConstantStringValue(const ConstantStringValue& other) : Value(), m_string(other.m_string)
+    {
+        init(other.m_from_link_list, other.m_values, m_string);
+    }
+
+    util::Optional<std::string> m_string;
+};
 
 // All overloads where left-hand-side is L:
 //
@@ -1542,10 +1554,11 @@ public:
 
     void set_table(const Table* table) override
     {
+        m_table = table;
         m_link_map.set_table(table);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
     {
         return make_subexpr<Columns<StringData>>(*this);
     }
@@ -1656,9 +1669,9 @@ template<class S, class I>
 Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_sensitive)
 {
     if (case_sensitive)
-        return new Compare<S, StringData>(right.clone(), left.clone());
+        return make_expression<Compare<S, StringData>>(right.clone(), left.clone());
     else
-        return new Compare<I, StringData>(right.clone(), left.clone());
+        return make_expression<Compare<I, StringData>>(right.clone(), left.clone());
 }
 
 // Columns<String> == Columns<String>
@@ -1718,7 +1731,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<BinaryData>>(*this);
     }
@@ -1730,6 +1743,7 @@ public:
 
     void set_table(const Table* table) override
     {
+        m_table = table;
         m_link_map.set_table(table);
     }
 
@@ -1828,7 +1842,14 @@ public:
         return not_found;
     }
 
+    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
+    {
+        return std::unique_ptr<Expression>(new UnaryLinkCompare(*this));
+    }
+
 private:
+    UnaryLinkCompare(const UnaryLinkCompare&) = default;
+
     mutable LinkMap m_link_map;
 };
 
@@ -1836,7 +1857,7 @@ class LinkCount : public Subexpr2<Int> {
 public:
     LinkCount(LinkMap link_map): m_link_map(link_map) { }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<LinkCount>(*this);
     }
@@ -1872,14 +1893,14 @@ public:
         if (m_link_map.m_link_columns.size() > 1)
             throw std::runtime_error("Combining link() and is_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
-        return new UnaryLinkCompare<false>(m_link_map);
+        return make_expression<UnaryLinkCompare<false>>(m_link_map);
     }
 
     Query is_not_null() {
         if (m_link_map.m_link_columns.size() > 1)
             throw std::runtime_error("Combining link() and is_not_null() is currently not supported");
         // Todo, it may be useful to support the above, but we would need to figure out an intuitive behaviour
-        return new UnaryLinkCompare<true>(m_link_map);
+        return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }
 
     LinkCount count() const
@@ -1892,6 +1913,8 @@ public:
     {
         return SubColumns<C>(Columns<C>(column, m_link_map.m_table), m_link_map);
     }
+
+    LinkMap link_map() const { return m_link_map; }
 
 private:
     Columns(size_t column, const Table* table, const std::vector<size_t>& links):
@@ -1911,10 +1934,11 @@ private:
 
     void set_table(const Table* table) override
     {
+        m_table = table;
         m_link_map.set_table(table);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<Link>>(*this);
     }
@@ -1978,7 +2002,7 @@ public:
         return *this;
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<T>>(*this);
     }
@@ -1986,6 +2010,7 @@ public:
     // See comment in base class
     void set_table(const Table* table) override
     {
+        m_table = table;
         m_link_map.set_table(table);
 
         const ColumnBase* c;
@@ -2135,7 +2160,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<SubColumns<T>>(*this);
     }
@@ -2148,7 +2173,7 @@ public:
     void set_table(const Table* table) override
     {
         m_link_map.set_table(table);
-        m_column.set_table(table);
+        m_column.set_table(m_link_map.m_table);
     }
 
     void evaluate(size_t, ValueBase&) override
@@ -2192,7 +2217,7 @@ public:
     {
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<SubColumnAggregate>(*this);
     }
@@ -2205,7 +2230,7 @@ public:
     void set_table(const Table* table) override
     {
         m_link_map.set_table(table);
-        m_column.set_table(table);
+        m_column.set_table(m_link_map.m_table);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2244,6 +2269,87 @@ public:
 
 private:
     Columns<T> m_column;
+    LinkMap m_link_map;
+};
+
+struct SubQueryCountHandoverPatch : QueryNodeHandoverPatch {
+    QueryHandoverPatch m_query;
+};
+
+class SubQueryCount : public Subexpr2<Int> {
+public:
+    SubQueryCount(Query q, LinkMap link_map) : m_query(std::move(q)), m_link_map(std::move(link_map)) { }
+
+    const Table* get_table() const override
+    {
+        return m_link_map.m_tables[0];
+    }
+
+    void set_table(const Table* table) override
+    {
+        m_link_map.set_table(table);
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        std::vector<size_t> links = m_link_map.get_links(index);
+        std::sort(links.begin(), links.end());
+
+        size_t count = std::accumulate(links.begin(), links.end(), 0, [this](size_t running_count, size_t link){
+            return running_count + m_query.count(link, link + 1, 1);
+        });
+
+        destination.import(Value<Int>(false, 1, count));
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        if (patches)
+            return std::unique_ptr<Subexpr>(new SubQueryCount(*this, patches));
+
+        return make_subexpr<SubQueryCount>(*this);
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        REALM_ASSERT(patches.size());
+        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
+        patches.pop_back();
+
+        auto patch = dynamic_cast<SubQueryCountHandoverPatch*>(abstract_patch.get());
+        REALM_ASSERT(patch);
+
+        m_query.apply_patch(patch->m_query, group);
+    }
+
+private:
+    SubQueryCount(const SubQueryCount& other, QueryNodeHandoverPatches* patches) : m_link_map(other.m_link_map)
+    {
+        std::unique_ptr<SubQueryCountHandoverPatch> patch(new SubQueryCountHandoverPatch);
+        m_query = Query(other.m_query, patch->m_query, ConstSourcePayload::Copy);
+        patches->emplace_back(patch.release());
+    }
+
+    Query m_query;
+    LinkMap m_link_map;
+};
+
+// The unused template parameter is a hack to avoid a circular dependency between table.hpp and query_expression.hpp.
+template<class>
+class SubQuery {
+public:
+    SubQuery(Columns<Link> link_column, Query query) : m_query(std::move(query)), m_link_map(link_column.link_map())
+    {
+        REALM_ASSERT(m_link_map.m_table == m_query.get_table());
+    }
+
+    SubQueryCount count() const
+    {
+        return SubQueryCount(m_query, m_link_map);
+    }
+
+private:
+    Query m_query;
     LinkMap m_link_map;
 };
 
@@ -2307,7 +2413,11 @@ class UnaryOperator : public Subexpr2<typename oper::type>
 public:
     UnaryOperator(std::unique_ptr<TLeft> left) : m_left(std::move(left)) {}
 
-    UnaryOperator(const UnaryOperator& other) : m_left(other.m_left->clone()) {}
+    UnaryOperator(const UnaryOperator& other, QueryNodeHandoverPatches* patches) :
+        m_left(other.m_left->clone(patches))
+    {
+    }
+
     UnaryOperator& operator=(const UnaryOperator& other)
     {
         if (this != &other) {
@@ -2342,9 +2452,14 @@ public:
         destination.import(result);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return make_subexpr<UnaryOperator>(*this);
+        return make_subexpr<UnaryOperator>(*this, patches);
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_left->apply_handover_patch(patches, group);
     }
 
 private:
@@ -2362,7 +2477,11 @@ public:
     {
     }
 
-    Operator(const Operator& other) : m_left(other.m_left->clone()), m_right(other.m_right->clone()) {}
+    Operator(const Operator& other, QueryNodeHandoverPatches* patches) : m_left(other.m_left->clone(patches)),
+        m_right(other.m_right->clone(patches))
+    {
+    }
+
     Operator& operator=(const Operator& other)
     {
         if (this != &other) {
@@ -2408,9 +2527,15 @@ public:
         destination.import(result);
     }
 
-    std::unique_ptr<Subexpr> clone() const override
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return make_subexpr<Operator>(*this);
+        return make_subexpr<Operator>(*this, patches);
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_right->apply_handover_patch(patches, group);
+        m_left->apply_handover_patch(patches, group);
     }
 
 private:
@@ -2424,14 +2549,9 @@ template<class TCond, class T, class TLeft, class TRight>
 class Compare : public Expression
 {
 public:
-    Compare(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right, const char* compare_string = nullptr) :
-        m_left(std::move(left)), m_right(std::move(right)), m_compare_string(compare_string)
+    Compare(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right) :
+        m_left(std::move(left)), m_right(std::move(right))
     {
-    }
-
-    ~Compare()
-    {
-        delete[] m_compare_string;
     }
 
     // See comment in base class
@@ -2476,14 +2596,25 @@ public:
         return not_found; // no match
     }
 
+    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<Expression>(new Compare(*this, patches));
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_right->apply_handover_patch(patches, group);
+        m_left->apply_handover_patch(patches, group);
+    }
+
 private:
+    Compare(const Compare& other, QueryNodeHandoverPatches* patches) : m_left(other.m_left->clone(patches)),
+        m_right(other.m_right->clone(patches))
+    {
+    }
+
     std::unique_ptr<TLeft> m_left;
     std::unique_ptr<TRight> m_right;
-
-    // Only used if T is StringData. It then points at the deep copied user given string (the "foo" in
-    // Query q = table2->link(col_link2).column<String>(1) == "foo") so that we can delete it when this
-    // Compare object is destructed and the copy is no longer needed.
-    const char* m_compare_string;
 };
 
 }

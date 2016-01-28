@@ -185,18 +185,7 @@ bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size) noexcept
-{
-    try {
-        return try_read(fd, pos, dst, size);
-    }
-    catch (...) {
-        // Not recoverable since we're running in a signal handler
-        REALM_TERMINATE("corrupted database");
-    }
-}
-
-bool AESCryptor::try_read(int fd, off_t pos, char* dst, size_t size)
+bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -393,7 +382,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
     return false;
 }
 
-void EncryptedFileMapping::refresh_page(size_t i) noexcept
+void EncryptedFileMapping::refresh_page(size_t i)
 {
     char* addr = page_addr(i);
 
@@ -512,8 +501,6 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 
     m_file.cryptor.set_file_size(new_size + new_file_offset);
 
-    bool first_init = m_addr == nullptr;
-
     flush();
     m_addr = new_addr;
     m_file_offset = new_file_offset;
@@ -526,14 +513,6 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 
     m_up_to_date_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
-
-    // provoke an error early on if encryption doesn't work.
-    if (first_init && m_file_offset == 0) {
-        if (!copy_up_to_date_page(0)) {
-            m_file.cryptor.try_read(m_file.fd, m_file_offset, page_addr(0), 1 << m_page_shift);
-        }
-        mark_up_to_date(0);
-    }
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept

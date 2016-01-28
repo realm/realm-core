@@ -55,7 +55,7 @@ public:
     // changes made globally visible through call to write_barrier
     void read_barrier(const void* addr, size_t size, 
                       UniqueLock& lock,
-                      Header_to_size header_to_size) noexcept;
+                      Header_to_size header_to_size);
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()
@@ -93,7 +93,7 @@ private:
     void mark_unwritable(size_t i) noexcept;
 
     bool copy_up_to_date_page(size_t i) noexcept;
-    void refresh_page(size_t i) noexcept;
+    void refresh_page(size_t i);
     void write_page(size_t i) noexcept;
 
     void validate_page(size_t i) noexcept;
@@ -104,7 +104,7 @@ private:
 
 inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, 
                                                UniqueLock& lock,
-                                               Header_to_size header_to_size) noexcept
+                                               Header_to_size header_to_size)
 {
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) >> m_page_shift;
     size_t first_idx = first_accessed_page - m_first_page;
