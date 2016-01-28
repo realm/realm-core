@@ -3429,6 +3429,57 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
 }
 
 
+TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a continuous read transaction
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+
+    // Add some tables and rows.
+    {
+        WriteTransaction wt(sg_w);
+        TableRef t0 = wt.add_table("t0");
+        TableRef t1 = wt.add_table("t1");
+        t0->add_column(type_Int, "i");
+        t1->add_column_link(type_Link, "l", *t0);
+        t0->add_empty_row(10);
+        t1->add_empty_row(10);
+        t1->set_link(0, 0, 0);
+        t1->set_link(0, 1, 1);
+        t1->set_link(0, 2, 0);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+
+    ConstRow row_int_0_replaced_by_row_2  = group.get_table(0)->get(0);
+    ConstRow row_link_0_replaced_by_row_2 = group.get_table(1)->get(0);
+    CHECK_EQUAL(row_link_0_replaced_by_row_2.get_link(0), 0);
+
+    // Replace some rows, with and without links.
+    {
+        WriteTransaction wt(sg_w);
+        TableRef t0 = wt.get_table("t0");
+        TableRef t1 = wt.get_table("t1");
+        t0->change_link_targets(0, 2);
+        t1->change_link_targets(0, 2);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+
+    CHECK(row_int_0_replaced_by_row_2.is_attached());
+    CHECK(row_link_0_replaced_by_row_2.is_attached());
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_Links)
 {
     // This test checks that all the links-related stuff works across
@@ -7304,6 +7355,7 @@ public:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
     bool erase_rows(size_t, size_t, size_t, bool) { return false; }
     bool swap_rows(size_t, size_t) { return false; }
+    bool change_link_targets(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
     bool link_list_set(size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t) { return false; }
@@ -8792,6 +8844,62 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     sg.end_read();
     sg_w.end_read();
 }
+
+
+TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<ClientHistory> hist{make_client_history(path, crypt_key())};
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    const Group& group = sg.begin_read();
+
+    // Create some tables and rows.
+    LangBindHelper::promote_to_write(sg, *hist);
+    Group& group_w = const_cast<Group&>(group);
+    TableRef t0 = group_w.add_table("t0");
+    TableRef t1 = group_w.add_table("t1");
+    t0->add_column(type_Int, "i");
+    t1->add_column_link(type_Link, "l", *t0);
+    t1->add_column_link(type_LinkList, "ll", *t0);
+    DescriptorRef t1t;
+    t1->add_column(type_Table, "t", &t1t);
+    t1t->add_column(type_Int, "t1ti");
+    t1->add_column(type_Mixed, "m");
+    t0->add_empty_row(10);
+    t1->add_empty_row(10);
+    for (size_t i = 0; i < 10; ++i) {
+        t0->set_int(0, i, int_fast64_t(i));
+        t1->set_mixed_subtable(3, i, nullptr);
+    }
+    LangBindHelper::commit_and_continue_as_read(sg);
+    group.verify();
+
+    Row r = t0->get(0);
+    CHECK_EQUAL(r.get_int(0), 0);
+
+    // Check that row accessors are detached.
+    LangBindHelper::promote_to_write(sg, *hist);
+    t0->change_link_targets(0, 9);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    CHECK(r.is_attached());
+
+    // Check that LinkView accessors, Subtable accessors, and Subtable accessors
+    // inside of Mixed columns are detached.
+    LinkViewRef l0 = t1->get_linklist(1, 0);
+    TableRef st0 = t1->get_subtable(2, 0);
+    TableRef mt0 = t1->get_subtable(3, 0);
+    CHECK_EQUAL(l0->get_origin_row_index(), 0);
+    LangBindHelper::promote_to_write(sg, *hist);
+    t1->change_link_targets(0, 9);
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    CHECK(l0->is_attached());
+    CHECK(st0->is_attached());
+    CHECK(mt0->is_attached());
+}
+
 
 TEST(LangBindHelper_MemOnly)
 {

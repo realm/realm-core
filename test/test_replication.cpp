@@ -886,6 +886,47 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
 }
 
 
+TEST(Replication_ChangeLinkTargets)
+{
+    // Test that ChangeLinkTargets has the same effect whether called directly
+    // or applied via TransactLogApplier.
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef t0 = wt.add_table("t0");
+        TableRef t1 = wt.add_table("t1");
+        t0->add_column(type_Int, "i");
+        t1->add_column_link(type_Link, "l", *t0);
+        t0->add_empty_row(2);
+        t1->add_empty_row(2);
+        t1->set_link(0, 0, 0);
+        t0->change_link_targets(0, 1);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt1(sg_1);
+        ReadTransaction rt2(sg_2);
+
+        auto t0_1 = rt1.get_table("t0");
+        auto t1_1 = rt1.get_table("t1");
+        auto t0_2 = rt2.get_table("t0");
+        auto t1_2 = rt2.get_table("t1");
+
+        CHECK_EQUAL(t1_1->get_link(0, 0), 1);
+        CHECK_EQUAL(t1_2->get_link(0, 0), 1);
+    }
+}
+
+
 TEST(Replication_Substrings)
 {
     SHARED_GROUP_TEST_PATH(path_1);

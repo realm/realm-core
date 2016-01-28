@@ -371,11 +371,6 @@ public:
     /// may also cause linked rows to be cascade-removed, but in this respect,
     /// the effect is exactly as if each row had been removed individually. See
     /// Descriptor::set_link_type() for details.
-    ///
-    /// It is an error to call add_empty_row() or insert_empty_row() on a table
-    /// with a primary key, if that would result in a violation the implied
-    /// *unique constraint* of the primary key. The consequenses of doing so are
-    /// unspecified.
 
     size_t add_empty_row(size_t num_rows = 1);
     void insert_empty_row(size_t row_ndx, size_t num_rows = 1);
@@ -384,8 +379,18 @@ public:
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
-
     //@}
+
+    /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
+    ///
+    /// This operation is usually followed by Table::move_last_over()
+    /// as part of Table::set_int_unique() or Table::set_string_unique()
+    /// detecting a collision.
+    ///
+    /// \sa Table::move_last_over()
+    /// \sa Table::set_int_unique()
+    /// \sa Table::set_string_unique()
+    void change_link_targets(size_t row_ndx, size_t new_row_ndx);
 
     // Get cell values
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -426,10 +431,14 @@ public:
     /// producing an oversized string or binary data value will cause an
     /// exception to be thrown.
     ///
-    /// It is an error to modify a value in a column that participates in a
-    /// primary key, if that would result in a violation the implied *unique
-    /// constraint* of that primary key. The consequenses of doing so are
-    /// unspecified.
+    /// The "unique" variants (set_int_unique(), set_string_unique()) are
+    /// intended to be used in the implementation of primary key support. They
+    /// check if the given column already contains one or more values that are
+    /// equal to \a value, and if there are conflicts, it calls
+    /// Table::change_link_targets() for the conflicting row to be replaced by
+    /// \a row_ndx, followed by a Table::move_last_over() of the offending row.
+    /// Users intending to implement primary keys must therefore manually check
+    /// for duplicates if they want to raise an error instead.
     ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
@@ -877,6 +886,7 @@ private:
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    void do_change_link_targets(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
 
@@ -2029,6 +2039,11 @@ public:
     static void do_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2)
     {
         table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
+    }
+
+    static void do_change_link_targets(Table& table, size_t row_ndx, size_t new_row_ndx)
+    {
+        table.do_change_link_targets(row_ndx, new_row_ndx); // Throws
     }
 
     static void do_clear(Table& table)

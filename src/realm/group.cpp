@@ -1150,6 +1150,13 @@ public:
         return true;
     }
 
+    bool change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
+    {
+        static_cast<void>(row_ndx);
+        static_cast<void>(new_row_ndx);
+        return true; // No-op
+    }
+
     bool clear_table() noexcept
     {
         typedef _impl::TableFriend tf;

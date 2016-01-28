@@ -60,6 +60,7 @@ public:
     Table& get_origin_table() const noexcept;
     void set_origin_table(Table&) noexcept;
     LinkColumnBase& get_origin_column() const noexcept;
+    size_t get_origin_column_index() const noexcept;
     void set_origin_column(LinkColumnBase& column, size_t col_ndx) noexcept;
 
     void insert_rows(size_t, size_t, size_t, bool) override;
@@ -141,6 +142,11 @@ inline void BacklinkColumn::set_origin_table(Table& table) noexcept
 inline LinkColumnBase& BacklinkColumn::get_origin_column() const noexcept
 {
     return *m_origin_column;
+}
+
+inline size_t BacklinkColumn::get_origin_column_index() const noexcept
+{
+    return m_origin_column_ndx;
 }
 
 inline void BacklinkColumn::set_origin_column(LinkColumnBase& column, size_t col_ndx) noexcept
