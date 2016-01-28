@@ -1152,11 +1152,9 @@ public:
 
     bool change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
     {
-        if (REALM_UNLIKELY(!m_table))
-            return false;
-        using tf = _impl::TableFriend;
-        tf::adj_acc_change_link_targets(*m_table, row_ndx, new_row_ndx);
-        return true;
+        static_cast<void>(row_ndx);
+        static_cast<void>(new_row_ndx);
+        return true; // No-op
     }
 
     bool clear_table() noexcept

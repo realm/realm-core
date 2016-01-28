@@ -80,7 +80,6 @@ public:
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
-    void adj_acc_change_link_targets(size_t, size_t) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
 #ifdef REALM_DEBUG

@@ -54,7 +54,6 @@ public:
     void adj_acc_move_over(size_t, size_t) noexcept override;
     void adj_acc_clear_root_table() noexcept override;
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
-    void adj_acc_change_link_targets(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
@@ -376,12 +375,6 @@ inline void SubtableColumnBase::adj_acc_swap_rows(size_t row_ndx_1, size_t row_n
 {
     const bool fix_ndx_in_parent = false;
     m_subtable_map.adj_swap_rows<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
-}
-
-inline void SubtableColumnBase::adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
-{
-    const bool fix_ndx_in_parent = true;
-    m_subtable_map.adj_change_link_targets<fix_ndx_in_parent>(row_ndx, new_row_ndx);
 }
 
 inline Table* SubtableColumnBase::get_subtable_accessor(size_t row_ndx) const noexcept
