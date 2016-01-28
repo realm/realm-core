@@ -1545,21 +1545,10 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 template <> class Columns<StringData> : public Subexpr2<StringData>
 {
 public:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}):
         m_link_map(table, links), m_column(column)
     {
         REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), ==, type_String);
-    }
-
-    Columns(size_t column, const Table* table): m_link_map(table, {}), m_column(column)
-    {
-    }
-
-    explicit Columns() { }
-
-
-    explicit Columns(size_t column): m_column(column)
-    {
     }
 
     void set_table(const Table* table) override
@@ -1722,19 +1711,10 @@ Query operator != (const Columns<StringData>& left, T right) {
 template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
 {
 public:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links) :
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}) :
         m_column(column), m_link_map(table, links)
     {
         REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), == , type_Binary);
-    }
-
-    Columns(size_t column, const Table* table) : m_link_map(table, {}), m_column(column) { }
-
-    explicit Columns() { }
-
-
-    explicit Columns(size_t column) : m_column(column)
-    {
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
@@ -1920,17 +1900,8 @@ public:
     LinkMap link_map() const { return m_link_map; }
 
 private:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}) :
         m_link_map(table, links)
-    {
-        static_cast<void>(column);
-    }
-
-    Columns() { }
-
-    explicit Columns(size_t column) { static_cast<void>(column); }
-
-    Columns(size_t column, const Table* table): m_link_map(table, {})
     {
         static_cast<void>(column);
     }
@@ -1968,19 +1939,10 @@ class Columns : public Subexpr2<T>
 public:
     using ColType = typename ColumnTypeTraits<T>::column_type;
 
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links):
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}):
         m_link_map(table, links), m_column(column), m_nullable(m_link_map.target_table()->is_nullable(m_column))
     {
     }
-
-    Columns(size_t column, const Table* table):
-        m_link_map(table, {}), m_column(column), m_nullable(m_link_map.target_table()->is_nullable(m_column))
-    {
-    }
-
-    Columns() { }
-
-    explicit Columns(size_t column) : m_column(column) {}
 
     Columns(const Columns& other):
         m_link_map(other.m_link_map), m_column(other.m_column), m_nullable(other.m_nullable)

@@ -6343,8 +6343,7 @@ TEST(Query_NullShowcase)
     Columns<BinaryData> photo = table->column<BinaryData>(6);
 
     // check int/double type mismatch error handling
-    Columns<Int> dummy1;
-    CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
+    CHECK_THROW_ANY(table->column<Int>(3));
 
     TableView tv;
 
