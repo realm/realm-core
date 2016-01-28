@@ -2247,9 +2247,7 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
     size_t backlink_col_start = m_spec.get_public_column_count();
     size_t backlink_col_end   = m_spec.get_column_count();
     for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
-        if (m_spec.get_column_type(col_ndx) != col_type_BackLink) {
-            continue; // Future-proofing; the only non-public columns today are backlink columns.
-        }
+        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
 
         auto& col = get_column_backlink(col_ndx);
         auto& origin_table = col.get_origin_table();
