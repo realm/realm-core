@@ -378,8 +378,6 @@ public:
 
     /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
     ///
-    /// No accessors are touched as part of this operation.
-    ///
     /// This operation is usually followed by Table::move_last_over()
     /// as part of Table::set_int_unique() or Table::set_string_unique()
     /// detecting a collision.
