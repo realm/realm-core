@@ -632,8 +632,6 @@ private:
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
     template<class T>
     TableView find_all(size_t column_ndx, T value);
-    template<class ColType, class T>
-    void do_set_unique(ColType& column, size_t row_ndx, T&& value);
 public:
 
 
@@ -891,6 +889,8 @@ private:
     void do_change_link_targets(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
+    template<class ColType, class T>
+    void do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
 
