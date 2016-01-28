@@ -2590,7 +2590,7 @@ void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
 
     // The following loop relies on unsigned overflow, so be sure that `not_found`
     // is what we expect it to be.
-    static_assert(not_found == size_t(-1));
+    static_assert(not_found == size_t(-1), "not_found != -1");
 
     while (true) {
         // Deliberate overflow; first iteration will start from 0,
