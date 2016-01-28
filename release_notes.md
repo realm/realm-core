@@ -112,6 +112,8 @@
 
 * Add `test_util::to_string()` for convenience. std::to_string() is not
   available via all Android NDK toolchains.
+* New operation: ChangeLinkTargets. It replaces all links to one row with
+  links to a different row.
 * Regular assertions (REALM_ASSERT()) are no longer enabled by default in
   release mode. Note that this is a reversion back to the "natural" state of
   affairs, after a period of having them enabled by default in release mode. The
