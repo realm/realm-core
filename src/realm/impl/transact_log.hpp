@@ -67,7 +67,7 @@ enum Instruction {
     instr_InsertEmptyRows       = 17,
     instr_EraseRows             = 18, // Remove (multiple) rows
     instr_SwapRows              = 19,
-    instr_ChangeLinkTargets       = 47, // Replace links and accessors pointing to row A with references to row B
+    instr_ChangeLinkTargets       = 47, // Replace links pointing to row A with links to row B
     instr_ClearTable            = 20, // Remove all rows in selected table
     instr_OptimizeTable         = 21,
     instr_SelectDescriptor      = 22, // Select descriptor from currently selected root table
