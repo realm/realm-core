@@ -33,6 +33,7 @@
 
 #include "test.hpp"
 #include "crypt_key.hpp"
+#include "util/to_string.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -10682,11 +10683,11 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         for (size_t i = 0; i < numberOfOwner; i++) {
 
             size_t r = owner->add_empty_row();
-            owner->set_string(0, r, std::string("owner") + std::to_string(i));
+            owner->set_string(0, r, std::string("owner") + to_string(i));
 
             for (size_t j = 0; j < numberOfDogsPerOwner; j++) {
                 size_t r = dog->add_empty_row();
-                dog->set_string(0, r, std::string("dog") + std::to_string(i * numberOfOwner + j));
+                dog->set_string(0, r, std::string("dog") + to_string(i * numberOfOwner + j));
                 dog->set_link(1, r, i);
                 LinkViewRef ll = owner->get_linklist(1, i);
                 ll->add(r);
@@ -10737,7 +10738,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     TableRef owner = group.get_table("Owner");
     TableRef dog = group.get_table("Dog");
 
-    realm::Query query = dog->link(1).column<String>(0) == "owner" + std::to_string(rand() % numberOfOwner);
+    realm::Query query = dog->link(1).column<String>(0) == "owner" + to_string(rand() % numberOfOwner);
 
     Thread slaves[threads];
     for (int i = 0; i != threads; ++i) {
