@@ -378,6 +378,8 @@ public:
 
     /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
     ///
+    /// No accessors are touched as part of this operation.
+    ///
     /// This operation is usually followed by Table::move_last_over()
     /// as part of Table::set_int_unique() or Table::set_string_unique()
     /// detecting a collision.
@@ -1240,7 +1242,6 @@ private:
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
     void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    void adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -1280,7 +1281,6 @@ private:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    void adj_row_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
@@ -2159,11 +2159,6 @@ public:
                                   size_t to_row_ndx) noexcept
     {
         table.adj_acc_move_over(from_row_ndx, to_row_ndx);
-    }
-
-    static void adj_acc_change_link_targets(Table& table, size_t row_ndx, size_t new_row_ndx) noexcept
-    {
-        table.adj_acc_change_link_targets(row_ndx, new_row_ndx);
     }
 
     static void adj_acc_clear_root_table(Table& table) noexcept

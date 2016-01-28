@@ -2271,7 +2271,6 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
         }
     }
 
-    adj_acc_change_link_targets(row_ndx, new_row_ndx);
     bump_version();
 }
 
@@ -5002,23 +5001,6 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    adj_row_acc_change_link_targets(row_ndx, new_row_ndx);
-
-    // Adjust subtable/linklist/mixed accessors after change_link_targets.
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->adj_acc_change_link_targets(row_ndx, new_row_ndx);
-    }
-}
-
-
 void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
@@ -5132,27 +5114,6 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
             row->m_row_ndx = row_ndx_1;
         }
         row = row->m_next;
-    }
-}
-
-
-void Table::adj_row_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
-{
-    // This function must assume no more than minimal consistency of the
-    // accessor hierarchy. This means in particular that it cannot access the
-    // underlying node structure. See AccessorConsistencyLevels.
-
-    static_cast<void>(new_row_ndx);
-
-    LockGuard lock(m_accessor_mutex);
-    RowBase* row = m_row_accessors;
-    while (row) {
-        RowBase* next = row->m_next;
-        if (row->m_row_ndx == row_ndx) {
-            row->m_table.reset();
-            do_unregister_row_accessor(row);
-        }
-        row = next;
     }
 }
 

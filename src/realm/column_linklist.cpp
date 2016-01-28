@@ -460,15 +460,6 @@ void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexc
 }
 
 
-void LinkListColumn::adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
-{
-    LinkColumnBase::adj_acc_change_link_targets(row_ndx, new_row_ndx);
-
-    const bool fix_ndx_in_parent = true;
-    adj_change_link_targets<fix_ndx_in_parent>(row_ndx, new_row_ndx);
-}
-
-
 template<bool fix_ndx_in_parent>
 void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {

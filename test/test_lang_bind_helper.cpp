@@ -3431,8 +3431,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
     LangBindHelper::advance_read(sg, hist);
     group.verify();
 
-    CHECK(!row_int_0_replaced_by_row_2.is_attached());
-    CHECK(!row_link_0_replaced_by_row_2.is_attached());
+    CHECK(row_int_0_replaced_by_row_2.is_attached());
+    CHECK(row_link_0_replaced_by_row_2.is_attached());
 }
 
 
@@ -8799,7 +8799,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
     t0->change_link_targets(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
-    CHECK(!r.is_attached());
+    CHECK(r.is_attached());
 
     // Check that LinkView accessors, Subtable accessors, and Subtable accessors
     // inside of Mixed columns are detached.
@@ -8811,9 +8811,9 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
     t1->change_link_targets(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
-    CHECK(!l0->is_attached());
-    CHECK(!st0->is_attached());
-    CHECK(!mt0->is_attached());
+    CHECK(l0->is_attached());
+    CHECK(st0->is_attached());
+    CHECK(mt0->is_attached());
 }
 
 
