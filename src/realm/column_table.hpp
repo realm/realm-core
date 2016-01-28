@@ -100,7 +100,7 @@ protected:
         template<bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
         template<bool fix_ndx_in_parent>
-        void adj_change_link_targets(size_t row_ndx, size_t subsumed_by) noexcept;
+        void adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);

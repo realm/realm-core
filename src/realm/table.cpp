@@ -5010,7 +5010,7 @@ void Table::adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noex
 
     adj_row_acc_change_link_targets(row_ndx, new_row_ndx);
 
-    // Adjust subtable/linklist/mixed accessors after subsume identity
+    // Adjust subtable/linklist/mixed accessors after change_link_targets.
     size_t n = m_cols.size();
     for (size_t i = 0; i < n; ++i) {
         if (ColumnBase* col = m_cols[i])
