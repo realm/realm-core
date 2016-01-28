@@ -2095,8 +2095,12 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
 
 void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT_EX(row_ndx < m_size, row_ndx, m_size);
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(row_ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    if (REALM_UNLIKELY(new_row_ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
 
     do_change_link_targets(row_ndx, new_row_ndx);
 
