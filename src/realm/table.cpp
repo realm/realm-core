@@ -2583,34 +2583,42 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 template<class ColType, class T>
 void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
 {
-    size_t found = not_found;
-    while (true) {
-        // Deliberate overflow; first iteration will start from 0, because not_found == size_t(-1).
-        found = col.find_first(value, found + 1);
+    size_t found_ndx = not_found;
 
-        if (found == ndx) {
-            // SetUnique is idempotent.
+    // The following loop relies on unsigned overflow, so be sure that `not_found`
+    // is what we expect it to be.
+    static_assert(not_found == size_t(-1));
+
+    while (true) {
+        // Deliberate overflow; first iteration will start from 0,
+        // because not_found == size_t(-1).
+        found_ndx = col.find_first(value, found_ndx + 1);
+
+        if (found_ndx == ndx) {
+            // SetUnique is idempotent (i.e. finding a matching value on the same row
+            // index is perfectly fine).
             continue;
         }
-        else if (found == not_found) {
+        else if (found_ndx == not_found) {
+            // No more matches.
             break;
         }
 
         // Unique constraint violation!
         // RESOLUTION: Let the new row subsume the identity of the old row,
         // and delete the old row.
-        change_link_targets(found, ndx);
+        change_link_targets(found_ndx, ndx);
 
         if (ndx == size() - 1) {
             // Row will be moved by move_last_over, adjust index.
-            ndx = found;
+            ndx = found_ndx;
         }
 
-        move_last_over(found);
+        move_last_over(found_ndx);
 
         // Since we removed an element, we need to re-check the element that was just
-        // moved into the "found" spot by move_last_over.
-        --found;
+        // moved into the "found_ndx" spot by move_last_over.
+        --found_ndx;
     }
 
     col.set(ndx, value);
