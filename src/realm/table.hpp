@@ -383,6 +383,8 @@ public:
     /// detecting a collision.
     ///
     /// \sa Table::move_last_over()
+    /// \sa Table::set_int_unique()
+    /// \sa Table::set_string_unique()
     void change_link_targets(size_t row_ndx, size_t new_row_ndx);
 
     // Get cell values
