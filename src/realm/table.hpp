@@ -375,14 +375,17 @@ public:
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     //@}
-    
-    /// Replaces all links to \a row_ndx with links to \a subsumed_by_row_ndx.
+
+    /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
     ///
-    /// All accessors to \a row_ndx will be updated to become accessors to
-    /// \a subsumed_by_row_ndx.
+    /// This operation is usually followed by Table::move_last_over()
+    /// as part of Table::set_int_unique() or Table::set_string_unique()
+    /// detecting a collision.
     ///
     /// \sa Table::move_last_over()
-    void subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx);
+    /// \sa Table::set_int_unique()
+    /// \sa Table::set_string_unique()
+    void change_link_targets(size_t row_ndx, size_t new_row_ndx);
 
     // Get cell values
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -423,10 +426,14 @@ public:
     /// producing an oversized string or binary data value will cause an
     /// exception to be thrown.
     ///
-    /// It is an error to modify a value in a column that participates in a
-    /// primary key, if that would result in a violation the implied *unique
-    /// constraint* of that primary key. The consequenses of doing so are
-    /// unspecified.
+    /// The "unique" variants (set_int_unique(), set_string_unique()) are
+    /// intended to be used in the implementation of primary key support. They
+    /// check if the given column already contains one or more values that are
+    /// equal to \a value, and if there are conflicts, it calls
+    /// Table::change_link_targets() for the conflicting row to be replaced by
+    /// \a row_ndx, followed by a Table::move_last_over() of the offending row.
+    /// Users intending to implement primary keys must therefore manually check
+    /// for duplicates if they want to raise an error instead.
     ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
@@ -876,7 +883,7 @@ private:
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
-    void do_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx);
+    void do_change_link_targets(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
 
@@ -1235,7 +1242,7 @@ private:
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
     void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    void adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept;
+    void adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -1275,7 +1282,7 @@ private:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    void adj_row_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept;
+    void adj_row_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
@@ -2026,9 +2033,9 @@ public:
         table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
     }
 
-    static void do_subsume_identity(Table& table, size_t row_ndx, size_t subsumed_by_row_ndx)
+    static void do_change_link_targets(Table& table, size_t row_ndx, size_t new_row_ndx)
     {
-        table.do_subsume_identity(row_ndx, subsumed_by_row_ndx); // Throws
+        table.do_change_link_targets(row_ndx, new_row_ndx); // Throws
     }
 
     static void do_clear(Table& table)
@@ -2155,9 +2162,9 @@ public:
         table.adj_acc_move_over(from_row_ndx, to_row_ndx);
     }
 
-    static void adj_acc_subsume_identity(Table& table, size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+    static void adj_acc_change_link_targets(Table& table, size_t row_ndx, size_t new_row_ndx) noexcept
     {
-        table.adj_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+        table.adj_acc_change_link_targets(row_ndx, new_row_ndx);
     }
 
     static void adj_acc_clear_root_table(Table& table) noexcept

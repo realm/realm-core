@@ -2088,15 +2088,15 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     remove_backlink_broken_rows(state); // Throws
 }
 
-void Table::subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
+void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_EX(row_ndx < m_size, row_ndx, m_size);
 
-    do_subsume_identity(row_ndx, subsumed_by_row_ndx);
+    do_change_link_targets(row_ndx, new_row_ndx);
 
     if (Replication* repl = get_repl()) {
-        repl->subsume_identity(this, row_ndx, subsumed_by_row_ndx);
+        repl->change_link_targets(this, row_ndx, new_row_ndx);
     }
 }
 
@@ -2229,16 +2229,21 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 }
 
 
-void Table::do_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
+void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
 {
     // Replace links through backlink columns, WITHOUT generating SetLink instructions.
-    // FIXME: Consider whether it is OK to ignore cascading behavior here, as we do.
+    //
+    // This bypasses handling of cascading rows, and we have decided that this is OK, because
+    // ChangeLinkTargets is always followed by MoveLastOver, so breaking the last strong link
+    // to a row that is being subsumed will have no observable effect, while honoring the
+    // cascading behavior would complicate the calling code somewhat (having to take
+    // into account whether or not the row was removed as a consequence of cascade, leading
+    // to bugs in case this was forgotten).
+
     size_t backlink_col_start = m_spec.get_public_column_count();
     size_t backlink_col_end   = m_spec.get_column_count();
     for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
-        if (m_spec.get_column_type(col_ndx) != col_type_BackLink) {
-            continue; // Future-proofing; the only non-public columns today are backlink columns.
-        }
+        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
 
         auto& col = get_column_backlink(col_ndx);
         auto& origin_table = col.get_origin_table();
@@ -2248,21 +2253,21 @@ void Table::do_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
             size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
 
             if (origin_col_type == col_type_Link) {
-                origin_table.do_set_link(origin_col_ndx, origin_row_ndx, subsumed_by_row_ndx);
+                origin_table.do_set_link(origin_col_ndx, origin_row_ndx, new_row_ndx);
             }
             else if (origin_col_type == col_type_LinkList) {
                 LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
                 for (size_t j = 0; j < links->size(); ++j) {
                     using llf = _impl::LinkListFriend;
                     if (links->get(j).get_index() == row_ndx) {
-                        llf::do_set(*links, j, subsumed_by_row_ndx);
+                        llf::do_set(*links, j, new_row_ndx);
                     }
                 }
             }
         }
     }
 
-    adj_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+    adj_acc_change_link_targets(row_ndx, new_row_ndx);
     bump_version();
 }
 
@@ -2594,7 +2599,7 @@ void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
         // Primary Key constraint violation!
         // RESOLUTION: Let the new row subsume the identity of the old row,
         // and delete the old row.
-        subsume_identity(found, ndx);
+        change_link_targets(found, ndx);
 
         if (ndx == size() - 1) {
             // Row will be moved by move_last_over, adjust index.
@@ -5011,19 +5016,19 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+void Table::adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    adj_row_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+    adj_row_acc_change_link_targets(row_ndx, new_row_ndx);
 
-    // Adjust subtable/linklist/mixed accessors after subsume identity
+    // Adjust subtable/linklist/mixed accessors after change_link_targets.
     size_t n = m_cols.size();
     for (size_t i = 0; i < n; ++i) {
         if (ColumnBase* col = m_cols[i])
-            col->adj_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+            col->adj_acc_change_link_targets(row_ndx, new_row_ndx);
     }
 }
 
@@ -5145,13 +5150,13 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_row_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+void Table::adj_row_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    static_cast<void>(subsumed_by_row_ndx);
+    static_cast<void>(new_row_ndx);
 
     LockGuard lock(m_accessor_mutex);
     RowBase* row = m_row_accessors;

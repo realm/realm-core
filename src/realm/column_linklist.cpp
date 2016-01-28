@@ -460,12 +460,12 @@ void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexc
 }
 
 
-void LinkListColumn::adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+void LinkListColumn::adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
 {
-    LinkColumnBase::adj_acc_subsume_identity(row_ndx, subsumed_by_row_ndx);
+    LinkColumnBase::adj_acc_change_link_targets(row_ndx, new_row_ndx);
 
     const bool fix_ndx_in_parent = true;
-    adj_subsume_identity<fix_ndx_in_parent>(row_ndx, subsumed_by_row_ndx);
+    adj_change_link_targets<fix_ndx_in_parent>(row_ndx, new_row_ndx);
 }
 
 
@@ -612,9 +612,9 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
 
 
 template<bool fix_ndx_in_parent>
-void LinkListColumn::adj_subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+void LinkListColumn::adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
 {
-    static_cast<void>(subsumed_by_row_ndx);
+    static_cast<void>(new_row_ndx);
 
     prune_list_accessor_tombstones();
 

@@ -254,7 +254,7 @@ public:
     virtual void adj_acc_move_over(size_t from_row_ndx,
                                    size_t to_row_ndx) noexcept;
     virtual void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-    virtual void adj_acc_subsume_identity(size_t row_ndx, size_t subsumed_by) noexcept;
+    virtual void adj_acc_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
     virtual void adj_acc_clear_root_table() noexcept;
 
     enum {
@@ -686,7 +686,7 @@ inline void ColumnBase::adj_acc_swap_rows(size_t, size_t) noexcept
     // Noop
 }
 
-inline void ColumnBase::adj_acc_subsume_identity(size_t, size_t) noexcept
+inline void ColumnBase::adj_acc_change_link_targets(size_t, size_t) noexcept
 {
     // Noop
 }

@@ -1150,12 +1150,12 @@ public:
         return true;
     }
 
-    bool subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx) noexcept
+    bool change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
         using tf = _impl::TableFriend;
-        tf::adj_acc_subsume_identity(*m_table, row_ndx, subsumed_by_row_ndx);
+        tf::adj_acc_change_link_targets(*m_table, row_ndx, new_row_ndx);
         return true;
     }
 
