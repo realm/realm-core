@@ -62,7 +62,7 @@
 
 * Add `test_util::to_string()` for convenience. std::to_string() is not
   available via all Android NDK toolchains.
-* New operation: SubsumeIdentity. It replaces all links to one row with
+* New operation: ChangeLinkTargets. It replaces all links to one row with
   links to a different row.
 * Regular assertions (REALM_ASSERT()) are no longer enabled by default in
   release mode. Note that this is a reversion back to the "natural" state of

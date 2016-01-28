@@ -257,15 +257,15 @@ public:
         return true;
     }
 
-    bool subsume_identity(size_t row_ndx, size_t subsumed_by_row_ndx)
+    bool change_link_targets(size_t row_ndx, size_t new_row_ndx)
     {
         if (REALM_UNLIKELY(!m_table))
             return false;
-        if (REALM_UNLIKELY(row_ndx >= m_table->size() || subsumed_by_row_ndx >= m_table->size()))
+        if (REALM_UNLIKELY(row_ndx >= m_table->size() || new_row_ndx >= m_table->size()))
             return false;
-        log("table->subsume_identity(%1, %2);", row_ndx, subsumed_by_row_ndx); // Throws
+        log("table->change_link_targets(%1, %2);", row_ndx, new_row_ndx); // Throws
         using tf = _impl::TableFriend;
-        tf::do_subsume_identity(*m_table, row_ndx, subsumed_by_row_ndx); // Throws
+        tf::do_change_link_targets(*m_table, row_ndx, new_row_ndx); // Throws
         return true;
     }
 

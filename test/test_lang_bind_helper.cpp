@@ -3385,7 +3385,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
 }
 
 
-TEST(LangBindHelper_AdvanceReadTransact_SubsumeIdentity)
+TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
@@ -3423,8 +3423,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SubsumeIdentity)
         WriteTransaction wt(sg_w);
         TableRef t0 = wt.get_table("t0");
         TableRef t1 = wt.get_table("t1");
-        t0->subsume_identity(0, 2);
-        t1->subsume_identity(0, 2);
+        t0->change_link_targets(0, 2);
+        t1->change_link_targets(0, 2);
         wt.commit();
     }
 
@@ -7311,7 +7311,7 @@ public:
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
     bool erase_rows(size_t, size_t, size_t, bool) { return false; }
     bool swap_rows(size_t, size_t) { return false; }
-    bool subsume_identity(size_t, size_t) { return false; }
+    bool change_link_targets(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
     bool link_list_set(size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t) { return false; }
@@ -8762,7 +8762,7 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
 }
 
 
-TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnSubsumeIdentity)
+TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -8796,7 +8796,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnSubsumeIdentity)
 
     // Check that row accessors are detached.
     LangBindHelper::promote_to_write(sg, *hist);
-    t0->subsume_identity(0, 9);
+    t0->change_link_targets(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
     CHECK(!r.is_attached());
@@ -8808,7 +8808,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnSubsumeIdentity)
     TableRef mt0 = t1->get_subtable(3, 0);
     CHECK_EQUAL(l0->get_origin_row_index(), 0);
     LangBindHelper::promote_to_write(sg, *hist);
-    t1->subsume_identity(0, 9);
+    t1->change_link_targets(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
     CHECK(!l0->is_attached());

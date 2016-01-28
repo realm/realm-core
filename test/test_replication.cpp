@@ -886,9 +886,9 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
 }
 
 
-TEST(Replication_SubsumeIdentity)
+TEST(Replication_ChangeLinkTargets)
 {
-    // Test that SubsumeIdentity has the same effect whether called directly
+    // Test that ChangeLinkTargets has the same effect whether called directly
     // or applied via TransactLogApplier.
 
     SHARED_GROUP_TEST_PATH(path_1);
@@ -908,7 +908,7 @@ TEST(Replication_SubsumeIdentity)
         t0->add_empty_row(2);
         t1->add_empty_row(2);
         t1->set_link(0, 0, 0);
-        t0->subsume_identity(0, 1);
+        t0->change_link_targets(0, 1);
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger.get());
