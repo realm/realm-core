@@ -6540,11 +6540,20 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_float(1, 0)));
     CHECK(std::isnan(table->get_float(1, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+ 
+    // FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
+    // signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel 
+    // Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that 
+    // has bit 22 clear (indicates it's signaling), and pop it back (fst instruction), the FPU will toggle
+    // that bit into being set. All this needs further investigation, so a P2 has been created. Note that 
+    // IEEE just began specifying signaling vs. non-signaling NaNs in 2008. Also note that all this seems
+    // to work fine on ARM in both 32 and 64 bit mode.
+
+#if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
     CHECK(null::is_signaling(table->get_float(1, 0)));
 #endif
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+#ifndef _WIN32 // signaling_NaN() may be broken in VS2015 (see long comment above)
     CHECK(!null::is_signaling(table->get_float(1, 1)));
 #endif
 
@@ -6556,7 +6565,8 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_double(3, 0)));
     CHECK(std::isnan(table->get_double(3, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+// signaling_NaN() broken in VS2015, and broken in 32bit intel
+#if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
     CHECK(null::is_signaling(table->get_double(3, 0)));
     CHECK(!null::is_signaling(table->get_double(3, 1)));
 #endif
