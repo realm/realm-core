@@ -105,7 +105,11 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
-    m_groups = source.m_groups;
+
+    m_groups.reserve(source.m_groups.size());
+    for (const auto& group: source.m_groups) {
+        m_groups.emplace_back(group, patch.m_node_data);
+    }
 }
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
@@ -122,14 +126,19 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
         m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
-    m_groups = source.m_groups;
+
+    m_groups.reserve(source.m_groups.size());
+    for (const auto& group: source.m_groups) {
+        m_groups.emplace_back(group, patch.m_node_data);
+    }
 }
 
-Query::Query(Expression* expr) : Query()
+Query::Query(std::unique_ptr<Expression> expr) : Query()
 {
-    add_expression_node(expr);
     if (auto table = const_cast<Table*>(expr->get_table()))
         set_table(table->get_table_ref());
+
+    add_expression_node(std::move(expr));
 }
 
 void Query::set_table(TableRef tr)
@@ -165,11 +174,17 @@ void Query::apply_patch(HandoverPatch& patch, Group& group)
     if (patch.m_table) {
         set_table(group.get_table(patch.m_table->m_table_num));
     }
+
+    for (auto it = m_groups.rbegin(); it != m_groups.rend(); ++it) {
+        if (auto& root_node = it->m_root_node)
+            root_node->apply_handover_patch(patch.m_node_data, group);
+    }
+    REALM_ASSERT(patch.m_node_data.empty());
 }
 
-void Query::add_expression_node(Expression* compare)
+void Query::add_expression_node(std::unique_ptr<Expression> expression)
 {
-    add_node(std::unique_ptr<ParentNode>(new ExpressionNode(compare)));
+    add_node(std::unique_ptr<ParentNode>(new ExpressionNode(std::move(expression))));
 }
 
 // Binary
@@ -497,7 +512,7 @@ Query& Query::between(size_t column_ndx, int from, int to)
     return between(column_ndx, static_cast<int64_t>(from), static_cast<int64_t>(to));
 }
 
-Query& Query::links_to(size_t origin_column, size_t target_row)
+Query& Query::links_to(size_t origin_column, const ConstRow& target_row)
 {
     add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column, target_row)));
     return *this;
@@ -1480,4 +1495,10 @@ QueryGroup& QueryGroup::operator=(const QueryGroup& other)
         m_state = other.m_state;
     }
     return *this;
+}
+
+QueryGroup::QueryGroup(const QueryGroup& other, QueryNodeHandoverPatches& patches) :
+    m_root_node(other.m_root_node ? other.m_root_node->clone(&patches) : nullptr),
+    m_pending_not(other.m_pending_not), m_subtable_column(other.m_subtable_column), m_state(other.m_state)
+{
 }
