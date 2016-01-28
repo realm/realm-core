@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.96.0 Release notes
 
 ### Bugfixes:
 
@@ -6,21 +6,11 @@
   sharing the expression nodes between `Query` instances. This prevents
   data races that could give incorrect results or crashes.
 
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * Subqueries are now supported via `Table::column(size_t, Query)`.
   This allows for queries based on the number of rows in the linked table
   that match the given subquery.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
