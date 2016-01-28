@@ -2596,7 +2596,7 @@ void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
             break;
         }
 
-        // Primary Key constraint violation!
+        // Unique constraint violation!
         // RESOLUTION: Let the new row subsume the identity of the old row,
         // and delete the old row.
         change_link_targets(found, ndx);
