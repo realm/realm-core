@@ -10,7 +10,11 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Memory errors caused by calls to mmap/mremap will now throw a specific
+  AddressSpaceExhausted exception which is a subclass of the previously
+  thrown std::runtime_error. This is so that iOS and Android language
+  bindings can specifically catch this case and handle it differently
+  than the rest of the general std::runtime_errors.
 
 -----------
 
