@@ -1418,18 +1418,18 @@ public:
         m_link_columns.clear();
         m_link_types.clear();
 
-        for (size_t t = 0; t < m_link_column_indexes.size(); t++) {
+        for (size_t link_column_index : m_link_column_indexes) {
             // Link column can be either LinkList or single Link
-            ColumnType type = table->get_real_column_type(m_link_column_indexes[t]);
+            ColumnType type = table->get_real_column_type(link_column_index);
             if (type == col_type_LinkList) {
-                const LinkListColumn& cll = table->get_column_link_list(m_link_column_indexes[t]);
-                m_link_columns.push_back(&(table->get_column_link_list(m_link_column_indexes[t])));
+                const LinkListColumn& cll = table->get_column_link_list(link_column_index);
+                m_link_columns.push_back(&cll);
                 m_link_types.push_back(realm::type_LinkList);
                 table = &cll.get_target_table();
             }
             else {
-                const LinkColumn& cl = table->get_column_link(m_link_column_indexes[t]);
-                m_link_columns.push_back(&(table->get_column_link(m_link_column_indexes[t])));
+                const LinkColumn& cl = table->get_column_link(link_column_index);
+                m_link_columns.push_back(&cl);
                 m_link_types.push_back(realm::type_Link);
                 table = &cl.get_target_table();
             }
