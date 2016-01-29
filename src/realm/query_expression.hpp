@@ -276,8 +276,8 @@ public:
     virtual ~Expression() {}
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
-    virtual void set_table(const Table* table) = 0;
-    virtual const Table* get_table() const = 0;
+    virtual void set_base_table(const Table* table) = 0;
+    virtual const Table* get_base_table() const = 0;
 
     virtual std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const = 0;
     virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&) { }
@@ -299,16 +299,16 @@ public:
 
     // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
     // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
-    // then Query::m_table is set to this table, and set_table() is called on all Columns and LinkMaps in
+    // then Query::m_table is set to this table, and set_base_table() is called on all Columns and LinkMaps in
     // the query expression tree so that they can set/update their internals as required. 
     // 
-    // During thread-handover of a Query, set_table() is also called to make objects point at the new table
+    // During thread-handover of a Query, set_base_table() is also called to make objects point at the new table
     // instead of the old one from the old thread.
-    virtual void set_table(const Table*) {}
+    virtual void set_base_table(const Table*) {}
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    virtual const Table* get_table() const
+    virtual const Table* get_base_table() const
     {
         return nullptr;
     }
@@ -361,7 +361,7 @@ Query create(L left, const Subexpr2<R>& right)
         (std::is_same<L, BinaryData>::value && std::is_same<R, BinaryData>::value))
         &&
         !column->links_exist()) {
-        const Table* t = column->get_table();
+        const Table* t = column->get_base_table();
         Query q = Query(*t);
 
         if (std::is_same<Cond, Less>::value)
@@ -508,7 +508,7 @@ public:
         // but only if both columns are non-nullable, and aren't in linked tables.
         if (left_col && right_col && std::is_same<L, R>::value && !left_col->m_nullable && !right_col->m_nullable
             && !left_col->links_exist() && !right_col->links_exist()) {
-            const Table* t = left_col->get_table();
+            const Table* t = left_col->get_base_table();
             Query q = Query(*t);
 
             if (std::numeric_limits<L>::is_integer || std::is_same<L, DateTime>::value) {
@@ -1406,10 +1406,10 @@ public:
     LinkMap() : m_table(nullptr) {}
     LinkMap(const Table* table, const std::vector<size_t>& columns) : m_link_column_indexes(columns)
     {
-        set_table(table);
+        set_base_table(table);
     }
 
-    void set_table(const Table* table) 
+    void set_base_table(const Table* table)
     {
         if (table == m_table)
             return;
@@ -1551,9 +1551,9 @@ public:
         REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), ==, type_String);
     }
 
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
+        m_link_map.set_base_table(table);
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
@@ -1561,7 +1561,7 @@ public:
         return make_subexpr<Columns<StringData>>(*this);
     }
 
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
@@ -1722,14 +1722,14 @@ public:
         return make_subexpr<Columns<BinaryData>>(*this);
     }
 
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
 
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
+        m_link_map.set_base_table(table);
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) override
@@ -1796,14 +1796,14 @@ public:
     {
     }
 
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
+        m_link_map.set_base_table(table);
     }
 
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
     // any linked-to payload tables
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
@@ -1845,14 +1845,14 @@ public:
         return make_subexpr<LinkCount>(*this);
     }
 
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
 
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
+        m_link_map.set_base_table(table);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -1906,9 +1906,9 @@ private:
         static_cast<void>(column);
     }
 
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
+        m_link_map.set_base_table(table);
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
@@ -1916,7 +1916,7 @@ private:
         return make_subexpr<Columns<Link>>(*this);
     }
 
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
@@ -1966,9 +1966,9 @@ public:
     }
 
     // See comment in base class
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
+        m_link_map.set_base_table(table);
 
         m_nullable = m_link_map.target_table()->is_nullable(m_column);
         const ColumnBase* c = &m_link_map.target_table()->get_column_base(m_column);
@@ -1993,7 +1993,7 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
@@ -2111,15 +2111,15 @@ public:
         return make_subexpr<SubColumns<T>>(*this);
     }
 
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
 
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
-        m_column.set_table(m_link_map.target_table());
+        m_link_map.set_base_table(table);
+        m_column.set_base_table(m_link_map.target_table());
     }
 
     void evaluate(size_t, ValueBase&) override
@@ -2168,15 +2168,15 @@ public:
         return make_subexpr<SubColumnAggregate>(*this);
     }
 
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
 
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
-        m_column.set_table(m_link_map.target_table());
+        m_link_map.set_base_table(table);
+        m_column.set_base_table(m_link_map.target_table());
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2226,14 +2226,14 @@ class SubQueryCount : public Subexpr2<Int> {
 public:
     SubQueryCount(Query q, LinkMap link_map) : m_query(std::move(q)), m_link_map(std::move(link_map)) { }
 
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
         return m_link_map.base_table();
     }
 
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_link_map.set_table(table);
+        m_link_map.set_base_table(table);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2376,16 +2376,16 @@ public:
     UnaryOperator& operator=(UnaryOperator&&) = default;
 
     // See comment in base class
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_left->set_table(table);
+        m_left->set_base_table(table);
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
-        return m_left->get_table();
+        return m_left->get_base_table();
     }
 
     // destination = operator(left)
@@ -2441,18 +2441,18 @@ public:
     Operator& operator=(Operator&&) = default;
 
     // See comment in base class
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_left->set_table(table);
-        m_right->set_table(table);
+        m_left->set_base_table(table);
+        m_right->set_base_table(table);
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
-        const Table* l = m_left->get_table();
-        const Table* r = m_right->get_table();
+        const Table* l = m_left->get_base_table();
+        const Table* r = m_right->get_base_table();
 
         // Queries do not support multiple different tables; all tables must be the same.
         REALM_ASSERT(l == nullptr || r == nullptr || l == r);
@@ -2501,18 +2501,18 @@ public:
     }
 
     // See comment in base class
-    void set_table(const Table* table) override
+    void set_base_table(const Table* table) override
     {
-        m_left->set_table(table);
-        m_right->set_table(table);
+        m_left->set_base_table(table);
+        m_right->set_base_table(table);
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and
     // binds it to a Query at a later time
-    const Table* get_table() const override
+    const Table* get_base_table() const override
     {
-        const Table* l = m_left->get_table();
-        const Table* r = m_right->get_table();
+        const Table* l = m_left->get_base_table();
+        const Table* r = m_right->get_base_table();
 
         // All main tables in each subexpression of a query (table.columns() or table.link()) must be the same.
         REALM_ASSERT(l == nullptr || r == nullptr || l == r);
