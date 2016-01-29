@@ -75,10 +75,11 @@ public:
     const char* what() const noexcept override;
 };
 
-// Thrown when memory can no longer be mapped to. When mmap/remap fails.
+/// Thrown when memory can no longer be mapped to. When mmap/remap fails.
 class AddressSpaceExhausted: public std::runtime_error {
 public:
-    const char* what() const noexcept override;
+    AddressSpaceExhausted(const std::string& msg);
+    /// runtime_error::what() returns the msg provided in the constructor.
 };
 
 
@@ -226,9 +227,9 @@ inline const char* DeletedLinkView::what() const noexcept
     return "Attempt to use a LinkView that has been deleted";
 }
 
-inline const char* AddressSpaceExhausted::what() const noexcept
+inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg):
+    std::runtime_error(msg)
 {
-    return "Could not map file into memory";
 }
 
 inline LogicError::LogicError(LogicError::ErrorKind kind):

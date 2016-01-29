@@ -28,6 +28,7 @@
 #include <sys/mman.h>
 
 #include <realm/util/errno.hpp>
+#include <realm/exceptions.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -203,7 +204,7 @@ void* mmap_anon(size_t size)
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
-        throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
     }
     return addr;
 }
@@ -259,7 +260,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+    throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
 }
 
 void munmap(void* addr, size_t size) noexcept
@@ -306,7 +307,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
             return new_addr;
         int err = errno; // Eliminate any risk of clobbering
         if (err != ENOTSUP && err != ENOSYS)
-            throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
+            throw AddressSpaceExhausted(get_errno_msg("mremap(): failed: ", err));
     }
     // Fall back to no-mremap case if it's not supported
 #endif
