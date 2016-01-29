@@ -1403,7 +1403,7 @@ iterator pattern. First solution can't exit, second solution requires internal s
 class LinkMap
 {
 public:
-    LinkMap() : m_table(nullptr) {}
+    LinkMap() = default;
     LinkMap(const Table* table, const std::vector<size_t>& columns) : m_link_column_indexes(columns)
     {
         set_base_table(table);
@@ -1411,31 +1411,31 @@ public:
 
     void set_base_table(const Table* table)
     {
-        if (table == m_table)
+        if (table == m_base_table)
             return;
 
-        m_tables.clear();
+        m_base_table = table;
         m_link_columns.clear();
         m_link_types.clear();
+
         for (size_t t = 0; t < m_link_column_indexes.size(); t++) {
             // Link column can be either LinkList or single Link
             ColumnType type = table->get_real_column_type(m_link_column_indexes[t]);
             if (type == col_type_LinkList) {
                 const LinkListColumn& cll = table->get_column_link_list(m_link_column_indexes[t]);
-                m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link_list(m_link_column_indexes[t])));
                 m_link_types.push_back(realm::type_LinkList);
                 table = &cll.get_target_table();
             }
             else {
                 const LinkColumn& cl = table->get_column_link(m_link_column_indexes[t]);
-                m_tables.push_back(table);
                 m_link_columns.push_back(&(table->get_column_link(m_link_column_indexes[t])));
                 m_link_types.push_back(realm::type_Link);
                 table = &cl.get_target_table();
             }
         }
-        m_table = table;
+
+        m_target_table = table;
     }
 
     std::vector<size_t> get_links(size_t index)
@@ -1464,12 +1464,12 @@ public:
 
     const Table* base_table() const
     {
-        return m_tables.size() ? m_tables[0] : m_table;
+        return m_base_table;
     }
 
     const Table* target_table() const
     {
-        return m_table;
+        return m_target_table;
     }
 
     std::vector<const LinkColumnBase*> m_link_columns;
@@ -1515,10 +1515,10 @@ private:
         map_links(row, mlv);
     }
 
-    const Table* m_table = nullptr;
-    std::vector<const Table*> m_tables;
     std::vector<size_t> m_link_column_indexes;
     std::vector<realm::DataType> m_link_types;
+    const Table* m_base_table = nullptr;
+    const Table* m_target_table = nullptr;
 };
 
 template<class T, class S, class I>
