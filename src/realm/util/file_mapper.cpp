@@ -66,6 +66,8 @@ using namespace realm::util;
 namespace realm {
 namespace util {
 
+#define REALM_MMAP_MEMORY_ERRORS (EAGAIN | EMFILE | ENOMEM)
+
 #if REALM_ENABLE_ENCRYPTION
 
 // A list of all of the active encrypted mappings for a single file
@@ -204,7 +206,10 @@ void* mmap_anon(size_t size)
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
-        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
+        if (err & REALM_MMAP_MEMORY_ERRORS) {
+            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
+        }
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
     }
     return addr;
 }
@@ -260,7 +265,10 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
+    if (err & REALM_MMAP_MEMORY_ERRORS) {
+        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
+    }
+    throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
 
 void munmap(void* addr, size_t size) noexcept
@@ -306,8 +314,12 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
         if (new_addr != MAP_FAILED)
             return new_addr;
         int err = errno; // Eliminate any risk of clobbering
-        if (err != ENOTSUP && err != ENOSYS)
-            throw AddressSpaceExhausted(get_errno_msg("mremap(): failed: ", err));
+        if (err != ENOTSUP && err != ENOSYS) {
+            if (err & REALM_MMAP_MEMORY_ERRORS) {
+                throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
+            }
+            throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+        }
     }
     // Fall back to no-mremap case if it's not supported
 #endif
