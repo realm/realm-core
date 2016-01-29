@@ -455,12 +455,22 @@ uint64_t TableViewBase::outside_version() const
     LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
     if (lvp) {
         // Depends on Query that depends on LinkList. 
-        return lvp->is_attached() ? lvp->get_origin_table().m_version : max;
+        if (lvp->is_attached()) {
+            return lvp->get_origin_table().m_version;
+        }
+        else {
+            return max;
+        }
     }
 
     if (m_linkview_source) {
         // m_linkview_source is set if-and-only-if this TableView was created by LinkView::get_as_sorted_view().
-        return lvp->is_attached() ? m_linkview_source->get_origin_table().m_version : max;
+        if (m_linkview_source->is_attached()) {
+            return m_linkview_source->get_origin_table().m_version;
+        }
+        else {
+            return max;
+        }
     }
     else {
         // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)

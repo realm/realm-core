@@ -8406,6 +8406,7 @@ TEST(Query_ReferDeletedLinkView)
     q.average_int(1, &rows);
     CHECK_EQUAL(rows, 0);
 
+    tv_sorted.sync_if_needed();
     // See if "TableView that depends on LinkView" returns sane "empty"-like values
     tv_sorted.average_int(1, &rows);
     CHECK_EQUAL(rows, 0);
