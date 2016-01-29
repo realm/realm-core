@@ -60,13 +60,18 @@
 
 #endif // enable encryption
 
+namespace {
+inline bool is_mmap_memory_error(int err)
+{
+    return (err == EAGAIN || err == EMFILE || err == ENOMEM);
+}
+} // Unnamed namespace
+
 using namespace realm;
 using namespace realm::util;
 
 namespace realm {
 namespace util {
-
-#define REALM_MMAP_MEMORY_ERRORS (EAGAIN | EMFILE | ENOMEM)
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -192,7 +197,7 @@ void remove_mapping(void* addr, size_t size)
         if (it->info->mappings.empty()) {
             if (::close(it->info->fd) != 0) {
                 int err = errno; // Eliminate any risk of clobbering
-                if (err == EBADF || err == EIO) // todo, how do we handle EINTR?
+                if (err == EBADF || err == EIO) // FIXME: how do we handle EINTR?
                     throw std::runtime_error(get_errno_msg("close() failed: ", err));
             }
             mappings_by_file.erase(it);
@@ -206,7 +211,7 @@ void* mmap_anon(size_t size)
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
-        if (err & REALM_MMAP_MEMORY_ERRORS) {
+        if (is_mmap_memory_error(err)) {
             throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
         }
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
@@ -265,7 +270,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    if (err & REALM_MMAP_MEMORY_ERRORS) {
+    if (is_mmap_memory_error(err)) {
         throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
     }
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
@@ -315,7 +320,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
             return new_addr;
         int err = errno; // Eliminate any risk of clobbering
         if (err != ENOTSUP && err != ENOSYS) {
-            if (err & REALM_MMAP_MEMORY_ERRORS) {
+            if (is_mmap_memory_error(err)) {
                 throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
             }
             throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
