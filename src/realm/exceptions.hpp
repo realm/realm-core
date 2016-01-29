@@ -75,6 +75,12 @@ public:
     const char* what() const noexcept override;
 };
 
+// Thrown when memory can no longer be mapped to. When mmap/remap fails.
+class AddressSpaceExhausted: public std::runtime_error {
+public:
+    const char* what() const noexcept override;
+};
+
 
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have
@@ -218,6 +224,11 @@ inline const char* FileFormatUpgradeRequired::what() const noexcept
 inline const char* DeletedLinkView::what() const noexcept
 {
     return "Attempt to use a LinkView that has been deleted";
+}
+
+inline const char* AddressSpaceExhausted::what() const noexcept
+{
+    return "Could not map file into memory";
 }
 
 inline LogicError::LogicError(LogicError::ErrorKind kind):
