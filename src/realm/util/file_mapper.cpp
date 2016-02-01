@@ -61,10 +61,12 @@
 #endif // enable encryption
 
 namespace {
+
 inline bool is_mmap_memory_error(int err)
 {
     return (err == EAGAIN || err == EMFILE || err == ENOMEM);
 }
+
 } // Unnamed namespace
 
 using namespace realm;
@@ -212,7 +214,8 @@ void* mmap_anon(size_t size)
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
         if (is_mmap_memory_error(err)) {
-            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
+            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
+                + " size: " + std::to_string(size));
         }
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
     }
@@ -271,7 +274,9 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
 
     int err = errno; // Eliminate any risk of clobbering
     if (is_mmap_memory_error(err)) {
-        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
+        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
+            + " size: " + std::to_string(size)
+            + " offset: " + std::to_string(offset));
     }
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
@@ -319,14 +324,18 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
         if (new_addr != MAP_FAILED)
             return new_addr;
         int err = errno; // Eliminate any risk of clobbering
+        // Do not throw here if mremap is declared as "not supported" by the
+        // platform Eg. When compiling with GNU libc on OSX, iOS. 
+        // In this case fall through to no-mremap case below.
         if (err != ENOTSUP && err != ENOSYS) {
             if (is_mmap_memory_error(err)) {
-                throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
+                throw AddressSpaceExhausted(get_errno_msg("mremap() failed: ", err)
+                    + " old size: " + std::to_string(old_size)
+                    + " new size: " + std::to_string(new_size));
             }
             throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
         }
     }
-    // Fall back to no-mremap case if it's not supported
 #endif
 
     void* new_addr = mmap(fd, new_size, a, file_offset, nullptr);
