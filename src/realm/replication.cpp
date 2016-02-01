@@ -58,8 +58,15 @@ public:
             if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
                 return false;
             }
-            log("table->set_int_unique(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_int_unique(col_ndx, row_ndx, value); // Throws
+
+            // Here it is acceptable to call the regular version of set_int(), because
+            // we presume that the side-effects of set_int_unique() are already documented
+            // as other instructions preceding this. Calling the set_int_unique() here
+            // would be a waste of time, because all possible side-effects have already
+            // been carried out.
+            log("table->set_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->set_int(col_ndx, row_ndx, value); // Throws
+
             return true;
         }
         return false;
@@ -111,8 +118,15 @@ public:
             if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
                 return false;
             }
-            log("table->set_string_unique(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
-            m_table->set_string_unique(col_ndx, row_ndx, value); // Throws
+
+            // Here it is acceptable to call the regular version of set_string(), because
+            // we presume that the side-effects of set_string_unique() are already documented
+            // as other instructions preceding this. Calling the set_string_unique() here
+            // would be a waste of time, because all possible side-effects have already
+            // been carried out.
+            log("table->set_string(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
+            m_table->set_string(col_ndx, row_ndx, value); // Throws
+
             return true;
         }
         return false;
