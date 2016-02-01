@@ -214,8 +214,7 @@ void* mmap_anon(size_t size)
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
         if (is_mmap_memory_error(err)) {
-            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
-                + " size: " + std::to_string(size));
+            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
         }
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
     }
@@ -274,9 +273,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
 
     int err = errno; // Eliminate any risk of clobbering
     if (is_mmap_memory_error(err)) {
-        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
-            + " size: " + std::to_string(size)
-            + " offset: " + std::to_string(offset));
+        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err));
     }
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
@@ -329,9 +326,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
         // In this case fall through to no-mremap case below.
         if (err != ENOTSUP && err != ENOSYS) {
             if (is_mmap_memory_error(err)) {
-                throw AddressSpaceExhausted(get_errno_msg("mremap() failed: ", err)
-                    + " old size: " + std::to_string(old_size)
-                    + " new size: " + std::to_string(new_size));
+                throw AddressSpaceExhausted(get_errno_msg("mremap() failed: ", err));
             }
             throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
         }
