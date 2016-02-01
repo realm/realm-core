@@ -1603,7 +1603,7 @@ public:
 
     void init(const Table& table) override
     {
-        m_expression->set_table(&table);
+        m_expression->set_base_table(&table);
         if (m_child)
             m_child->init(table);
     }
