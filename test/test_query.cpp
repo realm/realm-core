@@ -8386,21 +8386,47 @@ TEST(Query_MaximumSumAverage)
 
 TEST(Query_ReferDeletedLinkView)
 {
-    // This would segfault because the query refers a LinkView that had been removed by move_last_over
-    // It will now throw an exception instead.
+    // Queries and TableViews that depend on a deleted LinkList will now produce valid empty-like results
+    // (find() returns npos, find_all() returns empty TableView, sum() returns 0, etc.).
+    // They will no longer throw exceptions or crash.
     Group group;
     TableRef table = group.add_table("table");
     table->add_column_link(type_LinkList, "children", *table);
+    table->add_column(type_Int, "age");
     table->add_empty_row();
+    table->set_int(1, 0, 123);
     LinkViewRef links = table->get_linklist(0, 0);
     Query q = table->where(links);
     TableView tv = q.find_all();
     
-    table->move_last_over(0);
+    // TableView that depends on LinkView soon to be deleted
+    TableView tv_sorted = links->get_sorted_view(1);
 
-    CHECK_THROW(q.find_all(), DeletedLinkView);
+    // Delete LinkList so LinkView gets detached
+    table->move_last_over(0);
     CHECK(!links->is_attached());
-    CHECK_THROW(tv.sync_if_needed(), DeletedLinkView);
+
+    // See if "Query that depends on LinkView" returns sane "empty"-like values
+    CHECK_EQUAL(q.find_all().size(), 0);
+    CHECK_EQUAL(q.find(), npos);
+    CHECK_EQUAL(q.sum_int(1), 0);
+    CHECK_EQUAL(q.count(), 0);
+    size_t rows;
+    q.average_int(1, &rows);
+    CHECK_EQUAL(rows, 0);
+
+    tv_sorted.sync_if_needed();
+    // See if "TableView that depends on LinkView" returns sane "empty"-like values
+    tv_sorted.average_int(1, &rows);
+    CHECK_EQUAL(rows, 0);
+
+    // Now check a "Query that depends on (TableView that depends on LinkView)"
+    Query q2 = table->where(&tv_sorted);
+    CHECK_EQUAL(q2.count(), 0);
+    CHECK_EQUAL(q2.find(), npos);
+
+    CHECK(!links->is_attached());
+    tv.sync_if_needed();
     
     // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
     // the LinkView through multiple levels!
