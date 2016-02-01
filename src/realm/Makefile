@@ -27,6 +27,7 @@ util/platform_specific_condvar.hpp \
 util/file_mapper.hpp \
 util/encrypted_file_mapping.hpp \
 util/miscellaneous.hpp \
+util/to_string.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
