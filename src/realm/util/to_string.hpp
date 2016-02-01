@@ -27,7 +27,8 @@
 namespace realm {
 namespace util {
 
-template<class T> std::string to_string(const T& v)
+template<class T>
+std::string to_string(const T& v)
 {
     std::ostringstream out;
     out.imbue(std::locale::classic());
