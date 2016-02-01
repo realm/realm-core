@@ -2617,8 +2617,7 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
             ndx = found_ndx;
         }
 
-        bool broken_reciprocal_backlinks = false; // skip cascade
-        do_move_last_over(found_ndx, broken_reciprocal_backlinks);
+        move_last_over(found_ndx);
 
         // Since we removed an element, we need to re-check the element that was just
         // moved into the "found_ndx" spot by move_last_over.
@@ -2643,11 +2642,11 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 
     if (is_nullable(col_ndx)) {
         auto& col = get_column_int_null(col_ndx);
-        do_set_unique(col, ndx, value); // Throws
+        ndx = do_set_unique(col, ndx, value); // Throws
     }
     else {
         auto& col = get_column(col_ndx);
-        do_set_unique(col, ndx, value); // Throws
+        ndx = do_set_unique(col, ndx, value); // Throws
     }
 
     if (Replication* repl = get_repl())
