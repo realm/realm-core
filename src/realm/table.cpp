@@ -2610,7 +2610,7 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
         // Unique constraint violation!
         // RESOLUTION: Let the new row subsume the identity of the old row,
         // and delete the old row.
-        do_change_link_targets(found_ndx, ndx);
+        change_link_targets(found_ndx, ndx);
 
         if (ndx == size() - 1) {
             // Row will be moved by move_last_over, adjust index.
