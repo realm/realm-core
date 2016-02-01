@@ -2584,7 +2584,7 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 
 
 template<class ColType, class T>
-void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
+size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
 {
     size_t found_ndx = not_found;
 
@@ -2610,14 +2610,15 @@ void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
         // Unique constraint violation!
         // RESOLUTION: Let the new row subsume the identity of the old row,
         // and delete the old row.
-        change_link_targets(found_ndx, ndx);
+        do_change_link_targets(found_ndx, ndx);
 
         if (ndx == size() - 1) {
             // Row will be moved by move_last_over, adjust index.
             ndx = found_ndx;
         }
 
-        move_last_over(found_ndx);
+        bool broken_reciprocal_backlinks = false; // skip cascade
+        do_move_last_over(found_ndx, broken_reciprocal_backlinks);
 
         // Since we removed an element, we need to re-check the element that was just
         // moved into the "found_ndx" spot by move_last_over.
@@ -2625,6 +2626,8 @@ void Table::do_set_unique(ColType& col, size_t ndx, T&& value)
     }
 
     col.set(ndx, value);
+
+    return ndx;
 }
 
 
