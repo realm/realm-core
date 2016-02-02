@@ -1,5 +1,6 @@
 #include "realm/util/event_loop.hpp"
 #include "realm/util/network.hpp"
+#include "realm/util/optional.hpp"
 
 #if REALM_PLATFORM_APPLE
 #include <CoreFoundation/CoreFoundation.h>
@@ -208,6 +209,7 @@ struct EventLoop<Apple>::Socket: SocketBase {
     const char* m_current_write_buffer = nullptr;
     size_t m_current_write_buffer_size = 0;
     size_t m_bytes_written = 0;
+    Optional<char> m_read_delim;
 
 
     Socket(CFRunLoopRef runloop, std::string host, int port, OnConnectComplete on_connect_complete):
@@ -315,7 +317,9 @@ struct EventLoop<Apple>::Socket: SocketBase {
 
     void async_read_until(char* buffer, size_t size, char delim, OnReadComplete on_read_complete) override
     {
-        REALM_ASSERT(false); // FIXME
+        REALM_ASSERT(m_read_delim == none);
+        m_read_delim = delim;
+        async_read(buffer, size, std::move(on_read_complete));
     }
 
 private:
@@ -325,6 +329,18 @@ private:
         if (is_open()) {
             m_on_connect_complete(std::error_code{});
         }
+    }
+
+    void on_read_complete()
+    {
+        auto handler = std::move(m_on_read_complete);
+        auto total_bytes_read = m_bytes_read;
+        m_read_delim = none;
+        m_on_read_complete = nullptr;
+        m_current_read_buffer = nullptr;
+        m_current_read_buffer_size = 0;
+        m_bytes_read = 0;
+        handler(std::error_code{}, total_bytes_read);
     }
 
     void read_cb(CFReadStreamRef stream, CFStreamEventType event_type)
@@ -343,20 +359,31 @@ private:
                 }
 
                 UInt8* buffer = reinterpret_cast<UInt8*>(m_current_read_buffer);
-                size_t bytes_read = CFReadStreamRead(m_read_stream, buffer, m_current_read_buffer_size);
+
+                // FIXME: CFReadStreamRead advances the socket's read buffer internally,
+                // so read_until cannot consume more than a single byte at a time, because
+                // it needs to check if the delimiter was found. This is likely to be grossly
+                // inefficient, but the alternative is to introduce another layer of buffering.
+                // Mitigation: Investigate if CFReadStreamRead corresponds 1-to-1 to the read()
+                // system call and if there is any performance to be gained from introducing
+                // another layer of buffering.
+                size_t bytes_to_read = m_read_delim ? 1 : m_current_read_buffer_size;
+
+                size_t bytes_read = CFReadStreamRead(m_read_stream, buffer, bytes_to_read);
                 m_bytes_read += bytes_read;
-                if (bytes_read < m_current_read_buffer_size) {
+
+                if (m_read_delim && bytes_read > 0 && buffer[0] == UInt8(*m_read_delim)) {
+                    // Completion because delimiter found.
+                    on_read_complete();
+                }
+                else if (bytes_read < m_current_read_buffer_size) {
+                    // Not complete yet.
                     m_current_read_buffer_size -= bytes_read;
                     m_current_read_buffer += bytes_read;
                 }
                 else {
-                    auto on_read_complete = std::move(m_on_read_complete);
-                    auto total_bytes_read = m_bytes_read;
-                    m_on_read_complete = nullptr;
-                    m_current_read_buffer = nullptr;
-                    m_current_read_buffer_size = 0;
-                    m_bytes_read = 0;
-                    on_read_complete(std::error_code{}, total_bytes_read);
+                    // Completion because buffer is full.
+                    on_read_complete();
                 }
                 break;
             }
