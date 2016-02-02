@@ -135,7 +135,7 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
 
 Query::Query(std::unique_ptr<Expression> expr) : Query()
 {
-    if (auto table = const_cast<Table*>(expr->get_table()))
+    if (auto table = const_cast<Table*>(expr->get_base_table()))
         set_table(table->get_table_ref());
 
     add_expression_node(std::move(expr));

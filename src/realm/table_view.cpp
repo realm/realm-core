@@ -446,21 +446,31 @@ uint64_t TableViewBase::outside_version() const
 {
     check_cookie();
 
+    // If the TableView directly or indirectly depends on a LinkList that has been deleted, then its m_table has been
+    // set to 0 and there is no way to know its version number. So return biggest possible value to trigger a refresh
+    // later
+    uint64_t max = std::numeric_limits<uint64_t>::max();
+
     // Return version of whatever this TableView depends on
     LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
     if (lvp) {
-        // This TableView was created by a Query that had a LinkViewRef inside its .where() clause
-        if (!lvp->is_attached()) {
-            // LinkView has been deleted from the Table
-            throw(DeletedLinkView());
+        // Depends on Query that depends on LinkList. 
+        if (lvp->is_attached()) {
+            return lvp->get_origin_table().m_version;
         }
-
-        return lvp->get_origin_table().m_version;
+        else {
+            return max;
+        }
     }
 
     if (m_linkview_source) {
-        // m_linkview_source is set if-and-only-if this TableView was created by LinkView::get_as_sorted_view()
-        return m_linkview_source->get_origin_table().m_version;
+        // m_linkview_source is set if-and-only-if this TableView was created by LinkView::get_as_sorted_view().
+        if (m_linkview_source->is_attached()) {
+            return m_linkview_source->get_origin_table().m_version;
+        }
+        else {
+            return max;
+        }
     }
     else {
         // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)

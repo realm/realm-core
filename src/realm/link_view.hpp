@@ -46,8 +46,10 @@ public:
     ~LinkView() noexcept;
     bool is_attached() const noexcept;
 
-    // Size info
+    /// This method will return true if the LinkView is detached (no assert).
     bool is_empty() const noexcept;
+
+    /// This method will return 0 if the LinkView is detached (no assert).
     size_t size() const noexcept;
 
     bool operator==(const LinkView&) const noexcept;
@@ -202,7 +204,8 @@ inline bool LinkView::is_attached() const noexcept
 
 inline bool LinkView::is_empty() const noexcept
 {
-    REALM_ASSERT(is_attached());
+    if (!is_attached())
+        return true;
 
     if (!m_row_indexes.is_attached())
         return true;
@@ -212,7 +215,8 @@ inline bool LinkView::is_empty() const noexcept
 
 inline size_t LinkView::size() const noexcept
 {
-    REALM_ASSERT(is_attached());
+    if (!is_attached())
+        return 0;
 
     if (!m_row_indexes.is_attached())
         return 0;

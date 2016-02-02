@@ -511,6 +511,7 @@
 		F45014011B01027F00CD4A7E /* test_upgrade_database.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65BB22FF1AD80E870097170F /* test_upgrade_database.cpp */; };
 		F45014021B01027F00CD4A7E /* test_utf8.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B4717D4E89100DD22CC /* test_utf8.cpp */; };
 		F45014031B01027F00CD4A7E /* test_version.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 80ADCCED18A23E2D0049D472 /* test_version.cpp */; };
+		F450A3171C5FBB660008F287 /* to_string.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F450A3161C5FBB660008F287 /* to_string.hpp */; };
 		F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4D0FC1D1B00E0E40040956A /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
@@ -984,6 +985,7 @@
 		F45013BC1B01022800CD4A7E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		F45013BE1B01022800CD4A7E /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		F45013C11B01022800CD4A7E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/LaunchScreen.xib; sourceTree = "<group>"; };
+		F450A3161C5FBB660008F287 /* to_string.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = to_string.hpp; sourceTree = "<group>"; };
 		F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = query_engine.cpp; path = realm/query_engine.cpp; sourceTree = "<group>"; };
 		F4D0FC161B00E0D70040956A /* benchmark-common-tasks */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "benchmark-common-tasks"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4D0FC1F1B00E1020040956A /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
@@ -1405,6 +1407,7 @@
 		52D7C4661852A01700633748 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				F450A3161C5FBB660008F287 /* to_string.hpp */,
 				65F666FD1BFD01DC00749FA2 /* aes_cryptor.hpp */,
 				52D7C4671852A01700633748 /* assert.hpp */,
 				485231171B2E918F003C72AF /* basic_system_errors.cpp */,
@@ -1559,6 +1562,7 @@
 			files = (
 				36EE6CC217F0F97400BA9635 /* alloc.hpp in Headers */,
 				F43098B41B021C04000A2333 /* bptree.hpp in Headers */,
+				F450A3171C5FBB660008F287 /* to_string.hpp in Headers */,
 				36EE6CC117F0F97400BA9635 /* alloc_slab.hpp in Headers */,
 				365CCE40157CC37D00172BF8 /* array.hpp in Headers */,
 				36F3823A170D000300C95BCD /* array_basic.hpp in Headers */,
