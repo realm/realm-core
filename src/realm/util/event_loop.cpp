@@ -366,6 +366,17 @@ private:
         handler(ec, total_bytes_read);
     }
 
+    void on_write_complete(std::error_code ec)
+    {
+        auto on_write_complete = std::move(m_on_write_complete);
+        auto total_bytes_written = m_bytes_written;
+        m_on_write_complete = nullptr;
+        m_current_write_buffer = nullptr;
+        m_current_write_buffer_size = 0;
+        m_bytes_written = 0;
+        on_write_complete(ec, total_bytes_written);
+    }
+
     void read_cb(CFReadStreamRef stream, CFStreamEventType event_type)
     {
         REALM_ASSERT(stream == m_read_stream);
@@ -415,7 +426,7 @@ private:
                 break;
             }
             case kCFStreamEventErrorOccurred: {
-                REALM_ASSERT(false); // FIXME
+                on_read_complete(convert_error_code(CFReadStreamCopyError(m_read_stream)));
                 break;
             }
             case kCFStreamEventEndEncountered: {
@@ -448,18 +459,12 @@ private:
                     m_current_write_buffer += bytes_written;
                 }
                 else {
-                    auto on_write_complete = std::move(m_on_write_complete);
-                    auto total_bytes_written = m_bytes_written;
-                    m_on_write_complete = nullptr;
-                    m_current_write_buffer = nullptr;
-                    m_current_write_buffer_size = 0;
-                    m_bytes_written = 0;
-                    on_write_complete(std::error_code{}, total_bytes_written);
+                    on_write_complete(std::error_code{});
                 }
                 break;
             }
             case kCFStreamEventErrorOccurred: {
-                REALM_ASSERT(false); // FIXME
+                on_write_complete(convert_error_code(CFWriteStreamCopyError(m_write_stream)));
                 break;
             }
             case kCFStreamEventEndEncountered: {
