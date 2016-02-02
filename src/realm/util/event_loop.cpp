@@ -141,29 +141,6 @@ EventLoop<ASIO>::async_timer(EventLoopBase::Duration delay, EventLoopBase::OnTim
 
 #if REALM_PLATFORM_APPLE
 
-
-namespace {
-
-class CFStreamErrorCategory: public std::error_category {
-    const char* name() const noexcept override;
-    std::string message(int) const override;
-};
-CFStreamErrorCategory g_cfstream_error_category{};
-
-const char* CFStreamErrorCategory::name() const noexcept
-{
-    return "CFStream";
-}
-
-std::string CFStreamErrorCategory::message(int) const
-{
-    // FIXME
-    REALM_ASSERT(false);
-}
-
-} // anonymous namespace
-
-
 struct EventLoop<Apple>::Impl {
     CFRunLoopRef m_runloop;
 };
