@@ -396,7 +396,7 @@ private:
                 break;
             }
             case kCFStreamEventEndEncountered: {
-                REALM_ASSERT(false); // FIXME
+                on_read_complete(make_error_code(network::end_of_input));
                 break;
             }
         }
@@ -440,7 +440,7 @@ private:
                 break;
             }
             case kCFStreamEventEndEncountered: {
-                REALM_ASSERT(false); // FIXME
+                on_read_complete(make_error_code(network::end_of_input));
                 break;
             }
         }
