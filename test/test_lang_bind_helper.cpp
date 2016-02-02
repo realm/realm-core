@@ -9744,7 +9744,7 @@ TEST(LangBindHelper_HandoverDependentViews)
 }
 
 
-ONLY(LangBindHelper_HandoverTableViewWithLinkView)
+TEST(LangBindHelper_HandoverTableViewWithLinkView)
 {
     // First iteration hands-over a normal valid attached LinkView. Second
     // iteration hands-over a detached LinkView.
@@ -9824,9 +9824,15 @@ ONLY(LangBindHelper_HandoverTableViewWithLinkView)
             std::unique_ptr<TableView> tv(sg.import_from_handover(move(handover))); // <-- import tv
 
             CHECK(tv->is_in_sync());
-            CHECK_EQUAL(2, tv->size());
-            CHECK_EQUAL(0, tv->get_source_ndx(0));
-            CHECK_EQUAL(2, tv->get_source_ndx(1));
+            if (detached == 1) {
+                CHECK_EQUAL(0, tv->size());
+            }
+            else {
+                CHECK_EQUAL(2, tv->size());
+                CHECK_EQUAL(0, tv->get_source_ndx(0));
+                CHECK_EQUAL(2, tv->get_source_ndx(1));
+            }
+
         }
     }
 }
