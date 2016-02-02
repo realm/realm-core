@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -92,6 +92,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/meta.hpp>
+#include <realm/util/miscellaneous.hpp>
 #include <realm/unicode.hpp>
 #include <realm/utilities.hpp>
 #include <realm/table.hpp>
@@ -204,7 +205,7 @@ public:
             av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
         }
         REALM_ASSERT_DEBUG(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
-        bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
+        bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, av);
         return cont;
     }
 
@@ -222,17 +223,12 @@ public:
             return m_child->validate();
     }
 
-    ParentNode(const ParentNode& from)
+    ParentNode(const ParentNode& from, QueryNodeHandoverPatches* patches) :
+        m_child(from.m_child ? from.m_child->clone(patches) : nullptr),
+        m_condition_column_idx(from.m_condition_column_idx), m_dD(from.m_dD), m_dT(from.m_dT),
+        m_probes(from.m_probes), m_matches(from.m_matches)
     {
-        m_child = from.m_child ? from.m_child->clone() : nullptr;
-        m_condition_column_idx = from.m_condition_column_idx;
-        m_dD = from.m_dD;
-        m_dT = from.m_dT;
-        m_probes = from.m_probes;
-        m_matches = from.m_matches;
     }
-
-    virtual std::unique_ptr<ParentNode> clone() const = 0;
 
     void add_child(std::unique_ptr<ParentNode> child)
     {
@@ -240,6 +236,14 @@ public:
             m_child->add_child(std::move(child));
         else
             m_child = std::move(child);
+    }
+
+    virtual std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* = nullptr) const = 0;
+
+    virtual void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group)
+    {
+        if (m_child)
+            m_child->apply_handover_patch(patches, group);
     }
 
     std::unique_ptr<ParentNode> m_child;
@@ -291,7 +295,7 @@ public:
         if (m_child) m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)  override
+    size_t find_first_local(size_t start, size_t end) override
     {
         // Simply return index of first table row which is >= start
         size_t r;
@@ -304,17 +308,14 @@ public:
         return tableindex(r);
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new ListviewNode(*this));
+        return std::unique_ptr<ParentNode>(new ListviewNode(*this, patches));
     }
 
-    ListviewNode(const ListviewNode& from)
-        : ParentNode(from), m_tv(from.m_tv)
+    ListviewNode(const ListviewNode& from, QueryNodeHandoverPatches* patches)
+        : ParentNode(from, patches), m_max(from.m_max), m_next(from.m_next), m_size(from.m_size), m_tv(from.m_tv)
     {
-        m_max = from.m_max;
-        m_next = from.m_next;
-        m_size = from.m_size;
     }
 
 protected:
@@ -384,14 +385,19 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new SubtableNode(*this));
+        return std::unique_ptr<ParentNode>(new SubtableNode(*this, patches));
     }
 
-    SubtableNode(const SubtableNode& from) : ParentNode(from),
-        m_condition(from.m_condition ? from.m_condition->clone() : nullptr), m_column(from.m_column)
+    SubtableNode(const SubtableNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_condition(from.m_condition ? from.m_condition->clone(patches) : nullptr), m_column(from.m_column)
     {
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_condition->apply_handover_patch(patches, group);
     }
 
     std::unique_ptr<ParentNode> m_condition;
@@ -429,7 +435,12 @@ protected:
         m_condition_column_idx = column_idx;
     }
 
-    ColumnNodeBase(const ColumnNodeBase&) = default;
+    ColumnNodeBase(const ColumnNodeBase& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_last_local_match(from.m_last_local_match), m_local_matches(from.m_local_matches),
+        m_local_limit(from.m_local_limit), m_fastmode_disabled(from.m_fastmode_disabled), m_action(from.m_action),
+        m_state(from.m_state), m_source_column(from.m_source_column)
+    {
+    }
 
     template<Action TAction, class ColType>
     bool match_callback(int64_t v)
@@ -559,14 +570,13 @@ protected:
         m_dD = _impl::CostHeuristic<ColType>::dD;
     }
 
-    IntegerNodeBase(const ThisType& from) : ColumnNodeBase(from),
-        m_value(from.m_value)
+    IntegerNodeBase(const ThisType& from, QueryNodeHandoverPatches* patches) : ColumnNodeBase(from, patches),
+        m_value(from.m_value), m_condition_column(from.m_condition_column),
+        m_find_callback_specialized(from.m_find_callback_specialized)
     {
         // state is transient/only valid during search, no need to copy
         m_dT = _impl::CostHeuristic<ColType>::dT;
         m_dD = _impl::CostHeuristic<ColType>::dD;
-        m_condition_column = from.m_condition_column;
-        m_find_callback_specialized = from.m_find_callback_specialized;
     }
 
     void init(const Table& table) override
@@ -649,8 +659,6 @@ public:
     {
     }
 
-    IntegerNode(const IntegerNode&) = default;
-
     void aggregate_local_prepare(Action action, DataType col_id, bool nullable) override
     {
         this->m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
@@ -701,9 +709,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new IntegerNode<ColType, TConditionFunction>(*this));
+        return std::unique_ptr<ParentNode>(new IntegerNode<ColType, TConditionFunction>(*this, patches));
+    }
+
+    IntegerNode(const IntegerNode& from, QueryNodeHandoverPatches* patches) : BaseType(from, patches)
+    {
     }
 
 protected:
@@ -809,13 +821,13 @@ public:
             return find(false);
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this));
+        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this, patches));
     }
 
-    FloatDoubleNode(const FloatDoubleNode& from)
-        : ParentNode(from), m_value(from.m_value)
+    FloatDoubleNode(const FloatDoubleNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_value(from.m_value)
     {
         // m_condition_column is not copied
     }
@@ -845,8 +857,6 @@ public:
     {
     }
 
-    BinaryNode(const BinaryNode&) = default;
-
     void init(const Table& table) override
     {
         m_dD = 100.0;
@@ -869,14 +879,18 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new BinaryNode(*this));
+        return std::unique_ptr<ParentNode>(new BinaryNode(*this, patches));
+    }
+
+    BinaryNode(const BinaryNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_value(from.m_value), m_condition_column(from.m_condition_column), m_column_type(from.m_column_type)
+    {
     }
 
 private:
     OwnedBinaryData m_value;
-protected:
     const BinaryColumn* m_condition_column;
     ColumnType m_column_type;
 };
@@ -918,8 +932,8 @@ public:
         m_leaf.reset(nullptr);
     }
 
-    StringNodeBase(const StringNodeBase& from) : ParentNode(from), m_value(from.m_value),
-        m_condition_column(from.m_condition_column), m_column_type(from.m_column_type),
+    StringNodeBase(const StringNodeBase& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_value(from.m_value), m_condition_column(from.m_condition_column), m_column_type(from.m_column_type),
         m_leaf_type(from.m_leaf_type), m_end_s(0), m_leaf_start(0), m_leaf_end(0)
     {
     }
@@ -1012,12 +1026,15 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this));
+        return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this, patches));
     }
 
-    StringNode(const StringNode&) = default;
+    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches) : StringNodeBase(from, patches),
+        m_ucase(from.m_ucase), m_lcase(from.m_lcase)
+    {
+    }
 
 protected:
     std::string m_ucase;
@@ -1209,12 +1226,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this));
+        return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, patches));
     }
 
-    StringNode(const StringNode& from) : StringNodeBase(from), m_index_matches_destroy(false)
+    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches) : StringNodeBase(from, patches),
+        m_index_matches_destroy(false)
     {
     }
 
@@ -1261,10 +1279,11 @@ public:
             m_conditions.emplace_back(std::move(condition));
     }
 
-    OrNode(const OrNode& other) : ParentNode(other)
+    OrNode(const OrNode& other, QueryNodeHandoverPatches* patches) : ParentNode(other, patches)
     {
-        for (const auto& condition : other.m_conditions)
-            m_conditions.emplace_back(condition->clone());
+        for (const auto& condition : other.m_conditions) {
+            m_conditions.emplace_back(condition->clone(patches));
+        }
     }
 
     void init(const Table& table) override
@@ -1349,9 +1368,15 @@ public:
         return "";
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new OrNode(*this));
+        return std::unique_ptr<ParentNode>(new OrNode(*this, patches));
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        for (auto it = m_conditions.rbegin(); it != m_conditions.rend(); ++it)
+            (*it)->apply_handover_patch(patches, group);
     }
 
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
@@ -1420,18 +1445,21 @@ public:
         return "";
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new NotNode(*this));
+        return std::unique_ptr<ParentNode>(new NotNode(*this, patches));
     }
 
-    NotNode(const NotNode& from)
-        : ParentNode(from)
+    NotNode(const NotNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_condition(from.m_condition ? from.m_condition->clone(patches) : nullptr),
+        m_known_range_start(from.m_known_range_start), m_known_range_end(from.m_known_range_end),
+        m_first_in_known_range(from.m_first_in_known_range)
     {
-        m_condition = from.m_condition ? from.m_condition->clone() : nullptr;
-        m_known_range_start = from.m_known_range_start;
-        m_known_range_end = from.m_known_range_end;
-        m_first_in_known_range = from.m_first_in_known_range;
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_condition->apply_handover_patch(patches, group);
     }
 
     std::unique_ptr<ParentNode> m_condition;
@@ -1536,13 +1564,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new TwoColumnsNode<ColType, TConditionFunction>(*this));
+        return std::unique_ptr<ParentNode>(new TwoColumnsNode<ColType, TConditionFunction>(*this, patches));
     }
 
-    TwoColumnsNode(const TwoColumnsNode& from) : ParentNode(from), m_value(from.m_value),
-        m_condition_column(from.m_condition_column), m_column_type(from.m_column_type),
+    TwoColumnsNode(const TwoColumnsNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_value(from.m_value), m_condition_column(from.m_condition_column), m_column_type(from.m_column_type),
         m_condition_column_idx1(from.m_condition_column_idx1), m_condition_column_idx2(from.m_condition_column_idx2)
     {
         // NOT copied:
@@ -1550,7 +1578,7 @@ public:
         // m_getter2 = from.m_getter2;
     }
 
-protected:
+private:
     BinaryData m_value;
     const BinaryColumn* m_condition_column;
     ColumnType m_column_type;
@@ -1567,40 +1595,54 @@ protected:
 class ExpressionNode: public ParentNode {
 
 public:
-    ExpressionNode(Expression* compare) : m_compare(util::SharedPtr<Expression>(compare))
+    ExpressionNode(std::unique_ptr<Expression> expression) : m_expression(std::move(expression))
     {
         m_dD = 10.0;
         m_dT = 50.0;
     }
 
-    void init(const Table& table)  override
+    void init(const Table& table) override
     {
-        m_compare->set_table();
+        m_expression->set_base_table(&table);
         if (m_child)
             m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        size_t res = m_compare->find_first(start, end);
-        return res;
+        return m_expression->find_first(start, end);
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new ExpressionNode(*this));
+        return std::unique_ptr<ParentNode>(new ExpressionNode(*this, patches));
     }
 
-    ExpressionNode(const ExpressionNode&) = default;
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_expression->apply_handover_patch(patches, group);
+    }
 
-    util::SharedPtr<Expression> m_compare;
+private:
+    ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_expression(from.m_expression->clone(patches))
+    {
+    }
+
+    std::unique_ptr<Expression> m_expression;
 };
 
 
+struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
+    std::unique_ptr<RowBaseHandoverPatch> m_target_row;
+    size_t m_origin_column;
+};
+
 class LinksToNode : public ParentNode {
 public:
-    LinksToNode(size_t origin_column_index, size_t target_row) : m_origin_column(origin_column_index),
-                                                                 m_target_row(target_row)
+    LinksToNode(size_t origin_column_index, const ConstRow& target_row) :
+        m_origin_column(origin_column_index),
+        m_target_row(target_row)
     {
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1615,40 +1657,68 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        size_t ret = realm::npos; // superfluous init, but gives warnings otherwise
+        if (!m_target_row.is_attached())
+            return not_found;
+
         DataType type = m_table->get_column_type(m_origin_column);
+        REALM_ASSERT(type == type_Link || type == type_LinkList);
 
         if (type == type_Link) {
             LinkColumnBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
             LinkColumn& cl = static_cast<LinkColumn&>(clb);
-            ret = cl.find_first(m_target_row + 1, start, end); // LinkColumn stores link to row N as the integer N + 1
+            return cl.find_first(m_target_row.get_index() + 1, start, end); // LinkColumn stores link to row N as the integer N + 1
         }
         else if (type == type_LinkList) {
             LinkColumnBase& clb = const_cast<Table*>(m_table)->get_column_link_base(m_origin_column);
             LinkListColumn& cll = static_cast<LinkListColumn&>(clb);
+
             for (size_t i = start; i < end; i++) {
                 LinkViewRef lv = cll.get(i);
-                ret = lv->find(m_target_row);
-                if (ret != not_found)
+                if (lv->find(m_target_row.get_index()) != not_found)
                     return i;
             }
         }
-        else {
-            REALM_ASSERT(false);
-        }
 
-        return ret;
+        return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone() const override
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return std::unique_ptr<ParentNode>(new LinksToNode(*this));
+        return std::unique_ptr<ParentNode>(new LinksToNode(*this, patches));
     }
 
-    size_t m_origin_column;
-    size_t m_target_row;
-};
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        REALM_ASSERT(patches.size());
+        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
+        patches.pop_back();
 
+        auto patch = dynamic_cast<LinksToNodeHandoverPatch*>(abstract_patch.get());
+        REALM_ASSERT(patch);
+
+        m_origin_column = patch->m_origin_column;
+        m_target_row.apply_and_consume_patch(patch->m_target_row, group);
+
+        ParentNode::apply_handover_patch(patches, group);
+    }
+
+private:
+    size_t m_origin_column;
+    ConstRow m_target_row;
+
+    LinksToNode(const LinksToNode& source, QueryNodeHandoverPatches* patches) : ParentNode(source, patches),
+         m_origin_column(patches ? npos : source.m_origin_column),
+         m_target_row(patches ? ConstRow() : source.m_target_row)
+    {
+        if (!patches)
+            return;
+
+        std::unique_ptr<LinksToNodeHandoverPatch> patch(new LinksToNodeHandoverPatch);
+        patch->m_origin_column = source.m_origin_column;
+        ConstRow::generate_patch(source.m_target_row, patch->m_target_row);
+        patches->emplace_back(patch.release());
+    }
+};
 
 } // namespace realm
 

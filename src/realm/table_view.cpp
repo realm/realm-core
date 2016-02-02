@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -18,9 +18,9 @@
  *
  **************************************************************************/
 
+#include <unordered_set>
+
 #include <realm/table_view.hpp>
-
-
 #include <realm/column.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/util/utf8.hpp>
@@ -30,7 +30,7 @@
 
 using namespace realm;
 
-TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
+TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
                              MutableSourcePayload mode)
     : RowIndexes(src, mode),
       m_linked_table(TableRef()),
@@ -40,14 +40,10 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
       m_query(src.m_query, patch.query_patch, mode)
 {
     patch.was_in_sync = src.is_in_sync();
-    patch.table_num = src.m_table->get_index_in_group();
-    patch.linked_table_num = src.m_linked_table ? src.m_linked_table->get_index_in_group() : npos;
+    Table::generate_patch(src.m_table, patch.m_table);
+    Table::generate_patch(src.m_linked_table, patch.linked_table);
     patch.linked_column = src.m_linked_column;
     patch.linked_row = src.m_linked_row;
-    // must be group level table!
-    if (patch.table_num == npos) {
-        throw std::runtime_error("TableView handover failed: not a group level table");
-    }
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
     src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
@@ -61,7 +57,7 @@ TableViewBase::TableViewBase(TableViewBase& src, Handover_patch& patch,
     m_num_detached_refs = 0;
 }
 
-TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
+TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
                              ConstSourcePayload mode)
     : RowIndexes(src, mode),
       m_linked_table(TableRef()),
@@ -74,14 +70,10 @@ TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
         patch.was_in_sync = false;
     else
         patch.was_in_sync = src.is_in_sync();
-    patch.table_num = src.m_table->get_index_in_group();
-    patch.linked_table_num = src.m_linked_table ? src.m_linked_table->get_index_in_group() : npos;
+    Table::generate_patch(src.m_table, patch.m_table);
+    Table::generate_patch(src.m_linked_table, patch.linked_table);
     patch.linked_column = src.m_linked_column;
     patch.linked_row = src.m_linked_row;
-    // must be group level table!
-    if (patch.table_num == npos) {
-        throw std::runtime_error("TableView handover failed: not a group level table");
-    }
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
     m_last_seen_version = 0;
@@ -94,24 +86,23 @@ TableViewBase::TableViewBase(const TableViewBase& src, Handover_patch& patch,
     m_num_detached_refs = 0;
 }
 
-void TableViewBase::apply_patch(Handover_patch& patch, Group& group)
+void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 {
-    TableRef tr = group.get_table(patch.table_num);
-    m_table = tr;
-    if (patch.was_in_sync)
-        m_last_seen_version = tr->m_version;
-    else
-        m_last_seen_version = -1;
-    tr->register_view(this);
+    m_table = Table::create_from_and_consume_patch(patch.m_table, group);
+    m_table->register_view(this);
     m_query.apply_patch(patch.query_patch, group);
     m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
 
-    if (patch.linked_table_num != npos) {
-        TableRef linked_tr = group.get_table(patch.linked_table_num);
-        m_linked_table = linked_tr;
+    if (patch.linked_table) {
+        m_linked_table = Table::create_from_and_consume_patch(patch.linked_table, group);
         m_linked_column = patch.linked_column;
         m_linked_row = patch.linked_row;
     }
+
+    if (patch.was_in_sync)
+        m_last_seen_version = outside_version();
+    else
+        m_last_seen_version = -1;
 }
 
 // Searching
@@ -455,16 +446,31 @@ uint64_t TableViewBase::outside_version() const
 {
     check_cookie();
 
+    // If the TableView directly or indirectly depends on a LinkList that has been deleted, then its m_table has been
+    // set to 0 and there is no way to know its version number. So return biggest possible value to trigger a refresh
+    // later
+    uint64_t max = std::numeric_limits<uint64_t>::max();
+
     // Return version of whatever this TableView depends on
     LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
     if (lvp) {
-        // This TableView was created by a Query that had a LinkViewRef inside its .where() clause
-        return lvp->get_origin_table().m_version;
+        // Depends on Query that depends on LinkList. 
+        if (lvp->is_attached()) {
+            return lvp->get_origin_table().m_version;
+        }
+        else {
+            return max;
+        }
     }
 
     if (m_linkview_source) {
-        // m_linkview_source is set if-and-only-if this TableView was created by LinkView::get_as_sorted_view()
-        return m_linkview_source->get_origin_table().m_version;
+        // m_linkview_source is set if-and-only-if this TableView was created by LinkView::get_as_sorted_view().
+        if (m_linkview_source->is_attached()) {
+            return m_linkview_source->get_origin_table().m_version;
+        }
+        else {
+            return max;
+        }
     }
     else {
         // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)
@@ -472,7 +478,7 @@ uint64_t TableViewBase::outside_version() const
     }
 }
 
-bool TableViewBase::is_in_sync() const noexcept
+bool TableViewBase::is_in_sync() const
 {
     check_cookie();
 
@@ -613,6 +619,90 @@ void TableViewBase::sync_distinct_view(size_t column)
     }
 }
 
+void TableViewBase::distinct(size_t column)
+{
+    distinct(std::vector<size_t> { column });
+}
+
+/// Remove rows that are duplicated with respect to the column set passed as argument. 
+/// Will keep original sorting order so that you can both have a distinct and sorted view.
+void TableViewBase::distinct(std::vector<size_t> columns)
+{
+    m_distinct_columns.clear();
+    const_cast<TableViewBase*>(this)->do_sync();
+    m_distinct_columns = columns;
+
+    if (m_distinct_columns.size() == 0)
+        return;
+
+    // Step 1: First copy original TableView into a vector
+    std::vector<size_t> original;
+    original.resize(size());
+    std::vector<bool> ascending;
+    for (size_t r = 0; r < size(); r++) {
+        original[r] = m_row_indexes.get(r);
+        ascending.push_back(true);
+    }
+
+    // Step 2: Now sort ascending using the same column set that was passed to distinct()
+    Sorter s(columns, ascending);
+    sort(s);
+
+    // Step 3: Create column accessors for all columns in the column set. 
+    std::vector<const ColumnTemplateBase*> m_columns;
+    std::vector<const StringEnumColumn*> m_columns_enum;
+    m_columns.resize(columns.size());
+    m_columns_enum.resize(columns.size());
+
+    for (size_t i = 0; i < columns.size(); i++) {
+        const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
+        // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting 
+        // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used 
+        // in a couple of other places in Core too.
+        const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
+        REALM_ASSERT(ctb);
+        if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&cb))
+            m_columns_enum[i] = cse;
+        else
+            m_columns[i] = ctb;
+
+        REALM_ASSERT(ctb);
+    }
+
+    // Step 4: Build a list of all duplicated rows that need to be removed
+    std::unordered_set<size_t> remove;
+    for (size_t r = 1; r < size(); r++) {
+        bool identical = true;
+        for (size_t c = 0; c < m_distinct_columns.size(); c++) {
+
+            int cmp;
+            size_t r1 = m_row_indexes.get(r);
+            size_t r2 = m_row_indexes.get(r - 1);
+            if (const StringEnumColumn* cse = m_columns_enum[c])
+                cmp = cse->compare_values(r1, r2);
+            else
+                cmp = m_columns[c]->compare_values(r1, r2);
+
+            if (cmp != 0) {
+                identical = false;
+                break;
+            }
+        }
+        if (identical) {
+            remove.insert(m_row_indexes.get(r));
+        }
+    }
+
+    // Step 5: Add all elements from the original TableView, but skip those in the duplicate-list
+    m_row_indexes.clear();
+    for (size_t i = 0; i < original.size(); i++) {
+        if (remove.find(original[i]) == remove.end()) {
+            m_row_indexes.add(original[i]);
+        }
+    }
+}
+
+
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
 {
@@ -683,8 +773,13 @@ void TableViewBase::do_sync()
         // SO: fake that we're up to date BEFORE calling find_all.
         m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
     }
+    m_num_detached_refs = 0;
+
     if (m_auto_sort)
         re_sort();
+
+    if (m_distinct_columns.size() > 0)
+        distinct(m_distinct_columns);
 
     m_last_seen_version = outside_version();
 }

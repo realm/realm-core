@@ -244,7 +244,7 @@ class TestList::ExecContext {
 public:
     SharedContext* m_shared;
     Mutex m_mutex;
-    long long m_num_checks;
+    std::atomic<long long> m_num_checks;
     long long m_num_failed_checks;
     long m_num_failed_tests;
     bool m_errors_seen;
@@ -323,7 +323,7 @@ void TestList::ExecContext::run()
             test->test_results.test_failed(message);
         }
 
-        test->test_results.m_context = 0;
+        test->test_results.m_context = nullptr;
         if (m_errors_seen)
             ++m_num_failed_tests;
     }
@@ -412,7 +412,6 @@ TestResults::TestResults():
 
 void TestResults::check_succeeded()
 {
-    LockGuard lock(m_context->m_mutex);
     ++m_context->m_num_checks;
 }
 

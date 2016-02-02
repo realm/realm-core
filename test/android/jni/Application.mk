@@ -6,4 +6,4 @@ APP_CPPFLAGS += -frtti
 APP_ABI := armeabi
 
 # Must match the toolchain version used by core
-NDK_TOOLCHAIN_VERSION := 4.8
+NDK_TOOLCHAIN_VERSION := 4.9

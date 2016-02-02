@@ -3,7 +3,6 @@ util/features.h \
 util/meta.hpp \
 util/inspect.hpp \
 util/assert.hpp \
-util/encryption_not_supported_exception.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
 util/tuple.hpp \
@@ -26,6 +25,10 @@ util/uri.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/platform_specific_condvar.hpp \
+util/file_mapper.hpp \
+util/encrypted_file_mapping.hpp \
+util/miscellaneous.hpp \
+util/to_string.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \

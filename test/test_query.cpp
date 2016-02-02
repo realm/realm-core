@@ -5393,96 +5393,100 @@ TEST(Query_SubtablesTyped)
 
 TEST(Query_AllTypesDynamicallyTyped)
 {
-    Table table;
-    DescriptorRef sub1;
-    table.add_column(type_Bool, "boo");
-    table.add_column(type_Int, "int");
-    table.add_column(type_Float, "flt");
-    table.add_column(type_Double, "dbl");
-    table.add_column(type_String, "str");
-    table.add_column(type_Binary, "bin");
-    table.add_column(type_DateTime, "dat");
-    table.add_column(type_Table, "tab", &sub1);
-    table.add_column(type_Mixed, "mix");
-    sub1->add_column(type_Int, "sub_int");
-    sub1.reset();
+    for (int nullable = 0; nullable < 2; nullable++) {
+        bool n = (nullable == 1);
 
-    const char bin[4] = { 0, 1, 2, 3 };
-    BinaryData bin1(bin, sizeof bin / 2);
-    BinaryData bin2(bin, sizeof bin);
-    int_fast64_t time_now = time(0);
-    Mixed mix_int(int64_t(1));
-    Mixed mix_subtab((Mixed::subtable_tag()));
+        Table table;
+        DescriptorRef sub1;
+        table.add_column(type_Bool, "boo", n);
+        table.add_column(type_Int, "int", n);
+        table.add_column(type_Float, "flt", n);
+        table.add_column(type_Double, "dbl", n);
+        table.add_column(type_String, "str", n);
+        table.add_column(type_Binary, "bin", n);
+        table.add_column(type_DateTime, "dat", n);
+        table.add_column(type_Table, "tab", &sub1);
+        table.add_column(type_Mixed, "mix");
+        sub1->add_column(type_Int, "sub_int");
+        sub1.reset();
 
-    table.add_empty_row();
-    table.set_bool(0, 0, false);
-    table.set_int(1, 0, 54);
-    table.set_float(2, 0, 0.7f);
-    table.set_double(3, 0, 0.8);
-    table.set_string(4, 0, "foo");
-    table.set_binary(5, 0, bin1);
-    table.set_datetime(6, 0, 0);
-    table.set_mixed(8, 0, mix_int);
+        const char bin[4] = { 0, 1, 2, 3 };
+        BinaryData bin1(bin, sizeof bin / 2);
+        BinaryData bin2(bin, sizeof bin);
+        int_fast64_t time_now = time(0);
+        Mixed mix_int(int64_t(1));
+        Mixed mix_subtab((Mixed::subtable_tag()));
 
-    table.add_empty_row();
-    table.set_bool(0, 1, true);
-    table.set_int(1, 1, 506);
-    table.set_float(2, 1, 7.7f);
-    table.set_double(3, 1, 8.8);
-    table.set_string(4, 1, "banach");
-    table.set_binary(5, 1, bin2);
-    table.set_datetime(6, 1, time_now);
-    TableRef subtab = table.get_subtable(7, 1);
-    subtab->add_empty_row();
-    subtab->set_int(0, 0, 100);
-    table.set_mixed(8, 1, mix_subtab);
+        table.add_empty_row();
+        table.set_bool(0, 0, false);
+        table.set_int(1, 0, 54);
+        table.set_float(2, 0, 0.7f);
+        table.set_double(3, 0, 0.8);
+        table.set_string(4, 0, "foo");
+        table.set_binary(5, 0, bin1);
+        table.set_datetime(6, 0, 0);
+        table.set_mixed(8, 0, mix_int);
 
-    CHECK_EQUAL(1, table.where().equal(0, false).count());
-    CHECK_EQUAL(1, table.where().equal(1, int64_t(54)).count());
-    CHECK_EQUAL(1, table.where().equal(2, 0.7f).count());
-    CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
-    CHECK_EQUAL(1, table.where().equal(4, "foo").count());
-    CHECK_EQUAL(1, table.where().equal(5, bin1).count());
-    CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
-    //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
-    //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
+        table.add_empty_row();
+        table.set_bool(0, 1, true);
+        table.set_int(1, 1, 506);
+        table.set_float(2, 1, 7.7f);
+        table.set_double(3, 1, 8.8);
+        table.set_string(4, 1, "banach");
+        table.set_binary(5, 1, bin2);
+        table.set_datetime(6, 1, time_now);
+        TableRef subtab = table.get_subtable(7, 1);
+        subtab->add_empty_row();
+        subtab->set_int(0, 0, 100);
+        table.set_mixed(8, 1, mix_subtab);
 
-    Query query = table.where().equal(0, false);
+        CHECK_EQUAL(1, table.where().equal(0, false).count());
+        CHECK_EQUAL(1, table.where().equal(1, int64_t(54)).count());
+        CHECK_EQUAL(1, table.where().equal(2, 0.7f).count());
+        CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
+        CHECK_EQUAL(1, table.where().equal(4, "foo").count());
+        CHECK_EQUAL(1, table.where().equal(5, bin1).count());
+        CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
+        //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
+        //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
 
-    size_t ndx = not_found;
+        Query query = table.where().equal(0, false);
 
-    CHECK_EQUAL(54, query.minimum_int(1));
-    query.minimum_int(1, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        size_t ndx = not_found;
 
-    CHECK_EQUAL(54, query.maximum_int(1));
-    query.maximum_int(1, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(54, query.minimum_int(1));
+        query.minimum_int(1, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(54, query.sum_int(1));
-    CHECK_EQUAL(54, query.average_int(1));
+        CHECK_EQUAL(54, query.maximum_int(1));
+        query.maximum_int(1, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(0.7f, query.minimum_float(2));
-    query.minimum_float(2, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(54, query.sum_int(1));
+        CHECK_EQUAL(54, query.average_int(1));
 
-    CHECK_EQUAL(0.7f, query.maximum_float(2));
-    query.maximum_float(2, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.7f, query.minimum_float(2));
+        query.minimum_float(2, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(0.7f, query.sum_float(2));
-    CHECK_EQUAL(0.7f, query.average_float(2));
+        CHECK_EQUAL(0.7f, query.maximum_float(2));
+        query.maximum_float(2, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(0.8, query.minimum_double(3));
-    query.minimum_double(3, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.7f, query.sum_float(2));
+        CHECK_EQUAL(0.7f, query.average_float(2));
 
-    CHECK_EQUAL(0.8, query.maximum_double(3));
-    query.maximum_double(3, nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
+        CHECK_EQUAL(0.8, query.minimum_double(3));
+        query.minimum_double(3, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(0.8, query.sum_double(3));
-    CHECK_EQUAL(0.8, query.average_double(3));
+        CHECK_EQUAL(0.8, query.maximum_double(3));
+        query.maximum_double(3, nullptr, 0, not_found, not_found, &ndx);
+        CHECK_EQUAL(0, ndx);
+
+        CHECK_EQUAL(0.8, query.sum_double(3));
+        CHECK_EQUAL(0.8, query.average_double(3));
+    }
 }
 
 TEST(Query_AggregateSortedView)
@@ -6217,12 +6221,15 @@ void create_columns(TableRef table, bool nullable = true)
 
 bool equals(TableView& tv, std::vector<size_t> indexes)
 {
-    if (static_cast<int>(tv.size()) != indexes.end() - indexes.begin())
+    if (static_cast<int>(tv.size()) != indexes.end() - indexes.begin()) {
         return false;
+    }
 
-    for (auto it = indexes.begin(); it != indexes.end(); ++it)
-        if (tv.get_source_ndx(it - indexes.begin()) != *it)
-        return false;
+    for (auto it = indexes.begin(); it != indexes.end(); ++it) {
+        if (tv.get_source_ndx(it - indexes.begin()) != *it) {
+            return false;
+        }
+    }
 
     return true;
 }
@@ -6336,8 +6343,7 @@ TEST(Query_NullShowcase)
     Columns<BinaryData> photo = table->column<BinaryData>(6);
 
     // check int/double type mismatch error handling
-    Columns<Int> dummy1;
-    CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
+    CHECK_THROW_ANY(table->column<Int>(3));
 
     TableView tv;
 
@@ -6533,11 +6539,20 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_float(1, 0)));
     CHECK(std::isnan(table->get_float(1, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+ 
+    // FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
+    // signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel 
+    // Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that 
+    // has bit 22 clear (indicates it's signaling), and pop it back (fst instruction), the FPU will toggle
+    // that bit into being set. All this needs further investigation, so a P2 has been created. Note that 
+    // IEEE just began specifying signaling vs. non-signaling NaNs in 2008. Also note that all this seems
+    // to work fine on ARM in both 32 and 64 bit mode.
+
+#if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
     CHECK(null::is_signaling(table->get_float(1, 0)));
 #endif
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+#ifndef _WIN32 // signaling_NaN() may be broken in VS2015 (see long comment above)
     CHECK(!null::is_signaling(table->get_float(1, 1)));
 #endif
 
@@ -6549,7 +6564,8 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_double(3, 0)));
     CHECK(std::isnan(table->get_double(3, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+// signaling_NaN() broken in VS2015, and broken in 32bit intel
+#if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
     CHECK(null::is_signaling(table->get_double(3, 0)));
     CHECK(!null::is_signaling(table->get_double(3, 1)));
 #endif
@@ -7311,26 +7327,36 @@ TEST(Query_Link_MaximumSumAverage)
     table1->set_null(2, 3);
 
     TableRef table2 = group.add_table("table2");
+    size_t col_double = table2->add_column(type_Double, "double");
+    size_t col_link = table2->add_column_link(type_Link, "link", *table1);
     size_t col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
 
     // table2
-    // 0: { }
-    // 1: { 1 }
-    // 2: { 1, 2 }
-    // 3: { 1, 2, 3 }
+    // 0: 456.0 ->0 { }
+    // 1: 456.0 ->1 { 1 }
+    // 2: 456.0 ->2 { 1, 2 }
+    // 3: 456.0 ->3 { 1, 2, 3 }
 
     table2->add_empty_row();
+    table2->set_double(col_double, 0, 456.0);
+    table2->set_link(col_link, 0, 0);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 1, 456.0);
+    table2->set_link(col_link, 1, 1);
     LinkViewRef links = table2->get_linklist(col_linklist, 1);
     links->add(1);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 2, 456.0);
+    table2->set_link(col_link, 2, 2);
     links = table2->get_linklist(col_linklist, 2);
     links->add(1);
     links->add(2);
 
     table2->add_empty_row();
+    table2->set_double(col_double, 3, 456.0);
+    table2->set_link(col_link, 3, 3);
     links = table2->get_linklist(col_linklist, 3);
     links->add(1);
     links->add(2);
@@ -7358,6 +7384,20 @@ TEST(Query_Link_MaximumSumAverage)
     q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).max() == table2->column<Double>(col_double);
+    match = q.find();
+    CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
@@ -7404,6 +7444,18 @@ TEST(Query_Link_MaximumSumAverage)
     CHECK_EQUAL(not_found, match);
 
     q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 456;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == table2->column<Double>(col_double);
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
@@ -7460,6 +7512,18 @@ TEST(Query_Link_MaximumSumAverage)
     q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == null();
     match = q.find();
     CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() < table2->link(col_link).column<Int>(0);
+    match = q.find();
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == table2->column<Double>(col_double);
+    match = q.find();
+    CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
@@ -7798,6 +7862,680 @@ TEST(Query_DeepLink)
     Query query = table->link(col_linklist).column<Bool>(col_bool) == true;
     TableView view = query.find_all();
     CHECK_EQUAL(N, view.size());
+}
+
+TEST(Query_LinksToDeletedOrMovedRow)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    size_t col_link = source->add_column_link(type_Link, "link", *target);
+    size_t col_name = target->add_column(type_String, "name");
+
+    target->add_empty_row(3);
+    target->set_string(col_name, 0, "A");
+    target->set_string(col_name, 1, "B");
+    target->set_string(col_name, 2, "C");
+
+    source->add_empty_row(3);
+    source->set_link(col_link, 0, 0);
+    source->set_link(col_link, 1, 1);
+    source->set_link(col_link, 2, 2);
+
+    Query qA = source->where().links_to(col_link, target->get(0));
+    Query qB = source->where().links_to(col_link, target->get(1));
+    Query qC = source->where().links_to(col_link, target->get(2));
+
+    // Move row C over row A. Row C is now at position 0, and row A has been removed.
+    target->move_last_over(0);
+
+    // Row A should not be found as it has been removed.
+    TableView tvA = qA.find_all();
+    CHECK_EQUAL(0, tvA.size());
+
+    // Row B should be found as it was not changed.
+    TableView tvB = qB.find_all();
+    CHECK_EQUAL(1, tvB.size());
+    CHECK_EQUAL(1, tvB[0].get_link(col_link));
+    CHECK_EQUAL("B", target->get_string(col_name, tvB[0].get_link(col_link)));
+
+    // Row C should still be found, despite having been moved.
+    TableView tvC = qC.find_all();
+    CHECK_EQUAL(1, tvC.size());
+    CHECK_EQUAL(0, tvC[0].get_link(col_link));
+    CHECK_EQUAL("C", target->get_string(col_name, tvC[0].get_link(col_link)));
+}
+
+// Triggers bug in compare_relation()
+TEST(Query_BrokenFindGT)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    size_t col = table->add_column(type_Int, "int");
+
+    const size_t rows = 12;
+    for (size_t i = 0; i < rows; ++i) {
+        table->add_empty_row();
+        table->set_int(col, i, i + 2);
+    }
+
+    table->add_empty_row();
+    table->set_int(col, rows + 0, 1);
+
+    table->add_empty_row();
+    table->set_int(col, rows + 1, 1);
+
+    table->add_empty_row();
+    table->set_int(col, rows + 2, 1);
+
+    for (size_t i = 0; i < 3; ++i) {
+        table->add_empty_row();
+        table->set_int(col, rows + 3 + i, i + 2);
+    }
+
+    CHECK_EQUAL(18, table->size());
+
+    Query q = table->where().greater(col, 1);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(15, tv.size());
+
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_NOT_EQUAL(1, tv.get_int(col, i));
+    }
+}
+
+// Small fuzzy test also to trigger bugs such as the compare_relation() bug above
+TEST(Query_FuzzyFind)
+{
+    // TEST_DURATION is normally 0.
+    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++)
+    {
+        Group group;
+        TableRef table = group.add_table("test");
+        size_t col = table->add_column(type_Int, "int");
+
+        // The bug happened when values were stored in 4 bits or less. So create a table full of such random values
+        const size_t rows = 18;
+        for (size_t i = 0; i < rows; ++i) {
+            table->add_empty_row();
+            
+            // Produce numbers -3 ... 17. Just to test edge cases around 4-bit values also
+            int64_t t = (fastrand() % 21) - 3;
+            table->set_int(col, i, t);
+        }
+
+        for (int64_t s = -2; s < 18; s++) {
+            Query q_g = table->where().greater(col, s);
+            TableView tv_g = q_g.find_all();
+            for (size_t i = 0; i < tv_g.size(); ++i) {
+                CHECK(tv_g.get_int(col, i) > s);
+            }
+
+            Query q_l = table->where().less(col, s);
+            TableView tv_l = q_l.find_all();
+            for (size_t i = 0; i < tv_l.size(); ++i) {
+                CHECK(tv_l.get_int(col, i) < s);
+            }
+
+            Query q_le = table->where().less_equal(col, s);
+            TableView tv_le = q_le.find_all();
+            for (size_t i = 0; i < tv_le.size(); ++i) {
+                CHECK(tv_le.get_int(col, i) <= s);
+            }
+
+            // Sum of values greater + less-or-equal should be total number of rows. This ensures that both
+            // 1) no search results are *omitted* from find_all(), and no 2) results are *false* positives
+            CHECK(tv_g.size() + tv_le.size() == rows);
+        }
+    }
+}
+
+TEST(Query_AverageNullableColumns)
+{
+    Table table;
+    size_t col_int = table.add_column(type_Int, "int", true);
+    size_t col_float = table.add_column(type_Float, "float", true);
+    size_t col_double = table.add_column(type_Double, "double", true);
+
+    CHECK_EQUAL(0, table.where().average_int(col_int));
+    CHECK_EQUAL(0, table.where().average_float(col_float));
+    CHECK_EQUAL(0, table.where().average_double(col_double));
+
+    //
+    // +-----+-------+--------+
+    // | int | float | double |
+    // +-----+-------+--------+
+    // |   2 |     2 |      2 |
+    // |   4 |     4 |      4 |
+    // +-----+-------+--------+
+
+    table.add_empty_row(2);
+
+    table.set_int(col_int, 0, 2);
+    table.set_int(col_int, 1, 4);
+
+    table.set_float(col_float, 0, 2);
+    table.set_float(col_float, 1, 4);
+
+    table.set_double(col_double, 1, 4);
+    table.set_double(col_double, 0, 2);
+
+    CHECK_EQUAL(3, table.where().average_int(col_int));
+    CHECK_EQUAL(3, table.where().average_float(col_float));
+    CHECK_EQUAL(3, table.where().average_double(col_double));
+
+    // Add a row with nulls in each column. These nulls must be treated as not existing, that is,
+    // it must be such that the average of 2 + 2 + null == 2.
+    table.add_empty_row();
+
+    CHECK_EQUAL(3, table.where().average_int(col_int));
+    CHECK_EQUAL(3, table.where().average_float(col_float));
+    CHECK_EQUAL(3, table.where().average_double(col_double));
+}
+
+TEST(Query_NegativeNumbers)
+{
+    for (size_t nullable = 0; nullable < 2; ++nullable) {
+        Group group;
+        TableRef table = group.add_table("test");
+        table->add_column(type_Int, "int", nullable == 0);
+
+        int64_t id = -1;
+        for (size_t i = 0; i < 10; ++i) {
+            table->add_empty_row();
+            table->set_int(0, i, id--);
+        }
+
+        CHECK_EQUAL(10, table->where().between(0, -10, -1).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) > -11).find_all().size());
+        CHECK_EQUAL(10, table->where().greater(0, -11).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) >= -10).find_all().size());
+        CHECK_EQUAL(10, table->where().greater_equal(0, -10).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) < 128).find_all().size());
+        CHECK_EQUAL(10, table->where().less(0, 128).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) < 127).find_all().size());
+        CHECK_EQUAL(10, table->where().less(0, 127).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) <= -1).find_all().size());
+        CHECK_EQUAL(10, table->where().less_equal(0, -1).find_all().size());
+        CHECK_EQUAL(10, (table->column<Int>(0) < 0).find_all().size());
+        TableView view = table->where().less(0, 0).find_all();
+        CHECK_EQUAL(10, view.size());
+        id = -1;
+        for (size_t i = 0; i < view.size(); ++i) {
+            CHECK_EQUAL(id, view.get_int(0, i));
+            id--;
+        }
+    }
+}
+
+// Exposes bug that would lead to nulls being included as 0 value in average when performed
+// on Query. When performed on TableView or Table, it worked OK.
+TEST(Query_MaximumSumAverage)
+{
+    for (int nullable = 0; nullable < 2; nullable++)
+    {
+        bool n = (nullable == 1);
+        Group group;
+        TableRef table1 = group.add_table("table1");
+        table1->add_column(type_Int, "int1", /* nullable */ n);
+        table1->add_column(type_Int, "int2", /* nullable */ n);
+        table1->add_column(type_Double, "d", /* nullable */ n);
+
+        // Create three identical columns with values: For the nullable case: 
+        //      3, 4, null
+        // For non-nullable iteration:
+        //      3, 4
+
+        table1->add_empty_row(n ? 3 : 2);
+        table1->set_int(0, 0, 3);
+        table1->set_int(0, 1, 4);
+        table1->set_int(1, 0, 3);
+        table1->set_int(1, 1, 4);
+        table1->set_double(2, 0, 3.);
+        table1->set_double(2, 1, 4.);
+
+        // Average
+        {
+            double d;
+
+            // Those that have criterias include all rows, also those with null
+            d = table1->where().average_int(0);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            d = table1->where().average_int(1);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            // Criteria on same column as average
+            d = table1->where().not_equal(0, 1234).average_int(0);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            // Criteria on other column than average (triggers different code paths)
+            d = table1->where().not_equal(0, 1234).average_int(1);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            // Average of double, criteria on integer
+            d = table1->where().not_equal(0, 1234).average_double(2);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            d = table1->where().not_equal(2, 1234.).average_double(2);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+
+            // Those with criteria now only include some rows, whereof none are null
+            d = table1->where().average_int(0);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            d = table1->where().average_int(1);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            // Criteria on same column as average
+            d = table1->where().equal(0, 3).average_int(0);
+            CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+
+            // Criteria on other column than average (triggers different code paths)
+            d = table1->where().equal(0, 3).average_int(1);
+            CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+
+            // Average of double, criteria on integer
+            d = table1->where().not_equal(0, 3).average_double(2);
+            CHECK_APPROXIMATELY_EQUAL(d, 4., 0.001);
+
+            d = table1->where().equal(2, 3.).average_double(2);
+            CHECK_APPROXIMATELY_EQUAL(d, 3., 0.001);
+
+            // Now using null as criteria
+            d = (table1->column<Int>(0) != null()).average_double(2);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            d = (table1->column<Double>(2) != null()).average_double(2);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            d = (table1->column<Int>(0) != null()).average_int(0);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+
+            d = (table1->column<Int>(1) != null()).average_int(0);
+            CHECK_APPROXIMATELY_EQUAL(d, 7. / 2., 0.001);
+        }
+
+
+        // Maximum
+        {
+            int64_t d;
+            double dbl;
+            // Those that have criterias include all rows, also those with null
+            d = table1->where().maximum_int(0);
+            CHECK_EQUAL(d, 4);
+
+            d = table1->where().maximum_int(1);
+            CHECK_EQUAL(d, 4);
+
+            // Criteria on same column as maximum
+            d = table1->where().not_equal(0, 1234).maximum_int(0);
+            CHECK_EQUAL(d, 4);
+
+            // Criteria on other column than maximum (triggers different code paths)
+            d = table1->where().not_equal(0, 1234).maximum_int(1);
+            CHECK_EQUAL(d, 4);
+
+            // Average of double, criteria on integer
+            dbl = table1->where().not_equal(0, 1234).maximum_double(2);
+            CHECK_EQUAL(d, 4);
+
+            dbl = table1->where().not_equal(2, 1234.).maximum_double(2);
+            CHECK_EQUAL(d, 4.);
+
+
+            // Those with criteria now only include some rows, whereof none are null
+            d = table1->where().maximum_int(0);
+            CHECK_EQUAL(d, 4);
+
+            d = table1->where().maximum_int(1);
+            CHECK_EQUAL(d, 4);
+
+            // Criteria on same column as maximum
+            d = table1->where().equal(0, 4).maximum_int(0);
+            CHECK_EQUAL(d, 4);
+
+            // Criteria on other column than maximum (triggers different code paths)
+            d = table1->where().equal(0, 4).maximum_int(1);
+            CHECK_EQUAL(d, 4);
+
+            // Average of double, criteria on integer
+            dbl = table1->where().not_equal(0, 3).maximum_double(2);
+            CHECK_EQUAL(dbl, 4.);
+
+            dbl = table1->where().equal(2, 3.).maximum_double(2);
+            CHECK_EQUAL(dbl, 3.);
+
+            // Now using null as criteria
+            dbl = (table1->column<Int>(0) != null()).maximum_double(2);
+            CHECK_EQUAL(dbl, 4.);
+
+            dbl = (table1->column<Double>(2) != null()).maximum_double(2);
+            CHECK_EQUAL(dbl, 4.);
+
+            d = (table1->column<Int>(0) != null()).maximum_int(0);
+            CHECK_EQUAL(dbl, 4);
+
+            d = (table1->column<Int>(1) != null()).maximum_int(0);
+            CHECK_EQUAL(dbl, 4);
+        }
+
+
+        // Minimum
+        {
+            int64_t d;
+            double dbl;
+            // Those that have criterias include all rows, also those with null
+            d = table1->where().minimum_int(0);
+            CHECK_EQUAL(d, 3);
+
+            d = table1->where().minimum_int(1);
+            CHECK_EQUAL(d, 3);
+
+            // Criteria on same column as minimum
+            d = table1->where().not_equal(0, 1234).minimum_int(0);
+            CHECK_EQUAL(d, 3);
+
+            // Criteria on other column than minimum (triggers different code paths)
+            d = table1->where().not_equal(0, 1234).minimum_int(1);
+            CHECK_EQUAL(d, 3);
+
+            // Average of double, criteria on integer
+            dbl = table1->where().not_equal(0, 1234).minimum_double(2);
+            CHECK_EQUAL(d, 3);
+
+            dbl = table1->where().not_equal(2, 1234.).minimum_double(2);
+            CHECK_EQUAL(d, 3.);
+
+
+            // Those with criteria now only include some rows, whereof none are null
+            d = table1->where().minimum_int(0);
+            CHECK_EQUAL(d, 3);
+
+            d = table1->where().minimum_int(1);
+            CHECK_EQUAL(d, 3);
+
+            // Criteria on same column as minimum
+            d = table1->where().equal(0, 4).minimum_int(0);
+            CHECK_EQUAL(d, 4);
+
+            // Criteria on other column than minimum (triggers different code paths)
+            d = table1->where().equal(0, 4).minimum_int(1);
+            CHECK_EQUAL(d, 4);
+
+            // Average of double, criteria on integer
+            dbl = table1->where().not_equal(0, 3).minimum_double(2);
+            CHECK_EQUAL(dbl, 4.);
+
+            dbl = table1->where().equal(2, 3.).minimum_double(2);
+            CHECK_EQUAL(dbl, 3.);
+
+            // Now using null as criteria
+            dbl = (table1->column<Int>(0) != null()).minimum_double(2);
+            CHECK_EQUAL(dbl, 3.);
+
+            dbl = (table1->column<Double>(2) != null()).minimum_double(2);
+            CHECK_EQUAL(dbl, 3.);
+
+            d = (table1->column<Int>(0) != null()).minimum_int(0);
+            CHECK_EQUAL(dbl, 3);
+
+            d = (table1->column<Int>(1) != null()).minimum_int(0);
+            CHECK_EQUAL(dbl, 3);
+        }
+
+        // Sum
+        {
+            int64_t d;
+            double dbl;
+            // Those that have criterias include all rows, also those with null
+            d = table1->where().sum_int(0);
+            CHECK_EQUAL(d, 7);
+
+            // Criteria on same column as maximum
+            d = table1->where().not_equal(0, 1234).sum_int(0);
+            CHECK_EQUAL(d, 7);
+
+            // Criteria on other column than maximum (triggers different code paths)
+            d = table1->where().not_equal(0, 1234).sum_int(1);
+            CHECK_EQUAL(d, 7);
+
+            // Average of double, criteria on integer
+            dbl = table1->where().not_equal(0, 1234).sum_double(2);
+            CHECK_EQUAL(d, 7.);
+
+            dbl = table1->where().not_equal(2, 1234.).sum_double(2);
+            CHECK_APPROXIMATELY_EQUAL(d, 7., 0.001);
+
+
+            // Those with criteria now only include some rows, whereof none are null
+            d = table1->where().sum_int(0);
+            CHECK_EQUAL(d, 7);
+
+            d = table1->where().sum_int(1);
+            CHECK_EQUAL(d, 7);
+
+            // Criteria on same column as maximum
+            d = table1->where().equal(0, 4).sum_int(0);
+            CHECK_EQUAL(d, 4);
+
+            // Criteria on other column than maximum (triggers different code paths)
+            d = table1->where().equal(0, 4).sum_int(1);
+            CHECK_EQUAL(d, 4);
+
+            // Average of double, criteria on integer
+            dbl = table1->where().not_equal(0, 3).sum_double(2);
+            CHECK_APPROXIMATELY_EQUAL(dbl, 4., 0.001);
+
+            dbl = table1->where().equal(2, 3.).sum_double(2);
+            CHECK_APPROXIMATELY_EQUAL(dbl, 3., 0.001);
+
+            // Now using null as criteria
+            dbl = (table1->column<Int>(0) != null()).sum_double(2);
+            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+
+            dbl = (table1->column<Double>(2) != null()).sum_double(2);
+            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
+
+            d = (table1->column<Int>(0) != null()).sum_int(0);
+            CHECK_EQUAL(dbl, 7);
+
+            d = (table1->column<Int>(1) != null()).sum_int(0);
+            CHECK_EQUAL(dbl, 7);
+        }
+
+
+
+        // Count
+        {
+            int64_t d;
+            d = table1->where().count();
+            CHECK_EQUAL(d, n ? 3 : 2);
+
+            d = table1->where().not_equal(0, 1234).count();
+            CHECK_EQUAL(d, n ? 3 : 2);
+
+            d = table1->where().equal(0, 4).count();
+            CHECK_EQUAL(d, 1);
+
+            d = table1->where().not_equal(0, 3).count();
+            CHECK_EQUAL(d, n ? 2 : 1);
+
+            d = table1->where().equal(2, 3.).count();
+            CHECK_EQUAL(d, 1);
+
+            // Now using null as criteria
+            d = (table1->column<Int>(0) != null()).count();
+            CHECK_EQUAL(d, 2);
+
+            d = (table1->column<Double>(2) != null()).count();
+            CHECK_EQUAL(d, 2);
+
+            d = (table1->column<Int>(0) != null()).count();
+            CHECK_EQUAL(d, 2);
+
+            d = (table1->column<Int>(1) != null()).count();
+            CHECK_EQUAL(d, 2);
+        }
+    }
+}
+
+TEST(Query_ReferDeletedLinkView)
+{
+    // Queries and TableViews that depend on a deleted LinkList will now produce valid empty-like results
+    // (find() returns npos, find_all() returns empty TableView, sum() returns 0, etc.).
+    // They will no longer throw exceptions or crash.
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column_link(type_LinkList, "children", *table);
+    table->add_column(type_Int, "age");
+    table->add_empty_row();
+    table->set_int(1, 0, 123);
+    LinkViewRef links = table->get_linklist(0, 0);
+    Query q = table->where(links);
+    TableView tv = q.find_all();
+    
+    // TableView that depends on LinkView soon to be deleted
+    TableView tv_sorted = links->get_sorted_view(1);
+
+    // Delete LinkList so LinkView gets detached
+    table->move_last_over(0);
+    CHECK(!links->is_attached());
+
+    // See if "Query that depends on LinkView" returns sane "empty"-like values
+    CHECK_EQUAL(q.find_all().size(), 0);
+    CHECK_EQUAL(q.find(), npos);
+    CHECK_EQUAL(q.sum_int(1), 0);
+    CHECK_EQUAL(q.count(), 0);
+    size_t rows;
+    q.average_int(1, &rows);
+    CHECK_EQUAL(rows, 0);
+
+    tv_sorted.sync_if_needed();
+    // See if "TableView that depends on LinkView" returns sane "empty"-like values
+    tv_sorted.average_int(1, &rows);
+    CHECK_EQUAL(rows, 0);
+
+    // Now check a "Query that depends on (TableView that depends on LinkView)"
+    Query q2 = table->where(&tv_sorted);
+    CHECK_EQUAL(q2.count(), 0);
+    CHECK_EQUAL(q2.find(), npos);
+
+    CHECK(!links->is_attached());
+    tv.sync_if_needed();
+    
+    // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
+    // the LinkView through multiple levels!
+    CHECK(tv.is_attached());
+
+    // Before executing any methods on a LinkViewRef, you must still always check is_attached(). If you
+    // call links->add() on a deleted LinkViewRef (where is_attached() == false), it will assert
+    CHECK(!links->is_attached());
+}
+
+TEST(Query_SubQueries)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    table2->add_column(type_Int, "col1");
+    table2->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    table2->add_empty_row();
+    table2->set_int(0, 0, 400);
+    table2->set_string(1, 0, "hello");
+    table2->add_empty_row();
+    table2->set_int(0, 1, 500);
+    table2->set_string(1, 1, "world");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 2, "!");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 1, "world");
+
+
+    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+
+    // set some links
+    LinkViewRef links1;
+
+    links1 = table1->get_linklist(col_link2, 0);
+    links1->add(1);
+
+    links1 = table1->get_linklist(col_link2, 1);
+    links1->add(1);
+    links1->add(2);
+
+
+    size_t match;
+    Query q;
+
+    // The linked rows for rows 0 and 2 all match ("world", 500). Row 2 does by virtue of having no rows.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500).count() == table1->column<LinkList>(col_link2).count();
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // No linked rows match ("world, 600).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 600).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 0 and 1 both have at least one linked row that matches ("world", 500).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Row 1 has at least one linked row that matches ("!", 600).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "!" && table2->column<Int>(0) == 600).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Row 1 has two linked rows that contain either "world" or 600.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600).count() == 2;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 0 and 2 have at most one linked row that contains either "world" or 600. Row 2 does by virtue of having no rows.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600).count() <= 1;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
 }
 
 #endif // TEST_QUERY

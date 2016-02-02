@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -23,6 +23,7 @@
 #include <stdint.h> // unint8_t etc
 #include <vector>
 #include <string>
+#include <atomic>
 
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
@@ -84,6 +85,8 @@ public:
         const char* encryption_key = nullptr;
     };
 
+    struct Retry {};
+
     /// Attach this allocator to the specified file.
     ///
     /// When used by free-standing Group instances, no concurrency is
@@ -131,7 +134,15 @@ public:
     ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
+    /// Please note that attach_file can fail to attach to a file due to a collision
+    /// with a writer extending the file. This can only happen if the caller is *not*
+    /// the session initiator. When this happens, attach_file() throws SlabAlloc::Retry,
+    /// and the caller must retry the call. The caller should check if it has become
+    /// the session initiator before retrying. This can happen if the conflicting thread
+    /// (or process) terminates or crashes before the next retry.
+    ///
     /// \throw util::File::AccessError
+    /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& path, Config& cfg);
 
     /// Attach this allocator to the specified memory buffer.
@@ -273,7 +284,7 @@ protected:
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
-
+    void invalidate_cache() noexcept;
 private:
     enum AttachMode {
         attach_None,        // Nothing is attached
@@ -336,8 +347,7 @@ private:
     util::File m_file;
 
     // The initial mapping is determined by m_data and m_initial_mapping_size,
-    // we don't use a util::File::Map for that to stay compatible with the uses
-    // of slab_alloc that isn't attached to a file, but to an in-memory buffer.
+    util::File::Map<char> m_initial_mapping;
     char* m_data = nullptr;
     size_t m_initial_mapping_size = 0;
     // additional sections beyond those covered by the initial mapping, are
@@ -391,7 +401,13 @@ private:
 #ifdef REALM_DEBUG
     bool m_debug_out = false;
 #endif
-
+    struct hash_entry {
+        ref_type ref = 0;
+        char* addr = nullptr;
+        size_t version = 0;
+    };
+    mutable hash_entry cache[256];
+    mutable size_t version = 1;
     /// Throws if free-lists are no longer valid.
     const chunks& get_free_read_only() const;
 
@@ -443,6 +459,7 @@ private:
     friend class GroupWriter;
 };
 
+inline void SlabAlloc::invalidate_cache() noexcept { ++version; }
 
 class SlabAlloc::DetachGuard {
 public:

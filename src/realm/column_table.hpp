@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -98,6 +98,8 @@ protected:
         bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
         template<bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+        template<bool fix_ndx_in_parent>
+        void adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
@@ -250,6 +252,7 @@ inline void SubtableColumnBase::insert_rows(size_t row_ndx, size_t num_rows_to_i
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
     REALM_ASSERT(!insert_nulls);
+    static_cast<void>(insert_nulls);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     int_fast64_t value = 0;
@@ -405,24 +408,20 @@ inline void SubtableColumnBase::SubtableMap::add(size_t subtable_ndx, Table* tab
 }
 
 template<bool fix_ndx_in_parent>
-void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted)
-    noexcept
+void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
-    typedef entries::iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i) {
-        if (i->m_subtable_ndx >= row_ndx) {
-            i->m_subtable_ndx += num_rows_inserted;
+    for (auto& entry : m_entries) {
+        if (entry.m_subtable_ndx >= row_ndx) {
+            entry.m_subtable_ndx += num_rows_inserted;
             typedef _impl::TableFriend tf;
             if (fix_ndx_in_parent)
-                tf::set_ndx_in_parent(*(i->m_table), i->m_subtable_ndx);
+                tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
         }
     }
 }
 
 template<bool fix_ndx_in_parent>
-bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased)
-    noexcept
+bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept
 {
     if (m_entries.empty())
         return false;
@@ -492,17 +491,33 @@ template<bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     using tf = _impl::TableFriend;
-    for (size_t i = 0; i < m_entries.size(); ++i) {
-        entry& e = m_entries[i];
-        if (REALM_UNLIKELY(e.m_subtable_ndx == row_ndx_1)) {
-            e.m_subtable_ndx = row_ndx_2;
+    for (auto& entry : m_entries) {
+        if (REALM_UNLIKELY(entry.m_subtable_ndx == row_ndx_1)) {
+            entry.m_subtable_ndx = row_ndx_2;
             if (fix_ndx_in_parent)
-                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+                tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
         }
-        else if (REALM_UNLIKELY(e.m_subtable_ndx == row_ndx_2)) {
-            e.m_subtable_ndx = row_ndx_1;
+        else if (REALM_UNLIKELY(entry.m_subtable_ndx == row_ndx_2)) {
+            entry.m_subtable_ndx = row_ndx_1;
             if (fix_ndx_in_parent)
-                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+                tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
+        }
+    }
+}
+
+template<bool fix_ndx_in_parent>
+void SubtableColumnBase::SubtableMap::adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
+{
+    static_cast<void>(new_row_ndx);
+
+    using tf = _impl::TableFriend;
+    for (auto it = m_entries.begin(); it != m_entries.end(); ++it) {
+        entry& e = *it;
+        if (e.m_subtable_ndx == row_ndx) {
+            TableRef table(e.m_table);
+            tf::detach(*table);
+            m_entries.erase(it);
+            break;
         }
     }
 }
@@ -562,9 +577,9 @@ inline size_t* SubtableColumnBase::record_subtable_path(size_t* begin, size_t* e
     return _impl::TableFriend::record_subtable_path(*m_table, begin, end);
 }
 
-inline void SubtableColumnBase::
-update_table_accessors(const size_t* col_path_begin, const size_t* col_path_end,
-                       _impl::TableFriend::AccessorUpdater& updater)
+inline void SubtableColumnBase::update_table_accessors(const size_t* col_path_begin,
+                                                       const size_t* col_path_end,
+                                                       _impl::TableFriend::AccessorUpdater& updater)
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the

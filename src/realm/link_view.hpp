@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -46,8 +46,10 @@ public:
     ~LinkView() noexcept;
     bool is_attached() const noexcept;
 
-    // Size info
+    /// This method will return true if the LinkView is detached (no assert).
     bool is_empty() const noexcept;
+
+    /// This method will return 0 if the LinkView is detached (no assert).
     size_t size() const noexcept;
 
     bool operator==(const LinkView&) const noexcept;
@@ -108,9 +110,9 @@ private:
     LinkListColumn& m_origin_column;
     mutable size_t m_ref_count;
 
-    typedef LinkView_Handover_patch Handover_patch;
-    static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Handover_patch>& patch);
-    static LinkViewRef create_from_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group);
+    using HandoverPatch = LinkViewHandoverPatch;
+    static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch);
+    static LinkViewRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
     // constructor (protected since it can only be used by friends)
     LinkView(Table* origin_table, LinkListColumn&, size_t row_ndx);
@@ -202,7 +204,8 @@ inline bool LinkView::is_attached() const noexcept
 
 inline bool LinkView::is_empty() const noexcept
 {
-    REALM_ASSERT(is_attached());
+    if (!is_attached())
+        return true;
 
     if (!m_row_indexes.is_attached())
         return true;
@@ -212,7 +215,8 @@ inline bool LinkView::is_empty() const noexcept
 
 inline size_t LinkView::size() const noexcept
 {
-    REALM_ASSERT(is_attached());
+    if (!is_attached())
+        return 0;
 
     if (!m_row_indexes.is_attached())
         return 0;

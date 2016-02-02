@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -495,6 +495,10 @@ public:
     std::unique_ptr<Handover<LinkView>> export_linkview_for_handover(const LinkViewRef& accessor);
     LinkViewRef import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover);
 
+    // likewise for Tables.
+    std::unique_ptr<Handover<Table>> export_table_for_handover(const TableRef& accessor);
+    TableRef import_table_from_handover(std::unique_ptr<Handover<Table>> handover);
+
 private:
     struct SharedInfo;
     struct ReadCount;
@@ -821,7 +825,7 @@ private:
 
 template<typename T>
 struct SharedGroup::Handover {
-    std::unique_ptr<typename T::Handover_patch> patch;
+    std::unique_ptr<typename T::HandoverPatch> patch;
     std::unique_ptr<T> clone;
     VersionID version;
 };
@@ -902,11 +906,20 @@ inline void SharedGroup::advance_read(History& history, O* observer, VersionID v
     const BinaryData* changesets_end = changesets_begin + num_changesets;
 
     if (observer) {
-        _impl::TransactLogParser parser;
-        _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-        parser.parse(in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        try {
+            _impl::TransactLogParser parser;
+            _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
+            parser.parse(in, *observer); // Throws
+            observer->parse_complete(); // Throws
+        }
+        catch (...) {
+            release_readlock(m_readlock);
+            m_readlock = old_readlock;
+            rlug.release();
+            throw;
+        }
     }
+
     _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
     using gf = _impl::GroupFriend;
     gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size, in); // Throws

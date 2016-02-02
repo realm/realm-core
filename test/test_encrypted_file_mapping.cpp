@@ -1,6 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_ENCRYPTED_FILE_MAPPING
 
+#include <realm/util/aes_cryptor.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 
 #include "test.hpp"

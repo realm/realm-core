@@ -17,20 +17,34 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
+#ifndef REALM_UTIL_MISCELLANEOUS_HPP
+#define REALM_UTIL_MISCELLANEOUS_HPP
 
-#ifndef REALM_UTIL_ENCRYPTION_NOT_SUPPORTED_EXCEPTION_HPP
-#define REALM_UTIL_ENCRYPTION_NOT_SUPPORTED_EXCEPTION_HPP
-
-#include <stdexcept>
+#include <type_traits>
 
 namespace realm {
 namespace util {
 
-struct EncryptionNotSupportedOnThisDevice: std::runtime_error {
-    EncryptionNotSupportedOnThisDevice(): std::runtime_error("Encryption is not supported on this device") { }
-};
+// FIXME: Replace this with std::add_const_t when we switch over to C++14 by
+// default.
+/// \brief Adds const qualifier, unless T already has the const qualifier
+template <class T>
+using add_const_t = typename std::add_const<T>::type;
 
-}
+// FIXME: Replace this with std::as_const when we switch over to C++17 by
+// default.
+/// \brief Forms an lvalue reference to const T
+template <class T>
+constexpr add_const_t<T>& as_const(T& v) noexcept
+{
+    return v;
 }
 
-#endif //REALM_UTIL_ENCRYPTION_NOT_SUPPORTED_EXCEPTION_HPP
+/// \brief Disallows rvalue arguments
+template <class T>
+add_const_t<T>& as_const(const T&&) = delete;
+
+} // namespace util
+} // namespace realm
+
+#endif // REALM_UTIL_MISCELLANEOUS_HPP

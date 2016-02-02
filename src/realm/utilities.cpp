@@ -275,10 +275,11 @@ int fast_popcount64(int64_t x)
 }
 
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
-uint64_t fastrand(uint64_t max) 
+uint64_t fastrand(uint64_t max, bool is_seed) 
 {
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
-    static std::atomic<uint64_t> state(1);
+    static std::atomic<uint64_t> state(is_seed ? max : 1);
+    
     // Thread safe increment to prevent two threads from producing the same value if called at the exact same time
     state.fetch_add(1, std::memory_order_release); 
     uint64_t x = state.load(std::memory_order_acquire);
@@ -288,6 +289,20 @@ uint64_t fastrand(uint64_t max)
     x ^= x >> 27; // c
     state.store(x, std::memory_order_release);
     return (x * 2685821657736338717ULL) % (max + 1 == 0 ? 0xffffffffffffffffULL : max + 1);
+}
+
+
+void millisleep(size_t milliseconds)
+{
+#ifdef _WIN32
+    _sleep(milliseconds);
+#else
+    // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
+    timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = milliseconds * 1000 * 1000;
+    nanosleep(&ts, 0);
+#endif
 }
 
 } // namespace realm

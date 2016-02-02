@@ -430,7 +430,7 @@ void sqlite_create(const char *f, long n, bool wal)
     sqlite3 *db;
     char    *errmsg;
 
-    File::try_remove(f);
+    util::File::try_remove(f);
     srandom(1);
 
     if (sqlite3_config(SQLITE_CONFIG_MULTITHREAD, 1) == SQLITE_ERROR) {
@@ -486,8 +486,8 @@ void mysql_create(const char *f, long n)
 
 void realm_create(const char *f, long n)
 {
-    File::try_remove(f);
-    File::try_remove(string(f)+".lock");
+    util::File::try_remove(f);
+    util::File::try_remove(std::string(f)+".lock");
     SharedGroup sg(f);
     {
         WriteTransaction wt(sg);
@@ -520,15 +520,15 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     if (!single) {
         if (verbose) std::cout << "Copying file" << std::endl;
         if (database == DB_MYSQL) {
-            copy_db(datfile, ("tmp"+string(datfile)).c_str());
+            copy_db(datfile, ("tmp"+std::string(datfile)).c_str());
         }
         else {
-            copy(datfile, ("tmp"+string(datfile)).c_str());
+            copy(datfile, ("tmp"+std::string(datfile)).c_str());
         }
     }
     if (database != DB_MYSQL) {
-        unlink(("tmp"+string(datfile)).c_str());
-        unlink(("tmp"+string(datfile)+".lock").c_str());
+        unlink(("tmp"+std::string(datfile)).c_str());
+        unlink(("tmp"+std::string(datfile)+".lock").c_str());
     }
 
     assert(pthread_attr_init(&attr) == 0);
@@ -540,7 +540,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
             tinfo[i].datfile = strdup(datfile);
         }
         else {
-            tinfo[i].datfile = strdup(("tmp"+string(datfile)).c_str());
+            tinfo[i].datfile = strdup(("tmp"+std::string(datfile)).c_str());
         }
     }
 
@@ -601,8 +601,8 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     wall_time = delta_time(ts_1, ts_2);
 
     if (database == DB_REALM || database == DB_SQLITE) {
-        unlink(("tmp"+string(datfile)).c_str());
-        unlink(("tmp"+string(datfile)+".lock").c_str());
+        unlink(("tmp"+std::string(datfile)).c_str());
+        unlink(("tmp"+std::string(datfile)+".lock").c_str());
     }
     free((void *)tinfo);
 }

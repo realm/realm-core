@@ -52,7 +52,12 @@
 #define TEST_JSON
 #define TEST_LINKS
 #define TEST_ENCRYPTED_FILE_MAPPING
+
 #define TEST_UTIL_ERROR
+#define TEST_UTIL_INSPECT
+#define TEST_UTIL_STRINGBUFFER
+#define TEST_UTIL_URI
+
 #ifndef _WIN32
 #  define TEST_UTIL_NETWORK
 #endif

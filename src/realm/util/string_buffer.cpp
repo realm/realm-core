@@ -33,7 +33,7 @@ void StringBuffer::reallocate(size_t min_capacity)
         throw util::BufferSizeOverflow();
     size_t new_capacity = m_buffer.size();
     if (int_multiply_with_overflow_detect(new_capacity, 2))
-        new_capacity = std::numeric_limits<size_t>::max();
+        new_capacity = std::numeric_limits<size_t>::max(); // LCOV_EXCL_LINE
     if (new_capacity < min_capacity_2)
         new_capacity = min_capacity_2;
     m_buffer.resize(new_capacity, 0, m_size, 0); // Throws

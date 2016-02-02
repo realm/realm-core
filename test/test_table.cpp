@@ -905,7 +905,6 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
 
     // Searching:
 
-    CHECK_LOGIC_ERROR(degen_child->find_pkey_string(""), LogicError::no_primary_key);
 //    CHECK_EQUAL(0, degen_child->distinct(0).size()); // needs index but you cannot set index on ConstTableRef
     CHECK_EQUAL(0, degen_child->get_sorted_view(0).size());
 
@@ -1140,8 +1139,8 @@ TEST(Table_6)
     }};
 
     RLM_QUERY_OPT(TestQuery2, TestTableEnum) (Days a, Days b, const char* str) {
-        (void)b;
-        (void)a;
+        static_cast<void>(b);
+        static_cast<void>(a);
         //first.between(a, b);
         second == str || second.MatchRegEx(".*");
     }};
@@ -1439,167 +1438,44 @@ TEST(Table_IndexInteger)
 }
 
 
-TEST(Table_PrimaryKeyBasics)
+TEST(Table_SetIntUnique)
 {
-    // Note: Formally, member functions of Table are not required to leave the
-    // table in a valid state when they throw LogicError. In the cases below,
-    // however, informed by the actual implementation of these functions, we
-    // assume that they do allow us to continue, but please remember that this
-    // is not generally the case.
-
     Table table;
-    table.add_column(type_String, "");
+    table.add_column(type_Int, "ints");
+    table.add_column(type_Int, "ints_null", true);
+    table.add_empty_row(10);
 
-    // Empty table
-    CHECK_NOT(table.has_primary_key());
-    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK_LOGIC_ERROR(table.try_add_primary_key(0), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.set_int_unique(0, 0, 123), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.set_int_unique(1, 0, 123), LogicError::no_search_index);
     table.add_search_index(0);
-    CHECK_NOT(table.has_primary_key());
-    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK(table.try_add_primary_key(0));
-    CHECK(table.has_primary_key());
-    CHECK_NOT(table.find_pkey_string("foo"));
+    table.add_search_index(1);
 
-    // One row
-    table.remove_primary_key();
-    table.add_empty_row();
-    table.set_string(0, 0, "foo");
-    CHECK_LOGIC_ERROR(table.find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK(table.try_add_primary_key(0));
-    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
-    CHECK_NOT(table.find_pkey_string("bar"));
+    table.set_int_unique(0, 0, 123);
+    table.set_int_unique(1, 0, 123);
 
-    // Two rows
-    table.remove_primary_key();
-    table.add_empty_row();
-    table.set_string(0, 1, "bar");
-    CHECK(table.try_add_primary_key(0));
-    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
-    CHECK_EQUAL(1, table.find_pkey_string("bar").get_index());
-
-    // Modify primary key
-    CHECK_LOGIC_ERROR(table.set_string(0, 1, "foo"), LogicError::unique_constraint_violation);
-    table.set_string(0, 1, "bar");
-    table.set_string(0, 1, "baz");
-    CHECK_EQUAL(0, table.find_pkey_string("foo").get_index());
-    CHECK_NOT(table.find_pkey_string("bar"));
-    CHECK_EQUAL(1, table.find_pkey_string("baz").get_index());
-
-    // Insert row
-    // Unfortunately, we could not have recovered and continued if we had let
-    // Table::insert_string() throw.
-//    CHECK_LOGIC_ERROR(table.insert_string(0, 2, "foo"), LogicError::unique_constraint_violation);
-    table.verify();
-    table.insert_empty_row(2);
-    table.set_string(0, 2, "bar");
-    table.verify();
-    table.add_empty_row();
-    table.verify();
-    // Unfortunately, we could not have recovered and continued if we had let
-    // Table::add_empty_row() throw.
-//    CHECK_LOGIC_ERROR(table.add_empty_row(), LogicError::unique_constraint_violation);
-
-    // Duplicate key value
-    table.remove_primary_key();
-    table.set_string(0, 1, "foo");
-    CHECK_NOT(table.try_add_primary_key(0));
+    CHECK_LOGIC_ERROR(table.set_int_unique(0, 1, 123), LogicError::unique_constraint_violation);
+    CHECK_LOGIC_ERROR(table.set_int_unique(1, 1, 123), LogicError::unique_constraint_violation);
 }
 
 
-TEST(Table_PrimaryKeyLargeCommonPrefix)
+TEST(Table_SetStringUnique)
 {
     Table table;
-    table.add_column(type_String, "");
-    table.add_empty_row(2);
-    table.set_string(0, 0, "metasyntactic variable 1");
-    table.set_string(0, 1, "metasyntactic variable 2");
-    table.add_search_index(0);
-    CHECK(table.try_add_primary_key(0));
-    CHECK_LOGIC_ERROR(table.set_string(0, 1, "metasyntactic variable 1"),
-                      LogicError::unique_constraint_violation);
-    table.set_string(0, 1, "metasyntactic variable 2");
-    table.set_string(0, 1, "metasyntactic variable 3");
-}
+    table.add_column(type_Int, "ints");
+    table.add_column(type_String, "strings");
+    table.add_column(type_String, "strings_nullable", true);
+    table.add_empty_row(10);
 
+    CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, "foo"), LogicError::no_search_index);
+    table.add_search_index(1);
+    table.add_search_index(2);
 
-TEST(Table_PrimaryKeyExtra)
-{
-    Table table;
-    table.add_column(type_String, "");
-    table.add_column(type_Int, "");
-    table.add_empty_row(8);
+    table.set_string_unique(1, 0, "bar");
 
-    table.set_string(0, 0, "jeff");
-    table.set_string(0, 1, "jim");
-    table.set_string(0, 2, "jennifer");
-    table.set_string(0, 3, "john");
-    table.set_string(0, 4, "jimmy");
-    table.set_string(0, 5, "jimbo");
-    table.set_string(0, 6, "johnny");
-    table.set_string(0, 7, "jennifer"); // Duplicate primary key
+    CHECK_LOGIC_ERROR(table.set_string_unique(1, 1, "bar"), LogicError::unique_constraint_violation);
+    CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, realm::null()), LogicError::column_not_nullable);
 
-    table.set_int(1, 0, 0);
-    table.set_int(1, 1, 1);
-    table.set_int(1, 2, 2);
-    table.set_int(1, 3, 3);
-    table.set_int(1, 4, 4);
-    table.set_int(1, 5, 5);
-    table.set_int(1, 6, 6);
-    table.set_int(1, 7, 7);
-
-    CHECK_LOGIC_ERROR(table.find_pkey_string("jeff"), LogicError::no_primary_key);
-
-    CHECK_LOGIC_ERROR(table.try_add_primary_key(0), LogicError::no_search_index);
-    CHECK_NOT(table.has_primary_key());
-
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    CHECK_NOT(table.try_add_primary_key(0));
-    CHECK_NOT(table.has_primary_key());
-
-    table.set_string(0, 7, "jennifer 8");
-    CHECK(table.try_add_primary_key(0));
-    CHECK(table.has_primary_key());
-
-    table.verify();
-
-    Row a0 = table.find_pkey_string("jeff");
-    Row a1 = table.find_pkey_string("jim");
-    Row a2 = table.find_pkey_string("jennifer");
-    Row a3 = table.find_pkey_string("john");
-    Row a4 = table.find_pkey_string("jimmy");
-    Row a5 = table.find_pkey_string("jimbo");
-    Row a6 = table.find_pkey_string("johnny");
-    Row a7 = table.find_pkey_string("jerry");
-    CHECK(a0);
-    CHECK(a1);
-    CHECK(a2);
-    CHECK(a3);
-    CHECK(a4);
-    CHECK(a5);
-    CHECK(a6);
-    CHECK_NOT(a7);
-    CHECK_EQUAL(0, a0.get_index());
-    CHECK_EQUAL(1, a1.get_index());
-    CHECK_EQUAL(2, a2.get_index());
-    CHECK_EQUAL(3, a3.get_index());
-    CHECK_EQUAL(4, a4.get_index());
-    CHECK_EQUAL(5, a5.get_index());
-    CHECK_EQUAL(6, a6.get_index());
-}
-
-
-TEST(Table_SubtablePrimaryKey)
-{
-    Table parent;
-    parent.add_column(type_Table, "");
-    parent.get_subdescriptor(0)->add_column(type_String, "");
-    parent.add_empty_row();
-    TableRef child = parent[0].get_subtable(0);
-    CHECK_LOGIC_ERROR(child->find_pkey_string("foo"), LogicError::no_primary_key);
-    CHECK_LOGIC_ERROR(child->add_search_index(0), LogicError::wrong_kind_of_table);
+    CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, realm::null()), LogicError::unique_constraint_violation);
 }
 
 
@@ -5411,6 +5287,14 @@ TEST(Table_RowAccessorDetach)
 }
 
 
+TEST(Table_RowAccessor_DetachedRowExpr)
+{
+    // Check that it is possible to create a detached RowExpr from scratch.
+    BasicRowExpr<Table> row;
+    CHECK_NOT(row.is_attached());
+}
+
+
 TEST(Table_RowAccessorCopyAndAssign)
 {
     Table table;
@@ -6129,6 +6013,29 @@ TEST(Table_EnumStringInsertEmptyRow)
 }
 
 
+TEST(Table_InsertColumnMaintainsBacklinkIndices)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("hrnetprsafd");
+    TableRef t1 = g.add_table("qrsfdrpnkd");
+
+    t1->add_column_link(type_Link, "bbb", *t0);
+    t1->add_column_link(type_Link, "ccc", *t0);
+    t1->insert_column(0, type_Int, "aaa");
+
+    t1->add_empty_row();
+
+    t0->add_column(type_Int, "foo");
+    t0->add_empty_row();
+
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+    t1->remove_column(0);
+    t1->set_link(0, 0, 0);
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
@@ -6574,6 +6481,82 @@ TEST(Table_AllocatorCapacityBug)
     }
 }
 
+
+// Exposes crash when setting a int, float or double that has its least significant bit set
+TEST(Table_MixedCrashValues)
+{
+    GROUP_TEST_PATH(path);
+    const char* encryption_key = nullptr;
+    Group group(path, encryption_key, Group::mode_ReadWrite);
+    TableRef table = group.add_table("t");
+    table->add_column(type_Mixed, "m");
+    table->add_empty_row(3);
+
+    table->set_mixed(0, 0, Mixed(int64_t(-1)));
+    table->set_mixed(0, 1, Mixed(2.0f));
+    table->set_mixed(0, 2, Mixed(2.0));
+
+    CHECK_EQUAL(table->get_mixed(0, 0).get_int(), int64_t(-1));
+    CHECK_EQUAL(table->get_mixed(0, 1).get_float(), 2.0f);
+    CHECK_EQUAL(table->get_mixed(0, 2).get_double(), 2.0);
+
+    group.verify();
+}
+
+
+TEST(Table_ChangeLinkTargets_Links)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("t0");
+    TableRef t1 = g.add_table("t1");
+    t0->add_column_link(type_Link, "link", *t1);
+    t1->add_column(type_Int, "int");
+    t0->add_empty_row(10);
+    t1->add_empty_row(10);
+    for (int i = 0; i < 10; ++i) {
+        t0->set_link(0, i, i);
+        t1->set_int(0, i, i);
+    }
+
+    Row replaced_row = t1->get(0);
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
+    t1->change_link_targets(0, 9);
+    CHECK(replaced_row.is_attached());
+    CHECK_EQUAL(t0->get_link(0, 0), 9);
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
+}
+
+
+TEST(Table_ChangeLinkTargets_LinkLists)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("t0");
+    TableRef t1 = g.add_table("t1");
+    t0->add_column_link(type_LinkList, "linklist", *t1);
+    t1->add_column(type_Int, "int");
+    t0->add_empty_row(10);
+    t1->add_empty_row(10);
+    for (int i = 0; i < 10; ++i) {
+        auto links = t0->get_linklist(0, i);
+        links->add(i);
+        links->add((i + 1) % 10);
+        t1->set_int(0, i, i);
+    }
+
+    Row replaced_row = t1->get(0);
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
+    t1->change_link_targets(0, 9);
+    CHECK(replaced_row.is_attached());
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->get(1).get_index(), 1);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->size(), 2);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->get(0).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
+}
 
 
 #endif // TEST_TABLE

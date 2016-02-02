@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -54,16 +54,22 @@ void RowBase::impl_detach() noexcept
     }
 }
 
-RowBase::RowBase(const RowBase& source, Handover_patch& patch)
+RowBase::RowBase(const RowBase& source, HandoverPatch& patch)
     : m_table(TableRef())
 {
-    patch.table_num = source.m_table->get_index_in_group();
-    patch.row_ndx = source.m_row_ndx;
+    generate_patch(source, patch);
 }
 
-void RowBase::apply_patch(Handover_patch& patch, Group& group)
+void RowBase::generate_patch(const RowBase& source, HandoverPatch& patch)
 {
-    m_table = group.get_table(patch.table_num);
+    Table::generate_patch(source.m_table, patch.m_table);
+    patch.row_ndx = source.m_row_ndx;
+
+}
+
+void RowBase::apply_patch(HandoverPatch& patch, Group& group)
+{
+    m_table = Table::create_from_and_consume_patch(patch.m_table, group);
     m_table->register_row_accessor(this);
     m_row_ndx = patch.row_ndx;
 }

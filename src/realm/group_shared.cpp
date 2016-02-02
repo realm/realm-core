@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -206,9 +206,9 @@ public:
     Ringbuffer() noexcept
     {
         entries = init_readers_size;
-        for (int i=0; i < init_readers_size; i++) {
+        for (int i = 0; i < init_readers_size; i++) {
             data[i].version = 1;
-            data[i].count.store( 1, std::memory_order_relaxed );
+            data[i].count.store(1, std::memory_order_relaxed);
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
@@ -245,13 +245,13 @@ public:
         std::cout << "--- Done" << std::endl;
     }
 
-    void expand_to(uint_fast32_t new_entries)  noexcept
+    void expand_to(uint_fast32_t new_entries) noexcept
     {
         // std::cout << "expanding to " << new_entries << std::endl;
         // dump();
         for (uint_fast32_t i = entries; i < new_entries; i++) {
             data[i].version = 1;
-            data[i].count.store( 1, std::memory_order_relaxed );
+            data[i].count.store(1, std::memory_order_relaxed);
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
@@ -262,7 +262,7 @@ public:
         // dump();
     }
 
-    static size_t compute_required_space(uint_fast32_t num_entries)  noexcept
+    static size_t compute_required_space(uint_fast32_t num_entries) noexcept
     {
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
@@ -270,22 +270,22 @@ public:
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const  noexcept
+    uint_fast32_t get_num_entries() const noexcept
     {
         return entries;
     }
 
-    uint_fast32_t last() const  noexcept
+    uint_fast32_t last() const noexcept
     {
         return put_pos.load(std::memory_order_acquire);
     }
 
-    const ReadCount& get(uint_fast32_t idx) const  noexcept
+    const ReadCount& get(uint_fast32_t idx) const noexcept
     {
         return data[idx];
     }
 
-    const ReadCount& get_last() const  noexcept
+    const ReadCount& get_last() const noexcept
     {
         return get(last());
     }
@@ -309,36 +309,36 @@ public:
         return r;
     }
 
-    const ReadCount& get_oldest() const  noexcept
+    const ReadCount& get_oldest() const noexcept
     {
         return get(old_pos.load(std::memory_order_relaxed));
     }
 
-    bool is_full() const  noexcept
+    bool is_full() const noexcept
     {
         uint_fast32_t idx = get(last()).next;
         return idx == old_pos.load(std::memory_order_relaxed);
     }
 
-    uint_fast32_t next() const  noexcept
+    uint_fast32_t next() const noexcept
     { // do not call this if the buffer is full!
         uint_fast32_t idx = get(last()).next;
         return idx;
     }
 
-    ReadCount& get_next()  noexcept
+    ReadCount& get_next() noexcept
     {
         REALM_ASSERT(!is_full());
         return data[ next() ];
     }
 
-    void use_next()  noexcept
+    void use_next() noexcept
     {
         atomic_dec(get_next().count); // .store_release(0);
         put_pos.store(next(), std::memory_order_release);
     }
 
-    void cleanup()  noexcept
+    void cleanup() noexcept
     {   // invariant: entry held by put_pos has count > 1.
         // std::cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
         // dump();
@@ -500,7 +500,7 @@ void spawn_daemon(const std::string& file)
 
         // close all descriptors:
         int i;
-        for (i=m-1;i>=0;--i)
+        for (i = m - 1; i >= 0; --i)
             close(i);
         i = ::open("/dev/null",O_RDWR);
 #ifdef REALM_ENABLE_LOGFILE
@@ -720,6 +720,19 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
         // - Waiting for and signalling database changes
         {
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+            // we need a thread-local copy of the number of ringbuffer entries in order
+            // to later detect concurrent expansion of the ringbuffer.
+            m_local_max_entry = info->readers.get_num_entries();
+
+            // We need to map the info file once more for the readers part
+            // since that part can be resized and as such remapped which
+            // could move our mutexes (which we don't want to risk moving while
+            // they are locked)
+            size_t info_size =
+                sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
+            m_reader_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
+            File::UnmapGuard fug_2(m_reader_map);
+
             // Even though we checked init_complete before grabbing the write mutex,
             // we do not need to check it again, because it is only changed under
             // an exclusive file lock, and we checked it under a shared file lock
@@ -749,7 +762,14 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             if (repl)
                 cfg.server_sync_mode = repl->is_in_server_synchronization_mode();
             cfg.encryption_key = encryption_key;
-            ref_type top_ref = alloc.attach_file(path, cfg); // Throws
+            ref_type top_ref;
+            try {
+                top_ref = alloc.attach_file(path, cfg); // Throws
+            }
+            catch (SlabAlloc::Retry&) {
+                continue;
+            }
+
             size_t file_size = alloc.get_baseline();
 
             if (begin_new_session) {
@@ -794,9 +814,13 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                 }
 #endif
 
-                info->latest_version_number = version;
-                info->init_versioning(top_ref, file_size, version);
+                // Initially there is a single version in the file
+                info->number_of_versions = 1;
 
+                info->latest_version_number = version;
+
+                SharedInfo* r_info = m_reader_map.get_addr();
+                r_info->init_versioning(top_ref, file_size, version);
             }
             else { // not the session initiator!
 #ifndef _WIN32
@@ -827,17 +851,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             // std::cerr << "daemon should be ready" << std::endl;
 #endif
 #endif
-            // we need a thread-local copy of the number of ringbuffer entries in order
-            // to detect concurrent expansion of the ringbuffer.
-            m_local_max_entry = 0;
-
-            // We need to map the info file once more for the readers part
-            // since that part can be resized and as such remapped which
-            // could move our mutexes (which we don't want to risk moving while
-            // they are locked)
-            m_reader_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
-            File::UnmapGuard fug_2(m_reader_map);
-
             // Set initial version so we can track if other instances
             // change the db
             m_readlock.m_version = get_current_version();
@@ -851,9 +864,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
             // make our presence noted:
             ++info->num_participants;
-
-            // Initially there is a single version in the file
-            info->number_of_versions = 1;
 
             // Initially wait_for_change is enabled
             m_wait_for_change_enabled = true;
@@ -1171,6 +1181,7 @@ void SharedGroup::grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_bef
             // remapping takes time, so retry with a fresh entry
             continue;
         }
+        r_info = m_reader_map.get_addr();
         const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
         // if the entry is stale and has been cleared by the cleanup process,
         // we need to start all over again. This is extremely unlikely, but possible.
@@ -1194,6 +1205,7 @@ bool SharedGroup::grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_b
             // remapping takes time, so retry with a fresh entry
             continue;
         }
+        r_info = m_reader_map.get_addr();
         const Ringbuffer::ReadCount& r = r_info->readers.get(readlock.m_reader_idx);
 
         // if the entry is stale and has been cleared by the cleanup process,
@@ -1639,6 +1651,30 @@ LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<
     }
     // move data
     LinkViewRef result = LinkView::create_from_and_consume_patch(handover->patch, m_group);
+    return result;
+}
+
+
+std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_handover(const TableRef& accessor)
+{
+    LockGuard lg(m_handover_lock);
+    if (m_transact_stage != transact_Reading) {
+        throw LogicError(LogicError::wrong_transact_state);
+    }
+    std::unique_ptr<Handover<Table>> result(new Handover<Table>());
+    Table::generate_patch(accessor, result->patch);
+    result->clone = 0;
+    result->version = get_version_of_current_transaction();
+    return result;
+}
+
+
+TableRef SharedGroup::import_table_from_handover(std::unique_ptr<Handover<Table>> handover)
+{
+    if (handover->version != get_version_of_current_transaction()) {
+        throw BadVersion();
+    }
+    TableRef result = Table::create_from_and_consume_patch(handover->patch, m_group);
     return result;
 }
 

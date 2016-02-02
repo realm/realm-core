@@ -2,10 +2,243 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Important for language bindings: Any method on Query and TableView that
+  depends on a deleted LinkView will now return sane return values; 
+  Query::find() returns npos, Query::find_all() returns empty TableView,
+  Query::count() returns 0, TableView::sum() returns 0 (TableView created
+  from LinkView::get_sorted_view). So they will no longer throw
+  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in 
+  test_query.cpp for more info.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.96.0 Release notes
+
+### Bugfixes:
+
+* Handing over a query that includes an expression node will now avoid
+  sharing the expression nodes between `Query` instances. This prevents
+  data races that could give incorrect results or crashes.
+
+### Enhancements:
+
+* Subqueries are now supported via `Table::column(size_t, Query)`.
+  This allows for queries based on the number of rows in the linked table
+  that match the given subquery.
+
+----------------------------------------------
+
+# 0.95.9 Release notes
+
+### Bugfixes:
+
+* Fixed terminate() being called rather than InvalidDatabase being thrown when
+  a non-enrypted file that begins with four zero bytes was opened as an
+  encrypted file.
+
+----------------------------------------------
+
+# 0.95.8 Release notes
+
+### Bugfixes:
+
+* Fixed error when opening encrypted streaming-form files which would be
+  resized on open due to the size not aligning with a chunked mapping section
+  boundary.
+
+### API breaking changes:
+
+* Any attempt to execute a query that depends on a LinkList that has been
+  deleted from its table will now throw `DeletedLinkView` instead of
+  segfaulting. No other changes has been made; you must still verify 
+  LinkViewRef::is_attached() before calling any methods on a LinkViewRef, as 
+  usual.
+
+### Enhancements:
+
+* Optimized speed of TableView::clear() on an indexed unordered Table. A clear()
+  that before took several minutes with 300000 rows now takes a few seconds.
+
+----------------------------------------------
+
+# 0.95.7 Release notes
+
+### Bugfixes:
+
+* Corrected a bug which caused handover of a query with a restricting
+  view to loose the restricting view.
+
+----------------------------------------------
+
+# 0.95.6 Release notes
+
+### Bugfixes:
+
+* Fixed incorrect initialization of TableViews from queries on LinkViews
+  resulting in `TableView::is_in_sync()` being incorrect until the first time
+  it is brought back into sync.
+* Fixed `TableView` aggregate methods to give the correct result when called on
+  a table view that at one point had detached refs but has since been synced.
+* Fixed another bug in `ColumnBase::build()` which would cause it to produce an
+  invalid B+-tree (incorrect number of elements per child in the compact
+  form). This is a bug that could have been triggered through proper use of our
+  bindings in their current form. In particular, it would have been triggered
+  when adding a new attribute to a class that already has a sufficiently large
+  number of objects in it (> REALM_MAX_BPNODE_SIZE^2 = 1,000,000).
+* Fixed a bug in handover of Queries which use links. The bug was incomplete
+  cloning of the underlying data structure. This bug goes unnoticed as long
+  as the original datastructure is intact and is only seen if the original
+  datastructure is deleted or changed before the handed over query is re-executed
+
+### Enhancements:
+
+* Added support for handing over TableRefs from one thread to another.
+
+-----------
+
+### Internals:
+
+* Add `test_util::to_string()` for convenience. std::to_string() is not
+  available via all Android NDK toolchains.
+* New operation: ChangeLinkTargets. It replaces all links to one row with
+  links to a different row.
+* Regular assertions (REALM_ASSERT()) are no longer enabled by default in
+  release mode. Note that this is a reversion back to the "natural" state of
+  affairs, after a period of having them enabled by default in release mode. The
+  Cocoa binding was the primary target when the assertions were enabled a while
+  back, and steps were taken to explicitely disable those assertions in the
+  Android binding to avoid a performance-wise impact there. It is believed that
+  the assertions are no longer needed in the Cocoa binding, but in case they
+  are, the right approach, going forward, is to enable them specifically for the
+  Cocoa binding. Note that with these changes, the Android binding no longer
+  needs to explicitely disable regular assertions in release mode.
+* Upgraded Android toolchain to R10E and gcc to 4.9 for all architectures.
+
+----------------------------------------------
+
+
+# 0.95.5 Release notes
+
+### Bugfixes:
+
+* Fixed Row accessor updating after an unordered `TableView::clear()`.
+* Fixed bug in `ColumnBase::build()` which would cause it to produce an invalid
+  (too shallow) B+-tree. This is a bug that could have been triggered through
+  proper use of our bindings in their current form. In particular, it would have
+  been triggered when adding a new attribute to a class that already has a
+  sufficiently large number of objects in it (> REALM_MAX_BPNODE_SIZE^2 =
+  1,000,000).
+
+### Enhancements:
+
+* New default constructor added to `BasicRowExpr<>`. A default constructed
+  instance is in the detached state.
+
+----------------------------------------------
+
+# 0.95.4 Release notes
+
+### Bugfixes:
+
+* Fixed incorrect handling of a race between a commit() and a new thread
+  or process opening the database. In debug mode, the race would trigger an
+  assert "cfg.session_initiator || !cfg.is_shared", in release mode it could
+  conceivably result in undefined behaviour.
+* Fixed a segmentation fault in SharedGroup::do_open_2
+* Fixed a bug en ringbuffer handling that could cause readers to get a wrong
+  top pointer - causing later asserts regarding the size of the top array, or
+  asserts reporting mismatch between versions.
+
+### API breaking changes:
+
+* Primary key support has been removed. Instead, new instructions have been
+  introduced: SetIntUnique, SetStringUnique. To implement primary keys, callers
+  should manually check the PK constraint and then emit these instructions in
+  place of the regular SetInt and SetString instructions.
+
+### Enhancements:
+
+* Added TableView::distinct() method. It obeys TableView::sync_if_needed().
+  A call to distinct() will first fully populate the TableView and then perform
+  a distinct algorithm on that (i.e. it will *not* add a secondary distinct filter
+  to any earlier filter applied). See more in TEST(TableView_Distinct) in
+  test_table_view.cpp.
+
+-----------
+
+### Internals:
+
+* Changed `Group::remove_table`, `Group::TransactAdvancer::insert_group_level_table`
+  and `Group::TransactAdvancer::erase_group_level_table` from _move-last-over_ to
+  preserve table ordering within the group.
+
+----------------------------------------------
+
+# 0.95.3 Release notes
+
+### Bugfixes:
+
+* Reverted what was presumably a fix for a race between commit and opening the database (0.95.2).
+
+----------------------------------------------
+
+# 0.95.2 Release notes
+
+### Bugfixes:
+
+* Fixed bug where Query::average() would include the number of nulls in the 
+  result.
+* Presumably fixed a race between commit and opening the database.
+
+### Enhancements:
+
+* Recycle memory allocated for asynchronous operations in the networking
+  subsystem (`util::network`).
+
+----------------------------------------------
+
+# 0.95.1 Release notes
+
+### Bugfixes:
+* Fixed bug that would give false search results for queries on integer columns
+  due to bug in bithacks deep inside Array::find()
+
+### Enhancements:
+
+* Added Table::get_version_counter() exposing the versioning counter for the Table
+* Add `TableView::get_query()`.
+
+
+----------------------------------------------
+
+# 0.95.0 Release notes
+
+### Bugfixes:
+
 * When inserting a new non-nullable Binary column to a table that had
   *existing* rows, then the automatically added values would become null
 * Fixed updating TableViews when applying a transaction log with a table clear.
 * Fewer things are copied in TableView's move constructor.
+* Prevent spurious blocking in networking subsystem (put sockets in nonblocking
+  mode even when used with poll/select).
+* Fixed the shared group being left in an inconsistent state if the transaction
+  log observer threw an exception.
+* Fixed issue with table accessors not being updated properly, when link columns
+  were changed (e.g. in Group::remove_table, when the table had link columns).
 
 ### API breaking changes:
 
@@ -14,7 +247,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Eliminated use of signals in encryption. This also fixes failures related
+  to signals on some devices.
 
 -----------
 

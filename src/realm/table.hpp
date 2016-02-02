@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -53,6 +53,8 @@ class LinkListColumn;
 class BacklinkColumn;
 template<class>
 class Columns;
+template<class>
+class SubQuery;
 
 struct Link {};
 typedef Link LinkList;
@@ -228,19 +230,6 @@ public:
     /// index. The search index cannot be removed from the primary key of a
     /// table.
     ///
-    /// has_primary_key() returns true if, and only if a primary key has been
-    /// added to this table. Rather than throwing, it returns false if the table
-    /// accessor is detached.
-    ///
-    /// try_add_primary_key() tries to add a primary key to this table, by
-    /// forming it from the specified column. It fails and returns false if the
-    /// specified column has duplicate values, otherwise it returns true. The
-    /// specified column must already have a search index. This table must have
-    /// no preexisting primary key.
-    ///
-    /// remove_primary_key() removes a previously added primary key. It is an
-    /// error if this table has no primary key.
-    ///
     /// This table must be a root table; that is, it must have an independent
     /// descriptor. Freestanding tables, group-level tables, and subtables in a
     /// column of type 'mixed' are all examples of root tables. See add_column()
@@ -252,9 +241,6 @@ public:
 //    void remove_search_index(size_t col_ndx);
     void add_search_index(size_t column_ndx);
     void remove_search_index(size_t column_ndx);
-    bool has_primary_key() const noexcept;
-    bool try_add_primary_key(size_t column_ndx);
-    void remove_primary_key();
 
     //@}
 
@@ -343,6 +329,9 @@ public:
     template<class T>
     Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
 
+    template <class T>
+    SubQuery<T> column(size_t column, Query subquery);
+
     // Table size and deletion
     bool is_empty() const noexcept;
     size_t size() const noexcept;
@@ -382,11 +371,6 @@ public:
     /// may also cause linked rows to be cascade-removed, but in this respect,
     /// the effect is exactly as if each row had been removed individually. See
     /// Descriptor::set_link_type() for details.
-    ///
-    /// It is an error to call add_empty_row() or insert_empty_row() on a table
-    /// with a primary key, if that would result in a violation the implied
-    /// *unique constraint* of the primary key. The consequenses of doing so are
-    /// unspecified.
 
     size_t add_empty_row(size_t num_rows = 1);
     void insert_empty_row(size_t row_ndx, size_t num_rows = 1);
@@ -395,8 +379,18 @@ public:
     void move_last_over(size_t row_ndx);
     void clear();
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2);
-
     //@}
+
+    /// Replaces all links to \a row_ndx with links to \a new_row_ndx.
+    ///
+    /// This operation is usually followed by Table::move_last_over()
+    /// as part of Table::set_int_unique() or Table::set_string_unique()
+    /// detecting a collision.
+    ///
+    /// \sa Table::move_last_over()
+    /// \sa Table::set_int_unique()
+    /// \sa Table::set_string_unique()
+    void change_link_targets(size_t row_ndx, size_t new_row_ndx);
 
     // Get cell values
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -437,10 +431,14 @@ public:
     /// producing an oversized string or binary data value will cause an
     /// exception to be thrown.
     ///
-    /// It is an error to modify a value in a column that participates in a
-    /// primary key, if that would result in a violation the implied *unique
-    /// constraint* of that primary key. The consequenses of doing so are
-    /// unspecified.
+    /// The "unique" variants (set_int_unique(), set_string_unique()) are
+    /// intended to be used in the implementation of primary key support. They
+    /// check if the given column already contains one or more values that are
+    /// equal to \a value, and if there are conflicts, it calls
+    /// Table::change_link_targets() for the conflicting row to be replaced by
+    /// \a row_ndx, followed by a Table::move_last_over() of the offending row.
+    /// Users intending to implement primary keys must therefore manually check
+    /// for duplicates if they want to raise an error instead.
     ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
@@ -461,6 +459,7 @@ public:
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
+    void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
     template<class E>
@@ -468,6 +467,7 @@ public:
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
@@ -495,16 +495,14 @@ public:
     // and clear_subtable() replaces the value with an empty table.)
     TableRef get_subtable(size_t column_ndx, size_t row_ndx);
     ConstTableRef get_subtable(size_t column_ndx, size_t row_ndx) const;
-    size_t get_subtable_size(size_t column_ndx, size_t row_ndx)
-        const noexcept;
+    size_t get_subtable_size(size_t column_ndx, size_t row_ndx) const noexcept;
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
     size_t get_backlink_count(size_t row_ndx, const Table& origin,
-                                   size_t origin_col_ndx) const noexcept;
+                              size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin,
-                             size_t origin_col_ndx, size_t backlink_ndx) const
-        noexcept;
+                        size_t origin_col_ndx, size_t backlink_ndx) const noexcept;
 
 
     //@{
@@ -606,22 +604,6 @@ public:
     TableView      get_backlink_view(size_t row_ndx, Table *src_table,
                                      size_t src_col_ndx);
 
-    //@{
-
-    /// Find the row with the specified primary key.
-    ///
-    /// It is an error to call any of these function on a table that has no
-    /// primary key, or to call one of them for a column with a mismatching
-    /// type.
-
-    RowExpr find_pkey_int(int_fast64_t pkey_value);
-    ConstRowExpr find_pkey_int(int_fast64_t pkey_value) const;
-
-    RowExpr find_pkey_string(StringData pkey_value);
-    ConstRowExpr find_pkey_string(StringData pkey_value) const;
-
-    //@}
-
 
     // Pivot / aggregate operation types. Experimental! Please do not document method publicly.
     enum AggrType {
@@ -635,7 +617,16 @@ public:
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const IntegerColumn* viewrefs = nullptr) const;
 
-
+    /// Report the current versioning counter for the table. The versioning counter is guaranteed to
+    /// change when the contents of the table changes after advance_read() or promote_to_write(), or
+    /// immediately after calls to methods which change the table. The term "change" means "change of
+    /// value": The storage layout of the table may change, for example due to optimization, but this
+    /// is not considered a change of a value. This means that you *cannot* use a non-changing version
+    /// count to indicate that object addresses (e.g. strings, binary data) remain the same.
+    /// The versioning counter *may* change (but is not required to do so) when another table linked
+    /// from this table, or linking to this table, is changed. The version counter *may* also change
+    /// without any apparent reason.
+    uint_fast64_t get_version_counter() const noexcept;
 private:
     template<class T>
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
@@ -737,7 +728,7 @@ public:
 
     // Conversion
     void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string,
-                 std::string>* renames = 0) const;
+                 std::string>* renames = nullptr) const;
     void to_string(std::ostream& out, size_t limit = 500) const;
     void row_to_string(size_t row_ndx, std::ostream& out) const;
 
@@ -787,6 +778,9 @@ public:
 #endif
 
     class Parent;
+    using HandoverPatch = TableHandoverPatch;
+    static void generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch);
+    static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
 protected:
     /// Get a pointer to the accessor of the specified subtable. The
@@ -857,7 +851,6 @@ private:
     column_accessors m_cols;
 
     mutable size_t m_ref_count;
-    mutable const StringIndex* m_primary_key;
 
     // If this table is a root table (has independent descriptor),
     // then Table::m_descriptor refers to the accessor of its
@@ -893,6 +886,7 @@ private:
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
+    void do_change_link_targets(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
 
@@ -942,10 +936,6 @@ private:
               bool skip_create_column_accessors = false);
     void init(ConstSubspecRef shared_spec, ArrayParent* parent_column,
               size_t parent_row_ndx);
-
-    void reveal_primary_key() const;
-    size_t do_find_pkey_int(int_fast64_t) const;
-    size_t do_find_pkey_string(StringData) const;
 
     static void do_insert_column(Descriptor&, size_t col_ndx, DataType type,
                                  StringData name, Table* link_target_table, bool nullable = false);
@@ -1009,11 +999,11 @@ private:
 
     // recursive methods called by to_json, to follow links
     void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-        std::vector<ref_type>& followed) const;
+                 std::vector<ref_type>& followed) const;
     void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
-        std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
+                     std::map<std::string, std::string>& renames, std::vector<ref_type>& followed) const;
     void to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = nullptr) const;
+                     std::map<std::string, std::string>* renames = nullptr) const;
 
     // Detach accessor from underlying table. Caller must ensure that
     // a reference count exists upon return, for example by obtaining
@@ -1229,8 +1219,7 @@ private:
     void do_move_last_over(size_t row_ndx);
 
     // Precondition: 1 <= end - begin
-    size_t* record_subtable_path(size_t* begin,
-                                      size_t* end) const noexcept;
+    size_t* record_subtable_path(size_t* begin, size_t* end) const noexcept;
 
     /// Check if an accessor exists for the specified subtable. If it does,
     /// return a pointer to it, otherwise return null. This function assumes
@@ -1405,8 +1394,7 @@ protected:
     /// consistency can be assumed by this function.
     virtual void child_accessor_destroyed(Table* child) noexcept = 0;
 
-    virtual size_t* record_subtable_path(size_t* begin,
-                                              size_t* end) noexcept;
+    virtual size_t* record_subtable_path(size_t* begin, size_t* end) noexcept;
 
     friend class Table;
 };
@@ -1416,6 +1404,7 @@ protected:
 
 
 // Implementation:
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 
 inline void Table::bump_version(bool bump_global) const noexcept
@@ -1430,16 +1419,15 @@ inline void Table::bump_version(bool bump_global) const noexcept
         if (const Table* parent = get_parent_table_ptr())
             parent->bump_version(false);
         // Recurse through linked tables, use m_mark to avoid infinite recursion
-        size_t limit = m_cols.size();
-        for (size_t i = 0; i < limit; ++i) {
+        for (auto& column : m_cols) {
             // We may meet a null pointer in place of a backlink column, pending
             // replacement with a new one. This can happen ONLY when creation of
             // the corresponding forward link column in the origin table is
             // pending as well. In this case it is ok to just ignore the zeroed
             // backlink column, because the origin table is guaranteed to also
             // be refreshed/marked dirty and hence have it's version bumped.
-            if (ColumnBase* col = m_cols[i])
-                col->bump_link_origin_table_version();
+            if (column != nullptr)
+                column->bump_link_origin_table_version();
         }
     }
 }
@@ -1585,7 +1573,7 @@ public:
     Table* release() noexcept
     {
         Table* table = m_table;
-        m_table = 0;
+        m_table = nullptr;
         return table;
     }
 
@@ -1684,6 +1672,13 @@ inline Columns<T> Table::column(size_t column)
 
     m_link_chain.clear();
     return Columns<T>(column, this, tmp);
+}
+
+template<class T>
+SubQuery<T> Table::column(size_t column_ndx, Query subquery)
+{
+    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list column");
+    return SubQuery<T>(column<T>(column_ndx), std::move(subquery));
 }
 
 // For use by queries
@@ -1803,42 +1798,6 @@ inline bool Table::is_group_level() const noexcept
     return bool(get_parent_group());
 }
 
-inline Table::RowExpr Table::find_pkey_int(int_fast64_t value)
-{
-    Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return RowExpr(table, row_ndx);
-}
-
-inline Table::ConstRowExpr Table::find_pkey_int(int_fast64_t value) const
-{
-    const Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_int(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return ConstRowExpr(table, row_ndx);
-}
-
-inline Table::RowExpr Table::find_pkey_string(StringData value)
-{
-    Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return RowExpr(table, row_ndx);
-}
-
-inline Table::ConstRowExpr Table::find_pkey_string(StringData value) const
-{
-    const Table* table = nullptr;
-    size_t row_ndx = do_find_pkey_string(value); // Throws
-    if (row_ndx != realm::not_found)
-        table = this;
-    return ConstRowExpr(table, row_ndx);
-}
-
 inline bool Table::operator==(const Table& t) const
 {
     return m_spec == t.m_spec && compare_rows(t); // Throws
@@ -1878,8 +1837,7 @@ inline bool Table::is_link_type(ColumnType col_type) noexcept
     return col_type == col_type_Link || col_type == col_type_LinkList;
 }
 
-inline size_t* Table::record_subtable_path(size_t* begin,
-                                                size_t* end) const noexcept
+inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const noexcept
 {
     const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     size_t index_in_parent = real_top.get_ndx_in_parent();
@@ -1891,8 +1849,7 @@ inline size_t* Table::record_subtable_path(size_t* begin,
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 
-inline size_t* Table::Parent::record_subtable_path(size_t* begin,
-                                                        size_t*) noexcept
+inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*) noexcept
 {
     return begin;
 }
@@ -2021,8 +1978,7 @@ public:
         table.discard_child_accessors();
     }
 
-    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx)
-        noexcept
+    static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
     {
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
@@ -2083,6 +2039,11 @@ public:
     static void do_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2)
     {
         table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
+    }
+
+    static void do_change_link_targets(Table& table, size_t row_ndx, size_t new_row_ndx)
+    {
+        table.do_change_link_targets(row_ndx, new_row_ndx); // Throws
     }
 
     static void do_clear(Table& table)
@@ -2235,8 +2196,7 @@ public:
         table.adj_erase_column(col_ndx);
     }
 
-    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2)
-        noexcept
+    static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2) noexcept
     {
         table.adj_move_column(col_ndx_1, col_ndx_2);
     }
@@ -2278,9 +2238,9 @@ public:
 
     typedef Table::AccessorUpdater AccessorUpdater;
     static void update_accessors(Table& table, const size_t* col_path_begin,
-                                 const size_t* col_path_end, AccessorUpdater& updatder)
+                                 const size_t* col_path_end, AccessorUpdater& updater)
     {
-        table.update_accessors(col_path_begin, col_path_end, updatder); // Throws
+        table.update_accessors(col_path_begin, col_path_end, updater); // Throws
     }
 
     static void refresh_accessor_tree(Table& table)
@@ -2293,8 +2253,7 @@ public:
         table.set_ndx_in_parent(ndx_in_parent);
     }
 
-    static void set_shared_subspec_ndx_in_parent(Table& table, size_t spec_ndx_in_parent)
-        noexcept
+    static void set_shared_subspec_ndx_in_parent(Table& table, size_t spec_ndx_in_parent) noexcept
     {
         table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }

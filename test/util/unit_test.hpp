@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -242,7 +242,7 @@ public:
     void sort(Compare);
 
     /// Run all the tests in this list (or a filtered subset of them).
-    bool run(Reporter* = 0, Filter* = 0, int num_threads = 1, bool shuffle = false);
+    bool run(Reporter* = nullptr, Filter* = nullptr, int num_threads = 1, bool shuffle = false);
 
     /// Called automatically when you use the `TEST` macro (or one of
     /// its friends).

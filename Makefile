@@ -62,6 +62,11 @@ benchmark-row-accessor: check-norun/subdir/src
 benchmark-common-tasks: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-common-tasks
 
+# Build and run the "util network" benchmarking program
+.PHONY: benchmark-util-network
+benchmark-util-network: check-norun/subdir/src
+	@$(MAKE) -C test benchmark-util-network
+
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
 lcov: check-cover

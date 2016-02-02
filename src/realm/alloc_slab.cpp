@@ -8,6 +8,7 @@
 #endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <memory>
 #include <realm/array.hpp>
@@ -118,7 +119,8 @@ void SlabAlloc::detach() noexcept
             goto found;
         case attach_SharedFile:
         case attach_UnsharedFile:
-            File::unmap(m_data, m_initial_mapping_size);
+            m_data = 0;
+            m_initial_mapping.unmap();
             // running the destructors on the mappings will cause them to unmap:
             m_additional_mappings = nullptr;
             m_file.close();
@@ -126,6 +128,7 @@ void SlabAlloc::detach() noexcept
     }
     REALM_ASSERT(false);
   found:
+    invalidate_cache();
     m_attach_mode = attach_None;
 }
 
@@ -153,8 +156,9 @@ SlabAlloc::~SlabAlloc() noexcept
 #endif
 
     // Release all allocated memory
-    for (size_t i = 0; i < m_slabs.size(); ++i)
-        delete[] m_slabs[i].addr;
+    for (auto& slab : m_slabs) {
+        delete[] slab.addr;
+    }
 
     if (is_attached())
         detach();
@@ -372,31 +376,59 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     return new_mem;
 }
 
+
 char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
-    // fast path if reference is inside the initial mapping:
-    if (ref < m_initial_mapping_size)
-        return m_data + ref;
+    char* addr = nullptr;
+
+    size_t cache_index = ref ^ ((ref >> 16) >> 16);
+    // we shift by 16 two times. On 32-bitters it's undefined to shift by
+    // 32. Shifting twice x16 however, is defined and gives zero. On 64-bitters
+    // the compiler should reduce it to a single 32 bit shift.
+    cache_index = cache_index ^(cache_index >> 16);
+    cache_index = (cache_index ^(cache_index >> 8)) & 0xFF;
+    if (cache[cache_index].ref == ref && cache[cache_index].version == version)
+        return cache[cache_index].addr;
 
     if (ref < m_baseline) {
 
-        // reference must be inside a section mapped later
-        size_t section_index = get_section_index(ref);
-        size_t mapping_index = section_index - m_first_additional_mapping;
-        size_t section_offset = ref - get_section_base(section_index);
-        REALM_ASSERT_DEBUG(m_additional_mappings);
-        REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
-        return m_additional_mappings[mapping_index].get_addr() + section_offset;
+        const util::File::Map<char>* map;
+
+        // fast path if reference is inside the initial mapping:
+        if (ref < m_initial_mapping_size) {
+            addr = m_data + ref;
+            map = &m_initial_mapping;
+        }
+        else {
+            // reference must be inside a section mapped later
+            size_t section_index = get_section_index(ref);
+            size_t mapping_index = section_index - m_first_additional_mapping;
+            size_t section_offset = ref - get_section_base(section_index);
+            REALM_ASSERT_DEBUG(m_additional_mappings);
+            REALM_ASSERT_DEBUG(mapping_index < m_num_additional_mappings);
+            map = &m_additional_mappings[mapping_index];
+            REALM_ASSERT_DEBUG(map->get_addr() != nullptr);
+            addr = map->get_addr() + section_offset;
+        }
+        realm::util::encryption_read_barrier(addr, Array::header_size, 
+                                             map->get_encrypted_mapping(),
+                                             Array::get_byte_size_from_header);
     }
+    else {
+        typedef slabs::const_iterator iter;
+        iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
+        REALM_ASSERT_DEBUG(i != m_slabs.end());
 
-    typedef slabs::const_iterator iter;
-    iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
-    REALM_ASSERT_DEBUG(i != m_slabs.end());
-
-    ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
-    return i->addr + (ref - slab_ref);
+        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
+        addr = i->addr + (ref - slab_ref);
+    }
+    cache[cache_index].addr = addr;
+    cache[cache_index].ref = ref;
+    cache[cache_index].version = version;
+    REALM_ASSERT_DEBUG(addr != nullptr);
+    return addr;
 }
 
 int SlabAlloc::get_committed_file_format() const noexcept
@@ -433,14 +465,18 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_file.set_encryption_key(cfg.encryption_key);
     File::CloseGuard fcg(m_file);
 
-    size_t initial_size = m_initial_section_size;
-
     size_t initial_size_of_file;
+    size_t size;
+    bool did_create = false;
+
+    // We can only safely mmap the file, if its size matches a section. If not,
+    // we must change the size to match before mmaping it.
+    // This can fail due to a race with a concurrent commmit, in which case we
+    // must throw allowing the caller to retry, but the common case is to succeed
+    // at first attempt
 
     // The size of a database file must not exceed what can be encoded in
     // size_t.
-    size_t size;
-    bool did_create = false;
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file.get_size(), size)))
         throw InvalidDatabase("Realm file too large", path);
 
@@ -465,6 +501,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_file.write(data, sizeof empty_file_header); // Throws
 
         // Pre-alloc initial space
+        size_t initial_size = m_initial_section_size;
         m_file.prealloc(0, initial_size); // Throws
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
@@ -472,36 +509,64 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         size = initial_size;
     }
 
-    // We must now make sure the filesize matches a page boundary...
+    // We must now make sure the filesize matches a mmap boundary...
     // first, save the original filesize for use during validation and
     // (potentially) conversion from streaming format.
     initial_size_of_file = size;
 
-    // next extend the file to a mmapping boundary (unless already there)
-    // The file must be extended prior to being mmapped, as extending it after mmap has
-    // undefined behavior.
-    // The mapping of the first part of the file *must* be contiguous, because
-    // we do not know if the file was created by a version of the code, that took
-    // the section boundaries into account. If it wasn't we cannot map it in sections
-    // without risking datastructures that cross a mapping boundary.
-    // If the file is opened read-only, we cannot extend it. This is not a problem,
-    // because for a read-only file we assume that it will not change while we use it.
-    // This assumption obviously will not hold, if the file is shared by multiple
-    // processes with different opening modes.
-    if (!cfg.read_only && !matches_section_boundary(size)) {
+    if (!matches_section_boundary(size)) {
 
-        REALM_ASSERT_3(cfg.session_initiator, ||, !cfg.is_shared);
-        size = get_upper_section_boundary(size);
-        m_file.prealloc(0, size);
-        // resizing the file (as we do here) without actually changing any internal
-        // datastructures to reflect the additional free space will work, because the
-        // free space management relies on the logical filesize and disregards the
-        // actual size of the file.
+        // The file size did not match a section boundary.
+        // We must extend the file to a section boundary (unless already there)
+        // The file must be extended to match in size prior to being mmapped,
+        // as extending it after mmap has undefined behavior.
+
+        // The mapping of the first part of the file *must* be contiguous, because
+        // we do not know if the file was created by a version of the code, that took
+        // the section boundaries into account. If it wasn't we cannot map it in sections
+        // without risking datastructures that cross a mapping boundary.
+
+        if (cfg.read_only) {
+
+            // If the file is opened read-only, we cannot extend it. This is not a problem,
+            // because for a read-only file we assume that it will not change while we use it.
+            // This assumption obviously will not hold, if the file is shared by multiple
+            // processes or threads with different opening modes.
+            // Currently, there is no way to detect if this assumption is violated.
+            ;
+        }
+        else {
+
+            if (cfg.session_initiator || !cfg.is_shared) {
+
+                // We can only safely extend the file if we're the session initiator, or if
+                // the file isn't shared at all.
+
+                // resizing the file (as we do here) without actually changing any internal
+                // datastructures to reflect the additional free space will work, because the
+                // free space management relies on the logical filesize and disregards the
+                // actual size of the file.
+                size = get_upper_section_boundary(size);
+                m_file.prealloc(0, size);
+            }
+            else {
+                // Getting here, we have a file of a size that will not work, and without being
+                // allowed to extend it.
+                // This can happen in the case where a concurrent commit is extending the file,
+                // and we observe it part-way (file extension is not atomic). If so, we
+                // need to start all over. The alternative would be to synchronize with commit,
+                // and we generally try to avoid this when possible.
+                throw Retry();
+            }
+        }
     }
 
     ref_type top_ref;
     try {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
+        // we'll read header and (potentially) footer
+        realm::util::encryption_read_barrier(map, 0, sizeof(Header));
+        realm::util::encryption_read_barrier(map, initial_size_of_file - sizeof(Header), sizeof(Header));
 
         if (!cfg.skip_validate) {
             // Verify the data structures
@@ -511,7 +576,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
             Header& header = *writable_map.get_addr();
+            realm::util::encryption_read_barrier(writable_map, 0);
             header.m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
+            realm::util::encryption_write_barrier(writable_map, 0);
         }
         else {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
@@ -540,7 +607,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             }
         }
 
-        m_data        = map.release();
+        m_data        = map.get_addr();
+        m_initial_mapping = std::move(map);
         m_baseline    = size;
         m_initial_mapping_size = size;
         m_first_additional_mapping = get_section_index(m_initial_mapping_size);
@@ -578,10 +646,14 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             File::Map<Header> writable_map(m_file, File::access_ReadWrite,
                                            sizeof (Header)); // Throws
             Header& writable_header = *writable_map.get_addr();
+            realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_top_ref[1] = footer.m_top_ref;
+            realm::util::encryption_write_barrier(writable_map, 0);
             writable_map.sync();
             // keep bit 1 used for server sync mode unchanged
+            realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_flags |= flags_SelectBit;
+            realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
             writable_map.sync();
         }
@@ -705,6 +777,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 
 void SlabAlloc::reset_free_space_tracking()
 {
+    invalidate_cache();
     if (m_free_space_state == free_space_Clean)
         return;
 
@@ -716,12 +789,11 @@ void SlabAlloc::reset_free_space_tracking()
     // Rebuild free list to include all slabs
     Chunk chunk;
     chunk.ref = m_baseline;
-    typedef slabs::const_iterator iter;
-    iter end = m_slabs.end();
-    for (iter i = m_slabs.begin(); i != end; ++i) {
-        chunk.size = i->ref_end - chunk.ref;
+
+    for (const auto& slab : m_slabs) {
+        chunk.size = slab.ref_end - chunk.ref;
         m_free_space.push_back(chunk); // Throws
-        chunk.ref = i->ref_end;
+        chunk.ref = slab.ref_end;
     }
 
     REALM_ASSERT_DEBUG(is_all_free());
@@ -752,7 +824,7 @@ void SlabAlloc::remap(size_t file_size)
             new_mappings[j] = std::move(m_additional_mappings[j]);
         m_additional_mappings = std::move(new_mappings);
     }
-    for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
+    for (size_t k = m_num_additional_mappings; k < num_additional_mappings; ++k)
     {
         auto section_start_offset = get_section_base(k + m_first_additional_mapping);
         auto section_size = get_section_base(1 + k + m_first_additional_mapping) - section_start_offset;
@@ -859,17 +931,15 @@ bool SlabAlloc::is_all_free() const
 
     // Verify that free space matches slabs
     ref_type slab_ref = m_baseline;
-    typedef slabs::const_iterator iter;
-    iter end = m_slabs.end();
-    for (iter slab = m_slabs.begin(); slab != end; ++slab) {
-        size_t slab_size = slab->ref_end - slab_ref;
+    for (const auto& slab : m_slabs) {
+        size_t slab_size = slab.ref_end - slab_ref;
         chunks::const_iterator chunk =
             find_if(m_free_space.begin(), m_free_space.end(), ChunkRefEq(slab_ref));
         if (chunk == m_free_space.end())
             return false;
         if (slab_size != chunk->size)
             return false;
-        slab_ref = slab->ref_end;
+        slab_ref = slab.ref_end;
     }
     return true;
 }
@@ -878,15 +948,13 @@ bool SlabAlloc::is_all_free() const
 void SlabAlloc::verify() const
 {
     // Make sure that all free blocks fit within a slab
-    typedef chunks::const_iterator iter;
-    iter end = m_free_space.end();
-    for (iter chunk = m_free_space.begin(); chunk != end; ++chunk) {
+    for (const auto& chunk : m_free_space) {
         slabs::const_iterator slab =
-            upper_bound(m_slabs.begin(), m_slabs.end(), chunk->ref, &ref_less_than_slab_ref_end);
+            upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
         REALM_ASSERT(slab != m_slabs.end());
 
         ref_type slab_ref_end = slab->ref_end;
-        ref_type chunk_ref_end = chunk->ref + chunk->size;
+        ref_type chunk_ref_end = chunk.ref + chunk.size;
         REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
     }
 }
@@ -897,8 +965,9 @@ void SlabAlloc::print() const
     size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
 
     size_t free = 0;
-    for (size_t i = 0; i < m_free_space.size(); ++i)
-        free += m_free_space[i].size;
+    for (const auto& free_block : m_free_space) {
+        free += free_block.size;
+    }
 
     size_t allocated = allocated_for_slabs - free;
     std::cout << "Attached: " << (m_data ? m_baseline : 0) << " Allocated: " << allocated << "\n";
@@ -906,37 +975,39 @@ void SlabAlloc::print() const
     if (!m_slabs.empty()) {
         std::cout << "Slabs: ";
         ref_type first_ref = m_baseline;
-        typedef slabs::const_iterator iter;
-        for (iter i = m_slabs.begin(); i != m_slabs.end(); ++i) {
-            if (i != m_slabs.begin())
+
+        for (const auto& slab : m_slabs) {
+            if (&slab != &m_slabs.front())
                 std::cout << ", ";
-            ref_type last_ref = i->ref_end - 1;
-            size_t size = i->ref_end - first_ref;
-            void* addr = i->addr;
-            std::cout << "("<<first_ref<<"->"<<last_ref<<", size="<<size<<", addr="<<addr<<")";
-            first_ref = i->ref_end;
+
+            ref_type last_ref = slab.ref_end - 1;
+            size_t size = slab.ref_end - first_ref;
+            void* addr = slab.addr;
+            std::cout << "(" << first_ref << "->" << last_ref << ", size=" << size << ", addr=" << addr << ")";
+            first_ref = slab.ref_end;
         }
         std::cout << "\n";
     }
+
     if (!m_free_space.empty()) {
         std::cout << "FreeSpace: ";
-        typedef chunks::const_iterator iter;
-        for (iter i = m_free_space.begin(); i != m_free_space.end(); ++i) {
-            if (i != m_free_space.begin())
+        for (const auto& free_block : m_free_space) {
+            if (&free_block != &m_free_space.front())
                 std::cout << ", ";
-            ref_type last_ref = i->ref + i->size - 1;
-            std::cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
+
+            ref_type last_ref = free_block.ref + free_block.size - 1;
+            std::cout << "(" << free_block.ref << "->" << last_ref << ", size=" << free_block.size << ")";
         }
         std::cout << "\n";
     }
     if (!m_free_read_only.empty()) {
         std::cout << "FreeSpace (ro): ";
-        typedef chunks::const_iterator iter;
-        for (iter i = m_free_read_only.begin(); i != m_free_read_only.end(); ++i) {
-            if (i != m_free_read_only.begin())
+        for (const auto& free_block : m_free_read_only) {
+            if (&free_block != &m_free_read_only.front())
                 std::cout << ", ";
-            ref_type last_ref = i->ref + i->size - 1;
-            std::cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
+
+            ref_type last_ref = free_block.ref + free_block.size - 1;
+            std::cout << "(" << free_block.ref << "->" << last_ref << ", size=" << free_block.size << ")";
         }
         std::cout << "\n";
     }

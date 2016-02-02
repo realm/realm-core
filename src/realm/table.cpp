@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include <realm/util/features.h>
+#include <realm/util/miscellaneous.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
@@ -54,11 +55,12 @@
 /// only on some parts of the internal accessors states, and only on some parts
 /// of the structural state.
 ///
-/// This level of consistency is guaranteed, and it is also the **maximum** that
-/// may be assumed by the application after a library function fails by throwing
-/// an unexpected exception (such as std::bad_alloc). It is also the **minimum**
-/// level of consistency that is required to be able to properly destroy the
-/// accessor objects (manually, or as a result of stack unwinding).
+/// This level of consistency is guaranteed at all times, and it is also the
+/// **maximum** that may be assumed by the application after a library function
+/// fails by throwing an unexpected exception (such as std::bad_alloc). It is
+/// also the **minimum** level of consistency that is required to be able to
+/// properly destroy the accessor objects (manually, or as a result of stack
+/// unwinding).
 ///
 /// It is supposed to be a library-wide invariant that an accessor hierarchy is
 /// at least minimally consistent, but so far, only some parts of the library
@@ -439,10 +441,11 @@ ConstDescriptorRef Table::get_subdescriptor(size_t col_ndx) const
 DescriptorRef Table::get_subdescriptor(const path_vec& path)
 {
     DescriptorRef desc = get_descriptor(); // Throws
-    typedef path_vec::const_iterator iter;
-    iter end = path.end();
-    for (iter i = path.begin(); i != end; ++i)
-        desc = desc->get_subdescriptor(*i); // Throws
+
+    for (const auto& path_part : path) {
+        desc = desc->get_subdescriptor(path_part); // Throws
+    }
+
     return desc;
 }
 
@@ -987,16 +990,35 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
     // origin table column indices.
 
     size_t num_cols = m_cols.size();
+
+    // If multiple link columns exist to the same table, updating the backlink
+    // columns one by one is risky, because we use Spec::find_backlink_column
+    // to figure out which backlink column should be updated. If we update them
+    // as we find them, the next iteration might find the column that we have
+    // just updated, thinking it should be updated once more.
+    //
+    // Therefore, we figure out which backlink columns need to be updated first,
+    // and then we actually update them in the second pass.
+    //
+    // Tuples are: (target table, backlink column index, new column index).
+    std::vector<std::tuple<Table*, size_t, size_t>> update_backlink_columns;
+
     for (size_t new_col_ndx = new_col_ndx_begin; new_col_ndx < num_cols; ++new_col_ndx) {
         ColumnType type = m_spec.get_column_type(new_col_ndx);
         if (!is_link_type(type))
             continue;
         LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[new_col_ndx]);
-        Spec& target_spec = link_col->get_target_table().m_spec;
+        Table* target_table = &link_col->get_target_table();
+        Spec& target_spec = target_table->m_spec;
         size_t origin_table_ndx = get_index_in_group();
         size_t old_col_ndx = old_col_ndx_begin + (new_col_ndx - new_col_ndx_begin);
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
-        target_spec.set_backlink_origin_column(backlink_col_ndx, new_col_ndx); // Throws
+        update_backlink_columns.emplace_back(target_table, backlink_col_ndx, new_col_ndx); // Throws
+    }
+
+    for (auto& t : update_backlink_columns) {
+        Spec& target_spec = std::get<0>(t)->m_spec;
+        target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
     }
 }
 
@@ -1086,7 +1108,7 @@ void Table::discard_row_accessors() noexcept
     LockGuard lock(m_accessor_mutex);
     for (RowBase* row = m_row_accessors; row; row = row->m_next)
         row->m_table.reset(); // Detach
-    m_row_accessors = 0;
+    m_row_accessors = nullptr;
 }
 
 
@@ -1271,11 +1293,9 @@ void Table::unregister_view(const TableViewBase* view) noexcept
     LockGuard lock(m_accessor_mutex);
     // Fixme: O(n) may be unacceptable - if so, put and maintain
     // iterator or index in TableViewBase.
-    typedef views::iterator iter;
-    iter end = m_views.end();
-    for (iter i = m_views.begin(); i != end; ++i) {
-        if (*i == view) {
-            *i = m_views.back();
+    for (auto& v : m_views) {
+        if (v == view) {
+            v = m_views.back();
             m_views.pop_back();
             break;
         }
@@ -1287,13 +1307,11 @@ void Table::move_registered_view(const TableViewBase* old_addr,
                                  const TableViewBase* new_addr) noexcept
 {
     LockGuard lock(m_accessor_mutex);
-    typedef views::iterator iter;
-    iter end = m_views.end();
-    for (iter i = m_views.begin(); i != end; ++i) {
-        if (*i == old_addr) {
+    for (auto& view : m_views) {
+        if (view == old_addr) {
             // casting away constness here... all operations on members
             // of  m_views are preserving logical constness on the table views.
-            *i = const_cast<TableViewBase*>(new_addr);
+            view = const_cast<TableViewBase*>(new_addr);
             return;
         }
     }
@@ -1304,10 +1322,9 @@ void Table::move_registered_view(const TableViewBase* old_addr,
 void Table::discard_views() noexcept
 {
     LockGuard lock(m_accessor_mutex);
-    typedef views::const_iterator iter;
-    iter end = m_views.end();
-    for (iter i = m_views.begin(); i != end; ++i)
-        (*i)->detach();
+    for (const auto& view : m_views) {
+        view->detach();
+    }
     m_views.clear();
 }
 
@@ -1320,10 +1337,10 @@ void Table::discard_child_accessors() noexcept
 
     discard_row_accessors();
 
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->discard_child_accessors();
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->discard_child_accessors();
+        }
     }
 }
 
@@ -1434,9 +1451,7 @@ void Table::destroy_column_accessors() noexcept
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        ColumnBase* column = m_cols[i];
+    for (auto& column : m_cols) {
         delete column;
     }
     m_cols.clear();
@@ -1582,8 +1597,6 @@ void Table::add_search_index(size_t col_ndx)
     if (has_search_index(col_ndx))
         return;
 
-    REALM_ASSERT(!m_primary_key);
-
     // Create the index
     ColumnBase& col = get_column_base(col_ndx);
     StringIndex* index = col.create_search_index(); // Throws
@@ -1621,9 +1634,6 @@ void Table::remove_search_index(size_t col_ndx)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    if (REALM_UNLIKELY(m_primary_key))
-        throw LogicError(LogicError::is_primary_key);
-
     if (!has_search_index(col_ndx))
         return;
 
@@ -1647,120 +1657,6 @@ void Table::remove_search_index(size_t col_ndx)
 
     if (Replication* repl = get_repl())
         repl->remove_search_index(this, col_ndx); // Throws
-}
-
-
-bool Table::has_primary_key() const noexcept
-{
-    // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        ColumnAttr attr = m_spec.get_column_attr(i);
-        if (attr & col_attr_PrimaryKey)
-            return true;
-    }
-    return false;
-}
-
-
-bool Table::try_add_primary_key(size_t col_ndx)
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    if (REALM_UNLIKELY(has_primary_key()))
-        throw LogicError(LogicError::has_primary_key);
-
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
-
-    if (REALM_UNLIKELY(!has_search_index(col_ndx)))
-        throw LogicError(LogicError::no_search_index);
-
-    // FIXME: Also check that there are no null values
-    // (NoNullConstraintViolation).
-    ColumnType type = get_real_column_type(col_ndx);
-    ColumnBase& col = get_column_base(col_ndx);
-    if (type == col_type_String) {
-        StringColumn& col_2 = static_cast<StringColumn&>(col);
-        StringIndex& index = *col_2.get_search_index();
-        if (index.has_duplicate_values())
-            return false;
-        index.set_allow_duplicate_values(false);
-    }
-    else if (type == col_type_StringEnum) {
-        StringEnumColumn& col_2 = static_cast<StringEnumColumn&>(col);
-        StringIndex& index = *col_2.get_search_index();
-        if (index.has_duplicate_values())
-            return false;
-        index.set_allow_duplicate_values(false);
-    }
-    else if (type == col_type_Int) {
-        IntegerColumn& col_2 = static_cast<IntegerColumn&>(col);
-        StringIndex& index = *col_2.get_search_index();
-        if (index.has_duplicate_values())
-            return false;
-        index.set_allow_duplicate_values(false);
-    }
-    else {
-        // Impossible case, because we know that a search index was already
-        // added.
-        REALM_ASSERT(false);
-    }
-
-    int attr = m_spec.get_column_attr(col_ndx);
-    attr |= col_attr_Unique | col_attr_PrimaryKey;
-    m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->add_primary_key(this, col_ndx); // Throws
-
-    return true;
-}
-
-
-void Table::remove_primary_key()
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    size_t num_cols = m_cols.size();
-    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
-        int attr = m_spec.get_column_attr(col_ndx);
-        if (attr & col_attr_PrimaryKey) {
-            attr &= ~(col_attr_Unique | col_attr_PrimaryKey);
-            m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-            m_primary_key = nullptr;
-
-            ColumnType type = get_real_column_type(col_ndx);
-            ColumnBase& col = get_column_base(col_ndx);
-            if (type == col_type_String) {
-                StringColumn& col_2 = static_cast<StringColumn&>(col);
-                StringIndex& index = *col_2.get_search_index();
-                index.set_allow_duplicate_values(true);
-            }
-            else if (type == col_type_StringEnum) {
-                StringEnumColumn& col_2 = static_cast<StringEnumColumn&>(col);
-                StringIndex& index = *col_2.get_search_index();
-                index.set_allow_duplicate_values(true);
-            }
-            else {
-                REALM_ASSERT(false);
-            }
-
-            if (Replication* repl = get_repl())
-                repl->remove_primary_key(this); // Throws
-            return;
-        }
-    }
-
-    throw LogicError(LogicError::no_primary_key);
 }
 
 
@@ -2192,6 +2088,21 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     remove_backlink_broken_rows(state); // Throws
 }
 
+void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
+{
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(row_ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    if (REALM_UNLIKELY(new_row_ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+
+    do_change_link_targets(row_ndx, new_row_ndx);
+
+    if (Replication* repl = get_repl()) {
+        repl->change_link_targets(this, row_ndx, new_row_ndx);
+    }
+}
 
 void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over)
 {
@@ -2225,7 +2136,6 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
             if (repl) {
                 size_t num_rows_to_erase = 1;
                 size_t prior_num_rows = m_size;
-                bool is_move_last_over = false;
                 repl->erase_rows(this, row_ndx, num_rows_to_erase, prior_num_rows,
                                  is_move_last_over); // Throws
             }
@@ -2264,8 +2174,9 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
 
     // Iterate over a copy of `rows` since cascading deletes mutate it
     auto copy = state.rows;
-    for (auto const& row : copy)
+    for (auto const& row : copy) {
         cascade_break_backlinks_to(row.row_ndx, state); // Throws
+    }
 
     if (Group* g = get_parent_group())
         _impl::GroupFriend::send_cascade_notification(*g, state);
@@ -2318,6 +2229,48 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         column.swap_rows(row_ndx_1, row_ndx_2);
     }
     adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
+    bump_version();
+}
+
+
+void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
+{
+    // Replace links through backlink columns, WITHOUT generating SetLink instructions.
+    //
+    // This bypasses handling of cascading rows, and we have decided that this is OK, because
+    // ChangeLinkTargets is always followed by MoveLastOver, so breaking the last strong link
+    // to a row that is being subsumed will have no observable effect, while honoring the
+    // cascading behavior would complicate the calling code somewhat (having to take
+    // into account whether or not the row was removed as a consequence of cascade, leading
+    // to bugs in case this was forgotten).
+
+    size_t backlink_col_start = m_spec.get_public_column_count();
+    size_t backlink_col_end   = m_spec.get_column_count();
+    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
+        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
+
+        auto& col = get_column_backlink(col_ndx);
+        auto& origin_table = col.get_origin_table();
+        size_t origin_col_ndx = col.get_origin_column_index();
+        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
+        while (col.get_backlink_count(row_ndx) > 0) {
+            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
+
+            if (origin_col_type == col_type_Link) {
+                origin_table.do_set_link(origin_col_ndx, origin_row_ndx, new_row_ndx);
+            }
+            else if (origin_col_type == col_type_LinkList) {
+                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
+                for (size_t j = 0; j < links->size(); ++j) {
+                    using llf = _impl::LinkListFriend;
+                    if (links->get(j).get_index() == row_ndx) {
+                        llf::do_set(*links, j, new_row_ndx);
+                    }
+                }
+            }
+        }
+    }
+
     bump_version();
 }
 
@@ -2389,6 +2342,7 @@ void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     if (Replication* repl = get_repl())
         repl->swap_rows(this, row_ndx_1, row_ndx_2);
 }
+
 
 void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
@@ -2629,6 +2583,44 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 }
 
 
+void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    if (!has_search_index(col_ndx)) {
+        throw LogicError{LogicError::no_search_index};
+    }
+
+    if (is_nullable(col_ndx)) {
+        auto& col = get_column_int_null(col_ndx);
+        size_t found = col.find_first(value);
+        if (found != not_found) {
+            if (found == ndx)
+                found = col.find_first(value, found + 1);
+            if (found != not_found)
+                throw LogicError{LogicError::unique_constraint_violation};
+        }
+        col.set(ndx, value);
+    }
+    else {
+        auto& col = get_column(col_ndx);
+        size_t found = col.find_first(value);
+        if (found != not_found) {
+            if (found == ndx)
+                found = col.find_first(value, found + 1);
+            if (found != not_found)
+                throw LogicError{LogicError::unique_constraint_violation};
+        }
+        col.set(ndx, value);
+    }
+
+    if (Replication* repl = get_repl())
+        repl->set_int_unique(this, col_ndx, ndx, value); // Throws
+}
+
+
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2807,6 +2799,41 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
         repl->set_string(this, col_ndx, ndx, value); // Throws
 }
 
+
+void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
+{
+    if (REALM_UNLIKELY(value.size() > max_string_size))
+        throw LogicError(LogicError::string_too_big);
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(ndx >= m_size))
+        throw LogicError(LogicError::row_index_out_of_range);
+    // For a degenerate subtable, `m_cols.size()` is zero, even when it has a
+    // column, however, the previous row index check guarantees that `m_size >
+    // 0`, and since `m_size` is also zero for a degenerate subtable, the table
+    // cannot be degenerate if we got this far.
+
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
+
+    if (!has_search_index(col_ndx))
+        throw LogicError(LogicError::no_search_index);
+
+    bump_version();
+
+    StringColumn& col = get_column_string(col_ndx);
+    size_t found = col.find_first(value);
+    if (found != not_found) {
+        if (found == ndx)
+            found = col.find_first(value, found + 1);
+        if (found != not_found)
+            throw LogicError{LogicError::unique_constraint_violation};
+    }
+    col.set_string(ndx, value); // Throws
+
+    if (Replication* repl = get_repl())
+        repl->set_string_unique(this, col_ndx, ndx, value); // Throws
+}
 
 void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
 {
@@ -3384,63 +3411,6 @@ DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
     }
 }
 
-
-void Table::reveal_primary_key() const
-{
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        ColumnAttr attr = m_spec.get_column_attr(i);
-        if (attr & col_attr_PrimaryKey) {
-            ColumnType type = m_spec.get_column_type(i);
-            const ColumnBase& col = get_column_base(i);
-            if (type == col_type_String) {
-                const StringColumn& col_2 = static_cast<const StringColumn&>(col);
-                m_primary_key = col_2.get_search_index();
-                return;
-            }
-            if (type == col_type_StringEnum) {
-                const StringEnumColumn& col_2 = static_cast<const StringEnumColumn&>(col);
-                m_primary_key = col_2.get_search_index();
-                return;
-            }
-            REALM_ASSERT(false);
-            return;
-        }
-    }
-    throw LogicError(LogicError::no_primary_key);
-}
-
-
-size_t Table::do_find_pkey_int(int_fast64_t) const
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(!m_primary_key))
-        reveal_primary_key(); // Throws
-
-    // FIXME: Implement this when integer indexes become available. For now, all
-    // search indexes are of string type.
-    throw LogicError(LogicError::type_mismatch);
-}
-
-
-size_t Table::do_find_pkey_string(StringData value) const
-{
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(!m_primary_key))
-        reveal_primary_key(); // Throws
-
-    // FIXME: In case of datatype mismatch throw LogicError::type_mismatch. For
-    // now, all search indexes are of string type.
-
-    size_t row_ndx = m_primary_key->find_first(value); // Throws
-    return row_ndx;
-}
-
-
 namespace {
 
 util::Optional<int64_t> upgrade_optional_int(util::Optional<bool> value)
@@ -3480,7 +3450,8 @@ size_t Table::find_first(size_t col_ndx, T value) const
 
 size_t Table::find_first_link(size_t target_row_index) const
 {
-    size_t ret = where().links_to(m_link_chain[0], target_row_index).find();
+    auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
+    size_t ret = where().links_to(m_link_chain[0], target_row).find();
     m_link_chain.clear();
     return ret;
 }
@@ -3553,7 +3524,8 @@ TableView Table::find_all(size_t col_ndx, T value)
 
 TableView Table::find_all_link(size_t target_row_index)
 {
-    TableView tv = where().links_to(m_link_chain[0], target_row_index).find_all();
+    auto target_row = get_link_target(m_link_chain[0])->get(target_row_index);
+    TableView tv = where().links_to(m_link_chain[0], target_row).find_all();
     m_link_chain.clear();
     return tv;
 }
@@ -4022,8 +3994,9 @@ TableView Table::get_range_view(size_t begin, size_t end)
     TableView ctv(*this);
     if (m_columns.is_attached()) {
         IntegerColumn& refs = ctv.m_row_indexes;
-        for (size_t i = begin; i < end; ++i)
+        for (size_t i = begin; i < end; ++i) {
             refs.add(i);
+        }
     }
     return ctv;
 }
@@ -4226,7 +4199,7 @@ public:
             for (size_t i = 0; i != n; ++i) {
                 int attr = spec.get_column_attr(i);
                 // Remove any index specifying attributes
-                attr &= ~(col_attr_Indexed | col_attr_Unique | col_attr_PrimaryKey);
+                attr &= ~(col_attr_Indexed | col_attr_Unique);
                 spec.set_column_attr(i, ColumnAttr(attr)); // Throws
             }
             bool deep = true; // Deep
@@ -4241,9 +4214,7 @@ public:
             column_refs.create(Array::type_HasRefs); // Throws
             _impl::ShallowArrayDestroyGuard dg(&column_refs);
             size_t table_size = m_table.size();
-            size_t n = m_table.m_cols.size();
-            for (size_t i = 0; i != n; ++i) {
-                ColumnBase* column = m_table.m_cols[i];
+            for (auto& column : m_table.m_cols) {
                 ref_type ref = column->write(m_offset, m_size, table_size, out); // Throws
                 int_fast64_t ref_2(ref); // FIXME: Dangerous cast (unsigned -> signed)
                 column_refs.add(ref_2); // Throws
@@ -4323,10 +4294,10 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         return;
 
     // Update column accessors
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        ColumnBase* column = m_cols[i];
-        column->update_from_parent(old_baseline);
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->update_from_parent(old_baseline);
+        }
     }
 }
 
@@ -4362,8 +4333,10 @@ inline void out_datetime(std::ostream& out, DateTime value)
 inline void out_binary(std::ostream& out, const BinaryData bin)
 {
     const char* p = bin.data();
-    for (size_t i = 0; i < bin.size(); ++i)
+
+    for (size_t i = 0; i < bin.size(); ++i) {
         out << std::setw(2) << std::setfill('0') << std::hex << static_cast<unsigned int>(p[i]) << std::dec;
+    }
 }
 
 template<class T>
@@ -4594,8 +4567,9 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
     widths.push_back(row_ndx_width);
 
     // Empty space over row numbers
-    for (size_t i = 0; i < row_ndx_width+1; ++i)
+    for (size_t i = 0; i < row_ndx_width + 1; ++i) {
         out << " ";
+    }
 
     // Write header
     for (size_t col = 0; col < column_count; ++col) {
@@ -4990,10 +4964,10 @@ void Table::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
     adj_row_acc_insert_rows(row_ndx, num_rows);
 
     // Adjust column and subtable accessors after insertion of new rows
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->adj_acc_insert_rows(row_ndx, num_rows);
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->adj_acc_insert_rows(row_ndx, num_rows);
+        }
     }
 }
 
@@ -5007,10 +4981,10 @@ void Table::adj_acc_erase_row(size_t row_ndx) noexcept
     adj_row_acc_erase_row(row_ndx);
 
     // Adjust subtable accessors after removal of a row
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->adj_acc_erase_row(row_ndx);
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->adj_acc_erase_row(row_ndx);
+        }
     }
 }
 
@@ -5023,16 +4997,15 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
     adj_row_acc_swap_rows(row_ndx_1, row_ndx_2);
 
     // Adjust subtable accessors after row swap
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+        }
     }
 }
 
 
-void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
-    noexcept
+void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
@@ -5040,10 +5013,10 @@ void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx)
 
     adj_row_acc_move_over(from_row_ndx, to_row_ndx);
 
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->adj_acc_move_over(from_row_ndx, to_row_ndx);
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->adj_acc_move_over(from_row_ndx, to_row_ndx);
+        }
     }
 }
 
@@ -5056,10 +5029,10 @@ void Table::adj_acc_clear_root_table() noexcept
 
     discard_row_accessors();
 
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->adj_acc_clear_root_table();
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->adj_acc_clear_root_table();
+        }
     }
 
     // Adjust rows in tableviews after removal of all rows
@@ -5095,8 +5068,8 @@ void Table::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
     }
 
     // Adjust rows in tableviews after insertion of new rows
-    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
-        (*i)->adj_row_acc_insert_rows(row_ndx, num_rows);
+    for (auto& view : m_views) {
+        view->adj_row_acc_insert_rows(row_ndx, num_rows);
     }
 }
 
@@ -5123,8 +5096,8 @@ void Table::adj_row_acc_erase_row(size_t row_ndx) noexcept
     }
 
     // Adjust rows in tableviews after removal of row
-    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
-        (*i)->adj_row_acc_erase_row(row_ndx);
+    for (auto& view : m_views) {
+        view->adj_row_acc_erase_row(row_ndx);
     }
 }
 
@@ -5169,8 +5142,8 @@ void Table::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexce
     }
 
     // Adjust rows in tableviews after move over of new row
-    for (views::iterator i = m_views.begin(); i != m_views.end(); ++i) {
-        (*i)->adj_row_acc_move_over(from_row_ndx, to_row_ndx);
+    for (auto& view : m_views) {
+        view->adj_row_acc_move_over(from_row_ndx, to_row_ndx);
     }
 }
 
@@ -5186,7 +5159,7 @@ void Table::adj_insert_column(size_t col_ndx)
     bool not_degenerate = m_columns.is_attached();
     if (not_degenerate) {
         REALM_ASSERT_3(col_ndx, <=, m_cols.size());
-        m_cols.insert(m_cols.begin() + col_ndx, 0); // Throws
+        m_cols.insert(m_cols.begin() + col_ndx, nullptr); // Throws
     }
 }
 
@@ -5243,10 +5216,10 @@ void Table::recursive_mark() noexcept
 
     mark();
 
-    size_t n = m_cols.size();
-    for (size_t i = 0; i != n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->mark(ColumnBase::mark_Recursive);
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->mark(ColumnBase::mark_Recursive);
+        }
     }
 }
 
@@ -5260,6 +5233,7 @@ void Table::mark_link_target_tables(size_t col_ndx_begin) noexcept
 
     REALM_ASSERT(is_attached());
     REALM_ASSERT(!m_columns.is_attached() || col_ndx_begin <= m_cols.size());
+
     size_t n = m_cols.size();
     for (size_t i = col_ndx_begin; i < n; ++i) {
         if (ColumnBase* col = m_cols[i])
@@ -5276,10 +5250,11 @@ void Table::mark_opposite_link_tables() noexcept
     // structure. See AccessorConsistencyLevels.
 
     REALM_ASSERT(is_attached());
-    size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (ColumnBase* col = m_cols[i])
-            col->mark(ColumnBase::mark_LinkOrigins | ColumnBase::mark_LinkTargets);
+
+    for (auto& column : m_cols) {
+        if (column != nullptr) {
+            column->mark(ColumnBase::mark_LinkOrigins | ColumnBase::mark_LinkTargets);
+        }
     }
 }
 
@@ -5326,8 +5301,6 @@ void Table::refresh_accessor_tree()
 
 void Table::refresh_column_accessors(size_t col_ndx_begin)
 {
-    m_primary_key = nullptr;
-
     // Index of column in Table::m_columns, which is not always equal to the
     // 'logical' column index.
     size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(col_ndx_begin);
@@ -5403,9 +5376,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         }
 
         if (has_search_index) {
-            bool is_primary_key = (attr & col_attr_PrimaryKey) != 0;
-            REALM_ASSERT(has_search_index || !is_primary_key);
-            bool allow_duplicate_values = !is_primary_key;
+            bool allow_duplicate_values = true;
             if (col->has_search_index()) {
                 col->set_search_index_allow_duplicate_values(allow_duplicate_values);
             }
@@ -5442,6 +5413,33 @@ bool Table::is_cross_table_link_target() const noexcept
             return true;
     }
     return false;
+}
+
+
+void Table::generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch)
+{
+    if (ref.get()) {
+        patch.reset(new Table::HandoverPatch);
+        patch->m_table_num = ref.get()->get_index_in_group();
+        // must be group level table!
+        if (patch->m_table_num == npos) {
+            throw std::runtime_error("Table handover failed: not a group level table");
+        }
+    }
+    else {
+        patch.reset();
+    }
+}
+
+
+TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
+{
+    if (patch) {
+        TableRef result(group.get_table(patch->m_table_num));
+        patch.reset();
+        return result;
+    }
+    return TableRef();
 }
 
 
@@ -5639,6 +5637,5 @@ void Table::dump_node_structure(std::ostream& out, int level) const
         column.do_dump_node_structure(out, level+2);
     }
 }
-
 
 #endif // REALM_DEBUG

@@ -52,6 +52,16 @@ public:
         return false;
     }
 
+    bool set_int_unique(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    {
+        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+            log("table->set_int_unique(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->set_int_unique(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
     bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
@@ -87,6 +97,16 @@ public:
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
             log("table->set_string(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
             m_table->set_string(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
+    bool set_string_unique(size_t col_ndx, size_t row_ndx, StringData value)
+    {
+        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+            log("table->set_string_unique(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
+            m_table->set_string_unique(col_ndx, row_ndx, value); // Throws
             return true;
         }
         return false;
@@ -237,6 +257,18 @@ public:
         return true;
     }
 
+    bool change_link_targets(size_t row_ndx, size_t new_row_ndx)
+    {
+        if (REALM_UNLIKELY(!m_table))
+            return false;
+        if (REALM_UNLIKELY(row_ndx >= m_table->size() || new_row_ndx >= m_table->size()))
+            return false;
+        log("table->change_link_targets(%1, %2);", row_ndx, new_row_ndx); // Throws
+        using tf = _impl::TableFriend;
+        tf::do_change_link_targets(*m_table, row_ndx, new_row_ndx); // Throws
+        return true;
+    }
+
     bool select_table(size_t group_level_ndx, int levels, const size_t* path)
     {
         if (REALM_UNLIKELY(group_level_ndx >= m_group.size()))
@@ -303,36 +335,6 @@ public:
                     m_table->remove_search_index(col_ndx); // Throws
                     return true;
                 }
-            }
-        }
-        return false;
-    }
-
-    bool add_primary_key(size_t col_ndx)
-    {
-        if (REALM_LIKELY(m_table && m_table->is_attached())) {
-            if (REALM_LIKELY(!m_table->has_shared_type())) {
-                if (REALM_LIKELY(col_ndx < m_table->get_column_count())) {
-                    if (REALM_LIKELY(m_table->has_search_index(col_ndx))) {
-                        log("table->add_primary_key(%1);", col_ndx); // Throws
-                        // Fails if there are duplicate values, but given valid
-                        // transaction logs, there never will be.
-                        bool success = m_table->try_add_primary_key(col_ndx); // Throws
-                        return success;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    bool remove_primary_key()
-    {
-        if (REALM_LIKELY(m_table && m_table->is_attached())) {
-            if (REALM_LIKELY(!m_table->has_shared_type() && m_table->has_primary_key())) {
-                log("table->remove_primary_key();"); // Throws
-                m_table->remove_primary_key(); // Throws
-                return true;
             }
         }
         return false;
@@ -630,7 +632,7 @@ private:
     TableRef m_table;
     DescriptorRef m_desc;
     LinkViewRef m_link_list;
-    util::Logger* m_logger = 0;
+    util::Logger* m_logger = nullptr;
 
     bool check_set_cell(size_t col_ndx, size_t row_ndx) noexcept
     {

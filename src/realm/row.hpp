@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2014] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -182,6 +182,8 @@ template<class T>
 class BasicRowExpr:
         public RowFuncs<T, BasicRowExpr<T>> {
 public:
+    BasicRowExpr() noexcept;
+
     template<class U>
     BasicRowExpr(const BasicRowExpr<U>&) noexcept;
 
@@ -226,9 +228,12 @@ protected:
     void impl_detach() noexcept;
     RowBase() { };
 
-    typedef RowBase_Handover_patch Handover_patch;
-    RowBase(const RowBase& source, Handover_patch& patch);
-    void apply_patch(Handover_patch& patch, Group& group);
+    using HandoverPatch = RowBaseHandoverPatch;
+
+    RowBase(const RowBase& source, HandoverPatch& patch);
+public:
+    static void generate_patch(const RowBase& source, HandoverPatch& patch);
+    void apply_patch(HandoverPatch& patch, Group& group);
 private:
     RowBase* m_prev = nullptr; // nullptr if first, undefined if detached.
     RowBase* m_next = nullptr; // nullptr if last, undefined if detached.
@@ -306,25 +311,33 @@ private:
     template<class>
     friend class BasicRow;
 
-    std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<Handover_patch>& patch) const
+public:
+    std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<HandoverPatch>& patch) const
     {
-        patch.reset(new Handover_patch);
+        patch.reset(new HandoverPatch);
         std::unique_ptr<BasicRow<T>> retval(new BasicRow<T>(*this, *patch));
         return retval;
     }
 
-    void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    static void generate_patch(const BasicRow& row, std::unique_ptr<HandoverPatch>& patch)
+    {
+        patch.reset(new HandoverPatch);
+        RowBase::generate_patch(row, *patch);
+    }
+
+    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
     {
         apply_patch(*patch, group);
         patch.reset();
     }
 
-    void apply_patch(Handover_patch& patch, Group& group)
+    void apply_patch(HandoverPatch& patch, Group& group)
     {
         RowBase::apply_patch(patch, group);
     }
 
-    BasicRow(const BasicRow<T>& source, Handover_patch& patch)
+private:
+    BasicRow(const BasicRow<T>& source, HandoverPatch& patch)
         : RowBase(source, patch)
     {
     }
@@ -557,16 +570,14 @@ inline void RowFuncs<T,R>::move_last_over()
 }
 
 template<class T, class R>
-inline size_t
-RowFuncs<T,R>::get_backlink_count(const Table& src_table, size_t src_col_ndx) const
-    noexcept
+inline size_t RowFuncs<T,R>::get_backlink_count(const Table& src_table, size_t src_col_ndx) const noexcept
 {
     return table()->get_backlink_count(row_ndx(), src_table, src_col_ndx);
 }
 
 template<class T, class R>
 inline size_t RowFuncs<T,R>::get_backlink(const Table& src_table, size_t src_col_ndx,
-                                               size_t backlink_ndx) const noexcept
+                                          size_t backlink_ndx) const noexcept
 {
     return table()->get_backlink(row_ndx(), src_table, src_col_ndx, backlink_ndx);
 }
@@ -649,6 +660,13 @@ inline size_t RowFuncs<T,R>::row_ndx() const noexcept
     return static_cast<const R*>(this)->impl_get_row_ndx();
 }
 
+
+template<class T>
+inline BasicRowExpr<T>::BasicRowExpr() noexcept:
+    m_table(0),
+    m_row_ndx(0)
+{
+}
 
 template<class T>
 template<class U>

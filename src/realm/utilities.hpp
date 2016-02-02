@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -120,11 +120,12 @@ void* round_down(void* p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void checksum_init(checksum_t* t);
+void millisleep(size_t milliseconds);
 
 // popcount
 int fast_popcount32(int32_t x);
 int fast_popcount64(int64_t x);
-uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL);
+uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL, bool is_seed = false);
 
 // log2 - returns -1 if x==0, otherwise log2(x)
 inline int log2(size_t x) {

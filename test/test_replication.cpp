@@ -60,7 +60,7 @@ public:
     {
     }
 
-    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = 0)
+    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = nullptr)
     {
         for (const Buffer<char>& changeset: m_changesets)
             apply_changeset(changeset.data(), changeset.size(), target, replay_logger);
@@ -803,6 +803,48 @@ TEST(Replication_NullInteger)
 }
 
 
+TEST(Replication_SetUnique)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "c1");
+        table1->add_column(type_String, "c2");
+        table1->add_column(type_Int, "c3", true);
+        table1->add_column(type_String, "c4", true);
+        table1->add_search_index(0);
+        table1->add_search_index(1);
+        table1->add_search_index(2);
+        table1->add_search_index(3);
+        table1->add_empty_row(2);
+        table1->set_int_unique(0, 0, 123);
+        table1->set_string_unique(1, 0, "Hello, World!");
+        table1->set_int_unique(2, 0, 123);
+        table1->set_string_unique(3, 0, "Hello, World!");
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK_EQUAL(table2->get_int(0, 0), 123);
+        CHECK_EQUAL(table2->get_string(1, 0), "Hello, World!");
+        CHECK_EQUAL(table2->get_int(2, 0), 123);
+        CHECK_EQUAL(table2->get_string(3, 0), "Hello, World!");
+    }
+}
+
+
 TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColumn)
 {
     SHARED_GROUP_TEST_PATH(path_1);
@@ -840,6 +882,47 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         CHECK(bar);
         CHECK_EQUAL(1, bar->get_index_in_group());
         CHECK_EQUAL(1, bar->get_column_index("b"));
+    }
+}
+
+
+TEST(Replication_ChangeLinkTargets)
+{
+    // Test that ChangeLinkTargets has the same effect whether called directly
+    // or applied via TransactLogApplier.
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef t0 = wt.add_table("t0");
+        TableRef t1 = wt.add_table("t1");
+        t0->add_column(type_Int, "i");
+        t1->add_column_link(type_Link, "l", *t0);
+        t0->add_empty_row(2);
+        t1->add_empty_row(2);
+        t1->set_link(0, 0, 0);
+        t0->change_link_targets(0, 1);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt1(sg_1);
+        ReadTransaction rt2(sg_2);
+
+        auto t0_1 = rt1.get_table("t0");
+        auto t1_1 = rt1.get_table("t1");
+        auto t0_2 = rt2.get_table("t0");
+        auto t1_2 = rt2.get_table("t1");
+
+        CHECK_EQUAL(t1_1->get_link(0, 0), 1);
+        CHECK_EQUAL(t1_2->get_link(0, 0), 1);
     }
 }
 

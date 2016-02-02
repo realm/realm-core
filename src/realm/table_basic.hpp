@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] Realm Inc
+ *  [2011] - [2015] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -420,41 +420,41 @@ protected:
     Query(const BasicTable<Spec>& table, TableViewBase* tv):
         Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
 
-    typedef Query_Handover_patch Handover_patch;
-    Query(const Query& source, Handover_patch& patch, ConstSourcePayload mode) :
+    using HandoverPatch = QueryHandoverPatch;
+    Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode) :
         Spec::template ColNames<QueryCol, Query*>(this),
         m_impl(source.m_impl, patch, mode)
     {
     }
 
-    Query(Query& source, Handover_patch& patch, MutableSourcePayload mode) :
+    Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode) :
         Spec::template ColNames<QueryCol, Query*>(this),
         m_impl(source.m_impl, patch, mode)
     {
     }
 
-    void apply_patch(Handover_patch& patch, Group& group)
+    void apply_patch(HandoverPatch& patch, Group& group)
     {
         m_impl.apply_patch(patch, group);
     }
 
     virtual std::unique_ptr<Query>
-    clone_for_handover(std::unique_ptr<Handover_patch>& patch, ConstSourcePayload mode) const
+    clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const
     {
-        patch.reset(new Handover_patch);
+        patch.reset(new HandoverPatch);
         std::unique_ptr<Query> retval( new Query(*this, *patch, mode));
         return retval;
     }
 
     virtual std::unique_ptr<Query>
-    clone_for_handover(std::unique_ptr<Handover_patch>& patch, MutableSourcePayload mode)
+    clone_for_handover(std::unique_ptr<HandoverPatch>& patch, MutableSourcePayload mode)
     {
-        patch.reset(new Handover_patch);
+        patch.reset(new HandoverPatch);
         std::unique_ptr<Query> retval( new Query(*this, *patch, mode));
         return retval;
     }
 
-    virtual void apply_and_consume_patch(std::unique_ptr<Handover_patch>& patch, Group& group)
+    virtual void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
     {
         apply_patch(*patch, group);
         patch.reset();

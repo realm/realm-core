@@ -50,13 +50,13 @@ void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, int deta
         case 0: // Same as attach order
             break;
         case 1: // Opposite of attach order
-            reverse(detach_indexes.get(), detach_indexes.get() + balloon_size);
+            std::reverse(detach_indexes.get(), detach_indexes.get() + balloon_size);
             break;
         case 2: // Randomized
             random.shuffle(detach_indexes.get(), detach_indexes.get() + balloon_size);
             break;
         default:
-            throw runtime_error("Bad order specification");
+            throw std::runtime_error("Bad order specification");
     }
     int n = (100000000L + balloon_size - 1) / balloon_size;
     timer.reset();
