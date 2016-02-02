@@ -2,6 +2,8 @@
 #include "realm/util/network.hpp"
 #include "realm/util/optional.hpp"
 
+#include <system_error>
+
 #if REALM_PLATFORM_APPLE
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreServices/CoreServices.h>
@@ -238,8 +240,7 @@ struct EventLoop<Apple>::Socket: SocketBase {
             CFReadStreamScheduleWithRunLoop(m_read_stream, m_runloop, kCFRunLoopCommonModes);
         }
         else {
-            // FIXME: Proper error code
-            m_on_connect_complete(std::error_code{-1, std::system_category()});
+            m_on_connect_complete(convert_error_code(CFReadStreamCopyError(m_read_stream)));
             return;
         }
 
@@ -247,24 +248,21 @@ struct EventLoop<Apple>::Socket: SocketBase {
             CFWriteStreamScheduleWithRunLoop(m_write_stream, m_runloop, kCFRunLoopCommonModes);
         }
         else {
-            // FIXME: Proper error code
-            m_on_connect_complete(std::error_code{-1, std::system_category()});
+            m_on_connect_complete(convert_error_code(CFWriteStreamCopyError(m_write_stream)));
             return;
         }
 
         if (CFReadStreamOpen(m_read_stream)) {
-            CFStreamError err = CFReadStreamGetError(m_read_stream);
-            if (err.error != 0) {
-                // FIXME: Check domain
-                m_on_connect_complete(std::error_code{err.error, std::system_category()});
+            CFErrorRef err = CFReadStreamCopyError(m_read_stream);
+            if (err != nullptr) {
+                m_on_connect_complete(convert_error_code(err));
                 return;
             }
 
             if (CFWriteStreamOpen(m_write_stream)) {
-                err = CFWriteStreamGetError(m_write_stream);
-                if (err.error != 0) {
-                    // FIXME: Check domain
-                    m_on_connect_complete(std::error_code{err.error, std::system_category()});
+                err = CFWriteStreamCopyError(m_write_stream);
+                if (err != nullptr) {
+                    m_on_connect_complete(convert_error_code(err));
                     return;
                 }
             }
@@ -323,6 +321,31 @@ struct EventLoop<Apple>::Socket: SocketBase {
     }
 
 private:
+    std::error_code convert_error_code(CFErrorRef err)
+    {
+        CFStringRef domain = CFErrorGetDomain(err);
+        CFIndex code = CFErrorGetCode(err);
+        std::error_code ec;
+
+        if (domain == kCFErrorDomainPOSIX) {
+            ec = std::error_code{int(code), std::system_category()};
+        }
+        else if (domain == kCFErrorDomainOSStatus) {
+            REALM_ASSERT(false); // FIXME
+        }
+        else if (domain == kCFErrorDomainMach) {
+            REALM_ASSERT(false); // FIXME
+        }
+        else if (domain == kCFErrorDomainCocoa) {
+            REALM_ASSERT(false); // FIXME
+        }
+        else {
+            REALM_ASSERT(false); // FIXME
+        }
+        CFRelease(err);
+        return ec;
+    }
+
     void handle_open_completed()
     {
         ++m_num_open_streams;
