@@ -331,7 +331,7 @@ private:
         }
     }
 
-    void on_read_complete()
+    void on_read_complete(std::error_code ec)
     {
         auto handler = std::move(m_on_read_complete);
         auto total_bytes_read = m_bytes_read;
@@ -340,7 +340,7 @@ private:
         m_current_read_buffer = nullptr;
         m_current_read_buffer_size = 0;
         m_bytes_read = 0;
-        handler(std::error_code{}, total_bytes_read);
+        handler(ec, total_bytes_read);
     }
 
     void read_cb(CFReadStreamRef stream, CFStreamEventType event_type)
@@ -374,7 +374,7 @@ private:
 
                 if (m_read_delim && bytes_read > 0 && buffer[0] == UInt8(*m_read_delim)) {
                     // Completion because delimiter found.
-                    on_read_complete();
+                    on_read_complete(std::error_code{});
                 }
                 else if (bytes_read < m_current_read_buffer_size) {
                     // Not complete yet.
@@ -383,7 +383,11 @@ private:
                 }
                 else {
                     // Completion because buffer is full.
-                    on_read_complete();
+                    std::error_code ec{};
+                    if (m_read_delim) {
+                        ec = make_error_code(network::delim_not_found);
+                    }
+                    on_read_complete(ec);
                 }
                 break;
             }
