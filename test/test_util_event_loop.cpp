@@ -298,7 +298,14 @@ private:
 
 } // anonymous namespace
 
-TEST_TYPES(EventLoop_AsyncCommunication, ASIO, Apple)
+#if REALM_PLATFORM_APPLE
+using PlatformLocal = Apple;
+#else
+// Fallback
+using PlatformLocal = ASIO;
+#endif // platform
+
+TEST_TYPES(EventLoop_AsyncCommunication, ASIO, PlatformLocal)
 {
     AsyncServer server(test_results);
     unsigned short listen_port = server.init();

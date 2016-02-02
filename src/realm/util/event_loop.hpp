@@ -101,6 +101,8 @@ protected:
     ASIO m_io_service;
 };
 
+#if REALM_PLATFORM_APPLE
+
 class Apple {};
 template<>
 class EventLoop<Apple>: public EventLoopBase {
@@ -121,6 +123,8 @@ protected:
 
     std::unique_ptr<Impl> m_impl;
 };
+
+#endif // REALM_PLATFORM_APPLE
 
 } // namespace util
 } // namespace realm
