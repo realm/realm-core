@@ -445,7 +445,7 @@ private:
                 break;
             }
             case kCFStreamEventEndEncountered: {
-                on_read_complete(make_error_code(network::end_of_input));
+                on_write_complete(make_error_code(network::end_of_input));
                 break;
             }
         }
