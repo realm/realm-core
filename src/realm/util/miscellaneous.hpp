@@ -17,26 +17,34 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef REALM_TEST_UTIL_TO_STRING_HPP
-#define REALM_TEST_UTIL_TO_STRING_HPP
+#ifndef REALM_UTIL_MISCELLANEOUS_HPP
+#define REALM_UTIL_MISCELLANEOUS_HPP
 
-#include <locale>
-#include <string>
-#include <sstream>
+#include <type_traits>
 
 namespace realm {
-namespace test_util {
+namespace util {
 
-template<class T> std::string to_string(const T& v)
+// FIXME: Replace this with std::add_const_t when we switch over to C++14 by
+// default.
+/// \brief Adds const qualifier, unless T already has the const qualifier
+template <class T>
+using add_const_t = typename std::add_const<T>::type;
+
+// FIXME: Replace this with std::as_const when we switch over to C++17 by
+// default.
+/// \brief Forms an lvalue reference to const T
+template <class T>
+constexpr add_const_t<T>& as_const(T& v) noexcept
 {
-    std::ostringstream out;
-    out.imbue(std::locale::classic());
-    out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    out << v; // Throws
-    return out.str();
+    return v;
 }
 
-} // namespace test_util
+/// \brief Disallows rvalue arguments
+template <class T>
+add_const_t<T>& as_const(const T&&) = delete;
+
+} // namespace util
 } // namespace realm
 
-#endif // REALM_TEST_UTIL_TO_STRING_HPP
+#endif // REALM_UTIL_MISCELLANEOUS_HPP

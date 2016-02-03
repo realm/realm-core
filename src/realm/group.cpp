@@ -7,6 +7,7 @@
 
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
+#include <realm/util/miscellaneous.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/utilities.hpp>
@@ -242,10 +243,8 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
 
 void Group::detach_table_accessors() noexcept
 {
-    typedef table_accessors::const_iterator iter;
-    iter end = m_table_accessors.end();
-    for (iter i = m_table_accessors.begin(); i != end; ++i) {
-        if (Table* t = *i) {
+    for (const auto& table_accessor : m_table_accessors) {
+        if (Table* t = table_accessor) {
             typedef _impl::TableFriend tf;
             tf::detach(*t);
             tf::unbind_ptr(*t);
@@ -850,11 +849,9 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
 
     // Update all attached table accessors including those attached to
     // subtables.
-    typedef table_accessors::const_iterator iter;
-    iter end = m_table_accessors.end();
-    for (iter i = m_table_accessors.begin(); i != end; ++i) {
+    for (const auto& table_accessor : m_table_accessors) {
         typedef _impl::TableFriend tf;
-        if (Table* table = *i)
+        if (Table* table = table_accessor)
             tf::update_from_parent(*table, old_baseline);
     }
 }
@@ -1185,6 +1182,13 @@ public:
         return true;
     }
 
+    bool change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
+    {
+        static_cast<void>(row_ndx);
+        static_cast<void>(new_row_ndx);
+        return true; // No-op
+    }
+
     bool clear_table() noexcept
     {
         typedef _impl::TableFriend tf;
@@ -1280,10 +1284,10 @@ public:
         // get_link_target_table_accessor() will return null if the
         // m_table->m_cols[col_ndx] is null, but this can happen only when the
         // column was inserted earlier during this transaction advance, and in
-        // that case, we have already marked the target table accesor dirty.
+        // that case, we have already marked the target table accessor dirty.
 
-        typedef _impl::TableFriend tf;
         if (m_table) {
+            using tf = _impl::TableFriend;
             if (Table* target = tf::get_link_target_table_accessor(*m_table, col_ndx))
                 tf::mark(*target);
         }
@@ -1351,18 +1355,29 @@ public:
     bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx, size_t)
     {
         if (m_table) {
-            typedef _impl::TableFriend tf;
             InsertColumnUpdater updater(col_ndx);
+            using tf = _impl::TableFriend;
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
-
-            // See comments on link handling in TransactAdvancer::set_link().
-            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-            tf::adj_add_column(*target); // Throws
-            tf::mark(*target);
         }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
+        // Since insertion of a link column also modifies the target table by
+        // adding a backlink column there, the target table accessor needs to be
+        // marked dirty if it exists. Normally, the target table accesssor
+        // exists if, and only if the origin table accessor exists, but during
+        // Group::advance_transact() there will be times where this is not the
+        // case. Only after the final phase that updates all dirty accessors
+        // will this be guaranteed to be true again. See also the comments on
+        // link handling in TransactAdvancer::set_link().
+        if (link_target_table_ndx < m_group.m_table_accessors.size()) {
+            if (Table* target = m_group.m_table_accessors[link_target_table_ndx]) {
+                using tf = _impl::TableFriend;
+                tf::adj_add_column(*target); // Throws
+                tf::mark(*target);
+            }
+        }
+        if (m_desc) {
+            using df = _impl::DescriptorFriend;
             df::adj_insert_column(*m_desc, col_ndx);
+        }
 
         m_schema_changed = true;
 
@@ -1387,23 +1402,29 @@ public:
 
     bool erase_link_column(size_t col_ndx, size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
+        // For link columns we need to handle the backlink column first in case
+        // the target table is the same as the origin table (because the
+        // backlink column occurs after regular columns.)
+        //
+        // Please also see comments on special handling of link columns in
+        // TransactAdvancer::insert_link_column() and
+        // TransactAdvancer::set_link().
+        if (link_target_table_ndx < m_group.m_table_accessors.size()) {
+            if (Table* target = m_group.m_table_accessors[link_target_table_ndx]) {
+                using tf = _impl::TableFriend;
+                tf::adj_erase_column(*target, backlink_col_ndx); // Throws
+                tf::mark(*target);
+            }
+        }
         if (m_table) {
-            typedef _impl::TableFriend tf;
-
-            // For link columns we need to handle the backlink column first in
-            // case the target table is the same as the origin table (because
-            // the backlink column occurs after regular columns.) Also see
-            // comments on link handling in TransactAdvancer::set_link().
-            TableRef target = m_group.get_table(link_target_table_ndx); // Throws
-            tf::adj_erase_column(*target, backlink_col_ndx); // Throws
-            tf::mark(*target);
-
             EraseColumnUpdater updater(col_ndx);
+            using tf = _impl::TableFriend;
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
+        if (m_desc) {
+            using df = _impl::DescriptorFriend;
             df::adj_erase_column(*m_desc, col_ndx);
+        }
 
         m_schema_changed = true;
 
@@ -1575,8 +1596,8 @@ void Group::update_table_indices(F&& map_function)
     refresh_dirty_accessors(); // Throws
 
     // Table's specs might have changed, so they need to be reinitialized.
-    for (size_t i = 0; i < m_table_accessors.size(); ++i) {
-        if (Table* t = m_table_accessors[i]) {
+    for (const auto& table_accessor : m_table_accessors) {
+        if (Table* t = table_accessor) {
             tf::get_spec(*t).init_from_parent();
         }
     }
@@ -1841,11 +1862,8 @@ void Group::verify() const
 
     // Check the concistency of the allocation of the immutable memory that has
     // been marked as free after the file was opened
-    {
-        typedef SlabAlloc::chunks::const_iterator iter;
-        iter end = m_alloc.m_free_read_only.end();
-        for (iter i = m_alloc.m_free_read_only.begin(); i != end; ++i)
-            mem_usage_2.add_immutable(i->ref, i->size);
+    for (const auto& free_block : m_alloc.m_free_read_only) {
+        mem_usage_2.add_immutable(free_block.ref, free_block.size);
     }
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
@@ -1854,11 +1872,8 @@ void Group::verify() const
 
     // Check the concistency of the allocation of the mutable memory that has
     // been marked as free
-    {
-        typedef SlabAlloc::chunks::const_iterator iter;
-        iter end = m_alloc.m_free_space.end();
-        for (iter i = m_alloc.m_free_space.begin(); i != end; ++i)
-            mem_usage_2.add_mutable(i->ref, i->size);
+    for (const auto& free_block : m_alloc.m_free_space) {
+        mem_usage_2.add_mutable(free_block.ref, free_block.size);
     }
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);

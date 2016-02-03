@@ -195,5 +195,19 @@
 #  define REALM_ASYNC_DAEMON
 #endif
 
+// We're in i686 mode
+#if defined(__i386) || defined(__i386__) || defined(__i686__) || defined(_M_I86) || defined(_M_IX86)
+#  define REALM_ARCHITECTURE_X86_32 1
+#else
+#  define REALM_ARCHITECTURE_X86_32 0
+#endif
+
+// We're in amd64 mode
+#if defined(__amd64) || defined(__amd64__) || defined(__x86_64) || defined(__x86_64__) \
+    || defined(_M_X64) || defined(_M_AMD64)
+#  define REALM_ARCHITECTURE_X86_64 1
+#else
+#  define REALM_ARCHITECTURE_X86_64 0
+#endif
 
 #endif /* REALM_UTIL_FEATURES_H */

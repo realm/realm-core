@@ -48,6 +48,30 @@ struct Benchmark
     virtual void operator()(SharedGroup&) = 0;
 };
 
+struct BenchmarkUnorderedTableViewClear : Benchmark {
+    const char* name() const { return "UnorderedTableViewClear"; }
+
+    void operator()(SharedGroup& group)
+    {
+        const size_t rows = 10000;
+        WriteTransaction tr(group);
+        TableRef tbl = tr.add_table(name());
+        tbl->add_column(type_String, "s", true);
+        tbl->add_empty_row(rows);
+
+        tbl->add_search_index(0);
+
+        for (size_t t = 0; t < rows / 3; t += 3) {
+            tbl->set_string(0, t + 0, StringData("foo"));
+            tbl->set_string(0, t + 1, StringData("bar"));
+            tbl->set_string(0, t + 2, StringData("hello"));
+        }
+
+        TableView tv = (tbl->column<String>(0) == "foo").find_all();
+        tv.clear();
+    }
+};
+
 struct AddTable : Benchmark {
     const char* name() const { return "AddTable"; }
 
@@ -485,7 +509,8 @@ int benchmark_common_tasks_main()
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
-
+    
+    run_benchmark<BenchmarkUnorderedTableViewClear>(results);
     run_benchmark<BenchmarkEmptyCommit>(results);
     run_benchmark<AddTable>(results);
     run_benchmark<BenchmarkQuery>(results);

@@ -98,6 +98,8 @@ protected:
         bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
         template<bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+        template<bool fix_ndx_in_parent>
+        void adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
@@ -408,14 +410,12 @@ inline void SubtableColumnBase::SubtableMap::add(size_t subtable_ndx, Table* tab
 template<bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
-    typedef entries::iterator iter;
-    iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i) {
-        if (i->m_subtable_ndx >= row_ndx) {
-            i->m_subtable_ndx += num_rows_inserted;
+    for (auto& entry : m_entries) {
+        if (entry.m_subtable_ndx >= row_ndx) {
+            entry.m_subtable_ndx += num_rows_inserted;
             typedef _impl::TableFriend tf;
             if (fix_ndx_in_parent)
-                tf::set_ndx_in_parent(*(i->m_table), i->m_subtable_ndx);
+                tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
         }
     }
 }
@@ -491,17 +491,33 @@ template<bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     using tf = _impl::TableFriend;
-    for (size_t i = 0; i < m_entries.size(); ++i) {
-        entry& e = m_entries[i];
-        if (REALM_UNLIKELY(e.m_subtable_ndx == row_ndx_1)) {
-            e.m_subtable_ndx = row_ndx_2;
+    for (auto& entry : m_entries) {
+        if (REALM_UNLIKELY(entry.m_subtable_ndx == row_ndx_1)) {
+            entry.m_subtable_ndx = row_ndx_2;
             if (fix_ndx_in_parent)
-                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+                tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
         }
-        else if (REALM_UNLIKELY(e.m_subtable_ndx == row_ndx_2)) {
-            e.m_subtable_ndx = row_ndx_1;
+        else if (REALM_UNLIKELY(entry.m_subtable_ndx == row_ndx_2)) {
+            entry.m_subtable_ndx = row_ndx_1;
             if (fix_ndx_in_parent)
-                tf::set_ndx_in_parent(*(e.m_table), e.m_subtable_ndx);
+                tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
+        }
+    }
+}
+
+template<bool fix_ndx_in_parent>
+void SubtableColumnBase::SubtableMap::adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
+{
+    static_cast<void>(new_row_ndx);
+
+    using tf = _impl::TableFriend;
+    for (auto it = m_entries.begin(); it != m_entries.end(); ++it) {
+        entry& e = *it;
+        if (e.m_subtable_ndx == row_ndx) {
+            TableRef table(e.m_table);
+            tf::detach(*table);
+            m_entries.erase(it);
+            break;
         }
     }
 }

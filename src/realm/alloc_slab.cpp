@@ -8,6 +8,7 @@
 #endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <memory>
 #include <realm/array.hpp>
@@ -155,8 +156,9 @@ SlabAlloc::~SlabAlloc() noexcept
 #endif
 
     // Release all allocated memory
-    for (size_t i = 0; i < m_slabs.size(); ++i)
-        delete[] m_slabs[i].addr;
+    for (auto& slab : m_slabs) {
+        delete[] slab.addr;
+    }
 
     if (is_attached())
         detach();
@@ -564,7 +566,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
         // we'll read header and (potentially) footer
         realm::util::encryption_read_barrier(map, 0, sizeof(Header));
-        realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
+        realm::util::encryption_read_barrier(map, initial_size_of_file - sizeof(Header), sizeof(Header));
 
         if (!cfg.skip_validate) {
             // Verify the data structures
@@ -787,12 +789,11 @@ void SlabAlloc::reset_free_space_tracking()
     // Rebuild free list to include all slabs
     Chunk chunk;
     chunk.ref = m_baseline;
-    typedef slabs::const_iterator iter;
-    iter end = m_slabs.end();
-    for (iter i = m_slabs.begin(); i != end; ++i) {
-        chunk.size = i->ref_end - chunk.ref;
+
+    for (const auto& slab : m_slabs) {
+        chunk.size = slab.ref_end - chunk.ref;
         m_free_space.push_back(chunk); // Throws
-        chunk.ref = i->ref_end;
+        chunk.ref = slab.ref_end;
     }
 
     REALM_ASSERT_DEBUG(is_all_free());
@@ -823,7 +824,7 @@ void SlabAlloc::remap(size_t file_size)
             new_mappings[j] = std::move(m_additional_mappings[j]);
         m_additional_mappings = std::move(new_mappings);
     }
-    for (auto k = m_num_additional_mappings; k < num_additional_mappings; ++k)
+    for (size_t k = m_num_additional_mappings; k < num_additional_mappings; ++k)
     {
         auto section_start_offset = get_section_base(k + m_first_additional_mapping);
         auto section_size = get_section_base(1 + k + m_first_additional_mapping) - section_start_offset;
@@ -930,17 +931,15 @@ bool SlabAlloc::is_all_free() const
 
     // Verify that free space matches slabs
     ref_type slab_ref = m_baseline;
-    typedef slabs::const_iterator iter;
-    iter end = m_slabs.end();
-    for (iter slab = m_slabs.begin(); slab != end; ++slab) {
-        size_t slab_size = slab->ref_end - slab_ref;
+    for (const auto& slab : m_slabs) {
+        size_t slab_size = slab.ref_end - slab_ref;
         chunks::const_iterator chunk =
             find_if(m_free_space.begin(), m_free_space.end(), ChunkRefEq(slab_ref));
         if (chunk == m_free_space.end())
             return false;
         if (slab_size != chunk->size)
             return false;
-        slab_ref = slab->ref_end;
+        slab_ref = slab.ref_end;
     }
     return true;
 }
@@ -949,15 +948,13 @@ bool SlabAlloc::is_all_free() const
 void SlabAlloc::verify() const
 {
     // Make sure that all free blocks fit within a slab
-    typedef chunks::const_iterator iter;
-    iter end = m_free_space.end();
-    for (iter chunk = m_free_space.begin(); chunk != end; ++chunk) {
+    for (const auto& chunk : m_free_space) {
         slabs::const_iterator slab =
-            upper_bound(m_slabs.begin(), m_slabs.end(), chunk->ref, &ref_less_than_slab_ref_end);
+            upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
         REALM_ASSERT(slab != m_slabs.end());
 
         ref_type slab_ref_end = slab->ref_end;
-        ref_type chunk_ref_end = chunk->ref + chunk->size;
+        ref_type chunk_ref_end = chunk.ref + chunk.size;
         REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
     }
 }
@@ -968,8 +965,9 @@ void SlabAlloc::print() const
     size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
 
     size_t free = 0;
-    for (size_t i = 0; i < m_free_space.size(); ++i)
-        free += m_free_space[i].size;
+    for (const auto& free_block : m_free_space) {
+        free += free_block.size;
+    }
 
     size_t allocated = allocated_for_slabs - free;
     std::cout << "Attached: " << (m_data ? m_baseline : 0) << " Allocated: " << allocated << "\n";
@@ -977,37 +975,39 @@ void SlabAlloc::print() const
     if (!m_slabs.empty()) {
         std::cout << "Slabs: ";
         ref_type first_ref = m_baseline;
-        typedef slabs::const_iterator iter;
-        for (iter i = m_slabs.begin(); i != m_slabs.end(); ++i) {
-            if (i != m_slabs.begin())
+
+        for (const auto& slab : m_slabs) {
+            if (&slab != &m_slabs.front())
                 std::cout << ", ";
-            ref_type last_ref = i->ref_end - 1;
-            size_t size = i->ref_end - first_ref;
-            void* addr = i->addr;
-            std::cout << "("<<first_ref<<"->"<<last_ref<<", size="<<size<<", addr="<<addr<<")";
-            first_ref = i->ref_end;
+
+            ref_type last_ref = slab.ref_end - 1;
+            size_t size = slab.ref_end - first_ref;
+            void* addr = slab.addr;
+            std::cout << "(" << first_ref << "->" << last_ref << ", size=" << size << ", addr=" << addr << ")";
+            first_ref = slab.ref_end;
         }
         std::cout << "\n";
     }
+
     if (!m_free_space.empty()) {
         std::cout << "FreeSpace: ";
-        typedef chunks::const_iterator iter;
-        for (iter i = m_free_space.begin(); i != m_free_space.end(); ++i) {
-            if (i != m_free_space.begin())
+        for (const auto& free_block : m_free_space) {
+            if (&free_block != &m_free_space.front())
                 std::cout << ", ";
-            ref_type last_ref = i->ref + i->size - 1;
-            std::cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
+
+            ref_type last_ref = free_block.ref + free_block.size - 1;
+            std::cout << "(" << free_block.ref << "->" << last_ref << ", size=" << free_block.size << ")";
         }
         std::cout << "\n";
     }
     if (!m_free_read_only.empty()) {
         std::cout << "FreeSpace (ro): ";
-        typedef chunks::const_iterator iter;
-        for (iter i = m_free_read_only.begin(); i != m_free_read_only.end(); ++i) {
-            if (i != m_free_read_only.begin())
+        for (const auto& free_block : m_free_read_only) {
+            if (&free_block != &m_free_read_only.front())
                 std::cout << ", ";
-            ref_type last_ref = i->ref + i->size - 1;
-            std::cout << "("<<i->ref<<"->"<<last_ref<<", size="<<i->size<<")";
+
+            ref_type last_ref = free_block.ref + free_block.size - 1;
+            std::cout << "(" << free_block.ref << "->" << last_ref << ", size=" << free_block.size << ")";
         }
         std::cout << "\n";
     }

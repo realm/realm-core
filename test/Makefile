@@ -24,9 +24,9 @@ test_stl_DEPS     = util
 
 check_PROGRAMS = realm-tests
 
-TESTS := $(wildcard test_*.cpp large_tests/*.cpp)
+TESTS := $(wildcard test_*.cpp large_tests/*.cpp fuzz_*.cpp)
 
-realm_tests_SOURCES = $(TESTS) main.cpp fuzz_group.cpp
+realm_tests_SOURCES = $(TESTS) main.cpp
 realm_tests_LIBS    = util/test-util.a
 
 # Run test suite inside `gdb`

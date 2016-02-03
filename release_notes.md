@@ -6,6 +6,13 @@
 
 ### API breaking changes:
 
+* Important for language bindings: Any method on Query and TableView that
+  depends on a deleted LinkView will now return sane return values; 
+  Query::find() returns npos, Query::find_all() returns empty TableView,
+  Query::count() returns 0, TableView::sum() returns 0 (TableView created
+  from LinkView::get_sorted_view). So they will no longer throw
+  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in 
+  test_query.cpp for more info.
 * `LangBindHelper::advance_read()` and friends no longer take a history
   argument. Access to the history is now gained automatically via
   `Replaication::get_history()`. Application and bindings should simply delete
@@ -20,6 +27,55 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.96.0 Release notes
+
+### Bugfixes:
+
+* Handing over a query that includes an expression node will now avoid
+  sharing the expression nodes between `Query` instances. This prevents
+  data races that could give incorrect results or crashes.
+
+### Enhancements:
+
+* Subqueries are now supported via `Table::column(size_t, Query)`.
+  This allows for queries based on the number of rows in the linked table
+  that match the given subquery.
+
+----------------------------------------------
+
+# 0.95.9 Release notes
+
+### Bugfixes:
+
+* Fixed terminate() being called rather than InvalidDatabase being thrown when
+  a non-enrypted file that begins with four zero bytes was opened as an
+  encrypted file.
+
+----------------------------------------------
+
+# 0.95.8 Release notes
+
+### Bugfixes:
+
+* Fixed error when opening encrypted streaming-form files which would be
+  resized on open due to the size not aligning with a chunked mapping section
+  boundary.
+
+### API breaking changes:
+
+* Any attempt to execute a query that depends on a LinkList that has been
+  deleted from its table will now throw `DeletedLinkView` instead of
+  segfaulting. No other changes has been made; you must still verify 
+  LinkViewRef::is_attached() before calling any methods on a LinkViewRef, as 
+  usual.
+
+### Enhancements:
+
+* Optimized speed of TableView::clear() on an indexed unordered Table. A clear()
+  that before took several minutes with 300000 rows now takes a few seconds.
 
 ----------------------------------------------
 
@@ -62,6 +118,8 @@
 
 * Add `test_util::to_string()` for convenience. std::to_string() is not
   available via all Android NDK toolchains.
+* New operation: ChangeLinkTargets. It replaces all links to one row with
+  links to a different row.
 * Regular assertions (REALM_ASSERT()) are no longer enabled by default in
   release mode. Note that this is a reversion back to the "natural" state of
   affairs, after a period of having them enabled by default in release mode. The
