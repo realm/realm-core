@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2015] Realm Inc
+ *  [2016] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -17,17 +17,18 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef REALM_TEST_UTIL_TO_STRING_HPP
-#define REALM_TEST_UTIL_TO_STRING_HPP
+#ifndef REALM_UTIL_TO_STRING_HPP
+#define REALM_UTIL_TO_STRING_HPP
 
 #include <locale>
 #include <string>
 #include <sstream>
 
 namespace realm {
-namespace test_util {
+namespace util {
 
-template<class T> std::string to_string(const T& v)
+template<class T>
+std::string to_string(const T& v)
 {
     std::ostringstream out;
     out.imbue(std::locale::classic());
@@ -36,7 +37,7 @@ template<class T> std::string to_string(const T& v)
     return out.str();
 }
 
-} // namespace test_util
+} // namespace util
 } // namespace realm
 
-#endif // REALM_TEST_UTIL_TO_STRING_HPP
+#endif // REALM_UTIL_TO_STRING_HPP
