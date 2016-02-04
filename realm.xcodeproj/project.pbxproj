@@ -514,6 +514,9 @@
 		F450A3171C5FBB660008F287 /* to_string.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F450A3161C5FBB660008F287 /* to_string.hpp */; };
 		F462CFF71C6350E6006F3BCA /* event_loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C408701BF9FEDA00351E2F /* event_loop.cpp */; };
 		F462CFF81C6350E7006F3BCA /* event_loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C408701BF9FEDA00351E2F /* event_loop.cpp */; };
+		F48BBA321C63A52C002CF50F /* event_loop_apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = F48BBA311C63A52C002CF50F /* event_loop_apple.mm */; };
+		F48BBA331C63A52C002CF50F /* event_loop_apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = F48BBA311C63A52C002CF50F /* event_loop_apple.mm */; };
+		F48BBA341C63A52C002CF50F /* event_loop_apple.mm in Sources */ = {isa = PBXBuildFile; fileRef = F48BBA311C63A52C002CF50F /* event_loop_apple.mm */; };
 		F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4C408661BF9FD3200351E2F /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F4C408651BF9FD3200351E2F /* CoreServices.framework */; };
@@ -998,6 +1001,7 @@
 		F45013BE1B01022800CD4A7E /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		F45013C11B01022800CD4A7E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/LaunchScreen.xib; sourceTree = "<group>"; };
 		F450A3161C5FBB660008F287 /* to_string.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = to_string.hpp; sourceTree = "<group>"; };
+		F48BBA311C63A52C002CF50F /* event_loop_apple.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = event_loop_apple.mm; sourceTree = "<group>"; };
 		F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = query_engine.cpp; path = realm/query_engine.cpp; sourceTree = "<group>"; };
 		F4C408651BF9FD3200351E2F /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
 		F4C408681BF9FE0800351E2F /* test_util_event_loop.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_event_loop.cpp; sourceTree = "<group>"; };
@@ -1431,6 +1435,7 @@
 		52D7C4661852A01700633748 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				F48BBA311C63A52C002CF50F /* event_loop_apple.mm */,
 				F4C4086F1BF9FEDA00351E2F /* encryption_not_supported_exception.hpp */,
 				F4C408701BF9FEDA00351E2F /* event_loop.cpp */,
 				F4C408711BF9FEDA00351E2F /* event_loop.hpp */,
@@ -2168,6 +2173,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F48BBA321C63A52C002CF50F /* event_loop_apple.mm in Sources */,
 				4852311C1B2E9301003C72AF /* network.cpp in Sources */,
 				36A1DC9116C3F2F30086A836 /* alloc.cpp in Sources */,
 				F43098B21B021C04000A2333 /* bptree.cpp in Sources */,
@@ -2310,6 +2316,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F48BBA331C63A52C002CF50F /* event_loop_apple.mm in Sources */,
 				65F35E0A1B32F9D9006AE5A9 /* network.cpp in Sources */,
 				52F6359416B43C79006117C4 /* alloc.cpp in Sources */,
 				4142C93B1623478700B3B902 /* alloc_slab.cpp in Sources */,
@@ -2397,6 +2404,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F48BBA341C63A52C002CF50F /* event_loop_apple.mm in Sources */,
 				C008FF311B67F02F0042669E /* network.cpp in Sources */,
 				C008FF321B67F02F0042669E /* alloc.cpp in Sources */,
 				C008FF331B67F02F0042669E /* alloc_slab.cpp in Sources */,
