@@ -197,7 +197,8 @@ public:
     void run()
     {
         m_loop.reset(new EventLoop<Provider>);
-        m_socket = m_loop->async_connect("localhost", m_listen_port, [=](std::error_code ec) {
+        m_socket = m_loop->async_connect("localhost", m_listen_port, SocketSecurity::None,
+                                          [=](std::error_code ec) {
             auto& test_results = this->m_test_results;
             CHECK(!ec);
             this->connection_established();

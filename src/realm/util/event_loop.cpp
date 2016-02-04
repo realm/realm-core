@@ -103,8 +103,9 @@ struct EventLoop<ASIO>::Socket: SocketBase {
 };
 
 std::unique_ptr<SocketBase>
-EventLoop<ASIO>::async_connect(std::string host, int port, EventLoopBase::OnConnectComplete on_complete)
+EventLoop<ASIO>::async_connect(std::string host, int port, SocketSecurity sec, EventLoopBase::OnConnectComplete on_complete)
 {
+    REALM_ASSERT_RELEASE(sec == SocketSecurity::None && "Not implemented yet");
     return std::unique_ptr<SocketBase>{new Socket{m_io_service, std::move(host), port, std::move(on_complete)}};
 }
 

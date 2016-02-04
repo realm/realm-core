@@ -30,6 +30,11 @@ class SocketBase;
 class DeadlineTimerBase;
 class ResolverBase;
 
+enum class SocketSecurity {
+    None,
+    TLSv1,
+};
+
 class EventLoopBase {
 public:
     virtual ~EventLoopBase() {}
@@ -44,7 +49,7 @@ public:
     virtual void stop() = 0;
     virtual void reset() = 0;
 
-    virtual std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) = 0;
+    virtual std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) = 0;
     virtual std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) = 0;
     virtual void post(OnPost) = 0;
 };
@@ -97,7 +102,7 @@ public:
     void stop() override;
     void reset() override;
 
-    std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) final;
+    std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) final;
     std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
     void post(OnPost) final;
 protected:
@@ -121,7 +126,7 @@ public:
     void stop() override;
     void reset() override;
 
-    std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) final;
+    std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) final;
     std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
     void post(OnPost) final;
 protected:

@@ -59,7 +59,7 @@ struct EventLoop<Apple>::Socket: SocketBase {
     Optional<char> m_read_delim;
 
 
-    Socket(NSRunLoop* runloop, std::string host, int port, OnConnectComplete on_connect_complete):
+    Socket(NSRunLoop* runloop, std::string host, int port, SocketSecurity sec, OnConnectComplete on_connect_complete):
         m_runloop(runloop), m_on_connect_complete(std::move(on_connect_complete))
     {
         CFReadStreamRef read_stream;
@@ -71,6 +71,15 @@ struct EventLoop<Apple>::Socket: SocketBase {
 
         m_read_stream = static_cast<NSInputStream*>(read_stream);
         m_write_stream = static_cast<NSOutputStream*>(write_stream);
+
+        if (sec == SocketSecurity::TLSv1) {
+            [m_read_stream  setProperty:NSStreamSocketSecurityLevelTLSv1 forKey:NSStreamSocketSecurityLevelKey];
+            [m_write_stream setProperty:NSStreamSocketSecurityLevelTLSv1 forKey:NSStreamSocketSecurityLevelKey];
+        }
+        else if (sec == SocketSecurity::None) {}
+        else {
+            throw std::runtime_error{"Unsupported socket security level."};
+        }
 
         m_context.version = 1;
         m_context.info = this;
@@ -348,9 +357,12 @@ private:
     }
 };
 
-std::unique_ptr<SocketBase> EventLoop<Apple>::async_connect(std::string host, int port, OnConnectComplete on_connect)
+std::unique_ptr<SocketBase>
+EventLoop<Apple>::async_connect(std::string host, int port, SocketSecurity sec,
+                                OnConnectComplete on_connect)
 {
-    return std::unique_ptr<SocketBase>(new Socket{m_impl->m_runloop, std::move(host), port, std::move(on_connect)});
+    return std::unique_ptr<SocketBase>(new Socket{m_impl->m_runloop, std::move(host), port,
+                                                  sec, std::move(on_connect)});
 }
 
 std::unique_ptr<DeadlineTimerBase> EventLoop<Apple>::async_timer(Duration, OnTimeout)
