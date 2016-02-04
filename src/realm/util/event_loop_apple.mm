@@ -1,40 +1,34 @@
 #include <realm/util/event_loop.hpp>
 #include <realm/util/optional.hpp>
 
-#if REALM_PLATFORM_APPLE
-#  include <CoreFoundation/CoreFoundation.h>
-#  if !REALM_IOS
-#    include <CoreServices/CoreServices.h>
-#  endif // REALM_IOS
-#endif // REALM_PLATFORM_APPLE
+#import <Foundation/Foundation.h>
 
 using namespace realm;
 using namespace realm::util;
 
 struct EventLoop<Apple>::Impl {
-    CFRunLoopRef m_runloop;
+    NSRunLoop* m_runloop;
 };
 
 EventLoop<Apple>::EventLoop(): m_impl(new Impl)
 {
-    m_impl->m_runloop = CFRunLoopGetCurrent();
-    CFRetain(m_impl->m_runloop);
+    m_impl->m_runloop = [NSRunLoop currentRunLoop];
 }
 
 EventLoop<Apple>::~EventLoop()
 {
-    CFRelease(m_impl->m_runloop);
 }
 
 void EventLoop<Apple>::run()
 {
-    REALM_ASSERT(m_impl->m_runloop == CFRunLoopGetCurrent()); // Running a different runloop than expected.
-    CFRunLoopRun();
+    REALM_ASSERT(m_impl->m_runloop == [NSRunLoop currentRunLoop]); // Running a different runloop than expected.
+    [m_impl->m_runloop run];
 }
 
 void EventLoop<Apple>::stop()
 {
-    CFRunLoopStop(m_impl->m_runloop);
+    CFRunLoopRef runloop = [m_impl->m_runloop getCFRunLoop];
+    CFRunLoopStop(runloop);
 }
 
 void EventLoop<Apple>::reset()
@@ -43,11 +37,11 @@ void EventLoop<Apple>::reset()
 }
 
 struct EventLoop<Apple>::Socket: SocketBase {
-    CFRunLoopRef m_runloop;
+    NSRunLoop* m_runloop;
     OnConnectComplete m_on_connect_complete;
 
-    CFReadStreamRef m_read_stream;
-    CFWriteStreamRef m_write_stream;
+    NSInputStream* m_read_stream;
+    NSOutputStream* m_write_stream;
     CFStreamClientContext m_context;
 
     size_t m_num_open_streams = 0;
@@ -65,12 +59,18 @@ struct EventLoop<Apple>::Socket: SocketBase {
     Optional<char> m_read_delim;
 
 
-    Socket(CFRunLoopRef runloop, std::string host, int port, OnConnectComplete on_connect_complete):
+    Socket(NSRunLoop* runloop, std::string host, int port, OnConnectComplete on_connect_complete):
         m_runloop(runloop), m_on_connect_complete(std::move(on_connect_complete))
     {
+        CFReadStreamRef read_stream;
+        CFWriteStreamRef write_stream;
+
         CFStringRef cf_host = CFStringCreateWithCString(kCFAllocatorDefault, host.c_str(), kCFStringEncodingUTF8);
-        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, cf_host, static_cast<UInt32>(port), &m_read_stream, &m_write_stream);
+        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, cf_host, static_cast<UInt32>(port), &read_stream, &write_stream);
         CFRelease(cf_host);
+
+        m_read_stream = static_cast<NSInputStream*>(read_stream);
+        m_write_stream = static_cast<NSOutputStream*>(write_stream);
 
         m_context.version = 1;
         m_context.info = this;
@@ -84,28 +84,12 @@ struct EventLoop<Apple>::Socket: SocketBase {
             return;
         }
 
-        if (CFReadStreamOpen(m_read_stream)) {
-            CFErrorRef err = CFReadStreamCopyError(m_read_stream);
-            if (err != nullptr) {
-                m_on_connect_complete(convert_error_code(err));
-                return;
-            }
-
-            if (CFWriteStreamOpen(m_write_stream)) {
-                err = CFWriteStreamCopyError(m_write_stream);
-                if (err != nullptr) {
-                    CFReadStreamClose(m_read_stream);
-                    m_on_connect_complete(convert_error_code(err));
-                    return;
-                }
-            }
-        }
+        [m_read_stream  open];
+        [m_write_stream open];
     }
 
     ~Socket()
     {
-        CFRelease(m_read_stream);
-        CFRelease(m_write_stream);
     }
 
     std::error_code activate()
@@ -119,19 +103,22 @@ struct EventLoop<Apple>::Socket: SocketBase {
                                   | kCFStreamEventEndEncountered
                                   | kCFStreamEventCanAcceptBytes;
 
-        if (CFReadStreamSetClient(m_read_stream, read_flags, read_cb, &m_context)) {
-            CFReadStreamScheduleWithRunLoop(m_read_stream, m_runloop, kCFRunLoopCommonModes);
+        CFReadStreamRef read_stream = static_cast<CFReadStreamRef>(m_read_stream);
+        CFWriteStreamRef write_stream = static_cast<CFWriteStreamRef>(m_write_stream);
+
+        if (CFReadStreamSetClient(read_stream, read_flags, read_cb, &m_context)) {
+            [m_read_stream scheduleInRunLoop:m_runloop forMode:NSRunLoopCommonModes];
         }
         else {
-            return convert_error_code(CFReadStreamCopyError(m_read_stream)); 
+            return convert_error_code(CFReadStreamCopyError(read_stream));
         }
 
-        if (CFWriteStreamSetClient(m_write_stream, write_flags, write_cb, &m_context)) {
-            CFWriteStreamScheduleWithRunLoop(m_write_stream, m_runloop, kCFRunLoopCommonModes);
+        if (CFWriteStreamSetClient(write_stream, write_flags, write_cb, &m_context)) {
+            [m_write_stream scheduleInRunLoop:m_runloop forMode:NSRunLoopCommonModes];
         }
         else {
-            CFReadStreamUnscheduleFromRunLoop(m_read_stream, m_runloop, kCFRunLoopCommonModes);
-            return convert_error_code(CFWriteStreamCopyError(m_write_stream));
+            [m_read_stream removeFromRunLoop:m_runloop forMode:NSRunLoopCommonModes];
+            return convert_error_code(CFWriteStreamCopyError(write_stream));
         }
 
         return std::error_code{}; // no error
@@ -139,15 +126,15 @@ struct EventLoop<Apple>::Socket: SocketBase {
 
     void close() override
     {
-        CFReadStreamClose(m_read_stream);
-        CFWriteStreamClose(m_write_stream);
+        [m_read_stream close];
+        [m_write_stream close];
         m_num_open_streams = 0;
     }
 
     void cancel() override
     {
-        CFReadStreamUnscheduleFromRunLoop(m_read_stream, m_runloop, kCFRunLoopCommonModes);
-        CFWriteStreamUnscheduleFromRunLoop(m_write_stream, m_runloop, kCFRunLoopCommonModes);
+        [m_read_stream  removeFromRunLoop:m_runloop forMode:NSRunLoopCommonModes];
+        [m_write_stream removeFromRunLoop:m_runloop forMode:NSRunLoopCommonModes];
         if (m_on_read_complete) {
             on_read_complete(error::operation_aborted);
         }
@@ -255,8 +242,7 @@ private:
 
     void read_cb(CFReadStreamRef stream, CFStreamEventType event_type)
     {
-        REALM_ASSERT(stream == m_read_stream);
-        static_cast<void>(stream);
+        REALM_ASSERT(stream == static_cast<CFReadStreamRef>(m_read_stream));
 
         switch (event_type) {
             case kCFStreamEventOpenCompleted:
@@ -279,7 +265,7 @@ private:
                 // another layer of buffering.
                 size_t bytes_to_read = m_read_delim ? 1 : m_current_read_buffer_size;
 
-                size_t bytes_read = CFReadStreamRead(m_read_stream, buffer, bytes_to_read);
+                size_t bytes_read = CFReadStreamRead(stream, buffer, bytes_to_read);
                 m_bytes_read += bytes_read;
 
                 if (m_read_delim && bytes_read > 0 && buffer[0] == UInt8(*m_read_delim)) {
@@ -302,7 +288,7 @@ private:
                 break;
             }
             case kCFStreamEventErrorOccurred: {
-                on_read_complete(convert_error_code(CFReadStreamCopyError(m_read_stream)));
+                on_read_complete(convert_error_code(CFReadStreamCopyError(stream)));
                 break;
             }
             case kCFStreamEventEndEncountered: {
@@ -314,8 +300,7 @@ private:
 
     void write_cb(CFWriteStreamRef stream, CFStreamEventType event_type)
     {
-        REALM_ASSERT(stream == m_write_stream);
-        static_cast<void>(stream);
+        REALM_ASSERT(stream == static_cast<CFWriteStreamRef>(m_write_stream));
 
         switch (event_type) {
             case kCFStreamEventOpenCompleted:
@@ -328,7 +313,7 @@ private:
                 }
 
                 const UInt8* buffer = reinterpret_cast<const UInt8*>(m_current_write_buffer);
-                size_t bytes_written = CFWriteStreamWrite(m_write_stream, buffer, m_current_write_buffer_size);
+                size_t bytes_written = CFWriteStreamWrite(stream, buffer, m_current_write_buffer_size);
                 m_bytes_written += bytes_written;
                 if (bytes_written < m_current_write_buffer_size) {
                     m_current_write_buffer_size -= bytes_written;
@@ -340,7 +325,7 @@ private:
                 break;
             }
             case kCFStreamEventErrorOccurred: {
-                on_write_complete(convert_error_code(CFWriteStreamCopyError(m_write_stream)));
+                on_write_complete(convert_error_code(CFWriteStreamCopyError(stream)));
                 break;
             }
             case kCFStreamEventEndEncountered: {
@@ -375,6 +360,7 @@ std::unique_ptr<DeadlineTimerBase> EventLoop<Apple>::async_timer(Duration, OnTim
 
 void EventLoop<Apple>::post(OnPost on_post)
 {
+    static_cast<void>(on_post);
     REALM_ASSERT_RELEASE(false && "Not yet implemented");
 }
 
