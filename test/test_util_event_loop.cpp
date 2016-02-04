@@ -291,8 +291,6 @@ private:
         if (!CHECK_EQUAL(m_body_size, sizeof echo_body))
             return;
         CHECK(std::equal(echo_body, echo_body + sizeof echo_body, m_body_buffer.get()));
-        // Test is done.
-        m_socket->close();
     }
 };
 

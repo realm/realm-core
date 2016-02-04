@@ -177,9 +177,8 @@ struct EventLoop<Apple>::Socket: SocketBase {
     CFWriteStreamRef m_write_stream;
     CFStreamClientContext m_context;
 
-    bool m_read_scheduled = false;
-    bool m_write_scheduled = false;
     size_t m_num_open_streams = 0;
+    size_t m_num_operations_scheduled = 0;
 
     OnReadComplete m_on_read_complete;
     char* m_current_read_buffer = nullptr;
@@ -206,28 +205,9 @@ struct EventLoop<Apple>::Socket: SocketBase {
         m_context.release = nullptr;
         m_context.copyDescription = nullptr;
 
-        CFOptionFlags read_flags = kCFStreamEventOpenCompleted
-                                 | kCFStreamEventErrorOccurred
-                                 | kCFStreamEventEndEncountered
-                                 | kCFStreamEventHasBytesAvailable;
-        CFOptionFlags write_flags = kCFStreamEventOpenCompleted
-                                  | kCFStreamEventErrorOccurred
-                                  | kCFStreamEventEndEncountered
-                                  | kCFStreamEventCanAcceptBytes;
-
-        if (CFReadStreamSetClient(m_read_stream, read_flags, read_cb, &m_context)) {
-            CFReadStreamScheduleWithRunLoop(m_read_stream, m_runloop, kCFRunLoopCommonModes);
-        }
-        else {
-            m_on_connect_complete(convert_error_code(CFReadStreamCopyError(m_read_stream)));
-            return;
-        }
-
-        if (CFWriteStreamSetClient(m_write_stream, write_flags, write_cb, &m_context)) {
-            CFWriteStreamScheduleWithRunLoop(m_write_stream, m_runloop, kCFRunLoopCommonModes);
-        }
-        else {
-            m_on_connect_complete(convert_error_code(CFWriteStreamCopyError(m_write_stream)));
+        std::error_code err = activate();
+        if (err) {
+            m_on_connect_complete(err);
             return;
         }
 
@@ -241,6 +221,7 @@ struct EventLoop<Apple>::Socket: SocketBase {
             if (CFWriteStreamOpen(m_write_stream)) {
                 err = CFWriteStreamCopyError(m_write_stream);
                 if (err != nullptr) {
+                    CFReadStreamClose(m_read_stream);
                     m_on_connect_complete(convert_error_code(err));
                     return;
                 }
@@ -252,6 +233,35 @@ struct EventLoop<Apple>::Socket: SocketBase {
     {
         CFRelease(m_read_stream);
         CFRelease(m_write_stream);
+    }
+
+    std::error_code activate()
+    {
+        CFOptionFlags read_flags = kCFStreamEventOpenCompleted
+                                 | kCFStreamEventErrorOccurred
+                                 | kCFStreamEventEndEncountered
+                                 | kCFStreamEventHasBytesAvailable;
+        CFOptionFlags write_flags = kCFStreamEventOpenCompleted
+                                  | kCFStreamEventErrorOccurred
+                                  | kCFStreamEventEndEncountered
+                                  | kCFStreamEventCanAcceptBytes;
+
+        if (CFReadStreamSetClient(m_read_stream, read_flags, read_cb, &m_context)) {
+            CFReadStreamScheduleWithRunLoop(m_read_stream, m_runloop, kCFRunLoopCommonModes);
+        }
+        else {
+            return convert_error_code(CFReadStreamCopyError(m_read_stream)); 
+        }
+
+        if (CFWriteStreamSetClient(m_write_stream, write_flags, write_cb, &m_context)) {
+            CFWriteStreamScheduleWithRunLoop(m_write_stream, m_runloop, kCFRunLoopCommonModes);
+        }
+        else {
+            CFReadStreamUnscheduleFromRunLoop(m_read_stream, m_runloop, kCFRunLoopCommonModes);
+            return convert_error_code(CFWriteStreamCopyError(m_write_stream));
+        }
+
+        return std::error_code{}; // no error
     }
 
     void close() override
@@ -280,6 +290,7 @@ struct EventLoop<Apple>::Socket: SocketBase {
         m_on_write_complete = std::move(on_write_complete);
         m_current_write_buffer = data;
         m_current_write_buffer_size = size;
+        ++m_num_operations_scheduled;
     }
 
     void async_read(char* buffer, size_t size, OnReadComplete on_read_complete) override
@@ -290,6 +301,7 @@ struct EventLoop<Apple>::Socket: SocketBase {
         m_on_read_complete = std::move(on_read_complete);
         m_current_read_buffer = buffer;
         m_current_read_buffer_size = size;
+        ++m_num_operations_scheduled;
     }
 
     void async_read_until(char* buffer, size_t size, char delim, OnReadComplete on_read_complete) override
@@ -343,6 +355,9 @@ private:
         m_current_read_buffer_size = 0;
         m_bytes_read = 0;
         handler(ec, total_bytes_read);
+        --m_num_operations_scheduled;
+        if (m_num_operations_scheduled == 0)
+            cancel();
     }
 
     void on_write_complete(std::error_code ec)
@@ -354,6 +369,9 @@ private:
         m_current_write_buffer_size = 0;
         m_bytes_written = 0;
         on_write_complete(ec, total_bytes_written);
+        --m_num_operations_scheduled;
+        if (m_num_operations_scheduled == 0)
+            cancel();
     }
 
     void read_cb(CFReadStreamRef stream, CFStreamEventType event_type)
