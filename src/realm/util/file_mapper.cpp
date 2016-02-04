@@ -28,6 +28,8 @@
 #include <sys/mman.h>
 
 #include <realm/util/errno.hpp>
+#include <realm/util/to_string.hpp>
+#include <realm/exceptions.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
 
@@ -58,6 +60,15 @@
 #endif
 
 #endif // enable encryption
+
+namespace {
+
+inline bool is_mmap_memory_error(int err)
+{
+    return (err == EAGAIN || err == EMFILE || err == ENOMEM);
+}
+
+} // Unnamed namespace
 
 using namespace realm;
 using namespace realm::util;
@@ -189,7 +200,7 @@ void remove_mapping(void* addr, size_t size)
         if (it->info->mappings.empty()) {
             if (::close(it->info->fd) != 0) {
                 int err = errno; // Eliminate any risk of clobbering
-                if (err == EBADF || err == EIO) // todo, how do we handle EINTR?
+                if (err == EBADF || err == EIO) // FIXME: how do we handle EINTR?
                     throw std::runtime_error(get_errno_msg("close() failed: ", err));
             }
             mappings_by_file.erase(it);
@@ -203,6 +214,10 @@ void* mmap_anon(size_t size)
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
+        if (is_mmap_memory_error(err)) {
+            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
+                + " size: " + util::to_string(size));
+        }
         throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
     }
     return addr;
@@ -259,6 +274,11 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
     }
 
     int err = errno; // Eliminate any risk of clobbering
+    if (is_mmap_memory_error(err)) {
+        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
+            + " size: " + util::to_string(size)
+            + " offset: " + util::to_string(offset));
+    }
     throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
 }
 
@@ -305,10 +325,18 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
         if (new_addr != MAP_FAILED)
             return new_addr;
         int err = errno; // Eliminate any risk of clobbering
-        if (err != ENOTSUP && err != ENOSYS)
-            throw std::runtime_error(get_errno_msg("mremap(): failed: ", err));
+        // Do not throw here if mremap is declared as "not supported" by the
+        // platform Eg. When compiling with GNU libc on OSX, iOS. 
+        // In this case fall through to no-mremap case below.
+        if (err != ENOTSUP && err != ENOSYS) {
+            if (is_mmap_memory_error(err)) {
+                throw AddressSpaceExhausted(get_errno_msg("mremap() failed: ", err)
+                    + " old size: " + util::to_string(old_size)
+                    + " new size: " + util::to_string(new_size));
+            }
+            throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+        }
     }
-    // Fall back to no-mremap case if it's not supported
 #endif
 
     void* new_addr = mmap(fd, new_size, a, file_offset, nullptr);
