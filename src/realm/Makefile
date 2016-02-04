@@ -129,6 +129,7 @@ util/terminate.cpp \
 util/thread.cpp \
 util/network.cpp \
 util/event_loop.cpp \
+$(if $(call IS_EQUAL_TO,$(OS),Darwin),util/event_loop_apple.mm) \
 util/uri.cpp \
 util/platform_specific_condvar.cpp \
 alloc.cpp \
