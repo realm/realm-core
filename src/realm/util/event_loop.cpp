@@ -24,12 +24,12 @@ void EventLoop<ASIO>::run()
     m_io_service.run();
 }
 
-void EventLoop<ASIO>::stop() noexcept
+void EventLoop<ASIO>::stop()
 {
     m_io_service.stop();
 }
 
-void EventLoop<ASIO>::reset() noexcept
+void EventLoop<ASIO>::reset()
 {
     m_io_service.reset();
 }
@@ -140,6 +140,12 @@ EventLoop<ASIO>::async_timer(EventLoopBase::Duration delay, EventLoopBase::OnTim
     return std::unique_ptr<DeadlineTimerBase>{new DeadlineTimer{m_io_service, delay, std::move(on_timeout)}};
 }
 
+void
+EventLoop<ASIO>::post(OnPost on_post)
+{
+    m_io_service.post(std::move(on_post));
+}
+
 
 #if REALM_PLATFORM_APPLE
 
@@ -164,9 +170,14 @@ void EventLoop<Apple>::run()
     CFRunLoopRun();
 }
 
-void EventLoop<Apple>::stop() noexcept
+void EventLoop<Apple>::stop()
 {
     CFRunLoopStop(m_impl->m_runloop);
+}
+
+void EventLoop<Apple>::reset()
+{
+    // Do nothing.
 }
 
 struct EventLoop<Apple>::Socket: SocketBase {
@@ -275,6 +286,12 @@ struct EventLoop<Apple>::Socket: SocketBase {
     {
         CFReadStreamUnscheduleFromRunLoop(m_read_stream, m_runloop, kCFRunLoopCommonModes);
         CFWriteStreamUnscheduleFromRunLoop(m_write_stream, m_runloop, kCFRunLoopCommonModes);
+        if (m_on_read_complete) {
+            on_read_complete(error::operation_aborted);
+        }
+        if (m_on_write_complete) {
+            on_write_complete(error::operation_aborted);
+        }
     }
 
     bool is_open() const
@@ -491,9 +508,14 @@ std::unique_ptr<SocketBase> EventLoop<Apple>::async_connect(std::string host, in
 
 std::unique_ptr<DeadlineTimerBase> EventLoop<Apple>::async_timer(Duration, OnTimeout)
 {
-    // FIXME
-    return nullptr;
+    REALM_ASSERT_RELEASE(false && "Not yet implemented");
 }
+
+void EventLoop<Apple>::post(OnPost on_post)
+{
+    REALM_ASSERT_RELEASE(false && "Not yet implemented");
+}
+
 
 #endif // REALM_PLATFORM_APPLE
 

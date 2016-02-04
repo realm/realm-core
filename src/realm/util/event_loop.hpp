@@ -38,9 +38,15 @@ public:
 
     using OnConnectComplete = std::function<void(std::error_code)>;
     using OnTimeout = std::function<void(std::error_code)>;
+    using OnPost = std::function<void()>;
+
+    virtual void run() = 0;
+    virtual void stop() = 0;
+    virtual void reset() = 0;
 
     virtual std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) = 0;
     virtual std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) = 0;
+    virtual void post(OnPost) = 0;
 };
 
 class ResolverBase {
@@ -87,12 +93,13 @@ public:
     EventLoop();
     ~EventLoop();
 
-    void run();
-    void stop() noexcept;
-    void reset() noexcept;
+    void run() override;
+    void stop() override;
+    void reset() override;
 
     std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) final;
     std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
+    void post(OnPost) final;
 protected:
     struct Resolver;
     struct Socket;
@@ -110,11 +117,13 @@ public:
     EventLoop();
     ~EventLoop();
 
-    void run();
-    void stop() noexcept;
+    void run() override;
+    void stop() override;
+    void reset() override;
 
     std::unique_ptr<SocketBase> async_connect(std::string host, int port, OnConnectComplete) final;
     std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
+    void post(OnPost) final;
 protected:
     struct Impl;
 
