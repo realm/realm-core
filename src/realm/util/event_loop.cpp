@@ -5,8 +5,10 @@
 #include <system_error>
 
 #if REALM_PLATFORM_APPLE
-#include <CoreFoundation/CoreFoundation.h>
-#include <CoreServices/CoreServices.h>
+#  include <CoreFoundation/CoreFoundation.h>
+#  if !REALM_IOS
+#    include <CoreServices/CoreServices.h>
+#  endif // REALM_IOS
 #endif // REALM_PLATFORM_APPLE
 
 

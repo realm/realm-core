@@ -512,6 +512,8 @@
 		F45014021B01027F00CD4A7E /* test_utf8.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B4717D4E89100DD22CC /* test_utf8.cpp */; };
 		F45014031B01027F00CD4A7E /* test_version.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 80ADCCED18A23E2D0049D472 /* test_version.cpp */; };
 		F450A3171C5FBB660008F287 /* to_string.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F450A3161C5FBB660008F287 /* to_string.hpp */; };
+		F462CFF71C6350E6006F3BCA /* event_loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C408701BF9FEDA00351E2F /* event_loop.cpp */; };
+		F462CFF81C6350E7006F3BCA /* event_loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C408701BF9FEDA00351E2F /* event_loop.cpp */; };
 		F4C28BBD1A696DB600F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */; };
 		F4C408661BF9FD3200351E2F /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F4C408651BF9FD3200351E2F /* CoreServices.framework */; };
@@ -2342,6 +2344,7 @@
 				4142C9511623478700B3B902 /* group_shared.cpp in Sources */,
 				F43098B31B021C04000A2333 /* bptree.cpp in Sources */,
 				4142C9481623478700B3B902 /* group_writer.cpp in Sources */,
+				F462CFF71C6350E6006F3BCA /* event_loop.cpp in Sources */,
 				4142C9521623478700B3B902 /* index_string.cpp in Sources */,
 				52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */,
 				F4D0FC8A1B00F62C0040956A /* link_view.cpp in Sources */,
@@ -2428,6 +2431,7 @@
 				C008FF4F1B67F02F0042669E /* group_shared.cpp in Sources */,
 				C008FF501B67F02F0042669E /* bptree.cpp in Sources */,
 				C008FF511B67F02F0042669E /* group_writer.cpp in Sources */,
+				F462CFF81C6350E7006F3BCA /* event_loop.cpp in Sources */,
 				C008FF521B67F02F0042669E /* index_string.cpp in Sources */,
 				C008FF531B67F02F0042669E /* lang_bind_helper.cpp in Sources */,
 				C008FF541B67F02F0042669E /* link_view.cpp in Sources */,
