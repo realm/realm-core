@@ -52,11 +52,21 @@ public:
         return false;
     }
 
-    bool set_int_unique(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    bool set_int_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, int_fast64_t value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
-            log("table->set_int_unique(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_int_unique(col_ndx, row_ndx, value); // Throws
+            if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
+                return false;
+            }
+
+            // Here it is acceptable to call the regular version of set_int(), because
+            // we presume that the side-effects of set_int_unique() are already documented
+            // as other instructions preceding this. Calling the set_int_unique() here
+            // would be a waste of time, because all possible side-effects have already
+            // been carried out.
+            log("table->set_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->set_int(col_ndx, row_ndx, value); // Throws
+
             return true;
         }
         return false;
@@ -102,11 +112,21 @@ public:
         return false;
     }
 
-    bool set_string_unique(size_t col_ndx, size_t row_ndx, StringData value)
+    bool set_string_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, StringData value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
-            log("table->set_string_unique(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
-            m_table->set_string_unique(col_ndx, row_ndx, value); // Throws
+            if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
+                return false;
+            }
+
+            // Here it is acceptable to call the regular version of set_string(), because
+            // we presume that the side-effects of set_string_unique() are already documented
+            // as other instructions preceding this. Calling the set_string_unique() here
+            // would be a waste of time, because all possible side-effects have already
+            // been carried out.
+            log("table->set_string(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
+            m_table->set_string(col_ndx, row_ndx, value); // Throws
+
             return true;
         }
         return false;
