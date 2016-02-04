@@ -366,10 +366,10 @@ protected:
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
     TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
 
-    /// Copy constructor.
+    /// Copy constructor. See the inline definition below.
     TableViewBase(const TableViewBase&);
 
-    /// Move constructor.
+    /// Move constructor. See the inline definition below.
     TableViewBase(TableViewBase&&) noexcept;
 
     TableViewBase& operator=(const TableViewBase&) noexcept;
@@ -464,7 +464,9 @@ enum class RemoveMode {
 class TableView: public TableViewBase {
 public:
     TableView();
+    /// Copy constructor. See the inline definition below.
     TableView(const TableView&) = default;
+    /// Move constructor. See the inline definition below.
     TableView(TableView&&) = default;
     ~TableView() noexcept;
     TableView& operator=(const TableView&) = default;
@@ -631,7 +633,9 @@ class ConstTableView: public TableViewBase {
 public:
     ConstTableView();
     ~ConstTableView() noexcept;
+    /// Copy constructor. See the inline definition below.
     ConstTableView(const ConstTableView&) = default;
+    /// Move constructor. See the inline definition below.
     ConstTableView(ConstTableView&&) = default;
     ConstTableView& operator=(const ConstTableView&) = default;
     ConstTableView& operator=(ConstTableView&&) = default;
