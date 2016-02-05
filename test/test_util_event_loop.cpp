@@ -363,3 +363,23 @@ TEST_TYPES(EventLoop_DeadlineTimer, ASIO, PlatformLocal)
     CHECK(canceled);
 }
 
+TEST_TYPES(EventLoop_HandlerDealloc, ASIO, PlatformLocal)
+{
+    // Check that dynamically allocated handlers are properly freed when the
+    // service object is destroyed.
+    {
+        // m_post_handlers
+        EventLoop<TEST_TYPE> service;
+        service.post([] {});
+    }
+    {
+        // m_imm_handlers
+        EventLoop<TEST_TYPE> service;
+        // By adding two post handlers that throw, one is going to be left
+        // behind in `m_imm_handlers`
+        service.post([&]{ throw std::runtime_error(""); });
+        service.post([&]{ throw std::runtime_error(""); });
+        CHECK_THROW(service.run(), std::runtime_error);
+    }
+}
+
