@@ -382,19 +382,21 @@ public:
 
     ~DeadlineTimer()
     {
-        cancel();
-    }
-
-    void cancel() final
-    {
         if (m_timer) {
             [m_timer invalidate];
             m_timer = nil;
         }
         if (m_on_timeout) {
             m_on_timeout(error::operation_aborted);
-            m_on_timeout = nullptr;
         }
+    }
+
+    void cancel() final
+    {
+        REALM_ASSERT(m_timer);
+        REALM_ASSERT(m_on_timeout);
+        m_error = std::error_code{error::operation_aborted};
+        [m_timer setFireDate:[NSDate distantPast]];
     }
 
     void async_wait(Duration duration, OnTimeout on_timeout) final
@@ -428,13 +430,15 @@ private:
     NSTimer* m_timer;
     OnTimeout m_on_timeout;
     CFRunLoopTimerContext m_context;
+    std::error_code m_error;
 
     void timer_cb(CFRunLoopTimerRef timer)
     {
         REALM_ASSERT(timer == static_cast<CFRunLoopTimerRef>(m_timer));
-        m_on_timeout(std::error_code{});
+        m_on_timeout(m_error);
         m_on_timeout = nullptr;
         m_timer = nil;
+        m_error = std::error_code{};
     }
 
     static void on_timer_cb(CFRunLoopTimerRef timer, void* info)

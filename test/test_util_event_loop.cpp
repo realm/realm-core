@@ -317,3 +317,49 @@ TEST_TYPES(EventLoop_AsyncCommunication, ASIO, PlatformLocal)
     server_thread.join();
 }
 
+TEST_TYPES(EventLoop_DeadlineTimer, ASIO, PlatformLocal)
+{
+    EventLoop<TEST_TYPE> event_loop;
+    std::unique_ptr<DeadlineTimerBase> timer;
+
+    // Check that the completion handler is executed
+    bool completed = false;
+    bool canceled = false;
+    auto wait_handler = [&](std::error_code ec) {
+        if (!ec)
+            completed = true;
+        if (ec == error::operation_aborted)
+            canceled = true;
+    };
+    timer = event_loop.async_timer(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop.run();
+    CHECK(completed);
+    CHECK(!canceled);
+    completed = false;
+
+    // Check that an immediately completed wait operation can be canceled
+    timer->async_wait(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer->cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop.run();
+    CHECK(!completed);
+    CHECK(canceled);
+    canceled = false;
+
+    // Check that a long running wait operation can be canceled
+    timer->async_wait(std::chrono::hours(10000), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer->cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop.run();
+    CHECK(!completed);
+    CHECK(canceled);
+}
+
