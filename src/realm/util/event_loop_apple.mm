@@ -365,14 +365,122 @@ EventLoop<Apple>::async_connect(std::string host, int port, SocketSecurity sec,
                                                   sec, std::move(on_connect)});
 }
 
-std::unique_ptr<DeadlineTimerBase> EventLoop<Apple>::async_timer(Duration, OnTimeout)
+
+struct EventLoop<Apple>::DeadlineTimer: DeadlineTimerBase {
+public:
+    DeadlineTimer(NSRunLoop* runloop, Duration duration, OnTimeout on_timeout):
+        m_runloop(runloop), m_timer(nil)
+    {
+        m_context.version = 0;
+        m_context.info = this;
+        m_context.retain = nullptr;
+        m_context.release = nullptr;
+        m_context.copyDescription = nullptr;
+
+        async_wait(duration, std::move(on_timeout));
+    }
+
+    ~DeadlineTimer()
+    {
+        cancel();
+    }
+
+    void cancel() final
+    {
+        if (m_timer) {
+            [m_timer invalidate];
+            m_timer = nil;
+        }
+        if (m_on_timeout) {
+            m_on_timeout(error::operation_aborted);
+            m_on_timeout = nullptr;
+        }
+    }
+
+    void async_wait(Duration duration, OnTimeout on_timeout) final
+    {
+        REALM_ASSERT(!m_on_timeout);
+        REALM_ASSERT(!m_timer);
+
+        m_on_timeout = std::move(on_timeout);
+
+        // CFAbsoluteTime is a double representing seconds.
+        // Duration::period::den is the number of ticks per second.
+        static_assert(Duration::period::num == 1, "Duration type does not have sub-second precision.");
+        CFAbsoluteTime fire_date = CFAbsoluteTimeGetCurrent() + double(duration.count()) / double(Duration::period::den);
+        CFTimeInterval interval = 0; // fire once only
+        CFOptionFlags flags = 0; // unused; must be 0.
+        CFIndex order = 0; // unused; must be 0;
+
+        CFRunLoopTimerRef timer = CFRunLoopTimerCreate(kCFAllocatorDefault,
+                                                       fire_date,
+                                                       interval,
+                                                       flags,
+                                                       order,
+                                                       on_timer_cb,
+                                                       &m_context);
+        m_timer = static_cast<NSTimer*>(timer);
+        [m_runloop addTimer:m_timer forMode:NSRunLoopCommonModes];
+    }
+
+private:
+    NSRunLoop* m_runloop;
+    NSTimer* m_timer;
+    OnTimeout m_on_timeout;
+    CFRunLoopTimerContext m_context;
+
+    void timer_cb(CFRunLoopTimerRef timer)
+    {
+        REALM_ASSERT(timer == static_cast<CFRunLoopTimerRef>(m_timer));
+        m_on_timeout(std::error_code{});
+        m_on_timeout = nullptr;
+        m_timer = nil;
+    }
+
+    static void on_timer_cb(CFRunLoopTimerRef timer, void* info)
+    {
+        auto self = reinterpret_cast<DeadlineTimer*>(info);
+        self->timer_cb(timer);
+    }
+};
+
+
+std::unique_ptr<DeadlineTimerBase>
+EventLoop<Apple>::async_timer(Duration duration, OnTimeout on_timeout)
 {
-    REALM_ASSERT_RELEASE(false && "Not yet implemented");
+    return std::unique_ptr<DeadlineTimerBase>(new DeadlineTimer{m_impl->m_runloop, duration, std::move(on_timeout)});
 }
+
+@interface EventLoopApplePost: NSObject {
+    EventLoopBase::OnPost _on_post;
+}
+-(id)initWithCallback:(EventLoopBase::OnPost)callback;
+-(void)fire:(NSTimer*)timer;
+@end
+
+@implementation EventLoopApplePost
+
+-(id)initWithCallback:(EventLoopBase::OnPost)callback
+{
+    self = [super init];
+    if (self) {
+        self->_on_post = std::move(callback);
+    }
+    return self;
+}
+
+-(void)fire:(NSTimer*)timer
+{
+    static_cast<void>(timer);
+    self->_on_post();
+}
+
+@end
 
 void EventLoop<Apple>::post(OnPost on_post)
 {
-    static_cast<void>(on_post);
-    REALM_ASSERT_RELEASE(false && "Not yet implemented");
+    auto event = [[EventLoopApplePost alloc] initWithCallback:std::move(on_post)];
+    NSTimer* timer = [NSTimer scheduledTimerWithTimeInterval:0 target:event selector:@selector(fire:) userInfo:nil repeats:NO];
+    [m_impl->m_runloop addTimer:timer forMode:NSRunLoopCommonModes];
 }
 
