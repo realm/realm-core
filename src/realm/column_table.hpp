@@ -98,8 +98,6 @@ protected:
         bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
         template<bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
-        template<bool fix_ndx_in_parent>
-        void adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
@@ -501,23 +499,6 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
             entry.m_subtable_ndx = row_ndx_1;
             if (fix_ndx_in_parent)
                 tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
-        }
-    }
-}
-
-template<bool fix_ndx_in_parent>
-void SubtableColumnBase::SubtableMap::adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
-{
-    static_cast<void>(new_row_ndx);
-
-    using tf = _impl::TableFriend;
-    for (auto it = m_entries.begin(); it != m_entries.end(); ++it) {
-        entry& e = *it;
-        if (e.m_subtable_ndx == row_ndx) {
-            TableRef table(e.m_table);
-            tf::detach(*table);
-            m_entries.erase(it);
-            break;
         }
     }
 }

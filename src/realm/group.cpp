@@ -1202,7 +1202,7 @@ public:
         return true; // No-op
     }
 
-    bool set_int_unique(size_t, size_t, int_fast64_t) noexcept
+    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) noexcept
     {
         return true; // No-op
     }
@@ -1227,7 +1227,7 @@ public:
         return true; // No-op
     }
 
-    bool set_string_unique(size_t, size_t, StringData) noexcept
+    bool set_string_unique(size_t, size_t, size_t, StringData) noexcept
     {
         return true; // No-op
     }

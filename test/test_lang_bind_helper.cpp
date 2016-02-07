@@ -7377,12 +7377,12 @@ public:
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
     bool set_int(size_t, size_t, int_fast64_t) { return false; }
-    bool set_int_unique(size_t, size_t, int_fast64_t) { return false; }
+    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return false; }
     bool set_bool(size_t, size_t, bool) { return false; }
     bool set_float(size_t, size_t, float) { return false; }
     bool set_double(size_t, size_t, double) { return false; }
     bool set_string(size_t, size_t, StringData) { return false; }
-    bool set_string_unique(size_t, size_t, StringData) { return false; }
+    bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
     bool set_binary(size_t, size_t, BinaryData) { return false; }
     bool set_date_time(size_t, size_t, DateTime) { return false; }
     bool set_table(size_t, size_t) { return false; }
@@ -7788,7 +7788,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 TEST(LangBindHelper_RollbackCircularReferenceRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
@@ -8865,7 +8865,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist{make_client_history(path, crypt_key())};
+    std::unique_ptr<Replication> hist{make_client_history(path, crypt_key())};
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
@@ -8906,8 +8906,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
     TableRef st0 = t1->get_subtable(2, 0);
     TableRef mt0 = t1->get_subtable(3, 0);
     CHECK_EQUAL(l0->get_origin_row_index(), 0);
-    LangBindHelper::promote_to_write(sg
-        );
+    LangBindHelper::promote_to_write(sg);
     t1->change_link_targets(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
@@ -9762,77 +9761,93 @@ TEST(LangBindHelper_HandoverDependentViews)
 
 TEST(LangBindHelper_HandoverTableViewWithLinkView)
 {
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    sg.begin_read();
-
-    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    std::unique_ptr<SharedGroup::Handover<TableView> > handover;
-    SharedGroup::VersionID vid;
+    // First iteration hands-over a normal valid attached LinkView. Second
+    // iteration hands-over a detached LinkView.
+    for (int detached = 0; detached < 2; detached++)
     {
-        TableView tv;
-        LangBindHelper::promote_to_write(sg_w);
+        SHARED_GROUP_TEST_PATH(path);
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        sg.begin_read();
 
-        TableRef table1 = group_w.add_table("table1");
-        TableRef table2 = group_w.add_table("table2");
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        Group& group_w = const_cast<Group&>(sg_w.begin_read());
+        std::unique_ptr<SharedGroup::Handover<TableView> > handover;
+        SharedGroup::VersionID vid;
 
-        // add some more columns to table1 and table2
-        table1->add_column(type_Int, "col1");
-        table1->add_column(type_String, "str1");
+        {
+            TableView tv;
+            LangBindHelper::promote_to_write(sg_w);
 
-        // add some rows
-        table1->add_empty_row();
-        table1->set_int(0, 0, 300);
-        table1->set_string(1, 0, "delta");
+            TableRef table1 = group_w.add_table("table1");
+            TableRef table2 = group_w.add_table("table2");
 
-        table1->add_empty_row();
-        table1->set_int(0, 1, 100);
-        table1->set_string(1, 1, "alfa");
+            // add some more columns to table1 and table2
+            table1->add_column(type_Int, "col1");
+            table1->add_column(type_String, "str1");
 
-        table1->add_empty_row();
-        table1->set_int(0, 2, 200);
-        table1->set_string(1, 2, "beta");
+            // add some rows
+            table1->add_empty_row();
+            table1->set_int(0, 0, 300);
+            table1->set_string(1, 0, "delta");
 
-        size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+            table1->add_empty_row();
+            table1->set_int(0, 1, 100);
+            table1->set_string(1, 1, "alfa");
 
-        table2->add_empty_row();
-        table2->add_empty_row();
+            table1->add_empty_row();
+            table1->set_int(0, 2, 200);
+            table1->set_string(1, 2, "beta");
 
-        LinkViewRef lvr;
+            size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
 
-        lvr = table2->get_linklist(col_link2, 0);
-        lvr->clear();
-        lvr->add(0);
-        lvr->add(1);
-        lvr->add(2);
+            table2->add_empty_row();
+            table2->add_empty_row();
 
-        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+            LinkViewRef lvr;
 
-        // q.m_table = table1
-        // q.m_view = lvr
-        Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+            lvr = table2->get_linklist(col_link2, 0);
+            lvr->clear();
+            lvr->add(0);
+            lvr->add(1);
+            lvr->add(2);
 
-        // tv.m_table == table1
-        tv = q.find_all(); // tv = { 0, 2 }
-        CHECK(tv.is_in_sync());
+            // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
-        // TableView tv2 = lvr->get_sorted_view(0);
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
-    }
-    {
-        LangBindHelper::advance_read(sg, vid);
-        sg_w.close();
-        std::unique_ptr<TableView> tv( sg.import_from_handover(move(handover)) ); // <-- import tv
+            // q.m_table = table1
+            // q.m_view = lvr
+            Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
 
-        CHECK(tv->is_in_sync());
-        CHECK_EQUAL(2, tv->size());
-        CHECK_EQUAL(0, tv->get_source_ndx(0));
-        CHECK_EQUAL(2, tv->get_source_ndx(1));
+            // Remove the LinkList that the query depends on, to see if a detached LinkView can be handed over
+            // correctly
+            if (detached == 1)
+                table2->remove(0);
+
+            // tv.m_table == table1
+            tv = q.find_all(); // tv = { 0, 2 }
+            CHECK(tv.is_in_sync());
+
+            // TableView tv2 = lvr->get_sorted_view(0);
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
+        }
+        {
+            LangBindHelper::advance_read(sg, vid);
+            sg_w.close();
+            std::unique_ptr<TableView> tv(sg.import_from_handover(move(handover))); // <-- import tv
+
+            CHECK(tv->is_in_sync());
+            if (detached == 1) {
+                CHECK_EQUAL(0, tv->size());
+            }
+            else {
+                CHECK_EQUAL(2, tv->size());
+                CHECK_EQUAL(0, tv->get_source_ndx(0));
+                CHECK_EQUAL(2, tv->get_source_ndx(1));
+            }
+        }
     }
 }
 
@@ -10240,11 +10255,11 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 TEST(LangBindHelper_HandoverQueryLinksTo)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -10317,11 +10332,11 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 TEST(LangBindHelper_HandoverQuerySubQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -10696,7 +10711,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
     const size_t N = 32;
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key(true)));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("test");
@@ -10713,7 +10728,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
     }
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key(true)));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
@@ -10788,11 +10803,11 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     std::atomic<bool> end_signal(false);
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
 
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -10828,7 +10843,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     auto async = [&]() {
         // Async thread
         //************************************************************************************************
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
 
@@ -10858,7 +10873,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         //************************************************************************************************
     };
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& group = const_cast<Group&>(sg.begin_read());
 

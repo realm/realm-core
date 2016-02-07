@@ -143,9 +143,6 @@ private:
     template<bool fix_ndx_in_parent>
     void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
 
-    template<bool fix_ndx_in_parent>
-    void adj_change_link_targets(size_t, size_t) noexcept;
-
     void prune_list_accessor_tombstones() noexcept;
     void validate_list_accessors() const noexcept;
 

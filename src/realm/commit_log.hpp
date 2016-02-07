@@ -29,8 +29,6 @@
 
 namespace realm {
 
-using ClientHistory = Replication; // Deprecated class name
-
 // FIXME: Why is this exception class exposed?
 class LogFileError: public std::runtime_error {
 public:

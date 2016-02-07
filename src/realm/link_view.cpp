@@ -29,7 +29,7 @@ using namespace realm;
 
 void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch)
 {
-    if (bool(ref)) {
+    if (bool(ref) && ref->is_attached()) {
         patch.reset(new HandoverPatch);
         Table::generate_patch(ref->m_origin_table, patch->m_table);
         patch->m_col_num = ref->m_origin_column.m_column_ndx;
