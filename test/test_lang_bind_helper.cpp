@@ -11137,6 +11137,81 @@ TEST(LangBindHelper_InRealmHistory_Basics)
 }
 
 
+TEST(LangBindHelper_InRealmHistory_RollbackAndContinueAsRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    {
+        Group* group = const_cast<Group*>(&sg.begin_read());
+       {
+            LangBindHelper::promote_to_write(sg);
+            TableRef origin = group->get_or_add_table("origin");
+            origin->add_column(type_Int, "");
+            origin->add_empty_row();
+            origin->set_int(0,0,42);
+            LangBindHelper::commit_and_continue_as_read(sg);
+        }
+        group->verify();
+        {
+            // rollback of group level table insertion
+            LangBindHelper::promote_to_write(sg);
+            TableRef o = group->get_or_add_table("nullermand");
+            TableRef o2 = group->get_table("nullermand");
+            REALM_ASSERT(o2);
+            LangBindHelper::rollback_and_continue_as_read(sg);
+            TableRef o3 = group->get_table("nullermand");
+            REALM_ASSERT(!o3);
+            REALM_ASSERT(o2->is_attached() == false);
+        }
+
+        TableRef origin = group->get_table("origin");
+        Row row = origin->get(0);
+        CHECK_EQUAL(42, origin->get_int(0,0));
+
+        {
+            LangBindHelper::promote_to_write(sg);
+            origin->insert_empty_row(0);
+            origin->set_int(0,0,5746);
+            CHECK_EQUAL(42, origin->get_int(0,1));
+            CHECK_EQUAL(5746, origin->get_int(0,0));
+            CHECK_EQUAL(42, row.get_int(0));
+            CHECK_EQUAL(2, origin->size());
+            group->verify();
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        CHECK_EQUAL(1, origin->size());
+        group->verify();
+        CHECK_EQUAL(42, origin->get_int(0,0));
+        CHECK_EQUAL(42, row.get_int(0));
+
+        {
+            LangBindHelper::promote_to_write(sg);
+            origin->add_empty_row();
+            origin->set_int(0,1,42);
+            LangBindHelper::commit_and_continue_as_read(sg);
+        }
+        Row row2 = origin->get(1);
+        CHECK_EQUAL(2, origin->size());
+
+        {
+            LangBindHelper::promote_to_write(sg);
+            origin->move_last_over(0);
+            CHECK_EQUAL(1, origin->size());
+            CHECK_EQUAL(42, row2.get_int(0));
+            CHECK_EQUAL(42, origin->get_int(0,0));
+            group->verify();
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        CHECK_EQUAL(2, origin->size());
+        group->verify();
+        CHECK_EQUAL(42, row2.get_int(0));
+        CHECK_EQUAL(42, origin->get_int(0,1));
+        sg.end_read();
+    }
+}
+
+
 TEST(LangBindHelper_InRealmHistory_Upgrade)
 {
     SHARED_GROUP_TEST_PATH(path_1);

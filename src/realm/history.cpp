@@ -55,9 +55,7 @@ public:
 
     BinaryData get_uncommitted_changes() noexcept override
     {
-        // Not needed in this context.
-        REALM_ASSERT(false);
-        return BinaryData();
+        return TrivialReplication::get_uncommitted_changes();
     }
 };
 

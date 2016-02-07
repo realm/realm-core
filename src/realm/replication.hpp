@@ -427,6 +427,8 @@ protected:
 
     bool is_history_updated() const noexcept;
 
+    BinaryData get_uncommitted_changes() const noexcept;
+
     std::string get_database_path() override;
     void initialize(SharedGroup&) override;
     void do_initiate_transact(version_type, bool) override;
@@ -507,6 +509,13 @@ inline TrivialReplication::TrivialReplication(const std::string& database_file):
 inline bool TrivialReplication::is_history_updated() const noexcept
 {
     return m_history_updated;
+}
+
+inline BinaryData TrivialReplication::get_uncommitted_changes() const noexcept
+{
+    const char* data = m_transact_log_buffer.data();
+    size_t size = write_position() - data;
+    return BinaryData(data, size);
 }
 
 inline size_t TrivialReplication::transact_log_size()
