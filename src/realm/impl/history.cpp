@@ -125,59 +125,5 @@ void InRealmHistory::update_from_ref(ref_type ref, version_type version)
     m_base_version = version - m_size;
 }
 
-
-/*
-InRealmHistory::InRealmHistory(Group& group):
-    m_group(group),
-    m_top(_impl::GroupFriend::get_alloc(m_group))
-{
-    using gf = _impl::GroupFriend;
-    // FIXME: Cannot happen here
-    gf::set_history_parent(m_group, m_top);                                        
-}
-
-
-void InRealmHistory::update_early_from_top_ref(size_t new_file_size, ref_type new_top_ref)
-{
-    using gf = _impl::GroupFriend;
-    gf::remap(m_group, new_file_size);
-    Allocator& alloc = gf::get_alloc(m_group);
-    ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
-    if (hist_ref == 0)
-        return; // No history yet.
-    m_top.init_from_ref(hist_ref); // Throws
-    if (REALM_LIKELY(m_changesets))
-        m_changesets->update_from_parent_ext(); // Throws
-    else {
-        ref_type changesets_ref = m_top.get_as_ref(1);
-        bool nullable = false;
-        m_changesets.reset(new BinaryColumn(alloc, changesets_ref, nullable));
-        m_changesets->set_parent(&m_top, 1);
-    }
-    m_first_version_in_history = version_type(m_top.get(0) / 2);
-}
-
-
-void InRealmHistory::get_changesets(version_type begin_version, version_type end_version,
-                                    BinaryData* buffer) const noexcept
-{
-    REALM_ASSERT(begin_version <= end_version);
-    REALM_ASSERT(begin_version == end_version ||
-                 (m_first_version_in_history > 0 &&
-                  begin_version >= m_first_version_in_history - 1 &&
-                  end_version < m_first_version_in_history + m_changesets->size()));
-    size_t n = end_version - begin_version;
-    size_t offset = begin_version - (m_first_version_in_history-1);
-    for (size_t i = 0; i < n; ++i)
-        buffer[i] = m_changesets->get(offset + i);
-}
-
-
-InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
-{
-    
-}
-*/
-
 } // namespace _impl
 } // namespace realm

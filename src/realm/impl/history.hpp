@@ -32,7 +32,6 @@ class Group;
 
 namespace _impl {
 
-
 /// Read-only access to history of changesets as needed to enable continuous
 /// transactions.
 class History {
@@ -201,65 +200,6 @@ private:
 
     void update_from_ref(ref_type, version_type);
 };
-
-
-/*
-/// This class is intended to eventually become a basis for implementing the
-/// Replication API for the purpose of supporting continuous transactions. That
-/// is, its purpose is to replace the current implementation in commit_log.cpp,
-/// which places the history in separate files.
-///
-/// It is also intended to be used as a base class for an extended sync-enabled
-/// history.
-///
-/// By ensuring that the root node of the history is correctly configured with
-/// Group::m_top as its parent, this class allows for modifications of the
-/// history as long as those modifications happen after the remainder of the
-/// Group accessor is updated to reflect the new snapshot (see
-/// History::update_early_from_top_ref()).
-class SyncHistory: public History {
-public:
-    InRealmHistory(Group&);
-    void update_early_from_top_ref(size_t, ref_type) override;
-    void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
-
-    void update_from_parent();
-    version_type add_changeset(BinaryData);
-
-protected:
-    Group& m_group;
-
-    /// Root node of the history. Unattached if Group::m_top contains a
-    /// null-ref.
-    ///
-    ///     slot  value
-    ///     --------------------------------
-    ///     1st   m_first_version_in_history
-    ///     2nd   m_changesets
-    ///
-    Array m_top;
-
-    /// Version produced by first entry in history, or zero if the history is
-    /// empty.
-    ///
-    /// Undefined value if m_top is detached.
-    version_type m_first_version_in_history;
-
-    /// A list of changesets, one for each entry in the history.
-    ///
-    /// FIXME: Ideally, the B+tree accessor below should have been just
-    /// Bptree<BinaryData>, but Bptree<BinaryData> seems to not allow that yet.
-    ///
-    /// FIXME: The memory-wise indirection is an unfortunate consequence of the
-    /// fact that it is impossible to construct a BinaryColumn without already
-    /// having a ref to a valid underlying node structure. This, in turn, is an
-    /// unfortunate side effect of the fact that a column accessor contains a
-    /// root node accessor, and the type of the required root node accessor
-    /// varies depending on the size of the B+-tree.
-    std::unique_ptr<BinaryColumn> m_changesets;
-};
-*/
-
 
 } // namespace _impl
 } // namespace realm

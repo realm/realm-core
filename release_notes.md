@@ -15,7 +15,7 @@
   test_query.cpp for more info.
 * `LangBindHelper::advance_read()` and friends no longer take a history
   argument. Access to the history is now gained automatically via
-  `Replaication::get_history()`. Application and bindings should simply delete
+  `Replication::get_history()`. Applications and bindings should simply delete
   the history argument at each call site.
 
 ### Enhancements:
@@ -25,8 +25,8 @@
   thrown std::runtime_error. This is so that iOS and Android language
   bindings can specifically catch this case and handle it differently
   than the rest of the general std::runtime_errors.
-* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but keep
-  the current history implementation as the default for now
+* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
+  keeps the current history implementation as the default for now
   (`<realm/commit_log.hpp>`).
 
 -----------
@@ -39,7 +39,7 @@
   upgrade is implemented.
 * Adds checks for consistent use of history types.
 * Removes the "server sync mode" flag from the Realm file header. This feature
-  is now superseeded by the more powerful history type consistency checks. This
+  is now superseded by the more powerful history type consistency checks. This
   is not considered a file format change, as no released core version will ever
   set the "server sync mode" flag.
 * The SharedInfo file format version was bumped du to addition of history type
