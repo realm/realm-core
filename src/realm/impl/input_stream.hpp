@@ -189,12 +189,11 @@ private:
 
 class ChangesetInputStream: public NoCopyInputStream {
 public:
-    using version_type = ContinTransactHistory::version_type;
-    ChangesetInputStream(ContinTransactHistory&, version_type begin_version,
-                         version_type end_version);
+    using version_type = History::version_type;
+    ChangesetInputStream(History&, version_type begin_version, version_type end_version);
     size_t next_block(const char*& begin, const char*& end) override;
 private:
-    ContinTransactHistory& m_history;
+    History& m_history;
     version_type m_begin_version, m_end_version;
     BinaryData m_changesets[8]; // Buffer
     BinaryData* m_changesets_begin = 0;
@@ -202,8 +201,7 @@ private:
 };
 
 
-inline ChangesetInputStream::ChangesetInputStream(ContinTransactHistory& hist,
-                                                  version_type begin_version,
+inline ChangesetInputStream::ChangesetInputStream(History& hist, version_type begin_version,
                                                   version_type end_version):
     m_history(hist),
     m_begin_version(begin_version),

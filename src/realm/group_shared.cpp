@@ -57,7 +57,12 @@ namespace {
 // Constants controlling the amount of uncommited writes in flight:
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
-#define SHAREDINFO_VERSION 4
+
+// value   change
+// --------------------
+// 4       Unknown
+// 5       Introduction of SharedInfo::history_type.
+const uint_fast16_t g_shared_info_version = 5;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -373,6 +378,17 @@ private:
 
 
 
+// The structure of the contents of the per session `.lock` file. Note that this
+// file is transient in that it is recreated/reinitialized at the beginning of
+// every session. A session is any sequence of temporally overlapping openings
+// of a particular Realm file via SharedGroup objects. For example, if there are
+// two SharedGroup objects, A and B, and the file is first opened via A, then
+// opened via B, then closed via A, and finally closed via B, then the session
+// streaches from the opening via A to the closing via B.
+//
+// IMPORTANT: Remember to bump `g_shared_info_version` if anything is changed in
+// the memory layout of this class, or in the meaning of any of the stored
+// values.
 struct SharedGroup::SharedInfo
 {
     // indicates lock file has valid content, implying that all the following member
@@ -393,27 +409,30 @@ struct SharedGroup::SharedInfo
     // set by the daemon when it is ready to handle commits. Participants must
     // wait during open() on 'daemon_becomes_ready' for this to become true.
     // Cleared by the daemon when it decides to exit.
-    bool daemon_ready; // offset 4
+    bool daemon_ready; // Likely at offset 4
+
+    // Stores a value of Replication::HistoryType.
+    int8_t history_type;
 
     // Tracks the most recent version number.
-    uint16_t version;
-    uint16_t durability; // offset 8
+    uint16_t version = g_shared_info_version;
+    uint16_t durability; // Likely at offset 8
     uint16_t free_write_slots;
 
     // number of participating shared groups:
-    uint32_t num_participants; // offset 12
+    uint32_t num_participants; // Likely at offset 12
 
     // Latest version number. Guarded by the controlmutex (for lock-free access, use
     // get_current_version() instead)
-    uint64_t latest_version_number; // offset 16
+    uint64_t latest_version_number; // Likely at offset 16
 
     // Pid of process initiating the session, but only if that process runs with encryption
     // enabled, zero otherwise. Other processes cannot join a session wich uses encryption,
     // because interprocess sharing is not supported by our current encryption mechanisms.
-    uint64_t session_initiator_pid;
+    uint64_t session_initiator_pid; // Likely at offset 24
 
-    uint64_t number_of_versions;
-    RobustMutex writemutex;
+    uint64_t number_of_versions; // Likely at offset 32
+    RobustMutex writemutex; // Likely at offset 40
     RobustMutex balancemutex;
     RobustMutex controlmutex;
 #ifndef _WIN32
@@ -425,7 +444,7 @@ struct SharedGroup::SharedInfo
 #endif
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
-    SharedInfo(DurabilityLevel);
+    SharedInfo(DurabilityLevel, Replication::HistoryType);
     ~SharedInfo() noexcept {}
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
@@ -442,7 +461,7 @@ struct SharedGroup::SharedInfo
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura):
+SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryType hist_type):
 #ifndef _WIN32
     size_of_mutex(sizeof(writemutex)),
     size_of_condvar(sizeof(room_to_write)),
@@ -456,8 +475,9 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura):
     balancemutex() // Throws
 #endif
 {
-    version = SHAREDINFO_VERSION;
     durability = dura; // durability level is fixed from creation
+    REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(hist_type+0));
+    history_type = hist_type;
 #ifndef _WIN32
     PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
     PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
@@ -631,8 +651,11 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
     m_lockfile_path = path + ".lock";
     SlabAlloc& alloc = m_group.m_alloc;
 
-    while (1) {
+    Replication::HistoryType history_type = Replication::hist_None;
+    if (Replication* repl = m_group.get_replication())
+        history_type = repl->get_history_type();
 
+    for (;;) {
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0);
         File::CloseGuard fcg(m_file);
         if (m_file.try_lock_exclusive()) {
@@ -648,7 +671,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
             File::UnmapGuard fug_1(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
-            new (info) SharedInfo(durability); // Throws
+            new (info) SharedInfo(durability, history_type); // Throws
         }
 
         // we hold the shared lock from here until we close the file!
@@ -755,12 +778,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             // close previously, but wasn't (perhaps due to the process crashing)
             cfg.clear_file = durability == durability_MemOnly && begin_new_session;
 
-            // If replication is enabled, we need to ask it whether we're in server-sync mode
-            // and check that the database is operated in the same mode.
-            cfg.server_sync_mode = false;
-            Replication* repl = _impl::GroupFriend::get_replication(m_group);
-            if (repl)
-                cfg.server_sync_mode = repl->is_in_server_synchronization_mode();
             cfg.encryption_key = encryption_key;
             ref_type top_ref;
             try {
@@ -775,37 +792,31 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             if (begin_new_session) {
 
                 // determine version
-                uint_fast64_t version;
-                Array top(alloc);
-                if (top_ref) {
-                    // top_ref is non-zero implying that the database has seen at least one commit,
-                    // so we can get the versioning info from the database
-                    top.init_from_ref(top_ref);
-                    if (top.size() <= 5) {
-                        // the database wasn't written by shared group, so no versioning info
-                        version = 1;
-                        REALM_ASSERT(! cfg.server_sync_mode);
-                    }
-                    else {
-                        // the database was written by shared group, so it has versioning info
-                        REALM_ASSERT(top.size() >= 7);
-                        version = top.get(6) / 2;
-                        // In case this was written by an older version of shared group, it
-                        // will have version 0. Version 0 is not a legal initial version, so
-                        // it has to be set to 1 instead.
-                        if (version == 0)
-                            version = 1;
-                    }
+                using gf = _impl::GroupFriend;
+                version_type version = 0;
+                int stored_history_type = 0;
+                gf::get_version_and_history_type(alloc, top_ref, version, stored_history_type);
+                bool good_history_type = false;
+                switch (history_type) {
+                    case Replication::hist_None:
+                    case Replication::hist_OutOfRealm:
+                        good_history_type = (stored_history_type == Replication::hist_None);
+                        break;
+                    case Replication::hist_InRealm:
+                        good_history_type = (stored_history_type == Replication::hist_InRealm ||
+                                             stored_history_type == Replication::hist_None);
+                        break;
+                    case Replication::hist_Sync:
+                        good_history_type =
+                            ((stored_history_type == Replication::hist_Sync) ||
+                             (stored_history_type == Replication::hist_None && top_ref == 0));
                 }
-                else {
-                    // the database was just created, no metadata has been written yet.
-                    version = 1;
-                }
-                // If replication is enabled, we need to inform it of the latest version,
-                // allowing it to discard any surplus log entries
-                repl = _impl::GroupFriend::get_replication(m_group);
-                if (repl)
-                    repl->reset_log_management(version);
+                if (!good_history_type)
+                    throw InvalidDatabase("Bad or incompatible history type", path);
+
+                using gf = _impl::GroupFriend;
+                if (Replication* repl = gf::get_replication(m_group))
+                    repl->initiate_session(version); // Throws
 
 #ifndef _WIN32
                 if (encryption_key) {
@@ -822,7 +833,19 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
                 SharedInfo* r_info = m_reader_map.get_addr();
                 r_info->init_versioning(top_ref, file_size, version);
             }
-            else { // not the session initiator!
+            else { // Not the session initiator
+                // Format of SharedInfo file must be consistent across a session
+                if (info->version != g_shared_info_version)
+                    throw LogicError(LogicError::mixed_shared_info_version);
+
+                // Durability setting must be consistent across a session
+                if (info->durability != durability)
+                    throw LogicError(LogicError::mixed_durability);
+
+                // History type must be consistent across a session
+                if (info->history_type != history_type)
+                    throw LogicError(LogicError::mixed_history_type);
+
 #ifndef _WIN32
                 if (encryption_key && info->session_initiator_pid != uint64_t(getpid()))
                     throw std::runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
@@ -854,13 +877,6 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
             // Set initial version so we can track if other instances
             // change the db
             m_read_lock.m_version = get_current_version();
-
-            if (info->version != SHAREDINFO_VERSION)
-                throw std::runtime_error("Unsupported version");
-
-            // Durability level cannot be changed at runtime
-            if (info->durability != durability)
-                throw std::runtime_error("Inconsistent durability level");
 
             // make our presence noted:
             ++info->num_participants;
@@ -1002,19 +1018,8 @@ void SharedGroup::close() noexcept
                 }
                 catch(...) {} // ignored on purpose.
             }
-            // If replication is enabled, we need to stop log management:
-            Replication* repl = _impl::GroupFriend::get_replication(m_group);
-            if (repl) {
-#ifdef _WIN32
-                try {
-                    repl->stop_logging();
-                }
-                catch(...) {} // FIXME, on Windows, stop_logging() fails to delete a file because it's open
-#else
-                repl->stop_logging();
-#endif
-
-            }
+            if (Replication* repl = _impl::GroupFriend::get_replication(m_group))
+                repl->terminate_session();
         }
     }
 #ifndef _WIN32
@@ -1285,10 +1290,10 @@ Group& SharedGroup::begin_write()
         bool writable = true;
         do_begin_read(version_id, writable); // Throws
 
-        Replication* repl = m_group.get_replication();
-        if (repl) {
+        if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;
-            repl->initiate_transact(*this, current_version); // Throws
+            bool history_updated = false;
+            repl->initiate_transact(current_version, history_updated); // Throws
         }
     }
     catch (...) {
@@ -1329,7 +1334,7 @@ void SharedGroup::rollback() noexcept
     do_end_read();
 
     if (Replication* repl = m_group.get_replication())
-        repl->abort_transact(*this);
+        repl->abort_transact();
 
     m_transact_stage = transact_Ready;
 }
@@ -1410,15 +1415,15 @@ Replication::version_type SharedGroup::do_commit()
         // fails. The application then has the option of terminating the
         // transaction with a call to SharedGroup::rollback(), which in turn
         // must call Replication::abort_transact().
-        new_version = repl->prepare_commit(*this, current_version); // Throws
+        new_version = repl->prepare_commit(current_version); // Throws
         try {
             low_level_commit(new_version); // Throws
         }
         catch (...) {
-            repl->abort_transact(*this);
+            repl->abort_transact();
             throw;
         }
-        repl->finalize_commit(*this);
+        repl->finalize_commit();
     }
     else {
         low_level_commit(new_version); // Throws
@@ -1512,7 +1517,10 @@ uint_fast64_t SharedGroup::get_current_version()
 void SharedGroup::low_level_commit(uint_fast64_t new_version)
 {
     SharedInfo* info = m_file_map.get_addr();
-    uint_fast64_t read_lock_version;
+
+    // Version of oldest snapshot currently (or recently) bound in a transaction
+    // of the current session.
+    uint_fast64_t oldest_version;
     {
         SharedInfo* r_info = m_reader_map.get_addr();
 
@@ -1523,25 +1531,25 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             r_info = m_reader_map.get_addr();
         }
         r_info->readers.cleanup();
-        const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
-        read_lock_version = r.version;
-        // If replication is enabled, we need to propagate knowledge of the earliest
-        // available version:
-        Replication* repl = _impl::GroupFriend::get_replication(m_group);
-        if (repl)
-            repl->set_last_version_seen_locally(read_lock_version);
+        const Ringbuffer::ReadCount& rc = r_info->readers.get_oldest();
+        oldest_version = rc.version;
+
+        // Allow for trimming of the history. Some types of histories do not
+        // need store changesets prior to the oldest bound snapshot.
+        if (_impl::History* hist = get_history())
+            hist->set_oldest_bound_version(oldest_version); // Throws
     }
 
     // Do the actual commit
     REALM_ASSERT(m_group.m_top.is_attached());
-    REALM_ASSERT(read_lock_version <= new_version);
+    REALM_ASSERT(oldest_version <= new_version);
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
-    out.set_versions(new_version, read_lock_version);
+    out.set_versions(new_version, oldest_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
-    //     << " Read lock at version " << read_lock_version << std::endl;
+    //     << " Read lock at version " << oldest_version << std::endl;
     switch (DurabilityLevel(info->durability)) {
         case durability_Full:
             out.commit(new_top_ref); // Throws
@@ -1578,7 +1586,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     }
     {
         RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
-        info->number_of_versions = new_version - read_lock_version + 1;
+        info->number_of_versions = new_version - oldest_version + 1;
         info->latest_version_number = new_version;
 #ifndef _WIN32
         m_new_commit_available.notify_all();

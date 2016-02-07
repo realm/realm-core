@@ -2850,4 +2850,25 @@ TEST(Shared_BeginReadFailure)
 }
 #endif // REALM_DEBUG
 
+
+TEST(Shared_SessionDurabilityConsistency)
+{
+    // Check that we can reliably detect inconsist durability choices across
+    // concurrent session participants.
+
+    // Errors of this kind are considered as incorrect API usage, and will lead
+    // to throwing of LogicError exceptions.
+
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        bool no_create = false;
+        SharedGroup::DurabilityLevel durability_1 = SharedGroup::durability_Full;
+        SharedGroup sg(path, no_create, durability_1);
+
+        SharedGroup::DurabilityLevel durability_2 = SharedGroup::durability_MemOnly;
+        CHECK_LOGIC_ERROR(SharedGroup(path, no_create, durability_2),
+                          LogicError::mixed_durability);
+    }
+}
+
 #endif // TEST_SHARED

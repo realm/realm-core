@@ -56,10 +56,6 @@ public:
     {
     }
 
-    ~MyTrivialReplication() noexcept
-    {
-    }
-
     void replay_transacts(SharedGroup& target, util::Logger* replay_logger = nullptr)
     {
         for (const Buffer<char>& changeset: m_changesets)
@@ -67,8 +63,19 @@ public:
         m_changesets.clear();
     }
 
+    HistoryType get_history_type() const noexcept override
+    {
+        return hist_None;
+    }
+
+    _impl::History* get_history() override
+    {
+        return 0;
+    }
+
 private:
-    void prepare_changeset(const char* data, size_t size, version_type) override
+    version_type prepare_changeset(const char* data, size_t size,
+                                   version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data+size, m_incoming_changeset.data());
@@ -76,6 +83,7 @@ private:
         // sure no exception will be thrown whan adding the changeset in
         // finalize_changeset().
         m_changesets.reserve(m_changesets.size() + 1); // Throws
+        return orig_version + 1;
     }
 
     void finalize_changeset() noexcept override

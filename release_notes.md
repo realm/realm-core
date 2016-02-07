@@ -25,12 +25,26 @@
   thrown std::runtime_error. This is so that iOS and Android language
   bindings can specifically catch this case and handle it differently
   than the rest of the general std::runtime_errors.
+* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but keep
+  the current history implementation as the default for now
+  (`<realm/commit_log.hpp>`).
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Bumps file format version from 3 to 4 due to support for in-Realm history of
+  changes (extra entries in `Group::m_top`). The bump is necessary due to lack
+  of forwards compatibility. The changes are backwards compatible, and automatic
+  upgrade is implemented.
+* Adds checks for consistent use of history types.
+* Removes the "server sync mode" flag from the Realm file header. This feature
+  is now superseeded by the more powerful history type consistency checks. This
+  is not considered a file format change, as no released core version will ever
+  set the "server sync mode" flag.
+* The SharedInfo file format version was bumped du to addition of history type
+  information (all concurrent session participants must agree on SharedInfo file
+  format version).
 
 ----------------------------------------------
 

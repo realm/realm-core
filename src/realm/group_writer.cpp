@@ -117,12 +117,13 @@ ref_type GroupWriter::write_group()
     top.set(1, value_2); // Throws
 
     if (top.size() >= 8) {
-        if (ref_type sync_history_ref = top.get_as_ref(7)) {
+        REALM_ASSERT(top.size() >= 9);
+        if (ref_type history_ref = top.get_as_ref(8)) {
             Allocator& alloc = top.get_alloc();
-            ref_type new_sync_history_ref =
-                Array::write(sync_history_ref, alloc, *this, only_if_modified); // Throws
-            int_fast64_t value_3 = int_fast64_t(new_sync_history_ref); // FIXME: Problematic unsigned -> signed conversion
-            top.set(7, value_3); // Throws
+            ref_type new_history_ref =
+                Array::write(history_ref, alloc, *this, only_if_modified); // Throws
+            int_fast64_t value_3 = int_fast64_t(new_history_ref); // FIXME: Problematic unsigned -> signed conversion
+            top.set(8, value_3); // Throws
         }
     }
 

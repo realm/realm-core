@@ -20,6 +20,7 @@
 #include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/history.hpp>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -130,28 +131,27 @@ REALM_TABLE_1(TestTableInts,
                 first,  Int)
 
 
-class ShortCircuitHistory: public TrivialReplication, public _impl::ContinTransactHistory {
+class ShortCircuitHistory: public TrivialReplication, public _impl::History {
 public:
-    using version_type = _impl::ContinTransactHistory::version_type;
+    using version_type = _impl::History::version_type;
 
     ShortCircuitHistory(const std::string& database_file):
         TrivialReplication(database_file)
     {
     }
 
-    ~ShortCircuitHistory() noexcept
-    {
-    }
-
-    void prepare_changeset(const char* data, size_t size, Replication::version_type new_version) override
+    version_type prepare_changeset(const char* data, size_t size,
+                                   version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data+size, m_incoming_changeset.data());
+        version_type new_version = orig_version + 1;
         m_incoming_version = new_version;
         // Allocate space for the new changeset in m_changesets such that we can
         // be sure no exception will be thrown whan adding the changeset in
         // finalize_changeset().
         m_changesets[new_version]; // Throws
+        return new_version;
     }
 
     void finalize_changeset() noexcept override
@@ -161,16 +161,24 @@ public:
         m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
     }
 
-    _impl::ContinTransactHistory* get_history() override
+    HistoryType get_history_type() const noexcept override
+    {
+        return hist_OutOfRealm;
+    }
+
+    _impl::History* get_history() override
     {
         return this;
     }
 
-
-    void refresh_accessor_tree(ref_type hist_ref) override
+    void update_early_from_top_ref(version_type, size_t, ref_type) override
     {
-        REALM_ASSERT(hist_ref == 0);
-        static_cast<void>(hist_ref);
+        // No-op
+    }
+
+    void update_from_parent(version_type) override
+    {
+        // No-op
     }
 
     void get_changesets(version_type begin_version, version_type end_version,
@@ -187,11 +195,23 @@ public:
         }
     }
 
+    void set_oldest_bound_version(version_type) override
+    {
+        // No-op
+    }
+
     BinaryData get_uncommitted_changes() noexcept override
     {
         REALM_ASSERT(false);
         return BinaryData(); // FIXME: Not yet implemented
     }
+
+#ifdef REALM_DEBUG
+    void verify() const override
+    {
+        // No-op
+    }
+#endif
 
 private:
     Buffer<char> m_incoming_changeset;
@@ -2007,7 +2027,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist,SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
     SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
@@ -10654,6 +10674,7 @@ TEST(LangBindHelper_RollbackToInitialState2)
     sg_w.rollback();
 }
 
+
 TEST(LangBindHelper_Compact)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -10698,6 +10719,7 @@ TEST(LangBindHelper_Compact)
     }
 }
 
+
 TEST(LangBindHelper_CompactLargeEncryptedFile)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -10736,6 +10758,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         sg.close();
     }
 }
+
 
 TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 {
@@ -10784,6 +10807,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     CHECK_EQUAL(0, min);
     CHECK_EQUAL(not_found, ndx);
 }
+
 
 // Tests handover of a Query. Especially it tests if next-gen-syntax nodes are deep copied correctly by
 // executing an imported query multiple times in parallel
@@ -10909,6 +10933,299 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     end_signal = true;
     for (int i = 0; i != threads; ++i)
         slaves[i].join();
+}
+
+
+TEST(LangBindHelper_SessionHistoryConsistency)
+{
+    // Check that we can reliably detect inconsist history
+    // types across concurrent session participants.
+
+    // Errors of this kind are considered as incorrect API usage, and will lead
+    // to throwing of LogicError exceptions.
+
+    SHARED_GROUP_TEST_PATH(path);
+
+    // When starting with an empty Realm, all history types are allowed, but all
+    // session participants must still agree
+    {
+        // No history
+        SharedGroup sg(path);
+
+        // Out-of-Realm history
+        std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+                          LogicError::mixed_history_type);
+    }
+}
+
+
+TEST(LangBindHelper_InRealmHistory_Basics)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist = make_in_realm_history(path);
+    std::unique_ptr<Replication> hist_w = make_in_realm_history(path);
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Try to advance without anything having happened
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(0, group.size());
+
+    // Try to advance after an empty write transaction
+    {
+        WriteTransaction wt(sg_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(0, group.size());
+
+    // Try to advance after a superfluous rollback
+    {
+        WriteTransaction wt(sg_w);
+        // Implicit rollback
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(0, group.size());
+
+    // Try to advance after a propper rollback
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("bad");
+        // Implicit rollback
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(0, group.size());
+
+    // Create a table via the other SharedGroup
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("foo");
+        foo_w->add_column(type_Int, "i");
+        foo_w->add_empty_row();
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(1, group.size());
+    ConstTableRef foo = group.get_table("foo");
+    CHECK_EQUAL(1, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(1, foo->size());
+    CHECK_EQUAL(0, foo->get_int(0,0));
+    uint_fast64_t version = foo->get_version_counter();
+
+    // Modify the table via the other SharedGroup
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.get_table("foo");
+        foo_w->add_column(type_String, "s");
+        foo_w->add_empty_row();
+        foo_w->set_int(0, 0, 1);
+        foo_w->set_int(0, 1, 2);
+        foo_w->set_string(1, 0, "a");
+        foo_w->set_string(1, 1, "b");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    CHECK(version != foo->get_version_counter());
+    group.verify();
+    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(2, foo->size());
+    CHECK_EQUAL(1, foo->get_int(0,0));
+    CHECK_EQUAL(2, foo->get_int(0,1));
+    CHECK_EQUAL("a", foo->get_string(1,0));
+    CHECK_EQUAL("b", foo->get_string(1,1));
+    CHECK_EQUAL(foo, group.get_table("foo"));
+
+    // Again, with no change
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(2, foo->size());
+    CHECK_EQUAL(1, foo->get_int(0,0));
+    CHECK_EQUAL(2, foo->get_int(0,1));
+    CHECK_EQUAL("a", foo->get_string(1,0));
+    CHECK_EQUAL("b", foo->get_string(1,1));
+    CHECK_EQUAL(foo, group.get_table("foo"));
+
+    // Perform several write transactions before advancing the read transaction
+    {
+        WriteTransaction wt(sg_w);
+        TableRef bar_w = wt.add_table("bar");
+        bar_w->add_column(type_Int, "a");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_w);
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_w);
+        TableRef bar_w = wt.get_table("bar");
+        bar_w->add_column(type_Float, "b");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_w);
+        // Implicit rollback
+    }
+    {
+        WriteTransaction wt(sg_w);
+        TableRef bar_w = wt.get_table("bar");
+        bar_w->add_column(type_Double, "c");
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(2, group.size());
+    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(2, foo->size());
+    CHECK_EQUAL(1, foo->get_int(0,0));
+    CHECK_EQUAL(2, foo->get_int(0,1));
+    CHECK_EQUAL("a", foo->get_string(1,0));
+    CHECK_EQUAL("b", foo->get_string(1,1));
+    CHECK_EQUAL(foo, group.get_table("foo"));
+    ConstTableRef bar = group.get_table("bar");
+    CHECK_EQUAL(3, bar->get_column_count());
+    CHECK_EQUAL(type_Int,    bar->get_column_type(0));
+    CHECK_EQUAL(type_Float,  bar->get_column_type(1));
+    CHECK_EQUAL(type_Double, bar->get_column_type(2));
+
+    // Clear tables
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.get_table("foo");
+        foo_w->clear();
+        TableRef bar_w = wt.get_table("bar");
+        bar_w->clear();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(2, group.size());
+    CHECK(foo->is_attached());
+    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(0, foo->size());
+    CHECK(bar->is_attached());
+    CHECK_EQUAL(3, bar->get_column_count());
+    CHECK_EQUAL(type_Int,    bar->get_column_type(0));
+    CHECK_EQUAL(type_Float,  bar->get_column_type(1));
+    CHECK_EQUAL(type_Double, bar->get_column_type(2));
+    CHECK_EQUAL(0, bar->size());
+    CHECK_EQUAL(foo, group.get_table("foo"));
+    CHECK_EQUAL(bar, group.get_table("bar"));
+}
+
+
+TEST(LangBindHelper_InRealmHistory_Upgrade)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    {
+        // Out-of-Realm history
+        std::unique_ptr<Replication> hist = make_client_history(path_1, crypt_key());
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    {
+        // In-Realm history
+        std::unique_ptr<Replication> hist = make_in_realm_history(path_1);
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    SHARED_GROUP_TEST_PATH(path_2);
+    {
+        // No history
+        SharedGroup sg(path_2);
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    {
+        // In-Realm history
+        std::unique_ptr<Replication> hist = make_in_realm_history(path_2);
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+}
+
+
+TEST(LangBindHelper_InRealmHistory_Downgrade)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // In-Realm history
+        std::unique_ptr<Replication> hist = make_in_realm_history(path);
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    {
+        // No history
+        CHECK_THROW(SharedGroup(path), InvalidDatabase);
+    }
+    {
+        // Out-of-Realm history
+        std::unique_ptr<Replication> hist = make_client_history(path, crypt_key());
+        CHECK_THROW(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+                    InvalidDatabase);
+    }
+}
+
+
+TEST(LangBindHelper_InRealmHistory_SessionConsistency)
+{
+    // Check that we can reliably detect inconsist history
+    // types across concurrent session participants.
+
+    // Errors of this kind are considered as incorrect API usage, and will lead
+    // to throwing of LogicError exceptions.
+
+    SHARED_GROUP_TEST_PATH(path);
+
+    // When starting with an empty Realm, all history types are allowed, but all
+    // session participants must still agree
+    {
+        // No history
+        SharedGroup sg(path);
+
+        // In-Realm history
+        std::unique_ptr<Replication> hist = make_in_realm_history(path);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+                          LogicError::mixed_history_type);
+    }
+    // The Realm is still at its initial empty state
+    {
+        // Out-of-Realm history
+        std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+        // In-Realm history
+        std::unique_ptr<Replication> hist_2 = make_in_realm_history(path);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroup::durability_Full, crypt_key()),
+                          LogicError::mixed_history_type);
+    }
 }
 
 #endif

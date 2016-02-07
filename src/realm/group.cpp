@@ -40,14 +40,26 @@ void Group::upgrade_file_format()
 {
     REALM_ASSERT(is_attached());
 
-    // SlabAlloc::validate_buffer() ensures this
-    REALM_ASSERT_RELEASE(m_alloc.get_committed_file_format() == 2);
-    REALM_ASSERT_RELEASE(m_alloc.m_file_format == 2);
-    REALM_ASSERT_RELEASE(SlabAlloc::library_file_format == 3);
+    // Please revisit the following upgrade logic when library_file_format is
+    // bumped beyond 4
+    REALM_ASSERT(SlabAlloc::library_file_format == 4);
 
-    for (size_t t = 0; t < m_tables.size(); t++) {
-        TableRef table = get_table(t);
-        table->upgrade_file_format();
+    int file_format_version = get_file_format();
+
+    // SlabAlloc::validate_buffer() must ensure this
+    REALM_ASSERT(file_format_version >= 2 && file_format_version < 4);
+
+    // Upgrade from 2 to 3
+    if (file_format_version <= 2) {
+        for (size_t t = 0; t < m_tables.size(); t++) {
+            TableRef table = get_table(t);
+            table->upgrade_file_format();
+        }
+    }
+
+    // Upgrade from 3 to 4
+    if (file_format_version <= 3) {
+        // No-op
     }
 }
 
@@ -185,7 +197,7 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
             REALM_ASSERT_11(top_size, ==, 3, ||, top_size, ==, 5, ||, top_size, ==, 7);
         }
         else {
-            REALM_ASSERT_3(top_size, ==, 8);
+            REALM_ASSERT_3(top_size, ==, 9);
         }
 
         m_table_names.init_from_parent();
@@ -1025,7 +1037,9 @@ private:
 // transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
-    TransactAdvancer(Group& group, bool& schema_changed) : m_group(group), m_schema_changed(schema_changed)
+    TransactAdvancer(Group& group, bool& schema_changed):
+        m_group(group),
+        m_schema_changed(schema_changed)
     {
     }
 
@@ -1807,6 +1821,17 @@ void Group::verify() const
         }
     }
 
+    // Verify history if present
+    if (Replication* repl = get_replication()) {
+        if (_impl::History* hist = repl->get_history()) {
+            _impl::History::version_type version = 0;
+            int history_type = 0;
+            get_version_and_history_type(m_top, version, history_type);
+            hist->update_from_parent(version);
+            hist->verify();
+        }
+    }
+
     size_t logical_file_size = to_size_t(m_top.get(2) / 2);
     size_t ref_begin = sizeof (SlabAlloc::Header);
     ref_type immutable_ref_end = logical_file_size;
@@ -1822,7 +1847,8 @@ void Group::verify() const
     // marked as free before the file was opened.
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
-        REALM_ASSERT(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7);
+        REALM_ASSERT(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 ||
+                     m_top.size() == 9);
         Allocator& alloc = m_top.get_alloc();
         ArrayInteger pos(alloc), len(alloc), ver(alloc);
         size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;

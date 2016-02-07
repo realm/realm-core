@@ -22,24 +22,52 @@
 #define REALM_IMPL_HISTORY_HPP
 
 #include <stdint.h>
+#include <memory>
 
-#include <realm/binary_data.hpp>
-#include <realm/alloc.hpp>
+#include <realm/column_binary.hpp>
 
 namespace realm {
+
+class Group;
+
 namespace _impl {
 
 
 /// Read-only access to history of changesets as needed to enable continuous
 /// transactions.
-class ContinTransactHistory {
+class History {
 public:
     using version_type = uint_fast64_t;
 
-    /// May be called during, or at the beginning of a transaction to gain
-    /// access to the history of changesets preceeding the snapshot that is
-    /// bound to that transaction.
-    virtual void refresh_accessor_tree(ref_type hist_ref) = 0;
+    /// May be called during a read transaction to gain early access to the
+    /// history as it appears in a new snapshot that succeeds the one bound in
+    /// the current read transaction.
+    ///
+    /// May also be called at other times as long as the caller owns a read lock
+    /// (SharedGroup::grab_read_lock()) on the Realm for the specified file size
+    /// and top ref, and the allocator is in a 'free space clean' state
+    /// (SlabAlloc::is_free_space_clean()).
+    ///
+    /// This function may cause a remapping of the Realm file
+    /// (SlabAlloc::remap()) if it needs to make the new snapshot fully visible
+    /// in memory.
+    ///
+    /// Note that this method of gaining early access to the history in a new
+    /// snaphot only gives read access. It does not allow for modifications of
+    /// the history or any other part of the new snapshot. For modifications to
+    /// be allowed, `Group::m_top` (the parent of the history) would first have
+    /// to be updated to reflect the new snapshot, but at that time we are no
+    /// longer in an 'early access' situation.
+    ///
+    /// This is not a problem from the point of view of this history interface,
+    /// as it only contains methods for reading from the history, but some
+    /// implementations will want to also provide for ways to modify the
+    /// history, but in those cases, modifications must occur only after the
+    /// Group accessor has been fully updated to reflect the new snapshot.
+    virtual void update_early_from_top_ref(version_type new_version, size_t new_file_size,
+                                           ref_type new_top_ref) = 0;
+
+    virtual void update_from_parent(version_type current_version) = 0;
 
     /// Get all changesets between the specified versions. References to those
     /// changesets will be made availble in successive entries of `buffer`. The
@@ -64,11 +92,34 @@ public:
     ///
     /// This function may be called only during a transaction (prior to
     /// initiation of commit operation), and only after a successfull invocation
-    /// of refresh_accessor_tree(). In that case, the caller may assume that the
-    /// memory references stay valid for the remainder of the transaction (up
-    /// until initiation of the commit operation).
+    /// of update_early_from_top_ref(). In that case, the caller may assume that
+    /// the memory references stay valid for the remainder of the transaction
+    /// (up until initiation of the commit operation).
     virtual void get_changesets(version_type begin_version, version_type end_version,
                                 BinaryData* buffer) const noexcept = 0;
+
+    /// \brief Specify the version of the oldest bound snapshot.
+    ///
+    /// This function must be called by the associated SharedGroup object during
+    /// each successfully comitted write transaction.
+    ///
+    /// The caller must pass the version (\a version) of the oldest snapshot
+    /// that is currently (or was recently) bound through a transaction of the
+    /// current session. This gives the history implementation an opportunity to
+    /// trim off leading (early) history entries.
+    ///
+    /// Specifically, the caller must guarantee that the passed version (\a
+    /// version) is less than or equal to `begin_version` in all future
+    /// invocations of get_changesets().
+    ///
+    /// The caller is allowed to pass a version that is less than the version
+    /// passed in a preceeding invocation.
+    ///
+    /// This function should be called as late as possible, to maximize the
+    /// trimming opportunity, but at a time where the write transaction is still
+    /// open for additional modifications. This is necessary because some types
+    /// of histories are stored inside the Realm file.
+    virtual void set_oldest_bound_version(version_type version) = 0;
 
     /// Get the list of uncommited changes accumulated so far in the current
     /// write transaction.
@@ -82,8 +133,132 @@ public:
     /// until initiation of the commit operation).
     virtual BinaryData get_uncommitted_changes() noexcept = 0;
 
-    virtual ~ContinTransactHistory() noexcept {}
+#ifdef REALM_DEBUG
+    virtual void verify() const = 0;
+#endif
+
+    virtual ~History() noexcept {}
 };
+
+
+/// This class is intended to eventually become a basis for implementing the
+/// Replication API for the purpose of supporting continuous transactions. That
+/// is, its purpose is to replace the current implementation in commit_log.cpp,
+/// which places the history in separate files.
+///
+/// It is also intended to be used as a base class for an extended sync-enabled
+/// history.
+///
+/// By ensuring that the root node of the history is correctly configured with
+/// Group::m_top as its parent, this class allows for modifications of the
+/// history as long as those modifications happen after the remainder of the
+/// Group accessor is updated to reflect the new snapshot (see
+/// History::update_early_from_top_ref()).
+class InRealmHistory: public History {
+public:
+    void initialize(Group&);
+
+    /// Must never be called more than once per transaction. Returns the version
+    /// produced by the added changeset.
+    version_type add_changeset(BinaryData);
+
+    void update_early_from_top_ref(version_type, size_t, ref_type) override;
+    void update_from_parent(version_type) override;
+    void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
+    void set_oldest_bound_version(version_type) override;
+
+#ifdef REALM_DEBUG
+    void verify() const override;
+#endif
+
+private:
+    Group* m_group = 0;
+
+    /// Version on which the first changeset in the history is based, or if the
+    /// history is empty, the version associatede with currently bound
+    /// snapshot. In general, the version associatede with currently bound
+    /// snapshot is equal to `m_base_version + m_size`, but after
+    /// add_changeset() is called, it is equal to one minus that.
+    version_type m_base_version;
+
+    /// Current number of entries in the history. A cache of
+    /// `m_changesets->size()`.
+    size_t m_size;
+
+    /// A list of changesets, one for each entry in the history. If null, the
+    /// history is empty.
+    ///
+    /// FIXME: Ideally, the B+tree accessor below should have been just
+    /// Bptree<BinaryData>, but Bptree<BinaryData> seems to not allow that yet.
+    ///
+    /// FIXME: The memory-wise indirection is an unfortunate consequence of the
+    /// fact that it is impossible to construct a BinaryColumn without already
+    /// having a ref to a valid underlying node structure. This, in turn, is an
+    /// unfortunate consequence of the fact that a column accessor contains a
+    /// dynamicalle allocated root node accessor, and the type of the required
+    /// root node accessor depends on the size of the B+-tree.
+    std::unique_ptr<BinaryColumn> m_changesets;
+
+    void update_from_ref(ref_type, version_type);
+};
+
+
+/*
+/// This class is intended to eventually become a basis for implementing the
+/// Replication API for the purpose of supporting continuous transactions. That
+/// is, its purpose is to replace the current implementation in commit_log.cpp,
+/// which places the history in separate files.
+///
+/// It is also intended to be used as a base class for an extended sync-enabled
+/// history.
+///
+/// By ensuring that the root node of the history is correctly configured with
+/// Group::m_top as its parent, this class allows for modifications of the
+/// history as long as those modifications happen after the remainder of the
+/// Group accessor is updated to reflect the new snapshot (see
+/// History::update_early_from_top_ref()).
+class SyncHistory: public History {
+public:
+    InRealmHistory(Group&);
+    void update_early_from_top_ref(size_t, ref_type) override;
+    void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
+
+    void update_from_parent();
+    version_type add_changeset(BinaryData);
+
+protected:
+    Group& m_group;
+
+    /// Root node of the history. Unattached if Group::m_top contains a
+    /// null-ref.
+    ///
+    ///     slot  value
+    ///     --------------------------------
+    ///     1st   m_first_version_in_history
+    ///     2nd   m_changesets
+    ///
+    Array m_top;
+
+    /// Version produced by first entry in history, or zero if the history is
+    /// empty.
+    ///
+    /// Undefined value if m_top is detached.
+    version_type m_first_version_in_history;
+
+    /// A list of changesets, one for each entry in the history.
+    ///
+    /// FIXME: Ideally, the B+tree accessor below should have been just
+    /// Bptree<BinaryData>, but Bptree<BinaryData> seems to not allow that yet.
+    ///
+    /// FIXME: The memory-wise indirection is an unfortunate consequence of the
+    /// fact that it is impossible to construct a BinaryColumn without already
+    /// having a ref to a valid underlying node structure. This, in turn, is an
+    /// unfortunate side effect of the fact that a column accessor contains a
+    /// root node accessor, and the type of the required root node accessor
+    /// varies depending on the size of the B+-tree.
+    std::unique_ptr<BinaryColumn> m_changesets;
+};
+*/
 
 
 } // namespace _impl

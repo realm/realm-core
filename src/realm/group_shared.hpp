@@ -30,7 +30,6 @@
 #include <realm/util/platform_specific_condvar.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
-#include <realm/impl/history.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/replication.hpp>
 
@@ -271,7 +270,7 @@ public:
 #endif // !REALM_PLATFORM_APPLE
     // Transactions:
 
-    using version_type = _impl::ContinTransactHistory::version_type;
+    using version_type = _impl::History::version_type;
 
     struct VersionID {
         version_type version = std::numeric_limits<version_type>::max();
@@ -322,7 +321,7 @@ public:
     ///
     /// end_read() terminates the active read transaction. If no read
     /// transaction is active, end_read() does nothing. It is an error to call
-    /// this function on a SharedGRoup object with an active write
+    /// this function on a SharedGroup object with an active write
     /// transaction. end_read() does not throw.
     ///
     /// commit() commits all changes performed in the context of the active
@@ -606,12 +605,12 @@ private:
     template<class O> void rollback_and_continue_as_read(O* observer);
     //@}
 
-    template<class O> void do_advance_read(O* observer, VersionID, _impl::ContinTransactHistory&);
+    template<class O> void do_advance_read(O* observer, VersionID, _impl::History&);
 
-    /// If there is an assocoated \ref Replication object, then this function
+    /// If there is an associated \ref Replication object, then this function
     /// returns `repl->get_history()` where `repl` is that Replication object,
     /// otherwise this function returns null.
-    _impl::ContinTransactHistory* get_history();
+    _impl::History* get_history();
 
     int get_file_format() const noexcept;
 
@@ -787,11 +786,15 @@ inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
     // it must leave the file closed.
 
     REALM_ASSERT(!is_attached());
+
+    repl.initialize(*this); // Throws
+
+    typedef _impl::GroupFriend gf;
+    gf::set_replication(m_group, &repl);
+
     std::string file = repl.get_database_path();
     bool no_create   = false;
     bool is_backend  = false;
-    typedef _impl::GroupFriend gf;
-    gf::set_replication(m_group, &repl);
     do_open_1(file, no_create, durability, is_backend, encryption_key,
               allow_file_format_upgrade); // Throws
 }
@@ -898,7 +901,7 @@ inline void SharedGroup::advance_read(O* observer, VersionID version_id)
     if (version_id.version < m_read_lock.m_version)
         throw LogicError(LogicError::bad_version);
 
-    _impl::ContinTransactHistory* hist = get_history(); // Throws
+    _impl::History* hist = get_history(); // Throws
     if (!hist)
         throw LogicError(LogicError::no_history);
 
@@ -911,7 +914,7 @@ inline void SharedGroup::promote_to_write(O* observer)
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    _impl::ContinTransactHistory* hist = get_history(); // Throws
+    _impl::History* hist = get_history(); // Throws
     if (!hist)
         throw LogicError(LogicError::no_history);
 
@@ -923,7 +926,8 @@ inline void SharedGroup::promote_to_write(O* observer)
         Replication* repl = m_group.get_replication();
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         version_type current_version = m_read_lock.m_version;
-        repl->initiate_transact(*this, current_version); // Throws
+        bool history_updated = true;
+        repl->initiate_transact(current_version, history_updated); // Throws
 
         // If the group has no top array (top_ref == 0), create a new node
         // structure for an empty group now, to be ready for modifications. See
@@ -945,7 +949,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    _impl::ContinTransactHistory* hist = get_history(); // Throws
+    _impl::History* hist = get_history(); // Throws
     if (!hist)
         throw LogicError(LogicError::no_history);
 
@@ -980,15 +984,15 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 
     Replication* repl = gf::get_replication(m_group);
     REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
-    repl->abort_transact(*this);
+    repl->abort_transact();
 
     m_transact_stage = transact_Reading;
 }
 
 template<class O>
-inline void SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::ContinTransactHistory& hist)
+inline void SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist)
 {
-    util::LockGuard lg(m_handover_lock); // FIXME: Finn, is this the right place to grab a lock on m_handover_lock?
+    util::LockGuard lg(m_handover_lock);
     ReadLockInfo new_read_lock;
     grab_read_lock(new_read_lock, version_id); // Throws
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
@@ -999,19 +1003,15 @@ inline void SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
 
     ReadLockUnlockGuard g(*this, new_read_lock);
     {
-        // FIXME: Can this entire block be done inside a virtual function that replaces (or still is) ContinTransactHistory::refresh_accessor_tree()?
-        using gf = _impl::GroupFriend;
+        version_type new_version = new_read_lock.m_version;
         size_t new_file_size = new_read_lock.m_file_size;
-        gf::remap(m_group, new_file_size);
-        Allocator& alloc = gf::get_alloc(m_group);
-        ref_type top_ref = new_read_lock.m_top_ref;
-        ref_type hist_ref = gf::get_sync_history_ref(alloc, top_ref);
-        hist.refresh_accessor_tree(hist_ref); // Throws
+        ref_type new_top_ref = new_read_lock.m_top_ref;
+        hist.update_early_from_top_ref(new_version, new_file_size, new_top_ref); // Throws
     }
 
     if (observer) {
-        // This has to happen within the original snapshot and while it is still
-        // in a fully functional state.
+        // This has to happen in the context of the originally bound snapshot
+        // and while the read transaction is still in a fully functional state.
         _impl::TransactLogParser parser;
         version_type old_version = m_read_lock.m_version;
         version_type new_version = new_read_lock.m_version;
@@ -1020,14 +1020,15 @@ inline void SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         observer->parse_complete(); // Throws
     }
 
-    // The old read lock must be retaind for as long as the history of
-    // changesets is accessed (until Group::advance_transact() returns). This
-    // ensures that the oldest needed changeset remains in the history, even
-    // when the history is implemented as a separate unversioned entity outside
-    // the Realm (i.e., the old implementation). On the other hand, if, in the
-    // future, it can be assumed, that the history is always implemented as a
-    // versioned entity, that is part of the Realm state, then it will no longer
-    // be necessary to retain the old read lock beyond this point.
+    // The old read lock must be retaind for as long as the change history is
+    // accessed (until Group::advance_transact() returns). This ensures that the
+    // oldest needed changeset remains in the history, even when the history is
+    // implemented as a separate unversioned entity outside the Realm (i.e., the
+    // old implementation and ShortCircuitHistory in
+    // test_lang_Bind_helper.cpp). On the other hand, if it had been the case,
+    // that the history was always implemented as a versioned entity, that was
+    // part of the Realm state, then it would not have been necessary to retain
+    // the old read lock beyond this point.
 
     {
         version_type old_version = m_read_lock.m_version;
@@ -1049,18 +1050,26 @@ inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
     // that is ok, because the condition is later rechecked in a fully reliable
     // way inside a transaction.
 
-    // Please revisit upgrade logic when library_file_format is bumped beyond 3
-    REALM_ASSERT(SlabAlloc::library_file_format == 3);
-
     // First a non-threadsafe but fast check
     int file_format = m_group.get_file_format();
     REALM_ASSERT(file_format <= SlabAlloc::library_file_format);
     bool upgrade = (file_format < SlabAlloc::library_file_format);
     if (upgrade) {
 
+        // FIXME: Is there any way we can get rid of this sleep? Is seems
+        // unreasonable that we allow a sleep just to make a unit test work.
+
+        // FIXME: Judging from the comment in the mentioned unit test
+        // (Upgrade_Database_2_3_Writes_New_File_Format_new), the sleep is
+        // necessary to make the regular upgrade mechanics work. This seems very
+        // bizarre. If the test really can fail without the sleep, then it seems
+        // like it must be due to an unhandled race condition, and one that is
+        // not properly fixed by the sleep.
+
 #ifdef REALM_DEBUG
-        // Sleep 0.2 seconds to create a simple thread-barrier for the two threads in the
-        // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test. See the unit test for details.
+        // Sleep 0.2 seconds to create a simple thread-barrier for the two
+        // threads in the TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
+        // unit test. See the unit test for details.
 #ifdef _WIN32
         _sleep(200);
 #else
@@ -1078,17 +1087,27 @@ inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
         // value.
 
         WriteTransaction wt(*this);
-        if (m_group.get_committed_file_format() != SlabAlloc::library_file_format) {
+        int file_format_2 = m_group.get_committed_file_format();
+        // The file must either still be at its initial version (file_format) or
+        // have been upgraded already (SlabAlloc::library_file_format) via a
+        // concurrent SharedGroup object.
+        REALM_ASSERT(file_format_2 == file_format ||
+                     file_format_2 == SlabAlloc::library_file_format);
+        bool upgrade_2 = (file_format_2 < SlabAlloc::library_file_format);
+        if (upgrade_2) {
             if (!allow_file_format_upgrade)
                 throw FileFormatUpgradeRequired();
             m_group.upgrade_file_format(); // Throws
+            // Note: The file format specified in the Realm file is updated to
+            // SlabAlloc::library_file_format as part of the following commit
+            // operation. This happens in GroupWriter::commit().
             commit(); // Throws
             m_group.set_file_format(SlabAlloc::library_file_format);
         }
     }
 }
 
-inline _impl::ContinTransactHistory* SharedGroup::get_history()
+inline _impl::History* SharedGroup::get_history()
 {
     using gf = _impl::GroupFriend;
     if (Replication* repl = gf::get_replication(m_group))

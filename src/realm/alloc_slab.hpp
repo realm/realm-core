@@ -60,16 +60,26 @@ class SlabAlloc: public Allocator {
 public:
     /// File format versions:
     ///
-    ///   1   Initial file format version
+    ///   1 Initial file format version
     ///
-    ///   2   FIXME: Does anybody remember what happened here?
+    ///   2 FIXME: Does anybody remember what happened here?
     ///
-    ///   3   Supporting null on string columns broke the file format in following way: Index appends an 'X'
-    ///       character to all strings except the null string, to be able to distinguish between null and
-    ///       empty string.
-
-    // Bumped to 3 because of null support of String columns and because of new format of index
-    static constexpr int library_file_format = 3;
+    ///   3 Supporting null on string columns broke the file format in following
+    ///     way: Index appends an 'X' character to all strings except the null
+    ///     string, to be able to distinguish between null and empty
+    ///     string. Bumped to 3 because of null support of String columns and
+    ///     because of new format of index.
+    ///
+    ///   4 Introduction of optional in-Realm history of changes (additional
+    ///     entries in Group::m_top). Since this change is not forward
+    ///     compatible, the file format version had to be bumped. This change is
+    ///     implemented in a way that achieves backwards compatibility with
+    ///     version 3 (and in turn with version 2).
+    ///
+    /// IMPORTANT: When bumping the file format version, be sure to review the
+    /// file validity checks in validate_buffer(), and the upgrade logic in
+    /// Group::upgrade_file_format().
+    static constexpr int library_file_format = 4;
 
     ~SlabAlloc() noexcept override;
     SlabAlloc();
@@ -79,7 +89,6 @@ public:
         bool read_only = false;
         bool no_create = false;
         bool skip_validate = false;
-        bool server_sync_mode = false;
         bool session_initiator = false;
         bool clear_file = false;
         const char* encryption_key = nullptr;
@@ -115,12 +124,6 @@ public:
     ///
     /// \param encryption_key 32-byte key to use to encrypt and decrypt
     /// the backing storage, or nullptr to disable encryption.
-    ///
-    /// \param server_sync_mode bool indicating whether the database is operated
-    /// in server_synchronization mode or not. If the database is created,
-    /// this setting is stored in it. If the database exists already, it is validated
-    /// that the database was created with the same setting. In case of conflict
-    /// a runtime_error is thrown.
     ///
     /// \param session_initiator if set, the caller is the session initiator and
     /// guarantees exclusive access to the file. If attaching in read/write mode,
@@ -317,8 +320,7 @@ private:
 
     // Values of each used bit in m_flags
     enum {
-        flags_SelectBit = 1,
-        flags_ServerSyncMode = 2
+        flags_SelectBit = 1
     };
 
     // 24 bytes
@@ -329,10 +331,6 @@ private:
         uint8_t m_file_format[2]; // See `library_file_format`
         uint8_t m_reserved;
         // bit 0 of m_flags is used to select between the two top refs.
-        // bit 1 of m_flags is to be set for persistent commit-logs (Sync support).
-        // when clear, the commit-logs will be removed at the end of a session.
-        // when set, the commmit-logs are persisted, and IFF the database exists
-        // already at the start of a session, the commit logs too must exist.
         uint8_t m_flags;
     };
 

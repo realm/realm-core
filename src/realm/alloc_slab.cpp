@@ -412,7 +412,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
             REALM_ASSERT_DEBUG(map->get_addr() != nullptr);
             addr = map->get_addr() + section_offset;
         }
-        realm::util::encryption_read_barrier(addr, Array::header_size, 
+        realm::util::encryption_read_barrier(addr, Array::header_size,
                                              map->get_encrypted_mapping(),
                                              Array::get_byte_size_from_header);
     }
@@ -575,20 +575,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         if (did_create) {
             File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
-            Header& header = *writable_map.get_addr();
+            // FIXME: Finn, what of this is actually needed? Note that the
+            // sync-mode bit setting logic was removved from between the next
+            // two lines (from between the read and write barriers).
             realm::util::encryption_read_barrier(writable_map, 0);
-            header.m_flags |= cfg.server_sync_mode ? flags_ServerSyncMode : 0x0;
             realm::util::encryption_write_barrier(writable_map, 0);
-        }
-        else {
-            const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
-            bool stored_server_sync_mode = (header.m_flags & flags_ServerSyncMode) != 0;
-            if (cfg.server_sync_mode &&  !stored_server_sync_mode)
-                throw InvalidDatabase("Specified Realm file was not created with support for "
-                                      "client/server synchronization", path);
-            if (!cfg.server_sync_mode &&  stored_server_sync_mode)
-                throw InvalidDatabase("Specified Realm file requires support for client/server "
-                                      "synchronization", path);
         }
 
         {
@@ -607,9 +598,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             }
         }
 
-        m_data        = map.get_addr();
+        m_data = map.get_addr();
         m_initial_mapping = std::move(map);
-        m_baseline    = size;
+        m_baseline = size;
         m_initial_mapping_size = size;
         m_first_additional_mapping = get_section_index(m_initial_mapping_size);
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
@@ -650,7 +641,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             writable_header.m_top_ref[1] = footer.m_top_ref;
             realm::util::encryption_write_barrier(writable_map, 0);
             writable_map.sync();
-            // keep bit 1 used for server sync mode unchanged
             realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_flags |= flags_SelectBit;
             realm::util::encryption_write_barrier(writable_map, 0);
@@ -744,9 +734,9 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
     int file_format = int(header.m_file_format[select_field]);
     bool bad_file_format = (file_format != library_file_format);
 
-    // As a special case, allow upgrading from version 2 to 3, but only when
-    // accessed through SharedGroup.
-    if (file_format == 2 && library_file_format == 3 && is_shared)
+    // As a special case, allow upgrading from version 2 or 3 to version 4, but
+    // only when accessed through SharedGroup.
+    if ((file_format == 2 || file_format == 3) && library_file_format == 4 && is_shared)
         bad_file_format = false;
 
     if (REALM_UNLIKELY(bad_file_format))
@@ -904,7 +894,7 @@ size_t SlabAlloc::compute_section_base(size_t index) const noexcept
     return base;
 }
 
-size_t SlabAlloc::find_section_in_range(size_t start_pos, 
+size_t SlabAlloc::find_section_in_range(size_t start_pos,
                                              size_t free_chunk_size,
                                              size_t request_size) const noexcept
 {

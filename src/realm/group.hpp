@@ -31,6 +31,7 @@
 #include <realm/exceptions.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/impl/output_stream.hpp>
+#include <realm/impl/history.hpp>
 #include <realm/table.hpp>
 #include <realm/table_basic_fwd.hpp>
 #include <realm/alloc_slab.hpp>
@@ -534,7 +535,8 @@ public:
 private:
     SlabAlloc m_alloc;
 
-    /// `m_top` is the root node of the Realm, and has the following layout:
+    /// `m_top` is the root node (or top array) of the Realm, and has the
+    /// following layout:
     ///
     /// <pre>
     ///
@@ -547,16 +549,22 @@ private:
     ///   5th   GroupWriter::m_free_lengths   (optional)
     ///   6th   GroupWriter::m_free_versions  (optional)
     ///   7th   Transaction number / version  (optional)
-    ///   8th   Synchronization history       (optional)
-    ///
+    ///   8th   In-Realm history type         (optional)
+    ///   9th   In-Realm history ref          (optional)
     ///
     /// </pre>
+    ///
+    /// The 'in-Realm history type' slot stores a value of
+    /// Replication::HistoryType, although never
+    /// Replication::hist_OutOfRealm. For more information about that, see
+    /// Replication::get_history_type().
     ///
     /// The first three entries are mandatory. In files created by
     /// Group::write(), none of the optional entries are present. In files
     /// updated by Group::commit(), the 4th and 5th entry is present. In files
     /// updated by way of a transaction (SharedGroup::commit()), the 4th, 5th,
-    /// 6th, and 7th entry is present.
+    /// 6th, and 7th entry is present. In files that contain a changeset
+    /// history, the 8th and 9th entry is present.
     ///
     /// When a group accessor is attached to a newly created file or an empty
     /// memory buffer where there is no top array yet, `m_top`, `m_tables`, and
@@ -567,8 +575,6 @@ private:
     Array m_top;
     ArrayInteger m_tables;
     ArrayString m_table_names;
-
-    static constexpr int s_sync_history_ndx_in_parent = 7;
 
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
@@ -684,8 +690,12 @@ private:
     void send_cascade_notification(const CascadeNotification& notification) const;
     void send_schema_change_notification() const;
 
-    static ref_type get_sync_history_ref(Allocator&, ref_type top_ref) noexcept;
-    void set_sync_history_parent(Array& sync_history_root);
+    static void get_version_and_history_type(const Array& top,
+                                             _impl::History::version_type& version,
+                                             int& history_type) noexcept;
+    static ref_type get_history_ref(const Array& top) noexcept;
+    void set_history_parent(Array& history_root) noexcept;
+    void prepare_history_parent(Array& history_root, int history_type);
 
     friend class Table;
     friend class GroupWriter;
@@ -1056,24 +1066,55 @@ inline void Group::send_schema_change_notification() const
         m_schema_change_handler();
 }
 
-inline ref_type Group::get_sync_history_ref(Allocator& alloc, ref_type top_ref) noexcept
+inline void Group::get_version_and_history_type(const Array& top,
+                                                _impl::History::version_type& version,
+                                                int& history_type) noexcept
 {
-    if (top_ref != 0) {
-        Array top(alloc);
-        top.init_from_ref(top_ref);
-        if (top.size() > s_sync_history_ndx_in_parent)
-            return top.get_as_ref(s_sync_history_ndx_in_parent);
+    _impl::History::version_type version_2 = 0;
+    int history_type_2 = 0;
+    if (top.is_attached()) {
+        if (top.size() >= 6) {
+            REALM_ASSERT(top.size() >= 7);
+            version_2 = _impl::History::version_type(top.get(6) / 2);
+        }
+        if (top.size() >= 8) {
+            REALM_ASSERT(top.size() >= 9);
+            history_type_2 = int(top.get(7) / 2);
+        }
+    }
+    // Version 0 is not a legal initial version, so it has to be set to 1
+    // instead.
+    if (version_2 == 0)
+        version_2 = 1;
+    version      = version_2;
+    history_type = history_type_2;
+}
+
+inline ref_type Group::get_history_ref(const Array& top) noexcept
+{
+    if (top.is_attached()) {
+        if (top.size() >= 8) {
+            REALM_ASSERT(top.size() >= 9);
+            return top.get_as_ref(8);
+        }
     }
     return 0;
- }
+}
 
-inline void Group::set_sync_history_parent(Array& sync_history_root)
+inline void Group::set_history_parent(Array& history_root) noexcept
 {
-    REALM_ASSERT(m_top.is_attached());
-    REALM_ASSERT(m_top.size() >= 3);
-    while (m_top.size() <= s_sync_history_ndx_in_parent)
+    history_root.set_parent(&m_top, 8);
+}
+
+inline void Group::prepare_history_parent(Array& history_root, int history_type)
+{
+    // Ensure that there are slots for both the history type and the history
+    // ref.
+    while (m_top.size() < 9)
         m_top.add(0); // Throws
-    sync_history_root.set_parent(&m_top, s_sync_history_ndx_in_parent);
+    int_fast64_t value = 1 + 2*int_fast64_t(history_type);
+    m_top.set(7, value); // Throws
+    set_history_parent(history_root);
 }
 
 class Group::TableWriter {
@@ -1225,14 +1266,37 @@ public:
             group.create_empty_group(); // Throws
     }
 
-    static ref_type get_sync_history_ref(Allocator& alloc, ref_type top_ref) noexcept
+    static void get_version_and_history_type(Allocator& alloc, ref_type top_ref,
+                                             _impl::History::version_type& version,
+                                             int& history_type) noexcept
     {
-        return Group::get_sync_history_ref(alloc, top_ref);
+        Array top(alloc);
+        if (top_ref != 0)
+            top.init_from_ref(top_ref);
+        Group::get_version_and_history_type(top, version, history_type);
     }
 
-    static void set_sync_history_parent(Group& group, Array& sync_history_root)
+    static ref_type get_history_ref(const Group& group) noexcept
     {
-        group.set_sync_history_parent(sync_history_root); // Throws
+        return Group::get_history_ref(group.m_top);
+    }
+
+    static ref_type get_history_ref(Allocator& alloc, ref_type top_ref) noexcept
+    {
+        Array top(alloc);
+        if (top_ref != 0)
+            top.init_from_ref(top_ref);
+        return Group::get_history_ref(top);
+    }
+
+    static void set_history_parent(Group& group, Array& history_root) noexcept
+    {
+        group.set_history_parent(history_root);
+    }
+
+    static void prepare_history_parent(Group& group, Array& history_root, int history_type)
+    {
+        group.prepare_history_parent(history_root, history_type); // Throws
     }
 };
 
