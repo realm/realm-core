@@ -1061,11 +1061,11 @@ inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
 #ifdef REALM_DEBUG
         // This sleep() only exists in order to increase the quality of the
         // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test.
-        // The unit test creates multiple threads that all call 
+        // The unit test creates multiple threads that all call
         // upgrade_file_format() simultaneously. This sleep() then acts like
         // a simple thread barrier that makes sure the threads meet here, to
         // increase the likelyhood of detecting any potential race problems.
-        See the unit test for details.
+        // See the unit test for details.
 #ifdef _WIN32
         _sleep(200);
 #else
