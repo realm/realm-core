@@ -170,7 +170,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 #if !REALM_PLATFORM_APPLE && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
-TEST_IF(Shared_PipelinedWritesWithKills, false)
+TEST(Shared_PipelinedWritesWithKills)
 {
     // FIXME: This test was disabled because it has a strong tendency to leave
     // rogue child processes behind after the root test process aborts. If these
@@ -202,7 +202,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     if (pid == 0) {
         // first writer!
         writer(path, 0);
-        _exit(0);
+        std::quick_exit(0);
     }
     else {
         for (int k=1; k < num_processes; ++k) {
@@ -212,7 +212,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
                 REALM_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
-                _exit(0);
+                std::quick_exit(0);
             }
             else {
                 // std::cerr << "New process " << pid << " killing old " << pid2 << std::endl;
@@ -1335,7 +1335,8 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+//#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+#if 1
 #if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
@@ -1351,7 +1352,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
     SHARED_GROUP_TEST_PATH(path);
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         pid_t pid = fork();
         if (pid == pid_t(-1))
             REALM_TERMINATE("fork() failed");
@@ -1360,8 +1361,8 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TableRef table = wt.add_table("alpha");
-            _exit(0); // Die with an active write transaction
+            TableRef table = wt.get_or_add_table("alpha");
+            std::quick_exit(42); // Die hard with an active write transaction
         }
         else {
             // Parent
@@ -1373,7 +1374,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             bool child_exited_normaly = WIFEXITED(stat_loc);
             CHECK(child_exited_normaly);
             int child_exit_status = WEXITSTATUS(stat_loc);
-            CHECK_EQUAL(0, child_exit_status);
+            CHECK_EQUAL(42, child_exit_status);
         }
 
         // Check that we can continue without dead-locking
@@ -1381,7 +1382,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TableRef table = wt.add_table("beta");
+            TableRef table = wt.get_or_add_table("beta");
             if (table->is_empty()) {
                 table->add_column(type_Int, "i");
                 table->insert_empty_row(0);
@@ -1399,7 +1400,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         CHECK(!rt.has_table("alpha"));
         CHECK(rt.has_table("beta"));
         ConstTableRef table = rt.get_table("beta");
-        CHECK_EQUAL(10, table->get_int(0,0));
+        CHECK_EQUAL(100, table->get_int(0,0));
     }
 }
 
