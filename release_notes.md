@@ -1,8 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes:
-
-* Lorem ipsum.
+# 0.96.1 Release notes
 
 ### API breaking changes:
 
@@ -21,12 +17,6 @@
   thrown std::runtime_error. This is so that iOS and Android language
   bindings can specifically catch this case and handle it differently
   than the rest of the general std::runtime_errors.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
