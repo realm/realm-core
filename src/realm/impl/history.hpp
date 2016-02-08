@@ -145,9 +145,6 @@ public:
 /// is, its purpose is to replace the current implementation in commit_log.cpp,
 /// which places the history in separate files.
 ///
-/// It is also intended to be used as a base class for an extended sync-enabled
-/// history.
-///
 /// By ensuring that the root node of the history is correctly configured with
 /// Group::m_top as its parent, this class allows for modifications of the
 /// history as long as those modifications happen after the remainder of the

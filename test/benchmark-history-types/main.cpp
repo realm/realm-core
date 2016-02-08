@@ -6,6 +6,7 @@
 #include <realm/group_shared.hpp>
 #include <realm/history.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/lang_bind_helper.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
@@ -23,6 +24,69 @@ std::unique_ptr<Replication> make_history(std::string path)
     return make_client_history(path);
 //    return make_in_realm_history(path);
 }
+
+
+// Make a Realm of considerable size. Then perform as series of write
+// transactions via one SharedGroup. At the same time (by the same thread)
+// occasionally advance a read transaction via another SharedGroup. This will
+// produce a situation with a varying number of concurrently locked snapshots.
+class PeakFileSizeTask {
+public:
+    PeakFileSizeTask()
+    {
+        std::string path = "/tmp/benchmark-history-types.realm";
+        util::File::try_remove(path);
+
+        reader_history = make_history(path);
+        reader_shared_group.reset(new SharedGroup(*reader_history));
+
+        writer_history = make_history(path);
+        writer_shared_group.reset(new SharedGroup(*writer_history));
+
+        WriteTransaction wt(*writer_shared_group);
+        TableRef table = wt.add_table("table");
+        for (size_t i = 0; i < num_cols; ++i)
+            table->add_column(type_Int, "");
+        table->add_empty_row(num_rows);
+        for (size_t i = 0; i < num_rows; ++i) {
+            for (size_t j = 0; j < num_cols; ++j)
+                table->set_int(j, i, 65536L + long(i) + long(j));
+        }
+        wt.commit();
+
+        reader_shared_group->begin_read();
+    }
+
+    void run()
+    {
+        for (size_t i = 0; i < num_transactions; ++i) {
+            if (i % max_num_locked_snapshots == 0)
+                LangBindHelper::advance_read(*reader_shared_group);
+            WriteTransaction wt(*writer_shared_group);
+            TableRef table = wt.get_table("table");
+            for (size_t j = 0; j < num_modifications; ++j) {
+                size_t col_ndx = (j+i) % num_cols;
+                size_t row_ndx =
+                    (size_t((double(num_rows-1) / num_modifications-1) * j) + i) % num_rows;
+                table->set_int(col_ndx, row_ndx, 262144L + long(j) + long(i));
+            }
+            wt.commit();
+        }
+    }
+
+private:
+    const size_t num_cols = 8;
+    const size_t num_rows = 10000;
+    const size_t num_transactions = 10000;
+    const size_t num_modifications = 20;
+    const size_t max_num_locked_snapshots = 8;
+
+    std::unique_ptr<Replication> reader_history;
+    std::unique_ptr<SharedGroup> reader_shared_group;
+
+    std::unique_ptr<Replication> writer_history;
+    std::unique_ptr<SharedGroup> writer_shared_group;
+};
 
 
 class Task {
@@ -95,6 +159,15 @@ int main()
 
     Timer timer(Timer::type_UserTime);
     {
+/*
+        for (int i = 0; i != 1; ++i) {
+            PeakFileSizeTask task;
+            timer.reset();
+            task.run();
+            results.submit("dummy", timer);
+        }
+        results.finish("dummy", "Dummy");
+*/
         // No readers (no grow)
         for (int i = 0; i != 25; ++i) {
             Task task(0, false);
