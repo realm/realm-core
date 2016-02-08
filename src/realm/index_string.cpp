@@ -22,25 +22,6 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 } // anonymous namespace
 
 
-// FIXME: Indexing strings containing zero bytes is currently broken because
-// they result in non-equal strings having identical keys. Inserting such
-// strings can corrupt the index data structures as a result, so we need to not
-// allow users to do so until the index is fixed (which requires a breaking
-// change to how values are indexed). Once the bug is fixed, validate_value()
-// should be removed.
-void StringIndex::validate_value(int64_t) const noexcept
-{
-    // no-op: All ints are valid
-}
-
-void StringIndex::validate_value(StringData str) const
-{
-    // The "nulls on String column" branch fixed all known bugs in the index
-    static_cast<void>(str);
-    return;
-}
-
-
 Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
@@ -422,7 +403,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             if (m_deny_duplicate_values)
                 throw LogicError(LogicError::unique_constraint_violation);
             // find insert position (the list has to be kept in sorted order)
-            // In most cases we refs will be added to the end. So we test for that
+            // In most cases the refs will be added to the end. So we test for that
             // first to see if we can avoid the binary search for insert position
             size_t last_ref = size_t(sub.back());
             if (row_ndx > last_ref) {
@@ -619,7 +600,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
             else {
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
-                size_t r = sub.find_first(row_ndx);
+                size_t r = sub.lower_bound(row_ndx);
                 REALM_ASSERT(r != not_found);
                 size_t sub_size = sub.size(); // Slow
                 bool is_last = r == sub_size - 1;
@@ -675,7 +656,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
 
-                size_t old_pos = sub.find_first(row_ndx);
+                size_t old_pos = sub.lower_bound(row_ndx);
                 size_t new_pos = sub.lower_bound(new_row_ndx);
                 REALM_ASSERT(old_pos != not_found);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
