@@ -85,7 +85,9 @@ namespace _impl {
 // FIXME: we should not use size_t for memory mapped members, but one where the
 // size is guaranteed
 
-class WriteLogCollector: public Replication, private _impl::History {
+class WriteLogCollector:
+        public Replication,
+        private _impl::History {
 public:
     using version_type = _impl::History::version_type;
     WriteLogCollector(const std::string& database_name, const char* encryption_key);

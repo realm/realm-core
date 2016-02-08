@@ -605,7 +605,9 @@ private:
     template<class O> void rollback_and_continue_as_read(O* observer);
     //@}
 
-    template<class O> void do_advance_read(O* observer, VersionID, _impl::History&);
+    /// Returns true if, and only if _impl::History::update_early_from_top_ref()
+    /// was called during the execution of this function.
+    template<class O> bool do_advance_read(O* observer, VersionID, _impl::History&);
 
     /// If there is an associated \ref Replication object, then this function
     /// returns `repl->get_history()` where `repl` is that Replication object,
@@ -921,12 +923,11 @@ inline void SharedGroup::promote_to_write(O* observer)
     do_begin_write(); // Throws
     try {
         VersionID version = VersionID(); // Latest
-        do_advance_read(observer, version, *hist); // Throws
+        bool history_updated = do_advance_read(observer, version, *hist); // Throws
 
         Replication* repl = m_group.get_replication();
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         version_type current_version = m_read_lock.m_version;
-        bool history_updated = true;
         repl->initiate_transact(current_version, history_updated); // Throws
 
         // If the group has no top array (top_ref == 0), create a new node
@@ -990,7 +991,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 }
 
 template<class O>
-inline void SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist)
+inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist)
 {
     util::LockGuard lg(m_handover_lock);
     ReadLockInfo new_read_lock;
@@ -998,7 +999,7 @@ inline void SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
     if (new_read_lock.m_version == m_read_lock.m_version) {
         release_read_lock(new_read_lock);
-        return;
+        return false; // _impl::History::update_early_from_top_ref() was not called
     }
 
     ReadLockUnlockGuard g(*this, new_read_lock);
@@ -1042,6 +1043,8 @@ inline void SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
     g.release();
     release_read_lock(m_read_lock);
     m_read_lock = new_read_lock;
+
+    return true; // _impl::History::update_early_from_top_ref() was called
 }
 
 inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
