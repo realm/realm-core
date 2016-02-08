@@ -174,7 +174,7 @@ void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec
         poll_d.revents = 0;
 
         int r;
-        r = ppoll(&poll_d, 1, tp, 0);
+        r = poll(&poll_d, 1, tp->tv_sec*1000 + tp->tv_nsec/1000000);
         if (r == ETIMEDOUT) return;
         // if wait returns due to a signal, we must retry:
         if (r == EINTR)
