@@ -45,21 +45,12 @@ namespace util {
 
 
 /// Condition variable for use in synchronization monitors.
-/// This condition variable uses emulation based on semaphores
+/// This condition variable uses emulation based on named pipes
 /// for the inter-process case, if enabled by REALM_CONDVAR_EMULATION.
-/// Compared to a good pthread implemenation, the emulation carries an
-/// overhead of at most 2 task switches for every waiter notified during
-/// notify() or notify_all().
 ///
-/// When a semaphore is allocated to a condvar, its name is formed
-/// as prefix + "RLM" + three_letter_code, where the three letters are
-/// created by hashing the path to the file containing the shared part
-/// of the condvar and the offset within the file.
-///
-/// FIXME: This implementation will never release semaphores. This is unlikely
+/// FIXME: This implementation will never release/delete pipes. This is unlikely
 /// to be a problem as long as only a modest number of different database names
-/// are in use within the kernel lifetime (all semaphores are released when the
-/// kernel is rebooted).
+/// are in use
 ///
 /// A PlatformSpecificCondVar is always process shared.
 class PlatformSpecificCondVar {
@@ -96,6 +87,7 @@ public:
 
     void wait(EmulatedRobustMutex& m, const struct timespec* tp);
     /// If any threads are waiting for this condition, wake up at least one.
+    /// (Current implementation may actually wake all :-O )
     void notify() noexcept;
 
     /// Wake up every thread that is currently waiting on this condition.
@@ -111,12 +103,14 @@ private:
     sem_t* get_semaphore(std::string path, size_t offset_of_condvar);
 
     // non-zero if a shared part has been registered (always 0 on process local instances)
-    SharedPart* m_shared_part;
+    SharedPart* m_shared_part = nullptr;
 
-    // semaphore used for emulation, zero if emulation is not used
-    sem_t* m_sem;
+    bool uses_emulation = false;
+    // pipe used for emulation
+    int m_fd_read = -1;
+    int m_fd_write = -1;
 
-    // name of the semaphore - FIXME: generate a name based on inode, device and offset of
+    // name of the pipe - FIXME: generate a name based on inode, device and offset of
     // the file used for memory mapping.
     static std::string internal_naming_prefix;
 };
@@ -125,85 +119,6 @@ private:
 
 
 // Implementation:
-
-
-inline void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec* tp)
-{
-    REALM_ASSERT(m_shared_part);
-#ifdef REALM_CONDVAR_EMULATION
-    m_shared_part->waiters++;
-    uint64_t my_counter = m_shared_part->signal_counter;
-    m.unlock();
-    for (;;) {
-        // FIXME: handle premature return due to signal
-        int r;
-#if REALM_PLATFORM_APPLE
-        // no timeout support on apple
-        REALM_ASSERT(tp == nullptr);
-        static_cast<void>(tp);
-#else
-        if (tp) {
-            r = sem_timedwait(m_sem, tp);
-            if (r == ETIMEDOUT) return;
-        }
-        else
-#endif
-        {
-            r = sem_wait(m_sem);
-        }
-        // if wait returns due to a signal, we must retry:
-        if (r == EINTR)
-            continue;
-        m.lock();
-        if (m_shared_part->signal_counter != my_counter)
-            break;
-
-        // notification wasn't meant for us, hand in on and wait for another
-        sem_post(m_sem);
-        m.unlock();
-    }
-#else
-    m_shared_part->wait(*m.m_shared_part, [](){}, tp);
-#endif
-}
-
-
-
-
-
-
-inline void PlatformSpecificCondVar::notify() noexcept
-{
-    REALM_ASSERT(m_shared_part);
-#ifdef REALM_CONDVAR_EMULATION
-    m_shared_part->signal_counter++;
-    if (m_shared_part->waiters) {
-        sem_post(m_sem);
-        --m_shared_part->waiters;
-    }
-#else
-    m_shared_part->notify();
-#endif
-}
-
-
-
-
-
-inline void PlatformSpecificCondVar::notify_all() noexcept
-{
-    REALM_ASSERT(m_shared_part);
-#ifdef REALM_CONDVAR_EMULATION
-    m_shared_part->signal_counter++;
-    while (m_shared_part->waiters) {
-        sem_post(m_sem);
-        --m_shared_part->waiters;
-    }
-#else
-    m_shared_part->notify_all();
-#endif
-}
-
 
 
 } // namespace util
