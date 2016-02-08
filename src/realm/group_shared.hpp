@@ -1058,21 +1058,14 @@ inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
     REALM_ASSERT(file_format <= SlabAlloc::library_file_format);
     bool upgrade = (file_format < SlabAlloc::library_file_format);
     if (upgrade) {
-
-        // FIXME: Is there any way we can get rid of this sleep? Is seems
-        // unreasonable that we allow a sleep just to make a unit test work.
-
-        // FIXME: Judging from the comment in the mentioned unit test
-        // (Upgrade_Database_2_3_Writes_New_File_Format_new), the sleep is
-        // necessary to make the regular upgrade mechanics work. This seems very
-        // bizarre. If the test really can fail without the sleep, then it seems
-        // like it must be due to an unhandled race condition, and one that is
-        // not properly fixed by the sleep.
-
 #ifdef REALM_DEBUG
-        // Sleep 0.2 seconds to create a simple thread-barrier for the two
-        // threads in the TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
-        // unit test. See the unit test for details.
+        // This sleep() only exists in order to increase the quality of the
+        // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test.
+        // The unit test creates multiple threads that all call 
+        // upgrade_file_format() simultaneously. This sleep() then acts like
+        // a simple thread barrier that makes sure the threads meet here, to
+        // increase the likelyhood of detecting any potential race problems.
+        See the unit test for details.
 #ifdef _WIN32
         _sleep(200);
 #else
