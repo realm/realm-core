@@ -41,7 +41,9 @@ enum ColumnType {
     col_type_Reserved4   = 11, // Decimal
     col_type_Link        = 12,
     col_type_LinkList    = 13,
-    col_type_BackLink    = 14
+    col_type_BackLink    = 14,
+    col_type_NewDate     = 15 // FIXME, can it be moved up?
+
 };
 
 

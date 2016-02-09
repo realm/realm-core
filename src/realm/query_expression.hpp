@@ -143,23 +143,6 @@ The Columns class encapsulates all this into a simple class that, for any type T
 
 #define REALM_OLDQUERY_FALLBACK
 
-// This class is a temporary dummy class that only exists in order to upgrade the query system for the new date type.
-// Once the class is implemented properly, remove this and rename occurences of `NewDate_LASSE`
-struct NewDate_LASSE
-{
-    NewDate_LASSE(int64_t upper, int64_t lower) : m_upper(upper), m_lower(lower) { }
-    NewDate_LASSE() { }
-    
-    bool is_null() { return m_upper = 0 && m_upper == 0; }
-    bool operator == (const NewDate_LASSE& d) { return m_upper == d.m_upper && m_lower == d.m_lower; }
-    bool operator > (const NewDate_LASSE& d) { return m_upper > d.m_upper || (m_upper == d.m_upper && m_upper > d.m_lower); }
-    bool operator < (const NewDate_LASSE& d) { return m_upper < d.m_upper || (m_upper == d.m_upper && m_upper < d.m_lower); }
-    NewDate_LASSE& operator = (const NewDate_LASSE& other) = default;
-
-    int64_t m_upper = 0;
-    int64_t m_lower = 0;
-};
-
 namespace realm {
 
 template<class T>
@@ -193,7 +176,7 @@ int only_numeric(const StringData&)
 }
 
 template<class T>
-int only_numeric(const NewDate_LASSE&)
+int only_numeric(const NewDate&)
 {
     REALM_ASSERT(false);
     return 0;
@@ -913,20 +896,20 @@ inline void NullableVector<BinaryData>::set_null(size_t index)
 
 // NewDate
 template<>
-inline void NullableVector<NewDate_LASSE>::set(size_t index, NewDate_LASSE value)
+inline void NullableVector<NewDate>::set(size_t index, NewDate value)
 {
     m_first[index] = value;
 }
 template<>
-inline bool NullableVector<NewDate_LASSE>::is_null(size_t index) const
+inline bool NullableVector<NewDate>::is_null(size_t index) const
 {
     return m_first[index].is_null();
 }
 
 template<>
-inline void NullableVector<NewDate_LASSE>::set_null(size_t index)
+inline void NullableVector<NewDate>::set_null(size_t index)
 {
-    m_first[index] = NewDate_LASSE();
+    m_first[index] = NewDate();
 }
 
 
@@ -1073,7 +1056,7 @@ public:
 
     REALM_FORCEINLINE void export_NewDate(ValueBase& destination) const override
     {
-        export2<NewDate_LASSE>(destination);
+        export2<NewDate>(destination);
     }
 
     REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
@@ -1118,7 +1101,7 @@ public:
     {
         if (std::is_same<T, int>::value)
             source.export_int(*this);
-        else if (std::is_same<T, NewDate_LASSE>::value)
+        else if (std::is_same<T, NewDate>::value)
             source.export_NewDate(*this);
         else if (std::is_same<T, bool>::value)
             source.export_bool(*this);

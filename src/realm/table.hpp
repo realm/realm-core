@@ -63,6 +63,23 @@ namespace _impl { class TableFriend; }
 
 class Replication;
 
+// This class is a temporary dummy class that only exists in order to upgrade the query system for the new date type.
+// Once the class is implemented properly, remove this and rename occurences of `NewDate`
+struct NewDate
+{
+    NewDate(int64_t upper, int64_t lower) : m_upper(upper), m_lower(lower) { }
+    NewDate() { }
+
+    bool is_null() { return m_upper == 0 && m_upper == 0; }
+    bool operator == (const NewDate& d) { return m_upper == d.m_upper && m_lower == d.m_lower; }
+    bool operator > (const NewDate& d) { return (m_upper > d.m_upper) || (m_upper == d.m_upper && m_upper > d.m_lower); }
+    bool operator < (const NewDate& d) { return (m_upper < d.m_upper) || (m_upper == d.m_upper && m_upper < d.m_lower); }
+    NewDate& operator = (const NewDate& other) = default;
+
+    int64_t m_upper = 0;
+    int64_t m_lower = 0;
+};
+
 
 /// The Table class is non-polymorphic, that is, it has no virtual
 /// functions. This is important because it ensures that there is no run-time
@@ -393,6 +410,7 @@ public:
     void change_link_targets(size_t row_ndx, size_t new_row_ndx);
 
     // Get cell values
+    NewDate     get_newdate(size_t column_ndx, size_t row_ndx) const noexcept;
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
     DateTime    get_datetime(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -458,6 +476,7 @@ public:
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
+    void set_newdate(size_t, size_t, NewDate);
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);

@@ -2653,6 +2653,16 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         repl->set_int_unique(this, col_ndx, ndx, value); // Throws
 }
 
+NewDate Table::get_newdate(size_t, size_t) const noexcept
+{
+    return NewDate(111, 222);
+}
+
+void Table::set_newdate(size_t, size_t, NewDate)
+{
+        
+}
+
 
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
@@ -2728,7 +2738,6 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
     if (Replication* repl = get_repl())
         repl->set_date_time(this, col_ndx, ndx, value); // Throws
 }
-
 
 float Table::get_float(size_t col_ndx, size_t ndx) const noexcept
 {
