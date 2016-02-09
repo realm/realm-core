@@ -2092,6 +2092,7 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData)
     {
+        sync_table();
         m_encoder.erase_group_level_table(table_ndx, num_tables + 1);
         append_instruction();
         return true;
@@ -2099,6 +2100,7 @@ public:
 
     bool erase_group_level_table(size_t table_ndx, size_t num_tables)
     {
+        sync_table();
         m_encoder.insert_group_level_table(table_ndx, num_tables - 1, "");
         append_instruction();
         return true;
@@ -2106,12 +2108,14 @@ public:
 
     bool rename_group_level_table(size_t, StringData)
     {
-        return true; // No-op
+        sync_table();
+        return true;
     }
 
     bool move_group_level_table(size_t, size_t)
     {
-        return true; // No-op
+        sync_table();
+        return true;
     }
 
     bool optimize_table()
