@@ -49,8 +49,10 @@ public:
             table->add_column(type_Int, "");
         table->add_empty_row(num_rows);
         for (size_t i = 0; i < num_rows; ++i) {
-            for (size_t j = 0; j < num_cols; ++j)
-                table->set_int(j, i, 65536L + long(i) + long(j));
+            if (i % REALM_MAX_BPNODE_SIZE == 0) { // REALM_MAX_BPNODE_SIZE = 1000
+                for (size_t j = 0; j < num_cols; ++j)
+                    table->set_int(j, i, 65536L + long(i) + long(j));
+            }
         }
         wt.commit();
 
