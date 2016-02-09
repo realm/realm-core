@@ -1150,17 +1150,11 @@ TEST(StringIndex_Duplicate_Values)
 
     // remove and test again.
     col.erase(4);
-
     CHECK(!ndx.has_duplicate_values());
-
     col.add(s1);
-
     CHECK(ndx.has_duplicate_values());
-
     col.erase(0);
-
     CHECK(!ndx.has_duplicate_values());
-
     col.clear();
 
     // check emptied set
@@ -1185,7 +1179,7 @@ TEST(StringIndex_Duplicate_Values)
     CHECK(ndx.has_duplicate_values());
     col.erase(col.size() - 1);
     CHECK(!ndx.has_duplicate_values());
-    
+
     // Insert into the middle unique value of num_rows
     col.insert(num_rows/2, util::to_string(num_rows));
 
@@ -1282,7 +1276,7 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     col.destroy();
 }
 
-TEST(StringIndex_duplicates)
+TEST(StringIndex_Deny_Duplicates)
 {
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, true);
@@ -1324,7 +1318,6 @@ TEST(StringIndex_duplicates)
     CHECK(col.get(0) == duplicate);
     CHECK(col.get(col.size() - 1) == duplicate);
     CHECK(col.count(duplicate) == num_repeats);
-
 
     col.destroy();
 }
