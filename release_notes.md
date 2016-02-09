@@ -16,7 +16,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* `auto` is now the default value for `ENABLE_ENCRYPTION`. When set to `auto`,
+  encryption is enabled on Android and Cocoa, and disabled elsewhere.
 
 ----------------------------------------------
 

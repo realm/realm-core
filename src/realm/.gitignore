@@ -49,3 +49,5 @@
 /realm-config-tvos-dbg
 
 /util/config.h
+/util/config_android.h
+/util/config_cocoa.h
