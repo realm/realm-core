@@ -6,8 +6,6 @@
 #include <realm/column_linklist.hpp>
 #include <realm/column_string.hpp>
 #include <realm/util/to_string.hpp>
-#include <iostream>
-#include <fstream>
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
@@ -18,6 +16,7 @@ using namespace util;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+using unit_test::TestResults;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -1202,6 +1201,84 @@ TEST(StringIndex_Duplicate_Values)
     CHECK(col.size() == 0);
 
     // Clean up
+    col.destroy();
+}
+
+namespace {
+
+void verify_single_move_last_over(TestResults& test_results, StringColumn& col, size_t index) {
+    std::string value = col.get(col.size() - 1);
+    size_t orig_size = col.size();
+    col.move_last_over(index);
+    CHECK(col.get(index) == value);
+    CHECK(col.size() == orig_size - 1);
+}
+
+} // unnamed namespace
+
+TEST(StringIndex_MoveLastOver_DoUpdateRef)
+{
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, true);
+
+    // create subindex of repeated elements on a leaf
+    size_t num_initial_repeats = 100;
+    for (size_t i = 0; i < num_initial_repeats; ++i) {
+        col.add(util::to_string(i));
+    }
+
+    // common test strings
+    col.add(s1);
+    col.add(s2);
+    col.add(s3);
+    col.add(s4);
+    col.add(s5); // common prefix
+    col.add(s6); // common prefix
+    col.add(s7);
+
+    // Add random data to get sufficient internal nodes
+    // 256 is 4 levels deep on a base 4 tree
+    const size_t num_new_rand = 256;
+    Random random(random_int<unsigned long>());
+    for (size_t i = 0; i < num_new_rand; ++i) {
+        col.add(util::to_string(random.draw_int<size_t>()));
+    }
+
+    // Add a bunch of repeated data
+    const size_t num_repeats = 25;
+    const size_t num_repeated = 25;
+    for (size_t i = 0; i < num_repeats; ++i) {
+        for (size_t j = 0; j < num_repeated; ++j) {
+            col.add(util::to_string(i));
+        }
+    }
+
+    // force build the search index
+    col.create_search_index();
+
+    // switch out entire first leaf on a tree where MAX_BPNODE_SIZE == 4
+    ::verify_single_move_last_over(test_results, col, 0);
+    ::verify_single_move_last_over(test_results, col, 1);
+    ::verify_single_move_last_over(test_results, col, 2);
+    ::verify_single_move_last_over(test_results, col, 3);
+    ::verify_single_move_last_over(test_results, col, 4);
+    ::verify_single_move_last_over(test_results, col, 5);
+
+    // move_last_over for last index should remove the last item
+    size_t last_size = col.size();
+    col.move_last_over(col.size() - 1);
+    CHECK(col.size() == last_size - 1);
+
+    // randomly remove remaining elements until col.size() == 1
+    while (col.size() > 1) {
+        size_t random_index = random.draw_int<size_t>(0, col.size() - 2);
+        ::verify_single_move_last_over(test_results, col, random_index);
+    }
+
+    // remove final element
+    col.move_last_over(0);
+    CHECK(col.size() == 0);
+
     col.destroy();
 }
 
