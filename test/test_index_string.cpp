@@ -1288,8 +1288,8 @@ TEST(StringIndex_duplicates)
     StringColumn col(Allocator::get_default(), ref, true);
     StringData duplicate("duplicate");
     // create subindex of repeated elements on a leaf
-    size_t num_initial_repeats = 100;
-    for (size_t i = 0; i < num_initial_repeats; ++i) {
+    size_t num_repeats = 100;
+    for (size_t i = 0; i < num_repeats; ++i) {
         col.add(duplicate);
     }
 
@@ -1312,6 +1312,18 @@ TEST(StringIndex_duplicates)
     CHECK_THROW(col.add(duplicate), realm::LogicError);
     CHECK(!ndx.has_duplicate_values());
 
+    col.clear();
+    col.set_search_index_allow_duplicate_values(true);
+    CHECK(!ndx.has_duplicate_values());
+
+    // Populate tree with duplicates through insert() at back
+    for (size_t i = 0; i < num_repeats; ++i) {
+        col.insert(col.size(), duplicate);
+    }
+    CHECK(ndx.has_duplicate_values());
+    CHECK(col.get(0) == duplicate);
+    CHECK(col.get(col.size() - 1) == duplicate);
+    CHECK(col.count(duplicate) == num_repeats);
 
 
     col.destroy();
