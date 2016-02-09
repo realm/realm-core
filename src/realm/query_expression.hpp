@@ -143,6 +143,23 @@ The Columns class encapsulates all this into a simple class that, for any type T
 
 #define REALM_OLDQUERY_FALLBACK
 
+// This class is a temporary dummy class that only exists in order to upgrade the query system for the new date type.
+// Once the class is implemented properly, remove this and rename occurences of `NewDate_LASSE`
+struct NewDate_LASSE
+{
+	NewDate_LASSE(int64_t upper, int64_t lower) : m_upper(upper), m_lower(lower) { }
+	NewDate_LASSE() { }
+
+	bool is_null() { return m_upper = 0 && m_upper == 0; }
+	bool operator == (const NewDate_LASSE& d) { return m_upper == d.m_upper && m_lower == d.m_lower; }
+	bool operator > (const NewDate_LASSE& d) { return m_upper > d.m_upper || (m_upper == d.m_upper && m_upper > d.m_lower); }
+	bool operator < (const NewDate_LASSE& d) { return m_upper < d.m_upper || (m_upper == d.m_upper && m_upper < d.m_lower); }
+	NewDate_LASSE& operator = (const NewDate_LASSE& other) = default;
+
+	int64_t m_upper = 0;
+	int64_t m_lower = 0;
+};
+
 namespace realm {
 
 template<class T>
@@ -173,6 +190,13 @@ int only_numeric(const StringData&)
 {
     REALM_ASSERT(false);
     return 0;
+}
+
+template<class T>
+int only_numeric(const NewDate_LASSE&)
+{
+	REALM_ASSERT(false);
+	return 0;
 }
 
 template<class T>
@@ -251,8 +275,9 @@ struct Common<T1, T2, true, false, b> {
 struct ValueBase
 {
     static const size_t default_size = 8;
-    virtual void export_bool(ValueBase& destination) const = 0;
-    virtual void export_int(ValueBase& destination) const = 0;
+	virtual void export_bool(ValueBase& destination) const = 0;
+    virtual void export_NewDate(ValueBase& destination) const = 0;
+	virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
@@ -885,6 +910,26 @@ inline void NullableVector<BinaryData>::set_null(size_t index)
     m_first[index] = BinaryData();
 }
 
+
+// NewDate
+template<>
+inline void NullableVector<NewDate_LASSE>::set(size_t index, NewDate_LASSE value)
+{
+	m_first[index] = value;
+}
+template<>
+inline bool NullableVector<NewDate_LASSE>::is_null(size_t index) const
+{
+	return m_first[index].is_null();
+}
+
+template<>
+inline void NullableVector<NewDate_LASSE>::set_null(size_t index)
+{
+	m_first[index] = NewDate_LASSE();
+}
+
+
 template<typename Operator>
 struct OperatorOptionalAdapter {
     template<typename L, typename R>
@@ -1026,12 +1071,17 @@ public:
         REALM_ASSERT_DEBUG(false);
     }
 
-    REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
+    REALM_FORCEINLINE void export_NewDate(ValueBase& destination) const override
     {
-        export2<bool>(destination);
+        export2<NewDate_LASSE>(destination);
     }
 
-    REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const override
+	REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
+	{
+		export2<bool>(destination);
+	}
+	
+	REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const override
     {
         export2<int64_t>(destination);
     }
@@ -1068,7 +1118,9 @@ public:
     {
         if (std::is_same<T, int>::value)
             source.export_int(*this);
-        else if (std::is_same<T, bool>::value)
+		else if (std::is_same<T, NewDate_LASSE>::value)
+			source.export_NewDate(*this);
+		else if (std::is_same<T, bool>::value)
             source.export_bool(*this);
         else if (std::is_same<T, float>::value)
             source.export_float(*this);
