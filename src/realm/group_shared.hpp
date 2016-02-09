@@ -254,7 +254,6 @@ public:
     /// Has db been changed ?
     bool has_changed();
 
-#if !REALM_PLATFORM_APPLE
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to wait_for_change_release()
     /// further calls to wait_for_change() will return immediately. To restore
@@ -267,7 +266,6 @@ public:
 
     /// re-enable waiting for change
     void enable_wait_for_change();
-#endif // !REALM_PLATFORM_APPLE
     // Transactions:
 
     struct VersionID {

@@ -1039,7 +1039,6 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
-#if !REALM_PLATFORM_APPLE
 bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
@@ -1064,7 +1063,6 @@ void SharedGroup::enable_wait_for_change()
     EmulatedRobustMutex::LockGuard lock(m_controlmutex);
     m_wait_for_change_enabled = true;
 }
-#endif // !REALM_PLATFORM_APPLE
 
 void SharedGroup::do_async_commits()
 {
