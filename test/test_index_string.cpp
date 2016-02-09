@@ -1282,4 +1282,39 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     col.destroy();
 }
 
+TEST(StringIndex_duplicates)
+{
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, true);
+    StringData duplicate("duplicate");
+    // create subindex of repeated elements on a leaf
+    size_t num_initial_repeats = 100;
+    for (size_t i = 0; i < num_initial_repeats; ++i) {
+        col.add(duplicate);
+    }
+
+    // Create a new index on column
+    const StringIndex& ndx = *col.create_search_index();
+
+    CHECK(ndx.has_duplicate_values());
+
+    col.set_search_index_allow_duplicate_values(false);
+    CHECK(ndx.has_duplicate_values());
+
+    size_t ndx_count = ndx.count(duplicate);
+    CHECK_THROW(col.add(duplicate), realm::LogicError);
+    CHECK(ndx_count == ndx.count(duplicate));
+
+    col.clear();
+    CHECK(!ndx.has_duplicate_values());
+
+    col.add(duplicate);
+    CHECK_THROW(col.add(duplicate), realm::LogicError);
+    CHECK(!ndx.has_duplicate_values());
+
+
+
+    col.destroy();
+}
+
 #endif // TEST_INDEX_STRING
