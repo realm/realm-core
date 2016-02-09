@@ -202,7 +202,7 @@ TEST(Shared_PipelinedWritesWithKills)
     if (pid == 0) {
         // first writer!
         writer(path, 0);
-        std::quick_exit(0);
+        _Exit(0);
     }
     else {
         for (int k=1; k < num_processes; ++k) {
@@ -212,7 +212,7 @@ TEST(Shared_PipelinedWritesWithKills)
                 REALM_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
-                std::quick_exit(0);
+                _Exit(0);
             }
             else {
                 // std::cerr << "New process " << pid << " killing old " << pid2 << std::endl;
@@ -1362,7 +1362,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             WriteTransaction wt(sg);
             wt.get_group().verify();
             TableRef table = wt.get_or_add_table("alpha");
-            std::quick_exit(42); // Die hard with an active write transaction
+            _Exit(42); // Die hard with an active write transaction
         }
         else {
             // Parent
