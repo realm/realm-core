@@ -5,6 +5,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/column_string.hpp>
+#include <realm/util/to_string.hpp>
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
@@ -1124,8 +1125,69 @@ TEST(StringIndex_Integer_Increasing)
         CHECK_EQUAL(c, ref_count);
 
     }
+}
 
+TEST_TYPES(StringIndex_Duplicate_Values, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
 
+    // Create a column with random values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+
+    col.add(s1);
+    col.add(s2);
+    col.add(s3);
+    col.add(s4);
+
+    // Create a new index on column
+    const StringIndex& ndx = *col.create_search_index();
+
+    CHECK(!ndx.has_duplicate_values());
+
+    col.add(s1); // duplicate value
+
+    CHECK(ndx.has_duplicate_values());
+
+    // remove and test again.
+    col.erase(4);
+
+    CHECK(!ndx.has_duplicate_values());
+
+    col.add(s1);
+
+    CHECK(ndx.has_duplicate_values());
+
+    col.erase(0);
+
+    CHECK(!ndx.has_duplicate_values());
+
+    col.clear();
+
+    // check emptied set
+    CHECK(ndx.is_empty());
+    CHECK(!ndx.has_duplicate_values());
+
+    const size_t num_rows = 100;
+
+    for (size_t i = 1; i < num_rows; ++i) {
+        col.add(util::to_string(i));
+    }
+
+    CHECK(!ndx.has_duplicate_values());
+
+    // Insert into the middle unique value of num_rows
+    col.insert(num_rows/2, util::to_string(num_rows));
+
+    CHECK(!ndx.has_duplicate_values());
+
+    // Set the next element to be num_rows too
+    col.set(num_rows/2 + 1, util::to_string(num_rows));
+
+    CHECK(ndx.has_duplicate_values());
+
+    // Clean up
+    col.destroy();
 }
 
 #endif // TEST_INDEX_STRING

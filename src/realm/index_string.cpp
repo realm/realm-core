@@ -771,6 +771,8 @@ void StringIndex::node_add_key(ref_type ref)
 
 #ifdef REALM_DEBUG
 
+// LCOV_EXCL_START ignore debug functions
+
 void StringIndex::verify() const
 {
     m_array->verify();
@@ -984,5 +986,6 @@ void StringIndex::keys_to_dot(std::ostream& out, const Array& array, StringData 
     out << std::endl;
 }
 
+// LCOV_EXCL_STOP ignore debug functions
 
 #endif // REALM_DEBUG
