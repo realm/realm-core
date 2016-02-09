@@ -12,6 +12,12 @@ ifneq ($(REALM_ENABLE_FAT_BINARIES),)
   endif
 endif
 
+ifeq ($(COMPILER_IS),clang)
+	CFLAGS_ARCH += -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-undef \
+				   -Wno-exit-time-destructors -Wno-global-constructors -Wno-padded \
+				   -Wno-sign-conversion
+endif
+
 ifeq ($(OS),Darwin)
   CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++ -Wno-nested-anon-types
   VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
