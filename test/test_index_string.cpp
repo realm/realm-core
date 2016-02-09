@@ -6,6 +6,8 @@
 #include <realm/column_linklist.hpp>
 #include <realm/column_string.hpp>
 #include <realm/util/to_string.hpp>
+#include <iostream>
+#include <fstream>
 #include <set>
 #include "test.hpp"
 #include "util/misc.hpp"
@@ -1127,13 +1129,11 @@ TEST(StringIndex_Integer_Increasing)
     }
 }
 
-TEST_TYPES(StringIndex_Duplicate_Values, non_nullable, nullable)
+TEST(StringIndex_Duplicate_Values)
 {
-    constexpr bool nullable = TEST_TYPE::value;
-
     // Create a column with random values
     ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, nullable);
+    StringColumn col(Allocator::get_default(), ref, true);
 
     col.add(s1);
     col.add(s2);
@@ -1170,12 +1170,23 @@ TEST_TYPES(StringIndex_Duplicate_Values, non_nullable, nullable)
 
     const size_t num_rows = 100;
 
-    for (size_t i = 1; i < num_rows; ++i) {
+    for (size_t i = 0; i < num_rows; ++i) {
         col.add(util::to_string(i));
     }
-
     CHECK(!ndx.has_duplicate_values());
 
+    std::string a_string = "a";
+    for (size_t i = 0; i < num_rows; ++i) {
+        col.add(a_string);
+        a_string += "a";
+    }
+    CHECK(!ndx.has_duplicate_values());
+    col.add(a_string);
+    col.add(a_string);
+    CHECK(ndx.has_duplicate_values());
+    col.erase(col.size() - 1);
+    CHECK(!ndx.has_duplicate_values());
+    
     // Insert into the middle unique value of num_rows
     col.insert(num_rows/2, util::to_string(num_rows));
 
@@ -1185,6 +1196,10 @@ TEST_TYPES(StringIndex_Duplicate_Values, non_nullable, nullable)
     col.set(num_rows/2 + 1, util::to_string(num_rows));
 
     CHECK(ndx.has_duplicate_values());
+
+    col.clear();
+    CHECK(!ndx.has_duplicate_values());
+    CHECK(col.size() == 0);
 
     // Clean up
     col.destroy();
