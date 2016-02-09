@@ -202,6 +202,19 @@ StringData only_string(StringData in)
     return in;
 }
 
+// FIXME: Horrible. Use C++11 features instead
+template<class T>
+T no_newdate(T in)
+{
+    return in;
+}
+
+int no_newdate(NewDate in)
+{
+    return 0;
+}
+
+
 } // anonymous namespace
 
 template<class T>struct Plus {
@@ -377,9 +390,9 @@ Query create(L left, const Subexpr2<R>& right)
         else if (std::is_same<Cond, Greater>::value)
             q.less(column->m_column, only_numeric<R>(left));
         else if (std::is_same<Cond, Equal>::value)
-            q.equal(column->m_column, left);
+            q.equal(column->m_column, no_newdate(left));
         else if (std::is_same<Cond, NotEqual>::value)
-            q.not_equal(column->m_column, left);
+            q.not_equal(column->m_column, no_newdate(left));
         else if (std::is_same<Cond, LessEqual>::value)
             q.greater_equal(column->m_column, only_numeric<R>(left));
         else if (std::is_same<Cond, GreaterEqual>::value)
@@ -616,13 +629,13 @@ public:
 template<class T>
 class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
 Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
-public Overloads<T, bool>, public Overloads<T, DateTime>, public Overloads<T, null>
+public Overloads<T, bool>, public Overloads<T, NewDate>, public Overloads<T, DateTime>, public Overloads<T, null>
 {
 public:
     virtual ~Subexpr2() {};
 
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
-#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o) RLM_U2(null, o)
+#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o) RLM_U2(NewDate, o) RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/ ) RLM_U(> ) RLM_U(< ) RLM_U(== ) RLM_U(!= ) RLM_U(>= ) RLM_U(<= )
 };
 
@@ -1738,6 +1751,89 @@ template<class T>
 Query operator != (const Columns<StringData>& left, T right) {
     return string_compare<T, NotEqual, NotEqualIns>(left, right, true);
 }
+
+
+
+template <> class Columns<NewDate> : public Subexpr2<NewDate>
+{
+public:
+    Columns() {} // FIXME: remove
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
+        m_column(column), m_link_map(table, links)
+    {
+//        REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), == , type_NewDate);
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return make_subexpr<Columns<NewDate>>(*this);
+    }
+
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
+
+    void set_base_table(const Table* table) override
+    {
+        m_link_map.set_base_table(table);
+    }
+
+    virtual void evaluate(size_t index, ValueBase& destination) override
+    {
+        Value<NewDate>& d = static_cast<Value<NewDate>&>(destination);
+
+        if (links_exist()) {
+            std::vector<size_t> links = m_link_map.get_links(index);
+            Value<NewDate> v = make_value_for_link<NewDate>(m_link_map.only_unary_links(), links.size());
+
+            for (size_t t = 0; t < links.size(); t++) {
+                size_t link_to = links[t];
+                v.m_storage.set(t, m_link_map.target_table()->get_newdate(m_column, link_to));
+            }
+            destination.import(v);
+        }
+        else {
+            // Not a link column
+            const Table* target_table = m_link_map.target_table();
+            for (size_t t = 0; t < destination.m_values && index + t < target_table->size(); t++) {
+                d.m_storage.set(t, target_table->get_newdate(m_column, index + t));
+            }
+        }
+    }
+
+    bool links_exist() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
+    }
+
+    // Column index of payload column of m_table
+    size_t m_column;
+
+    LinkMap m_link_map;
+};
+
+inline Query operator==(const Columns<NewDate>& left, NewDate right) {
+    return create<NewDate, Equal, NewDate>(right, left);
+
+//    return create<NewDate, Equal, NewDate>(right, left);
+}
+
+/*
+inline Query operator==(NewDate left, const Columns<NewDate>& right) {
+    return create<NewDate, Equal, NewDate>(left, right);
+}
+
+inline Query operator!=(const Columns<NewDate>& left, NewDate right) {
+    return create<NewDate, NotEqual, NewDate>(right, left);
+}
+
+inline Query operator!=(NewDate left, const Columns<NewDate>& right) {
+    return create<NewDate, NotEqual, NewDate>(left, right);
+}
+
+*/
+
 
 
 // Handling of BinaryData columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).

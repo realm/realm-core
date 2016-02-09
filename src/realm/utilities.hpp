@@ -60,6 +60,23 @@
 
 namespace realm {
 
+
+struct NewDate
+{
+    NewDate(int64_t upper, int64_t lower) : m_upper(upper), m_lower(lower) { }
+    NewDate() { }
+
+    bool is_null() const { return m_upper == 0 && m_upper == 0; }
+    bool operator == (const NewDate& d) const { return m_upper == d.m_upper && m_lower == d.m_lower; }
+    bool operator > (const NewDate& d) const { return (m_upper > d.m_upper) || (m_upper == d.m_upper && m_upper > d.m_lower); }
+    bool operator < (const NewDate& d) const { return (m_upper < d.m_upper) || (m_upper == d.m_upper && m_upper < d.m_lower); }
+    NewDate& operator = (const NewDate& other) = default;
+
+    int64_t m_upper = 0;
+    int64_t m_lower = 0;
+};
+
+
 typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
 
 extern signed char sse_support;

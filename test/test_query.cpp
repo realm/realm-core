@@ -8538,4 +8538,20 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(not_found, match);
 }
 
+
+TEST(Query_NewDate)
+{
+    Table table;
+    table.add_column(type_Int, "first1");
+
+    size_t match;
+
+    Columns<NewDate> first = table.column<NewDate>(0);
+    table.add_empty_row(2);
+
+    match = (first == NewDate(111, 222)).find();
+
+    CHECK_EQUAL(match, 0);
+}
+
 #endif // TEST_QUERY

@@ -63,24 +63,6 @@ namespace _impl { class TableFriend; }
 
 class Replication;
 
-// This class is a temporary dummy class that only exists in order to upgrade the query system for the new date type.
-// Once the class is implemented properly, remove this and rename occurences of `NewDate`
-struct NewDate
-{
-    NewDate(int64_t upper, int64_t lower) : m_upper(upper), m_lower(lower) { }
-    NewDate() { }
-
-    bool is_null() { return m_upper == 0 && m_upper == 0; }
-    bool operator == (const NewDate& d) { return m_upper == d.m_upper && m_lower == d.m_lower; }
-    bool operator > (const NewDate& d) { return (m_upper > d.m_upper) || (m_upper == d.m_upper && m_upper > d.m_lower); }
-    bool operator < (const NewDate& d) { return (m_upper < d.m_upper) || (m_upper == d.m_upper && m_upper < d.m_lower); }
-    NewDate& operator = (const NewDate& other) = default;
-
-    int64_t m_upper = 0;
-    int64_t m_lower = 0;
-};
-
-
 /// The Table class is non-polymorphic, that is, it has no virtual
 /// functions. This is important because it ensures that there is no run-time
 /// distinction between a Table instance and an instance of any variation of

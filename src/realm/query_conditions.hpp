@@ -25,6 +25,7 @@
 
 #include <realm/unicode.hpp>
 #include <realm/binary_data.hpp>
+#include <realm/utilities.hpp>
 
 namespace realm {
 

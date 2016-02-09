@@ -37,7 +37,9 @@ enum DataType {
     type_Table      =  5,
     type_Mixed      =  6,
     type_Link       = 12,
-    type_LinkList   = 13
+    type_LinkList   = 13,
+    type_NewDate    = 14
+
 };
 
 /// See Descriptor::set_link_type().
