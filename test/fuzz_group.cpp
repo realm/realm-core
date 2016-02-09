@@ -1,6 +1,8 @@
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/lang_bind_helper.hpp>
+#include "crypt_key.hpp"
 #include "test.hpp"
 
 #include <stdio.h>
@@ -22,6 +24,7 @@ std::string create_string(unsigned char byte)
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
+            COMMIT, ROLLBACK, ADVANCE,
 
             COUNT};
 
@@ -67,7 +70,7 @@ int64_t get_int64(State& s) {
     return v;
 }
 
-void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std::ostream&> log)
+void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
 {
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
     const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
@@ -75,6 +78,18 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
     // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
     const size_t max_rows = 100000;
+
+    std::unique_ptr<ClientHistory> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+    ReadTransaction rt(sg_r);
+    WriteTransaction wt(sg_w);
+
+    const Group& g_r = rt.get_group();
+    Group& g = wt.get_group();
 
     try {
         State s;
@@ -355,6 +370,42 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                     t->remove(row_ndx);
                 }
             }
+            else if (instr == COMMIT) {
+                if (log) {
+                    *log << "LangBindHelper::commit_and_continue_as_read(sg_w);\n";
+                    *log << "g.verify();\n";
+                }
+                LangBindHelper::commit_and_continue_as_read(sg_w);
+                g.verify();
+                if (log) {
+                    *log << "LangBindHelper::promote_to_write(sg_w, *hist_w);\n";
+                    *log << "g.verify();\n";
+                }
+                LangBindHelper::promote_to_write(sg_w, *hist_w);
+                g.verify();
+            }
+            else if (instr == ROLLBACK) {
+                if (log) {
+                    *log << "LangBindHelper::rollback_and_continue_as_read(sg_w);\n";
+                    *log << "g.verify();\n";
+                }
+                LangBindHelper::rollback_and_continue_as_read(sg_w, *hist_w);
+                g.verify();
+                if (log) {
+                    *log << "LangBindHelper::promote_to_write(sg_w, *hist_w);\n";
+                    *log << "g.verify();\n";
+                }
+                LangBindHelper::promote_to_write(sg_w, *hist_w);
+                g.verify();
+            }
+            else if (instr == ADVANCE) {
+                if (log) {
+                    *log << "LangBindHelper::advance_read(sg_r, *hist);\n";
+                    *log << "g_r.verify();\n";
+                }
+                LangBindHelper::advance_read(sg_r, *hist_r);
+                g_r.verify();
+            }
         }
     }
     catch (const EndOfFile&) {
@@ -416,7 +467,7 @@ int run_fuzzy(int argc, const char* argv[])
             *log << "Group g;\n";
         }
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-        parse_and_apply_instructions(contents, group, std::cerr);
+        //        parse_and_apply_instructions(contents, path, std::cerr);
     }
     catch (const EndOfFile&) {
         return 0;
