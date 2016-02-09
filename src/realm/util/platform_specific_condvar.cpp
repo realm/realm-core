@@ -28,6 +28,7 @@
 using namespace realm;
 using namespace realm::util;
 
+#ifdef REALM_CONDVAR_EMULATION
 
 namespace {
 // Write a byte to a pipe to notify anyone waiting for data on the pipe
@@ -51,6 +52,7 @@ void notify_fd(int fd)
     }
 }
 } // anonymous namespace
+#endif // REALM_CONDVAR_EMULATION
 
 
 std::string PlatformSpecificCondVar::internal_naming_prefix = "/RealmsBigFriendlySemaphore";
