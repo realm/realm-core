@@ -7970,7 +7970,7 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     LangBindHelper::rollback_and_continue_as_read(sg, *hist);
 }
 
-TEST(LangBindHelper_AdvanceReadTransact_MoveTable)
+TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
@@ -7979,8 +7979,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveTable)
 
     {
         WriteTransaction wt(sg_w);
-        TableRef table_1_w = wt.get_or_add_table("table_1");
-        TableRef table_2_w = wt.get_or_add_table("table_2");
+        TableRef table_1_w = wt.add_table("table_1");
+        TableRef table_2_w = wt.add_table("table_2");
         table_2_w->add_column(type_Int, "i");
         table_2_w->add_empty_row();
         wt.commit();
