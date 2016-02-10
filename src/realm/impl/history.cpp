@@ -1,3 +1,5 @@
+#include <stdexcept>
+
 #include <realm/group.hpp>
 #include <realm/replication.hpp>
 #include <realm/impl/destroy_guard.hpp>
@@ -16,6 +18,9 @@ void InRealmHistory::initialize(Group& group)
 
 InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 {
+    if (changeset.size() > Table::max_binary_size)
+        throw std::runtime_error("Changeset too large");
+
     if (!m_changesets) {
         using gf = _impl::GroupFriend;
         // Note: gf::set_history_type() also ensures the the root array has a
