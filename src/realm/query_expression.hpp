@@ -437,7 +437,7 @@ Query create(L left, const Subexpr2<R>& right)
 // left-hand-side       operator                              right-hand-side
 // Subexpr2<L>          +, -, *, /, <, >, ==, !=, <=, >=      R, Subexpr2<R>
 //
-// For L = R = {int, int64_t, float, double, StringData}:
+// For L = R = {int, int64_t, float, double, StringData, NewDate}:
 template<class L, class R>
 class Overloads
 {
@@ -1589,24 +1589,14 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
     return value;
 }
 
-// Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
-template <> class Columns<StringData> : public Subexpr2<StringData>
+
+// FIXME: Documentation/comments on this class
+template <class T> class QColumns: public Subexpr2<T>
 {
 public:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}):
-        m_link_map(table, links), m_column(column)
+    QColumns(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
+        m_column(column), m_link_map(table, links)
     {
-        REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), ==, type_String);
-    }
-
-    void set_base_table(const Table* table) override
-    {
-        m_link_map.set_base_table(table);
-    }
-
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
-    {
-        return make_subexpr<Columns<StringData>>(*this);
     }
 
     const Table* get_base_table() const override
@@ -1614,17 +1604,22 @@ public:
         return m_link_map.base_table();
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
+    void set_base_table(const Table* table) override
     {
-        Value<StringData>& d = static_cast<Value<StringData>&>(destination);
+        m_link_map.set_base_table(table);
+    }
+
+    virtual void evaluate(size_t index, ValueBase& destination) override
+    {
+        Value<T>& d = static_cast<Value<T>&>(destination);
 
         if (links_exist()) {
             std::vector<size_t> links = m_link_map.get_links(index);
-            Value<StringData> v = make_value_for_link<StringData>(m_link_map.only_unary_links(), links.size());
+            Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                v.m_storage.set(t, m_link_map.target_table()->get_string(m_column, link_to));
+                v.m_storage.set(t, m_link_map.target_table()->get<T>(m_column, link_to));
             }
             destination.import(v);
         }
@@ -1632,9 +1627,48 @@ public:
             // Not a link column
             const Table* target_table = m_link_map.target_table();
             for (size_t t = 0; t < destination.m_values && index + t < target_table->size(); t++) {
-                d.m_storage.set(t, target_table->get_string(m_column, index + t));
+                d.m_storage.set(t, target_table->get<T>(m_column, index + t));
             }
         }
+    }
+
+    bool links_exist() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
+    }
+
+    // Column index of payload column of m_table
+    size_t m_column;
+    LinkMap m_link_map;
+};
+
+
+template <> class Columns<NewDate> : public QColumns<NewDate>
+{
+    using QColumns::QColumns;
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return make_subexpr<Columns<NewDate>>(*this);
+    }
+};
+
+template <> class Columns<BinaryData> : public QColumns<BinaryData>
+{
+    using QColumns::QColumns;
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return make_subexpr<Columns<BinaryData>>(*this);
+    }
+};
+
+
+template <> class Columns<StringData> : public QColumns<StringData>
+{
+public:
+    using QColumns::QColumns;
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* np = nullptr) const override
+    {
+        return make_subexpr<Columns<StringData>>(*this);
     }
 
     Query equal(StringData sd, bool case_sensitive = true)
@@ -1686,16 +1720,6 @@ public:
     {
         return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
     }
-
-    bool links_exist() const
-    {
-        return m_link_map.m_link_columns.size() > 0;
-    }
-
-    LinkMap m_link_map;
-
-    // Column index of payload column of m_table
-    size_t m_column;
 };
 
 
@@ -1753,149 +1777,6 @@ Query operator != (const Columns<StringData>& left, T right) {
 }
 
 
-
-template <> class Columns<NewDate> : public Subexpr2<NewDate>
-{
-public:
-    Columns() {} // FIXME: remove
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
-        m_column(column), m_link_map(table, links)
-    {
-//        REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), == , type_NewDate);
-    }
-
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
-    {
-        return make_subexpr<Columns<NewDate>>(*this);
-    }
-
-    const Table* get_base_table() const override
-    {
-        return m_link_map.base_table();
-    }
-
-    void set_base_table(const Table* table) override
-    {
-        m_link_map.set_base_table(table);
-    }
-
-    virtual void evaluate(size_t index, ValueBase& destination) override
-    {
-        Value<NewDate>& d = static_cast<Value<NewDate>&>(destination);
-
-        if (links_exist()) {
-            std::vector<size_t> links = m_link_map.get_links(index);
-            Value<NewDate> v = make_value_for_link<NewDate>(m_link_map.only_unary_links(), links.size());
-
-            for (size_t t = 0; t < links.size(); t++) {
-                size_t link_to = links[t];
-                v.m_storage.set(t, m_link_map.target_table()->get_newdate(m_column, link_to));
-            }
-            destination.import(v);
-        }
-        else {
-            // Not a link column
-            const Table* target_table = m_link_map.target_table();
-            for (size_t t = 0; t < destination.m_values && index + t < target_table->size(); t++) {
-                d.m_storage.set(t, target_table->get_newdate(m_column, index + t));
-            }
-        }
-    }
-
-    bool links_exist() const
-    {
-        return m_link_map.m_link_columns.size() > 0;
-    }
-
-    // Column index of payload column of m_table
-    size_t m_column;
-
-    LinkMap m_link_map;
-};
-
-inline Query operator==(const Columns<NewDate>& left, NewDate right) {
-    return create<NewDate, Equal, NewDate>(right, left);
-
-//    return create<NewDate, Equal, NewDate>(right, left);
-}
-
-/*
-inline Query operator==(NewDate left, const Columns<NewDate>& right) {
-    return create<NewDate, Equal, NewDate>(left, right);
-}
-
-inline Query operator!=(const Columns<NewDate>& left, NewDate right) {
-    return create<NewDate, NotEqual, NewDate>(right, left);
-}
-
-inline Query operator!=(NewDate left, const Columns<NewDate>& right) {
-    return create<NewDate, NotEqual, NewDate>(left, right);
-}
-
-*/
-
-
-
-// Handling of BinaryData columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
-//
-// FIXME: See if we can merge it with Columns<StringData> because they are very similiar
-template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
-{
-public:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}) :
-        m_column(column), m_link_map(table, links)
-    {
-        REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), == , type_Binary);
-    }
-
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
-    {
-        return make_subexpr<Columns<BinaryData>>(*this);
-    }
-
-    const Table* get_base_table() const override
-    {
-        return m_link_map.base_table();
-    }
-
-    void set_base_table(const Table* table) override
-    {
-        m_link_map.set_base_table(table);
-    }
-
-    virtual void evaluate(size_t index, ValueBase& destination) override
-    {
-        Value<BinaryData>& d = static_cast<Value<BinaryData>&>(destination);
-
-        if (links_exist()) {
-            std::vector<size_t> links = m_link_map.get_links(index);
-            Value<BinaryData> v = make_value_for_link<BinaryData>(m_link_map.only_unary_links(), links.size());
-
-            for (size_t t = 0; t < links.size(); t++) {
-                size_t link_to = links[t];
-                v.m_storage.set(t, m_link_map.target_table()->get_binary(m_column, link_to));
-            }
-            destination.import(v);
-        }
-        else {
-            // Not a link column
-            const Table* target_table = m_link_map.target_table();
-            for (size_t t = 0; t < destination.m_values && index + t < target_table->size(); t++) {
-                d.m_storage.set(t, target_table->get_binary(m_column, index + t));
-            }
-        }
-    }
-
-    bool links_exist() const
-    {
-        return m_link_map.m_link_columns.size() > 0;
-    }
-
-    // Column index of payload column of m_table
-    size_t m_column;
-
-    LinkMap m_link_map;
-};
 
 inline Query operator==(const Columns<BinaryData>& left, BinaryData right) {
     return create<BinaryData, Equal, BinaryData>(right, left);

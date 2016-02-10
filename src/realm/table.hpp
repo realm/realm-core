@@ -402,6 +402,9 @@ public:
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
+
+    template<class T> T get(size_t c, size_t r) const noexcept { return T(); }
+
     size_t get_link(size_t column_ndx, size_t row_ndx) const noexcept;
     bool is_null_link(size_t column_ndx, size_t row_ndx) const noexcept;
     LinkViewRef get_linklist(size_t column_ndx, size_t row_ndx);
@@ -1403,12 +1406,18 @@ protected:
 };
 
 
-
-
-
 // Implementation:
-inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
+template<> inline NewDate Table::get(size_t c, size_t r) const noexcept { return get_newdate(c, r); }
+template<> inline int64_t Table::get(size_t c, size_t r) const noexcept { return get_int(c, r); }
+template<> inline DateTime Table::get(size_t c, size_t r) const noexcept { return get_datetime(c, r); }
+template<> inline float Table::get(size_t c, size_t r) const noexcept { return get_float(c, r); }
+template<> inline double Table::get(size_t c, size_t r) const noexcept { return get_double(c, r); }
+template<> inline StringData Table::get(size_t c, size_t r) const noexcept { return get_string(c, r); }
+template<> inline BinaryData Table::get(size_t c, size_t r) const noexcept { return get_binary(c, r); }
+template<> inline Mixed Table::get(size_t c, size_t r) const noexcept { return get_mixed(c, r); }
+
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 inline void Table::bump_version(bool bump_global) const noexcept
 {
