@@ -6343,8 +6343,7 @@ TEST(Query_NullShowcase)
     Columns<BinaryData> photo = table->column<BinaryData>(6);
 
     // check int/double type mismatch error handling
-    Columns<Int> dummy1;
-    CHECK_THROW_ANY(dummy1 = table->column<Int>(3));
+    CHECK_THROW_ANY(table->column<Int>(3));
 
     TableView tv;
 
@@ -6540,11 +6539,20 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_float(1, 0)));
     CHECK(std::isnan(table->get_float(1, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+ 
+    // FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
+    // signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel 
+    // Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that 
+    // has bit 22 clear (indicates it's signaling), and pop it back (fst instruction), the FPU will toggle
+    // that bit into being set. All this needs further investigation, so a P2 has been created. Note that 
+    // IEEE just began specifying signaling vs. non-signaling NaNs in 2008. Also note that all this seems
+    // to work fine on ARM in both 32 and 64 bit mode.
+
+#if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
     CHECK(null::is_signaling(table->get_float(1, 0)));
 #endif
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+#ifndef _WIN32 // signaling_NaN() may be broken in VS2015 (see long comment above)
     CHECK(!null::is_signaling(table->get_float(1, 1)));
 #endif
 
@@ -6556,7 +6564,8 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_double(3, 0)));
     CHECK(std::isnan(table->get_double(3, 1)));
 
-#ifndef _WIN32 // signaling_NaN() broken in VS2015
+// signaling_NaN() broken in VS2015, and broken in 32bit intel
+#if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
     CHECK(null::is_signaling(table->get_double(3, 0)));
     CHECK(!null::is_signaling(table->get_double(3, 1)));
 #endif
@@ -7855,6 +7864,50 @@ TEST(Query_DeepLink)
     CHECK_EQUAL(N, view.size());
 }
 
+TEST(Query_LinksToDeletedOrMovedRow)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    size_t col_link = source->add_column_link(type_Link, "link", *target);
+    size_t col_name = target->add_column(type_String, "name");
+
+    target->add_empty_row(3);
+    target->set_string(col_name, 0, "A");
+    target->set_string(col_name, 1, "B");
+    target->set_string(col_name, 2, "C");
+
+    source->add_empty_row(3);
+    source->set_link(col_link, 0, 0);
+    source->set_link(col_link, 1, 1);
+    source->set_link(col_link, 2, 2);
+
+    Query qA = source->where().links_to(col_link, target->get(0));
+    Query qB = source->where().links_to(col_link, target->get(1));
+    Query qC = source->where().links_to(col_link, target->get(2));
+
+    // Move row C over row A. Row C is now at position 0, and row A has been removed.
+    target->move_last_over(0);
+
+    // Row A should not be found as it has been removed.
+    TableView tvA = qA.find_all();
+    CHECK_EQUAL(0, tvA.size());
+
+    // Row B should be found as it was not changed.
+    TableView tvB = qB.find_all();
+    CHECK_EQUAL(1, tvB.size());
+    CHECK_EQUAL(1, tvB[0].get_link(col_link));
+    CHECK_EQUAL("B", target->get_string(col_name, tvB[0].get_link(col_link)));
+
+    // Row C should still be found, despite having been moved.
+    TableView tvC = qC.find_all();
+    CHECK_EQUAL(1, tvC.size());
+    CHECK_EQUAL(0, tvC[0].get_link(col_link));
+    CHECK_EQUAL("C", target->get_string(col_name, tvC[0].get_link(col_link)));
+}
+
 // Triggers bug in compare_relation()
 TEST(Query_BrokenFindGT)
 {
@@ -8330,7 +8383,159 @@ TEST(Query_MaximumSumAverage)
     }
 }
 
+TEST(Query_ReferDeletedLinkView)
+{
+    // Queries and TableViews that depend on a deleted LinkList will now produce valid empty-like results
+    // (find() returns npos, find_all() returns empty TableView, sum() returns 0, etc.).
+    // They will no longer throw exceptions or crash.
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column_link(type_LinkList, "children", *table);
+    table->add_column(type_Int, "age");
+    table->add_empty_row();
+    table->set_int(1, 0, 123);
+    LinkViewRef links = table->get_linklist(0, 0);
+    Query q = table->where(links);
+    TableView tv = q.find_all();
+    
+    // TableView that depends on LinkView soon to be deleted
+    TableView tv_sorted = links->get_sorted_view(1);
+
+    // Delete LinkList so LinkView gets detached
+    table->move_last_over(0);
+    CHECK(!links->is_attached());
+
+    // See if "Query that depends on LinkView" returns sane "empty"-like values
+    CHECK_EQUAL(q.find_all().size(), 0);
+    CHECK_EQUAL(q.find(), npos);
+    CHECK_EQUAL(q.sum_int(1), 0);
+    CHECK_EQUAL(q.count(), 0);
+    size_t rows;
+    q.average_int(1, &rows);
+    CHECK_EQUAL(rows, 0);
+
+    tv_sorted.sync_if_needed();
+    // See if "TableView that depends on LinkView" returns sane "empty"-like values
+    tv_sorted.average_int(1, &rows);
+    CHECK_EQUAL(rows, 0);
+
+    // Now check a "Query that depends on (TableView that depends on LinkView)"
+    Query q2 = table->where(&tv_sorted);
+    CHECK_EQUAL(q2.count(), 0);
+    CHECK_EQUAL(q2.find(), npos);
+
+    CHECK(!links->is_attached());
+    tv.sync_if_needed();
+    
+    // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
+    // the LinkView through multiple levels!
+    CHECK(tv.is_attached());
+
+    // Before executing any methods on a LinkViewRef, you must still always check is_attached(). If you
+    // call links->add() on a deleted LinkViewRef (where is_attached() == false), it will assert
+    CHECK(!links->is_attached());
+}
+
+TEST(Query_SubQueries)
+{
+    Group group;
+
+    TableRef table1 = group.add_table("table1");
+    TableRef table2 = group.add_table("table2");
+
+    // add some more columns to table1 and table2
+    table1->add_column(type_Int, "col1");
+    table1->add_column(type_String, "str1");
+
+    table2->add_column(type_Int, "col1");
+    table2->add_column(type_String, "str2");
+
+    // add some rows
+    table1->add_empty_row();
+    table1->set_int(0, 0, 100);
+    table1->set_string(1, 0, "foo");
+    table1->add_empty_row();
+    table1->set_int(0, 1, 200);
+    table1->set_string(1, 1, "!");
+    table1->add_empty_row();
+    table1->set_int(0, 2, 300);
+    table1->set_string(1, 2, "bar");
+
+    table2->add_empty_row();
+    table2->set_int(0, 0, 400);
+    table2->set_string(1, 0, "hello");
+    table2->add_empty_row();
+    table2->set_int(0, 1, 500);
+    table2->set_string(1, 1, "world");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 2, "!");
+    table2->add_empty_row();
+    table2->set_int(0, 2, 600);
+    table2->set_string(1, 1, "world");
+
+
+    size_t col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+
+    // set some links
+    LinkViewRef links1;
+
+    links1 = table1->get_linklist(col_link2, 0);
+    links1->add(1);
+
+    links1 = table1->get_linklist(col_link2, 1);
+    links1->add(1);
+    links1->add(2);
+
+
+    size_t match;
+    Query q;
+
+    // The linked rows for rows 0 and 2 all match ("world", 500). Row 2 does by virtue of having no rows.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500).count() == table1->column<LinkList>(col_link2).count();
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // No linked rows match ("world, 600).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 600).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 0 and 1 both have at least one linked row that matches ("world", 500).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Row 1 has at least one linked row that matches ("!", 600).
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "!" && table2->column<Int>(0) == 600).count() >= 1;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Row 1 has two linked rows that contain either "world" or 600.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600).count() == 2;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+
+    // Rows 0 and 2 have at most one linked row that contains either "world" or 600. Row 2 does by virtue of having no rows.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600).count() <= 1;
+    match = q.find();
+    CHECK_EQUAL(0, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(2, match);
+    match = q.find(match + 1);
+    CHECK_EQUAL(not_found, match);
+}
+
 #endif // TEST_QUERY
-
-
-

@@ -70,6 +70,13 @@ public:
     const char* what() const noexcept override;
 };
 
+/// Thrown when memory can no longer be mapped to. When mmap/remap fails.
+class AddressSpaceExhausted: public std::runtime_error {
+public:
+    AddressSpaceExhausted(const std::string& msg);
+    /// runtime_error::what() returns the msg provided in the constructor.
+};
+
 
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have
@@ -208,6 +215,11 @@ inline const char* DescriptorMismatch::what() const noexcept
 inline const char* FileFormatUpgradeRequired::what() const noexcept
 {
     return "Database upgrade required but prohibited";
+}
+
+inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg):
+    std::runtime_error(msg)
+{
 }
 
 inline LogicError::LogicError(LogicError::ErrorKind kind):

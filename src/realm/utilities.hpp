@@ -120,6 +120,7 @@ void* round_down(void* p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void checksum_init(checksum_t* t);
+void millisleep(size_t milliseconds);
 
 // popcount
 int fast_popcount32(int32_t x);

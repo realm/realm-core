@@ -1453,8 +1453,13 @@ TEST(Table_SetIntUnique)
     table.set_int_unique(0, 0, 123);
     table.set_int_unique(1, 0, 123);
 
-    CHECK_LOGIC_ERROR(table.set_int_unique(0, 1, 123), LogicError::unique_constraint_violation);
-    CHECK_LOGIC_ERROR(table.set_int_unique(1, 1, 123), LogicError::unique_constraint_violation);
+    // Check that conflicting SetIntUniques result in rows being deleted.
+    table.set_int_unique(0, 1, 123);
+    CHECK_EQUAL(table.size(), 9);
+    table.set_int_unique(1, 1, 123);
+    CHECK_EQUAL(table.size(), 9);
+    table.set_int_unique(1, 2, 123);
+    CHECK_EQUAL(table.size(), 8);
 }
 
 
@@ -1464,18 +1469,21 @@ TEST(Table_SetStringUnique)
     table.add_column(type_Int, "ints");
     table.add_column(type_String, "strings");
     table.add_column(type_String, "strings_nullable", true);
-    table.add_empty_row(10);
+    table.add_empty_row(10); // all duplicates!
 
     CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, "foo"), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, "foo"), LogicError::no_search_index);
     table.add_search_index(1);
     table.add_search_index(2);
 
     table.set_string_unique(1, 0, "bar");
 
-    CHECK_LOGIC_ERROR(table.set_string_unique(1, 1, "bar"), LogicError::unique_constraint_violation);
-    CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, realm::null()), LogicError::column_not_nullable);
+    // Check that conflicting SetStringUniques result in rows with duplicate values being deleted.
+    table.set_string_unique(1, 1, "bar");
+    CHECK_EQUAL(table.size(), 9); // Only duplicates of "bar" are removed.
 
-    CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, realm::null()), LogicError::unique_constraint_violation);
+    table.set_string_unique(2, 0, realm::null());
+    CHECK_EQUAL(table.size(), 1);
 }
 
 
@@ -6503,6 +6511,60 @@ TEST(Table_MixedCrashValues)
     group.verify();
 }
 
+
+TEST(Table_ChangeLinkTargets_Links)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("t0");
+    TableRef t1 = g.add_table("t1");
+    t0->add_column_link(type_Link, "link", *t1);
+    t1->add_column(type_Int, "int");
+    t0->add_empty_row(10);
+    t1->add_empty_row(10);
+    for (int i = 0; i < 10; ++i) {
+        t0->set_link(0, i, i);
+        t1->set_int(0, i, i);
+    }
+
+    Row replaced_row = t1->get(0);
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
+    t1->change_link_targets(0, 9);
+    CHECK(replaced_row.is_attached());
+    CHECK_EQUAL(t0->get_link(0, 0), 9);
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
+}
+
+
+TEST(Table_ChangeLinkTargets_LinkLists)
+{
+    Group g;
+
+    TableRef t0 = g.add_table("t0");
+    TableRef t1 = g.add_table("t1");
+    t0->add_column_link(type_LinkList, "linklist", *t1);
+    t1->add_column(type_Int, "int");
+    t0->add_empty_row(10);
+    t1->add_empty_row(10);
+    for (int i = 0; i < 10; ++i) {
+        auto links = t0->get_linklist(0, i);
+        links->add(i);
+        links->add((i + 1) % 10);
+        t1->set_int(0, i, i);
+    }
+
+    Row replaced_row = t1->get(0);
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
+    t1->change_link_targets(0, 9);
+    CHECK(replaced_row.is_attached());
+    CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->get(1).get_index(), 1);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->size(), 2);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->get(0).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
+}
 
 
 #endif // TEST_TABLE

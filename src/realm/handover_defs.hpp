@@ -21,6 +21,7 @@
 #define REALM_HANDOVER_DEFS
 
 #include <memory>
+#include <vector>
 
 namespace realm {
 
@@ -39,11 +40,18 @@ struct LinkViewHandoverPatch {
     size_t m_row_ndx;
 };
 
+// Base class for handover patches for query nodes. Subclasses are declared in query_engine.hpp.
+struct QueryNodeHandoverPatch {
+    virtual ~QueryNodeHandoverPatch() = default;
+};
+
+using QueryNodeHandoverPatches = std::vector<std::unique_ptr<QueryNodeHandoverPatch>>;
+
 struct QueryHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
     std::unique_ptr<TableViewHandoverPatch> table_view_data;
     std::unique_ptr<LinkViewHandoverPatch> link_view_data;
-    ~QueryHandoverPatch() {};
+    QueryNodeHandoverPatches m_node_data;
 };
 
 struct TableViewHandoverPatch {
@@ -54,7 +62,6 @@ struct TableViewHandoverPatch {
     bool was_in_sync;
     QueryHandoverPatch query_patch;
     std::unique_ptr<LinkViewHandoverPatch> linkview_patch;
-    ~TableViewHandoverPatch() { }
 };
 
 

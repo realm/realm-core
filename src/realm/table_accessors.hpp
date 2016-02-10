@@ -837,25 +837,33 @@ protected:
     explicit ColumnAccessorBase(Taboid* t) noexcept: m_table(t) {}
 };
 
+namespace {
+
+// Used as base class of ColumnAccessor when Columns is not appropriate
+// (e.g., accessor of a TableView, which is not yet supported).
+struct NotARealColumns {
+    NotARealColumns(size_t, void*) { }
+};
+
+// Select whether to use Columns<T> or NotARealColumns for the given Taboid.
+template<class Taboid, class T>
+struct ColumnsForTaboid {
+    using type = typename std::conditional<std::is_base_of<Table, Taboid>::value, Columns<T>, NotARealColumns>::type;
+};
+
+} // anonymous namespace
 
 /// Column accessor specialization for integers.
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, int64_t>:
-    public ColumnAccessorBase<Taboid, col_idx, int64_t>, public Columns<int64_t> {
+    public ColumnAccessorBase<Taboid, col_idx, int64_t>, public ColumnsForTaboid<Taboid, int64_t>::type {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, int64_t> Base;
+    using Base = ColumnAccessorBase<Taboid, col_idx, int64_t>;
+    using ColumnsBase = typename ColumnsForTaboid<Taboid, int64_t>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
-        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<int64_t>::m_column = col_idx;
-        Columns<int64_t>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
-    }
-
-    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
-    virtual std::unique_ptr<Subexpr> clone() const
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), ColumnsBase(col_idx, t->get_impl())
     {
-        return make_subexpr<Columns<int64_t>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     size_t find_first(int64_t value) const
@@ -913,21 +921,14 @@ public:
 /// Column accessor specialization for float
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, float>:
-    public ColumnAccessorBase<Taboid, col_idx, float>, public Columns<float> {
+    public ColumnAccessorBase<Taboid, col_idx, float>, public ColumnsForTaboid<Taboid, float>::type {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
+    using Base = ColumnAccessorBase<Taboid, col_idx, float>;
+    using ColumnsBase = typename ColumnsForTaboid<Taboid, float>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
-        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<float>::m_column = col_idx;
-        Columns<float>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
-    }
-
-    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
-    virtual std::unique_ptr<Subexpr> clone() const
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), ColumnsBase(col_idx, t->get_impl())
     {
-        return make_subexpr<Columns<float>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     size_t find_first(float value) const
@@ -991,21 +992,14 @@ public:
 /// Column accessor specialization for double
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, double>:
-    public ColumnAccessorBase<Taboid, col_idx, double>, public Columns<double> {
+    public ColumnAccessorBase<Taboid, col_idx, double>, public ColumnsForTaboid<Taboid, double>::type {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
+    using Base = ColumnAccessorBase<Taboid, col_idx, double>;
+    using ColumnsBase = typename ColumnsForTaboid<Taboid, double>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
-        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<double>::m_column = col_idx;
-        Columns<double>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
-    }
-
-    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
-    virtual std::unique_ptr<Subexpr> clone() const
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), ColumnsBase(col_idx, t->get_impl())
     {
-        return make_subexpr<Columns<double>>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     size_t find_first(double value) const
@@ -1168,14 +1162,13 @@ public:
 /// Column accessor specialization for strings.
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, StringData>:
-    public ColumnAccessorBase<Taboid, col_idx, StringData>, public Columns<StringData> {
+    public ColumnAccessorBase<Taboid, col_idx, StringData>, public ColumnsForTaboid<Taboid, StringData>::type {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, StringData> Base;
+    using Base = ColumnAccessorBase<Taboid, col_idx, StringData>;
+    using ColumnsBase = typename ColumnsForTaboid<Taboid, StringData>::type;
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {
-        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<StringData>::m_column = col_idx;
-        Columns<StringData>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), ColumnsBase(col_idx, t->get_impl())
+    {
     }
 
     size_t count(StringData value) const
