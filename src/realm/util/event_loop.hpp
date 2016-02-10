@@ -22,6 +22,7 @@
 #define REALM_UTIL_EVENT_LOOP_HPP
 
 #include <realm/util/network.hpp>
+#include <realm/util/logger.hpp>
 
 namespace realm {
 namespace util {
@@ -47,6 +48,8 @@ enum class SocketSecurity {
 /// used to cancel the operation or reschedule a new operation. In general, if the handler
 /// is destroyed and an operation is in progress, the operation is cancelled.
 ///
+/// Operations on an event-loop are generally not thread-safe, with the exception of post().
+///
 /// \sa SocketBase
 /// \sa DeadlineTimerBase
 class EventLoopBase {
@@ -64,11 +67,6 @@ public:
 
     /// Forcibly terminate the event loop. It may be restarted at a later time.
     virtual void stop() = 0;
-
-    /// Reset the state of the event loop.
-    ///
-    /// In some implementations, this may do nothing.
-    virtual void reset() = 0;
 
     /// Establish a socket connection to \a host on port \a port.
     ///
@@ -96,9 +94,21 @@ public:
     /// caller is not required to hold a handle. Therefore, the callback also cannot
     /// be cancelled.
     ///
+    /// This is the only operation that is thread-safe.
+    ///
     /// \sa EventLoopBase::async_timer()
     virtual void post(OnPost callback) = 0;
 };
+
+/// Get a thread-local instance of an event loop that uses whatever implementation matches
+/// the current platform best. On Apple platforms, the returned event loop will internally
+/// represent an NSRunLoop.
+EventLoopBase& get_native_event_loop();
+
+/// Get an instance of an event loop that is implemented in terms of POSIX primitives.
+/// Please note: Networking operations on event loops of this type will not work correctly
+/// on iOS, because POSIX-level socket operations do no correctly activate the antennae.
+std::unique_ptr<EventLoopBase> get_posix_event_loop();
 
 /// SocketBase describes an event handler for socket operations.
 ///
@@ -144,57 +154,149 @@ public:
     virtual void async_wait(Duration delay, OnComplete callback) = 0;
 };
 
-template<class EventLoopProvider> class EventLoop;
 
-using ASIO = network::io_service;
+#if REALM_DEBUG
 
-template<>
-class EventLoop<ASIO>: public EventLoopBase {
-public:
-    EventLoop();
-    ~EventLoop();
+struct SocketLogger: SocketBase {
+    SocketLogger(std::unique_ptr<SocketBase> base, util::Logger& logger):
+        m_base(std::move(base)), m_logger(logger)
+    {}
 
-    void run() override;
-    void stop() override;
-    void reset() override;
+    void close() final
+    {
+        m_logger.log("((SocketBase*)%1)->close()", m_base.get());
+        m_base->close();
+    }
 
-    std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) final;
-    std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
-    void post(OnPost) final;
-protected:
-    struct Resolver;
-    struct Socket;
-    struct DeadlineTimer;
+    void cancel() final
+    {
+        m_logger.log("((SocketBase*)%1)->cancel()", m_base.get());
+        m_base->cancel();
+    }
 
-    ASIO m_io_service;
+    void async_write(const char* data, size_t size, OnWriteComplete on_complete) final
+    {
+        m_logger.log("((SocketBase*)%1)->async_write(\"...\", %2, ...)", m_base.get(), size);
+        m_base->async_write(data, size, [=](std::error_code ec, size_t n) {
+            m_logger.log("((SocketBase*)%1)->async_write->on_complete(%2, %3)", m_base.get(), ec, n);
+            on_complete(ec, n);
+        });
+    }
+
+    void async_read(char* buffer, size_t size, OnReadComplete on_complete) final
+    {
+        m_logger.log("((SocketBase*)%1)->async_read(%2, %3, ...)", m_base.get(), static_cast<void*>(buffer), size);
+        m_base->async_read(buffer, size, [=](std::error_code ec, size_t n) {
+            m_logger.log("((SocketBase*)%1)->async_read->on_complete(%2, %3)", m_base.get(), ec, n);
+            on_complete(ec, n);
+        });
+    }
+
+    void async_read_until(char* buffer, size_t size, char delim, OnReadComplete on_complete) final
+    {
+        m_logger.log("((SocketBase*)%1)->async_read_until(%2, %3, %4, ...)", m_base.get(), static_cast<void*>(buffer), size, static_cast<int>(delim));
+        m_base->async_read_until(buffer, size, delim, [=](std::error_code ec, size_t n) {
+            m_logger.log("((SocketBase*)%1)->async_read_until->on_complete(%2, %3)", m_base.get(), ec, n);
+            on_complete(ec, n);
+        });
+    }
+private:
+    std::unique_ptr<SocketBase> m_base;
+    util::Logger& m_logger;
 };
 
-#if REALM_PLATFORM_APPLE
 
-class Apple {};
-template<>
-class EventLoop<Apple>: public EventLoopBase {
-public:
-    EventLoop();
-    ~EventLoop();
+struct DeadlineTimerLogger: DeadlineTimerBase {
+    DeadlineTimerLogger(std::unique_ptr<DeadlineTimerBase> base, util::Logger& logger):
+        m_base(std::move(base)), m_logger(logger)
+    {}
 
-    void run() override;
-    void stop() override;
-    void reset() override;
+    void cancel() final
+    {
+        m_logger.log("((DeadlineTimerBase*)%1)->cancel()", m_base.get());
+        m_base->cancel();
+    }
 
-    std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) final;
-    std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
-    void post(OnPost) final;
-protected:
-    struct Impl;
-
-    struct Socket;
-    struct DeadlineTimer;
-
-    std::unique_ptr<Impl> m_impl;
+    void async_wait(Duration delay, OnComplete callback)
+    {
+        m_logger.log("((DeadlineTimerBase*)%1)->async_wait(%2, ...)", m_base.get(), delay.count());
+        auto logger_callback = [=](std::error_code ec) {
+            m_logger.log("((DeadlineTimerBase*)%1)->async_wait->on_complete(%2)", m_base.get(), ec);
+            callback(ec);
+        };
+        m_base->async_wait(delay, logger_callback);
+    }
+private:
+    std::unique_ptr<DeadlineTimerBase> m_base;
+    util::Logger& m_logger;
 };
 
-#endif // REALM_PLATFORM_APPLE
+
+class EventLoopLogger: public EventLoopBase {
+public:
+    EventLoopLogger(std::unique_ptr<EventLoopBase> base, util::Logger& logger):
+        m_base(std::move(base)), m_logger(logger)
+    {}
+
+    void run() final
+    {
+        m_logger.log("run()");
+        m_base->run();
+    }
+
+    void stop() final
+    {
+        m_logger.log("stop()");
+        m_base->stop();
+    }
+
+    std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity sec,
+                                              OnConnectComplete on_complete) final
+    {
+        m_logger.log("async_connect(\"%1\", %2, %3, ...)", host, port, socket_security_as_string(sec));
+        auto logging_on_complete = [=](std::error_code ec) {
+            m_logger.log("async_connect->on_complete(%1)", ec);
+            on_complete(ec);
+        };
+        return std::unique_ptr<SocketBase>(
+                new SocketLogger{m_base->async_connect(std::move(host), port, sec, logging_on_complete), m_logger});
+    }
+
+    std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout on_timeout) final
+    {
+        m_logger.log("async_timer(%1, ...)", delay.count());
+        auto logging_on_timeout = [=](std::error_code ec) {
+            m_logger.log("async_timer->on_timeout(%1)", ec);
+            on_timeout(ec);
+        };
+        return std::unique_ptr<DeadlineTimerBase>(
+                new DeadlineTimerLogger{m_base->async_timer(delay, logging_on_timeout), m_logger});
+    }
+
+    void post(OnPost on_post) final
+    {
+        m_logger.log("post()");
+        auto logging_on_post = [=]() {
+            m_logger.log("post->on_post()");
+            on_post();
+        };
+        m_base->post(logging_on_post);
+    }
+private:
+    std::unique_ptr<EventLoopBase> m_base;
+    util::Logger& m_logger;
+
+
+    static const char* socket_security_as_string(SocketSecurity sec) {
+        switch (sec) {
+            case SocketSecurity::None:  return "SocketSecurity::None";
+            case SocketSecurity::TLSv1: return "SocketSecurity::TLSv1";
+        }
+        REALM_UNREACHABLE();
+    }
+};
+
+#endif // REALM_DEBUG
 
 } // namespace util
 } // namespace realm

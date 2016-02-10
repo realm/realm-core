@@ -7,9 +7,27 @@
 using namespace realm::util;
 using namespace realm::test_util;
 
-TEST_TYPES(EventLoop_Timer, ASIO)
+template <class T> struct GetEventLoop;
+struct POSIX {};
+struct PlatformLocal {};
+
+template <> struct GetEventLoop<POSIX> {
+    GetEventLoop(): m_loop(get_posix_event_loop()), loop(*m_loop)
+    {}
+    std::unique_ptr<EventLoopBase> m_loop;
+    EventLoopBase& loop;
+};
+
+template <> struct GetEventLoop<PlatformLocal> {
+    GetEventLoop(): loop(get_native_event_loop())
+    {}
+    EventLoopBase& loop;
+};
+
+TEST_TYPES(EventLoop_Timer, POSIX, PlatformLocal)
 {
-    EventLoop<TEST_TYPE> loop;
+    GetEventLoop<TEST_TYPE> get_loop;
+    EventLoopBase& loop = get_loop.loop;
     bool ran = false;
     auto timer = loop.async_timer(std::chrono::milliseconds(1), [&](std::error_code ec) {
         CHECK(!ec);
@@ -188,6 +206,8 @@ template<class Provider>
 class AsyncClient {
 public:
     AsyncClient(unsigned short listen_port, unit_test::TestResults& test_results):
+        m_get_loop(),
+        m_loop(m_get_loop.loop),
         m_listen_port(listen_port),
         m_test_results(test_results)
     {
@@ -196,15 +216,14 @@ public:
 
     void run()
     {
-        m_loop.reset(new EventLoop<Provider>);
-        m_socket = m_loop->async_connect("localhost", m_listen_port, SocketSecurity::None,
+        m_socket = m_loop.async_connect("localhost", m_listen_port, SocketSecurity::None,
                                           [=](std::error_code ec) {
             auto& test_results = this->m_test_results;
             CHECK(!ec);
             this->connection_established();
         });
 
-        m_loop->run();
+        m_loop.run();
 
         if (m_socket) {
             m_socket->close();
@@ -223,8 +242,9 @@ public:
     }
 
 private:
+    GetEventLoop<Provider> m_get_loop;
+    EventLoopBase& m_loop;
     unsigned short m_listen_port;
-    std::unique_ptr<EventLoop<Provider>> m_loop;
     std::unique_ptr<SocketBase> m_socket;
 
     static const size_t s_max_header_size = 32;
@@ -297,29 +317,26 @@ private:
 
 } // anonymous namespace
 
-#if REALM_PLATFORM_APPLE
-using PlatformLocal = Apple;
-#else
-// Fallback
-using PlatformLocal = ASIO;
-#endif // platform
-
-TEST_TYPES(EventLoop_AsyncCommunication, ASIO, PlatformLocal)
+TEST_TYPES(EventLoop_AsyncCommunication, POSIX, PlatformLocal)
 {
     AsyncServer server(test_results);
     unsigned short listen_port = server.init();
-    AsyncClient<TEST_TYPE> client(listen_port, test_results);
 
     ThreadWrapper server_thread, client_thread;
     server_thread.start([&] { server.run(); });
-    client_thread.start([&] { client.run(); });
+    client_thread.start([&] {
+        AsyncClient<TEST_TYPE> client(listen_port, test_results);
+        client.run();
+    });
     client_thread.join();
     server_thread.join();
 }
 
-TEST_TYPES(EventLoop_DeadlineTimer, ASIO, PlatformLocal)
+TEST_TYPES(EventLoop_DeadlineTimer, POSIX, PlatformLocal)
 {
-    EventLoop<TEST_TYPE> event_loop;
+    GetEventLoop<TEST_TYPE> get_event_loop;
+    EventLoopBase& event_loop = get_event_loop.loop;
+
     std::unique_ptr<DeadlineTimerBase> timer;
 
     // Check that the completion handler is executed
@@ -363,23 +380,18 @@ TEST_TYPES(EventLoop_DeadlineTimer, ASIO, PlatformLocal)
     CHECK(canceled);
 }
 
-TEST_TYPES(EventLoop_HandlerDealloc, ASIO, PlatformLocal)
+TEST_TYPES(EventLoop_HandlerDealloc, POSIX, PlatformLocal)
 {
-    // Check that dynamically allocated handlers are properly freed when the
-    // service object is destroyed.
-    {
-        // m_post_handlers
-        EventLoop<TEST_TYPE> service;
-        service.post([] {});
-    }
+    // Check that throwing an exception from a callback cancels future
+    // callbacks.
     {
         // m_imm_handlers
-        EventLoop<TEST_TYPE> service;
+        GetEventLoop<TEST_TYPE> service;
         // By adding two post handlers that throw, one is going to be left
         // behind in `m_imm_handlers`
-        service.post([&]{ throw std::runtime_error(""); });
-        service.post([&]{ throw std::runtime_error(""); });
-        CHECK_THROW(service.run(), std::runtime_error);
+        service.loop.post([&]{ throw std::runtime_error(""); });
+        service.loop.post([&]{ throw std::runtime_error(""); });
+        CHECK_THROW(service.loop.run(), std::runtime_error);
     }
 }
 

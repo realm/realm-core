@@ -6,38 +6,107 @@
 using namespace realm;
 using namespace realm::util;
 
-struct EventLoop<Apple>::Impl {
-    NSRunLoop* m_runloop;
+static const NSString* kRealmEventLoopStateKey = @"RealmEventLoopState";
+
+class EventLoopApple;
+
+@interface EventLoopState: NSObject {
+    std::unique_ptr<EventLoopApple> _eventLoop;
+}
+-(id)init;
+@property(readonly) EventLoopApple* eventLoop;
+@end
+
+static EventLoopApple& get_apple_event_loop()
+{
+    NSMutableDictionary* dict = [NSThread currentThread].threadDictionary;
+    auto state = static_cast<EventLoopState*>(dict[kRealmEventLoopStateKey]);
+    if (state == nil) {
+        state = [[EventLoopState alloc] init];
+        dict[kRealmEventLoopStateKey] = state;
+    }
+    return *state.eventLoop;
+}
+
+class EventLoopApple: public EventLoopBase {
+public:
+    EventLoopApple();
+    ~EventLoopApple();
+
+    void run() override;
+    void stop() override;
+
+    std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) final;
+    std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
+    void post(OnPost) final;
+
+    struct Socket;
+    struct DeadlineTimer;
+
+    NSRunLoop* m_runloop = nil;
+    NSThread* m_thread = nil;
+    size_t m_active_events = 0;
+    std::exception_ptr m_caught_exception;
 };
 
-EventLoop<Apple>::EventLoop(): m_impl(new Impl)
+
+@implementation EventLoopState
+-(EventLoopApple*)eventLoop {
+    return self->_eventLoop.get();
+}
+-(id)init {
+    self = [super init];
+    if (self) {
+        self->_eventLoop.reset(new EventLoopApple);
+    }
+    return self;
+}
+@end
+
+
+EventLoopApple::EventLoopApple()
 {
-    m_impl->m_runloop = [NSRunLoop currentRunLoop];
+    m_runloop = [NSRunLoop currentRunLoop];
+    m_thread = [NSThread currentThread];
 }
 
-EventLoop<Apple>::~EventLoop()
+EventLoopApple::~EventLoopApple()
 {
 }
 
-void EventLoop<Apple>::run()
+void EventLoopApple::run()
 {
-    REALM_ASSERT(m_impl->m_runloop == [NSRunLoop currentRunLoop]); // Running a different runloop than expected.
-    [m_impl->m_runloop run];
+    do {
+        // FIXME: NSRunLoop doesn't seem to have a built-in mode that exactly matches the
+        // behavior we want, which is to run until no events are scheduled, but terminate
+        // when there actually are no more events that we have scheduled ourselves.
+        //
+        // -[NSRunLoop run] never terminates.
+        //
+        // -[NSRunLoop runInMode:untilDate:] terminates too early.
+        //
+        // Additional complication arise from the fact that NSRunLoop ignores exceptions
+        // thrown from a task scheduled by [NSObject performSelector:onThread:], which we
+        // use to implement post(). The current solution waits for 100ms before
+        // terminating when there are no more events, or if an exception is caught.
+        [m_runloop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+
+        if (m_caught_exception) {
+            auto exception = std::move(m_caught_exception);
+            m_caught_exception = nullptr;
+            std::rethrow_exception(exception);
+        }
+    } while (m_active_events > 0);
 }
 
-void EventLoop<Apple>::stop()
+void EventLoopApple::stop()
 {
-    CFRunLoopRef runloop = [m_impl->m_runloop getCFRunLoop];
+    CFRunLoopRef runloop = [m_runloop getCFRunLoop];
     CFRunLoopStop(runloop);
 }
 
-void EventLoop<Apple>::reset()
-{
-    // Do nothing.
-}
-
-struct EventLoop<Apple>::Socket: SocketBase {
-    NSRunLoop* m_runloop;
+struct EventLoopApple::Socket: SocketBase {
+    EventLoopApple& m_owner;
     OnConnectComplete m_on_connect_complete;
 
     NSInputStream* m_read_stream;
@@ -59,8 +128,8 @@ struct EventLoop<Apple>::Socket: SocketBase {
     Optional<char> m_read_delim;
 
 
-    Socket(NSRunLoop* runloop, std::string host, int port, SocketSecurity sec, OnConnectComplete on_connect_complete):
-        m_runloop(runloop), m_on_connect_complete(std::move(on_connect_complete))
+    Socket(EventLoopApple& runloop, std::string host, int port, SocketSecurity sec, OnConnectComplete on_connect_complete):
+        m_owner(runloop), m_on_connect_complete(std::move(on_connect_complete))
     {
         CFReadStreamRef read_stream;
         CFWriteStreamRef write_stream;
@@ -116,17 +185,20 @@ struct EventLoop<Apple>::Socket: SocketBase {
         CFWriteStreamRef write_stream = static_cast<CFWriteStreamRef>(m_write_stream);
 
         if (CFReadStreamSetClient(read_stream, read_flags, read_cb, &m_context)) {
-            [m_read_stream scheduleInRunLoop:m_runloop forMode:NSRunLoopCommonModes];
+            [m_read_stream scheduleInRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
+            ++m_owner.m_active_events;
         }
         else {
             return convert_error_code(CFReadStreamCopyError(read_stream));
         }
 
         if (CFWriteStreamSetClient(write_stream, write_flags, write_cb, &m_context)) {
-            [m_write_stream scheduleInRunLoop:m_runloop forMode:NSRunLoopCommonModes];
+            [m_write_stream scheduleInRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
+            ++m_owner.m_active_events;
         }
         else {
-            [m_read_stream removeFromRunLoop:m_runloop forMode:NSRunLoopCommonModes];
+            [m_read_stream removeFromRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
+            --m_owner.m_active_events;
             return convert_error_code(CFWriteStreamCopyError(write_stream));
         }
 
@@ -138,12 +210,14 @@ struct EventLoop<Apple>::Socket: SocketBase {
         [m_read_stream close];
         [m_write_stream close];
         m_num_open_streams = 0;
+        m_owner.m_active_events -= 2;
     }
 
     void cancel() override
     {
-        [m_read_stream  removeFromRunLoop:m_runloop forMode:NSRunLoopCommonModes];
-        [m_write_stream removeFromRunLoop:m_runloop forMode:NSRunLoopCommonModes];
+        [m_read_stream  removeFromRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
+        [m_write_stream removeFromRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
+        m_owner.m_active_events -= 2;
         if (m_on_read_complete) {
             on_read_complete(error::operation_aborted);
         }
@@ -166,6 +240,7 @@ struct EventLoop<Apple>::Socket: SocketBase {
         m_current_write_buffer = data;
         m_current_write_buffer_size = size;
         ++m_num_operations_scheduled;
+        ++m_owner.m_active_events;
     }
 
     void async_read(char* buffer, size_t size, OnReadComplete on_read_complete) override
@@ -177,6 +252,7 @@ struct EventLoop<Apple>::Socket: SocketBase {
         m_current_read_buffer = buffer;
         m_current_read_buffer_size = size;
         ++m_num_operations_scheduled;
+        ++m_owner.m_active_events;
     }
 
     void async_read_until(char* buffer, size_t size, char delim, OnReadComplete on_read_complete) override
@@ -231,6 +307,7 @@ private:
         m_bytes_read = 0;
         handler(ec, total_bytes_read);
         --m_num_operations_scheduled;
+        --m_owner.m_active_events;
         if (m_num_operations_scheduled == 0)
             cancel();
     }
@@ -245,6 +322,7 @@ private:
         m_bytes_written = 0;
         on_write_complete(ec, total_bytes_written);
         --m_num_operations_scheduled;
+        --m_owner.m_active_events;
         if (m_num_operations_scheduled == 0)
             cancel();
     }
@@ -358,18 +436,18 @@ private:
 };
 
 std::unique_ptr<SocketBase>
-EventLoop<Apple>::async_connect(std::string host, int port, SocketSecurity sec,
+EventLoopApple::async_connect(std::string host, int port, SocketSecurity sec,
                                 OnConnectComplete on_connect)
 {
-    return std::unique_ptr<SocketBase>(new Socket{m_impl->m_runloop, std::move(host), port,
+    return std::unique_ptr<SocketBase>(new Socket{*this, std::move(host), port,
                                                   sec, std::move(on_connect)});
 }
 
 
-struct EventLoop<Apple>::DeadlineTimer: DeadlineTimerBase {
+struct EventLoopApple::DeadlineTimer: DeadlineTimerBase {
 public:
-    DeadlineTimer(NSRunLoop* runloop, Duration duration, OnTimeout on_timeout):
-        m_runloop(runloop), m_timer(nil)
+    DeadlineTimer(EventLoopApple& owner, Duration duration, OnTimeout on_timeout):
+        m_owner(owner), m_timer(nil)
     {
         m_context.version = 0;
         m_context.info = this;
@@ -422,11 +500,12 @@ public:
                                                        on_timer_cb,
                                                        &m_context);
         m_timer = static_cast<NSTimer*>(timer);
-        [m_runloop addTimer:m_timer forMode:NSRunLoopCommonModes];
+        [m_owner.m_runloop addTimer:m_timer forMode:NSRunLoopCommonModes];
+        ++m_owner.m_active_events;
     }
 
 private:
-    NSRunLoop* m_runloop;
+    EventLoopApple& m_owner;
     NSTimer* m_timer;
     OnTimeout m_on_timeout;
     CFRunLoopTimerContext m_context;
@@ -435,6 +514,7 @@ private:
     void timer_cb(CFRunLoopTimerRef timer)
     {
         REALM_ASSERT(timer == static_cast<CFRunLoopTimerRef>(m_timer));
+        --m_owner.m_active_events;
         m_on_timeout(m_error);
         m_on_timeout = nullptr;
         m_timer = nil;
@@ -450,41 +530,56 @@ private:
 
 
 std::unique_ptr<DeadlineTimerBase>
-EventLoop<Apple>::async_timer(Duration duration, OnTimeout on_timeout)
+EventLoopApple::async_timer(Duration duration, OnTimeout on_timeout)
 {
-    return std::unique_ptr<DeadlineTimerBase>(new DeadlineTimer{m_impl->m_runloop, duration, std::move(on_timeout)});
+    return std::unique_ptr<DeadlineTimerBase>(new DeadlineTimer{*this, duration, std::move(on_timeout)});
 }
 
-@interface EventLoopApplePost: NSObject {
-    EventLoopBase::OnPost _on_post;
+@interface FunctionTask: NSObject {
+    EventLoopApple* _owner;
+    std::function<void()> _function;
 }
--(id)initWithCallback:(EventLoopBase::OnPost)callback;
--(void)fire:(NSTimer*)timer;
++(id)functionTaskWithFunction:(std::function<void()>)function andOwner:(EventLoopApple*)owner;
+-(void)perform;
 @end
 
-@implementation EventLoopApplePost
+@implementation FunctionTask
++(id)functionTaskWithFunction:(std::function<void()>)function andOwner:(EventLoopApple*)owner {
+    FunctionTask* task = [[FunctionTask alloc] init];
+    task->_owner = owner;
+    task->_function = std::move(function);
+    return task;
+}
+-(void)perform {
+    // NSRunLoop eats exceptions for breakfast, but we don't want that behavior. We want to
+    // stop the event loop and propagate the exception to the caller instead.
 
--(id)initWithCallback:(EventLoopBase::OnPost)callback
-{
-    self = [super init];
-    if (self) {
-        self->_on_post = std::move(callback);
+    if (_owner->m_caught_exception) {
+        // If an exception was caught from a different post() handler, skip this one.
+        return;
     }
-    return self;
-}
 
--(void)fire:(NSTimer*)timer
-{
-    static_cast<void>(timer);
-    self->_on_post();
+    try {
+        (self->_function)();
+    }
+    catch (...) {
+        _owner->m_caught_exception = std::current_exception();
+    }
 }
-
 @end
 
-void EventLoop<Apple>::post(OnPost on_post)
+void EventLoopApple::post(OnPost on_post)
 {
-    auto event = [[EventLoopApplePost alloc] initWithCallback:std::move(on_post)];
-    NSTimer* timer = [NSTimer scheduledTimerWithTimeInterval:0 target:event selector:@selector(fire:) userInfo:nil repeats:NO];
-    [m_impl->m_runloop addTimer:timer forMode:NSRunLoopCommonModes];
+    FunctionTask* task = [FunctionTask functionTaskWithFunction:on_post andOwner:this];
+    [task performSelector:@selector(perform) onThread:m_thread withObject:nil waitUntilDone:NO];
 }
+
+namespace realm {
+namespace util {
+EventLoopBase& get_native_event_loop()
+{
+    return get_apple_event_loop();
+}
+} // namespace util
+} // namespace realm
 

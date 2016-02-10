@@ -5,26 +5,63 @@
 namespace realm {
 namespace util {
 
+class EventLoopPOSIX: public EventLoopBase {
+public:
+    EventLoopPOSIX();
+    ~EventLoopPOSIX();
 
-EventLoop<ASIO>::EventLoop() {}
-EventLoop<ASIO>::~EventLoop() {}
+    void run() override;
+    void stop() override;
+    void reset();
 
-void EventLoop<ASIO>::run()
+    std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) final;
+    std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
+    void post(OnPost) final;
+protected:
+    struct Resolver;
+    struct Socket;
+    struct DeadlineTimer;
+
+    network::io_service m_io_service;
+};
+
+
+std::unique_ptr<EventLoopBase> get_posix_event_loop()
+{
+    return std::unique_ptr<EventLoopBase>{new EventLoopPOSIX};
+}
+
+#if !REALM_PLATFORM_APPLE
+static REALM_THREAD_LOCAL EventLoopPOSIX* g_realm_event_loop = nullptr;
+EventLoopBase& get_native_event_loop()
+{
+    if (g_realm_event_loop == nullptr) {
+        g_realm_event_loop = new EventLoopPOSIX;
+    }
+    return *g_realm_event_loop;
+}
+#endif
+
+
+EventLoopPOSIX::EventLoopPOSIX() {}
+EventLoopPOSIX::~EventLoopPOSIX() {}
+
+void EventLoopPOSIX::run()
 {
     m_io_service.run();
 }
 
-void EventLoop<ASIO>::stop()
+void EventLoopPOSIX::stop()
 {
     m_io_service.stop();
 }
 
-void EventLoop<ASIO>::reset()
+void EventLoopPOSIX::reset()
 {
     m_io_service.reset();
 }
 
-struct EventLoop<ASIO>::Socket: SocketBase {
+struct EventLoopPOSIX::Socket: SocketBase {
     Socket(network::io_service& io_service, std::string host, int port, EventLoopBase::OnConnectComplete on_complete):
         m_on_complete(std::move(on_complete)),
         m_socket(io_service),
@@ -98,14 +135,14 @@ struct EventLoop<ASIO>::Socket: SocketBase {
 };
 
 std::unique_ptr<SocketBase>
-EventLoop<ASIO>::async_connect(std::string host, int port, SocketSecurity sec, EventLoopBase::OnConnectComplete on_complete)
+EventLoopPOSIX::async_connect(std::string host, int port, SocketSecurity sec, EventLoopBase::OnConnectComplete on_complete)
 {
     REALM_ASSERT_RELEASE(sec == SocketSecurity::None && "Not implemented yet");
     return std::unique_ptr<SocketBase>{new Socket{m_io_service, std::move(host), port, std::move(on_complete)}};
 }
 
 
-struct EventLoop<ASIO>::DeadlineTimer: DeadlineTimerBase {
+struct EventLoopPOSIX::DeadlineTimer: DeadlineTimerBase {
     DeadlineTimer(network::io_service& io_service, EventLoopBase::Duration delay, EventLoopBase::OnTimeout on_timeout):
         m_timer(io_service)
     {
@@ -126,13 +163,13 @@ struct EventLoop<ASIO>::DeadlineTimer: DeadlineTimerBase {
 };
 
 std::unique_ptr<DeadlineTimerBase>
-EventLoop<ASIO>::async_timer(EventLoopBase::Duration delay, EventLoopBase::OnTimeout on_timeout)
+EventLoopPOSIX::async_timer(EventLoopBase::Duration delay, EventLoopBase::OnTimeout on_timeout)
 {
     return std::unique_ptr<DeadlineTimerBase>{new DeadlineTimer{m_io_service, delay, std::move(on_timeout)}};
 }
 
 void
-EventLoop<ASIO>::post(OnPost on_post)
+EventLoopPOSIX::post(OnPost on_post)
 {
     m_io_service.post(std::move(on_post));
 }
