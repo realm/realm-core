@@ -40,6 +40,14 @@
   bindings can specifically catch this case and handle it differently
   than the rest of the general std::runtime_errors.
 
+* Doubled the speed of TableView::clear() when parent table has an 
+  indexed column.
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
 ----------------------------------------------
 
 # 0.96.0 Release notes

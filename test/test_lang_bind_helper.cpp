@@ -10893,4 +10893,94 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         slaves[i].join();
 }
 
+
+// TableView::clear() was originally reported to be slow when table was indexed and had links, but performance
+// has now doubled. This test is just a short sanity test that clear() still works.
+TEST(LangBindHelper_TableViewClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    size_t number_of_history = 1000;
+    size_t number_of_line = 18;
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    // set up tables:
+    // history : ["id" (int), "parent" (int), "lines" (list(line))]
+    // line    : ["id" (int), "parent" (int)]
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        TableRef history = group_w.add_table("history");
+        TableRef line = group_w.add_table("line");
+
+        history->add_column(type_Int, "id");
+        history->add_column(type_Int, "parent");
+        history->add_column_link(type_LinkList, "lines", *line);
+        history->add_search_index(1);
+
+        line->add_column(type_Int, "id");
+        line->add_column(type_Int, "parent");
+        line->add_search_index(1);
+
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+    }
+
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+
+        TableRef history = group_w.get_table("history");
+        TableRef line = group_w.get_table("line");
+
+        history->add_empty_row();
+        history->set_int(0, 0, 1);
+        LinkViewRef ll = history->get_linklist(2, 0);
+        for (size_t j = 0; j < number_of_line; ++j) {
+            size_t r = line->add_empty_row();
+            line->set_int(0, r, j + 1);
+            ll->add(r);
+        }
+
+        for (size_t i = 1; i < number_of_history; ++i) {
+            size_t ri = history->add_empty_row();
+            history->set_int(0, ri, i + 1);
+            history->set_int(1, ri, 1);
+            for (size_t j = 1; j <= number_of_line; ++j) {
+                size_t rj = line->add_empty_row();
+                line->set_int(0, rj, rj + 1);
+                line->set_int(1, rj, j);
+            }
+        }
+
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+
+        CHECK_EQUAL(number_of_history, history->size());
+        CHECK_EQUAL(number_of_history * number_of_line, line->size());
+    }
+
+    // query and delete
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+
+        TableRef history = group_w.get_table("history");
+        TableRef line = group_w.get_table("line");
+
+    //    number_of_line = 2;
+        for (size_t i = 1; i <= number_of_line; ++i) {
+            TableView tv = (line->column<Int>(1) == int64_t(i)).find_all();
+            tv.clear(RemoveMode::unordered);
+        }
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+    }
+
+    {
+        TableRef history = group_w.get_table("history");
+        TableRef line = group_w.get_table("line");
+
+        CHECK_EQUAL(number_of_history, history->size());
+        CHECK_EQUAL(number_of_line, line->size());
+    }
+}
+
 #endif
