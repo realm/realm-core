@@ -6,6 +6,24 @@
 
 ### API breaking changes:
 
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.96.1 Release notes
+
+### API breaking changes:
+
 * Important for language bindings: Any method on Query and TableView that
   depends on a deleted LinkView will now return sane return values; 
   Query::find() returns npos, Query::find_all() returns empty TableView,
