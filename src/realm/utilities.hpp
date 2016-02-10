@@ -63,17 +63,17 @@ namespace realm {
 
 struct NewDate
 {
-    NewDate(int64_t upper, int64_t lower) : m_upper(upper), m_lower(lower) { }
+    NewDate(int64_t seconds, int64_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds) { }
     NewDate() { }
 
-    bool is_null() const { return m_upper == 0 && m_upper == 0; }
-    bool operator == (const NewDate& d) const { return m_upper == d.m_upper && m_lower == d.m_lower; }
-    bool operator > (const NewDate& d) const { return (m_upper > d.m_upper) || (m_upper == d.m_upper && m_upper > d.m_lower); }
-    bool operator < (const NewDate& d) const { return (m_upper < d.m_upper) || (m_upper == d.m_upper && m_upper < d.m_lower); }
-    NewDate& operator = (const NewDate& other) = default;
+    bool is_null() const { return m_seconds == 0 && m_seconds == 0; }
+    bool operator == (const NewDate& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
+    bool operator > (const NewDate& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_seconds > rhs.m_nanoseconds); }
+    bool operator < (const NewDate& rhs) const { return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_seconds < rhs.m_nanoseconds); }
+    NewDate& operator = (const NewDate& rhs) = default;
 
-    int64_t m_upper = 0;
-    int64_t m_lower = 0;
+    int64_t m_seconds = 0;
+    int64_t m_nanoseconds = 0;
 };
 
 
