@@ -234,20 +234,20 @@ private:
 
 class EventLoopLogger: public EventLoopBase {
 public:
-    EventLoopLogger(std::unique_ptr<EventLoopBase> base, util::Logger& logger):
-        m_base(std::move(base)), m_logger(logger)
+    EventLoopLogger(EventLoopBase& base, util::Logger& logger):
+        m_base(base), m_logger(logger)
     {}
 
     void run() final
     {
         m_logger.log("run()");
-        m_base->run();
+        m_base.run();
     }
 
     void stop() final
     {
         m_logger.log("stop()");
-        m_base->stop();
+        m_base.stop();
     }
 
     std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity sec,
@@ -259,7 +259,7 @@ public:
             on_complete(ec);
         };
         return std::unique_ptr<SocketBase>(
-                new SocketLogger{m_base->async_connect(std::move(host), port, sec, logging_on_complete), m_logger});
+                new SocketLogger{m_base.async_connect(std::move(host), port, sec, logging_on_complete), m_logger});
     }
 
     std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout on_timeout) final
@@ -270,7 +270,7 @@ public:
             on_timeout(ec);
         };
         return std::unique_ptr<DeadlineTimerBase>(
-                new DeadlineTimerLogger{m_base->async_timer(delay, logging_on_timeout), m_logger});
+                new DeadlineTimerLogger{m_base.async_timer(delay, logging_on_timeout), m_logger});
     }
 
     void post(OnPost on_post) final
@@ -280,10 +280,10 @@ public:
             m_logger.log("post->on_post()");
             on_post();
         };
-        m_base->post(logging_on_post);
+        m_base.post(logging_on_post);
     }
 private:
-    std::unique_ptr<EventLoopBase> m_base;
+    EventLoopBase& m_base;
     util::Logger& m_logger;
 
 
