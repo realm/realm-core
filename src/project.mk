@@ -15,6 +15,7 @@ endif
 ifeq ($(OS),Darwin)
   CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++ -Wno-nested-anon-types
   VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
+  CFLAGS_OBJC += -fobjc-arc
 endif
 
 CFLAGS_DEBUG += -fno-elide-constructors
