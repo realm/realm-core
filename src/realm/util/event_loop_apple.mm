@@ -6,7 +6,8 @@
 using namespace realm;
 using namespace realm::util;
 
-static const NSString* kRealmEventLoopStateKey = @"RealmEventLoopState";
+static NSString* kRealmEventLoopStateKey = @"RealmEventLoopState";
+static NSString* kRealmRunLoopMode = @"RealmRunLoopMode";
 
 class EventLoopApple;
 
@@ -47,6 +48,7 @@ public:
     NSThread* m_thread = nil;
     size_t m_active_events = 0;
     std::exception_ptr m_caught_exception;
+    std::atomic<bool> m_running;
 };
 
 
@@ -76,6 +78,7 @@ EventLoopApple::~EventLoopApple()
 
 void EventLoopApple::run()
 {
+    m_running = true;
     do {
         // FIXME: NSRunLoop doesn't seem to have a built-in mode that exactly matches the
         // behavior we want, which is to run until no events are scheduled, but terminate
@@ -83,26 +86,23 @@ void EventLoopApple::run()
         //
         // -[NSRunLoop run] never terminates.
         //
-        // -[NSRunLoop runInMode:untilDate:] terminates too early.
-        //
         // Additional complication arise from the fact that NSRunLoop ignores exceptions
         // thrown from a task scheduled by [NSObject performSelector:onThread:], which we
         // use to implement post(). The current solution waits for 100ms before
         // terminating when there are no more events, or if an exception is caught.
-        [m_runloop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        [m_runloop runMode:kRealmRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
 
         if (m_caught_exception) {
             auto exception = std::move(m_caught_exception);
             m_caught_exception = nullptr;
             std::rethrow_exception(exception);
         }
-    } while (m_active_events > 0);
+    } while (m_running && m_active_events > 0);
 }
 
 void EventLoopApple::stop()
 {
-    CFRunLoopRef runloop = [m_runloop getCFRunLoop];
-    CFRunLoopStop(runloop);
+    m_running = false;
 }
 
 struct EventLoopApple::Socket: SocketBase {
@@ -128,8 +128,8 @@ struct EventLoopApple::Socket: SocketBase {
     Optional<char> m_read_delim;
 
 
-    Socket(EventLoopApple& runloop, std::string host, int port, SocketSecurity sec, OnConnectComplete on_connect_complete):
-        m_owner(runloop), m_on_connect_complete(std::move(on_connect_complete))
+    Socket(EventLoopApple& runloop, std::string host, int port, SocketSecurity sec, OnConnectComplete connect_complete_handler):
+        m_owner(runloop), m_on_connect_complete(std::move(connect_complete_handler))
     {
         CFReadStreamRef read_stream;
         CFWriteStreamRef write_stream;
@@ -138,8 +138,8 @@ struct EventLoopApple::Socket: SocketBase {
         CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, cf_host, static_cast<UInt32>(port), &read_stream, &write_stream);
         CFRelease(cf_host);
 
-        m_read_stream = static_cast<NSInputStream*>(read_stream);
-        m_write_stream = static_cast<NSOutputStream*>(write_stream);
+        m_read_stream = (__bridge NSInputStream*)read_stream;
+        m_write_stream = (__bridge NSOutputStream*)write_stream;
 
         if (sec == SocketSecurity::TLSv1) {
             [m_read_stream  setProperty:NSStreamSocketSecurityLevelTLSv1 forKey:NSStreamSocketSecurityLevelKey];
@@ -158,7 +158,7 @@ struct EventLoopApple::Socket: SocketBase {
 
         std::error_code err = activate();
         if (err) {
-            m_on_connect_complete(err);
+            on_open_complete(err);
             return;
         }
 
@@ -181,11 +181,11 @@ struct EventLoopApple::Socket: SocketBase {
                                   | kCFStreamEventEndEncountered
                                   | kCFStreamEventCanAcceptBytes;
 
-        CFReadStreamRef read_stream = static_cast<CFReadStreamRef>(m_read_stream);
-        CFWriteStreamRef write_stream = static_cast<CFWriteStreamRef>(m_write_stream);
+        CFReadStreamRef read_stream = (__bridge CFReadStreamRef)m_read_stream;
+        CFWriteStreamRef write_stream = (__bridge CFWriteStreamRef)m_write_stream;
 
         if (CFReadStreamSetClient(read_stream, read_flags, read_cb, &m_context)) {
-            [m_read_stream scheduleInRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
+            [m_read_stream scheduleInRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
             ++m_owner.m_active_events;
         }
         else {
@@ -193,12 +193,12 @@ struct EventLoopApple::Socket: SocketBase {
         }
 
         if (CFWriteStreamSetClient(write_stream, write_flags, write_cb, &m_context)) {
-            [m_write_stream scheduleInRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
+            [m_write_stream scheduleInRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
             ++m_owner.m_active_events;
         }
         else {
-            [m_read_stream removeFromRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
-            --m_owner.m_active_events;
+            [m_read_stream removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
+            --m_owner.m_active_events; // because read stream was removed
             return convert_error_code(CFWriteStreamCopyError(write_stream));
         }
 
@@ -210,20 +210,41 @@ struct EventLoopApple::Socket: SocketBase {
         [m_read_stream close];
         [m_write_stream close];
         m_num_open_streams = 0;
-        m_owner.m_active_events -= 2;
+        cancel_with_error(error::connection_aborted);
     }
 
     void cancel() override
     {
-        [m_read_stream  removeFromRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
-        [m_write_stream removeFromRunLoop:m_owner.m_runloop forMode:NSRunLoopCommonModes];
-        m_owner.m_active_events -= 2;
-        if (m_on_read_complete) {
-            on_read_complete(error::operation_aborted);
+        cancel_with_error(error::operation_aborted);
+    }
+
+    void cancel_with_error(std::error_code ec)
+    {
+        if (m_on_connect_complete || m_on_read_complete) {
+            [m_read_stream  removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
+            if (m_on_connect_complete) {
+                --m_owner.m_active_events;
+                on_open_complete(ec);
+            }
+            else {
+                on_read_complete(ec);
+            }
         }
-        if (m_on_write_complete) {
-            on_write_complete(error::operation_aborted);
+
+        if (m_on_connect_complete || m_on_write_complete) {
+            [m_write_stream removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
+            if (m_on_connect_complete) {
+                --m_owner.m_active_events;
+                // Completion handler already invoked above.
+            }
+            else {
+                on_write_complete(ec);
+            }
         }
+
+        m_on_connect_complete = nullptr;
+        REALM_ASSERT(m_on_read_complete == nullptr);
+        REALM_ASSERT(m_on_write_complete == nullptr);
     }
 
     bool is_open() const
@@ -234,6 +255,7 @@ struct EventLoopApple::Socket: SocketBase {
     void async_write(const char* data, size_t size, OnWriteComplete on_write_complete) override
     {
         REALM_ASSERT(m_current_write_buffer == nullptr);
+        REALM_ASSERT(!m_on_connect_complete); // not yet connected
         REALM_ASSERT(!m_on_write_complete);
 
         m_on_write_complete = std::move(on_write_complete);
@@ -241,11 +263,13 @@ struct EventLoopApple::Socket: SocketBase {
         m_current_write_buffer_size = size;
         ++m_num_operations_scheduled;
         ++m_owner.m_active_events;
+        [m_write_stream scheduleInRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
     }
 
     void async_read(char* buffer, size_t size, OnReadComplete on_read_complete) override
     {
         REALM_ASSERT(m_current_read_buffer == nullptr);
+        REALM_ASSERT(!m_on_connect_complete); // not yet connected
         REALM_ASSERT(!m_on_read_complete);
 
         m_on_read_complete = std::move(on_read_complete);
@@ -253,6 +277,7 @@ struct EventLoopApple::Socket: SocketBase {
         m_current_read_buffer_size = size;
         ++m_num_operations_scheduled;
         ++m_owner.m_active_events;
+        [m_read_stream scheduleInRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
     }
 
     void async_read_until(char* buffer, size_t size, char delim, OnReadComplete on_read_complete) override
@@ -288,11 +313,22 @@ private:
         return ec;
     }
 
+    void on_open_complete(std::error_code)
+    {
+        [m_read_stream removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
+        [m_write_stream removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
+
+        auto handler = std::move(m_on_connect_complete);
+        m_on_connect_complete = nullptr;
+        handler(std::error_code{});
+    }
+
     void handle_open_completed()
     {
+        --m_owner.m_active_events;
         ++m_num_open_streams;
         if (is_open()) {
-            m_on_connect_complete(std::error_code{});
+            on_open_complete(std::error_code{});
         }
     }
 
@@ -305,31 +341,29 @@ private:
         m_current_read_buffer = nullptr;
         m_current_read_buffer_size = 0;
         m_bytes_read = 0;
-        handler(ec, total_bytes_read);
         --m_num_operations_scheduled;
         --m_owner.m_active_events;
-        if (m_num_operations_scheduled == 0)
-            cancel();
+        [m_read_stream removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
+        handler(ec, total_bytes_read);
     }
 
     void on_write_complete(std::error_code ec)
     {
-        auto on_write_complete = std::move(m_on_write_complete);
+        auto handler = std::move(m_on_write_complete);
         auto total_bytes_written = m_bytes_written;
         m_on_write_complete = nullptr;
         m_current_write_buffer = nullptr;
         m_current_write_buffer_size = 0;
         m_bytes_written = 0;
-        on_write_complete(ec, total_bytes_written);
         --m_num_operations_scheduled;
         --m_owner.m_active_events;
-        if (m_num_operations_scheduled == 0)
-            cancel();
+        [m_write_stream removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
+        handler(ec, total_bytes_written);
     }
 
     void read_cb(CFReadStreamRef stream, CFStreamEventType event_type)
     {
-        REALM_ASSERT(stream == static_cast<CFReadStreamRef>(m_read_stream));
+        REALM_ASSERT(stream == (__bridge CFReadStreamRef)m_read_stream);
 
         switch (event_type) {
             case kCFStreamEventOpenCompleted:
@@ -375,10 +409,18 @@ private:
                 break;
             }
             case kCFStreamEventErrorOccurred: {
-                on_read_complete(convert_error_code(CFReadStreamCopyError(stream)));
+                auto ec = convert_error_code(CFReadStreamCopyError(stream));
+                if (m_on_connect_complete) {
+                    m_on_connect_complete(ec);
+                    m_on_connect_complete = nullptr;
+                }
+                else if (m_on_read_complete) {
+                    on_read_complete(ec);
+                }
                 break;
             }
             case kCFStreamEventEndEncountered: {
+                REALM_ASSERT(m_on_read_complete);
                 on_read_complete(make_error_code(network::end_of_input));
                 break;
             }
@@ -387,7 +429,7 @@ private:
 
     void write_cb(CFWriteStreamRef stream, CFStreamEventType event_type)
     {
-        REALM_ASSERT(stream == static_cast<CFWriteStreamRef>(m_write_stream));
+        REALM_ASSERT(stream == (__bridge CFWriteStreamRef)m_write_stream);
 
         switch (event_type) {
             case kCFStreamEventOpenCompleted:
@@ -412,7 +454,14 @@ private:
                 break;
             }
             case kCFStreamEventErrorOccurred: {
-                on_write_complete(convert_error_code(CFWriteStreamCopyError(stream)));
+                auto ec = convert_error_code(CFWriteStreamCopyError(stream));
+                if (m_on_connect_complete) {
+                    m_on_connect_complete(ec);
+                    m_on_connect_complete = nullptr;
+                }
+                else if (m_on_write_complete) {
+                    on_write_complete(ec);
+                }
                 break;
             }
             case kCFStreamEventEndEncountered: {
@@ -437,8 +486,9 @@ private:
 
 std::unique_ptr<SocketBase>
 EventLoopApple::async_connect(std::string host, int port, SocketSecurity sec,
-                                OnConnectComplete on_connect)
+                              OnConnectComplete on_connect)
 {
+    REALM_ASSERT(m_thread == [NSThread currentThread]); // Not thread-safe
     return std::unique_ptr<SocketBase>(new Socket{*this, std::move(host), port,
                                                   sec, std::move(on_connect)});
 }
@@ -499,8 +549,8 @@ public:
                                                        order,
                                                        on_timer_cb,
                                                        &m_context);
-        m_timer = static_cast<NSTimer*>(timer);
-        [m_owner.m_runloop addTimer:m_timer forMode:NSRunLoopCommonModes];
+        m_timer = (__bridge NSTimer*)timer;
+        [m_owner.m_runloop addTimer:m_timer forMode:kRealmRunLoopMode];
         ++m_owner.m_active_events;
     }
 
@@ -513,7 +563,7 @@ private:
 
     void timer_cb(CFRunLoopTimerRef timer)
     {
-        REALM_ASSERT(timer == static_cast<CFRunLoopTimerRef>(m_timer));
+        REALM_ASSERT(timer == (__bridge CFRunLoopTimerRef)m_timer);
         --m_owner.m_active_events;
         m_on_timeout(m_error);
         m_on_timeout = nullptr;
@@ -532,6 +582,7 @@ private:
 std::unique_ptr<DeadlineTimerBase>
 EventLoopApple::async_timer(Duration duration, OnTimeout on_timeout)
 {
+    REALM_ASSERT(m_thread == [NSThread currentThread]); // Not thread-safe
     return std::unique_ptr<DeadlineTimerBase>(new DeadlineTimer{*this, duration, std::move(on_timeout)});
 }
 
@@ -571,7 +622,7 @@ EventLoopApple::async_timer(Duration duration, OnTimeout on_timeout)
 void EventLoopApple::post(OnPost on_post)
 {
     FunctionTask* task = [FunctionTask functionTaskWithFunction:on_post andOwner:this];
-    [task performSelector:@selector(perform) onThread:m_thread withObject:nil waitUntilDone:NO];
+    [task performSelector:@selector(perform) onThread:m_thread withObject:nil waitUntilDone:NO modes:@[kRealmRunLoopMode]];
 }
 
 namespace realm {
