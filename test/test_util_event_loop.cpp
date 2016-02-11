@@ -380,18 +380,12 @@ TEST_TYPES(EventLoop_DeadlineTimer, POSIX, PlatformLocal)
     CHECK(canceled);
 }
 
-TEST_TYPES(EventLoop_HandlerDealloc, POSIX, PlatformLocal)
+TEST_TYPES(EventLoop_PostPropagatesExceptions, POSIX, PlatformLocal)
 {
-    // Check that throwing an exception from a callback cancels future
-    // callbacks.
-    {
-        // m_imm_handlers
-        GetEventLoop<TEST_TYPE> service;
-        // By adding two post handlers that throw, one is going to be left
-        // behind in `m_imm_handlers`
-        service.loop.post([&]{ throw std::runtime_error(""); });
-        service.loop.post([&]{ throw std::runtime_error(""); });
-        CHECK_THROW(service.loop.run(), std::runtime_error);
-    }
+    // Check that throwing an exception propagates to the point of invocation
+    // of the runloop.
+    GetEventLoop<TEST_TYPE> service;
+    service.loop.post([&]{ throw std::runtime_error(""); });
+    CHECK_THROW(service.loop.run(), std::runtime_error);
 }
 
