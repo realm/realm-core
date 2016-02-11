@@ -1057,11 +1057,38 @@ public:
         return true;
     }
 
-    bool move_group_level_table(size_t, size_t) noexcept
+    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
     {
-        // No-op since table names / table refs are properties of the group, and the group
-        // accessor is always refreshed
+        if (!m_group.m_table_accessors.empty()) {
+            using iter = decltype(m_group.m_table_accessors)::iterator;
+            iter begin, end;
+            if (from_table_ndx < to_table_ndx) {
+                // Left rotation
+                begin = m_group.m_table_accessors.begin() + from_table_ndx;
+                end = m_group.m_table_accessors.begin() + to_table_ndx + 1;
+                Table* table = begin[0];
+                std::copy(begin + 1, end, begin);
+                end[-1] = table;
+            }
+            else if (from_table_ndx > to_table_ndx) {
+                // Right rotation
+                begin = m_group.m_table_accessors.begin() + to_table_ndx;
+                end = m_group.m_table_accessors.begin() + from_table_ndx + 1;
+                Table* table = end[-1];
+                std::copy_backward(begin, end-1, end);
+                begin[0] = table;
+            }
+            for (iter i = begin; i != end; ++i) {
+                if (Table* table = *i) {
+                    typedef _impl::TableFriend tf;
+                    tf::mark(*table); // FIXME: Not sure this is needed
+                    tf::mark_opposite_link_tables(*table);
+                }
+            }
+        }
+
         m_schema_changed = true;
+
         return true;
     }
 

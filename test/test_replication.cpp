@@ -974,7 +974,7 @@ TEST(Replication_MoveSelectedLinkView)
     SHARED_GROUP_TEST_PATH(path_2);
 
     std::unique_ptr<util::Logger> replay_logger;
-    replay_logger.reset(new util::Logger);
+//    replay_logger.reset(new util::Logger);
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -1014,8 +1014,8 @@ TEST(Replication_MoveSelectedLinkView)
         CHECK_EQUAL(2, link_list->size());
     }
 
-    // FIXME: Redo test with all other table-level operations that move the link
-    // list to a new row or column index.
+    // FIXME: Redo the test with all other table-level operations that move the
+    // link list to a new row or column index.
 }
 
 

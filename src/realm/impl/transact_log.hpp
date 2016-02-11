@@ -378,7 +378,7 @@ public:
 protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
 
-    void reset_selection_caches();
+    void reset_selection_caches() noexcept;
     void set_buffer(char* new_free_begin, char* new_free_end) { m_encoder.set_buffer(new_free_begin, new_free_end); }
     char* write_position() const { return m_encoder.write_position(); }
 
@@ -390,10 +390,11 @@ private:
     mutable const Spec*     m_selected_spec;
     mutable const LinkView* m_selected_link_list;
 
-    void select_table(const Table*);
-    void select_desc(const Descriptor&);
-    void select_link_list(const LinkView&);
-    // These reset the above caches and modify them as necessary
+    void unselect_all() noexcept;
+    void select_table(const Table*); // unselects descriptor and link list
+    void select_desc(const Descriptor&); // unselects link list
+    void select_link_list(const LinkView&); // unselects descriptor
+
     void record_subtable_path(const Table&, size_t*& out_begin, size_t*& out_end);
     void do_select_table(const Table*);
     void do_select_desc(const Descriptor&);
@@ -518,11 +519,9 @@ inline void TransactLogEncoder::set_buffer(char* free_begin, char* free_end)
     m_transact_log_free_end   = free_end;
 }
 
-inline void TransactLogConvenientEncoder::reset_selection_caches()
+inline void TransactLogConvenientEncoder::reset_selection_caches() noexcept
 {
-    m_selected_table = nullptr;
-    m_selected_spec  = nullptr;
-    m_selected_link_list  = nullptr;
+    unselect_all();
 }
 
 inline char* TransactLogEncoder::reserve(size_t n)
@@ -762,27 +761,34 @@ bool TransactLogEncoder::append_variable_size_instr(Instruction instr,
     return true;
 }
 
-inline
-void TransactLogConvenientEncoder::select_table(const Table* table)
+inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
-    if (table != m_selected_table) {
-        do_select_table(table);
-    }
+    m_selected_table     = nullptr;
+    m_selected_spec      = nullptr;
+    m_selected_link_list = nullptr;
 }
 
-inline
-void TransactLogConvenientEncoder::select_desc(const Descriptor& desc)
+inline void TransactLogConvenientEncoder::select_table(const Table* table)
+{
+    if (table != m_selected_table)
+        do_select_table(table); // Throws
+    m_selected_spec      = nullptr;
+    m_selected_link_list = nullptr;
+}
+
+inline void TransactLogConvenientEncoder::select_desc(const Descriptor& desc)
 {
     typedef _impl::DescriptorFriend df;
     if (&df::get_spec(desc) != m_selected_spec)
         do_select_desc(desc); // Throws
+    m_selected_link_list = nullptr;
 }
 
-inline
-void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
+inline void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
 {
     if (&list != m_selected_link_list)
         do_select_link_list(list); // Throws
+    m_selected_spec = nullptr;
 }
 
 
@@ -798,6 +804,7 @@ inline void TransactLogConvenientEncoder::insert_group_level_table(size_t table_
                                                                    size_t prior_num_tables,
                                                                    StringData name)
 {
+    unselect_all();
     m_encoder.insert_group_level_table(table_ndx, prior_num_tables, name); // Throws
 }
 
@@ -809,6 +816,7 @@ inline bool TransactLogEncoder::erase_group_level_table(size_t table_ndx, size_t
 
 inline void TransactLogConvenientEncoder::erase_group_level_table(size_t table_ndx, size_t prior_num_tables)
 {
+    unselect_all();
     m_encoder.erase_group_level_table(table_ndx, prior_num_tables); // Throws
 }
 
@@ -821,6 +829,7 @@ inline bool TransactLogEncoder::rename_group_level_table(size_t table_ndx, Strin
 inline void TransactLogConvenientEncoder::rename_group_level_table(size_t table_ndx,
                                                                    StringData new_name)
 {
+    unselect_all();
     m_encoder.rename_group_level_table(table_ndx, new_name); // Throws
 }
 
@@ -832,6 +841,7 @@ inline bool TransactLogEncoder::move_group_level_table(size_t table_ndx_1, size_
 
 inline void TransactLogConvenientEncoder::move_group_level_table(size_t table_ndx_1, size_t table_ndx_2)
 {
+    unselect_all();
     m_encoder.move_group_level_table(table_ndx_1, table_ndx_2);
 }
 
