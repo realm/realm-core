@@ -240,22 +240,22 @@ public:
 
     void run() final
     {
-        m_logger.log("run()");
+        m_logger.log("((EventLoopBase*)%1)->run()", &m_base);
         m_base.run();
     }
 
     void stop() final
     {
-        m_logger.log("stop()");
+        m_logger.log("((EventLoopBase*)%1)->stop()", &m_base);
         m_base.stop();
     }
 
     std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity sec,
                                               OnConnectComplete on_complete) final
     {
-        m_logger.log("async_connect(\"%1\", %2, %3, ...)", host, port, socket_security_as_string(sec));
+        m_logger.log("((EventLoopBase*)%1)->async_connect(\"%2\", %3, %4, ...)", &m_base, host, port, socket_security_as_string(sec));
         auto logging_on_complete = [=](std::error_code ec) {
-            m_logger.log("async_connect->on_complete(%1)", ec);
+            m_logger.log("((EventLoopBase*)%1)->async_connect->on_complete(%2)", &m_base, ec);
             on_complete(ec);
         };
         return std::unique_ptr<SocketBase>(
@@ -264,9 +264,9 @@ public:
 
     std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout on_timeout) final
     {
-        m_logger.log("async_timer(%1, ...)", delay.count());
+        m_logger.log("((EventLoopBase*)%1)->async_timer(%2, ...)", &m_base, delay.count());
         auto logging_on_timeout = [=](std::error_code ec) {
-            m_logger.log("async_timer->on_timeout(%1)", ec);
+            m_logger.log("((EventLoopBase*)%1)->async_timer->on_timeout(%2)", &m_base, ec);
             on_timeout(ec);
         };
         return std::unique_ptr<DeadlineTimerBase>(
@@ -275,9 +275,9 @@ public:
 
     void post(OnPost on_post) final
     {
-        m_logger.log("post()");
+        m_logger.log("((EventLoopBase*)%1)->post()", &m_base);
         auto logging_on_post = [=]() {
-            m_logger.log("post->on_post()");
+            m_logger.log("((EventLoopBase*)%1)->post->on_post()", &m_base);
             on_post();
         };
         m_base.post(logging_on_post);
