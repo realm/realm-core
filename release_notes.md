@@ -10,7 +10,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Add SharedGroup::get_transact_stage().
 
 -----------
 
