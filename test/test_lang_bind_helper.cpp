@@ -7880,6 +7880,139 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
 }
 
 
+// This issue was uncovered while looking into the RollbackCircularReferenceRemoval issue
+TEST(LangBindHelper_RollbackTableRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef alpha = group->get_or_add_table("alpha");
+        TableRef beta = group->get_or_add_table("beta");
+        beta->add_column_link(type_Link, "alpha-1", *alpha);
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+        TableRef alpha = group->get_table("alpha");
+        TableRef beta = group->get_table("beta");
+        group->remove_table("beta");
+        CHECK_NOT(group->has_table("beta"));
+
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+
+    }
+    group->verify();
+}
+
+
+TEST(LangBindHelper_RollbackTableRemove2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef a = group->get_or_add_table("a");
+        TableRef b = group->get_or_add_table("b");
+        TableRef c = group->get_or_add_table("c");
+        TableRef d = group->get_or_add_table("d");
+        c->add_column_link(type_Link, "a", *a);
+        d->add_column_link(type_Link, "b", *b);
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        CHECK_EQUAL(4, group->size());
+        group->remove_table("c");
+        CHECK_NOT(group->has_table("c"));
+        group->verify();
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        CHECK_EQUAL(4, group->size());
+    }
+    group->verify();
+}
+
+
+TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
+{
+    // Test that it is possible to modify a table, then remove it from the
+    // group, and then rollback the transaction.
+
+    // This triggered a bug in the instruction reverser which would incorrectly
+    // associate the table removal instruction with the table selection
+    // instruction induced by the modification, causing the latter to occur in
+    // the reverse log at a point where the selected table does not yet
+    // exist. The filler table is there to avoid an early-out in
+    // Group::TransactAdvancer::select_table() due to a misinterpretation of the
+    // reason for the missing table accessor entry.
+
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *hist);
+    TableRef filler = group->get_or_add_table("filler");
+    TableRef table = group->get_or_add_table("table");
+    table->add_column(type_Int, "i");
+    table->add_empty_row();
+    LangBindHelper::commit_and_continue_as_read(sg);
+    LangBindHelper::promote_to_write(sg, *hist);
+    table->set_int(0, 0, 0);
+    group->remove_table("table");
+    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+}
+
+TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_1_w = wt.add_table("table_1");
+        TableRef table_2_w = wt.add_table("table_2");
+        table_2_w->add_column(type_Int, "i");
+        table_2_w->add_empty_row();
+        wt.commit();
+    }
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    ConstTableRef table_1 = group.get_table("table_1");
+    ConstTableRef table_2 = group.get_table("table_2");
+
+    // Try to advance after an empty write transaction
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_1_w = wt.get_or_add_table("table_1");
+        TableRef table_2_w = wt.get_or_add_table("table_2");
+        table_2_w->set_int(0,0,1);
+        wt.get_group().move_table(0,1);
+        CHECK_EQUAL(1, table_2_w->get_int(0,0));
+        CHECK_EQUAL(0, table_2_w->get_index_in_group());
+        CHECK_EQUAL(1, table_1_w->get_index_in_group());
+        table_2_w->set_int(0,0,2);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(2, table_2->get_int(0,0));
+    CHECK_EQUAL(0, table_2->get_index_in_group());
+    CHECK_EQUAL(1, table_1->get_index_in_group());
+}
+
+
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
