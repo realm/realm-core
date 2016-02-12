@@ -132,14 +132,6 @@ std::string network_error_category::message(int value) const
 } // anonymous namespace
 
 
-endpoint::endpoint(const unsigned char* data, size_t num_bytes)
-{
-    REALM_ASSERT(num_bytes <= sizeof(m_sockaddr_union));
-    unsigned char* target = reinterpret_cast<unsigned char*>(&m_sockaddr_union);
-    std::copy(data, data + num_bytes, target);
-}
-
-
 class io_service::oper_queue {
 public:
     bool empty() const noexcept

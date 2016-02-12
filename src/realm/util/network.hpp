@@ -149,7 +149,6 @@ public:
     port_type port() const;
 
     endpoint();
-    endpoint(const unsigned char* memory, size_t len);
     ~endpoint() noexcept {}
 
 private:
