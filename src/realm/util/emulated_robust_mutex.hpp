@@ -23,9 +23,9 @@
 
 // Enable this only on platforms where it might be needed
 // currently APPLE.
-#if REALM_PLATFORM_APPLE
+//#if REALM_PLATFORM_APPLE
 #define REALM_ROBUST_MUTEX_EMULATION
-#endif
+//#endif
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
