@@ -411,8 +411,7 @@ private:
             case kCFStreamEventErrorOccurred: {
                 auto ec = convert_error_code(CFReadStreamCopyError(stream));
                 if (m_on_connect_complete) {
-                    m_on_connect_complete(ec);
-                    m_on_connect_complete = nullptr;
+                    on_open_complete(ec);
                 }
                 else if (m_on_read_complete) {
                     on_read_complete(ec);
@@ -456,8 +455,7 @@ private:
             case kCFStreamEventErrorOccurred: {
                 auto ec = convert_error_code(CFWriteStreamCopyError(stream));
                 if (m_on_connect_complete) {
-                    m_on_connect_complete(ec);
-                    m_on_connect_complete = nullptr;
+                    on_open_complete(ec);
                 }
                 else if (m_on_write_complete) {
                     on_write_complete(ec);
