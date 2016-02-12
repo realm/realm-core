@@ -14,20 +14,20 @@ struct PlatformLocal {};
 template <> struct GetEventLoop<POSIX> {
     GetEventLoop(): m_loop(get_posix_event_loop()), loop(*m_loop)
     {}
-    std::unique_ptr<EventLoopBase> m_loop;
-    EventLoopBase& loop;
+    std::unique_ptr<EventLoop> m_loop;
+    EventLoop& loop;
 };
 
 template <> struct GetEventLoop<PlatformLocal> {
     GetEventLoop(): loop(get_native_event_loop())
     {}
-    EventLoopBase& loop;
+    EventLoop& loop;
 };
 
 TEST_TYPES(EventLoop_Timer, POSIX, PlatformLocal)
 {
     GetEventLoop<TEST_TYPE> get_loop;
-    EventLoopBase& loop = get_loop.loop;
+    EventLoop& loop = get_loop.loop;
     bool ran = false;
     auto timer = loop.async_timer(std::chrono::milliseconds(1), [&](std::error_code ec) {
         CHECK(!ec);
@@ -243,9 +243,9 @@ public:
 
 private:
     GetEventLoop<Provider> m_get_loop;
-    EventLoopBase& m_loop;
+    EventLoop& m_loop;
     unsigned short m_listen_port;
-    std::unique_ptr<SocketBase> m_socket;
+    std::unique_ptr<Socket> m_socket;
 
     static const size_t s_max_header_size = 32;
     char m_header_buffer[s_max_header_size];
@@ -335,9 +335,9 @@ TEST_TYPES(EventLoop_AsyncCommunication, POSIX, PlatformLocal)
 TEST_TYPES(EventLoop_DeadlineTimer, POSIX, PlatformLocal)
 {
     GetEventLoop<TEST_TYPE> get_event_loop;
-    EventLoopBase& event_loop = get_event_loop.loop;
+    EventLoop& event_loop = get_event_loop.loop;
 
-    std::unique_ptr<DeadlineTimerBase> timer;
+    std::unique_ptr<DeadlineTimer> timer;
 
     // Check that the completion handler is executed
     bool completed = false;

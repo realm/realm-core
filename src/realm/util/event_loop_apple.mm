@@ -29,7 +29,7 @@ static EventLoopApple& get_apple_event_loop()
     return *state.eventLoop;
 }
 
-class EventLoopApple: public EventLoopBase {
+class EventLoopApple: public EventLoop {
 public:
     EventLoopApple();
     ~EventLoopApple();
@@ -37,12 +37,12 @@ public:
     void run() override;
     void stop() override;
 
-    std::unique_ptr<SocketBase> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) final;
-    std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
+    std::unique_ptr<Socket> async_connect(std::string host, int port, SocketSecurity, OnConnectComplete) final;
+    std::unique_ptr<DeadlineTimer> async_timer(Duration delay, OnTimeout) final;
     void post(OnPost) final;
 
-    struct Socket;
-    struct DeadlineTimer;
+    struct SocketImpl;
+    struct DeadlineTimerImpl;
 
     NSRunLoop* m_runloop = nil;
     NSThread* m_thread = nil;
@@ -105,7 +105,7 @@ void EventLoopApple::stop()
     m_running = false;
 }
 
-struct EventLoopApple::Socket: SocketBase {
+struct EventLoopApple::SocketImpl: Socket {
     EventLoopApple& m_owner;
     OnConnectComplete m_on_connect_complete;
 
@@ -128,7 +128,7 @@ struct EventLoopApple::Socket: SocketBase {
     Optional<char> m_read_delim;
 
 
-    Socket(EventLoopApple& runloop, std::string host, int port, SocketSecurity sec, OnConnectComplete connect_complete_handler):
+    SocketImpl(EventLoopApple& runloop, std::string host, int port, SocketSecurity sec, OnConnectComplete connect_complete_handler):
         m_owner(runloop), m_on_connect_complete(std::move(connect_complete_handler))
     {
         CFReadStreamRef read_stream;
@@ -164,10 +164,6 @@ struct EventLoopApple::Socket: SocketBase {
 
         [m_read_stream  open];
         [m_write_stream open];
-    }
-
-    ~Socket()
-    {
     }
 
     std::error_code activate()
@@ -471,30 +467,30 @@ private:
 
     static void read_cb(CFReadStreamRef stream, CFStreamEventType event_type, void* info)
     {
-        Socket* self = reinterpret_cast<Socket*>(info);
+        SocketImpl* self = reinterpret_cast<SocketImpl*>(info);
         self->read_cb(stream, event_type);
     }
 
     static void write_cb(CFWriteStreamRef stream, CFStreamEventType event_type, void* info)
     {
-        Socket* self = reinterpret_cast<Socket*>(info);
+        SocketImpl* self = reinterpret_cast<SocketImpl*>(info);
         self->write_cb(stream, event_type);
     }
 };
 
-std::unique_ptr<SocketBase>
+std::unique_ptr<Socket>
 EventLoopApple::async_connect(std::string host, int port, SocketSecurity sec,
                               OnConnectComplete on_connect)
 {
     REALM_ASSERT(m_thread == [NSThread currentThread]); // Not thread-safe
-    return std::unique_ptr<SocketBase>(new Socket{*this, std::move(host), port,
+    return std::unique_ptr<Socket>(new SocketImpl{*this, std::move(host), port,
                                                   sec, std::move(on_connect)});
 }
 
 
-struct EventLoopApple::DeadlineTimer: DeadlineTimerBase {
+struct EventLoopApple::DeadlineTimerImpl: DeadlineTimer {
 public:
-    DeadlineTimer(EventLoopApple& owner, Duration duration, OnTimeout on_timeout):
+    DeadlineTimerImpl(EventLoopApple& owner, Duration duration, OnTimeout on_timeout):
         m_owner(owner), m_timer(nil)
     {
         m_context.version = 0;
@@ -506,7 +502,7 @@ public:
         async_wait(duration, std::move(on_timeout));
     }
 
-    ~DeadlineTimer()
+    ~DeadlineTimerImpl()
     {
         if (m_timer) {
             [m_timer invalidate];
@@ -571,17 +567,17 @@ private:
 
     static void on_timer_cb(CFRunLoopTimerRef timer, void* info)
     {
-        auto self = reinterpret_cast<DeadlineTimer*>(info);
+        auto self = reinterpret_cast<DeadlineTimerImpl*>(info);
         self->timer_cb(timer);
     }
 };
 
 
-std::unique_ptr<DeadlineTimerBase>
+std::unique_ptr<DeadlineTimer>
 EventLoopApple::async_timer(Duration duration, OnTimeout on_timeout)
 {
     REALM_ASSERT(m_thread == [NSThread currentThread]); // Not thread-safe
-    return std::unique_ptr<DeadlineTimerBase>(new DeadlineTimer{*this, duration, std::move(on_timeout)});
+    return std::unique_ptr<DeadlineTimer>(new DeadlineTimerImpl{*this, duration, std::move(on_timeout)});
 }
 
 void EventLoopApple::post(OnPost on_post)
@@ -606,7 +602,7 @@ void EventLoopApple::post(OnPost on_post)
 
 namespace realm {
 namespace util {
-EventLoopBase& get_native_event_loop()
+EventLoop& get_native_event_loop()
 {
     return get_apple_event_loop();
 }
