@@ -586,43 +586,24 @@ EventLoopApple::async_timer(Duration duration, OnTimeout on_timeout)
     return std::unique_ptr<DeadlineTimerBase>(new DeadlineTimer{*this, duration, std::move(on_timeout)});
 }
 
-@interface FunctionTask: NSObject {
-    EventLoopApple* _owner;
-    std::function<void()> _function;
-}
-+(id)functionTaskWithFunction:(std::function<void()>)function andOwner:(EventLoopApple*)owner;
--(void)perform;
-@end
-
-@implementation FunctionTask
-+(id)functionTaskWithFunction:(std::function<void()>)function andOwner:(EventLoopApple*)owner {
-    FunctionTask* task = [[FunctionTask alloc] init];
-    task->_owner = owner;
-    task->_function = std::move(function);
-    return task;
-}
--(void)perform {
-    // NSRunLoop eats exceptions for breakfast, but we don't want that behavior. We want to
-    // stop the event loop and propagate the exception to the caller instead.
-
-    if (_owner->m_caught_exception) {
-        // If an exception was caught from a different post() handler, skip this one.
-        return;
-    }
-
-    try {
-        (self->_function)();
-    }
-    catch (...) {
-        _owner->m_caught_exception = std::current_exception();
-    }
-}
-@end
-
 void EventLoopApple::post(OnPost on_post)
 {
-    FunctionTask* task = [FunctionTask functionTaskWithFunction:on_post andOwner:this];
-    [task performSelector:@selector(perform) onThread:m_thread withObject:nil waitUntilDone:NO modes:@[kRealmRunLoopMode]];
+    CFRunLoopPerformBlock([m_runloop getCFRunLoop], (__bridge CFStringRef)kRealmRunLoopMode, ^{
+        // NSRunLoop eats exceptions for breakfast, but we don't want that behavior. We want to
+        // stop the event loop and propagate the exception to the caller instead.
+
+        if (m_caught_exception) {
+            // If an exception was caught from a different post() handler, skip this one.
+            return;
+        }
+
+        try {
+            on_post();
+        }
+        catch (...) {
+            m_caught_exception = std::current_exception();
+        }
+    });
 }
 
 namespace realm {
