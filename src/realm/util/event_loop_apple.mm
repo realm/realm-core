@@ -166,6 +166,11 @@ struct EventLoopApple::SocketImpl: Socket {
         [m_write_stream open];
     }
 
+    ~SocketImpl()
+    {
+        cancel(); // cancel() is virtual but final, so OK to call in destructor.
+    }
+
     std::error_code activate()
     {
         CFOptionFlags read_flags = kCFStreamEventOpenCompleted
