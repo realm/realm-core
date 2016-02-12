@@ -135,6 +135,11 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
         throw std::system_error(errno, std::system_category());
     }
 
+    m_fd_read = open(path.c_str(), O_RDONLY);
+    if (m_fd_read == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+
 #else // !TARGET_OS_TV
 
     // tvOS does not support named pipes, so use an anonymous pipe instead
@@ -170,27 +175,40 @@ void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec
     uint64_t my_counter = m_shared_part->signal_counter;
     m.unlock();
     for (;;) {
+/*
         struct pollfd poll_d;
         poll_d.fd = m_fd_read;
         poll_d.events = POLLIN;
         poll_d.revents = 0;
 
         int r;
-        r = poll(&poll_d, 1, tp->tv_sec*1000 + tp->tv_nsec/1000000);
-        if (r == ETIMEDOUT) return;
-        // if wait returns due to a signal, we must retry:
-        if (r == EINTR)
-            continue;
+        if (tp)
+            r = poll(&poll_d, 1, tp->tv_sec*1000 + tp->tv_nsec/1000000);
+        else
+            r = poll(&poll_d, 1, -1);
+
         // if wait returns with no ready fd, we retry
-        if (r == 0)
+        if (errno == 0)
             continue;
+
+        // if wait returns due to a signal, we must retry:
+        if (r == -1) {
+            if (errno == EINTR)
+            continue;
+        }
+*/
         m.lock();
+        return;
+
+/*
+        if (r == ETIMEDOUT) return;
         if (m_shared_part->signal_counter != my_counter)
-            break;
+            return;
 
         // notification wasn't meant for us, hand it on and wait for another
         notify_fd(m_fd_write);
         m.unlock();
+*/
     }
 #else
     m_shared_part->wait(*m.m_shared_part, [](){}, tp);
@@ -206,11 +224,11 @@ void PlatformSpecificCondVar::notify() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
-    m_shared_part->signal_counter++;
-    if (m_shared_part->waiters) {
+//    m_shared_part->signal_counter++;
+//    if (m_shared_part->waiters) {
         notify_fd(m_fd_write);
-        --m_shared_part->waiters;
-    }
+//        --m_shared_part->waiters;
+//    }
 #else
     m_shared_part->notify();
 #endif
@@ -224,11 +242,11 @@ void PlatformSpecificCondVar::notify_all() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
-    m_shared_part->signal_counter++;
-    while (m_shared_part->waiters) {
+//    m_shared_part->signal_counter++;
+//    while (m_shared_part->waiters) {
         notify_fd(m_fd_write);
-        --m_shared_part->waiters;
-    }
+//        --m_shared_part->waiters;
+//    }
 #else
     m_shared_part->notify_all();
 #endif

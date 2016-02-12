@@ -22,7 +22,6 @@
 #define REALM_UTIL_PLATFORM_SPECIFIC_CONDVAR
 
 
-
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/emulated_robust_mutex.hpp>
@@ -35,8 +34,6 @@
 #ifdef REALM_ROBUST_MUTEX_EMULATION
 #define REALM_CONDVAR_EMULATION
 #endif
-
-
 
 namespace realm {
 namespace util {
