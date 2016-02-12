@@ -46,7 +46,7 @@ public:
 
     NSRunLoop* m_runloop = nil;
     NSThread* m_thread = nil;
-    size_t m_active_events = 0;
+    std::atomic<size_t> m_active_events;
     std::exception_ptr m_caught_exception;
     std::atomic<bool> m_running;
 };
@@ -68,6 +68,7 @@ public:
 
 EventLoopApple::EventLoopApple()
 {
+    m_active_events = 0;
     m_runloop = [NSRunLoop currentRunLoop];
     m_thread = [NSThread currentThread];
 }
@@ -225,7 +226,7 @@ struct EventLoopApple::SocketImpl: Socket {
             [m_read_stream  removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
             if (m_on_connect_complete) {
                 --m_owner.m_active_events;
-                on_open_complete(ec);
+                m_on_connect_complete(ec); // Invoke directly instead of through on_open_complete()
             }
             else {
                 on_read_complete(ec);
@@ -318,6 +319,7 @@ private:
     {
         [m_read_stream removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
         [m_write_stream removeFromRunLoop:m_owner.m_runloop forMode:kRealmRunLoopMode];
+        m_owner.m_active_events -= 2;
 
         auto handler = std::move(m_on_connect_complete);
         m_on_connect_complete = nullptr;
@@ -326,7 +328,6 @@ private:
 
     void handle_open_completed()
     {
-        --m_owner.m_active_events;
         ++m_num_open_streams;
         if (is_open()) {
             on_open_complete(std::error_code{});
@@ -514,6 +515,7 @@ public:
             m_timer = nil;
         }
         if (m_on_timeout) {
+            --m_owner.m_active_events;
             m_on_timeout(error::operation_aborted);
         }
     }
@@ -587,9 +589,12 @@ EventLoopApple::async_timer(Duration duration, OnTimeout on_timeout)
 
 void EventLoopApple::post(OnPost on_post)
 {
-    CFRunLoopPerformBlock([m_runloop getCFRunLoop], (__bridge CFStringRef)kRealmRunLoopMode, ^{
+    CFRunLoopRef runloop = [m_runloop getCFRunLoop];
+    ++m_active_events;
+    CFRunLoopPerformBlock(runloop, (__bridge CFStringRef)kRealmRunLoopMode, ^{
         // NSRunLoop eats exceptions for breakfast, but we don't want that behavior. We want to
         // stop the event loop and propagate the exception to the caller instead.
+        --m_active_events;
 
         if (m_caught_exception) {
             // If an exception was caught from a different post() handler, skip this one.
@@ -603,6 +608,7 @@ void EventLoopApple::post(OnPost on_post)
             m_caught_exception = std::current_exception();
         }
     });
+    CFRunLoopWakeUp(runloop);
 }
 
 namespace realm {
