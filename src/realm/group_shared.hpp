@@ -374,6 +374,14 @@ public:
 
     //@}
 
+    enum TransactStage {
+        transact_Ready,
+        transact_Reading,
+        transact_Writing
+    };
+
+    /// Get the current transaction type
+    TransactStage get_transact_stage() const noexcept;
 
     /// Get a version id which may be used to request a different SharedGroup
     /// to start transaction at a specific version.
@@ -524,11 +532,6 @@ private:
     std::string m_lockfile_path;
     std::string m_db_path;
     const char* m_key;
-    enum TransactStage {
-        transact_Ready,
-        transact_Reading,
-        transact_Writing
-    };
     TransactStage m_transact_stage;
     util::Mutex m_handover_lock;
 #ifndef _WIN32
@@ -799,6 +802,11 @@ inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
 inline bool SharedGroup::is_attached() const noexcept
 {
     return m_file_map.is_attached();
+}
+
+inline SharedGroup::TransactStage SharedGroup::get_transact_stage() const noexcept
+{
+    return m_transact_stage;
 }
 
 class SharedGroup::ReadLockUnlockGuard {
