@@ -170,7 +170,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 #if !REALM_PLATFORM_APPLE && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
-TEST_IF(Shared_PipelinedWritesWithKills, false)
+TEST_IF(Shared_PipelinedWritesWithKills, true)
 {
     // FIXME: This test was disabled because it has a strong tendency to leave
     // rogue child processes behind after the root test process aborts. If these
@@ -2106,7 +2106,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 
 // Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
-/*
+
 
 namespace {
 
@@ -2123,7 +2123,9 @@ void waiter(std::string path, int i)
         shared_state[i] = 1;
         sgs[i] = sg;
     }
-    sg->wait_for_change();
+    sg->begin_read(); // open a transaction at least once to make "changed" well defined
+    sg->end_read();
+    sg->wait_for_change(); // we'll wait here for first commit
     {
         LockGuard l(*muu);
         shared_state[i] = 2; // this state should not be observed by the writer
@@ -2170,23 +2172,31 @@ TEST(Shared_WaitForChange)
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
         threads[j].start(std::bind(&waiter, std::string(path), j));
+
+    // Wait for all waiters to initialize (reach state 1)
     bool try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(*muu);
-            if (shared_state[j] != 1) try_again = true;
+            if (shared_state[j] < 1) try_again = true;
+            CHECK(shared_state[j] < 2);
         }
     }
 
+    // This write transaction should allow all readers to run again
     sg.begin_write();
     sg.commit();
+
+    // All readers should pass through state 2 to state 3, so wait
+    // for all to reach state 3:
     try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(*muu); // <--- hanging on this lock
             if (3 != shared_state[j]) try_again = true;
+            CHECK(shared_state[j] < 4);
         }
     }
 
@@ -2232,7 +2242,7 @@ TEST(Shared_WaitForChange)
     delete muu;
 }
 
-*/
+
 
 #endif // endif not on windows (or apple)
 

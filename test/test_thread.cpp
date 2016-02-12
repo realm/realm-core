@@ -6,7 +6,10 @@
 #include <queue>
 #include <functional>
 
+#include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#include <realm/util/platform_specific_condvar.hpp>
+#include <realm/util/emulated_robust_mutex.hpp>
 
 #include "test.hpp"
 
@@ -78,6 +81,35 @@ struct Shared {
 
 };
 
+struct SharedWithEmulated {
+    EmulatedRobustMutex m_mutex;
+    EmulatedRobustMutex::SharedPart m_shared_part;
+    int m_value;
+
+    SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
+
+    // 10000 takes less than 0.1 sec
+    void increment_10000_times()
+    {
+        for (int i=0; i<10000; ++i) {
+            EmulatedRobustMutex::LockGuard lock(m_mutex);
+            ++m_value;
+        }
+    }
+
+    void increment_10000_times2()
+    {
+        for (int i=0; i<10000; ++i) {
+            EmulatedRobustMutex::LockGuard lock(m_mutex);
+            // Create a time window where thread interference can take place. Problem with ++m_value is that it
+            // could assemble into 'inc [addr]' which has very tiny gap
+            double f = m_value;
+            f += 1.;
+            m_value = int(f);
+        }
+    }
+
+};
 
 struct Robust {
     RobustMutex m_mutex;
@@ -179,6 +211,37 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
     }
 }
 
+#if 0 // not ready yet
+class QueueEmulated {
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
+    PlatformSpecificCondvar changed;
+    PlatformSpecificCondvar::SharedPart condvar_part;
+    int counter;
+    int max;
+public:
+    QueueEmulated(std::string name, int max) :max(max), counter(max/2) { 
+        mutex.set_shared_part(mutex_part, name, "");
+        changed.set_shared_part(condvar_part, name, "");
+    }
+    void put(int value) {
+        EmulatedRobustMutex::LockGuard l(mutex);
+        while (counter+value > max) changed.wait();
+        int tmp = counter;
+        sched_yield();
+        counter = value + tmp;
+        changed.notify_all();
+    }
+    void get(int value) {
+        EmulatedRobustMutex::LockGuard l(mutex);
+        while (counter-value < 0) changed.wait();
+        int tmp = counter;
+        sched_yield();
+        counter = tmp - value;
+        changed.notify_all();
+    }
+};
+#endif
 } // anonymous namespace
 
 
@@ -238,6 +301,19 @@ TEST(Thread_CriticalSection)
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
         threads[i].start(std::bind(&Shared::increment_10000_times, &shared));
+    for (int i = 0; i < 10; ++i)
+        threads[i].join();
+    CHECK_EQUAL(100000, shared.m_value);
+}
+
+
+TEST(Thread_EmulatedMutex_CriticalSection)
+{
+    SharedWithEmulated shared("EmulatedMutex_CriticalSection");
+    shared.m_value = 0;
+    Thread threads[10];
+    for (int i = 0; i < 10; ++i)
+        threads[i].start(std::bind(&SharedWithEmulated::increment_10000_times, &shared));
     for (int i = 0; i < 10; ++i)
         threads[i].join();
     CHECK_EQUAL(100000, shared.m_value);
