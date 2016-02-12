@@ -18,7 +18,6 @@ public:
     std::unique_ptr<DeadlineTimerBase> async_timer(Duration delay, OnTimeout) final;
     void post(OnPost) final;
 protected:
-    struct Resolver;
     struct Socket;
     struct DeadlineTimer;
 
