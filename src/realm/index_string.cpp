@@ -86,12 +86,12 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
         return;
     }
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug code
     // Since we only use this for moving existing values to new
     // subindexes, there should never be an existing match.
     key_type k = key_type(values.get(ins_pos));
     REALM_ASSERT(k != key);
-#endif
+#endif  // LCOV_EXCL_STOP ignore debug code
 
     // If key is not present we add it at the correct location
     values.insert(ins_pos, key);
@@ -130,7 +130,7 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
             return;
         }
     }
-    REALM_ASSERT(false);
+    REALM_ASSERT(false); // LCOV_EXCL_LINE; internal Realm error
 }
 
 
@@ -771,6 +771,8 @@ void StringIndex::node_add_key(ref_type ref)
 
 #ifdef REALM_DEBUG
 
+// LCOV_EXCL_START ignore debug functions
+
 void StringIndex::verify() const
 {
     m_array->verify();
@@ -984,5 +986,6 @@ void StringIndex::keys_to_dot(std::ostream& out, const Array& array, StringData 
     out << std::endl;
 }
 
+// LCOV_EXCL_STOP ignore debug functions
 
 #endif // REALM_DEBUG
