@@ -48,7 +48,8 @@ enum class SocketSecurity {
 /// used to cancel the operation or reschedule a new operation. In general, if the handler
 /// is destroyed and an operation is in progress, the operation is cancelled.
 ///
-/// Operations on an event-loop are generally not thread-safe, with the exception of post().
+/// Operations on an event-loop are generally not thread-safe, with the exception of post()
+/// and stop().
 ///
 /// \sa Socket
 /// \sa DeadlineTimer
@@ -66,6 +67,7 @@ public:
     virtual void run() = 0;
 
     /// Forcibly terminate the event loop. It may be restarted at a later time.
+    /// This operation is thread-safe.
     virtual void stop() = 0;
 
     /// Establish a socket connection to \a host on port \a port.
@@ -77,6 +79,8 @@ public:
     /// \a security indicates the desired security level for the connection. If the
     /// desired security level cannot be achieved, the completion handler will be
     /// invoked with an error code indicating the failure.
+    ///
+    /// This operation is NOT thread-safe.
     virtual std::unique_ptr<Socket>
     async_connect(std::string host, int port, SocketSecurity security, OnConnectComplete on_complete) = 0;
 
@@ -85,6 +89,8 @@ public:
     /// \a delay is a duration in milliseconds, after which \a on_timeout will be invoked.
     /// The delay may be zero, but the completion handler will still only be invoked
     /// from the event loop.
+    ///
+    /// This operation is NOT thread-safe.
     virtual std::unique_ptr<DeadlineTimer>
     async_timer(Duration delay, OnTimeout on_timeout) = 0;
 
@@ -94,7 +100,7 @@ public:
     /// caller is not required to hold a handle. Therefore, the callback also cannot
     /// be cancelled.
     ///
-    /// This is the only operation that is thread-safe.
+    /// This operation is thread-safe.
     ///
     /// \sa EventLoop::async_timer()
     virtual void post(OnPost callback) = 0;
