@@ -16,7 +16,12 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Early out from `Group::move_table()` if `from_index == to_index`. This
+  behaviour agrees with `LinkView::move()` and is assumed by other parts of
+  core, and by the merge logic of the sync mechanism.
+* Convert some assertions on arguments of public `Group` and `LinkView` methods
+  to throwing checks.
+* Align argument naming of `Group::move_table()` and `LinkView::move()`.
 
 ----------------------------------------------
 
