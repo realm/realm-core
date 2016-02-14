@@ -65,7 +65,7 @@ public:
 #ifdef REALM_CONDVAR_EMULATION
     struct SharedPart {
         uint64_t signal_counter;
-        uint32_t waiters;
+        uint32_t wait_counter;
     };
 #else
     typedef CondVar SharedPart;
