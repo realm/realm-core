@@ -6,6 +6,8 @@
 #include <queue>
 #include <functional>
 
+#include <unistd.h>
+
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_specific_condvar.hpp>
@@ -211,22 +213,22 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
     }
 }
 
-#if 0 // not ready yet
+#if 1 // not ready yet
 class QueueEmulated {
     EmulatedRobustMutex mutex;
     EmulatedRobustMutex::SharedPart mutex_part;
-    PlatformSpecificCondvar changed;
-    PlatformSpecificCondvar::SharedPart condvar_part;
+    PlatformSpecificCondVar changed;
+    PlatformSpecificCondVar::SharedPart condvar_part;
     int counter;
     int max;
 public:
     QueueEmulated(std::string name, int max) :max(max), counter(max/2) { 
         mutex.set_shared_part(mutex_part, name, "");
-        changed.set_shared_part(condvar_part, name, "");
+        changed.set_shared_part(condvar_part, name, 0);
     }
     void put(int value) {
         EmulatedRobustMutex::LockGuard l(mutex);
-        while (counter+value > max) changed.wait();
+        while (counter+value > max) changed.wait(mutex, nullptr);
         int tmp = counter;
         sched_yield();
         counter = value + tmp;
@@ -234,7 +236,7 @@ public:
     }
     void get(int value) {
         EmulatedRobustMutex::LockGuard l(mutex);
-        while (counter-value < 0) changed.wait();
+        while (counter-value < 0) changed.wait(mutex, nullptr);
         int tmp = counter;
         sched_yield();
         counter = tmp - value;
@@ -500,4 +502,115 @@ TEST(Thread_CondVar)
     }
 }
 
+// Detect and flag trivial implementations of condvars.
+namespace {
+
+static int signals;
+
+void signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
+{
+    sleep(1);
+    signals = 1;
+    {
+        EmulatedRobustMutex::LockGuard l(*mutex);
+        // wakeup any waiters
+        cv->notify_all();
+    }
+    // exit scope to allow waiters to get lock
+    sleep(1);
+    signals = 2;
+    {
+        EmulatedRobustMutex::LockGuard l(*mutex);
+        // wakeup any waiters, 2nd time
+        cv->notify_all();
+    }
+    sleep(1);
+    signals = 3;
+    {
+        EmulatedRobustMutex::LockGuard l(*mutex);
+        // wakeup any waiters, 2nd time
+        cv->notify_all();
+    }
+    sleep(1);
+    signals = 4;
+}
+
+static int signal_state;
+void wakeup_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
+{
+    sleep(1);
+    signal_state = 2;
+    EmulatedRobustMutex::LockGuard l(*mutex);
+    cv->notify_all();
+}
+
+void burst_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
+{
+    sleep(1);
+    EmulatedRobustMutex::LockGuard l(*mutex);
+    for (int i=0; i<100; ++i) {
+        cv->notify_all();
+    }
+}
+
+}
+
+// Verify, that a wait on a condition variable actually waits
+// - this test relies on assumptions about scheduling, which
+//   may not hold on a heavily loaded system.
+TEST(Thread_CondvarWaits)
+{
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
+    PlatformSpecificCondVar changed;
+    PlatformSpecificCondVar::SharedPart condvar_part;
+    mutex.set_shared_part(mutex_part, "Thread_CondvarWaits", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarWaits", 0);
+    changed.init_shared_part(condvar_part);
+    Thread signal_thread;
+    signals = 0;
+    signal_thread.start(std::bind(signaller, &mutex, &changed));
+    {
+        EmulatedRobustMutex::LockGuard l(mutex);
+        changed.wait(mutex, nullptr);
+        CHECK_EQUAL(signals, 1);
+        changed.wait(mutex, nullptr);
+        CHECK_EQUAL(signals, 2);
+        changed.wait(mutex, nullptr);
+        CHECK_EQUAL(signals, 3);
+    }
+    signal_thread.join();
+}
+
+// Verify that a condition variable looses its signal if no one
+// collects it.
+TEST(Thread_CondvarIsStateless)
+{
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
+    PlatformSpecificCondVar changed;
+    PlatformSpecificCondVar::SharedPart condvar_part;
+    PlatformSpecificCondVar::init_shared_part(condvar_part);
+    mutex.set_shared_part(mutex_part, "Thread_CondvarIsStateless", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarIsStateless", 0);
+    Thread signal_thread;
+    signal_state = 1;
+    // send some signals:
+    {
+        EmulatedRobustMutex::LockGuard l(mutex);
+        for (int i=0; i<10; ++i)
+            changed.notify_all();
+    }
+    // spawn a thread which will later do one more signal in order
+    // to wake us up.
+    signal_thread.start(std::bind(wakeup_signaller, &mutex, &changed));
+    // Wait for a signal - the signals sent above should be lost, so
+    // that this wait will actually wait for the thread to signal.
+    {
+        EmulatedRobustMutex::LockGuard l(mutex);
+        changed.wait(mutex,0);
+        CHECK_EQUAL(signal_state, 2);
+    }
+    signal_thread.join();
+}
 #endif // TEST_THREAD
