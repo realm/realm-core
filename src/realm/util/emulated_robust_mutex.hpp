@@ -35,7 +35,7 @@ namespace realm {
 namespace util {
 
 // fwd decl to support friend decl below
-class PlatformSpecificCondvar;
+class PlatformSpecificCondVar;
 
 
 /// Emulation of a Robust Mutex.
@@ -93,7 +93,7 @@ public:
     File m_file;
     Mutex m_local_mutex;
 #endif
-    friend class PlatformSpecificCondvar;
+    friend class PlatformSpecificCondVar;
 };
 
 
