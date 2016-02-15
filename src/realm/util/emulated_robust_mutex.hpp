@@ -85,6 +85,14 @@ public:
     /// Attempt to check if the mutex is valid (only relevant if not emulating)
     bool is_valid() noexcept;
 
+    static bool is_robust_on_this_platform() 
+    { 
+#ifdef REALM_ROBUST_MUTEX_EMULATION
+        return true;  // we're faking it!
+#else
+        return RobustMutex::is_robust_on_this_platform();
+#endif
+    }
 //private:
 #ifndef REALM_ROBUST_MUTEX_EMULATION
     SharedPart* m_shared_part = 0;
