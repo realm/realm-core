@@ -38,8 +38,8 @@ enum DataType {
     type_Mixed      =  6,
     type_Link       = 12,
     type_LinkList   = 13,
-    type_NewDate    = 14
-
+    type_BackLink   = 14, // FIXME: review addition of this type
+    type_NewDate    = 15
 };
 
 /// See Descriptor::set_link_type().
