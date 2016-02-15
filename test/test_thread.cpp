@@ -219,8 +219,8 @@ class QueueEmulated {
     EmulatedRobustMutex::SharedPart mutex_part;
     PlatformSpecificCondVar changed;
     PlatformSpecificCondVar::SharedPart condvar_part;
-    int counter;
     int max;
+    int counter;
 public:
     QueueEmulated(std::string name, int max) :max(max), counter(max/2) { 
         mutex.set_shared_part(mutex_part, name, "");
@@ -544,6 +544,8 @@ void wakeup_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
     cv->notify_all();
 }
 
+/* no use for this yet.
+
 void burst_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 {
     sleep(1);
@@ -552,7 +554,7 @@ void burst_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
         cv->notify_all();
     }
 }
-
+*/
 }
 
 // Verify, that a wait on a condition variable actually waits
