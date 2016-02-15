@@ -962,6 +962,63 @@ TEST(Replication_Substrings)
 }
 
 
+TEST(Replication_MoveSelectedLinkView)
+{
+    // 1st: Create table with two rows
+    // 2nd: Select link list via 2nd row
+    // 3rd: Delete first row by move last over (which moves the row of the selected link list)
+    // 4th: Modify the selected link list.
+    // 5th: Replay changeset on different Realm
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    std::unique_ptr<util::Logger> replay_logger;
+//    replay_logger.reset(new util::Logger);
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef origin = wt.add_table("origin");
+        TableRef target = wt.add_table("target");
+        origin->add_column_link(type_LinkList, "", *target);
+        target->add_column(type_Int, "");
+        origin->add_empty_row(2);
+        target->add_empty_row(2);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        rt.get_group().verify();
+    }
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef origin = wt.get_table("origin");
+        LinkViewRef link_list = origin->get_linklist(0,1);
+        link_list->add(0); // Select the link list of the 2nd row
+        origin->move_last_over(0); // Move that link list
+        link_list->add(1); // Now modify it again
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt(sg_2);
+        rt.get_group().verify();
+        ConstTableRef origin = rt.get_table("origin");
+        ConstLinkViewRef link_list = origin->get_linklist(0,0);
+        CHECK_EQUAL(2, link_list->size());
+    }
+
+    // FIXME: Redo the test with all other table-level operations that move the
+    // link list to a new row or column index.
+}
+
+
 } // anonymous namespace
 
 #endif // TEST_REPLICATION

@@ -51,8 +51,6 @@ void TransactLogConvenientEncoder::do_select_table(const Table* table)
 
     size_t levels = (end - begin) / 2;
     m_encoder.select_table(*begin, levels, begin + 1); // Throws
-    m_selected_spec = nullptr;
-    m_selected_link_list = nullptr;
     m_selected_table = table;
 }
 

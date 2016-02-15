@@ -366,6 +366,15 @@ public:
 
     //@}
 
+    /// Move the table at \a index_1 such that it ends up at \a index_2. Other
+    /// tables are shifted as necessary in such a way that their order is
+    /// preserved.
+    ///
+    /// Note that \a index_2 is the desired final index of the moved table,
+    /// therefore, `move_table(1,1)` is a no-op, while `move_table(1,2)` moves
+    /// the table at index 1 by one position, such that it ends up at index 2. A
+    /// side-effect of that, is that the table, that was originally at index 2,
+    /// is moved to index 1.
     void move_table(size_t index_1, size_t index_2);
 
     // Serialization
