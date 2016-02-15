@@ -35,7 +35,7 @@ public:
     ///
     /// Returns the ref (position in the target stream) of the written copy of
     /// the specified array data.
-    virtual ref_type write_array(const char* data, size_t size, uint_fast32_t checksum) = 0;
+    virtual ref_type write_array(const char* data, size_t size, uint32_t checksum) = 0;
 };
 
 } // namespace impl_

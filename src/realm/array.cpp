@@ -349,12 +349,10 @@ void Array::destroy_children(size_t offset) noexcept
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
-    // FIXME: Replace capacity with checksum
-
     // Write flat array
     const char* header = get_header_from_data(m_data);
     size_t size = get_byte_size();
-    uint_fast32_t dummy_checksum = 0x01010101UL;
+    uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
     ref_type new_ref = out.write_array(header, size, dummy_checksum); // Throws
     REALM_ASSERT_3(new_ref % 8, ==, 0); // 8-byte alignment
     return new_ref;

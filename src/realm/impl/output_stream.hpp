@@ -42,7 +42,7 @@ public:
 
     void write(const char* data, size_t size);
 
-    ref_type write_array(const char* data, size_t size, uint_fast32_t checksum) override;
+    ref_type write_array(const char* data, size_t size, uint32_t checksum) override;
 
 private:
     ref_type m_next_ref;
