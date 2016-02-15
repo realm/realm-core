@@ -119,7 +119,7 @@ void writer(std::string path, int id)
 }
 
 
-#if !REALM_PLATFORM_APPLE && !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
+#if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 
 void killer(TestResults& test_results, int pid, std::string path, int id)
 {
@@ -168,7 +168,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !REALM_PLATFORM_APPLE && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
 TEST_IF(Shared_PipelinedWritesWithKills, true)
 {
@@ -182,7 +182,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, true)
     // Idea for solution: Install a custom signal handler for SIGABRT and
     // friends, and kill all spawned child processes from it. See `man abort`.
 
-    CHECK(RobustMutex::is_robust_on_this_platform());
+    CHECK(EmulatedRobustMutex::is_robust_on_this_platform());
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
     {
@@ -222,6 +222,8 @@ TEST_IF(Shared_PipelinedWritesWithKills, true)
         // std::cerr << "Killing last one: " << pid << std::endl;
         killer(test_results, pid, path, num_processes-1);
     }
+    // We need to wait cleaning up til the killed processes have exited.
+    sleep(1);
 }
 #endif
 
@@ -1344,7 +1346,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
-    if (!RobustMutex::is_robust_on_this_platform())
+    if (!EmulatedRobustMutex::is_robust_on_this_platform())
         return;
 
     // This test can only be conducted by spawning independent
@@ -2102,7 +2104,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
-#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
+#if !defined(_WIN32)
 
 
 // Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
@@ -2244,7 +2246,7 @@ TEST(Shared_WaitForChange)
 
 
 
-#endif // endif not on windows (or apple)
+#endif // endif not on windows
 
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
