@@ -8119,7 +8119,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 }
 
 
-TEST(LangBindHelper_RollbackAndContinueAsReadLink)
+TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
@@ -8163,6 +8163,54 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLink)
     LangBindHelper::rollback_and_continue_as_read(sg, *hist);
     CHECK_EQUAL(2, origin->get_link(0,0));
 }
+
+
+TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *hist);
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    link_list->add(0);
+    link_list->add(1);
+    link_list->add(2);
+    link_list->add(0);
+    link_list->add(2);
+    LangBindHelper::commit_and_continue_as_read(sg);
+    // verify that we can reverse a LinkView::move()
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(1, link_list->get(1).get_index());
+    CHECK_EQUAL(2, link_list->get(2).get_index());
+    CHECK_EQUAL(0, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+    LangBindHelper::promote_to_write(sg, *hist);
+    link_list->move(1,3);
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(2, link_list->get(1).get_index());
+    CHECK_EQUAL(0, link_list->get(2).get_index());
+    CHECK_EQUAL(1, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(1, link_list->get(1).get_index());
+    CHECK_EQUAL(2, link_list->get(2).get_index());
+    CHECK_EQUAL(0, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+}
+
 
 TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
 {

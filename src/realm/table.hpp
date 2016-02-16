@@ -447,7 +447,7 @@ public:
     /// remove_substring() removes the specified byte range from the currently
     /// stored string. The beginning of the range (\a pos) must be less than or
     /// equal to the size of the currently stored string. If the specified range
-    /// cextends beyond the end of the currently stored string, it will be
+    /// extends beyond the end of the currently stored string, it will be
     /// silently clamped.
     ///
     /// String level modifications performed via insert_substring() and
