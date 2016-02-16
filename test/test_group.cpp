@@ -24,10 +24,10 @@ static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 
 #include "fuzz_group.hpp"
 #include "test.hpp"
-#include "crypt_key.hpp"
 
 using namespace realm;
 using namespace realm::util;
+using namespace realm::test_util;
 
 extern uint64_t unit_test_random_seed;
 
@@ -2380,7 +2380,7 @@ TEST(Group_Fuzzy)
                 char c = static_cast<char>(fastrand());
                 instr += c;
                 std::string tmp;
-                test_util::unit_test::to_string(static_cast<int>(c), tmp);
+                unit_test::to_string(static_cast<int>(c), tmp);
                 fastlog += tmp;
                 if (t + 1 < instructions) {
                     fastlog += ", ";
