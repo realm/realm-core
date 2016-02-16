@@ -16,7 +16,7 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Lorem ipsum
 
 ### Enhancements:
 
