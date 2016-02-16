@@ -214,8 +214,6 @@ enum IndexMethod {
 template<typename... T>
 struct is_any : std::false_type { };
 
-template<typename T>
-struct is_any<T, T> : std::true_type { };
 
 template<typename T, typename... Ts>
 struct is_any<T, T, Ts...> : std::true_type { };
