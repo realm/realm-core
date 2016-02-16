@@ -82,12 +82,20 @@ public:
     /// all sharing a common SharedPart instance, which must be in shared memory.
     static void init_shared_part(SharedPart& shared_part);
 
+    /// Wait for someone to call notify() or notify_all() on this condition
+    /// variable. The call to wait() may return spuriously, so the caller should
+    /// always re-evaluate the condition on which to wait and loop on wait()
+    /// if necessary.
     void wait(EmulatedRobustMutex& m, const struct timespec* tp);
+
     /// If any threads are waiting for this condition, wake up at least one.
-    /// (Current implementation may actually wake all :-O )
+    /// (Current implementation may actually wake all :-O ). The caller must
+    /// hold the lock associated with the condvar at the time of calling notify()
     void notify() noexcept;
 
     /// Wake up every thread that is currently waiting on this condition.
+    /// The caller must hold the lock associated with the condvar at the time
+    /// of calling notify_all().
     void notify_all() noexcept;
 
     /// Cleanup and release system resources if possible.

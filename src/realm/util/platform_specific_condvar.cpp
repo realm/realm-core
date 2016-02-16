@@ -31,6 +31,7 @@ using namespace realm::util;
 #ifdef REALM_CONDVAR_EMULATION
 
 namespace {
+
 // Write a byte to a pipe to notify anyone waiting for data on the pipe
 void notify_fd(int fd)
 {
@@ -44,7 +45,8 @@ void notify_fd(int fd)
         // If the pipe's buffer is full, we need to read some of the old data in
         // it to make space. We don't just read in the code waiting for
         // notifications so that we can notify multiple waiters with a single
-        // write.
+        // write. (This code is copied from the cocoa binding, but because our
+        // implementation of wait/signal is different, it may never be executed).
         REALM_ASSERT(ret == -1 && errno == EAGAIN);
         char buff[1024];
         int result = read(fd, buff, sizeof buff);
@@ -55,7 +57,7 @@ void notify_fd(int fd)
 #endif // REALM_CONDVAR_EMULATION
 
 
-std::string PlatformSpecificCondVar::internal_naming_prefix = "/RealmsBigFriendlySemaphore";
+std::string PlatformSpecificCondVar::internal_naming_prefix = "";
 
 void PlatformSpecificCondVar::set_resource_naming_prefix(std::string prefix)
 {
@@ -100,7 +102,7 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
     static_cast<void>(offset_of_condvar);
 #ifdef REALM_CONDVAR_EMULATION
 #if !TARGET_OS_TV
-    auto path = base_path + ".cv";
+    auto path = internal_naming_prefix + base_path + ".cv";
 
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);
@@ -128,25 +130,10 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
         throw std::system_error(errno, std::system_category());
     }
 
-    // Make writing to the pipe return -1 when the pipe's buffer is full
-    // rather than blocking until there's space available
-    ret = fcntl(m_fd_write, F_SETFL, O_NONBLOCK);
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category());
-    }
-
     m_fd_read = open(path.c_str(), O_RDONLY);
     if (m_fd_read == -1) {
         throw std::system_error(errno, std::system_category());
     }
-
-    // Make reading from the pipe return -1 when the pipe's buffer is empty
-    // rather than blocking until there's data available
-    ret = fcntl(m_fd_read, F_SETFL, O_NONBLOCK);
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category());
-    }
-
 
 #else // !TARGET_OS_TV
 
@@ -161,8 +148,24 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
     m_fd_write = notification_pipe[1];
 
 #endif // TARGET_OS_TV
+
+    // Make writing to the pipe return -1 when the pipe's buffer is full
+    // rather than blocking until there's space available
+    ret = fcntl(m_fd_write, F_SETFL, O_NONBLOCK);
+    if (ret == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+
+    // Make reading from the pipe return -1 when the pipe's buffer is empty
+    // rather than blocking until there's data available
+    ret = fcntl(m_fd_read, F_SETFL, O_NONBLOCK);
+    if (ret == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+
 #endif
 }
+
 
 void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
 #ifdef REALM_CONDVAR_EMULATION
@@ -173,12 +176,27 @@ void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
 #endif // REALM_CONDVAR_EMULATION
 }
 
-
+// Wait/notify combined invariant:
+// - (number of bytes in the fifo - number of suspended thread)
+//          = (wait_counter - signal_counter)
+// - holds at the point of entry/exit from the critical section.
 
 void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec* tp)
 {
+    // precondition: Caller holds the mutex ensuring exclusive access to variables
+    // in the shared part.
+    // postcondition: regardless of cause for return (timeout or notification),
+    // the lock is held.
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
+
+    // indicate arrival of a new waiter (me) and get our own number in the
+    // line of waiters. We later use this number to determine if a wakeup
+    // is done because of valid signaling or should be ignored. We also use
+    // wait count in the shared part to limit the number of wakeups that a
+    // signaling process can buffer up. This is needed because a condition
+    // variable is supposed to be state-less, so any signals sent before a
+    // waiter has arrived must be lost.
     uint64_t my_wait_counter = ++m_shared_part->wait_counter;
     for (;;) {
 
@@ -187,13 +205,28 @@ void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec
         poll_d.events = POLLIN;
         poll_d.revents = 0;
 
-        m.unlock();
+        m.unlock(); // open for race from here
+
+        // Race: A signal may trigger a write to the fifo both before and after
+        // the call to poll(). If the write occurs before the call to poll(),
+        // poll() will not block. This is intended.
+
+        // Race: Another reader may overtake this one while the mutex is lifted,
+        // and thus pass through the poll() call, even though it has arrived later
+        // than the current thread. If so, the ticket (my_wait_counter) is used
+        // below to filter waiters for fairness. The other thread will see that
+        // its ticket is newer than the head of the queue and it will retry the
+        // call to poll() - eventually allowing this thread to also get through
+        // poll() and complete the wait().
+
         int r;
-        if (tp)
-            r = poll(&poll_d, 1, tp->tv_sec*1000 + tp->tv_nsec/1000000);
-        else
-            r = poll(&poll_d, 1, -1);
-        m.lock();
+        {
+            if (tp)
+                r = poll(&poll_d, 1, tp->tv_sec*1000 + tp->tv_nsec/1000000);
+            else
+                r = poll(&poll_d, 1, -1);
+        }
+        m.lock(); // no race after this point.
         uint64_t my_signal_counter = m_shared_part->signal_counter;
 
         // if wait returns with no ready fd, we retry
@@ -206,21 +239,42 @@ void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec
                 continue;
             // but if it returns due to timeout, we must exit the wait loop
             if (errno == ETIMEDOUT) {
+                // We've earlier indicated that we're waiting and increased
+                // the wait counter. Eventually (and possibly already after the return
+                // from poll() but before locking the mutex) someone will write
+                // to the fifo to wake us up. To keep the balance, we fake that
+                // this signaling has already been done:
+                ++m_shared_part->signal_counter;
+                // even though we do this, a byte may be pending on the fifo.
+                // we ignore this - so it may cause another, later, waiter to pass
+                // through poll and grab that byte from the fifo. This will cause
+                // said waiter to do a spurious return.
+                // FIXME: No unittest for this, yet.
                 return;
             }
         }
         // If we've been woken up, but actually arrived later than the
-        // signal sent, we allow someone else to catch the signal.
+        // signal sent (have a later ticket), we allow someone else to
+        // wake up. This can cause spinning until the right process acts
+        // on its notification. To minimize this, we explicitly yield(),
+        // hopefully advancing the point in time, where the rightful reciever
+        // acts on the notification.
         if (my_signal_counter < my_wait_counter) {
             sched_yield();
             continue;
         }
-        // We need to actually consume the pipe data, if not, subsequent
+        // Acting on the notification:
+        // We need to consume the pipe data, if not, subsequent
         // waits will have their call to poll() return immediately.
+        // This would effectively turn the condition variable into
+        // a spinning wait, which will have correct behavior (provided
+        // the user remembers to always validate the condition and
+        // potentially loop on it), but it will consume excess CPU/battery
+        // and may also cause priority inversion
         char c;
         int ret = read(m_fd_read,&c,1);
         if (ret == -1)
-            continue;
+            continue; // FIXME: If the invariants hold, this is unreachable
         return;
     }
 #else
@@ -229,27 +283,29 @@ void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec
 }
 
 
-
-
-
+// Notify:
+// invariant: The caller holds the mutex guarding the condition variable.
+// operation: If a waiter is present, we wake her up by writing a single
+// byte to the fifo.
 
 void PlatformSpecificCondVar::notify() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
-//    m_shared_part->signal_counter++;
-//    if (m_shared_part->waiters) {
+    if (m_shared_part->wait_counter > m_shared_part->signal_counter) {
+        m_shared_part->signal_counter++;
         notify_fd(m_fd_write);
-//        --m_shared_part->waiters;
-//    }
+    }
 #else
     m_shared_part->notify();
 #endif
 }
 
 
-
-
+// Notify_all:
+// invariant: The caller holds the mutex guarding the condition variable.
+// operation: If waiters are present, we wake them up by writing a single
+// byte to the fifo for each waiter.
 
 void PlatformSpecificCondVar::notify_all() noexcept
 {
@@ -258,7 +314,6 @@ void PlatformSpecificCondVar::notify_all() noexcept
     while (m_shared_part->wait_counter > m_shared_part->signal_counter) {
         m_shared_part->signal_counter++;
         notify_fd(m_fd_write);
-//        --m_shared_part->waiters;
     }
 #else
     m_shared_part->notify_all();
