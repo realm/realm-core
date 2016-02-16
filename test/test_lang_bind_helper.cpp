@@ -9633,7 +9633,7 @@ namespace {
 
 void attacher(std::string path)
 {
-    for (int i=0; i<1000; ++i) {
+    for (int i=0; i<10; ++i) {
         std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         Group& g = const_cast<Group&>(sg.begin_read());

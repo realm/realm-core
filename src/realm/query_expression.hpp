@@ -718,7 +718,9 @@ struct NullableVector
         m_first[index] = m_null;
     }
 
-    inline void set(size_t index, t_storage value)
+    template <typename Type = t_storage> typename std::enable_if<
+        std::is_same<Type, int64_t>::value, void>::type
+    set(size_t index, t_storage value)
     {
         REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
 
@@ -732,6 +734,13 @@ struct NullableVector
         }
         m_first[index] = value;
     }
+
+    template <typename Type = T> typename std::enable_if
+        <realm::is_any<Type, float, double, DateTime, BinaryData, StringData, NewDate, null>::value, void>::type
+    set(size_t index, t_storage value) {
+        m_first[index] = value;
+    }
+
 
     inline util::Optional<T> get(size_t index) const
     {
@@ -799,12 +808,6 @@ struct NullableVector
 // Double
 // NOTE: fails in gcc 4.8 without `inline`. Do not remove. Same applies for all methods below.
 template<>
-inline void NullableVector<double>::set(size_t index, double value)
-{
-    m_first[index] = value;
-}
-
-template<>
 inline bool NullableVector<double>::is_null(size_t index) const
 {
     return null::is_null_float(m_first[index]);
@@ -829,11 +832,6 @@ inline void NullableVector<float>::set_null(size_t index)
     m_first[index] = null::get_null_float<float>();
 }
 
-template<>
-inline void NullableVector<float>::set(size_t index, float value)
-{
-    m_first[index] = value;
-}
 
 // Null
 template<>
@@ -846,10 +844,7 @@ inline bool NullableVector<null>::is_null(size_t) const
 {
     return true;
 }
-template<>
-inline void NullableVector<null>::set(size_t, null)
-{
-}
+
 
 // DateTime
 template<>
@@ -858,11 +853,6 @@ inline bool NullableVector<DateTime>::is_null(size_t index) const
     return m_first[index].get_datetime() == m_null;
 }
 
-template<>
-inline void NullableVector<DateTime>::set(size_t index, DateTime value)
-{
-    m_first[index] = value;
-}
 
 template<>
 inline void NullableVector<DateTime>::set_null(size_t index)
@@ -871,11 +861,7 @@ inline void NullableVector<DateTime>::set_null(size_t index)
 }
 
 // StringData
-template<>
-inline void NullableVector<StringData>::set(size_t index, StringData value)
-{
-    m_first[index] = value;
-}
+
 template<>
 inline bool NullableVector<StringData>::is_null(size_t index) const
 {
@@ -889,11 +875,7 @@ inline void NullableVector<StringData>::set_null(size_t index)
 }
 
 // BinaryData
-template<>
-inline void NullableVector<BinaryData>::set(size_t index, BinaryData value)
-{
-    m_first[index] = value;
-}
+
 template<>
 inline bool NullableVector<BinaryData>::is_null(size_t index) const
 {
@@ -908,11 +890,7 @@ inline void NullableVector<BinaryData>::set_null(size_t index)
 
 
 // NewDate
-template<>
-inline void NullableVector<NewDate>::set(size_t index, NewDate value)
-{
-    m_first[index] = value;
-}
+
 template<>
 inline bool NullableVector<NewDate>::is_null(size_t index) const
 {
