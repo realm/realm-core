@@ -50,6 +50,8 @@ WATCHOS_DIR="watchos-lib"
 TVOS_SDKS="appletvos appletvsimulator"
 TVOS_DIR="tvos-lib"
 
+: ${REALM_COCOA_PLATFORMS:="osx iphone watchos tvos"}
+
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
@@ -920,10 +922,9 @@ EOF
             realm_cocoa_dir="../realm-cocoa"
         fi
 
-        sh build.sh build-osx || exit 1
-        sh build.sh build-iphone || exit 1
-        sh build.sh build-watchos || exit 1
-        sh build.sh build-tvos || exit 1
+        for platform in $REALM_COCOA_PLATFORMS; do
+            sh build.sh build-$platform || exit 1
+        done
 
         echo "Copying files"
         tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
@@ -931,8 +932,16 @@ EOF
         BASENAME="core"
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
-        cp -r "$IPHONE_DIR/include/"* "$tmpdir/$BASENAME/include" || exit 1
-        cp "$IPHONE_DIR"/*.a "$WATCHOS_DIR"/*.a "$TVOS_DIR"/*.a "$OSX_DIR"/*.a "$tmpdir/$BASENAME" || exit 1
+
+        platform_for_headers=$(echo $REALM_COCOA_PLATFORMS | cut -d ' ' -f 1 | tr '[a-z]' '[A-Z]')
+        eval headers_dir=\$${platform_for_headers}_DIR
+        cp -r "$headers_dir/include/"* "$tmpdir/$BASENAME/include" || exit 1
+
+        for platform in $REALM_COCOA_PLATFORMS; do
+            eval platform_dir=\$$(echo $platform | tr '[a-z]' '[A-Z]')_DIR
+            cp "$platform_dir"/*.a "$tmpdir/$BASENAME" || exit 1
+        done
+
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
