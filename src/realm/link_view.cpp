@@ -40,7 +40,7 @@ void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Hando
 }
 
 
-LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group) 
+LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
 {
     if (patch) {
         TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);

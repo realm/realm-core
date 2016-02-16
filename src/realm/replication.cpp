@@ -295,6 +295,7 @@ public:
             return false;
         log("table = group->get_table(%1);", group_level_ndx); // Throws
         m_desc.reset();
+        m_link_list.reset();
         m_table = m_group.get_table(group_level_ndx); // Throws
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[2*i + 0];
@@ -471,6 +472,7 @@ public:
         if (REALM_UNLIKELY(m_table->has_shared_type()))
             return false;
         log("desc = table->get_descriptor();"); // Throws
+        m_link_list.reset();
         m_desc = m_table->get_descriptor(); // Throws
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[i];
@@ -560,6 +562,7 @@ public:
         if (REALM_UNLIKELY(type != type_LinkList))
             return false;
         log("link_list = table->get_link_list(%1, %2);", col_ndx, row_ndx); // Throws
+        m_desc.reset();
         m_link_list = m_table->get_linklist(col_ndx, row_ndx); // Throws
         return true;
     }

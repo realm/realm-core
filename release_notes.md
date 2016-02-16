@@ -2,7 +2,10 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Table::clear() issues link nullification instructions for each link that did
+  point to a removed row. It did however issue those instructions after the
+  clear instruction, which is incorrect, as the links do not exist after the
+  clear operation. Was fixed.
 
 ### API breaking changes:
 
@@ -19,8 +22,8 @@
 * Early out from `Group::move_table()` if `from_index == to_index`. This
   behaviour agrees with `LinkView::move()` and is assumed by other parts of
   core, and by the merge logic of the sync mechanism.
-* Convert some assertions on arguments of public `Group` and `LinkView` methods
-  to throwing checks.
+* Convert some assertions on arguments of public `Group`, `Table`, and
+  `LinkView` methods to throwing checks.
 * Align argument naming of `Group::move_table()` and `LinkView::move()`.
 
 ----------------------------------------------

@@ -432,9 +432,9 @@ void Group::remove_table(StringData name)
 
 void Group::remove_table(size_t table_ndx)
 {
-    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
+    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
     TableRef table = get_table(table_ndx);
@@ -504,9 +504,9 @@ void Group::rename_table(StringData name, StringData new_name, bool require_uniq
 
 void Group::rename_table(size_t table_ndx, StringData new_name, bool require_unique_name)
 {
-    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
+    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
     if (require_unique_name && has_table(new_name))
@@ -519,9 +519,9 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
 
 void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
 {
-    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
+    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (from_table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
     if (to_table_ndx >= m_tables.size())

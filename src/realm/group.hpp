@@ -229,7 +229,7 @@ public:
     bool is_empty() const noexcept;
 
     /// Returns the number of tables in this group.
-    size_t size() const;
+    size_t size() const noexcept;
 
     //@{
 
@@ -768,15 +768,15 @@ inline bool Group::is_attached() const noexcept
 inline bool Group::is_empty() const noexcept
 {
     if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+        return false;
     REALM_ASSERT(m_table_names.is_attached());
     return m_table_names.is_empty();
 }
 
-inline size_t Group::size() const
+inline size_t Group::size() const noexcept
 {
     if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+        return 0;
     REALM_ASSERT(m_table_names.is_attached());
     return m_table_names.size();
 }
@@ -797,7 +797,7 @@ inline bool Group::has_table(StringData name) const noexcept
 inline size_t Group::find_table(StringData name) const noexcept
 {
     if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+        return 0;
     REALM_ASSERT(m_table_names.is_attached());
     size_t ndx = m_table_names.find_first(name);
     return ndx;
