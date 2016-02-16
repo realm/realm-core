@@ -409,6 +409,15 @@ EOF
     fi
     echo "Using existing configuration in $CONFIG_MK:"
     cat "$CONFIG_MK" | sed 's/^/    /' || return 1
+
+    config_version="$(get_config_param "CONFIG_VERSION")" || exit 1
+    if [ "$config_version" != "$CONFIG_VERSION" ]; then
+        cat 1>&2 <<EOF
+ERROR: Found outdated configuration!
+You need to rerun 'sh build.sh config [PREFIX]'
+EOF
+        return 1
+    fi
 }
 
 auto_configure()
@@ -416,14 +425,10 @@ auto_configure()
     cd "$REALM_HOME" || return 1
     if [ -e "$CONFIG_MK" ]; then
         require_config || return 1
-        config_version="$(get_config_param "CONFIG_VERSION")" || exit 1
-        if [ "$config_version" == "$CONFIG_VERSION" ]; then
-            return 0
-        fi
+    else
+        echo "No configuration found. Running 'sh build.sh config' for you."
+        sh build.sh config || return 1
     fi
-
-    echo "No configuration found. Running 'sh build.sh config' for you."
-    sh build.sh config || return 1
 }
 
 get_config_param()
