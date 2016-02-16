@@ -936,12 +936,12 @@ EOF
         rm -f "$BASENAME-$realm_version.zip" || exit 1
         mkdir -p "$tmpdir/$BASENAME/include" || exit 1
 
-        platform_for_headers=$(echo $REALM_COCOA_PLATFORMS | cut -d ' ' -f 1 | tr '[a-z]' '[A-Z]')
+        platform_for_headers=$(echo $REALM_COCOA_PLATFORMS | cut -d ' ' -f 1 | tr "[:upper:]" "[:lower:]")
         eval headers_dir=\$${platform_for_headers}_DIR
         cp -r "$headers_dir/include/"* "$tmpdir/$BASENAME/include" || exit 1
 
         for platform in $REALM_COCOA_PLATFORMS; do
-            eval platform_dir=\$$(echo $platform | tr '[a-z]' '[A-Z]')_DIR
+            eval platform_dir=\$$(echo $platform | tr "[:upper:]" "[:lower:]")_DIR
             cp "$platform_dir"/*.a "$tmpdir/$BASENAME" || exit 1
         done
 
