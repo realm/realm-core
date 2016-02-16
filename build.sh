@@ -277,12 +277,11 @@ build_apple()
     for x in $sdks; do
         sdk="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
         archs="$(printf "%s\n" "$x" | cut -d: -f2 | sed 's/,/ /g')" || exit 1
-        cflags_arch="-stdlib=libc++"
+        cflags_arch="-stdlib=libc++ -m$os_name-version-min=$min_version"
         for y in $archs; do
             word_list_append "cflags_arch" "-arch $y" || exit 1
         done
         if [ "$sdk" = "${sdk%simulator}" ]; then
-            word_list_append "cflags_arch" "-m$os_name-version-min=$min_version" || exit 1
             if [ "$sdk" != "macosx" ]; then
                 word_list_append "cflags_arch" "-mstrict-align" || exit 1
             fi
@@ -290,7 +289,6 @@ build_apple()
                 word_list_append "cflags_arch" "-fembed-bitcode" || exit 1
             fi
         else
-            word_list_append "cflags_arch" "-m$os_name-version-min=$min_version" || exit 1
             if [ "$enable_bitcode" = "yes" ]; then
                 word_list_append "cflags_arch" "-fembed-bitcode-marker" || exit 1
             fi
