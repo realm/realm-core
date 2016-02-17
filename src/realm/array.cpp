@@ -835,8 +835,7 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
     if (high > m_size)
         high = m_size;
 
-   // if (start > 0)
-        start--;
+    start--;
 
     //start og high
 

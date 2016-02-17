@@ -113,7 +113,7 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size,
     if (!m_up_to_date_pages[first_idx]) {
         if (!lock.holds_lock())
             lock.lock();
-            refresh_page(first_idx);
+        refresh_page(first_idx);
     }
 
     if (header_to_size) {
