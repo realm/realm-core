@@ -96,6 +96,7 @@
     <ClCompile Include="..\..\test\util\resource_limits.cpp" />
     <ClCompile Include="..\..\test\util\test_only.cpp" />
     <ClCompile Include="..\..\test\util\test_path.cpp" />
+    <ClCompile Include="..\..\test\util\crypt_key.cpp" />
     <ClCompile Include="..\..\test\util\timer.cpp" />
     <ClCompile Include="..\..\test\util\unit_test.cpp" />
     <ClCompile Include="..\..\test\util\wildcard.cpp" />

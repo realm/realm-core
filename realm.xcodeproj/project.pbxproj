@@ -205,6 +205,9 @@
 		4852311C1B2E9301003C72AF /* network.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4852311B1B2E9301003C72AF /* network.cpp */; };
 		4852311E1B2E930F003C72AF /* network.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4852311D1B2E930F003C72AF /* network.hpp */; };
 		485231201B2E9361003C72AF /* test_util_network.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4852311F1B2E9361003C72AF /* test_util_network.cpp */; };
+		48B1D2381C749D750066A961 /* crypt_key.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 48B1D2371C749D750066A961 /* crypt_key.hpp */; };
+		48B1D23A1C749D850066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
+		48B1D23B1C749DF00066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
 		520588CA16C1DA9D009DA6D8 /* data_type.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 520588C916C1DA9D009DA6D8 /* data_type.hpp */; };
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
 		5219EB6918FB026100FF9232 /* verified_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5219EB6718FB026100FF9232 /* verified_integer.cpp */; };
@@ -831,6 +834,8 @@
 		4852311D1B2E930F003C72AF /* network.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = network.hpp; sourceTree = "<group>"; };
 		4852311F1B2E9361003C72AF /* test_util_network.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_network.cpp; sourceTree = "<group>"; };
 		485231211B2E9484003C72AF /* history.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = history.hpp; path = realm/history.hpp; sourceTree = "<group>"; };
+		48B1D2371C749D750066A961 /* crypt_key.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = crypt_key.hpp; sourceTree = "<group>"; };
+		48B1D2391C749D850066A961 /* crypt_key.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = crypt_key.cpp; sourceTree = "<group>"; };
 		520588C916C1DA9D009DA6D8 /* data_type.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = data_type.hpp; path = realm/data_type.hpp; sourceTree = "<group>"; };
 		52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = lang_bind_helper.cpp; path = realm/lang_bind_helper.cpp; sourceTree = "<group>"; };
 		5219EB6718FB026100FF9232 /* verified_integer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = verified_integer.cpp; sourceTree = "<group>"; };
@@ -1367,6 +1372,8 @@
 				526F3F0518246523005217F1 /* benchmark_results.cpp */,
 				526F3F0318246519005217F1 /* benchmark_results.hpp */,
 				52C9B60F19B7418200248011 /* check_logic_error.hpp */,
+				48B1D2371C749D750066A961 /* crypt_key.hpp */,
+				48B1D2391C749D850066A961 /* crypt_key.cpp */,
 				B159814718CF560000E3C5DF /* demangle.cpp */,
 				B159814818CF560000E3C5DF /* demangle.hpp */,
 				4222F2F819640A7A00EC86A5 /* jsmn.cpp */,
@@ -1726,6 +1733,7 @@
 				524F3C9D18EA347900DEE22A /* test_path.hpp in Headers */,
 				526F3F081824652B005217F1 /* thread_wrapper.hpp in Headers */,
 				B159627718DB14C4008B9421 /* unit_test.hpp in Headers */,
+				48B1D2381C749D750066A961 /* crypt_key.hpp in Headers */,
 				5219EB6A18FB026100FF9232 /* verified_integer.hpp in Headers */,
 				F4DCAF2E1B78EE8900EEC19A /* quote.hpp in Headers */,
 				5219EB6E18FB028300FF9232 /* verified_string.hpp in Headers */,
@@ -2343,6 +2351,7 @@
 				523AC1AA18EABFE900049AEA /* random.cpp in Sources */,
 				5238B562193F5051003F1C38 /* resource_limits.cpp in Sources */,
 				B159627418DB14C4008B9421 /* test_only.cpp in Sources */,
+				48B1D23A1C749D850066A961 /* crypt_key.cpp in Sources */,
 				524F3C9A18EA346A00DEE22A /* test_path.cpp in Sources */,
 				52D6E070175BDC6500B423E5 /* timer.cpp in Sources */,
 				B159627618DB14C4008B9421 /* unit_test.cpp in Sources */,
@@ -2499,6 +2508,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F4D0FC691B00F4EC0040956A /* benchmark_results.cpp in Sources */,
+				48B1D23B1C749DF00066A961 /* crypt_key.cpp in Sources */,
 				F4D0FC6A1B00F4EC0040956A /* demangle.cpp in Sources */,
 				F4D0FC6B1B00F4EC0040956A /* jsmn.cpp in Sources */,
 				F4D0FC6C1B00F4EC0040956A /* mem.cpp in Sources */,

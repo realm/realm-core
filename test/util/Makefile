@@ -11,6 +11,7 @@ wildcard.cpp \
 unit_test.cpp \
 test_path.cpp \
 test_only.cpp \
+crypt_key.cpp \
 misc.cpp \
 verified_integer.cpp \
 verified_string.cpp \

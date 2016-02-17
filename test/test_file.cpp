@@ -8,9 +8,9 @@
 #include <realm/util/file_mapper.hpp>
 
 #include "test.hpp"
-#include "crypt_key.hpp"
 
 using namespace realm::util;
+using namespace realm::test_util;
 
 
 // Test independence and thread-safety
