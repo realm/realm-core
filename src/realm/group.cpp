@@ -379,7 +379,7 @@ void Group::create_and_insert_table(size_t table_ndx, StringData name)
     typedef TableFriend tf;
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    size_t prior_size = m_tables.size();
+    size_t prior_num_tables = m_tables.size();
     m_tables.insert(table_ndx, ref); // Throws
     m_table_names.insert(table_ndx, name); // Throws
 
@@ -396,7 +396,7 @@ void Group::create_and_insert_table(size_t table_ndx, StringData name)
     }); // Throws
 
     if (Replication* repl = m_alloc.get_replication())
-        repl->insert_group_level_table(table_ndx, prior_size, name); // Throws
+        repl->insert_group_level_table(table_ndx, prior_num_tables, name); // Throws
 }
 
 
@@ -453,7 +453,8 @@ Table* Group::create_table_accessor(size_t table_ndx)
 
 void Group::remove_table(StringData name)
 {
-    REALM_ASSERT(is_attached());
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
@@ -463,7 +464,11 @@ void Group::remove_table(StringData name)
 
 void Group::remove_table(size_t table_ndx)
 {
-    REALM_ASSERT(is_attached());
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
+    if (table_ndx >= m_tables.size())
+        throw LogicError(LogicError::table_index_out_of_range);
     TableRef table = get_table(table_ndx);
 
     // In principle we could remove a table even if it is the target of link
@@ -520,7 +525,8 @@ void Group::remove_table(size_t table_ndx)
 
 void Group::rename_table(StringData name, StringData new_name, bool require_unique_name)
 {
-    REALM_ASSERT(is_attached());
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
@@ -530,7 +536,8 @@ void Group::rename_table(StringData name, StringData new_name, bool require_uniq
 
 void Group::rename_table(size_t table_ndx, StringData new_name, bool require_unique_name)
 {
-    REALM_ASSERT(is_attached());
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
@@ -542,52 +549,55 @@ void Group::rename_table(size_t table_ndx, StringData new_name, bool require_uni
 }
 
 
-void Group::move_table(size_t from_ndx, size_t to_ndx)
+void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
 {
-    REALM_ASSERT_3(from_ndx, !=, to_ndx);
-    REALM_ASSERT(is_attached());
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    if (from_ndx >= m_tables.size())
+    if (from_table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
-    if (to_ndx >= m_tables.size())
+    if (to_table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
 
-    // Tables between from_ndx and to_ndx change their indices,
-    // so link columns have to be adjusted (similar to remove_table).
+    if (from_table_ndx == to_table_ndx)
+        return;
+
+    // Tables between from_table_ndx and to_table_ndx change their indices, so
+    // link columns have to be adjusted (similar to remove_table).
 
     // Build a map of all table indices that are going to change:
     std::map<size_t, size_t> moves; // from -> to
-    moves[from_ndx] = to_ndx;
-    if (from_ndx < to_ndx) {
+    moves[from_table_ndx] = to_table_ndx;
+    if (from_table_ndx < to_table_ndx) {
         // Move up:
-        for (size_t i = from_ndx + 1; i <= to_ndx; ++i) {
+        for (size_t i = from_table_ndx + 1; i <= to_table_ndx; ++i) {
             moves[i] = i - 1;
         }
     }
-    else if (from_ndx > to_ndx) {
+    else { // from_table_ndx > to_table_ndx
         // Move down:
-        for (size_t i = to_ndx; i < from_ndx; ++i) {
+        for (size_t i = to_table_ndx; i < from_table_ndx; ++i) {
             moves[i] = i + 1;
         }
     }
 
     // Move entries in internal data structures.
-    m_tables.move_rotate(from_ndx, to_ndx);
-    m_table_names.move_rotate(from_ndx, to_ndx);
+    m_tables.move_rotate(from_table_ndx, to_table_ndx);
+    m_table_names.move_rotate(from_table_ndx, to_table_ndx);
 
     // Move accessors.
     using iter = decltype(m_table_accessors.begin());
     iter first, new_first, last;
-    if (from_ndx < to_ndx) {
+    if (from_table_ndx < to_table_ndx) {
         // Rotate left.
-        first     = m_table_accessors.begin() + from_ndx;
+        first     = m_table_accessors.begin() + from_table_ndx;
         new_first = first + 1;
-        last      = m_table_accessors.begin() + to_ndx + 1;
+        last      = m_table_accessors.begin() + to_table_ndx + 1;
     }
-    else { // from_ndx > to_ndx
+    else { // from_table_ndx > to_table_ndx
         // Rotate right.
-        first     = m_table_accessors.begin() + to_ndx;
-        new_first = m_table_accessors.begin() + from_ndx;
+        first     = m_table_accessors.begin() + to_table_ndx;
+        new_first = m_table_accessors.begin() + from_table_ndx;
         last      = new_first + 1;
     }
     std::rotate(first, new_first, last);
@@ -601,7 +611,7 @@ void Group::move_table(size_t from_ndx, size_t to_ndx)
     });
 
     if (Replication* repl = m_alloc.get_replication())
-        repl->move_group_level_table(from_ndx, to_ndx); // Throws
+        repl->move_group_level_table(from_table_ndx, to_table_ndx); // Throws
 }
 
 
@@ -1089,17 +1099,51 @@ public:
         return true;
     }
 
-    bool move_group_level_table(size_t, size_t) noexcept
+    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
     {
-        // No-op since table names / table refs are properties of the group, and the group
-        // accessor is always refreshed
+        REALM_ASSERT(from_table_ndx != to_table_ndx);
+        if (!m_group.m_table_accessors.empty()) {
+            using iter = decltype(m_group.m_table_accessors)::iterator;
+            iter begin, end;
+            if (from_table_ndx < to_table_ndx) {
+                // Left rotation
+                begin = m_group.m_table_accessors.begin() + from_table_ndx;
+                end = m_group.m_table_accessors.begin() + to_table_ndx + 1;
+                Table* table = begin[0];
+                std::copy(begin + 1, end, begin);
+                end[-1] = table;
+            }
+            else { // from_table_ndx > to_table_ndx
+                // Right rotation
+                begin = m_group.m_table_accessors.begin() + to_table_ndx;
+                end = m_group.m_table_accessors.begin() + from_table_ndx + 1;
+                Table* table = end[-1];
+                std::copy_backward(begin, end-1, end);
+                begin[0] = table;
+            }
+            for (iter i = begin; i != end; ++i) {
+                if (Table* table = *i) {
+                    typedef _impl::TableFriend tf;
+                    tf::mark(*table); // FIXME: Not sure this is needed
+                    tf::mark_opposite_link_tables(*table);
+                }
+            }
+        }
+
         m_schema_changed = true;
+
         return true;
     }
 
     bool select_table(size_t group_level_ndx, int levels, const size_t* path) noexcept
     {
         m_table.reset();
+        // The list of table accessors must either be empty or correctly reflect
+        // the number of tables prior to this instruction (see
+        // Group::do_get_table()). An empty list means that no table accessors
+        // have been created yet (all entries are null).
+        REALM_ASSERT(m_group.m_table_accessors.empty() ||
+                     group_level_ndx < m_group.m_table_accessors.size());
         if (group_level_ndx < m_group.m_table_accessors.size()) {
             if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
                 const size_t* path_begin = path;

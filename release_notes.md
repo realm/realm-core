@@ -2,7 +2,45 @@
 
 ### Bugfixes:
 
+* `Group::TransactAdvancer::move_group_level_table()` was forgetting some of its
+  duties (move the table accessor). That has been fixed.
+* While generating transaction logs, we didn't always deselect nested
+  accessors. For example, when performing a table-level operation, we didn't
+  deselect a selected link list. In some cases, it didn't matter, but in others
+  it did. The general rule is that an operation on a particular level must
+  deselect every accessor at deeper (more nested) levels. This is important for
+  the merge logic of the sync mechanism, and for transaction log reversal. This
+  has been fixed.
+* While reversing transaction logs, group level operations did not terminate the
+  preceding section of table level operations. Was fixed.
+* Table::clear() issues link nullification instructions for each link that did
+  point to a removed row. It did however issue those instructions after the
+  clear instruction, which is incorrect, as the links do not exist after the
+  clear operation. Was fixed.
+
+### API breaking changes:
+
 * Lorem ipsum.
+
+### Enhancements:
+
+* Add SharedGroup::get_transact_stage().
+
+-----------
+
+### Internals:
+
+* Improve documentation of `Group::move_table()` and `LinkView::move()`.
+* Early out from `Group::move_table()` if `from_index == to_index`. This
+  behaviour agrees with `LinkView::move()` and is assumed by other parts of
+  core, and by the merge logic of the sync mechanism.
+* Convert some assertions on arguments of public `Group`, `Table`, and
+  `LinkView` methods to throwing checks.
+* Align argument naming of `Group::move_table()` and `LinkView::move()`.
+
+----------------------------------------------
+
+# 0.96.1 Release notes
 
 ### API breaking changes:
 
@@ -26,6 +64,8 @@
   bindings can specifically catch this case and handle it differently
   than the rest of the general std::runtime_errors.
 
+* Doubled the speed of TableView::clear() when parent table has an 
+  indexed column.
 -----------
 
 ### Internals:

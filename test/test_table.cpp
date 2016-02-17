@@ -6567,4 +6567,28 @@ TEST(Table_ChangeLinkTargets_LinkLists)
 }
 
 
+TEST(Table_DetachedAccessor)
+{
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column(type_Int, "i");
+    table->add_column(type_String, "s");
+    table->add_column(type_Binary, "b");
+    table->add_column_link(type_Link, "l", *table);
+    table->add_empty_row(2);
+    group.remove_table("table");
+
+    CHECK_LOGIC_ERROR(table->clear(), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->add_search_index(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->change_link_targets(0,1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->swap_rows(0,1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->set_string_unique(1, 0, ""), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->insert_substring(1, 0, 0, "x"), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->remove_substring(1, 0, 0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->set_binary(2, 0, BinaryData()), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->set_link(3, 0, 0), LogicError::detached_accessor);
+}
+
 #endif // TEST_TABLE

@@ -2277,33 +2277,34 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
 
 void Table::clear()
 {
-    REALM_ASSERT(is_attached());
-
-    if (Replication* repl = get_repl())
-        repl->clear_table(this); // Throws
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
 
     size_t table_ndx = get_index_in_group();
     if (table_ndx == realm::npos) {
         bool broken_reciprocal_backlinks = false;
         do_clear(broken_reciprocal_backlinks);
-        return;
+    }
+    else {
+        // Group-level tables may have links, so in those cases we need to
+        // discover all the rows that need to be cascade-removed.
+        CascadeState state;
+        state.stop_on_table = this;
+        if (Group* g = get_parent_group())
+            state.track_link_nullifications = g->has_cascade_notification_handler();
+        cascade_break_backlinks_to_all_rows(state); // Throws
+
+        if (Group* g = get_parent_group())
+            _impl::GroupFriend::send_cascade_notification(*g, state);
+
+        bool broken_reciprocal_backlinks = true;
+        do_clear(broken_reciprocal_backlinks);
+
+        remove_backlink_broken_rows(state); // Throws
     }
 
-    // Group-level tables may have links, so in those cases we need to discover
-    // all the rows that need to be cascade-removed.
-    CascadeState state;
-    state.stop_on_table = this;
-    if (Group* g = get_parent_group())
-        state.track_link_nullifications = g->has_cascade_notification_handler();
-    cascade_break_backlinks_to_all_rows(state); // Throws
-
-    if (Group* g = get_parent_group())
-        _impl::GroupFriend::send_cascade_notification(*g, state);
-
-    bool broken_reciprocal_backlinks = true;
-    do_clear(broken_reciprocal_backlinks);
-
-    remove_backlink_broken_rows(state); // Throws
+    if (Replication* repl = get_repl())
+        repl->clear_table(this); // Throws
 }
 
 
