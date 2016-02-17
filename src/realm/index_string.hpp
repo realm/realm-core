@@ -28,6 +28,37 @@
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
 
+ /*
+The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_DateTime and 
+type_Int. When used for integral types, the 64-bit integer is simply casted to a string of 8 bytes through a 
+pretty simple "wrapper layer" in all public methods.
+
+The StringIndex data structure is like an "inversed" B+ tree where the leafs contain row indexes and the non-leafs
+contain 4-byte chunks of payload. Imagine a table with following strings:
+
+        hello, kitty, kitten, foobar, kitty, foobar
+
+The topmost level of the index tree contains prefixes of the payload strings of length <= 4. The next level contains
+prefixes of the remaining parts of the strings. Unnecessary levels of the tree are optimized away; the prefix "foob" 
+is shared only by rows that are identical ("foobar"), so "ar" is not needed to be stored in the tree.
+
+        hell   kitt      foob
+         |      /\        |
+         0     en  y    {3, 5}
+               |    \
+            {1, 4}   2
+
+Each non-leafs consists of two integer arrays of the same length, one containing payload and the other containing
+references to the sublevel nodes.
+
+The leafs can be either a single value or a Column. If the reference in its parent node has its least significant 
+bit set, then the remaining upper bits specify the row index at which the string is stored. If the bit is clear, 
+it must be interpreted as a reference to a Column that stores the row indexes at which the string is stored.
+
+If a Column is used, then all row indexes are guaranteed to be sorted increasingly, which means you an search in it 
+using our binary search functions such as upper_bound() and lower_bound().
+*/
+
 namespace realm {
 
 class Spec;
@@ -191,9 +222,6 @@ private:
     /// Add small signed \a diff to all elements that are greater than, or equal
     /// to \a min_row_ndx.
     void adjust_row_indexes(size_t min_row_ndx, int diff);
-
-    void validate_value(StringData data) const;
-    void validate_value(int64_t value) const noexcept;
 
     struct NodeChange {
         size_t ref1;
