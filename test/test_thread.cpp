@@ -213,7 +213,7 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
     }
 }
 
-#if 1 // not ready yet
+#if 0 // not ready yet
 class QueueEmulated {
     EmulatedRobustMutex mutex;
     EmulatedRobustMutex::SharedPart mutex_part;
@@ -615,4 +615,25 @@ TEST(Thread_CondvarIsStateless)
     }
     signal_thread.join();
 }
+
+
+TEST(Thread_CondvarTimeout)
+{
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
+    PlatformSpecificCondVar changed;
+    PlatformSpecificCondVar::SharedPart condvar_part;
+    PlatformSpecificCondVar::init_shared_part(condvar_part);
+    mutex.set_shared_part(mutex_part, "Thread_CondvarTimeout", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarTimeout", 0);
+    struct timespec time;
+    time.tv_sec = 0;
+    time.tv_nsec = 100000000; // 0.1 sec
+    {
+        EmulatedRobustMutex::LockGuard l(mutex);
+        for (int i=0; i<5; ++i)
+            changed.wait(mutex, &time);
+    }
+}
+
 #endif // TEST_THREAD
