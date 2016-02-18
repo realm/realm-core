@@ -544,6 +544,21 @@ void wakeup_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
     cv->notify_all();
 }
 
+static int wait_counter;
+void waiter_with_count(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
+{
+    EmulatedRobustMutex::LockGuard l(*mutex);
+    ++wait_counter;
+    cv->wait(*mutex, nullptr);
+    --wait_counter;
+}
+
+void waiter(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
+{
+    EmulatedRobustMutex::LockGuard l(*mutex);
+    cv->wait(*mutex, nullptr);
+}
+
 /* no use for this yet.
 
 void burst_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
@@ -585,7 +600,7 @@ TEST(Thread_CondvarWaits)
 }
 
 // Verify that a condition variable looses its signal if no one
-// collects it.
+// is waiting on it
 TEST(Thread_CondvarIsStateless)
 {
     EmulatedRobustMutex mutex;
@@ -617,6 +632,7 @@ TEST(Thread_CondvarIsStateless)
 }
 
 
+// this test hangs, if timeout doesn't work.
 TEST(Thread_CondvarTimeout)
 {
     EmulatedRobustMutex mutex;
@@ -635,5 +651,63 @@ TEST(Thread_CondvarTimeout)
             changed.wait(mutex, &time);
     }
 }
+
+
+// test that notify_all will wake up all waiting threads, if there
+// are many waiters:
+TEST(Thread_CondvarNotifyAllWakeup)
+{
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
+    PlatformSpecificCondVar changed;
+    PlatformSpecificCondVar::SharedPart condvar_part;
+    PlatformSpecificCondVar::init_shared_part(condvar_part);
+    mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyAllWakeup", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyAllWakeup", 0);
+    const int num_waiters = 10;
+    Thread waiters[num_waiters];
+    for (int i=0; i<num_waiters; ++i) {
+        waiters[i].start(std::bind(waiter, &mutex, &changed));
+    }
+    sleep(1); // allow time for all waiters to wait
+    changed.notify_all();
+    for (int i=0; i<num_waiters; ++i) {
+        waiters[i].join();
+    }
+}
+
+
+// test that notify will wake up only a single thread, even if there
+// are many waiters:
+TEST(Thread_CondvarNotifyWakeup)
+{
+    wait_counter = 0;
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
+    PlatformSpecificCondVar changed;
+    PlatformSpecificCondVar::SharedPart condvar_part;
+    PlatformSpecificCondVar::init_shared_part(condvar_part);
+    mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyWakeup", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyWakeup", 0);
+    const int num_waiters = 10;
+    Thread waiters[num_waiters];
+    for (int i=0; i<num_waiters; ++i) {
+        waiters[i].start(std::bind(waiter_with_count, &mutex, &changed));
+    }
+    sleep(1); // allow time for all waiters to wait
+    CHECK(wait_counter == 10);
+    changed.notify();
+    sleep(1);
+    CHECK(wait_counter == 9);
+    changed.notify();
+    sleep(1);
+    CHECK(wait_counter == 8);
+    changed.notify_all();
+    for (int i=0; i<num_waiters; ++i) {
+        waiters[i].join();
+    }
+}
+
+
 
 #endif // TEST_THREAD
