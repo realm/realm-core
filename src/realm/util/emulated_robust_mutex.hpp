@@ -23,9 +23,9 @@
 
 // Enable this only on platforms where it might be needed
 // currently APPLE.
-//#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE
 #define REALM_ROBUST_MUTEX_EMULATION
-//#endif
+#endif
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -43,7 +43,7 @@ class PlatformSpecificCondVar;
 /// release any locks held by a process when it crashes. Contrary to
 /// Posix robust mutexes, this robust mutex is not capable of informing
 /// participants that they have been granted a lock after a crash of
-/// the process holding it.
+/// the process holding it (though it could be added if needed).
 
 class EmulatedRobustMutex {
 public:
@@ -93,7 +93,7 @@ public:
         return RobustMutex::is_robust_on_this_platform();
 #endif
     }
-//private:
+private:
 #ifndef REALM_ROBUST_MUTEX_EMULATION
     SharedPart* m_shared_part = 0;
 #else
