@@ -221,37 +221,34 @@ void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec
 
         int r;
         {
-            if (tp)
-                r = poll(&poll_d, 1, tp->tv_sec*1000 + tp->tv_nsec/1000000);
+            if (tp) {
+                int time = tp->tv_sec*1000 + tp->tv_nsec/1000000;
+                r = poll(&poll_d, 1, time);
+            }
             else
                 r = poll(&poll_d, 1, -1);
         }
         m.lock(); // no race after this point.
         uint64_t my_signal_counter = m_shared_part->signal_counter;
 
-        // if wait returns with no ready fd, we retry
-        if (r == 0)
-            continue;
-
+        // if wait returns with no ready fd it's a timeout:
+        if (r == 0) {
+            // We've earlier indicated that we're waiting and increased
+            // the wait counter. Eventually (and possibly already after the return
+            // from poll() but before locking the mutex) someone will write
+            // to the fifo to wake us up. To keep the balance, we fake that
+            // this signaling has already been done:
+            ++m_shared_part->signal_counter;
+            // even though we do this, a byte may be pending on the fifo.
+            // we ignore this - so it may cause another, later, waiter to pass
+            // through poll and grab that byte from the fifo. This will cause
+            // said waiter to do a spurious return.
+            return;
+        }
         if (r == -1) {
             // if wait returns due to a signal, we must retry:
             if (errno == EINTR)
                 continue;
-            // but if it returns due to timeout, we must exit the wait loop
-            if (errno == ETIMEDOUT) {
-                // We've earlier indicated that we're waiting and increased
-                // the wait counter. Eventually (and possibly already after the return
-                // from poll() but before locking the mutex) someone will write
-                // to the fifo to wake us up. To keep the balance, we fake that
-                // this signaling has already been done:
-                ++m_shared_part->signal_counter;
-                // even though we do this, a byte may be pending on the fifo.
-                // we ignore this - so it may cause another, later, waiter to pass
-                // through poll and grab that byte from the fifo. This will cause
-                // said waiter to do a spurious return.
-                // FIXME: No unittest for this, yet.
-                return;
-            }
         }
         // If we've been woken up, but actually arrived later than the
         // signal sent (have a later ticket), we allow someone else to
