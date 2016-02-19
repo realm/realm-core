@@ -16,6 +16,8 @@ Testing
 cmake_install.cmake
 CTestTestfile.cmake
 Makefile
+Realm.xcodeproj
+CMakeScripts
 
 # Ignore all user files except one which includes execution path for test
 *.user
