@@ -8,10 +8,10 @@ set(TESTS ${NORMAL_TESTS} ${LARGE_TESTS} ${FUZZY_TESTS})
 
 # FIXME: Resources
 # FIXME: Benchmarks
-# FIXME: Fuzzy tests
 
 add_executable(realm-tests ${TESTS} main.cpp)
 target_link_libraries(realm-tests realm test-util)
+# FIXME: Link with procps and define HAVE_PROCPS
 
 add_test(RealmTests realm-tests)
 
