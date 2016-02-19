@@ -315,8 +315,8 @@ public:
     // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
     // Each time you call distinct() it will first fetch the full original TableView contents and then apply
     // distinct() on that. So it distinct() does not filter the result of the previous distinct().
-    void distinct(size_t column);
-    void distinct(std::vector<size_t> columns);
+    TableView distinct(size_t column);
+    TableView distinct(std::vector<size_t> columns);
 
     // Actual sorting facility is provided by the base class:
     using RowIndexes::sort;
@@ -434,6 +434,8 @@ private:
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
     void adj_row_acc_clear() noexcept;
+
+    void distinct_internal(std::vector<size_t> columns);
 
     template<typename Tab>
     friend class BasicTableView;
@@ -829,8 +831,8 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
     m_linked_row(tv.m_linked_row),
     m_linkview_source(tv.m_linkview_source),
     m_distinct_column_source(tv.m_distinct_column_source),
-    m_distinct_columns(std::move(tv.m_distinct_columns)),
-    m_sorting_predicate(std::move(tv.m_sorting_predicate)),
+    m_distinct_columns(tv.m_distinct_columns),
+    m_sorting_predicate(tv.m_sorting_predicate),
     m_auto_sort(tv.m_auto_sort),
     m_query(tv.m_query),
     m_start(tv.m_start),
@@ -888,21 +890,21 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
 {
     if (m_table)
         m_table->unregister_view(this);
-    m_table = move(tv.m_table);
+    m_table = tv.m_table;
     if (m_table)
         m_table->move_registered_view(&tv, this);
 
     m_row_indexes.move_assign(tv.m_row_indexes);
-    m_query = std::move(tv.m_query);
+    m_query = tv.m_query;
     m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_version = tv.m_last_seen_version;
     m_auto_sort = tv.m_auto_sort;
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linkview_source = std::move(tv.m_linkview_source);
+    m_linkview_source = tv.m_linkview_source;
     m_distinct_columns = tv.m_distinct_columns;
-    m_sorting_predicate = std::move(tv.m_sorting_predicate);
+    m_sorting_predicate = tv.m_sorting_predicate;
 
     return *this;
 }

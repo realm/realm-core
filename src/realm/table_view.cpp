@@ -619,30 +619,37 @@ void TableViewBase::sync_distinct_view(size_t column)
     }
 }
 
-void TableViewBase::distinct(size_t column)
+TableView TableViewBase::distinct(size_t column)
 {
-    distinct(std::vector<size_t> { column });
+    return distinct(std::vector<size_t> { column });
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument. 
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
-void TableViewBase::distinct(std::vector<size_t> columns)
+TableView TableViewBase::distinct(std::vector<size_t> columns)
 {
-    m_distinct_columns.clear();
-    const_cast<TableViewBase*>(this)->do_sync();
+    TableView res = TableView(*static_cast<TableView*>(this));
+    res.distinct_internal(columns);
+    return res;
+}
+
+void TableViewBase::distinct_internal(std::vector<size_t> columns)
+{
     m_distinct_columns = columns;
 
     if (m_distinct_columns.size() == 0)
         return;
 
+    std::vector<bool> ascending;
+    for (size_t r = 0; r < m_distinct_columns.size(); r++)
+        ascending.push_back(true);
+
     // Step 1: First copy original TableView into a vector
     std::vector<size_t> original;
     original.resize(size());
-    std::vector<bool> ascending;
-    for (size_t r = 0; r < size(); r++) {
+
+    for (size_t r = 0; r < size(); r++)
         original[r] = m_row_indexes.get(r);
-        ascending.push_back(true);
-    }
 
     // Step 2: Now sort ascending using the same column set that was passed to distinct()
     Sorter s(columns, ascending);

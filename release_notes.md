@@ -16,7 +16,8 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* TableView::distinct() now returns a new TableView with the result. Older calls
+  to distinct() are therefore no longer reversed/forgotten upon successive calls.
 
 ### Enhancements:
 
