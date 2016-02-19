@@ -13,6 +13,5 @@ set(TESTS ${NORMAL_TESTS} ${LARGE_TESTS} ${FUZZY_TESTS})
 add_executable(realm-tests ${TESTS} main.cpp)
 target_link_libraries(realm-tests realm test-util)
 
-enable_testing()
 add_test(RealmTests realm-tests)
 

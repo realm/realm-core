@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(Realm)
 set(CMAKE_CXX_STANDARD 11)
+enable_testing()
 
 include_directories(src)
 
