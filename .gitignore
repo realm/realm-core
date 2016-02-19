@@ -9,6 +9,13 @@ tags
 /gcovr.xml
 /tmp
 
+# CMake artifacts
+CMakeFiles
+CMakeCache.txt
+Testing
+cmake_install.cmake
+CTestTestfile.cmake
+
 # Ignore all user files except one which includes execution path for test
 *.user
 !tighdb.vcxproj.user
