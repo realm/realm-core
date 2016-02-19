@@ -1026,7 +1026,6 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
 
         LinkColumnBase& link_col = get_column_link_base(origin_col_ndx);
         BacklinkColumn& backlink_col = target_table->get_column_backlink(backlink_col_ndx);
-        //FIXME: link_col->m_column_ndx = origin_col_ndx;
         backlink_col.set_origin_column(link_col, origin_col_ndx);
     }
 }
