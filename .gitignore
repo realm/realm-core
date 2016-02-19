@@ -15,6 +15,7 @@ CMakeCache.txt
 Testing
 cmake_install.cmake
 CTestTestfile.cmake
+Makefile
 
 # Ignore all user files except one which includes execution path for test
 *.user
