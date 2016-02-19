@@ -309,12 +309,10 @@ public:
     // Sort m_row_indexes according to multiple columns
     void sort(std::vector<size_t> columns, std::vector<bool> ascending);
 
-    // Remove rows that are duplicated with respect to the column set passed as argument. 
+    // Remove rows from returned TableView that are duplicated with respect to the column set passed as argument. 
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
-    // If two rows are indentical (for the given set of distinct-columns), then the last row is removed.
-    // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
-    // Each time you call distinct() it will first fetch the full original TableView contents and then apply
-    // distinct() on that. So it distinct() does not filter the result of the previous distinct().
+    // If two rows are indentical (for the given set of distinct-columns), then the last row is removed. You can
+    // call sync_if_needed() to update the distinct view, just like you can for a sorted view.
     TableView distinct(size_t column);
     TableView distinct(std::vector<size_t> columns);
 
