@@ -721,7 +721,7 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     // column that is not a backlink column. If there are no backlink columns,
     // then the removal of the last column is enough to effectively truncate the
     // size (number of rows) to zero, since the number of rows is simply the
-    // number of entries en each column. If, on the other hand, there are
+    // number of entries in each column. If, on the other hand, there are
     // additional backlink columns, we need to inject a clear operation before
     // the column removal to correctly reproduce the desired effect, namely that
     // the table appears truncated after the removal of the last non-hidden
@@ -1017,8 +1017,17 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
     }
 
     for (auto& t : update_backlink_columns) {
-        Spec& target_spec = std::get<0>(t)->m_spec;
-        target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
+        Table* target_table = std::get<0>(t);
+        size_t backlink_col_ndx = std::get<1>(t);
+        size_t origin_col_ndx = std::get<2>(t);
+
+        Spec& target_spec = target_table->m_spec;
+        target_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_ndx);
+
+        LinkColumnBase& link_col = get_column_link_base(origin_col_ndx);
+        BacklinkColumn& backlink_col = target_table->get_column_backlink(backlink_col_ndx);
+        //FIXME: link_col->m_column_ndx = origin_col_ndx;
+        backlink_col.set_origin_column(link_col, origin_col_ndx);
     }
 }
 
@@ -1051,10 +1060,13 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             if (!is_link_type(m_spec.get_column_type(col_ndx)))
                 continue;
             LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[col_ndx]);
+
             Spec& target_spec = link_col->get_target_table().m_spec;
             size_t old_col_ndx = col_ndx + 1;
             size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
             target_spec.set_backlink_origin_column(backlink_col_ndx, col_ndx);
+            BacklinkColumn& backlink_col = link_col->get_target_table().get_column_backlink(backlink_col_ndx);
+            backlink_col.set_origin_column(*link_col, col_ndx);
         }
     }
     else if (moved_from > moved_to) {
@@ -1067,6 +1079,8 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             size_t old_col_ndx = col_ndx - 1;
             size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
             target_spec.set_backlink_origin_column(backlink_col_ndx, col_ndx);
+            BacklinkColumn& backlink_col = link_col->get_target_table().get_column_backlink(backlink_col_ndx);
+            backlink_col.set_origin_column(*link_col, col_ndx);
         }
     }
 }

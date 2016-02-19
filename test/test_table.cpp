@@ -6566,6 +6566,101 @@ TEST(Table_ChangeLinkTargets_LinkLists)
     CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
 }
 
+TEST(Table_FailingFuzzyTestcase)
+{
+    Group g;
+    g.add_table("string_index_test_table");
+    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "aa",true));
+    g.get_table(0)->insert_empty_row(0, 17);
+    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "cXagaaxcxXXcaaaggaXxgcxTxaXgcTgTxXgaXaxxgXxXTaX",true));
+    g.get_table(0)->insert_empty_row(4, 244);
+    g.get_table(0)->add_empty_row(17);
+    g.get_table(0)->add_empty_row(225);
+    g.get_table(0)->remove_last();
+    g.get_table(0)->insert_column(0, DataType(0), "axaacXaTgxTgcTcgxTgaaXTaxaaTTcacTTccTgaaXXcXXxgaaTXx",true);
+    g.get_table(0)->add_search_index(0);
+    g.get_table(0)->insert_empty_row(18, 13);
+    g.get_table(0)->insert_column_link(3, type_Link, "XXg", *g.get_table(0));
+    g.get_table(0)->find_first_int(2, 0);
+    { TableRef t = g.get_table(0); t->remove_column(1); }
+    g.get_table(0)->insert_empty_row(1, 2);
+    { TableRef t = g.get_table(0); t->remove_column(0); }
+    g.get_table(0)->add_empty_row(186);
+    g.get_table(0)->find_first_int(0, 0);
+    g.get_table(0)->set_int_unique(0, 255, 1);
+    g.get_table(0)->find_first_int(0, 0);
+    g.get_table(0)->set_null(0, 53);
+    g.get_table(0)->set_int_unique(0, 97, 'l');
+    g.get_table(0)->add_empty_row(85);
+    g.get_table(0)->set_int_unique(0, 100, 'l');
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 100), 'l');
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 97), 0);
+
+}
+
+TEST(Table_InsertUniqueDuplicate_LinkedColumns)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    t->add_column(type_Int, "int1");
+    t->add_search_index(0);
+    t->add_empty_row(2);
+    t->set_int_unique(0, 0, 42);
+    t->set_int_unique(0, 1, 42);
+    CHECK_EQUAL(t->size(), 1);
+    CHECK_EQUAL(t->get_int(0, 0), 42);
+
+    t->insert_column(0, type_String, "string1");
+    t->add_search_index(0);
+    t->add_empty_row(1);
+    t->set_string_unique(0, 0, "fourty-two");
+    t->set_string_unique(0, 1, "fourty-two");
+    CHECK_EQUAL(t->size(), 1);
+    CHECK_EQUAL(t->get_string(0, 0), "fourty-two");
+    CHECK_EQUAL(t->get_int(1, 0), 0);
+
+    TableRef t2 = g.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column(type_String, "string_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->add_search_index(0);
+    t2->add_search_index(1);
+    t2->add_empty_row(2);
+    t2->set_int_unique(0, 0, 43);
+    t2->set_string_unique(1, 0, "fourty-three");
+    t2->set_string_unique(1, 1, "FOURTY_THREE");
+    t2->set_link(2, 1, 0);
+    t2->set_int_unique(0, 1, 43);
+
+    CHECK_EQUAL(t2->size(), 1);
+    CHECK_EQUAL(t2->get_int(0, 0), 43);
+    CHECK_EQUAL(t2->get_string(1, 0), "FOURTY_THREE");
+    CHECK_EQUAL(t2->get_link(2, 0), 0);
+
+    t2->remove_column(0);
+    t->insert_empty_row(0);     // update t2 link through backlinks
+    t->set_int(1, 0, 333);
+    CHECK_EQUAL(t->get_int(1, 0), 333);
+    CHECK_EQUAL(t->get_int(1, 1), 0);
+    CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped forward by insert at t(0), updated through backlinks
+
+    using df = _impl::DescriptorFriend;
+    DescriptorRef t2_descriptor = t2->get_descriptor();
+    df::move_column(*t2_descriptor, 0, 1);
+    CHECK_EQUAL(t2->get_link(0, 0), 1); // unchanged
+    t->insert_empty_row(0);
+    t->set_int(1, 0, 4444);
+    CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped forward via backlinks
+    t2->remove_column(1);
+    CHECK_EQUAL(t2->get_link(0, 0), 2); // unchanged
+    t->insert_empty_row(0);     // update through backlinks
+    t->set_int(1, 0, 55555);
+    CHECK_EQUAL(t2->get_link(0, 0), 3);
+
+    t->set_int_unique(1, 0, 4444);  // duplicate
+    CHECK_EQUAL(t2->get_link(0, 0), 1); // changed by duplicate overwrite in linked table via backlinks
+}
+
 
 TEST(Table_DetachedAccessor)
 {
