@@ -8,7 +8,8 @@ include_directories(src)
 add_subdirectory(src/realm)
 add_subdirectory(test)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-DDEBUG" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS "-Wextra -Wpedantic -DREALM_HAVE_CONFIG" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_DEBUG "-DDEBUG -DREALM_DEBUG" CACHE INTERNAL "")
 
 if(APPLE)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework CoreFoundation" CACHE INTERNAL "")
