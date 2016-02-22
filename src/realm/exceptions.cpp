@@ -58,9 +58,6 @@ const char* LogicError::what() const noexcept
                 "or transaction already in progress)";
         case no_history:
             return "Continuous transaction through SharedGroup object without history information";
-        case mixed_shared_info_version:
-            return "Format of SharedInfo file (`foo.realm.lock`) was not consistent across the "
-                "session";
         case mixed_durability:
             return "Durability setting (as passed to the SharedGroup constructor) was "
                 "not consistent across the session";

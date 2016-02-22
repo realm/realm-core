@@ -182,10 +182,6 @@ public:
         /// object with no history. See Replication::get_history().
         no_history,
 
-        /// Format of SharedInfo file (`foo.realm.lock`) was not consistent
-        /// across the session.
-        mixed_shared_info_version,
-
         /// Durability setting (as passed to the SharedGroup constructor) was
         /// not consistent across the session.
         mixed_durability,
