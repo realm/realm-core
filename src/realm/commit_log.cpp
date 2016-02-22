@@ -738,8 +738,6 @@ void WriteLogCollector::get_changesets(version_type from_version, version_type t
 
 void WriteLogCollector::set_oldest_bound_version(version_type version)
 {
-    // FIXME: Finn, `map_header_if_needed()` can throw, so it is an error to
-    // declare this one `noexcept`
     map_header_if_needed();
     RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
     CommitLogPreamble* preamble = get_preamble_for_write();
