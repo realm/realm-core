@@ -945,6 +945,14 @@ EOF
             cp "$platform_dir"/*.a "$tmpdir/$BASENAME" || exit 1
         done
 
+        if [ -f "$tmpdir/$BASENAME"/librealm-macosx.a ]; then
+            # If we built for OS X, add symlinks at the location of the old library names. This will give the bindings
+            # a chance to update to the new names without breaking building with new versions of core.
+            rm -f "$tmpdir/$BASENAME"/librealm{,-dbg}.a
+            ln -sf librealm-macosx.a "$tmpdir/$BASENAME"/librealm.a
+            ln -sf librealm-macosx-dbg.a "$tmpdir/$BASENAME"/librealm-dbg.a
+        fi
+
         cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
@@ -952,7 +960,7 @@ EOF
         fi
 
         echo "Create zip file: '$BASENAME-$realm_version.zip'"
-        (cd $tmpdir && zip -r -q "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
+        (cd $tmpdir && zip -r -q --symlinks "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
         mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
 
         echo "Unzipping in '$realm_cocoa_dir'"

@@ -668,6 +668,8 @@ private:
 
     void write(const std::string& file, const char* encryption_key,
                uint_fast64_t version_number) const;
+    void write(util::File& file, const char* encryption_key,
+               uint_fast64_t version_number) const;
     void write(std::ostream&, bool pad, uint_fast64_t version_numer) const;
 
     Replication* get_replication() const noexcept;

@@ -17,6 +17,8 @@
   point to a removed row. It did however issue those instructions after the
   clear instruction, which is incorrect, as the links do not exist after the
   clear operation. Was fixed.
+* `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
+  file after compacting.
 
 ### API breaking changes:
 
