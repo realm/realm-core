@@ -1,5 +1,7 @@
+#include <type_traits>
 #include <exception>
 #include <algorithm>
+#include <memory>
 #include <iostream>
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
@@ -10,7 +12,6 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
-#include <memory>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
@@ -34,6 +35,7 @@ public:
 
 } // anonymous namespace
 
+
 SlabAlloc::SlabAlloc()
 {
     m_initial_section_size = page_size();
@@ -46,21 +48,28 @@ SlabAlloc::SlabAlloc()
     }
 }
 
+
 const SlabAlloc::Header SlabAlloc::empty_file_header = {
     { 0, 0 }, // top-refs
     { 'T', '-', 'D', 'B' },
-    { library_file_format, library_file_format },
+    { 0, 0 }, // undecided file format
     0, // reserved
-    0  // select bit
+    0  // flags (lsb is select bit)
 };
 
-const SlabAlloc::Header SlabAlloc::streaming_header = {
-    { 0xFFFFFFFFFFFFFFFFULL, 0 }, // top-refs
-    { 'T', '-', 'D', 'B' },
-    { library_file_format, library_file_format },
-    0, // reserved
-    0  // select bit
-};
+
+void SlabAlloc::init_streaming_header(Header* streaming_header, int file_format_version)
+{
+    using storage_type = std::remove_reference<decltype(Header::m_file_format[0])>::type;
+    REALM_ASSERT(!util::int_cast_has_overflow<storage_type>(file_format_version));
+    *streaming_header = {
+        { 0xFFFFFFFFFFFFFFFFULL, 0 }, // top-refs
+        { 'T', '-', 'D', 'B' },
+        { storage_type(file_format_version), 0 },
+        0, // reserved
+        0  // flags (lsb is select bit)
+    };
+}
 
 
 class SlabAlloc::ChunkRefEq {
@@ -431,13 +440,15 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     return addr;
 }
 
-int SlabAlloc::get_committed_file_format() const noexcept
+
+int SlabAlloc::get_committed_file_format_version() const noexcept
 {
-    Header* header = reinterpret_cast<Header*>(m_data);
-    int select_field = header->m_flags & SlabAlloc::flags_SelectBit;
-    int file_format = header->m_file_format[select_field];
-    return file_format;
+    Header& header = *reinterpret_cast<Header*>(m_data);
+    int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+    int file_format_version = int(header.m_file_format[slot_selector]);
+    return file_format_version;
 }
+
 
 ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 {
@@ -515,7 +526,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     initial_size_of_file = size;
 
     if (!matches_section_boundary(size)) {
-
         // The file size did not match a section boundary.
         // We must extend the file to a section boundary (unless already there)
         // The file must be extended to match in size prior to being mmapped,
@@ -584,10 +594,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
         {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
-            int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-            m_file_format = header.m_file_format[select_field];
-            uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
-            m_file_on_streaming_form = (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+            int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+            m_file_format_version = header.m_file_format[slot_selector];
+            uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+            m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
             if (m_file_on_streaming_form) {
                 const StreamingFooter& footer =
                     *(reinterpret_cast<StreamingFooter*>(map.get_addr()+initial_size_of_file) - 1);
@@ -617,6 +627,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
     // make sure the database is not on streaming format. This has to be done at
     // session initialization, even if it means writing the database during open.
+    //
+    // FIXME: Why does this need to be done? Explanation needed.
     if (cfg.session_initiator && m_file_on_streaming_form) {
         const Header& header = *reinterpret_cast<Header*>(m_data);
         const StreamingFooter& footer =
@@ -624,13 +636,13 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
         static_cast<void>(header);
-        REALM_ASSERT_3(header.m_flags, == , streaming_header.m_flags);
-        REALM_ASSERT_3(header.m_mnemonic[0], == , streaming_header.m_mnemonic[0]);
-        REALM_ASSERT_3(header.m_mnemonic[1], == , streaming_header.m_mnemonic[1]);
-        REALM_ASSERT_3(header.m_mnemonic[2], == , streaming_header.m_mnemonic[2]);
-        REALM_ASSERT_3(header.m_mnemonic[3], == , streaming_header.m_mnemonic[3]);
-        REALM_ASSERT_3(header.m_top_ref[0], == , streaming_header.m_top_ref[0]);
-        REALM_ASSERT_3(header.m_top_ref[1], == , streaming_header.m_top_ref[1]);
+        REALM_ASSERT_3(header.m_flags, == , 0);
+        REALM_ASSERT_3(header.m_mnemonic[0], == , uint_fast8_t('T'));
+        REALM_ASSERT_3(header.m_mnemonic[1], == , uint_fast8_t('-'));
+        REALM_ASSERT_3(header.m_mnemonic[2], == , uint_fast8_t('D'));
+        REALM_ASSERT_3(header.m_mnemonic[3], == , uint_fast8_t('B'));
+        REALM_ASSERT_3(header.m_top_ref[0], == , 0xFFFFFFFFFFFFFFFFULL);
+        REALM_ASSERT_3(header.m_top_ref[1], == , 0);
 
         REALM_ASSERT_3(footer.m_magic_cookie, ==, footer_magic_cookie);
         {
@@ -639,6 +651,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             Header& writable_header = *writable_map.get_addr();
             realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_top_ref[1] = footer.m_top_ref;
+            writable_header.m_file_format[1] = writable_header.m_file_format[0];
             realm::util::encryption_write_barrier(writable_map, 0);
             writable_map.sync();
             realm::util::encryption_read_barrier(writable_map, 0);
@@ -668,10 +681,10 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     ref_type top_ref;
     {
         const Header& header = reinterpret_cast<const Header&>(*data);
-        int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-        m_file_format = header.m_file_format[select_field];
-        uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
-        m_file_on_streaming_form = (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+        int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+        m_file_format_version = header.m_file_format[slot_selector];
+        uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+        m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
         if (m_file_on_streaming_form) {
             const StreamingFooter& footer = *(reinterpret_cast<StreamingFooter*>(data+size) - 1);
             top_ref = ref_type(footer.m_top_ref);
@@ -699,6 +712,7 @@ void SlabAlloc::attach_empty()
 
     REALM_ASSERT(!is_attached());
 
+    m_file_format_version = 0; // Not yet decided
     m_attach_mode = attach_OwnedBuffer;
     m_data = nullptr; // Empty buffer
 
@@ -728,34 +742,60 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
         throw InvalidDatabase("Not a Realm file", path);
 
     // Last bit in info block indicates which top_ref block is valid
-    int select_field = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+    int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
-    // Byte 4 and 5 (depending on valid_part) in the info block is version
-    int file_format = int(header.m_file_format[select_field]);
-    bool bad_file_format = (file_format != library_file_format);
-
-    // As a special case, allow upgrading from version 2 or 3 to version 4, but
-    // only when accessed through SharedGroup.
-    if ((file_format == 2 || file_format == 3) && library_file_format == 4 && is_shared)
-        bad_file_format = false;
-
-    if (REALM_UNLIKELY(bad_file_format))
-        throw InvalidDatabase("Unsupported Realm file format version", path);
-
-    // Top_ref should always point within buffer
-    uint_fast64_t ref = uint_fast64_t(header.m_top_ref[select_field]);
-    if (select_field == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
+    // Top-ref must always point within buffer
+    uint_fast64_t top_ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+    if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof (Header) + sizeof (StreamingFooter)))
             throw InvalidDatabase("Realm file in streaming form has bad size", path);
         const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data+size) - 1);
-        ref = footer.m_top_ref;
+        top_ref = footer.m_top_ref;
         if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie))
             throw InvalidDatabase("Bad Realm file header (#1)", path);
     }
-    if (REALM_UNLIKELY(ref % 8 != 0))
+    if (REALM_UNLIKELY(top_ref % 8 != 0))
         throw InvalidDatabase("Bad Realm file header (#2)", path);
-    if (REALM_UNLIKELY(ref >= size))
+    if (REALM_UNLIKELY(top_ref >= size))
         throw InvalidDatabase("Bad Realm file header (#3)", path);
+
+    // Check file format version. For information about the differences between
+    // particular file format versions, refer to the documentation for
+    // get_file_format_version().
+    bool bad_file_format = true;
+    int file_format_version = int(header.m_file_format[slot_selector]);
+    if (file_format_version == 0) { // Not yet decided
+        if (top_ref == 0)
+            bad_file_format = false;
+    }
+    else if (is_shared) {
+        // In shared mode (Realm file opened via a SharedGroup instance) this
+        // version of the core library is able to open Realms using file format
+        // versions 2, 3, and 4. Versoin 2 files always need to be
+        // upgraded. Version 3 files only need to be upgraded when using an
+        // in-Realm history (see Replication::get_history_type()).
+        switch (file_format_version) {
+            case 2:
+            case 3:
+            case 4:
+                bad_file_format = false;
+        }
+    }
+    else {
+        // In non-shared mode (Realm file opened via a Group instance) this
+        // version of the core library is able to open Realms using file format
+        // versions 3 and 4. Since a Realm file cannot be upgraded when opened
+        // in this mode (we may be unable to write to the file), versoin 2 files
+        // cannot be opened. In-Realm histories require file format 4, but this
+        // is not a problem, as no history is used non-shared mode.
+        switch (file_format_version) {
+            case 3:
+            case 4:
+                bad_file_format = false;
+        }
+    }
+    if (REALM_UNLIKELY(bad_file_format))
+        throw InvalidDatabase("Unsupported Realm file format version", path);
 }
 
 

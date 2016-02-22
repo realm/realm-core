@@ -112,7 +112,8 @@ void writer(std::string path, int id)
             wt.commit();
         }
         // std::cerr << "Ended pid " << getpid() << std::endl;
-    } catch (...) {
+    }
+    catch (...) {
         // std::cerr << "Exception from " << getpid() << std::endl;
         REALM_ASSERT(false);
     }

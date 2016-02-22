@@ -82,9 +82,24 @@
   is now superseded by the more powerful history type consistency checks. This
   is not considered a file format change, as no released core version will ever
   set the "server sync mode" flag.
-* The SharedInfo file format version was bumped du to addition of history type
+* The SharedInfo file format version was bumped due to addition of history type
   information (all concurrent session participants must agree on SharedInfo file
   format version).
+* Make it possible to open both file format version 3 and 4 files without
+  upgrading. If in-Realm history is required, and the current file format
+  version is less than 4, upgrade to version 4, otherwise if the current file
+  format version is less than 3, upgrade to version 3.
+* The current file format version is available via
+  `Allocator::get_file_format_version()`.
+* Set Realm file format to zero (not yet decided) when creating a new empty
+  Realm where top-ref is zero. This was done to minimize the number of distinct
+  places in the code dealing with file format upgrade logic.
+* Check that all session participants agree on target Realm file format for that
+  session. File format upgrade required when larger than the actual file format.
+* Eliminate a temporary memory mapping of the SharedInfo file during the Realm
+  opening process.
+* Improved documentation of some of the complicated parts of the Realm opening
+  process.
 
 ----------------------------------------------
 

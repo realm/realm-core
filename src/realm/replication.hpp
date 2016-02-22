@@ -314,11 +314,11 @@ public:
     /// no need to expand the top array to store the history type \ref
     /// hist_None, due to the rule mentioned above.
     ///
-    /// Due to the rules listed above, a new history type only only actually
-    /// needs to be stored when the history type of the session
-    /// (get_history_type()) is neither \ref hist_None nor \ref hist_OutOfRealm,
-    /// and only when that differs from the stored history type, or if there is
-    /// no top array at the beginning of the session.
+    /// Due to the rules listed above, a new history type only actually needs to
+    /// be stored when the history type of the session (get_history_type()) is
+    /// neither \ref hist_None nor \ref hist_OutOfRealm, and only when that
+    /// differs from the stored history type, or if there is no top array at the
+    /// beginning of the session.
     ///
     /// Summary of session-to-session history type change constraints:
     ///

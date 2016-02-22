@@ -554,42 +554,43 @@ void GroupWriter::write_array_at(ref_type ref, const char* data, size_t size)
 
 void GroupWriter::commit(ref_type new_top_ref)
 {
-    // File header is 24 bytes, composed of three 64-bit blocks. The two first
-    // being top_refs (only one valid at a time) and the last being the info
-    // block.
-    char* file_header = m_file_map.get_addr();
-    realm::util::encryption_read_barrier(file_header, sizeof(SlabAlloc::Header), m_file_map.get_encrypted_mapping());
+    SlabAlloc::Header& file_header = *reinterpret_cast<SlabAlloc::Header*>(m_file_map.get_addr());
+    realm::util::encryption_read_barrier(&file_header, sizeof file_header,
+                                         m_file_map.get_encrypted_mapping());
 
-    // Least significant bit in last byte of info block indicates which top_ref
-    // block is valid - other bits remain unchanged
-    int select_field = file_header[16+7];
-    select_field ^= SlabAlloc::flags_SelectBit;
-    int new_valid_ref = select_field & SlabAlloc::flags_SelectBit;
+    // One bit of the flags field selects which of the two top ref slots are in
+    // use (same for file format version slots). The current value of the bit
+    // reflects the currently bound snapshot, so we need to invert it for the
+    // new snapshot. Other bits must remain unchanged.
+    unsigned old_flags = file_header.m_flags;
+    unsigned new_flags = old_flags ^ SlabAlloc::flags_SelectBit;
+    int slot_selector = ((new_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
-    // FIXME: What rule guarantees that the new top ref is written to physical
-    // medium before the swapping bit?
-
-    // Update top ref pointer
-    uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
-    top_refs[new_valid_ref] = new_top_ref;
+    // Update top ref and file format version
+    int file_format_version = m_alloc.get_file_format_version();
+    using type_1 = std::remove_reference<decltype(file_header.m_file_format[0])>::type;
+    REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
+    file_header.m_top_ref[slot_selector] = new_top_ref;
+    file_header.m_file_format[slot_selector] = type_1(file_format_version);
 
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk();
 
-    // Make sure that all data and the top pointer is written to stable storage
-    realm::util::encryption_write_barrier(file_header, sizeof(SlabAlloc::Header), m_file_map.get_encrypted_mapping());
+    // Make sure that that all data relating to the new snapshot is written to
+    // stable storage before flipping the slot selector
+    realm::util::encryption_write_barrier(&file_header, sizeof file_header,
+                                          m_file_map.get_encrypted_mapping());
     if (!disable_sync)
         m_file_map.sync(); // Throws
 
-    // update selector - must happen after write of all data and top pointer
-    file_header[16+7] = char(select_field); // swap
-
-    // file format is guaranteed to be at `library_file_format` now
-    file_header[16 + 4 + new_valid_ref] = SlabAlloc::library_file_format;
+    // Flip the slot selector bit.
+    using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
+    file_header.m_flags = type_2(new_flags);
 
     // Write new selector to disk
     // FIXME: we might optimize this to write of a single page?
-    realm::util::encryption_write_barrier(file_header, sizeof(SlabAlloc::Header), m_file_map.get_encrypted_mapping());
+    realm::util::encryption_write_barrier(&file_header, sizeof file_header,
+                                          m_file_map.get_encrypted_mapping());
     if (!disable_sync)
         m_file_map.sync(); // Throws
 }

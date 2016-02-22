@@ -82,7 +82,8 @@ public:
 
     /// Equivalent to calling open(const std::string&, const char*, OpenMode)
     /// on an unattached group accessor.
-    explicit Group(const std::string& file, const char* encryption_key = nullptr, OpenMode = mode_ReadOnly);
+    explicit Group(const std::string& file, const char* encryption_key = nullptr,
+                   OpenMode = mode_ReadOnly);
 
     /// Equivalent to calling open(BinaryData, bool) on an unattached
     /// group accessor. Note that if this constructor throws, the
@@ -569,10 +570,11 @@ private:
     /// Replication::get_history_type().
     ///
     /// The first three entries are mandatory. In files created by
-    /// Group::write(), none of the optional entries are present. In files
-    /// updated by Group::commit(), the 4th and 5th entry is present. In files
-    /// updated by way of a transaction (SharedGroup::commit()), the 4th, 5th,
-    /// 6th, and 7th entry is present. In files that contain a changeset
+    /// Group::write(), none of the optional entries are present and the size of
+    /// `m_top` is 3. In files updated by Group::commit(), the 4th and 5th entry
+    /// is present, and the size of `m_top` is 5. In files updated by way of a
+    /// transaction (SharedGroup::commit()), the 4th, 5th, 6th, and 7th entry is
+    /// present, and the size of `m_top` is 7. In files that contain a changeset
     /// history, the 8th and 9th entry is present.
     ///
     /// When a group accessor is attached to a newly created file or an empty
@@ -649,7 +651,7 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, TableWriter&, bool, uint_fast64_t = 0);
+    static void write(std::ostream&, const Allocator&, TableWriter&, bool, uint_fast64_t = 0);
 
     typedef void (*DescSetter)(Table&);
     typedef bool (*DescMatcher)(const Spec&);
@@ -684,12 +686,16 @@ private:
     template<class F>
     void update_table_indices(F&& map_function);
 
-    int get_file_format() const noexcept;
-    void set_file_format(int) noexcept;
-    int get_committed_file_format() const noexcept;
+    int get_file_format_version() const noexcept;
+    void set_file_format_version(int) noexcept;
+    int get_committed_file_format_version() const noexcept;
+
+    /// The specified history type must be a value of Replication::HistoryType.
+    static int get_target_file_format_version_for_session(int current_file_format_version,
+                                                          int history_type) noexcept;
 
     /// Must be called from within a write transaction
-    void upgrade_file_format();
+    void upgrade_file_format(int target_file_format_version);
 
 #ifdef REALM_DEBUG
     std::pair<ref_type, size_t>
@@ -721,20 +727,6 @@ private:
 
 
 // Implementation
-
-inline Group::Group():
-    m_alloc(), // Throws
-    m_top(m_alloc),
-    m_tables(m_alloc),
-    m_table_names(m_alloc),
-    m_is_shared(false)
-{
-    init_array_parents();
-    m_alloc.attach_empty(); // Throws
-    ref_type top_ref = 0; // Instantiate a new empty group
-    bool create_group_when_missing = true;
-    attach(top_ref, create_group_when_missing); // Throws
-}
 
 inline Group::Group(const std::string& file, const char* key, OpenMode mode):
     m_alloc(), // Throws
@@ -1117,6 +1109,7 @@ inline void Group::set_history_parent(Array& history_root) noexcept
 
 inline void Group::prepare_history_parent(Array& history_root, int history_type)
 {
+    REALM_ASSERT(m_alloc.get_file_format_version() >= 4);
     // Ensure that there are slots for both the history type and the history
     // ref.
     while (m_top.size() < 9)
@@ -1307,6 +1300,34 @@ public:
     {
         group.prepare_history_parent(history_root, history_type); // Throws
     }
+
+    static int get_file_format_version(const Group& group) noexcept
+    {
+        return group.get_file_format_version();
+    }
+
+    static void set_file_format_version(Group& group, int file_format_version) noexcept
+    {
+        group.set_file_format_version(file_format_version);
+    }
+
+    static int get_committed_file_format_version(const Group& group) noexcept
+    {
+        return group.get_committed_file_format_version();
+    }
+
+    static int get_target_file_format_version_for_session(int current_file_format_version,
+                                                          int history_type) noexcept
+    {
+        return Group::get_target_file_format_version_for_session(current_file_format_version,
+                                                                 history_type);
+    }
+
+    static void upgrade_file_format(Group& group, int target_file_format_version)
+    {
+        group.upgrade_file_format(target_file_format_version); // Throws
+    }
+
 };
 
 

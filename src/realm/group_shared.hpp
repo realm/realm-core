@@ -87,22 +87,22 @@ struct IncompatibleLockFile: std::runtime_error {
 ///    write transaction, the shared group accessor is left in state "error
 ///    during write".
 ///
-///  - If GroupShared::begin_write() or GroupShared::begin_read() throws an
+///  - If SharedGroup::begin_write() or SharedGroup::begin_read() throws an
 ///    unexpcted exception, the shared group accessor is left in state "no
 ///    transaction in progress".
 ///
-///  - GroupShared::end_read() and GroupShared::rollback() do not throw.
+///  - SharedGroup::end_read() and SharedGroup::rollback() do not throw.
 ///
-///  - If GroupShared::commit() throws an unexpcted exception, the shared group
+///  - If SharedGroup::commit() throws an unexpcted exception, the shared group
 ///    accessor is left in state "error during write" and the transaction was
 ///    not comitted.
 ///
-///  - If GroupShared::advance_read() or GroupShared::promote_to_write() throws
+///  - If SharedGroup::advance_read() or SharedGroup::promote_to_write() throws
 ///    an unexpcted exception, the shared group accessor is left in state "error
 ///    during read".
 ///
-///  - If GroupShared::commit_and_continue_as_read() or
-///    GroupShared::rollback_and_continue_as_read() throws an unexpcted
+///  - If SharedGroup::commit_and_continue_as_read() or
+///    SharedGroup::rollback_and_continue_as_read() throws an unexpcted
 ///    exception, the shared group accessor is left in state "error during
 ///    write".
 ///
@@ -119,14 +119,14 @@ struct IncompatibleLockFile: std::runtime_error {
 ///
 ///  - In state "error during read", almost all Realm API functions are
 ///    illegal on the connected group of accessors. The only valid operations
-///    are destruction of the shared group, and GroupShared::end_read(). If
-///    GroupShared::end_read() is called, the new state becomes "no transaction
+///    are destruction of the shared group, and SharedGroup::end_read(). If
+///    SharedGroup::end_read() is called, the new state becomes "no transaction
 ///    in progress".
 ///
 ///  - In state "error during write", almost all Realm API functions are
 ///    illegal on the connected group of accessors. The only valid operations
-///    are destruction of the shared group, and GroupShared::rollback(). If
-///    GroupShared::end_write() is called, the new state becomes "no transaction
+///    are destruction of the shared group, and SharedGroup::rollback(). If
+///    SharedGroup::end_write() is called, the new state becomes "no transaction
 ///    in progress"
 class SharedGroup {
 public:
@@ -540,10 +540,8 @@ private:
     util::PlatformSpecificCondVar m_new_commit_available;
 #endif
 
-    void do_open_1(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
-                   const char* encryption_key, bool allow_file_format_upgrade);
-    void do_open_2(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
-                   const char* encryption_key);
+    void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
+                 const char* encryption_key, bool allow_file_format_upgrade);
 
     // Ring buffer managment
     bool        ringbuf_is_empty() const noexcept;
@@ -598,7 +596,7 @@ private:
 
     void do_async_commits();
 
-    void upgrade_file_format(bool allow_file_format_upgrade);
+    void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version);
 
     //@{
     /// See LangBindHelper.
@@ -617,7 +615,7 @@ private:
     /// otherwise this function returns null.
     _impl::History* get_history();
 
-    int get_file_format() const noexcept;
+    int get_file_format_version() const noexcept;
 
     friend class _impl::SharedGroupFriend;
 };
@@ -780,8 +778,8 @@ inline void SharedGroup::open(const std::string& path, bool no_create_file,
     // it must leave the file closed.
 
     bool is_backend = false;
-    do_open_1(path, no_create_file, durability, is_backend, encryption_key,
-              allow_file_format_upgrade); // Throws
+    do_open(path, no_create_file, durability, is_backend, encryption_key,
+            allow_file_format_upgrade); // Throws
 }
 
 inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
@@ -800,8 +798,8 @@ inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
     std::string file = repl.get_database_path();
     bool no_create   = false;
     bool is_backend  = false;
-    do_open_1(file, no_create, durability, is_backend, encryption_key,
-              allow_file_format_upgrade); // Throws
+    do_open(file, no_create, durability, is_backend, encryption_key,
+            allow_file_format_upgrade); // Throws
 }
 
 inline bool SharedGroup::is_attached() const noexcept
@@ -1055,62 +1053,6 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
     return true; // _impl::History::update_early_from_top_ref() was called
 }
 
-inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
-{
-    // In a multithreaded scenario multiple threads may set upgrade = true, but
-    // that is ok, because the condition is later rechecked in a fully reliable
-    // way inside a transaction.
-
-    // First a non-threadsafe but fast check
-    int file_format = m_group.get_file_format();
-    REALM_ASSERT(file_format <= SlabAlloc::library_file_format);
-    bool upgrade = (file_format < SlabAlloc::library_file_format);
-    if (upgrade) {
-#ifdef REALM_DEBUG
-        // This sleep() only exists in order to increase the quality of the
-        // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test.
-        // The unit test creates multiple threads that all call
-        // upgrade_file_format() simultaneously. This sleep() then acts like
-        // a simple thread barrier that makes sure the threads meet here, to
-        // increase the likelyhood of detecting any potential race problems.
-        // See the unit test for details.
-#ifdef _WIN32
-        _sleep(200);
-#else
-        // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
-        timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 200000000;
-        nanosleep(&ts, 0);
-#endif
-#endif
-
-        // Exception safety: It is important that m_group.set_file_format() is
-        // called only when the upgrade operation has completed successfully,
-        // otherwise then next call to SharedGroup::open() will see the wrong
-        // value.
-
-        WriteTransaction wt(*this);
-        int file_format_2 = m_group.get_committed_file_format();
-        // The file must either still be at its initial version (file_format) or
-        // have been upgraded already (SlabAlloc::library_file_format) via a
-        // concurrent SharedGroup object.
-        REALM_ASSERT(file_format_2 == file_format ||
-                     file_format_2 == SlabAlloc::library_file_format);
-        bool upgrade_2 = (file_format_2 < SlabAlloc::library_file_format);
-        if (upgrade_2) {
-            if (!allow_file_format_upgrade)
-                throw FileFormatUpgradeRequired();
-            m_group.upgrade_file_format(); // Throws
-            // Note: The file format specified in the Realm file is updated to
-            // SlabAlloc::library_file_format as part of the following commit
-            // operation. This happens in GroupWriter::commit().
-            commit(); // Throws
-            m_group.set_file_format(SlabAlloc::library_file_format);
-        }
-    }
-}
-
 inline _impl::History* SharedGroup::get_history()
 {
     using gf = _impl::GroupFriend;
@@ -1119,9 +1061,10 @@ inline _impl::History* SharedGroup::get_history()
     return 0;
 }
 
-inline int SharedGroup::get_file_format() const noexcept
+inline int SharedGroup::get_file_format_version() const noexcept
 {
-    return m_group.get_file_format();
+    using gf = _impl::GroupFriend;
+    return gf::get_file_format_version(m_group);
 }
 
 
@@ -1164,13 +1107,13 @@ public:
         bool is_backend = true;
         const char* encryption_key = nullptr;
         bool allow_file_format_upgrade = false;
-        sg.do_open_1(file, no_create, durability, is_backend, encryption_key,
-                     allow_file_format_upgrade); // Throws
+        sg.do_open(file, no_create, durability, is_backend, encryption_key,
+                   allow_file_format_upgrade); // Throws
     }
 
-    static int get_file_format(const SharedGroup& sg) noexcept
+    static int get_file_format_version(const SharedGroup& sg) noexcept
     {
-        return sg.get_file_format();
+        return sg.get_file_format_version();
     }
 };
 
