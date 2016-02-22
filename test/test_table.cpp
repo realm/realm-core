@@ -6566,24 +6566,24 @@ TEST(Table_ChangeLinkTargets_LinkLists)
     CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
 }
 
+// This test case is a simplified version of a bug revealed by fuzz testing
+// set_int_unique triggers backlinks to update if the element to insert is
+// not unique. The expected behaviour is that the old row containing the
+// unique int will be removed and the new row will remain; this ensures
+// uniques without throwing errors. This test was crashing (assert failed)
+// when inserting a unique duplicate because backlink indices hadn't been
+// updated after a column had been removed from the table containing the link.
 TEST(Table_FailingFuzzyTestcase)
 {
     Group g;
     g.add_table("string_index_test_table");
     g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "aa",true));
-    g.get_table(0)->insert_empty_row(0, 17);
-    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "cXagaaxcxXXcaaaggaXxgcxTxaXgcTgTxXgaXaxxgXxXTaX",true));
-    g.get_table(0)->insert_empty_row(4, 244);
-    g.get_table(0)->add_empty_row(17);
-    g.get_table(0)->add_empty_row(225);
-    g.get_table(0)->remove_last();
-    g.get_table(0)->insert_column(0, DataType(0), "axaacXaTgxTgcTcgxTgaaXTaxaaTTcacTTccTgaaXXcXXxgaaTXx",true);
+    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "bb",true));
+    g.get_table(0)->insert_column(0, DataType(0), "cc",true);
     g.get_table(0)->add_search_index(0);
-    g.get_table(0)->insert_empty_row(18, 13);
-    g.get_table(0)->insert_column_link(3, type_Link, "XXg", *g.get_table(0));
-    g.get_table(0)->find_first_int(2, 0);
+    g.get_table(0)->insert_column_link(3, type_Link, "dd", *g.get_table(0));
+    g.get_table(0)->add_empty_row(225);
     { TableRef t = g.get_table(0); t->remove_column(1); }
-    g.get_table(0)->insert_empty_row(1, 2);
     { TableRef t = g.get_table(0); t->remove_column(0); }
     g.get_table(0)->add_empty_row(186);
     g.get_table(0)->find_first_int(0, 0);
@@ -6592,10 +6592,9 @@ TEST(Table_FailingFuzzyTestcase)
     g.get_table(0)->set_null(0, 53);
     g.get_table(0)->set_int_unique(0, 97, 'l');
     g.get_table(0)->add_empty_row(85);
-    g.get_table(0)->set_int_unique(0, 100, 'l');
+    g.get_table(0)->set_int_unique(0, 100, 'l');    // duplicate
     CHECK_EQUAL(g.get_table(0)->get_int(0, 100), 'l');
     CHECK_EQUAL(g.get_table(0)->get_int(0, 97), 0);
-
 }
 
 TEST(Table_InsertUniqueDuplicate_LinkedColumns)
