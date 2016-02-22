@@ -2453,6 +2453,22 @@ TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
 }
 
 
+TEST(Group_WriteEmpty)
+{
+    GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
+    {
+        Group group;
+        group.write(path_2);
+    }
+    File::remove(path_2);
+    {
+        Group group(path_1, 0, Group::mode_ReadWrite);
+        group.write(path_2);
+    }
+}
+
+
 #ifdef REALM_DEBUG
 #ifdef REALM_TO_DOT
 

@@ -2871,4 +2871,26 @@ TEST(Shared_SessionDurabilityConsistency)
     }
 }
 
+
+TEST(Shared_WriteEmpty)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
+    {
+        SharedGroup sg(path_1);
+        ReadTransaction rt(sg);
+        rt.get_group().write(path_2);
+    }
+}
+
+
+TEST(Shared_CompactEmpty)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        SharedGroup sg(path);
+        CHECK(sg.compact());
+    }
+}
+
 #endif // TEST_SHARED

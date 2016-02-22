@@ -651,7 +651,8 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, const Allocator&, TableWriter&, bool, uint_fast64_t = 0);
+    static void write(std::ostream&, const Allocator&, TableWriter&, bool no_top_array,
+                      bool pad_for_encryption, uint_fast64_t version_number);
 
     typedef void (*DescSetter)(Table&);
     typedef bool (*DescMatcher)(const Spec&);

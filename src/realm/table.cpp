@@ -4297,7 +4297,11 @@ void Table::write(std::ostream& out, size_t offset, size_t size, StringData over
     if (!table_name)
         table_name = get_name();
     SliceWriter writer(*this, table_name, offset, size_2);
-    Group::write(out, get_alloc(), writer, false); // Throws
+    bool no_top_array = false;
+    bool pad_for_encryption = false;
+    uint_fast64_t version_number = 0;
+    Group::write(out, get_alloc(), writer, no_top_array, pad_for_encryption,
+                 version_number); // Throws
 }
 
 

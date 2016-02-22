@@ -735,11 +735,12 @@ void Group::write(std::ostream& out, bool pad) const
     write(out, pad, 0);
 }
 
-void Group::write(std::ostream& out, bool pad, uint_fast64_t version_number) const
+void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number) const
 {
     REALM_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
-    write(out, m_alloc, table_writer, pad, version_number); // Throws
+    bool no_top_array = !m_top.is_attached();
+    write(out, m_alloc, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
 void Group::write(const std::string& path, const char* encryption_key) const
@@ -793,88 +794,98 @@ BinaryData Group::write_to_mem() const
 
 
 void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_writer,
-                  bool pad_for_encryption, uint_fast64_t version_number)
+                  bool no_top_array, bool pad_for_encryption, uint_fast64_t version_number)
 {
     _impl::OutputStream out_2(out);
 
     // Write the file header
     SlabAlloc::Header streaming_header;
-    SlabAlloc::init_streaming_header(&streaming_header, alloc.get_file_format_version());
+    int file_format_version = (no_top_array ? 0 : alloc.get_file_format_version());
+    SlabAlloc::init_streaming_header(&streaming_header, file_format_version);
     out_2.write(reinterpret_cast<const char*>(&streaming_header), sizeof streaming_header);
 
-    // Because we need to include the total logical file size in the
-    // top-array, we have to start by writing everything except the
-    // top-array, and then finally compute and write a correct version
-    // of the top-array. The free-space information of the group will
-    // only be included if a non-zero version number is given as parameter,
-    // indicating that versioning info is to be saved. This is used from
-    // SharedGroup to compact the database by writing only the live data
-    // into a separate file.
-    ref_type names_ref  = table_writer.write_names(out_2); // Throws
-    ref_type tables_ref = table_writer.write_tables(out_2); // Throws
-    SlabAlloc new_alloc;
-    new_alloc.attach_empty(); // Throws
-    new_alloc.set_file_format_version(alloc.get_file_format_version());
-    Array top(new_alloc);
-    top.create(Array::type_HasRefs); // Throws
-    _impl::ShallowArrayDestroyGuard dg_top(&top);
-    // FIXME: We really need an alternative to Array::truncate() that is able to expand.
-    int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
-    int_fast64_t value_2 = int_fast64_t(tables_ref); // FIXME: Problematic unsigned -> signed conversion
-    top.add(value_1); // Throws
-    top.add(value_2); // Throws
-    top.add(0); // Throws
-
-    int top_size = 3;
-    if (version_number) {
-        Array free_list(new_alloc);
-        Array size_list(new_alloc);
-        Array version_list(new_alloc);
-        free_list.create(Array::type_Normal); // Throws
-        _impl::DeepArrayDestroyGuard dg_1(&free_list);
-        size_list.create(Array::type_Normal); // Throws
-        _impl::DeepArrayDestroyGuard dg_2(&size_list);
-        version_list.create(Array::type_Normal); // Throws
-        _impl::DeepArrayDestroyGuard dg_3(&version_list);
-        bool deep = true; // Deep
-        bool only_if_modified = false; // Always
-        ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified);
-        ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified);
-        ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified);
-        int_fast64_t value_3 = int_fast64_t(free_list_ref); // FIXME: Problematic unsigned -> signed conversion
-        int_fast64_t value_4 = int_fast64_t(size_list_ref); // FIXME: Problematic unsigned -> signed conversion
-        int_fast64_t value_5 = int_fast64_t(version_list_ref); // FIXME: Problematic unsigned -> signed conversion
-        int_fast64_t value_6 = 1 + 2 * int_fast64_t(version_number); // FIXME: Problematic unsigned -> signed conversion
-        top.add(value_3); // Throws
-        top.add(value_4); // Throws
-        top.add(value_5); // Throws
-        top.add(value_6); // Throws
-        top_size = 7;
+    ref_type top_ref = 0;
+    size_t final_file_size = sizeof streaming_header;
+    if (no_top_array) {
+        // Accept version number 1 as that number is (unfortunately) also used
+        // to denote the empty initial state of a Realm file.
+        REALM_ASSERT(version_number == 0 || version_number == 1);
     }
-    ref_type top_ref = out_2.get_ref_of_next_array();
+    else {
+        // Because we need to include the total logical file size in the
+        // top-array, we have to start by writing everything except the
+        // top-array, and then finally compute and write a correct version of
+        // the top-array. The free-space information of the group will only be
+        // included if a non-zero version number is given as parameter,
+        // indicating that versioning info is to be saved. This is used from
+        // SharedGroup to compact the database by writing only the live data
+        // into a separate file.
+        ref_type names_ref  = table_writer.write_names(out_2); // Throws
+        ref_type tables_ref = table_writer.write_tables(out_2); // Throws
+        SlabAlloc new_alloc;
+        new_alloc.attach_empty(); // Throws
+        new_alloc.set_file_format_version(alloc.get_file_format_version());
+        Array top(new_alloc);
+        top.create(Array::type_HasRefs); // Throws
+        _impl::ShallowArrayDestroyGuard dg_top(&top);
+        // FIXME: We really need an alternative to Array::truncate() that is able to expand.
+        int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
+        int_fast64_t value_2 = int_fast64_t(tables_ref); // FIXME: Problematic unsigned -> signed conversion
+        top.add(value_1); // Throws
+        top.add(value_2); // Throws
+        top.add(0); // Throws
 
-    // Produce a preliminary version of the top array whose
-    // representation is guaranteed to be able to hold the final file
-    // size
-    size_t max_top_byte_size = Array::get_max_byte_size(top_size);
-    size_t max_final_file_size = size_t(top_ref) + max_top_byte_size;
-    int_fast64_t value_7 = 1 + 2*int_fast64_t(max_final_file_size); // FIXME: Problematic unsigned -> signed conversion
-    top.ensure_minimum_width(value_7); // Throws
+        int top_size = 3;
+        if (version_number) {
+            Array free_list(new_alloc);
+            Array size_list(new_alloc);
+            Array version_list(new_alloc);
+            free_list.create(Array::type_Normal); // Throws
+            _impl::DeepArrayDestroyGuard dg_1(&free_list);
+            size_list.create(Array::type_Normal); // Throws
+            _impl::DeepArrayDestroyGuard dg_2(&size_list);
+            version_list.create(Array::type_Normal); // Throws
+            _impl::DeepArrayDestroyGuard dg_3(&version_list);
+            bool deep = true; // Deep
+            bool only_if_modified = false; // Always
+            ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified);
+            ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified);
+            ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified);
+            int_fast64_t value_3 = int_fast64_t(free_list_ref); // FIXME: Problematic unsigned -> signed conversion
+            int_fast64_t value_4 = int_fast64_t(size_list_ref); // FIXME: Problematic unsigned -> signed conversion
+            int_fast64_t value_5 = int_fast64_t(version_list_ref); // FIXME: Problematic unsigned -> signed conversion
+            int_fast64_t value_6 = 1 + 2 * int_fast64_t(version_number); // FIXME: Problematic unsigned -> signed conversion
+            top.add(value_3); // Throws
+            top.add(value_4); // Throws
+            top.add(value_5); // Throws
+            top.add(value_6); // Throws
+            top_size = 7;
+        }
+        top_ref = out_2.get_ref_of_next_array();
 
-    // Finalize the top array by adding the projected final file size
-    // to it
-    size_t top_byte_size = top.get_byte_size();
-    size_t final_file_size = size_t(top_ref) + top_byte_size;
-    int_fast64_t value_8 = 1 + 2*int_fast64_t(final_file_size); // FIXME: Problematic unsigned -> signed conversion
-    top.set(2, value_8); // Throws
+        // Produce a preliminary version of the top array whose
+        // representation is guaranteed to be able to hold the final file
+        // size
+        size_t max_top_byte_size = Array::get_max_byte_size(top_size);
+        size_t max_final_file_size = size_t(top_ref) + max_top_byte_size;
+        int_fast64_t value_7 = 1 + 2*int_fast64_t(max_final_file_size); // FIXME: Problematic unsigned -> signed conversion
+        top.ensure_minimum_width(value_7); // Throws
 
-    // Write the top array
-    bool deep = false; // Shallow
-    bool only_if_modified = false; // Always
-    top.write(out_2, deep, only_if_modified); // Throws
-    REALM_ASSERT_3(size_t(out_2.get_ref_of_next_array()), ==, final_file_size);
+        // Finalize the top array by adding the projected final file size
+        // to it
+        size_t top_byte_size = top.get_byte_size();
+        final_file_size = size_t(top_ref) + top_byte_size;
+        int_fast64_t value_8 = 1 + 2*int_fast64_t(final_file_size); // FIXME: Problematic unsigned -> signed conversion
+        top.set(2, value_8); // Throws
 
-    dg_top.reset(nullptr); // Destroy now
+        // Write the top array
+        bool deep = false; // Shallow
+        bool only_if_modified = false; // Always
+        top.write(out_2, deep, only_if_modified); // Throws
+        REALM_ASSERT_3(size_t(out_2.get_ref_of_next_array()), ==, final_file_size);
+
+        dg_top.reset(nullptr); // Destroy now
+    }
 
     // encryption will pad the file to a multiple of the page, so ensure the
     // footer is aligned to the end of a page
