@@ -17,14 +17,22 @@
   point to a removed row. It did however issue those instructions after the
   clear instruction, which is incorrect, as the links do not exist after the
   clear operation. Was fixed.
+* `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
+  file after compacting.
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `LangBindHelper::advance_read()` and friends no longer take a history
+  argument. Access to the history is now gained automatically via
+  `Replication::get_history()`. Applications and bindings should simply delete
+  the history argument at each call site.
 
 ### Enhancements:
 
 * Add SharedGroup::get_transact_stage().
+* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
+  keeps the current history implementation as the default for now
+  (`<realm/commit_log.hpp>`).
 
 -----------
 
@@ -37,42 +45,6 @@
 * Convert some assertions on arguments of public `Group`, `Table`, and
   `LinkView` methods to throwing checks.
 * Align argument naming of `Group::move_table()` and `LinkView::move()`.
-
-----------------------------------------------
-
-# 0.96.1 Release notes
-
-### API breaking changes:
-
-* Important for language bindings: Any method on Query and TableView that
-  depends on a deleted LinkView will now return sane return values; 
-  Query::find() returns npos, Query::find_all() returns empty TableView,
-  Query::count() returns 0, TableView::sum() returns 0 (TableView created
-  from LinkView::get_sorted_view). So they will no longer throw
-  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in 
-  test_query.cpp for more info.
-* `LangBindHelper::advance_read()` and friends no longer take a history
-  argument. Access to the history is now gained automatically via
-  `Replication::get_history()`. Applications and bindings should simply delete
-  the history argument at each call site.
-
-### Enhancements:
-
-* Memory errors caused by calls to mmap/mremap will now throw a specific
-  AddressSpaceExhausted exception which is a subclass of the previously
-  thrown std::runtime_error. This is so that iOS and Android language
-  bindings can specifically catch this case and handle it differently
-  than the rest of the general std::runtime_errors.
-* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
-  keeps the current history implementation as the default for now
-  (`<realm/commit_log.hpp>`).
-
-* Doubled the speed of TableView::clear() when parent table has an 
-  indexed column.
------------
-
-### Internals:
-
 * Bumps file format version from 3 to 4 due to support for in-Realm history of
   changes (extra entries in `Group::m_top`). The bump is necessary due to lack
   of forwards compatibility. The changes are backwards compatible, and automatic
@@ -100,6 +72,30 @@
   opening process.
 * Improved documentation of some of the complicated parts of the Realm opening
   process.
+
+----------------------------------------------
+
+# 0.96.1 Release notes
+
+### API breaking changes:
+
+* Important for language bindings: Any method on Query and TableView that
+  depends on a deleted LinkView will now return sane return values;
+  Query::find() returns npos, Query::find_all() returns empty TableView,
+  Query::count() returns 0, TableView::sum() returns 0 (TableView created
+  from LinkView::get_sorted_view). So they will no longer throw
+  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in
+  test_query.cpp for more info.
+
+### Enhancements:
+
+* Memory errors caused by calls to mmap/mremap will now throw a specific
+  AddressSpaceExhausted exception which is a subclass of the previously
+  thrown std::runtime_error. This is so that iOS and Android language
+  bindings can specifically catch this case and handle it differently
+  than the rest of the general std::runtime_errors.
+* Doubled the speed of TableView::clear() when parent table has an
+  indexed column.
 
 ----------------------------------------------
 

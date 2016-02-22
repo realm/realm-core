@@ -752,12 +752,18 @@ void Group::write(const std::string& path, const char* encryption_key, uint_fast
     File file;
     int flags = 0;
     file.open(path, File::access_ReadWrite, File::create_Must, flags);
+    write(file, encryption_key, version_number);
+}
+
+void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number) const
+{
+    REALM_ASSERT(file.get_size() == 0);
+
     file.set_encryption_key(encryption_key);
     File::Streambuf streambuf(&file);
     std::ostream out(&streambuf);
     write(out, encryption_key != 0, version_number);
 }
-
 
 BinaryData Group::write_to_mem() const
 {
