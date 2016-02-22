@@ -22,7 +22,10 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `LangBindHelper::advance_read()` and friends no longer take a history
+  argument. Access to the history is now gained automatically via
+  `Replaication::get_history()`. Application and bindings should simply delete
+  the history argument at each call site.
 
 ### Enhancements:
 
@@ -47,16 +50,12 @@
 ### API breaking changes:
 
 * Important for language bindings: Any method on Query and TableView that
-  depends on a deleted LinkView will now return sane return values; 
+  depends on a deleted LinkView will now return sane return values;
   Query::find() returns npos, Query::find_all() returns empty TableView,
   Query::count() returns 0, TableView::sum() returns 0 (TableView created
   from LinkView::get_sorted_view). So they will no longer throw
-  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in 
+  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in
   test_query.cpp for more info.
-* `LangBindHelper::advance_read()` and friends no longer take a history
-  argument. Access to the history is now gained automatically via
-  `Replaication::get_history()`. Application and bindings should simply delete
-  the history argument at each call site.
 
 ### Enhancements:
 
@@ -65,14 +64,8 @@
   thrown std::runtime_error. This is so that iOS and Android language
   bindings can specifically catch this case and handle it differently
   than the rest of the general std::runtime_errors.
-
-* Doubled the speed of TableView::clear() when parent table has an 
+* Doubled the speed of TableView::clear() when parent table has an
   indexed column.
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
