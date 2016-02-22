@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.96.2 Release notes
 
 ### Bugfixes:
 
@@ -20,15 +20,9 @@
 * `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
   file after compacting.
 
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * Add SharedGroup::get_transact_stage().
-
------------
 
 ### Internals:
 
