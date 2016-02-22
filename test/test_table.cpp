@@ -6659,6 +6659,20 @@ TEST(Table_InsertUniqueDuplicate_LinkedColumns)
 
     t->set_int_unique(1, 0, 4444);  // duplicate
     CHECK_EQUAL(t2->get_link(0, 0), 1); // changed by duplicate overwrite in linked table via backlinks
+
+    t2->insert_column(0, type_Int, "type_Int col");
+    CHECK_EQUAL(t2->get_link(1, 0), 1); // no change after insert col
+    t->insert_empty_row(0);
+    t->set_int(1, 0, 666666);
+    CHECK_EQUAL(t2->get_link(1, 0), 2); // bumped forward via backlinks
+
+    df::move_column(*t2_descriptor, 1, 0);  // move backwards
+    CHECK_EQUAL(t2->get_link(0, 0), 2);     // no change
+    t->insert_empty_row(0);
+    t->set_int(1, 0, 7777777);
+    CHECK_EQUAL(t2->get_link(0, 0), 3); // bumped forward via backlinks
+    t->remove(0);
+    CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped back via backlinks
 }
 
 
