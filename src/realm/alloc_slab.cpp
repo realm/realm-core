@@ -478,7 +478,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
     size_t initial_size_of_file;
     size_t size;
-    bool did_create = false;
 
     // We can only safely mmap the file, if its size matches a section. If not,
     // we must change the size to match before mmaping it.
@@ -504,7 +503,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // it. B) It looks corrupt. In this case we throw an exception. C) It looks
     // good. In this case we proceede as normal.
     if (size == 0 || cfg.clear_file) {
-        did_create = true;
         if (REALM_UNLIKELY(cfg.read_only))
             throw InvalidDatabase("Read-only access to empty Realm file", path);
 
@@ -581,15 +579,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         if (!cfg.skip_validate) {
             // Verify the data structures
             validate_buffer(map.get_addr(), initial_size_of_file, path, cfg.is_shared); // Throws
-        }
-
-        if (did_create) {
-            File::Map<Header> writable_map(m_file, File::access_ReadWrite, sizeof (Header)); // Throws
-            // FIXME: Finn, what of this is actually needed? Note that the
-            // sync-mode bit setting logic was removved from between the next
-            // two lines (from between the read and write barriers).
-            realm::util::encryption_read_barrier(writable_map, 0);
-            realm::util::encryption_write_barrier(writable_map, 0);
         }
 
         {
