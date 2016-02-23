@@ -100,16 +100,26 @@ public:
     /// \brief Specify the version of the oldest bound snapshot.
     ///
     /// This function must be called by the associated SharedGroup object during
-    /// each successfully comitted write transaction.
+    /// each successfully committed write transaction. It must be called before
+    /// the transaction is finalized (Replication::finalize_commit()) or aborted
+    /// (Replication::abort_transact()), but after the initiation of the commit
+    /// operation (Replication::prepare_commit()). This allows history
+    /// implementations to add new history entries before triming off old ones,
+    /// and this, in turn, guarantees that the history never becomes empty,
+    /// except in the initial empty Realm state.
     ///
     /// The caller must pass the version (\a version) of the oldest snapshot
-    /// that is currently (or was recently) bound through a transaction of the
+    /// that is currently (or was recently) bound via a transaction of the
     /// current session. This gives the history implementation an opportunity to
     /// trim off leading (early) history entries.
     ///
-    /// Specifically, the caller must guarantee that the passed version (\a
-    /// version) is less than or equal to `begin_version` in all future
-    /// invocations of get_changesets().
+    /// Since this function must be called during a write transaction, there
+    /// will always be at least one snapshot that is currently bound via a
+    /// transaction.
+    ///
+    /// The caller must guarantee that the passed version (\a version) is less
+    /// than or equal to `begin_version` in all future invocations of
+    /// get_changesets().
     ///
     /// The caller is allowed to pass a version that is less than the version
     /// passed in a preceeding invocation.
@@ -191,7 +201,7 @@ private:
     /// fact that it is impossible to construct a BinaryColumn without already
     /// having a ref to a valid underlying node structure. This, in turn, is an
     /// unfortunate consequence of the fact that a column accessor contains a
-    /// dynamicalle allocated root node accessor, and the type of the required
+    /// dynamically allocated root node accessor, and the type of the required
     /// root node accessor depends on the size of the B+-tree.
     std::unique_ptr<BinaryColumn> m_changesets;
 

@@ -23,8 +23,6 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 
     if (!m_changesets) {
         using gf = _impl::GroupFriend;
-        // Note: gf::set_history_type() also ensures the the root array has a
-        // slot for the history ref.
         Allocator& alloc = gf::get_alloc(*m_group);
         size_t size = 0;
         bool nullable = false;
@@ -33,6 +31,8 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
         m_changesets.reset(new BinaryColumn(alloc, hist_ref, nullable)); // Throws
         gf::prepare_history_parent(*m_group, *m_changesets->get_root_array(),
                                    Replication::hist_InRealm); // Throws
+        // Note: gf::prepare_history_parent() also ensures the the root array
+        // has a slot for the history ref.
         m_changesets->get_root_array()->update_parent(); // Throws
         dg.release();
     }
@@ -54,7 +54,7 @@ void InRealmHistory::update_early_from_top_ref(version_type new_version, size_t 
                                                ref_type new_top_ref)
 {
     using gf = _impl::GroupFriend;
-    gf::remap(*m_group, new_file_size);
+    gf::remap(*m_group, new_file_size); // Throws
     Allocator& alloc = gf::get_alloc(*m_group);
     ref_type hist_ref = gf::get_history_ref(alloc, new_top_ref);
     update_from_ref(hist_ref, new_version); // Throws
@@ -84,17 +84,20 @@ void InRealmHistory::get_changesets(version_type begin_version, version_type end
 
 void InRealmHistory::set_oldest_bound_version(version_type version)
 {
-    if (!m_changesets)
-        return;
-    if (version <= m_base_version)
-        return;
-
-    size_t num_entries_to_erase = size_t(version - m_base_version);
-    REALM_ASSERT(num_entries_to_erase <= m_size);
-    for (size_t i = 0; i < num_entries_to_erase; ++i)
-        m_changesets->erase(0); // Throws
-    m_base_version += num_entries_to_erase;
-    m_size -= num_entries_to_erase;
+    REALM_ASSERT(version >= m_base_version);
+    if (version > m_base_version) {
+        REALM_ASSERT(m_changesets);
+        size_t num_entries_to_erase = size_t(version - m_base_version);
+        // The new changeset is always added before set_oldest_bound_version()
+        // is called. Therefore, the trimming operation can never leave the
+        // history empty.
+        REALM_ASSERT(num_entries_to_erase < m_size);
+        for (size_t i = 0; i < num_entries_to_erase; ++i)
+            m_changesets->erase(0); // Throws
+        m_base_version += num_entries_to_erase;
+        m_size -= num_entries_to_erase;
+std::cerr << "Size after trim = " << m_size << "\n";
+    }
 }
 
 
