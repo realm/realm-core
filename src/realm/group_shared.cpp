@@ -448,7 +448,7 @@ struct SharedGroup::SharedInfo {
     uint32_t num_participants; // Offset 12
 
     // Latest version number. Guarded by the controlmutex (for lock-free access,
-    // use get_current_version() instead)
+    // use get_version_of_latest_snapshot() instead)
     uint64_t latest_version_number; // Offset 16
 
     // Pid of process initiating the session, but only if that process runs with
@@ -1001,7 +1001,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
             // Set initial version so we can track if other instances
             // change the db
-            m_read_lock.m_version = get_current_version();
+            m_read_lock.m_version = get_version_of_latest_snapshot();
 
             // make our presence noted:
             ++info->num_participants;
@@ -1198,7 +1198,7 @@ void SharedGroup::close() noexcept
 
 bool SharedGroup::has_changed()
 {
-    bool changed = m_read_lock.m_version != get_current_version();
+    bool changed = m_read_lock.m_version != get_version_of_latest_snapshot();
     return changed;
 }
 
@@ -1701,13 +1701,14 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 }
 
 
-uint_fast64_t SharedGroup::get_current_version()
+SharedGroup::version_type SharedGroup::get_version_of_latest_snapshot()
 {
-    // As get_current_version may be called outside of the write mutex, another
-    // thread may be performing changes to the ringbuffer concurrently. It may
-    // even cleanup and recycle the current entry from under our feet, so we need
-    // to protect the entry by temporarily incrementing the reader ref count until
-    // we've got a safe reading of the version number.
+    // As get_version_of_latest_snapshot() may be called outside of the write
+    // mutex, another thread may be performing changes to the ringbuffer
+    // concurrently. It may even cleanup and recycle the current entry from
+    // under our feet, so we need to protect the entry by temporarily
+    // incrementing the reader ref count until we've got a safe reading of the
+    // version number.
     while (1) {
         uint_fast32_t index;
         SharedInfo* r_info;
@@ -1727,12 +1728,13 @@ uint_fast64_t SharedGroup::get_current_version()
 
             continue;
         }
-        uint_fast64_t version = r.version;
+        version_type version = r.version;
         // release the entry again:
         atomic_double_dec(r.count);
         return version;
     }
 }
+
 
 void SharedGroup::low_level_commit(uint_fast64_t new_version)
 {

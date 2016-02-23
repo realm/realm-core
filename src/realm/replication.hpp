@@ -392,10 +392,6 @@ protected:
     // realm/replication/simplified/provider.cpp for more on this.
     static void set_replication(Group&, Replication*) noexcept;
 
-    /// Must be called only from do_initiate_transact(), do_prepare_commit(), or
-    /// do_abort_transact().
-    static version_type get_current_version(SharedGroup&);
-
     friend class _impl::TransactReverser;
 };
 

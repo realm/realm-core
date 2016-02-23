@@ -19,11 +19,6 @@ void Replication::set_replication(Group& group, Replication* repl) noexcept
     gf::set_replication(group, repl);
 }
 
-Replication::version_type Replication::get_current_version(SharedGroup& sg)
-{
-    return sg.get_current_version();
-}
-
 
 class Replication::TransactLogApplier {
 public:

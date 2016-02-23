@@ -10,12 +10,19 @@
   argument. Access to the history is now gained automatically via
   `Replication::get_history()`. Applications and bindings should simply delete
   the history argument at each call site.
+* `SharedGroup::get_current_version()`, `LangBindHelper::get_current_version()`,
+  and `Replication::get_current_version()` were all removed. They are not used
+  by the Cocoa or Android binding, and `SharedGroup::get_current_version()` was
+  never supposed to be public.
 
 ### Enhancements:
 
 * Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
   keeps the current history implementation as the default for now
   (`<realm/commit_log.hpp>`).
+* New methods `ReadTransaction::get_version()` and
+  `WriteTransaction::get_version()` for getting the version of the bound
+  snapshot during a transaction.
 
 -----------
 

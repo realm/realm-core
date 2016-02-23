@@ -2893,4 +2893,43 @@ TEST(Shared_CompactEmpty)
     }
 }
 
+
+TEST(Shared_VersionOfBoundSnapshot)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup::version_type version;
+    SharedGroup sg(path);
+    {
+        ReadTransaction rt(sg);
+        version = rt.get_version();
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_EQUAL(version, rt.get_version());
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+        wt.commit(); // Increment version
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_LESS(version, rt.get_version());
+        version = rt.get_version();
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+        wt.commit(); // Increment version
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_LESS(version, rt.get_version());
+    }
+}
+
 #endif // TEST_SHARED

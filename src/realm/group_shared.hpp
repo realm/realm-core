@@ -580,11 +580,13 @@ private:
     version_type do_commit();
     void do_end_write() noexcept;
 
-public:
-    // return the current version of the database - note, this is not necessarily
-    // the version seen by any currently open transactions.
-    uint_fast64_t get_current_version();
-private:
+    /// Returns the version of the latest snapshot.
+    version_type get_version_of_latest_snapshot();
+
+    /// Returns the version of the snapshot bound in the current read or write
+    /// transaction. It is an error to call this function when no transaction is
+    /// in progress.
+    version_type get_version_of_bound_snapshot() const noexcept;
 
     // make sure the given index is within the currently mapped area.
     // if not, expand the mapped area. Returns true if the area is expanded.
@@ -658,6 +660,9 @@ public:
 
     const Group& get_group() const noexcept;
 
+    /// Get the version of the snapshot to which this read transaction is bound.
+    SharedGroup::version_type get_version() const noexcept;
+
 private:
     SharedGroup& m_shared_group;
 };
@@ -721,6 +726,10 @@ public:
     }
 
     Group& get_group() const noexcept;
+
+    /// Get the version of the snapshot on which this write transaction is
+    /// based.
+    SharedGroup::version_type get_version() const noexcept;
 
     SharedGroup::version_type commit()
     {
@@ -810,6 +819,11 @@ inline bool SharedGroup::is_attached() const noexcept
 inline SharedGroup::TransactStage SharedGroup::get_transact_stage() const noexcept
 {
     return m_transact_stage;
+}
+
+inline SharedGroup::version_type SharedGroup::get_version_of_bound_snapshot() const noexcept
+{
+    return m_read_lock.m_version;
 }
 
 class SharedGroup::ReadLockUnlockGuard {
@@ -1115,6 +1129,11 @@ public:
     {
         return sg.get_file_format_version();
     }
+
+    static SharedGroup::version_type get_version_of_bound_snapshot(const SharedGroup& sg) noexcept
+    {
+        return sg.get_version_of_bound_snapshot();
+    }
 };
 
 inline const Group& ReadTransaction::get_group() const noexcept
@@ -1123,11 +1142,23 @@ inline const Group& ReadTransaction::get_group() const noexcept
     return sgf::get_group(m_shared_group);
 }
 
+inline SharedGroup::version_type ReadTransaction::get_version() const noexcept
+{
+    using sgf = _impl::SharedGroupFriend;
+    return sgf::get_version_of_bound_snapshot(m_shared_group);
+}
+
 inline Group& WriteTransaction::get_group() const noexcept
 {
     REALM_ASSERT(m_shared_group);
     using sgf = _impl::SharedGroupFriend;
     return sgf::get_group(*m_shared_group);
+}
+
+inline SharedGroup::version_type WriteTransaction::get_version() const noexcept
+{
+    using sgf = _impl::SharedGroupFriend;
+    return sgf::get_version_of_bound_snapshot(*m_shared_group);
 }
 
 } // namespace realm
