@@ -96,7 +96,6 @@ void InRealmHistory::set_oldest_bound_version(version_type version)
             m_changesets->erase(0); // Throws
         m_base_version += num_entries_to_erase;
         m_size -= num_entries_to_erase;
-std::cerr << "Size after trim = " << m_size << "\n";
     }
 }
 
