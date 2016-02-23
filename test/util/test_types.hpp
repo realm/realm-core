@@ -73,9 +73,23 @@ struct RegisterTests {
     static void register_tests(TestList& list, TestCons<Test, Type, Types...>& tests,
                                const char* suite, const char* name, const char* file, long line)
     {
+        std::string type_name = get_type_name<Type>();
+        auto replace = [&](std::string a, std::string b) {
+            std::string::size_type offset = 0;
+            for (;;) {
+                std::string::size_type i = type_name.find(a, offset);
+                if (i == std::string::npos)
+                    break;
+                type_name.replace(i, a.size(), b);
+                offset = i = b.size();
+            }
+        };
+        replace("(anonymous namespace)", "anon"); // GCC specific
+        replace(" >", ">");
+        replace(" ", "+"); // "long double" -> "long+double"
         std::string name_2 = name;
         name_2 += '<';
-        name_2 += get_type_name<Type>();
+        name_2 += type_name;
         name_2 += '>';
         RegisterTest::register_test(list, tests.head, suite, name_2, file, line);
         register_tests(list, tests.tail, suite, name, file, line);
@@ -86,7 +100,6 @@ struct RegisterTests {
     {
     }
 };
-
 
 } // namespace unit_test
 } // namespace test_util
