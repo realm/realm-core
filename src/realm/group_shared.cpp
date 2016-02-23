@@ -414,7 +414,9 @@ struct SharedGroup::SharedInfo
 
     uint64_t number_of_versions;
     EmulatedRobustMutex::SharedPart shared_writemutex;
+#ifdef REALM_ASYNC_DAEMON
     EmulatedRobustMutex::SharedPart shared_balancemutex;
+#endif
     EmulatedRobustMutex::SharedPart shared_controlmutex;
 #ifndef _WIN32
     // FIXME: windows pthread support for condvar not ready
@@ -447,22 +449,28 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura):
     size_of_mutex(sizeof(shared_writemutex)),
     size_of_condvar(sizeof(room_to_write)),
     shared_writemutex(), // Throws
+#ifdef REALM_ASYNC_DAEMON
     shared_balancemutex(), // Throws
+#endif
     shared_controlmutex() // Throws
 #else
     size_of_mutex(sizeof(writemutex)),
     size_of_condvar(0),
     writemutex(), // Throws
+#ifdef REALM_ASYNC_DAEMON
     balancemutex() // Throws
+#endif
 #endif
 {
     version = SHAREDINFO_VERSION;
     durability = dura; // durability level is fixed from creation
 #ifndef _WIN32
+    PlatformSpecificCondVar::init_shared_part(new_commit_available); // Throws
+#ifdef REALM_ASYNC_DAEMON
     PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
     PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
     PlatformSpecificCondVar::init_shared_part(daemon_becomes_ready); // Throws
-    PlatformSpecificCondVar::init_shared_part(new_commit_available); // Throws
+#endif
 #endif
     free_write_slots = 0;
     num_participants = 0;
@@ -703,9 +711,11 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
         SharedInfo* info = m_file_map.get_addr();
 
 #ifndef _WIN32
-        m_writemutex.set_shared_part(info->shared_writemutex,m_db_path,"wm");
-        m_balancemutex.set_shared_part(info->shared_balancemutex,m_db_path,"bm");
-        m_controlmutex.set_shared_part(info->shared_controlmutex,m_db_path,"cm");
+        m_writemutex.set_shared_part(info->shared_writemutex,m_db_path,"write");
+#ifdef REALM_ASYNC_DAEMON
+        m_balancemutex.set_shared_part(info->shared_balancemutex,m_db_path,"balance");
+#endif
+        m_controlmutex.set_shared_part(info->shared_controlmutex,m_db_path,"control");
 #endif
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
@@ -832,11 +842,11 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
 
             }
 #ifndef _WIN32
+            m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
+#ifdef REALM_ASYNC_DAEMON
             m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_db_path,0);
             m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
             m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
-            m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
-#ifdef REALM_ASYNC_DAEMON
             // In async mode, we need to make sure the daemon is running and ready:
             if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == false) {
@@ -1064,6 +1074,7 @@ void SharedGroup::enable_wait_for_change()
     m_wait_for_change_enabled = true;
 }
 
+#ifdef REALM_ASYNC_DAEMON
 void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
@@ -1162,6 +1173,7 @@ void SharedGroup::do_async_commits()
 
     }
 }
+#endif // REALM_ASYNC_DAEMON
 #endif // _WIN32
 
 

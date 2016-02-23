@@ -131,7 +131,7 @@ inline void EmulatedRobustMutex::set_shared_part(SharedPart& shared_part,
     if (m_file.is_attached()) {
         m_file.close();
     }
-    m_filename = path + "_" + mutex_name + ".lck";
+    m_filename = path + "." + mutex_name + ".mx";
     m_local_mutex.lock();
     m_file.open(m_filename, File::mode_Write);
     m_local_mutex.unlock();

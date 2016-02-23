@@ -93,7 +93,8 @@ PlatformSpecificCondVar::~PlatformSpecificCondVar() noexcept
 
 
 
-void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, size_t offset_of_condvar)
+void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, 
+                                              size_t offset_of_condvar)
 {
     close();
     uses_emulation = true;
