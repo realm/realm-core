@@ -170,7 +170,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 #if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
-TEST_IF(Shared_PipelinedWritesWithKills, true)
+TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
     // FIXME: This test was disabled because it has a strong tendency to leave
     // rogue child processes behind after the root test process aborts. If these
