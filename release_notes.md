@@ -2,6 +2,59 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* `LangBindHelper::advance_read()` and friends no longer take a history
+  argument. Access to the history is now gained automatically via
+  `Replication::get_history()`. Applications and bindings should simply delete
+  the history argument at each call site.
+
+### Enhancements:
+
+* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
+  keeps the current history implementation as the default for now
+  (`<realm/commit_log.hpp>`).
+
+-----------
+
+### Internals:
+
+* Bumps file format version from 3 to 4 due to support for in-Realm history of
+  changes (extra entries in `Group::m_top`). The bump is necessary due to lack
+  of forwards compatibility. The changes are backwards compatible, and automatic
+  upgrade is implemented.
+* Adds checks for consistent use of history types.
+* Removes the "server sync mode" flag from the Realm file header. This feature
+  is now superseded by the more powerful history type consistency checks. This
+  is not considered a file format change, as no released core version will ever
+  set the "server sync mode" flag.
+* The SharedInfo file format version was bumped due to addition of history type
+  information (all concurrent session participants must agree on SharedInfo file
+  format version).
+* Make it possible to open both file format version 3 and 4 files without
+  upgrading. If in-Realm history is required and the current file format version
+  is less than 4, upgrade to version 4. Otherwise, if the current file format
+  version is less than 3, upgrade to version 3.
+* The current file format version is available via
+  `Allocator::get_file_format_version()`.
+* Set Realm file format to zero (not yet decided) when creating a new empty
+  Realm where top-ref is zero. This was done to minimize the number of distinct
+  places in the code dealing with file format upgrade logic.
+* Check that all session participants agree on target Realm file format for that
+  session. File format upgrade required when larger than the actual file format.
+* Eliminate a temporary memory mapping of the SharedInfo file during the Realm
+  opening process.
+* Improved documentation of some of the complicated parts of the Realm opening
+  process.
+
+----------------------------------------------
+
+# 0.96.2 Release notes
+
+### Bugfixes:
+
 * `Group::TransactAdvancer::move_group_level_table()` was forgetting some of its
   duties (move the table accessor). That has been fixed.
 * While generating transaction logs, we didn't always deselect nested
@@ -20,21 +73,9 @@
 * `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
   file after compacting.
 
-### API breaking changes:
-
-* `LangBindHelper::advance_read()` and friends no longer take a history
-  argument. Access to the history is now gained automatically via
-  `Replication::get_history()`. Applications and bindings should simply delete
-  the history argument at each call site.
-
 ### Enhancements:
 
 * Add SharedGroup::get_transact_stage().
-* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
-  keeps the current history implementation as the default for now
-  (`<realm/commit_log.hpp>`).
-
------------
 
 ### Internals:
 
@@ -45,33 +86,6 @@
 * Convert some assertions on arguments of public `Group`, `Table`, and
   `LinkView` methods to throwing checks.
 * Align argument naming of `Group::move_table()` and `LinkView::move()`.
-* Bumps file format version from 3 to 4 due to support for in-Realm history of
-  changes (extra entries in `Group::m_top`). The bump is necessary due to lack
-  of forwards compatibility. The changes are backwards compatible, and automatic
-  upgrade is implemented.
-* Adds checks for consistent use of history types.
-* Removes the "server sync mode" flag from the Realm file header. This feature
-  is now superseded by the more powerful history type consistency checks. This
-  is not considered a file format change, as no released core version will ever
-  set the "server sync mode" flag.
-* The SharedInfo file format version was bumped due to addition of history type
-  information (all concurrent session participants must agree on SharedInfo file
-  format version).
-* Make it possible to open both file format version 3 and 4 files without
-  upgrading. If in-Realm history is required, and the current file format
-  version is less than 4, upgrade to version 4, otherwise if the current file
-  format version is less than 3, upgrade to version 3.
-* The current file format version is available via
-  `Allocator::get_file_format_version()`.
-* Set Realm file format to zero (not yet decided) when creating a new empty
-  Realm where top-ref is zero. This was done to minimize the number of distinct
-  places in the code dealing with file format upgrade logic.
-* Check that all session participants agree on target Realm file format for that
-  session. File format upgrade required when larger than the actual file format.
-* Eliminate a temporary memory mapping of the SharedInfo file during the Realm
-  opening process.
-* Improved documentation of some of the complicated parts of the Realm opening
-  process.
 
 ----------------------------------------------
 
