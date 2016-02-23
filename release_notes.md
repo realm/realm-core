@@ -2,6 +2,31 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* `LangBindHelper::advance_read()` and friends no longer take a history
+  argument. Access to the history is now gained automatically via
+  `Replication::get_history()`. Applications and bindings should simply delete
+  the history argument at each call site.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.96.2 Release notes
+
+### Bugfixes:
+
 * `Group::TransactAdvancer::move_group_level_table()` was forgetting some of its
   duties (move the table accessor). That has been fixed.
 * While generating transaction logs, we didn't always deselect nested
@@ -20,18 +45,9 @@
 * `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
   file after compacting.
 
-### API breaking changes:
-
-* `LangBindHelper::advance_read()` and friends no longer take a history
-  argument. Access to the history is now gained automatically via
-  `Replaication::get_history()`. Application and bindings should simply delete
-  the history argument at each call site.
-
 ### Enhancements:
 
 * Add SharedGroup::get_transact_stage().
-
------------
 
 ### Internals:
 
