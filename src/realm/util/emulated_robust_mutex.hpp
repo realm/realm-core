@@ -56,21 +56,6 @@ public:
     using SharedPart = RobustMutex;
 #endif
 
-    class LockGuard {
-    public:
-        LockGuard(EmulatedRobustMutex& mutex) : m_mutex(mutex)
-        {
-            m_mutex.lock();
-        }
-        ~LockGuard()
-        {
-            m_mutex.unlock();
-        }
-    private:
-        EmulatedRobustMutex& m_mutex;
-    };
-
-
     /// You need to bind the emulation to a SharedPart in shared/mmapped memory.
     /// The SharedPart is assumed to have been initialized (possibly by another process)
     /// elsewhere.

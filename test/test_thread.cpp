@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <queue>
 #include <functional>
+#include <mutex>
 
 #include <unistd.h>
 
@@ -94,7 +95,7 @@ struct SharedWithEmulated {
     void increment_10000_times()
     {
         for (int i=0; i<10000; ++i) {
-            EmulatedRobustMutex::LockGuard lock(m_mutex);
+            std::lock_guard<EmulatedRobustMutex> lock(m_mutex);
             ++m_value;
         }
     }
@@ -102,7 +103,7 @@ struct SharedWithEmulated {
     void increment_10000_times2()
     {
         for (int i=0; i<10000; ++i) {
-            EmulatedRobustMutex::LockGuard lock(m_mutex);
+            std::lock_guard<EmulatedRobustMutex> lock(m_mutex);
             // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
             double f = m_value;
@@ -227,7 +228,7 @@ public:
         changed.set_shared_part(condvar_part, name, 0);
     }
     void put(int value) {
-        EmulatedRobustMutex::LockGuard l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         while (counter+value > max) changed.wait(mutex, nullptr);
         int tmp = counter;
         sched_yield();
@@ -235,7 +236,7 @@ public:
         changed.notify_all();
     }
     void get(int value) {
-        EmulatedRobustMutex::LockGuard l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         while (counter-value < 0) changed.wait(mutex, nullptr);
         int tmp = counter;
         sched_yield();
@@ -512,7 +513,7 @@ void signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
     sleep(1);
     signals = 1;
     {
-        EmulatedRobustMutex::LockGuard l(*mutex);
+        std::lock_guard<EmulatedRobustMutex> l(*mutex);
         // wakeup any waiters
         cv->notify_all();
     }
@@ -520,14 +521,14 @@ void signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
     sleep(1);
     signals = 2;
     {
-        EmulatedRobustMutex::LockGuard l(*mutex);
+        std::lock_guard<EmulatedRobustMutex> l(*mutex);
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
     sleep(1);
     signals = 3;
     {
-        EmulatedRobustMutex::LockGuard l(*mutex);
+        std::lock_guard<EmulatedRobustMutex> l(*mutex);
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
@@ -540,14 +541,14 @@ void wakeup_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 {
     sleep(1);
     signal_state = 2;
-    EmulatedRobustMutex::LockGuard l(*mutex);
+    std::lock_guard<EmulatedRobustMutex> l(*mutex);
     cv->notify_all();
 }
 
 static int wait_counter;
 void waiter_with_count(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 {
-    EmulatedRobustMutex::LockGuard l(*mutex);
+    std::lock_guard<EmulatedRobustMutex> l(*mutex);
     ++wait_counter;
     cv->wait(*mutex, nullptr);
     --wait_counter;
@@ -555,7 +556,7 @@ void waiter_with_count(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 
 void waiter(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 {
-    EmulatedRobustMutex::LockGuard l(*mutex);
+    std::lock_guard<EmulatedRobustMutex> l(*mutex);
     cv->wait(*mutex, nullptr);
 }
 
@@ -564,7 +565,7 @@ void waiter(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 void burst_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 {
     sleep(1);
-    EmulatedRobustMutex::LockGuard l(*mutex);
+    std::lock_guard<EmulatedRobustMutex> l(*mutex);
     for (int i=0; i<100; ++i) {
         cv->notify_all();
     }
@@ -588,7 +589,7 @@ TEST(Thread_CondvarWaits)
     signals = 0;
     signal_thread.start(std::bind(signaller, &mutex, &changed));
     {
-        EmulatedRobustMutex::LockGuard l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         changed.wait(mutex, nullptr);
         CHECK_EQUAL(signals, 1);
         changed.wait(mutex, nullptr);
@@ -614,7 +615,7 @@ TEST(Thread_CondvarIsStateless)
     signal_state = 1;
     // send some signals:
     {
-        EmulatedRobustMutex::LockGuard l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         for (int i=0; i<10; ++i)
             changed.notify_all();
     }
@@ -624,7 +625,7 @@ TEST(Thread_CondvarIsStateless)
     // Wait for a signal - the signals sent above should be lost, so
     // that this wait will actually wait for the thread to signal.
     {
-        EmulatedRobustMutex::LockGuard l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         changed.wait(mutex,0);
         CHECK_EQUAL(signal_state, 2);
     }
@@ -646,7 +647,7 @@ TEST(Thread_CondvarTimeout)
     time.tv_sec = 0;
     time.tv_nsec = 100000000; // 0.1 sec
     {
-        EmulatedRobustMutex::LockGuard l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         for (int i=0; i<5; ++i)
             changed.wait(mutex, &time);
     }

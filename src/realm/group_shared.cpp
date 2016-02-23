@@ -24,6 +24,7 @@
 
 #include <fcntl.h>
 #include <atomic>
+#include <mutex>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
@@ -731,7 +732,7 @@ void SharedGroup::do_open_2(const std::string& path, bool no_create_file, Durabi
         // - SharedGroup beginning/ending a session
         // - Waiting for and signalling database changes
         {
-            EmulatedRobustMutex::LockGuard lock(m_controlmutex); // Throws
+            std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex); // Throws
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to later detect concurrent expansion of the ringbuffer.
             m_local_max_entry = info->readers.get_num_entries();
@@ -918,7 +919,7 @@ bool SharedGroup::compact()
     }
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     SharedInfo* info = m_file_map.get_addr();
-    EmulatedRobustMutex::LockGuard lock(m_controlmutex); // Throws
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex); // Throws
     if (info->num_participants > 1)
         return false;
 
@@ -968,7 +969,7 @@ bool SharedGroup::compact()
 uint_fast64_t SharedGroup::get_number_of_versions()
 {
     SharedInfo* info = m_file_map.get_addr();
-    EmulatedRobustMutex::LockGuard lock(m_controlmutex); // Throws
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
 }
 
@@ -996,7 +997,7 @@ void SharedGroup::close() noexcept
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
-        EmulatedRobustMutex::LockGuard lock(m_controlmutex);
+        std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
 
         if (m_group.m_alloc.is_attached())
             m_group.m_alloc.detach();
@@ -1052,7 +1053,7 @@ bool SharedGroup::has_changed()
 bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
-    EmulatedRobustMutex::LockGuard lock(m_controlmutex);
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
     while (m_readlock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
         m_new_commit_available.wait(m_controlmutex, 0);
     }
@@ -1062,7 +1063,7 @@ bool SharedGroup::wait_for_change()
 
 void SharedGroup::wait_for_change_release()
 {
-    EmulatedRobustMutex::LockGuard lock(m_controlmutex);
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = false;
     m_new_commit_available.notify_all();
 }
@@ -1070,7 +1071,7 @@ void SharedGroup::wait_for_change_release()
 
 void SharedGroup::enable_wait_for_change()
 {
-    EmulatedRobustMutex::LockGuard lock(m_controlmutex);
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
 }
 
@@ -1087,7 +1088,7 @@ void SharedGroup::do_async_commits()
     grab_latest_readlock(m_readlock, dummy);
     // we must treat version and version_index the same way:
     {
-        EmulatedRobustMutex::LockGuard lock(m_controlmutex);
+        std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
         info->free_write_slots = max_write_slots;
         info->daemon_ready = true;
         m_daemon_becomes_ready.notify_all();
@@ -1108,8 +1109,8 @@ void SharedGroup::do_async_commits()
         ReadLockInfo next_readlock = m_readlock;
         {
             // detect if we're the last "client", and if so, shutdown (must be under lock):
-            EmulatedRobustMutex::LockGuard lock2(m_writemutex);
-            EmulatedRobustMutex::LockGuard lock(m_controlmutex);
+            std::lock_guard<EmulatedRobustMutex> lock2(m_writemutex);
+            std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
             grab_latest_readlock(next_readlock, is_same);
             if (is_same && (shutdown || info->num_participants == 1)) {
 #ifdef REALM_ENABLE_LOGFILE
@@ -1614,7 +1615,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.use_next();
     }
     {
-        EmulatedRobustMutex::LockGuard lock(m_controlmutex);
+        std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
         info->number_of_versions = new_version - readlock_version + 1;
         info->latest_version_number = new_version;
 #ifndef _WIN32
