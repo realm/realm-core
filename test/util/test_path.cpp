@@ -136,9 +136,9 @@ SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
     File::try_remove(get_lock_path());
     File::try_remove(m_path + ".log_a");
     File::try_remove(m_path + ".log_b");
-    File::try_remove(m_path + "_bm.lck");
-    File::try_remove(m_path + "_cm.lck");
-    File::try_remove(m_path + "_wm.lck");
+    File::try_remove(m_path + ".control.mx");
+    File::try_remove(m_path + ".balance.mx");
+    File::try_remove(m_path + ".write.mx");
 }
 
 
@@ -150,9 +150,9 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
         File::try_remove(get_lock_path());
         File::try_remove(m_path + ".log_a");
         File::try_remove(m_path + ".log_b");
-        File::try_remove(m_path + "_bm.lck");
-        File::try_remove(m_path + "_cm.lck");
-        File::try_remove(m_path + "_wm.lck");
+        File::try_remove(m_path + ".balance.mx");
+        File::try_remove(m_path + ".control.mx");
+        File::try_remove(m_path + ".write.mx");
     }
     catch (...) {
         // Exception deliberately ignored
