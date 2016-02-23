@@ -284,9 +284,10 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
         m_table_names.init_from_parent();
         m_tables.init_from_parent();
 
-        // The 3rd slot in m_top is `1 + 2 * logical_file_size`, and the logical
-        // file size must never exceed actual file size.
-        REALM_ASSERT_3(size_t(m_top.get(2) / 2), <=, m_alloc.get_baseline());
+        // The 3rd slot in m_top is
+        // `RefOrTagged::make_tagged(logical_file_size)`, and the logical file
+        // size must never exceed actual file size.
+        REALM_ASSERT_3(m_top.get_as_ref_or_tagged(2).get_as_int(), <=, m_alloc.get_baseline());
     }
     else if (create_group_when_missing) {
         create_empty_group(); // Throws
@@ -363,7 +364,7 @@ void Group::create_empty_group()
         dg.release();
     }
     size_t initial_logical_file_size = sizeof (SlabAlloc::Header);
-    m_top.add(1 + 2*initial_logical_file_size); // Throws
+    m_top.add(RefOrTagged::make_tagged(initial_logical_file_size)); // Throws
     dg_top.release();
 }
 
@@ -851,14 +852,10 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
             ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified);
             ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified);
             ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified);
-            int_fast64_t value_3 = int_fast64_t(free_list_ref); // FIXME: Problematic unsigned -> signed conversion
-            int_fast64_t value_4 = int_fast64_t(size_list_ref); // FIXME: Problematic unsigned -> signed conversion
-            int_fast64_t value_5 = int_fast64_t(version_list_ref); // FIXME: Problematic unsigned -> signed conversion
-            int_fast64_t value_6 = 1 + 2 * int_fast64_t(version_number); // FIXME: Problematic unsigned -> signed conversion
-            top.add(value_3); // Throws
-            top.add(value_4); // Throws
-            top.add(value_5); // Throws
-            top.add(value_6); // Throws
+            top.add(RefOrTagged::make_ref(free_list_ref)); // Throws
+            top.add(RefOrTagged::make_ref(size_list_ref)); // Throws
+            top.add(RefOrTagged::make_ref(version_list_ref)); // Throws
+            top.add(RefOrTagged::make_tagged(version_number)); // Throws
             top_size = 7;
         }
         top_ref = out_2.get_ref_of_next_array();
@@ -868,15 +865,13 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
         // size
         size_t max_top_byte_size = Array::get_max_byte_size(top_size);
         size_t max_final_file_size = size_t(top_ref) + max_top_byte_size;
-        int_fast64_t value_7 = 1 + 2*int_fast64_t(max_final_file_size); // FIXME: Problematic unsigned -> signed conversion
-        top.ensure_minimum_width(value_7); // Throws
+        top.ensure_minimum_width(RefOrTagged::make_tagged(max_final_file_size)); // Throws
 
         // Finalize the top array by adding the projected final file size
         // to it
         size_t top_byte_size = top.get_byte_size();
         final_file_size = size_t(top_ref) + top_byte_size;
-        int_fast64_t value_8 = 1 + 2*int_fast64_t(final_file_size); // FIXME: Problematic unsigned -> signed conversion
-        top.set(2, value_8); // Throws
+        top.set(2, RefOrTagged::make_tagged(final_file_size)); // Throws
 
         // Write the top array
         bool deep = false; // Shallow
@@ -1977,7 +1972,7 @@ void Group::verify() const
         }
     }
 
-    size_t logical_file_size = to_size_t(m_top.get(2) / 2);
+    size_t logical_file_size = to_size_t(m_top.get_as_ref_or_tagged(2).get_as_int());
     size_t ref_begin = sizeof (SlabAlloc::Header);
     ref_type immutable_ref_end = logical_file_size;
     ref_type mutable_ref_end = m_alloc.get_total_size();

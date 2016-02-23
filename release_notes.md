@@ -55,6 +55,8 @@
   opening process.
 * Improved documentation of some of the complicated parts of the Realm opening
   process.
+* Introducing `RefOrTagged` value type whan can be used to make it safer to work
+  with "tagged integers" in arrays having the "has refs" flag.
 
 ----------------------------------------------
 

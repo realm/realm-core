@@ -36,7 +36,8 @@ class Replication;
 
 using ref_type = size_t;
 
-ref_type to_ref(int64_t) noexcept;
+int_fast64_t from_ref(ref_type) noexcept;
+ref_type to_ref(int_fast64_t) noexcept;
 
 class MemRef {
 public:

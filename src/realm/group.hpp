@@ -1117,8 +1117,7 @@ inline void Group::prepare_history_parent(Array& history_root, int history_type)
     // ref.
     while (m_top.size() < 9)
         m_top.add(0); // Throws
-    int_fast64_t value = 1 + 2*int_fast64_t(history_type);
-    m_top.set(7, value); // Throws
+    m_top.set(7, RefOrTagged::make_tagged(history_type)); // Throws
     set_history_parent(history_root);
 }
 
