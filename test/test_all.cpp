@@ -22,11 +22,11 @@
 #include <realm/version.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
-#include "test_all.hpp"
 #include "util/timer.hpp"
 #include "util/resource_limits.hpp"
 
 #include "test.hpp"
+#include "test_all.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -160,10 +160,26 @@ void set_random_seed()
     }
 }
 
+void set_always_encrypt()
+{
+    const char* str = getenv("UNITTEST_ENCRYPT_ALL");
+    if (str && strlen(str) != 0)
+        enable_always_encrypt();
+}
+
 void display_build_config()
 {
     const char* with_debug =
         Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
+
+#if REALM_ENABLE_ENCRYPTION
+    bool always_encrypt = is_always_encrypt_enabled();
+    const char* encryption = always_encrypt ?
+        "Enabled at compile-time (always encrypt = yes)" :
+        "Enabled at compile-time (always encrypt = no)";
+#else
+    const char* encryption = "Disabled at compile-time";
+#endif
 
 #ifdef REALM_COMPILER_SSE
     const char* compiler_sse = "Yes";
@@ -184,10 +200,10 @@ void display_build_config()
 
     std::cout <<
         "\n"
-        "Realm version: " << Version::get_version() << "\n"
-        "  with Debug " << with_debug << "\n"
+        "Realm version: "<<Version::get_version()<<" with Debug "<<with_debug<<"\n"
+        "Encryption: "<<encryption<<"\n"
         "\n"
-        "REALM_MAX_BPNODE_SIZE = " << REALM_MAX_BPNODE_SIZE << "\n"
+        "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
@@ -376,6 +392,7 @@ int test_all(int argc, char* argv[])
 #endif
 
     set_random_seed();
+    set_always_encrypt();
 
     fix_max_open_files();
     fix_async_daemon_path();

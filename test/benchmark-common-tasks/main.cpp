@@ -9,7 +9,7 @@
 #include "../util/benchmark_results.hpp"
 #include "../util/test_path.hpp"
 #if REALM_ENABLE_ENCRYPTION
-#include "../crypt_key.hpp"
+#  include "../util/crypt_key.hpp"
 #endif
 
 using namespace realm;

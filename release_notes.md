@@ -2,6 +2,28 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.96.2 Release notes
+
+### Bugfixes:
+
 * `Group::TransactAdvancer::move_group_level_table()` was forgetting some of its
   duties (move the table accessor). That has been fixed.
 * While generating transaction logs, we didn't always deselect nested
@@ -13,20 +35,26 @@
   has been fixed.
 * While reversing transaction logs, group level operations did not terminate the
   preceding section of table level operations. Was fixed.
-
-### API breaking changes:
-
-* Lorem ipsum.
+* Table::clear() issues link nullification instructions for each link that did
+  point to a removed row. It did however issue those instructions after the
+  clear instruction, which is incorrect, as the links do not exist after the
+  clear operation. Was fixed.
+* `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
+  file after compacting.
 
 ### Enhancements:
 
 * Add SharedGroup::get_transact_stage().
 
------------
-
 ### Internals:
 
 * Improve documentation of `Group::move_table()` and `LinkView::move()`.
+* Early out from `Group::move_table()` if `from_index == to_index`. This
+  behaviour agrees with `LinkView::move()` and is assumed by other parts of
+  core, and by the merge logic of the sync mechanism.
+* Convert some assertions on arguments of public `Group`, `Table`, and
+  `LinkView` methods to throwing checks.
+* Align argument naming of `Group::move_table()` and `LinkView::move()`.
 
 ----------------------------------------------
 
