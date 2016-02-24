@@ -1597,7 +1597,7 @@ public:
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                v.m_storage.set(t, m_link_map.target_table()->get<T>(m_column, link_to));
+                v.m_storage.set(t, m_link_map.target_table()->template get<T>(m_column, link_to));
             }
             destination.import(v);
         }
