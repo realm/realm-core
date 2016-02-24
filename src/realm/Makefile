@@ -97,6 +97,7 @@ array_string_long.hpp \
 column.hpp \
 column_tpl.hpp \
 column_binary.hpp \
+column_datetime.hpp \
 column_string_enum.hpp \
 column_string.hpp \
 column_table.hpp \
@@ -144,6 +145,7 @@ bptree.cpp \
 column.cpp \
 column_backlink.cpp \
 column_binary.cpp \
+column_datetime.cpp \
 column_link.cpp \
 column_link_base.cpp \
 column_linklist.cpp \
