@@ -6,7 +6,10 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Language bindings can now test if a TableView depends on a deleted LinkList
+  (detached LinkView) using `bool TableViewBase::depends_deleted_linklist()`.
+  See https://github.com/realm/realm-core/issues/1509 and also 
+  TEST(Query_ReferDeletedLinkView) in test_query.cpp for details.
 
 ### Enhancements:
 
