@@ -1337,7 +1337,7 @@ TEST(Shared_WriterThreads)
 
 
 //#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
-#if 1
+#if !REALM_ENABLE_ENCRYPTION
 //#if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
@@ -1350,10 +1350,10 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
     // This test can only be conducted by spawning independent
     // processes which can then be terminated individually.
-
+    const int process_count = 100;
     SHARED_GROUP_TEST_PATH(path);
 
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < process_count; ++i) {
         pid_t pid = fork();
         if (pid == pid_t(-1))
             REALM_TERMINATE("fork() failed");
@@ -1401,11 +1401,13 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         CHECK(!rt.has_table("alpha"));
         CHECK(rt.has_table("beta"));
         ConstTableRef table = rt.get_table("beta");
-        CHECK_EQUAL(100, table->get_int(0,0));
+        CHECK_EQUAL(process_count, table->get_int(0,0));
     }
 }
 
-#endif // not ios or android
+#endif // encryption enabled
+
+// not ios or android
 //#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 

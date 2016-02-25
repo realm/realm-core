@@ -289,6 +289,7 @@ TEST(Group_Permissions)
 
 // FIXME: Fails on Windows
 #ifndef _MSC_VER
+#if !REALM_ENABLE_ENCRYPTION
 TEST(Group_BadFile)
 {
     GROUP_TEST_PATH(path_1);
@@ -313,6 +314,7 @@ TEST(Group_BadFile)
         CHECK(group.is_attached());
     }
 }
+#endif // encryption enabled
 #endif
 
 TEST(Group_OpenBuffer)

@@ -9676,6 +9676,7 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
 } // anonymous namespace
 
 
+#if !REALM_ENABLE_ENCRYPTION
 namespace {
 
 void attacher(std::string path)
@@ -9716,7 +9717,7 @@ TEST(LangBindHelper_RacingAttachers)
         attachers[i].join();
     }
 }
-
+#endif
 
 
 TEST(LangBindHelper_HandoverBetweenThreads)
