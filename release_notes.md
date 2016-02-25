@@ -2,6 +2,28 @@
 
 ### Bugfixes:
 
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.96.2 Release notes
+
+### Bugfixes:
+
 * `Group::TransactAdvancer::move_group_level_table()` was forgetting some of its
   duties (move the table accessor). That has been fixed.
 * While generating transaction logs, we didn't always deselect nested
@@ -20,15 +42,9 @@
 * `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
   file after compacting.
 
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * Add SharedGroup::get_transact_stage().
-
------------
 
 ### Internals:
 
