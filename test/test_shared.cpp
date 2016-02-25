@@ -1338,7 +1338,7 @@ TEST(Shared_WriterThreads)
 
 //#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 #if 1
-#if !defined REALM_ANDROID && !defined REALM_IOS
+//#if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
@@ -1406,7 +1406,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 }
 
 #endif // not ios or android
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+//#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
