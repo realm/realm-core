@@ -146,7 +146,7 @@ public:
     virtual void verify() const = 0;
 #endif
 
-    virtual ~History() noexcept {}
+    virtual ~History() noexcept;
 };
 
 

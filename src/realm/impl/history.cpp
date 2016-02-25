@@ -9,6 +9,11 @@
 namespace realm {
 namespace _impl {
 
+History::~History() noexcept
+{
+}
+
+
 void InRealmHistory::initialize(Group& group)
 {
     REALM_ASSERT(!m_group);
