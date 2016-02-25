@@ -111,7 +111,8 @@ void writer(std::string path, int id)
             wt.commit();
         }
         // std::cerr << "Ended pid " << getpid() << std::endl;
-    } catch (...) {
+    }
+    catch (...) {
         // std::cerr << "Exception from " << getpid() << std::endl;
         REALM_ASSERT(false);
     }
@@ -2848,5 +2849,87 @@ TEST(Shared_BeginReadFailure)
     CHECK_THROW(sg.begin_read(), SimulatedFailure);
 }
 #endif // REALM_DEBUG
+
+
+TEST(Shared_SessionDurabilityConsistency)
+{
+    // Check that we can reliably detect inconsist durability choices across
+    // concurrent session participants.
+
+    // Errors of this kind are considered as incorrect API usage, and will lead
+    // to throwing of LogicError exceptions.
+
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        bool no_create = false;
+        SharedGroup::DurabilityLevel durability_1 = SharedGroup::durability_Full;
+        SharedGroup sg(path, no_create, durability_1);
+
+        SharedGroup::DurabilityLevel durability_2 = SharedGroup::durability_MemOnly;
+        CHECK_LOGIC_ERROR(SharedGroup(path, no_create, durability_2),
+                          LogicError::mixed_durability);
+    }
+}
+
+
+TEST(Shared_WriteEmpty)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
+    {
+        SharedGroup sg(path_1);
+        ReadTransaction rt(sg);
+        rt.get_group().write(path_2);
+    }
+}
+
+
+TEST(Shared_CompactEmpty)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        SharedGroup sg(path);
+        CHECK(sg.compact());
+    }
+}
+
+
+TEST(Shared_VersionOfBoundSnapshot)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup::version_type version;
+    SharedGroup sg(path);
+    {
+        ReadTransaction rt(sg);
+        version = rt.get_version();
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_EQUAL(version, rt.get_version());
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+        wt.commit(); // Increment version
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_LESS(version, rt.get_version());
+        version = rt.get_version();
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+        wt.commit(); // Increment version
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_LESS(version, rt.get_version());
+    }
+}
 
 #endif // TEST_SHARED

@@ -58,19 +58,6 @@ struct InvalidDatabase;
 /// of slabs.
 class SlabAlloc: public Allocator {
 public:
-    /// File format versions:
-    ///
-    ///   1   Initial file format version
-    ///
-    ///   2   FIXME: Does anybody remember what happened here?
-    ///
-    ///   3   Supporting null on string columns broke the file format in following way: Index appends an 'X'
-    ///       character to all strings except the null string, to be able to distinguish between null and
-    ///       empty string.
-
-    // Bumped to 3 because of null support of String columns and because of new format of index
-    static constexpr int library_file_format = 3;
-
     ~SlabAlloc() noexcept override;
     SlabAlloc();
 
@@ -79,7 +66,6 @@ public:
         bool read_only = false;
         bool no_create = false;
         bool skip_validate = false;
-        bool server_sync_mode = false;
         bool session_initiator = false;
         bool clear_file = false;
         const char* encryption_key = nullptr;
@@ -87,15 +73,27 @@ public:
 
     struct Retry {};
 
-    /// Attach this allocator to the specified file.
+    /// \brief Attach this allocator to the specified file.
     ///
-    /// When used by free-standing Group instances, no concurrency is
-    /// allowed. When used on behalf of SharedGroup, concurrency is
-    /// allowed, but read_only and no_create must both be false in
-    /// this case.
+    /// It is an error if this function is called at a time where the specified
+    /// Realm file (file system inode) is modified asynchronously.
     ///
-    /// It is an error to call this function on an attached
-    /// allocator. Doing so will result in undefined behavor.
+    /// In non-shared mode (when this function is called on behalf of a
+    /// free-standing Group instance), it is the responsibility of the
+    /// application to ensure that the Realm file is not modified concurrently
+    /// from any other thread or process.
+    ///
+    /// In shared mode (when this function is called on behalf of a SharedGroup
+    /// instance), the caller (SharedGroup::do_open()) must take steps to ensure
+    /// cross-process mutual exclusion.
+    ///
+    /// If the attached file contains an empty Realm (one whose top-ref is
+    /// zero), the file format version may remain undecided upon return from
+    /// this function. The file format is undecided if, and only if
+    /// get_file_format_version() returns zero. The caller is required to check
+    /// for this case, and decide on a file format version. This must happen
+    /// before the Realm opening process completes, and the decided file format
+    /// must be set in the allocator by calling set_file_format_version().
     ///
     /// Except for \a path, the parameters are passed in through a
     /// configuration object.
@@ -115,12 +113,6 @@ public:
     ///
     /// \param encryption_key 32-byte key to use to encrypt and decrypt
     /// the backing storage, or nullptr to disable encryption.
-    ///
-    /// \param server_sync_mode bool indicating whether the database is operated
-    /// in server_synchronization mode or not. If the database is created,
-    /// this setting is stored in it. If the database exists already, it is validated
-    /// that the database was created with the same setting. In case of conflict
-    /// a runtime_error is thrown.
     ///
     /// \param session_initiator if set, the caller is the session initiator and
     /// guarantees exclusive access to the file. If attaching in read/write mode,
@@ -147,6 +139,14 @@ public:
 
     /// Attach this allocator to the specified memory buffer.
     ///
+    /// If the attached buffer contains an empty Realm (one whose top-ref is
+    /// zero), the file format version may remain undecided upon return from
+    /// this function. The file format is undecided if, and only if
+    /// get_file_format_version() returns zero. The caller is required to check
+    /// for this case, and decide on a file format version. This must happen
+    /// before the Realm opening process completes, and the decided file format
+    /// must be set in the allocator by calling set_file_format_version().
+    ///
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
     ///
@@ -159,9 +159,15 @@ public:
 
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
-    int get_committed_file_format() const noexcept;
+    int get_committed_file_format_version() const noexcept;
 
     /// Attach this allocator to an empty buffer.
+    ///
+    /// Upon return from this function, the file format is undecided
+    /// (get_file_format_version() returns zero). The caller is required to
+    /// decide on a file format version. This must happen before the Realm
+    /// opening process completes, and the decided file format must be set in
+    /// the allocator by calling set_file_format_version().
     ///
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
@@ -251,7 +257,7 @@ public:
     /// allocator. Doing so will result in undefined behavior.
     size_t get_total_size() const noexcept;
 
-    /// Mark all managed memory (except the attached file) as free
+    /// Mark all mutable memory (ref-space outside the attached file) as free
     /// space.
     void reset_free_space_tracking();
 
@@ -270,6 +276,23 @@ public:
     /// boundary between two sections.
     void remap(size_t file_size);
 
+    /// Returns true initially, and after a call to reset_free_space_tracking()
+    /// up until the point of the first call to SlabAlloc::alloc(). Note that a
+    /// call to SlabAlloc::alloc() corresponds to a mutation event.
+    bool is_free_space_clean() const noexcept;
+
+    /// \brief Update the file format version field of the allocator.
+    ///
+    /// This must be done during the opening of the Realm if the stored file
+    /// format version is zero (empty Realm), or after the file format is
+    /// upgraded.
+    ///
+    /// Note that this does not modify the attached file, only the "cached"
+    /// value subsequenty returned by get_file_format_version().
+    ///
+    /// \sa get_file_format_version()
+    void set_file_format_version(int) noexcept;
+
 #ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
     void verify() const override;
@@ -285,6 +308,7 @@ protected:
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
     void invalidate_cache() noexcept;
+
 private:
     enum AttachMode {
         attach_None,        // Nothing is attached
@@ -311,8 +335,7 @@ private:
 
     // Values of each used bit in m_flags
     enum {
-        flags_SelectBit = 1,
-        flags_ServerSyncMode = 2
+        flags_SelectBit = 1
     };
 
     // 24 bytes
@@ -323,10 +346,6 @@ private:
         uint8_t m_file_format[2]; // See `library_file_format`
         uint8_t m_reserved;
         // bit 0 of m_flags is used to select between the two top refs.
-        // bit 1 of m_flags is to be set for persistent commit-logs (Sync support).
-        // when clear, the commit-logs will be removed at the end of a session.
-        // when set, the commmit-logs are persisted, and IFF the database exists
-        // already at the start of a session, the commit logs too must exist.
         uint8_t m_flags;
     };
 
@@ -340,7 +359,7 @@ private:
     static_assert(sizeof (StreamingFooter) == 16, "Bad footer size");
 
     static const Header empty_file_header;
-    static const Header streaming_header;
+    static void init_streaming_header(Header*, int file_format_version);
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
@@ -386,11 +405,6 @@ private:
     /// placed here (after m_attach_mode) in the hope that it leads to
     /// less padding between members due to alignment requirements.
     FeeeSpaceState m_free_space_state = free_space_Clean;
-
-    /// File format fetched from header during attach. If less than
-    /// `library_file_format`, it will be updated later during SharedGroup
-    /// construction as part of a file format upgrade.
-    int m_file_format;
 
     typedef std::vector<Slab> slabs;
     typedef std::vector<Chunk> chunks;
@@ -503,6 +517,16 @@ inline size_t SlabAlloc::get_baseline() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_baseline;
+}
+
+inline bool SlabAlloc::is_free_space_clean() const noexcept
+{
+    return m_free_space_state == free_space_Clean;
+}
+
+inline void SlabAlloc::set_file_format_version(int file_format_version) noexcept
+{
+    m_file_format_version = file_format_version;
 }
 
 inline void SlabAlloc::resize_file(size_t new_file_size)
