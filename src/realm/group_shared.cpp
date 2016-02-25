@@ -400,7 +400,7 @@ private:
 /// only while holding a lock on `controlmutex`.
 struct SharedGroup::SharedInfo {
     // Indicates that initialization of the lock file was completed sucessfully.
-    uint8_t init_complete; // Offset 0
+    uint8_t init_complete = 0; // Offset 0
 
     /// The size in bytes of a mutex member of SharedInfo. This allows all
     /// session participants to be in agreement. Obviously, a size match is not
@@ -442,10 +442,10 @@ struct SharedGroup::SharedInfo {
     uint16_t shared_info_version = g_shared_info_version; // Offset 6
 
     uint16_t durability; // Offset 8
-    uint16_t free_write_slots; // Offset 10
+    uint16_t free_write_slots = 0; // Offset 10
 
     // Number of participating shared groups
-    uint32_t num_participants; // Offset 12
+    uint32_t num_participants = 0; // Offset 12
 
     // Latest version number. Guarded by the controlmutex (for lock-free access,
     // use get_version_of_latest_snapshot() instead)
@@ -455,7 +455,7 @@ struct SharedGroup::SharedInfo {
     // encryption enabled, zero otherwise. Other processes cannot join a session
     // wich uses encryption, because interprocess sharing is not supported by
     // our current encryption mechanisms.
-    uint64_t session_initiator_pid; // Offset 24
+    uint64_t session_initiator_pid = 0; // Offset 24
 
     uint64_t number_of_versions; // Offset 32
 
@@ -515,12 +515,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
     PlatformSpecificCondVar::init_shared_part(daemon_becomes_ready); // Throws
     PlatformSpecificCondVar::init_shared_part(new_commit_available); // Throws
 #endif
-    free_write_slots = 0;
-    num_participants = 0;
-    session_initiator_pid = 0;
     daemon_started = 0;
     daemon_ready = 0;
-    init_complete = 1;
 
     // IMPORTANT: The offsets, types (, and meanings) of these members must
     // never change, not even when the SharedInfo layout version is bumped. The
@@ -723,31 +719,27 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         if (m_file.try_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
 
-            // FIXME: Consider truncating the file to `sizeof (SharedInfo)` here.
+            // We're alone in the world, and it is Ok to initialize the
+            // file. Start by truncating the file, to maximize the chance of a
+            // an incorrectly initialized file gets accepted by other session
+            // participants. Note, howeve, that this can still happen if the
+            // initializing process is dies before the truncation, but after
+            // obtaining the exclusive file lock.
+            m_file.resize(0);
 
-            // We're alone in the world, and it is Ok to initialize the file:
-            char zero_buf[sizeof (SharedInfo)];
-            std::fill(zero_buf, zero_buf + sizeof (SharedInfo), 0);
-            m_file.write(zero_buf, sizeof (SharedInfo)); // Throws
+            // Write an initialized SharedInfo structure to the file, but with
+            // init_complete = 0.
+            SharedInfo info(durability, history_type);
+            m_file.write(reinterpret_cast<char*>(&info), sizeof info); // Throws
 
-            // FIXME: Explain why it is necessary to initialize the file via a
-            // memory mapping (assuming that it is necessary).
-
-            // FIXME: The initialization procedure below has a problem that
-            // effectively cancel the crash safety guarantee: Writes performed
-            // during initialization may get reordered. If that happens, and the
-            // initializing process is killed mid way, then another process (one
-            // that failed to get the exclusive lock, and was waiting to get the
-            // shared lock) will be able to get the shared lock and see an
-            // incompletely initialized file, but possible one that still has
-            // `init_complete = 1`.
-
-            // Complete initialization of shared info via the memory mapping.
+            // Mark the file as completely initialized via a memory mapping. It
+            // could also have been done by a util::File::write(), but it is
+            // more convenient to manipulate the structure via its type.
             m_file_map.map(m_file, File::access_ReadWrite,
                            sizeof (SharedInfo), File::map_NoSync); // Throws
-            File::UnmapGuard fug_1(m_file_map);
-            SharedInfo* info = m_file_map.get_addr();
-            new (info) SharedInfo(durability, history_type); // Throws
+            File::UnmapGuard fug(m_file_map);
+            SharedInfo* info_2 = m_file_map.get_addr();
+            info_2->init_complete = 1;
         }
 
         // We hold the shared lock from here until we close the file!

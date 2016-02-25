@@ -116,9 +116,9 @@ void Group::upgrade_file_format(int target_file_format_version)
     // SlabAlloc::validate_buffer() must ensure this. Be sure to revisit the
     // following upgrade logic when SlabAlloc::validate_buffer() is changed (or
     // vice versa).
-    REALM_ASSERT(current_file_format_version == 2 ||
-                 current_file_format_version == 3 ||
-                 current_file_format_version == 4);
+    REALM_ASSERT_EX(current_file_format_version == 2 ||
+                    current_file_format_version == 3 ||
+                    current_file_format_version == 4, current_file_format_version);
 
     // Upgrade from 2 to 3
     if (current_file_format_version <= 2 && target_file_format_version >= 3) {
