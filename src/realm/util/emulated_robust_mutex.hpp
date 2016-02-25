@@ -79,12 +79,12 @@ public:
 #endif
     }
 private:
-#ifndef REALM_ROBUST_MUTEX_EMULATION
-    SharedPart* m_shared_part = 0;
-#else
+#ifdef REALM_ROBUST_MUTEX_EMULATION
     std::string m_filename;
     File m_file;
     Mutex m_local_mutex;
+#else
+    SharedPart* m_shared_part = 0;
 #endif
     friend class PlatformSpecificCondVar;
 };
@@ -107,11 +107,7 @@ inline void EmulatedRobustMutex::set_shared_part(SharedPart& shared_part,
                                                  std::string path,
                                                  std::string mutex_name)
 {
-#ifndef REALM_ROBUST_MUTEX_EMULATION
-    m_shared_part = &shared_part;
-    static_cast<void>(path);
-    static_cast<void>(mutex_name);
-#else
+#ifdef REALM_ROBUST_MUTEX_EMULATION
     static_cast<void>(shared_part);
     if (m_file.is_attached()) {
         m_file.close();
@@ -120,40 +116,45 @@ inline void EmulatedRobustMutex::set_shared_part(SharedPart& shared_part,
     m_local_mutex.lock();
     m_file.open(m_filename, File::mode_Write);
     m_local_mutex.unlock();
+#else
+    m_shared_part = &shared_part;
+    static_cast<void>(path);
+    static_cast<void>(mutex_name);
+
 #endif
 }
 
 inline void EmulatedRobustMutex::lock()
 {
-#ifndef REALM_ROBUST_MUTEX_EMULATION
-    REALM_ASSERT(m_shared_part);
-    m_shared_part->lock([](){});
-#else
+#ifdef REALM_ROBUST_MUTEX_EMULATION
     m_local_mutex.lock();
     m_file.lock_exclusive();
+#else
+    REALM_ASSERT(m_shared_part);
+    m_shared_part->lock([](){});
 #endif
 }
 
 
 inline void EmulatedRobustMutex::unlock()
 {
-#ifndef REALM_ROBUST_MUTEX_EMULATION
-    REALM_ASSERT(m_shared_part);
-    m_shared_part->unlock();
-#else
+#ifdef REALM_ROBUST_MUTEX_EMULATION
     m_file.unlock();
     m_local_mutex.unlock();
+#else
+    REALM_ASSERT(m_shared_part);
+    m_shared_part->unlock();
 #endif
 }
 
 
 inline bool EmulatedRobustMutex::is_valid() noexcept
 {
-#ifndef REALM_ROBUST_MUTEX_EMULATION
+#ifdef REALM_ROBUST_MUTEX_EMULATION
+    return true;
+#else
     REALM_ASSERT(m_shared_part);
     return m_shared_part->is_valid();
-#else
-    return true;
 #endif
 }
 
