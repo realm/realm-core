@@ -296,18 +296,8 @@ std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef 
 template<class T>
 std::unique_ptr<Array> BpTree<T>::create_root_from_ref(Allocator& alloc, ref_type ref)
 {
-    const char* header = alloc.translate(ref);
-    std::unique_ptr<Array> new_root;
-    if (Array::get_is_inner_bptree_node_from_header(header)) {
-        new_root.reset(new Array{alloc});
-        new_root->init_from_ref(ref);
-    }
-    else {
-        std::unique_ptr<LeafType> leaf { new LeafType{alloc} };
-        leaf->init_from_ref(ref);
-        new_root = std::move(leaf);
-    }
-    return new_root;
+    MemRef mem = MemRef{alloc.translate(ref), ref};
+    return create_root_from_mem(alloc, mem);
 }
 
 template<class T>
