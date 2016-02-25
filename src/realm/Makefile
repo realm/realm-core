@@ -65,7 +65,7 @@ descriptor_fwd.hpp \
 descriptor.hpp \
 group.hpp \
 group_shared.hpp \
-impl/history.hpp \
+impl/continuous_transactions_history.hpp \
 handover_defs.hpp \
 replication.hpp \
 impl/sequential_getter.hpp \
@@ -157,7 +157,7 @@ exceptions.cpp \
 group.cpp \
 group_shared.cpp \
 group_writer.cpp \
-impl/history.cpp \
+impl/continuous_transactions_history.cpp \
 impl/output_stream.cpp \
 impl/transact_log.cpp \
 impl/simulated_failure.cpp \

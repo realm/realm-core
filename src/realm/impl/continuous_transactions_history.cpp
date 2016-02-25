@@ -3,16 +3,11 @@
 #include <realm/group.hpp>
 #include <realm/replication.hpp>
 #include <realm/impl/destroy_guard.hpp>
-#include <realm/impl/history.hpp>
+#include <realm/impl/continuous_transactions_history.hpp>
 
 
 namespace realm {
 namespace _impl {
-
-History::~History() noexcept
-{
-}
-
 
 void InRealmHistory::initialize(Group& group)
 {
