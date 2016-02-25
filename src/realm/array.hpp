@@ -1641,21 +1641,25 @@ inline ref_type Array::get_as_ref(size_t ndx) const noexcept
 
 inline RefOrTagged Array::get_as_ref_or_tagged(size_t ndx) const noexcept
 {
+    REALM_ASSERT(has_refs());
     return RefOrTagged(get(ndx));
 }
 
 inline void Array::set(size_t ndx, RefOrTagged ref_or_tagged)
 {
+    REALM_ASSERT(has_refs());
     set(ndx, ref_or_tagged.m_value); // Throws
 }
 
 inline void Array::add(RefOrTagged ref_or_tagged)
 {
+    REALM_ASSERT(has_refs());
     add(ref_or_tagged.m_value); // Throws
 }
 
 inline void Array::ensure_minimum_width(RefOrTagged ref_or_tagged)
 {
+    REALM_ASSERT(has_refs());
     ensure_minimum_width(ref_or_tagged.m_value); // Throws
 }
 
