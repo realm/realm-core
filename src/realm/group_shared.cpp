@@ -732,9 +732,14 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             SharedInfo info(durability, history_type);
             m_file.write(reinterpret_cast<char*>(&info), sizeof info); // Throws
 
-            // Mark the file as completely initialized via a memory mapping. It
-            // could also have been done by a util::File::write(), but it is
-            // more convenient to manipulate the structure via its type.
+            // Mark the file as completely initialized via a memory
+            // mapping. Since this is done as a separate final step (involving
+            // separate system calls) there is no chance of the individual
+            // modifications to get reordered, even in case of a crash at a
+            // random position during the initialization (except if it happens
+            // before the truncation). This could also have been done by a
+            // util::File::write(), but it is more convenient to manipulate the
+            // structure via its type.
             m_file_map.map(m_file, File::access_ReadWrite,
                            sizeof (SharedInfo), File::map_NoSync); // Throws
             File::UnmapGuard fug(m_file_map);
