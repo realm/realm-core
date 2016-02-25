@@ -292,7 +292,7 @@ std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef 
     }
 
     // Not reusing root note, allocating a new one.
-    if (Array::get_is_inner_bptree_node_from_header(header)) {
+    if (is_inner_bptree_node) {
         new_root.reset(new Array{alloc});
         new_root->init_from_mem(mem);
     }
