@@ -281,6 +281,17 @@ std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef 
 {
     const char* header = mem.m_addr;
     std::unique_ptr<Array> new_root;
+    bool is_inner_bptree_node = Array::get_is_inner_bptree_node_from_header(header);
+
+    bool can_reuse_root_accessor = m_root &&
+                                   &m_root->get_alloc() == &alloc &&
+                                   m_root->is_inner_bptree_node() == is_inner_bptree_node;
+    if (can_reuse_root_accessor) {
+        m_root->init_from_mem(mem);
+        return std::move(m_root); // Same root will be reinstalled.
+    }
+
+    // Not reusing root note, allocating a new one.
     if (Array::get_is_inner_bptree_node_from_header(header)) {
         new_root.reset(new Array{alloc});
         new_root->init_from_mem(mem);
@@ -318,8 +329,10 @@ template<class T>
 void BpTree<T>::init_from_parent()
 {
     ref_type ref = root().get_ref_from_parent();
+    ArrayParent* parent = m_root->get_parent();
+    size_t ndx_in_parent = m_root->get_ndx_in_parent();
     auto new_root = create_root_from_ref(get_alloc(), ref);
-    new_root->set_parent(m_root->get_parent(), m_root->get_ndx_in_parent());
+    new_root->set_parent(parent, ndx_in_parent);
     m_root = std::move(new_root);
 }
 
