@@ -1337,7 +1337,7 @@ TEST(Shared_WriterThreads)
 
 
 //#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
-#if !REALM_ENABLE_ENCRYPTION
+#if !REALM_ENABLE_ENCRYPTION &&  defined(ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE)
 //#if !defined REALM_ANDROID && !defined REALM_IOS
 
 // Not supported on Windows in particular? Keywords: winbug
