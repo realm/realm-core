@@ -287,7 +287,12 @@ std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef 
                                    &m_root->get_alloc() == &alloc &&
                                    m_root->is_inner_bptree_node() == is_inner_bptree_node;
     if (can_reuse_root_accessor) {
-        m_root->init_from_mem(mem);
+        if (is_inner_bptree_node) {
+            m_root->init_from_mem(mem);
+        }
+        else {
+            static_cast<LeafType&>(*m_root).init_from_mem(mem);
+        }
         return std::move(m_root); // Same root will be reinstalled.
     }
 
