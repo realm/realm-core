@@ -925,11 +925,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 #ifndef _WIN32
                 if (encryption_key) {
                     static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
-                    info->session_initiator_pid = uint64_t(getpid());
+                    info->session_initiator_pid = uint_fast64_t(getpid());
                 }
 #endif
 
-                info->file_format_version = target_file_format_version;
+                info->file_format_version = uint_fast8_t(target_file_format_version);
 
                 // Initially there is a single version in the file
                 info->number_of_versions = 1;
