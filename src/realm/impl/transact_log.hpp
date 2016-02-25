@@ -149,12 +149,12 @@ public:
     bool change_link_targets(size_t, size_t) { return true; }
     bool clear_table() { return true; }
     bool set_int(size_t, size_t, int_fast64_t) { return true; }
-    bool set_int_unique(size_t, size_t, int_fast64_t) { return true; }
+    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return true; }
     bool set_bool(size_t, size_t, bool) { return true; }
     bool set_float(size_t, size_t, float) { return true; }
     bool set_double(size_t, size_t, double) { return true; }
     bool set_string(size_t, size_t, StringData) { return true; }
-    bool set_string_unique(size_t, size_t, StringData) { return true; }
+    bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
     bool set_binary(size_t, size_t, BinaryData) { return true; }
     bool set_date_time(size_t, size_t, DateTime) { return true; }
     bool set_table(size_t, size_t) { return true; }
@@ -205,7 +205,7 @@ public:
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name);
     bool erase_group_level_table(size_t table_ndx, size_t num_tables);
     bool rename_group_level_table(size_t table_ndx, StringData new_name);
-    bool move_group_level_table(size_t table_ndx_1, size_t table_ndx_2);
+    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
 
     /// Must have table selected.
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
@@ -217,12 +217,12 @@ public:
     bool clear_table();
 
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t);
-    bool set_int_unique(size_t col_ndx, size_t row_ndx, int_fast64_t);
+    bool set_int_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, int_fast64_t);
     bool set_bool(size_t col_ndx, size_t row_ndx, bool);
     bool set_float(size_t col_ndx, size_t row_ndx, float);
     bool set_double(size_t col_ndx, size_t row_ndx, double);
     bool set_string(size_t col_ndx, size_t row_ndx, StringData);
-    bool set_string_unique(size_t col_ndx, size_t row_ndx, StringData);
+    bool set_string_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, StringData);
     bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData);
     bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime);
     bool set_table(size_t col_ndx, size_t row_ndx);
@@ -249,7 +249,7 @@ public:
     bool link_list_set(size_t link_ndx, size_t value);
     bool link_list_set_all(const IntegerColumn& values);
     bool link_list_insert(size_t link_ndx, size_t value);
-    bool link_list_move(size_t old_link_ndx, size_t new_link_ndx);
+    bool link_list_move(size_t from_link_ndx, size_t to_link_ndx);
     bool link_list_swap(size_t link1_ndx, size_t link2_ndx);
     bool link_list_erase(size_t link_ndx);
     bool link_list_nullify(size_t link_ndx);
@@ -308,7 +308,7 @@ public:
     void insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name);
     void erase_group_level_table(size_t table_ndx, size_t num_tables);
     void rename_group_level_table(size_t table_ndx, StringData new_name);
-    void move_group_level_table(size_t table_ndx_1, size_t table_ndx_2);
+    void move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
     void insert_column(const Descriptor&, size_t col_ndx, DataType type, StringData name,
                        const Table* link_target_table, bool nullable = false);
     void erase_column(const Descriptor&, size_t col_ndx);
@@ -352,7 +352,7 @@ public:
 
     void link_list_set(const LinkView&, size_t link_ndx, size_t value);
     void link_list_insert(const LinkView&, size_t link_ndx, size_t value);
-    void link_list_move(const LinkView&, size_t old_link_ndx, size_t new_link_ndx);
+    void link_list_move(const LinkView&, size_t from_link_ndx, size_t to_link_ndx);
     void link_list_swap(const LinkView&, size_t link_ndx_1, size_t link_ndx_2);
     void link_list_erase(const LinkView&, size_t link_ndx);
     void link_list_clear(const LinkView&);
@@ -378,7 +378,7 @@ public:
 protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
 
-    void reset_selection_caches();
+    void reset_selection_caches() noexcept;
     void set_buffer(char* new_free_begin, char* new_free_end) { m_encoder.set_buffer(new_free_begin, new_free_end); }
     char* write_position() const { return m_encoder.write_position(); }
 
@@ -390,10 +390,11 @@ private:
     mutable const Spec*     m_selected_spec;
     mutable const LinkView* m_selected_link_list;
 
-    void select_table(const Table*);
-    void select_desc(const Descriptor&);
-    void select_link_list(const LinkView&);
-    // These reset the above caches and modify them as necessary
+    void unselect_all() noexcept;
+    void select_table(const Table*); // unselects descriptor and link list
+    void select_desc(const Descriptor&); // unselects link list
+    void select_link_list(const LinkView&); // unselects descriptor
+
     void record_subtable_path(const Table&, size_t*& out_begin, size_t*& out_end);
     void do_select_table(const Table*);
     void do_select_desc(const Descriptor&);
@@ -518,11 +519,9 @@ inline void TransactLogEncoder::set_buffer(char* free_begin, char* free_end)
     m_transact_log_free_end   = free_end;
 }
 
-inline void TransactLogConvenientEncoder::reset_selection_caches()
+inline void TransactLogConvenientEncoder::reset_selection_caches() noexcept
 {
-    m_selected_table = nullptr;
-    m_selected_spec  = nullptr;
-    m_selected_link_list  = nullptr;
+    unselect_all();
 }
 
 inline char* TransactLogEncoder::reserve(size_t n)
@@ -762,43 +761,51 @@ bool TransactLogEncoder::append_variable_size_instr(Instruction instr,
     return true;
 }
 
-inline
-void TransactLogConvenientEncoder::select_table(const Table* table)
+inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
-    if (table != m_selected_table) {
-        do_select_table(table);
-    }
+    m_selected_table     = nullptr;
+    m_selected_spec      = nullptr;
+    m_selected_link_list = nullptr;
 }
 
-inline
-void TransactLogConvenientEncoder::select_desc(const Descriptor& desc)
+inline void TransactLogConvenientEncoder::select_table(const Table* table)
+{
+    if (table != m_selected_table)
+        do_select_table(table); // Throws
+    m_selected_spec      = nullptr;
+    m_selected_link_list = nullptr;
+}
+
+inline void TransactLogConvenientEncoder::select_desc(const Descriptor& desc)
 {
     typedef _impl::DescriptorFriend df;
     if (&df::get_spec(desc) != m_selected_spec)
         do_select_desc(desc); // Throws
+    m_selected_link_list = nullptr;
 }
 
-inline
-void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
+inline void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
 {
     if (&list != m_selected_link_list)
         do_select_link_list(list); // Throws
+    m_selected_spec = nullptr;
 }
 
 
-inline bool TransactLogEncoder::insert_group_level_table(size_t table_ndx, size_t num_tables,
+inline bool TransactLogEncoder::insert_group_level_table(size_t table_ndx, size_t prior_num_tables,
                                                          StringData name)
 {
-    append_string_instr(instr_InsertGroupLevelTable, util::tuple(table_ndx, num_tables),
+    append_string_instr(instr_InsertGroupLevelTable, util::tuple(table_ndx, prior_num_tables),
                         name); // Throws
     return true;
 }
 
 inline void TransactLogConvenientEncoder::insert_group_level_table(size_t table_ndx,
-                                                                   size_t num_tables,
+                                                                   size_t prior_num_tables,
                                                                    StringData name)
 {
-    m_encoder.insert_group_level_table(table_ndx, num_tables, name); // Throws
+    unselect_all();
+    m_encoder.insert_group_level_table(table_ndx, prior_num_tables, name); // Throws
 }
 
 inline bool TransactLogEncoder::erase_group_level_table(size_t table_ndx, size_t prior_num_tables)
@@ -809,6 +816,7 @@ inline bool TransactLogEncoder::erase_group_level_table(size_t table_ndx, size_t
 
 inline void TransactLogConvenientEncoder::erase_group_level_table(size_t table_ndx, size_t prior_num_tables)
 {
+    unselect_all();
     m_encoder.erase_group_level_table(table_ndx, prior_num_tables); // Throws
 }
 
@@ -821,18 +829,21 @@ inline bool TransactLogEncoder::rename_group_level_table(size_t table_ndx, Strin
 inline void TransactLogConvenientEncoder::rename_group_level_table(size_t table_ndx,
                                                                    StringData new_name)
 {
+    unselect_all();
     m_encoder.rename_group_level_table(table_ndx, new_name); // Throws
 }
 
-inline bool TransactLogEncoder::move_group_level_table(size_t table_ndx_1, size_t table_ndx_2)
+inline bool TransactLogEncoder::move_group_level_table(size_t from_table_ndx, size_t to_table_ndx)
 {
-    append_simple_instr(instr_MoveGroupLevelTable, util::tuple(table_ndx_1, table_ndx_2));
+    REALM_ASSERT(from_table_ndx != to_table_ndx);
+    append_simple_instr(instr_MoveGroupLevelTable, util::tuple(from_table_ndx, to_table_ndx));
     return true;
 }
 
-inline void TransactLogConvenientEncoder::move_group_level_table(size_t table_ndx_1, size_t table_ndx_2)
+inline void TransactLogConvenientEncoder::move_group_level_table(size_t from_table_ndx, size_t to_table_ndx)
 {
-    m_encoder.move_group_level_table(table_ndx_1, table_ndx_2);
+    unselect_all();
+    m_encoder.move_group_level_table(from_table_ndx, to_table_ndx);
 }
 
 inline bool TransactLogEncoder::insert_column(size_t col_ndx, DataType type, StringData name,
@@ -954,9 +965,9 @@ inline void TransactLogConvenientEncoder::set_int(const Table* t, size_t col_ndx
     m_encoder.set_int(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
+inline bool TransactLogEncoder::set_int_unique(size_t col_ndx, size_t ndx, size_t prior_num_rows, int_fast64_t value)
 {
-    append_simple_instr(instr_SetIntUnique, util::tuple(col_ndx, ndx, value));
+    append_simple_instr(instr_SetIntUnique, util::tuple(col_ndx, ndx, prior_num_rows, value));
     return true;
 }
 
@@ -964,7 +975,7 @@ inline void TransactLogConvenientEncoder::set_int_unique(const Table* t, size_t 
                                                          size_t ndx, int_fast64_t value)
 {
     select_table(t); // Throws
-    m_encoder.set_int_unique(col_ndx, ndx, value); // Throws
+    m_encoder.set_int_unique(col_ndx, ndx, t->size(), value); // Throws
 }
 
 inline bool TransactLogEncoder::set_bool(size_t col_ndx, size_t ndx, bool value)
@@ -1024,13 +1035,14 @@ inline void TransactLogConvenientEncoder::set_string(const Table* t, size_t col_
     m_encoder.set_string(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
+inline bool TransactLogEncoder::set_string_unique(size_t col_ndx, size_t ndx, size_t prior_num_rows, StringData value)
 {
     if (value.is_null()) {
+        // FIXME: This loses SetUnique information.
         set_null(col_ndx, ndx); // Throws
     }
     else {
-        append_string_instr(instr_SetStringUnique, util::tuple(col_ndx, ndx), value); // Throws
+        append_string_instr(instr_SetStringUnique, util::tuple(col_ndx, ndx, prior_num_rows), value); // Throws
     }
     return true;
 }
@@ -1039,7 +1051,7 @@ inline void TransactLogConvenientEncoder::set_string_unique(const Table* t, size
                                                             size_t ndx, StringData value)
 {
     select_table(t); // Throws
-    m_encoder.set_string_unique(col_ndx, ndx, value); // Throws
+    m_encoder.set_string_unique(col_ndx, ndx, t->size(), value); // Throws
 }
 
 inline bool TransactLogEncoder::set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
@@ -1371,17 +1383,18 @@ inline void TransactLogConvenientEncoder::link_list_insert(const LinkView& list,
     m_encoder.link_list_insert(link_ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_move(size_t old_link_ndx, size_t new_link_ndx)
+inline bool TransactLogEncoder::link_list_move(size_t from_link_ndx, size_t to_link_ndx)
 {
-    append_simple_instr(instr_LinkListMove, util::tuple(old_link_ndx, new_link_ndx)); // Throws
+    REALM_ASSERT(from_link_ndx != to_link_ndx);
+    append_simple_instr(instr_LinkListMove, util::tuple(from_link_ndx, to_link_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::link_list_move(const LinkView& list, size_t old_link_ndx,
-                                        size_t new_link_ndx)
+inline void TransactLogConvenientEncoder::link_list_move(const LinkView& list, size_t from_link_ndx,
+                                                         size_t to_link_ndx)
 {
     select_link_list(list); // Throws
-    m_encoder.link_list_move(old_link_ndx, new_link_ndx); // Throws
+    m_encoder.link_list_move(from_link_ndx, to_link_ndx); // Throws
 }
 
 inline bool TransactLogEncoder::link_list_swap(size_t link1_ndx, size_t link2_ndx)
@@ -1490,11 +1503,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetIntUnique: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t prior_num_rows = read_int<std::size_t>(); // Throws
             // FIXME: Don't depend on the existence of int64_t,
             // but don't allow values to use more than 64 bits
             // either.
             int_fast64_t value = read_int<int64_t>(); // Throws
-            if (!handler.set_int_unique(col_ndx, row_ndx, value)) // Throws
+            if (!handler.set_int_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
                 parser_error();
             return;
         }
@@ -1533,8 +1547,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetStringUnique: {
             std::size_t col_ndx = read_int<std::size_t>(); // Throws
             std::size_t row_ndx = read_int<std::size_t>(); // Throws
+            std::size_t prior_num_rows = read_int<std::size_t>(); // Throws
             StringData value = read_string(m_string_buffer); // Throws
-            if (!handler.set_string_unique(col_ndx, row_ndx, value)) // Throws
+            if (!handler.set_string_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
                 parser_error();
             return;
         }
@@ -1695,9 +1710,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_LinkListMove: {
-            size_t old_link_ndx = read_int<size_t>(); // Throws
-            size_t new_link_ndx = read_int<size_t>(); // Throws
-            if (!handler.link_list_move(old_link_ndx, new_link_ndx)) // Throws
+            size_t from_link_ndx = read_int<size_t>(); // Throws
+            size_t to_link_ndx   = read_int<size_t>(); // Throws
+            if (!handler.link_list_move(from_link_ndx, to_link_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -1854,9 +1869,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_MoveGroupLevelTable: {
-            size_t table_ndx_1 = read_int<size_t>(); // Throws
-            size_t table_ndx_2 = read_int<size_t>(); // Throws
-            if (!handler.move_group_level_table(table_ndx_1, table_ndx_2)) // Throws
+            size_t from_table_ndx = read_int<size_t>(); // Throws
+            size_t to_table_ndx   = read_int<size_t>(); // Throws
+            if (!handler.move_group_level_table(from_table_ndx, to_table_ndx)) // Throws
                 parser_error();
             return;
         }
@@ -2116,6 +2131,7 @@ public:
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData)
     {
+        sync_table();
         m_encoder.erase_group_level_table(table_ndx, num_tables + 1);
         append_instruction();
         return true;
@@ -2123,6 +2139,7 @@ public:
 
     bool erase_group_level_table(size_t table_ndx, size_t num_tables)
     {
+        sync_table();
         m_encoder.insert_group_level_table(table_ndx, num_tables - 1, "");
         append_instruction();
         return true;
@@ -2130,12 +2147,14 @@ public:
 
     bool rename_group_level_table(size_t, StringData)
     {
-        return true; // No-op
+        sync_table();
+        return true;
     }
 
     bool move_group_level_table(size_t, size_t)
     {
-        return true; // No-op
+        sync_table();
+        return true;
     }
 
     bool optimize_table()
@@ -2187,9 +2206,9 @@ public:
         return true;
     }
 
-    bool set_int_unique(std::size_t col_ndx, std::size_t row_ndx, int_fast64_t value)
+    bool set_int_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, int_fast64_t value)
     {
-        m_encoder.set_int_unique(col_ndx, row_ndx, value);
+        m_encoder.set_int_unique(col_ndx, row_ndx, prior_num_rows, value);
         append_instruction();
         return true;
     }
@@ -2222,9 +2241,9 @@ public:
         return true;
     }
 
-    bool set_string_unique(std::size_t col_ndx, std::size_t row_ndx, StringData value)
+    bool set_string_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, StringData value)
     {
-        m_encoder.set_string_unique(col_ndx, row_ndx, value);
+        m_encoder.set_string_unique(col_ndx, row_ndx, prior_num_rows, value);
         append_instruction();
         return true;
     }
@@ -2369,9 +2388,9 @@ public:
         return true;
     }
 
-    bool link_list_move(size_t old_link_ndx, size_t new_link_ndx)
+    bool link_list_move(size_t from_link_ndx, size_t to_link_ndx)
     {
-        m_encoder.link_list_move(new_link_ndx, old_link_ndx);
+        m_encoder.link_list_move(from_link_ndx, to_link_ndx);
         append_instruction();
         return true;
     }

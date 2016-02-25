@@ -58,11 +58,6 @@ public:
     const char* what() const noexcept override;
 };
 
-/// Thrown if you attempt to execute a query that depends on a deleted LinkView
-class DeletedLinkView : public std::exception {
-public:
-    const char* what() const noexcept override;
-};
 
 /// The \c FileFormatUpgradeRequired exception can be thrown by the \c
 /// SharedGroup constructor when opening a database that uses a deprecated file
@@ -73,6 +68,13 @@ public:
 class FileFormatUpgradeRequired: public std::exception {
 public:
     const char* what() const noexcept override;
+};
+
+/// Thrown when memory can no longer be mapped to. When mmap/remap fails.
+class AddressSpaceExhausted: public std::runtime_error {
+public:
+    AddressSpaceExhausted(const std::string& msg);
+    /// runtime_error::what() returns the msg provided in the constructor.
 };
 
 
@@ -215,9 +217,9 @@ inline const char* FileFormatUpgradeRequired::what() const noexcept
     return "Database upgrade required but prohibited";
 }
 
-inline const char* DeletedLinkView::what() const noexcept
+inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg):
+    std::runtime_error(msg)
 {
-    return "Attempt to use a LinkView that has been deleted";
 }
 
 inline LogicError::LogicError(LogicError::ErrorKind kind):

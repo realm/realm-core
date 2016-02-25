@@ -241,9 +241,9 @@
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">$(ProjectName)64</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">$(ProjectName)32d</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">$(ProjectName)32</TargetName>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(LibraryPath)</LibraryPath>
@@ -341,13 +341,11 @@
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>WS2_32.lib ;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
-      <AdditionalLibraryDirectories>
-      </AdditionalLibraryDirectories>
-      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Visual Leak Detector\lib\Win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">
@@ -515,7 +513,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>WS2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
@@ -1092,6 +1090,7 @@
     <ClCompile Include="..\..\test\util\resource_limits.cpp" />
     <ClCompile Include="..\..\test\util\test_only.cpp" />
     <ClCompile Include="..\..\test\util\test_path.cpp" />
+    <ClCompile Include="..\..\test\util\crypt_key.cpp" />
     <ClCompile Include="..\..\test\util\timer.cpp" />
     <ClCompile Include="..\..\test\util\unit_test.cpp" />
     <ClCompile Include="..\..\test\util\wildcard.cpp" />

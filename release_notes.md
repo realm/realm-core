@@ -23,6 +23,74 @@
 
 ----------------------------------------------
 
+# 0.96.2 Release notes
+
+### Bugfixes:
+
+* `Group::TransactAdvancer::move_group_level_table()` was forgetting some of its
+  duties (move the table accessor). That has been fixed.
+* While generating transaction logs, we didn't always deselect nested
+  accessors. For example, when performing a table-level operation, we didn't
+  deselect a selected link list. In some cases, it didn't matter, but in others
+  it did. The general rule is that an operation on a particular level must
+  deselect every accessor at deeper (more nested) levels. This is important for
+  the merge logic of the sync mechanism, and for transaction log reversal. This
+  has been fixed.
+* While reversing transaction logs, group level operations did not terminate the
+  preceding section of table level operations. Was fixed.
+* Table::clear() issues link nullification instructions for each link that did
+  point to a removed row. It did however issue those instructions after the
+  clear instruction, which is incorrect, as the links do not exist after the
+  clear operation. Was fixed.
+* `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
+  file after compacting.
+
+### Enhancements:
+
+* Add SharedGroup::get_transact_stage().
+
+### Internals:
+
+* Improve documentation of `Group::move_table()` and `LinkView::move()`.
+* Early out from `Group::move_table()` if `from_index == to_index`. This
+  behaviour agrees with `LinkView::move()` and is assumed by other parts of
+  core, and by the merge logic of the sync mechanism.
+* Convert some assertions on arguments of public `Group`, `Table`, and
+  `LinkView` methods to throwing checks.
+* Align argument naming of `Group::move_table()` and `LinkView::move()`.
+
+----------------------------------------------
+
+# 0.96.1 Release notes
+
+### API breaking changes:
+
+* Important for language bindings: Any method on Query and TableView that
+  depends on a deleted LinkView will now return sane return values; 
+  Query::find() returns npos, Query::find_all() returns empty TableView,
+  Query::count() returns 0, TableView::sum() returns 0 (TableView created
+  from LinkView::get_sorted_view). So they will no longer throw
+  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in 
+  test_query.cpp for more info.
+
+### Enhancements:
+
+* Memory errors caused by calls to mmap/mremap will now throw a specific
+  AddressSpaceExhausted exception which is a subclass of the previously
+  thrown std::runtime_error. This is so that iOS and Android language
+  bindings can specifically catch this case and handle it differently
+  than the rest of the general std::runtime_errors.
+
+* Doubled the speed of TableView::clear() when parent table has an 
+  indexed column.
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
 # 0.96.0 Release notes
 
 ### Bugfixes:

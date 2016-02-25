@@ -17,6 +17,7 @@
 #include <realm/table_macros.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>
 #include <realm/commit_log.hpp>
 
@@ -32,8 +33,6 @@
 
 
 #include "test.hpp"
-#include "crypt_key.hpp"
-#include "util/to_string.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -7365,12 +7364,12 @@ public:
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
     bool set_int(size_t, size_t, int_fast64_t) { return false; }
-    bool set_int_unique(size_t, size_t, int_fast64_t) { return false; }
+    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return false; }
     bool set_bool(size_t, size_t, bool) { return false; }
     bool set_float(size_t, size_t, float) { return false; }
     bool set_double(size_t, size_t, double) { return false; }
     bool set_string(size_t, size_t, StringData) { return false; }
-    bool set_string_unique(size_t, size_t, StringData) { return false; }
+    bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
     bool set_binary(size_t, size_t, BinaryData) { return false; }
     bool set_date_time(size_t, size_t, DateTime) { return false; }
     bool set_table(size_t, size_t) { return false; }
@@ -7880,6 +7879,139 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
 }
 
 
+// This issue was uncovered while looking into the RollbackCircularReferenceRemoval issue
+TEST(LangBindHelper_RollbackTableRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef alpha = group->get_or_add_table("alpha");
+        TableRef beta = group->get_or_add_table("beta");
+        beta->add_column_link(type_Link, "alpha-1", *alpha);
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+        TableRef alpha = group->get_table("alpha");
+        TableRef beta = group->get_table("beta");
+        group->remove_table("beta");
+        CHECK_NOT(group->has_table("beta"));
+
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        CHECK_EQUAL(2, group->size());
+
+    }
+    group->verify();
+}
+
+
+TEST(LangBindHelper_RollbackTableRemove2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        TableRef a = group->get_or_add_table("a");
+        TableRef b = group->get_or_add_table("b");
+        TableRef c = group->get_or_add_table("c");
+        TableRef d = group->get_or_add_table("d");
+        c->add_column_link(type_Link, "a", *a);
+        d->add_column_link(type_Link, "b", *b);
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group->verify();
+    {
+        LangBindHelper::promote_to_write(sg, *hist);
+        CHECK_EQUAL(4, group->size());
+        group->remove_table("c");
+        CHECK_NOT(group->has_table("c"));
+        group->verify();
+        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        CHECK_EQUAL(4, group->size());
+    }
+    group->verify();
+}
+
+
+TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
+{
+    // Test that it is possible to modify a table, then remove it from the
+    // group, and then rollback the transaction.
+
+    // This triggered a bug in the instruction reverser which would incorrectly
+    // associate the table removal instruction with the table selection
+    // instruction induced by the modification, causing the latter to occur in
+    // the reverse log at a point where the selected table does not yet
+    // exist. The filler table is there to avoid an early-out in
+    // Group::TransactAdvancer::select_table() due to a misinterpretation of the
+    // reason for the missing table accessor entry.
+
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *hist);
+    TableRef filler = group->get_or_add_table("filler");
+    TableRef table = group->get_or_add_table("table");
+    table->add_column(type_Int, "i");
+    table->add_empty_row();
+    LangBindHelper::commit_and_continue_as_read(sg);
+    LangBindHelper::promote_to_write(sg, *hist);
+    table->set_int(0, 0, 0);
+    group->remove_table("table");
+    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+}
+
+TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_1_w = wt.add_table("table_1");
+        TableRef table_2_w = wt.add_table("table_2");
+        table_2_w->add_column(type_Int, "i");
+        table_2_w->add_empty_row();
+        wt.commit();
+    }
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    ConstTableRef table_1 = group.get_table("table_1");
+    ConstTableRef table_2 = group.get_table("table_2");
+
+    // Try to advance after an empty write transaction
+    {
+        WriteTransaction wt(sg_w);
+        TableRef table_1_w = wt.get_or_add_table("table_1");
+        TableRef table_2_w = wt.get_or_add_table("table_2");
+        table_2_w->set_int(0,0,1);
+        wt.get_group().move_table(0,1);
+        CHECK_EQUAL(1, table_2_w->get_int(0,0));
+        CHECK_EQUAL(0, table_2_w->get_index_in_group());
+        CHECK_EQUAL(1, table_1_w->get_index_in_group());
+        table_2_w->set_int(0,0,2);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg, hist);
+    group.verify();
+    CHECK_EQUAL(2, table_2->get_int(0,0));
+    CHECK_EQUAL(0, table_2->get_index_in_group());
+    CHECK_EQUAL(1, table_1->get_index_in_group());
+}
+
+
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -7986,7 +8118,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 }
 
 
-TEST(LangBindHelper_RollbackAndContinueAsReadLink)
+TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
@@ -8030,6 +8162,54 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLink)
     LangBindHelper::rollback_and_continue_as_read(sg, *hist);
     CHECK_EQUAL(2, origin->get_link(0,0));
 }
+
+
+TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg, *hist);
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    link_list->add(0);
+    link_list->add(1);
+    link_list->add(2);
+    link_list->add(0);
+    link_list->add(2);
+    LangBindHelper::commit_and_continue_as_read(sg);
+    // verify that we can reverse a LinkView::move()
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(1, link_list->get(1).get_index());
+    CHECK_EQUAL(2, link_list->get(2).get_index());
+    CHECK_EQUAL(0, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+    LangBindHelper::promote_to_write(sg, *hist);
+    link_list->move(1,3);
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(2, link_list->get(1).get_index());
+    CHECK_EQUAL(0, link_list->get(2).get_index());
+    CHECK_EQUAL(1, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(1, link_list->get(1).get_index());
+    CHECK_EQUAL(2, link_list->get(2).get_index());
+    CHECK_EQUAL(0, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+}
+
 
 TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
 {
@@ -9746,77 +9926,94 @@ TEST(LangBindHelper_HandoverDependentViews)
 
 TEST(LangBindHelper_HandoverTableViewWithLinkView)
 {
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    sg.begin_read();
-
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
-    Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    std::unique_ptr<SharedGroup::Handover<TableView> > handover;
-    SharedGroup::VersionID vid;
+    // First iteration hands-over a normal valid attached LinkView. Second
+    // iteration hands-over a detached LinkView.
+    for (int detached = 0; detached < 2; detached++)
     {
-        TableView tv;
-        LangBindHelper::promote_to_write(sg_w, *hist);
+        SHARED_GROUP_TEST_PATH(path);
+        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        sg.begin_read();
 
-        TableRef table1 = group_w.add_table("table1");
-        TableRef table2 = group_w.add_table("table2");
+        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        Group& group_w = const_cast<Group&>(sg_w.begin_read());
+        std::unique_ptr<SharedGroup::Handover<TableView> > handover;
+        SharedGroup::VersionID vid;
 
-        // add some more columns to table1 and table2
-        table1->add_column(type_Int, "col1");
-        table1->add_column(type_String, "str1");
+        {
+            TableView tv;
+            LangBindHelper::promote_to_write(sg_w, *hist);
 
-        // add some rows
-        table1->add_empty_row();
-        table1->set_int(0, 0, 300);
-        table1->set_string(1, 0, "delta");
+            TableRef table1 = group_w.add_table("table1");
+            TableRef table2 = group_w.add_table("table2");
 
-        table1->add_empty_row();
-        table1->set_int(0, 1, 100);
-        table1->set_string(1, 1, "alfa");
+            // add some more columns to table1 and table2
+            table1->add_column(type_Int, "col1");
+            table1->add_column(type_String, "str1");
 
-        table1->add_empty_row();
-        table1->set_int(0, 2, 200);
-        table1->set_string(1, 2, "beta");
+            // add some rows
+            table1->add_empty_row();
+            table1->set_int(0, 0, 300);
+            table1->set_string(1, 0, "delta");
 
-        size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+            table1->add_empty_row();
+            table1->set_int(0, 1, 100);
+            table1->set_string(1, 1, "alfa");
 
-        table2->add_empty_row();
-        table2->add_empty_row();
+            table1->add_empty_row();
+            table1->set_int(0, 2, 200);
+            table1->set_string(1, 2, "beta");
 
-        LinkViewRef lvr;
+            size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
 
-        lvr = table2->get_linklist(col_link2, 0);
-        lvr->clear();
-        lvr->add(0);
-        lvr->add(1);
-        lvr->add(2);
+            table2->add_empty_row();
+            table2->add_empty_row();
 
-        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+            LinkViewRef lvr;
 
-        // q.m_table = table1
-        // q.m_view = lvr
-        Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
+            lvr = table2->get_linklist(col_link2, 0);
+            lvr->clear();
+            lvr->add(0);
+            lvr->add(1);
+            lvr->add(2);
 
-        // tv.m_table == table1
-        tv = q.find_all(); // tv = { 0, 2 }
-        CHECK(tv.is_in_sync());
+            // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
-        // TableView tv2 = lvr->get_sorted_view(0);
-        LangBindHelper::commit_and_continue_as_read(sg_w);
-        vid = sg_w.get_version_of_current_transaction();
-        handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
-    }
-    {
-        LangBindHelper::advance_read(sg, *hist, vid);
-        sg_w.close();
-        std::unique_ptr<TableView> tv( sg.import_from_handover(move(handover)) ); // <-- import tv
+            // q.m_table = table1
+            // q.m_view = lvr
+            Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
 
-        CHECK(tv->is_in_sync());
-        CHECK_EQUAL(2, tv->size());
-        CHECK_EQUAL(0, tv->get_source_ndx(0));
-        CHECK_EQUAL(2, tv->get_source_ndx(1));
+            // Remove the LinkList that the query depends on, to see if a detached LinkView can be handed over 
+            // correctly
+            if (detached == 1)
+                table2->remove(0);
+
+            // tv.m_table == table1
+            tv = q.find_all(); // tv = { 0, 2 }
+            CHECK(tv.is_in_sync());
+
+            // TableView tv2 = lvr->get_sorted_view(0);
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
+        }
+        {
+            LangBindHelper::advance_read(sg, *hist, vid);
+            sg_w.close();
+            std::unique_ptr<TableView> tv(sg.import_from_handover(move(handover))); // <-- import tv
+
+            CHECK(tv->is_in_sync());
+            if (detached == 1) {
+                CHECK_EQUAL(0, tv->size());
+            }
+            else {
+                CHECK_EQUAL(2, tv->size());
+                CHECK_EQUAL(0, tv->get_source_ndx(0));
+                CHECK_EQUAL(2, tv->get_source_ndx(1));
+            }
+
+        }
     }
 }
 
@@ -10874,6 +11071,96 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     end_signal = true;
     for (int i = 0; i != threads; ++i)
         slaves[i].join();
+}
+
+
+// TableView::clear() was originally reported to be slow when table was indexed and had links, but performance
+// has now doubled. This test is just a short sanity test that clear() still works.
+TEST(LangBindHelper_TableViewClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    size_t number_of_history = 1000;
+    size_t number_of_line = 18;
+
+    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    // set up tables:
+    // history : ["id" (int), "parent" (int), "lines" (list(line))]
+    // line    : ["id" (int), "parent" (int)]
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        TableRef history = group_w.add_table("history");
+        TableRef line = group_w.add_table("line");
+
+        history->add_column(type_Int, "id");
+        history->add_column(type_Int, "parent");
+        history->add_column_link(type_LinkList, "lines", *line);
+        history->add_search_index(1);
+
+        line->add_column(type_Int, "id");
+        line->add_column(type_Int, "parent");
+        line->add_search_index(1);
+
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+    }
+
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+
+        TableRef history = group_w.get_table("history");
+        TableRef line = group_w.get_table("line");
+
+        history->add_empty_row();
+        history->set_int(0, 0, 1);
+        LinkViewRef ll = history->get_linklist(2, 0);
+        for (size_t j = 0; j < number_of_line; ++j) {
+            size_t r = line->add_empty_row();
+            line->set_int(0, r, j + 1);
+            ll->add(r);
+        }
+
+        for (size_t i = 1; i < number_of_history; ++i) {
+            size_t ri = history->add_empty_row();
+            history->set_int(0, ri, i + 1);
+            history->set_int(1, ri, 1);
+            for (size_t j = 1; j <= number_of_line; ++j) {
+                size_t rj = line->add_empty_row();
+                line->set_int(0, rj, rj + 1);
+                line->set_int(1, rj, j);
+            }
+        }
+
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+
+        CHECK_EQUAL(number_of_history, history->size());
+        CHECK_EQUAL(number_of_history * number_of_line, line->size());
+    }
+
+    // query and delete
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+
+        TableRef history = group_w.get_table("history");
+        TableRef line = group_w.get_table("line");
+
+    //    number_of_line = 2;
+        for (size_t i = 1; i <= number_of_line; ++i) {
+            TableView tv = (line->column<Int>(1) == int64_t(i)).find_all();
+            tv.clear(RemoveMode::unordered);
+        }
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+    }
+
+    {
+        TableRef history = group_w.get_table("history");
+        TableRef line = group_w.get_table("line");
+
+        CHECK_EQUAL(number_of_history, history->size());
+        CHECK_EQUAL(number_of_line, line->size());
+    }
 }
 
 #endif

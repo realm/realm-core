@@ -1453,8 +1453,13 @@ TEST(Table_SetIntUnique)
     table.set_int_unique(0, 0, 123);
     table.set_int_unique(1, 0, 123);
 
-    CHECK_LOGIC_ERROR(table.set_int_unique(0, 1, 123), LogicError::unique_constraint_violation);
-    CHECK_LOGIC_ERROR(table.set_int_unique(1, 1, 123), LogicError::unique_constraint_violation);
+    // Check that conflicting SetIntUniques result in rows being deleted.
+    table.set_int_unique(0, 1, 123);
+    CHECK_EQUAL(table.size(), 9);
+    table.set_int_unique(1, 1, 123);
+    CHECK_EQUAL(table.size(), 9);
+    table.set_int_unique(1, 2, 123);
+    CHECK_EQUAL(table.size(), 8);
 }
 
 
@@ -1464,18 +1469,21 @@ TEST(Table_SetStringUnique)
     table.add_column(type_Int, "ints");
     table.add_column(type_String, "strings");
     table.add_column(type_String, "strings_nullable", true);
-    table.add_empty_row(10);
+    table.add_empty_row(10); // all duplicates!
 
     CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, "foo"), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, "foo"), LogicError::no_search_index);
     table.add_search_index(1);
     table.add_search_index(2);
 
     table.set_string_unique(1, 0, "bar");
 
-    CHECK_LOGIC_ERROR(table.set_string_unique(1, 1, "bar"), LogicError::unique_constraint_violation);
-    CHECK_LOGIC_ERROR(table.set_string_unique(1, 0, realm::null()), LogicError::column_not_nullable);
+    // Check that conflicting SetStringUniques result in rows with duplicate values being deleted.
+    table.set_string_unique(1, 1, "bar");
+    CHECK_EQUAL(table.size(), 9); // Only duplicates of "bar" are removed.
 
-    CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, realm::null()), LogicError::unique_constraint_violation);
+    table.set_string_unique(2, 0, realm::null());
+    CHECK_EQUAL(table.size(), 1);
 }
 
 
@@ -6558,5 +6566,29 @@ TEST(Table_ChangeLinkTargets_LinkLists)
     CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
 }
 
+
+TEST(Table_DetachedAccessor)
+{
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column(type_Int, "i");
+    table->add_column(type_String, "s");
+    table->add_column(type_Binary, "b");
+    table->add_column_link(type_Link, "l", *table);
+    table->add_empty_row(2);
+    group.remove_table("table");
+
+    CHECK_LOGIC_ERROR(table->clear(), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->add_search_index(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->change_link_targets(0,1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->swap_rows(0,1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->set_string_unique(1, 0, ""), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->insert_substring(1, 0, 0, "x"), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->remove_substring(1, 0, 0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->set_binary(2, 0, BinaryData()), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->set_link(3, 0, 0), LogicError::detached_accessor);
+}
 
 #endif // TEST_TABLE

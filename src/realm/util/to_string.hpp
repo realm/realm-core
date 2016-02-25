@@ -3,7 +3,7 @@
  * REALM CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2015] Realm Inc
+ *  [2016] Realm Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -17,33 +17,27 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
-#ifndef REALM_TEST_CRYPT_KEY_HPP
-#define REALM_TEST_CRYPT_KEY_HPP
+#ifndef REALM_UTIL_TO_STRING_HPP
+#define REALM_UTIL_TO_STRING_HPP
 
-#include <stdint.h>
-#include <stdlib.h>
+#include <locale>
+#include <string>
+#include <sstream>
 
-namespace {
+namespace realm {
+namespace util {
 
-const char* crypt_key(bool always=false)
+template<class T>
+std::string to_string(const T& v)
 {
-    static const char key[] = "1234567890123456789012345678901123456789012345678901234567890123";
-    if (always) {
-#if REALM_ENABLE_ENCRYPTION
-        return key;
-#else
-        return 0;
-#endif
-    }
-
-    const char* str = getenv("UNITTEST_ENCRYPT_ALL");
-    if (str && *str) {
-        return key;
-    }
-
-    return 0;
+    std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    out << v; // Throws
+    return out.str();
 }
 
-} // anonymous namespace
+} // namespace util
+} // namespace realm
 
-#endif // REALM_TEST_CRYPT_KEY_HPP
+#endif // REALM_UTIL_TO_STRING_HPP

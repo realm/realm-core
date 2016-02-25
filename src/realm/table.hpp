@@ -447,7 +447,7 @@ public:
     /// remove_substring() removes the specified byte range from the currently
     /// stored string. The beginning of the range (\a pos) must be less than or
     /// equal to the size of the currently stored string. If the specified range
-    /// cextends beyond the end of the currently stored string, it will be
+    /// extends beyond the end of the currently stored string, it will be
     /// silently clamped.
     ///
     /// String level modifications performed via insert_substring() and
@@ -889,6 +889,8 @@ private:
     void do_change_link_targets(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
+    template<class ColType, class T>
+    size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
 

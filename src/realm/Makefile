@@ -20,6 +20,7 @@ util/thread.hpp \
 util/file.hpp \
 util/optional.hpp \
 util/network.hpp \
+util/event_loop.hpp \
 util/uri.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
@@ -28,6 +29,7 @@ util/emulated_robust_mutex.hpp \
 util/file_mapper.hpp \
 util/encrypted_file_mapping.hpp \
 util/miscellaneous.hpp \
+util/to_string.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
@@ -127,6 +129,7 @@ util/string_buffer.cpp \
 util/terminate.cpp \
 util/thread.cpp \
 util/network.cpp \
+util/event_loop.cpp \
 util/uri.cpp \
 util/platform_specific_condvar.cpp \
 alloc.cpp \

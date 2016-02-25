@@ -36,6 +36,7 @@
 #include <realm/link_view.hpp>
 #include <realm/replication.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 #ifndef _WIN32
 #  include <sys/wait.h>
@@ -934,7 +935,13 @@ bool SharedGroup::compact()
 
     // Compact by writing a new file holding only live data, then renaming the new file
     // so it becomes the database file, replacing the old one in the process.
-    m_group.write(tmp_path, m_key, info->latest_version_number);
+    File file;
+    file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
+    m_group.write(file, m_key, info->latest_version_number);
+    // Data needs to be flushed to the disk before renaming.
+    bool disable_sync = get_disable_sync_to_disk();
+    if (!disable_sync)
+        file.sync(); // Throws
     rename(tmp_path.c_str(), m_db_path.c_str());
     {
         SharedInfo* r_info = m_reader_map.get_addr();

@@ -29,7 +29,7 @@ using namespace realm;
 
 void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch)
 {
-    if (bool(ref)) {
+    if (bool(ref) && ref->is_attached()) {
         patch.reset(new HandoverPatch);
         Table::generate_patch(ref->m_origin_table, patch->m_table);
         patch->m_col_num = ref->m_origin_column.m_column_ndx;
@@ -40,7 +40,7 @@ void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Hando
 }
 
 
-LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group) 
+LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
 {
     if (patch) {
         TableRef tr = Table::create_from_and_consume_patch(patch->m_table, group);
@@ -124,25 +124,27 @@ size_t LinkView::do_set(size_t link_ndx, size_t target_row_ndx)
 }
 
 
-void LinkView::move(size_t old_link_ndx, size_t new_link_ndx)
+void LinkView::move(size_t from_link_ndx, size_t to_link_ndx)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT(m_row_indexes.is_attached());
-    REALM_ASSERT_3(old_link_ndx, <, m_row_indexes.size());
-    REALM_ASSERT_3(new_link_ndx, <, m_row_indexes.size());
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+    if (REALM_UNLIKELY(!m_row_indexes.is_attached() || from_link_ndx >= m_row_indexes.size() ||
+                       to_link_ndx >= m_row_indexes.size()))
+        throw LogicError(LogicError::link_index_out_of_range);
 
-    if (old_link_ndx == new_link_ndx)
+    if (from_link_ndx == to_link_ndx)
         return;
+
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
 
-    // Fixme, can get() return -1 now that we have detached entries? Does this move() work with it?
-    size_t target_row_ndx = static_cast<size_t>(m_row_indexes.get(old_link_ndx));
-    m_row_indexes.erase(old_link_ndx);
-    m_row_indexes.insert(new_link_ndx, target_row_ndx);
+    // FIXME: Can get() return -1 now that we have detached entries? Does this move() work with it?
+    size_t target_row_ndx = static_cast<size_t>(m_row_indexes.get(from_link_ndx));
+    m_row_indexes.erase(from_link_ndx);
+    m_row_indexes.insert(to_link_ndx, target_row_ndx);
 
     if (Replication* repl = get_repl())
-        repl->link_list_move(*this, old_link_ndx, new_link_ndx); // Throws
+        repl->link_list_move(*this, from_link_ndx, to_link_ndx); // Throws
 }
 
 void LinkView::swap(size_t link_ndx_1, size_t link_ndx_2)

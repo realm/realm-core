@@ -1888,6 +1888,7 @@ TEST(Links_LinkList_Swap)
     }
 }
 
+
 TEST(Links_LinkListAccessors_MoveOver)
 {
     Group group;
@@ -1925,6 +1926,22 @@ TEST(Links_LinkListAccessors_MoveOver)
     tf::refresh_accessor_tree(*origin);
     CHECK_EQUAL(false, links0->is_attached());
     CHECK_EQUAL(false, links3->is_attached());
+}
+
+
+TEST(Links_DetachedAccessor)
+{
+    Group group;
+    TableRef table = group.add_table("table");
+    table->add_column_link(type_LinkList, "l", *table);
+    table->add_empty_row();
+    LinkViewRef link_list = table->get_linklist(0,0);
+    link_list->add(0);
+    link_list->add(0);
+    group.remove_table("table");
+
+    CHECK_LOGIC_ERROR(link_list->move(0,1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(link_list->swap(0,1), LogicError::detached_accessor);
 }
 
 #endif // TEST_LINKS

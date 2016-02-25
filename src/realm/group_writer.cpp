@@ -518,7 +518,7 @@ void GroupWriter::write(const char* data, size_t size)
 }
 
 
-ref_type GroupWriter::write_array(const char* data, size_t size, uint_fast32_t checksum)
+ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checksum)
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
@@ -527,14 +527,8 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint_fast32_t c
     // Write the block
     char* dest_addr = m_file_map.get_addr() + pos;
     realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
-#ifdef REALM_DEBUG
-    const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
-    std::copy(cksum_bytes, cksum_bytes+4, dest_addr);
-    std::copy(data+4, data+size, dest_addr+4);
-#else
-    static_cast<void>(checksum);
-    std::copy(data, data+size, dest_addr);
-#endif
+    memcpy(dest_addr, &checksum, 4);
+    memcpy(dest_addr + 4, data + 4, size - 4);
 
     realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
     // return ref of the written array
@@ -551,14 +545,9 @@ void GroupWriter::write_array_at(ref_type ref, const char* data, size_t size)
     REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = m_file_map.get_addr() + pos;
 
-#ifdef REALM_DEBUG
-    uint_fast32_t dummy_checksum = 0x01010101UL;
-    const char* cksum_bytes = reinterpret_cast<const char*>(&dummy_checksum);
-    std::copy(cksum_bytes, cksum_bytes+4, dest_addr);
-    std::copy(data+4, data+size, dest_addr+4);
-#else
-    std::copy(data, data+size, dest_addr);
-#endif
+    uint32_t dummy_checksum = 41414141UL; // "AAAA" in ASCII
+    memcpy(dest_addr, &dummy_checksum, 4);
+    memcpy(dest_addr + 4, data + 4, size - 4);
 }
 
 

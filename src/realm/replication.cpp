@@ -52,11 +52,21 @@ public:
         return false;
     }
 
-    bool set_int_unique(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    bool set_int_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, int_fast64_t value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
-            log("table->set_int_unique(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_int_unique(col_ndx, row_ndx, value); // Throws
+            if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
+                return false;
+            }
+
+            // Here it is acceptable to call the regular version of set_int(), because
+            // we presume that the side-effects of set_int_unique() are already documented
+            // as other instructions preceding this. Calling the set_int_unique() here
+            // would be a waste of time, because all possible side-effects have already
+            // been carried out.
+            log("table->set_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->set_int(col_ndx, row_ndx, value); // Throws
+
             return true;
         }
         return false;
@@ -102,11 +112,21 @@ public:
         return false;
     }
 
-    bool set_string_unique(size_t col_ndx, size_t row_ndx, StringData value)
+    bool set_string_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, StringData value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
-            log("table->set_string_unique(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
-            m_table->set_string_unique(col_ndx, row_ndx, value); // Throws
+            if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
+                return false;
+            }
+
+            // Here it is acceptable to call the regular version of set_string(), because
+            // we presume that the side-effects of set_string_unique() are already documented
+            // as other instructions preceding this. Calling the set_string_unique() here
+            // would be a waste of time, because all possible side-effects have already
+            // been carried out.
+            log("table->set_string(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
+            m_table->set_string(col_ndx, row_ndx, value); // Throws
+
             return true;
         }
         return false;
@@ -275,6 +295,7 @@ public:
             return false;
         log("table = group->get_table(%1);", group_level_ndx); // Throws
         m_desc.reset();
+        m_link_list.reset();
         m_table = m_group.get_table(group_level_ndx); // Throws
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[2*i + 0];
@@ -451,6 +472,7 @@ public:
         if (REALM_UNLIKELY(m_table->has_shared_type()))
             return false;
         log("desc = table->get_descriptor();"); // Throws
+        m_link_list.reset();
         m_desc = m_table->get_descriptor(); // Throws
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[i];
@@ -503,16 +525,16 @@ public:
         return true;
     }
 
-    bool move_group_level_table(size_t table_ndx_1, size_t table_ndx_2) noexcept
+    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx) noexcept
     {
-        if (REALM_UNLIKELY(table_ndx_1 == table_ndx_2))
+        if (REALM_UNLIKELY(from_table_ndx == to_table_ndx))
             return false;
-        if (REALM_UNLIKELY(table_ndx_1 >= m_group.size()))
+        if (REALM_UNLIKELY(from_table_ndx >= m_group.size()))
             return false;
-        if (REALM_UNLIKELY(table_ndx_2 >= m_group.size()))
+        if (REALM_UNLIKELY(to_table_ndx >= m_group.size()))
             return false;
-        log("group->move_table(%1, %2);", table_ndx_1, table_ndx_2); // Throws
-        m_group.move_table(table_ndx_1, table_ndx_2);
+        log("group->move_table(%1, %2);", from_table_ndx, to_table_ndx); // Throws
+        m_group.move_table(from_table_ndx, to_table_ndx);
         return true;
     }
 
@@ -540,6 +562,7 @@ public:
         if (REALM_UNLIKELY(type != type_LinkList))
             return false;
         log("link_list = table->get_link_list(%1, %2);", col_ndx, row_ndx); // Throws
+        m_desc.reset();
         m_link_list = m_table->get_linklist(col_ndx, row_ndx); // Throws
         return true;
     }
@@ -567,17 +590,19 @@ public:
         return true;
     }
 
-    bool link_list_move(size_t old_link_ndx, size_t new_link_ndx)
+    bool link_list_move(size_t from_link_ndx, size_t to_link_ndx)
     {
         if (REALM_UNLIKELY(!m_link_list))
             return false;
+        if (REALM_UNLIKELY(from_link_ndx == to_link_ndx))
+            return false;
         size_t num_links = m_link_list->size();
-        if (REALM_UNLIKELY(old_link_ndx >= num_links))
+        if (REALM_UNLIKELY(from_link_ndx >= num_links))
             return false;
-        if (REALM_UNLIKELY(new_link_ndx >= num_links))
+        if (REALM_UNLIKELY(to_link_ndx >= num_links))
             return false;
-        log("link_list->move(%1, %2);", old_link_ndx, new_link_ndx); // Throws
-        m_link_list->move(old_link_ndx, new_link_ndx); // Throws
+        log("link_list->move(%1, %2);", from_link_ndx, to_link_ndx); // Throws
+        m_link_list->move(from_link_ndx, to_link_ndx); // Throws
         return true;
     }
 

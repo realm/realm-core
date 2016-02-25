@@ -178,6 +178,7 @@ public:
 
     iterator begin() const;
     iterator end() const;
+    size_t size() const;
 
     ~list() noexcept {}
 
@@ -915,6 +916,11 @@ inline endpoint::list::iterator endpoint::list::begin() const
 inline endpoint::list::iterator endpoint::list::end() const
 {
     return m_endpoints.data() + m_endpoints.size();
+}
+
+inline size_t endpoint::list::size() const
+{
+    return m_endpoints.size();
 }
 
 // ---------------- io_service ----------------

@@ -602,31 +602,6 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-template<bool fix_ndx_in_parent>
-void LinkListColumn::adj_change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
-{
-    static_cast<void>(new_row_ndx);
-
-    prune_list_accessor_tombstones();
-
-    auto begin = m_list_accessors.begin();
-    auto end   = m_list_accessors.end();
-
-    auto it = std::lower_bound(begin, end, list_entry{row_ndx, nullptr});
-    bool found = (it != end && it->m_row_ndx == row_ndx);
-
-    if (found) {
-        // Detach any accessors to the subsumed row.
-        LinkViewRef list(it->m_list);
-        list->detach();
-        it->m_list = nullptr;
-        m_list_accessors_contains_tombstones = true;
-    }
-
-    validate_list_accessors();
-}
-
-
 void LinkListColumn::adj_acc_clear_root_table() noexcept
 {
     LinkColumnBase::adj_acc_clear_root_table();
