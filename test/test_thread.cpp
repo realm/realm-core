@@ -214,37 +214,6 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
     }
 }
 
-#if 0 // not ready yet
-class QueueEmulated {
-    EmulatedRobustMutex mutex;
-    EmulatedRobustMutex::SharedPart mutex_part;
-    PlatformSpecificCondVar changed;
-    PlatformSpecificCondVar::SharedPart condvar_part;
-    int max;
-    int counter;
-public:
-    QueueEmulated(std::string name, int max) :max(max), counter(max/2) { 
-        mutex.set_shared_part(mutex_part, name, "");
-        changed.set_shared_part(condvar_part, name, 0);
-    }
-    void put(int value) {
-        std::lock_guard<EmulatedRobustMutex> l(mutex);
-        while (counter+value > max) changed.wait(mutex, nullptr);
-        int tmp = counter;
-        sched_yield();
-        counter = value + tmp;
-        changed.notify_all();
-    }
-    void get(int value) {
-        std::lock_guard<EmulatedRobustMutex> l(mutex);
-        while (counter-value < 0) changed.wait(mutex, nullptr);
-        int tmp = counter;
-        sched_yield();
-        counter = tmp - value;
-        changed.notify_all();
-    }
-};
-#endif
 } // anonymous namespace
 
 
