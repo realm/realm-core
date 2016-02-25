@@ -179,11 +179,6 @@ public:
 
     //@}
 
-    static Replication::version_type get_current_version(SharedGroup& sg)
-    {
-        return Replication::version_type(sg.get_current_version());
-    }
-
     /// Returns the name of the specified data type as follows:
     ///
     /// <pre>

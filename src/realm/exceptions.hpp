@@ -180,7 +180,16 @@ public:
 
         /// Attempted use of a continuous transaction through a SharedGroup
         /// object with no history. See Replication::get_history().
-        no_history
+        no_history,
+
+        /// Durability setting (as passed to the SharedGroup constructor) was
+        /// not consistent across the session.
+        mixed_durability,
+
+        /// History type (as specified by the Replication implementation passed
+        /// to the SharedGroup constructor) was not consistent across the
+        /// session.
+        mixed_history_type
     };
 
     LogicError(ErrorKind message);

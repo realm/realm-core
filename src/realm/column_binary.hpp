@@ -81,6 +81,13 @@ public:
     void update_from_parent(size_t) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
+    /// In contrast to update_from_parent(), this function is able to handle
+    /// cases where the accessed payload data has changed. In particular, it
+    /// handles cases where the B+-tree switches from having one level (root is
+    /// a leaf node), to having multiple levels (root is an inner node). Note
+    /// that this is at the expense of loosing the `noexcept` guarantee.
+    void update_from_ref(ref_type ref);
+
 #ifdef REALM_DEBUG
     void verify() const override;
     void to_dot(std::ostream&, StringData title) const override;

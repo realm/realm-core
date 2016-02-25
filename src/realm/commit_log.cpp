@@ -39,11 +39,22 @@ public:
     realm::BinaryData changeset;
 };
 
-} // anonymous namespace
+// little helpers:
+inline uint_fast64_t aligned_to(uint_fast64_t alignment, uint_fast64_t value)
+{
+    return (value + alignment - 1) & ~(alignment - 1);
+}
+
+void recover_from_dead_owner()
+{
+    // nothing!
+}
+
+} // unnamed namespace
+
 
 namespace realm {
 namespace _impl {
-
 
 // Design of the commit logs:
 //
@@ -74,36 +85,35 @@ namespace _impl {
 // FIXME: we should not use size_t for memory mapped members, but one where the
 // size is guaranteed
 
-class WriteLogCollector: public Replication, private _impl::ContinTransactHistory {
+class WriteLogCollector:
+        public Replication,
+        private _impl::History {
 public:
-    using version_type = _impl::ContinTransactHistory::version_type;
+    using version_type = _impl::History::version_type;
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
-    std::string do_get_database_path() override { return m_database_name; }
-    void do_initiate_transact(SharedGroup&, version_type) override;
-    version_type do_prepare_commit(SharedGroup& sg, version_type orig_version) override;
-    void do_finalize_commit(SharedGroup&) noexcept override;
-    void do_abort_transact(SharedGroup&) noexcept override;
+    std::string get_database_path() override { return m_database_name; }
+    void initialize(SharedGroup&) override;
+    void initiate_session(version_type) override;
+    void terminate_session() noexcept override;
+    void do_initiate_transact(version_type, bool) override;
+    version_type do_prepare_commit(version_type) override;
+    void do_finalize_commit() noexcept override;
+    void do_abort_transact() noexcept override;
     void do_interrupt() noexcept override {};
     void do_clear_interrupt() noexcept override {};
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
-    void stop_logging() override;
-    void reset_log_management(version_type last_version) override;
-    void set_last_version_seen_locally(version_type last_seen_version_number) noexcept override;
+    HistoryType get_history_type() const noexcept override;
+    _impl::History* get_history() override;
 
+    void update_early_from_top_ref(version_type, size_t, ref_type) override;
+    void update_from_parent(version_type) override;
     void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
+    void set_oldest_bound_version(version_type) override;
     BinaryData get_uncommitted_changes() noexcept override;
-
-    _impl::ContinTransactHistory* get_history() override
-    {
-        return this;
-    }
-
-    void refresh_accessor_tree(ref_type hist_ref) override
-    {
-        REALM_ASSERT(hist_ref == 0);
-        static_cast<void>(hist_ref);
-    }
+#ifdef REALM_DEBUG
+    void verify() const override;
+#endif
 
 protected:
     // file and memory mappings are always multiples of this size
@@ -265,22 +275,19 @@ protected:
 
 
 
-// little helpers:
-inline uint_fast64_t aligned_to(uint_fast64_t alignment, uint_fast64_t value)
+WriteLogCollector::WriteLogCollector(const std::string& database_name,
+                                     const char* encryption_key):
+    m_log_a(database_name + ".log_a"),
+    m_log_b(database_name + ".log_b")
 {
-    return (value + alignment - 1) & ~(alignment - 1);
+    m_database_name = database_name;
+    m_header_name = database_name + ".log";
+    m_read_version = 0;
+    m_read_offset = 0;
+    m_log_a.file.set_encryption_key(encryption_key);
+    m_log_b.file.set_encryption_key(encryption_key);
 }
 
-namespace {
-
-void recover_from_dead_owner()
-{
-    // nothing!
-}
-
-} // unnamed namespace
-
-// Header access and manipulation methods:
 
 inline WriteLogCollector::CommitLogPreamble* WriteLogCollector::get_preamble() const
 {
@@ -329,7 +336,7 @@ inline void WriteLogCollector::map_header_if_needed() const
 // convenience methods for getting to buffers and logs.
 
 void WriteLogCollector::get_maps_in_order(const CommitLogPreamble* preamble,
-                           const util::File::Map<CommitLogHeader>*& first, 
+                           const util::File::Map<CommitLogHeader>*& first,
                            const util::File::Map<CommitLogHeader>*& second) const
 {
     if (preamble->active_file_is_log_a) {
@@ -494,20 +501,29 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
 
 // Public methods:
 
-void WriteLogCollector::stop_logging()
+void WriteLogCollector::initialize(SharedGroup&)
 {
-    File::try_remove(m_log_a.name);
-    File::try_remove(m_log_b.name);
-    File::try_remove(m_header_name);
+    // No-op
 }
 
-
-void WriteLogCollector::reset_log_management(version_type last_version)
+void WriteLogCollector::initiate_session(version_type version)
 {
+    // Reset transaction logs. This call informs the commitlog subsystem of the
+    // initial version chosen as part of establishing a sharing scheme (also
+    // called a "session").  Following a crash, the commitlog subsystem may hold
+    // multiple commitlogs for versions which are lost during the crash. When
+    // SharedGroup establishes a sharing scheme it will continue from the last
+    // version commited to the database.
+    //
+    // The call also indicates that the current thread (and current process) has
+    // exclusive access to the commitlogs, allowing them to reset
+    // synchronization variables. This can be beneficial on systems without
+    // proper support for robust mutexes.
+
     reset_header();
     reset_file(m_log_a);
     reset_file(m_log_b);
-    new (m_header.get_addr()) CommitLogHeader(last_version);
+    new (m_header.get_addr()) CommitLogHeader(version);
     // This protects us against deadlock when we restart after crash on a
     // platform without support for robust mutexes.
     new (& m_header.get_addr()->lock) RobustMutex;
@@ -517,16 +533,22 @@ void WriteLogCollector::reset_log_management(version_type last_version)
 }
 
 
-// FIXME: Finn, `map_header_if_needed()` can throw, so it is an error to declare
-// this one `noexcept`
-void WriteLogCollector::set_last_version_seen_locally(version_type last_seen_version_number) noexcept
+void WriteLogCollector::terminate_session() noexcept
 {
-    map_header_if_needed();
-    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
-    CommitLogPreamble* preamble = get_preamble_for_write();
-    preamble->last_version_seen_locally = last_seen_version_number;
-    cleanup_stale_versions(preamble);
-    sync_header();
+    // Cleanup, remove any log files
+#ifdef _WIN32
+    // FIXME: on Windows, terminate_session() fails to delete a file because it's open
+    try {
+        File::try_remove(m_log_a.name);
+        File::try_remove(m_log_b.name);
+        File::try_remove(m_header_name);
+    }
+    catch (...) {}
+#else
+    File::try_remove(m_log_a.name);
+    File::try_remove(m_log_b.name);
+    File::try_remove(m_header_name);
+#endif
 }
 
 
@@ -540,13 +562,6 @@ void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
                                                const EntryHeader* hdr, const char* log)
 {
     *entry = BinaryData(log, hdr->size);
-}
-
-
-void WriteLogCollector::get_changesets(version_type from_version, version_type to_version,
-                                       BinaryData* logs_buffer) const noexcept
-{
-    get_commit_entries_internal(from_version, to_version, logs_buffer);
 }
 
 
@@ -633,15 +648,14 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
 }
 
 
-void WriteLogCollector::do_initiate_transact(SharedGroup&, version_type)
+void WriteLogCollector::do_initiate_transact(version_type, bool)
 {
     char* buffer = m_transact_log_buffer.data();
     set_buffer(buffer, buffer + m_transact_log_buffer.size());
 }
 
 
-WriteLogCollector::version_type
-WriteLogCollector::do_prepare_commit(SharedGroup&, WriteLogCollector::version_type orig_version)
+WriteLogCollector::version_type WriteLogCollector::do_prepare_commit(version_type orig_version)
 {
     // Note: This function does not utilize the two-phase changeset submission
     // scheme, nor does it utilize the ability to discard a submitted changeset
@@ -660,22 +674,15 @@ WriteLogCollector::do_prepare_commit(SharedGroup&, WriteLogCollector::version_ty
 }
 
 
-void WriteLogCollector::do_finalize_commit(SharedGroup&) noexcept
+void WriteLogCollector::do_finalize_commit() noexcept
 {
     // See note in do_prepare_commit().
 }
 
 
-void WriteLogCollector::do_abort_transact(SharedGroup&) noexcept
+void WriteLogCollector::do_abort_transact() noexcept
 {
     // See note in do_prepare_commit().
-}
-
-
-BinaryData WriteLogCollector::get_uncommitted_changes() noexcept
-{
-    return BinaryData(m_transact_log_buffer.data(),
-                      write_position() - m_transact_log_buffer.data());
 }
 
 
@@ -698,18 +705,61 @@ void WriteLogCollector::transact_log_reserve(size_t size, char** new_begin, char
 }
 
 
-WriteLogCollector::WriteLogCollector(const std::string& database_name,
-                                     const char* encryption_key):
-    m_log_a(database_name + ".log_a"),
-    m_log_b(database_name + ".log_b")
+WriteLogCollector::HistoryType WriteLogCollector::get_history_type() const noexcept
 {
-    m_database_name = database_name;
-    m_header_name = database_name + ".log";
-    m_read_version = 0;
-    m_read_offset = 0;
-    m_log_a.file.set_encryption_key(encryption_key);
-    m_log_b.file.set_encryption_key(encryption_key);
+    return hist_OutOfRealm;
 }
+
+
+_impl::History* WriteLogCollector::get_history()
+{
+    return this;
+}
+
+
+void WriteLogCollector::update_early_from_top_ref(version_type, size_t, ref_type)
+{
+    // No-op
+}
+
+
+void WriteLogCollector::update_from_parent(version_type)
+{
+    // No-op
+}
+
+
+void WriteLogCollector::get_changesets(version_type from_version, version_type to_version,
+                                       BinaryData* logs_buffer) const noexcept
+{
+    get_commit_entries_internal(from_version, to_version, logs_buffer);
+}
+
+
+void WriteLogCollector::set_oldest_bound_version(version_type version)
+{
+    map_header_if_needed();
+    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    CommitLogPreamble* preamble = get_preamble_for_write();
+    preamble->last_version_seen_locally = version;
+    cleanup_stale_versions(preamble);
+    sync_header();
+}
+
+
+BinaryData WriteLogCollector::get_uncommitted_changes() noexcept
+{
+    return BinaryData(m_transact_log_buffer.data(),
+                      write_position() - m_transact_log_buffer.data());
+}
+
+
+#ifdef REALM_DEBUG
+void WriteLogCollector::verify() const
+{
+    // No-op
+}
+#endif
 
 } // namespace _impl
 
@@ -720,6 +770,5 @@ std::unique_ptr<Replication> make_client_history(const std::string& database_nam
     return std::unique_ptr<Replication>(new _impl::WriteLogCollector(database_name,
                                                                      encryption_key));
 }
-
 
 } // namespace realm
