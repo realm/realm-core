@@ -6,7 +6,14 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `LangBindHelper::advance_read()` and friends no longer take a history
+  argument. Access to the history is now gained automatically via
+  `Replication::get_history()`. Applications and bindings should simply delete
+  the history argument at each call site.
+* `SharedGroup::get_current_version()`, `LangBindHelper::get_current_version()`,
+  and `Replication::get_current_version()` were all removed. They are not used
+  by the Cocoa or Android binding, and `SharedGroup::get_current_version()` was
+  never supposed to be public.
 
 ### Enhancements:
 
@@ -14,12 +21,46 @@
   provide the full posix API for it. This prevents a situation
   where a crash in one process holding the lock, would leave
   the database locked. Fixes issue #1429
+* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
+  keeps the current history implementation as the default for now
+  (`<realm/commit_log.hpp>`).
+* New methods `ReadTransaction::get_version()` and
+  `WriteTransaction::get_version()` for getting the version of the bound
+  snapshot during a transaction.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Bumps file format version from 3 to 4 due to support for in-Realm history of
+  changes (extra entries in `Group::m_top`). The bump is necessary due to lack
+  of forwards compatibility. The changes are backwards compatible, and automatic
+  upgrade is implemented.
+* Adds checks for consistent use of history types.
+* Removes the "server sync mode" flag from the Realm file header. This feature
+  is now superseded by the more powerful history type consistency checks. This
+  is not considered a file format change, as no released core version will ever
+  set the "server sync mode" flag.
+* The SharedInfo file format version was bumped due to addition of history type
+  information (all concurrent session participants must agree on SharedInfo file
+  format version).
+* Make it possible to open both file format version 3 and 4 files without
+  upgrading. If in-Realm history is required and the current file format version
+  is less than 4, upgrade to version 4. Otherwise, if the current file format
+  version is less than 3, upgrade to version 3.
+* The current file format version is available via
+  `Allocator::get_file_format_version()`.
+* Set Realm file format to zero (not yet decided) when creating a new empty
+  Realm where top-ref is zero. This was done to minimize the number of distinct
+  places in the code dealing with file format upgrade logic.
+* Check that all session participants agree on target Realm file format for that
+  session. File format upgrade required when larger than the actual file format.
+* Eliminate a temporary memory mapping of the SharedInfo file during the Realm
+  opening process.
+* Improved documentation of some of the complicated parts of the Realm opening
+  process.
+* Introducing `RefOrTagged` value type whan can be used to make it safer to work
+  with "tagged integers" in arrays having the "has refs" flag.
 
 ----------------------------------------------
 
@@ -66,11 +107,11 @@
 ### API breaking changes:
 
 * Important for language bindings: Any method on Query and TableView that
-  depends on a deleted LinkView will now return sane return values; 
+  depends on a deleted LinkView will now return sane return values;
   Query::find() returns npos, Query::find_all() returns empty TableView,
   Query::count() returns 0, TableView::sum() returns 0 (TableView created
   from LinkView::get_sorted_view). So they will no longer throw
-  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in 
+  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in
   test_query.cpp for more info.
 
 ### Enhancements:
@@ -80,14 +121,8 @@
   thrown std::runtime_error. This is so that iOS and Android language
   bindings can specifically catch this case and handle it differently
   than the rest of the general std::runtime_errors.
-
-* Doubled the speed of TableView::clear() when parent table has an 
+* Doubled the speed of TableView::clear() when parent table has an
   indexed column.
------------
-
-### Internals:
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
