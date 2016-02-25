@@ -8982,6 +8982,7 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
 }
 
 
+
 TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11571,6 +11572,41 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
         CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroup::durability_Full, crypt_key()),
                           LogicError::mixed_history_type);
     }
+}
+
+
+TEST(LangBindHelper_RollBackAfterRemovalOfTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w, *hist);
+
+    TableRef source_a = group_w.add_table("source_a");
+    TableRef source_b = group_w.add_table("source_b");
+    TableRef target_a = group_w.add_table("target_a");
+    TableRef target_b = group_w.add_table("target_b");
+
+
+    //source_a->add_column_link(type_Link, "a", *target_a);
+    source_a->add_column_link(type_LinkList, "b", *target_b);
+    source_b->add_column_link(type_LinkList, "b", *target_b);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    {
+        LangBindHelper::promote_to_write(sg_w, *hist);
+
+        group_w.remove_table("source_a");
+        LangBindHelper::rollback_and_continue_as_read(sg_w, *hist);
+    }
+    CHECK_EQUAL(group_w.size(), 4);
+    CHECK_EQUAL(group_w.get_table_name(0), StringData("source_a"));
+    CHECK_EQUAL(group_w.get_table(0)->get_column_count(), 1);
+    CHECK_EQUAL(group_w.get_table(0)->get_link_target(0), target_b);
+    CHECK_EQUAL(group_w.get_table(1)->get_link_target(0), target_b);
 }
 
 #endif
