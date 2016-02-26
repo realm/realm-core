@@ -27,7 +27,9 @@
 #include <limits>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#ifndef _WIN32
 #include <realm/util/platform_specific_condvar.hpp>
+#endif
 #include <realm/util/emulated_robust_mutex.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>

@@ -14,7 +14,9 @@
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#ifndef _WIN32
 #include <realm/util/platform_specific_condvar.hpp>
+#endif
 #include <realm/util/emulated_robust_mutex.hpp>
 
 #include "test.hpp"
@@ -475,6 +477,8 @@ TEST(Thread_CondVar)
     }
 }
 
+#ifndef _WIN32 // interprocess condvars not suported in Windows yet
+
 // Detect and flag trivial implementations of condvars.
 namespace {
 
@@ -681,6 +685,6 @@ TEST(Thread_CondvarNotifyWakeup)
     }
 }
 
-
+#endif // _WIN32
 
 #endif // TEST_THREAD
