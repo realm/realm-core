@@ -2,7 +2,6 @@
 #include <utility>
 #include <iomanip>
 
-
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/descriptor.hpp>
@@ -18,11 +17,6 @@ void Replication::set_replication(Group& group, Replication* repl) noexcept
 {
     typedef _impl::GroupFriend gf;
     gf::set_replication(group, repl);
-}
-
-Replication::version_type Replication::get_current_version(SharedGroup& sg)
-{
-    return sg.get_current_version();
 }
 
 
@@ -769,34 +763,38 @@ void TrivialReplication::apply_changeset(const char* data, size_t size, SharedGr
     wt.commit(); // Throws
 }
 
-std::string TrivialReplication::do_get_database_path()
+std::string TrivialReplication::get_database_path()
 {
     return m_database_file;
 }
 
-void TrivialReplication::do_initiate_transact(SharedGroup&, version_type)
+void TrivialReplication::initialize(SharedGroup&)
+{
+    // Nothing needs to be done here
+}
+
+void TrivialReplication::do_initiate_transact(version_type, bool history_updated)
 {
     char* data = m_transact_log_buffer.data();
     size_t size = m_transact_log_buffer.size();
     set_buffer(data, data + size);
+    m_history_updated = history_updated;
 }
 
-Replication::version_type
-TrivialReplication::do_prepare_commit(SharedGroup&, version_type orig_version)
+Replication::version_type TrivialReplication::do_prepare_commit(version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
     size_t size = write_position() - data;
-    version_type new_version = orig_version + 1;
-    prepare_changeset(data, size, new_version); // Throws
+    version_type new_version = prepare_changeset(data, size, orig_version); // Throws
     return new_version;
 }
 
-void TrivialReplication::do_finalize_commit(SharedGroup&) noexcept
+void TrivialReplication::do_finalize_commit() noexcept
 {
     finalize_changeset();
 }
 
-void TrivialReplication::do_abort_transact(SharedGroup&) noexcept
+void TrivialReplication::do_abort_transact() noexcept
 {
 }
 

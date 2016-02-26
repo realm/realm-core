@@ -207,6 +207,12 @@ bool RobustMutex::low_level_lock()
 
 bool RobustMutex::is_valid() noexcept
 {
+    // FIXME: This check tries to lock the mutex, and only unlocks it if the
+    // return value is zero. If pthread_mutex_trylock() fails with EOWNERDEAD,
+    // this leads to deadlock during the following propper attempt to lock. This
+    // cannot be fixed by also unlocking on failure with EOWNERDEAD, because
+    // that would mark the mutex as consistent again and prevent the expected
+    // notification.
     int r = pthread_mutex_trylock(&m_impl);
     if (r == 0) {
         r = pthread_mutex_unlock(&m_impl);
