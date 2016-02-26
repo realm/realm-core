@@ -7,8 +7,11 @@
 #include <functional>
 #include <mutex>
 
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
+#include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_specific_condvar.hpp>
@@ -479,7 +482,7 @@ static int signals;
 
 void signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 {
-    sleep(1);
+    millisleep(1000);
     signals = 1;
     {
         std::lock_guard<EmulatedRobustMutex> l(*mutex);
@@ -487,28 +490,28 @@ void signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
         cv->notify_all();
     }
     // exit scope to allow waiters to get lock
-    sleep(1);
+    millisleep(1000);
     signals = 2;
     {
         std::lock_guard<EmulatedRobustMutex> l(*mutex);
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
-    sleep(1);
+    millisleep(1000);
     signals = 3;
     {
         std::lock_guard<EmulatedRobustMutex> l(*mutex);
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
-    sleep(1);
+    millisleep(1000);
     signals = 4;
 }
 
 static int signal_state;
 void wakeup_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 {
-    sleep(1);
+    millisleep(1000);
     signal_state = 2;
     std::lock_guard<EmulatedRobustMutex> l(*mutex);
     cv->notify_all();
@@ -533,7 +536,7 @@ void waiter(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 
 void burst_signaller(EmulatedRobustMutex* mutex, PlatformSpecificCondVar* cv)
 {
-    sleep(1);
+    millisleep(1000);
     std::lock_guard<EmulatedRobustMutex> l(*mutex);
     for (int i=0; i<100; ++i) {
         cv->notify_all();
@@ -639,7 +642,7 @@ TEST(Thread_CondvarNotifyAllWakeup)
     for (int i=0; i<num_waiters; ++i) {
         waiters[i].start(std::bind(waiter, &mutex, &changed));
     }
-    sleep(1); // allow time for all waiters to wait
+    millisleep(1000); // allow time for all waiters to wait
     changed.notify_all();
     for (int i=0; i<num_waiters; ++i) {
         waiters[i].join();
@@ -664,13 +667,13 @@ TEST(Thread_CondvarNotifyWakeup)
     for (int i=0; i<num_waiters; ++i) {
         waiters[i].start(std::bind(waiter_with_count, &mutex, &changed));
     }
-    sleep(1); // allow time for all waiters to wait
+    millisleep(1000); // allow time for all waiters to wait
     CHECK(wait_counter == 10);
     changed.notify();
-    sleep(1);
+    millisleep(1000);
     CHECK(wait_counter == 9);
     changed.notify();
-    sleep(1);
+    millisleep(1000);
     CHECK(wait_counter == 8);
     changed.notify_all();
     for (int i=0; i<num_waiters; ++i) {
