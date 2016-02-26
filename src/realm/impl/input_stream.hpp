@@ -24,7 +24,7 @@
 #include <algorithm>
 
 #include <realm/binary_data.hpp>
-#include <realm/impl/history.hpp>
+#include <realm/impl/continuous_transactions_history.hpp>
 
 
 namespace realm {

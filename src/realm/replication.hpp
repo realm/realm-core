@@ -32,7 +32,7 @@
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/impl/history.hpp>
+#include <realm/impl/continuous_transactions_history.hpp>
 #include <realm/impl/transact_log.hpp>
 
 namespace realm {

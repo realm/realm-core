@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_IMPL_HISTORY_HPP
-#define REALM_IMPL_HISTORY_HPP
+#ifndef REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
+#define REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
 
 #include <stdint.h>
 #include <memory>
@@ -211,4 +211,4 @@ private:
 } // namespace _impl
 } // namespace realm
 
-#endif // REALM_IMPL_HISTORY_HPP
+#endif // REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
