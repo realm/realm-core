@@ -31,7 +31,7 @@
 #include <realm/exceptions.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/impl/output_stream.hpp>
-#include <realm/impl/history.hpp>
+#include <realm/impl/continuous_transactions_history.hpp>
 #include <realm/table.hpp>
 #include <realm/table_basic_fwd.hpp>
 #include <realm/alloc_slab.hpp>

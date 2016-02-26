@@ -721,16 +721,20 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
             // We're alone in the world, and it is Ok to initialize the
             // file. Start by truncating the file, to maximize the chance of a
-            // an incorrectly initialized file gets accepted by other session
-            // participants. Note, howeve, that this can still happen if the
-            // initializing process is dies before the truncation, but after
-            // obtaining the exclusive file lock.
+            // an incorrectly initialized file gets rejected by other session
+            // participants that get the shared file lock after the initiator
+            // has dies half way through the initialization. Note, however, that
+            // this can still happen if the initializing process is dies before
+            // the truncation, but after obtaining the exclusive file lock.
             m_file.resize(0);
 
             // Write an initialized SharedInfo structure to the file, but with
-            // init_complete = 0.
-            SharedInfo info(durability, history_type);
-            m_file.write(reinterpret_cast<char*>(&info), sizeof info); // Throws
+            // init_complete = 0. Need to fill with zeros before constructing
+            // due to the bit field members. Otherwise we would write
+            // uninitialized bits to the file.
+            char buffer[sizeof (SharedInfo)] = {0};
+            new (buffer) SharedInfo(durability, history_type); // Throws
+            m_file.write(buffer, sizeof buffer); // Throws
 
             // Mark the file as completely initialized via a memory
             // mapping. Since this is done as a separate final step (involving
@@ -921,11 +925,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 #ifndef _WIN32
                 if (encryption_key) {
                     static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
-                    info->session_initiator_pid = uint64_t(getpid());
+                    info->session_initiator_pid = uint_fast64_t(getpid());
                 }
 #endif
 
-                info->file_format_version = target_file_format_version;
+                info->file_format_version = uint_fast8_t(target_file_format_version);
 
                 // Initially there is a single version in the file
                 info->number_of_versions = 1;
