@@ -403,7 +403,7 @@ public:
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
 
-    template<class T> T get(size_t c, size_t r) const noexcept { return T(); }
+    template<class T> T get(size_t c, size_t r) const noexcept;
 
     size_t get_link(size_t column_ndx, size_t row_ndx) const noexcept;
     bool is_null_link(size_t column_ndx, size_t row_ndx) const noexcept;
