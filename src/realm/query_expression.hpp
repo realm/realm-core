@@ -1568,11 +1568,17 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 }
 
 
-// FIXME: Documentation/comments on this class
-template <class T> class QColumns: public Subexpr2<T>
+// If we add a new Realm type T and quickly want Query support for it, then simply inherit from it like
+// `template <> class Columns<T> : public SimpleColumn<T>` and you're done. Any operators of the set
+// { ==, >=, <=, !=, >, < } that are supported by T will be supported by the "query expression syntax"
+// automatically. NOTE: This method of Query support will be slow because it goes through Table::get<T>.
+// To get faster Query support, either add SequentialGetter support (faster) or create a query_engine.hpp
+// node for it (super fast).
+
+template <class T> class SimpleColumn: public Subexpr2<T>
 {
 public:
-    QColumns(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
+    SimpleColumn(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
         m_column(column), m_link_map(table, links)
     {
     }
@@ -1621,18 +1627,18 @@ public:
 };
 
 
-template <> class Columns<NewDate> : public QColumns<NewDate>
+template <> class Columns<NewDate> : public SimpleColumn<NewDate>
 {
-    using QColumns::QColumns;
+    using SimpleColumn::SimpleColumn;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<NewDate>>(*this);
     }
 };
 
-template <> class Columns<BinaryData> : public QColumns<BinaryData>
+template <> class Columns<BinaryData> : public SimpleColumn<BinaryData>
 {
-    using QColumns::QColumns;
+    using SimpleColumn::SimpleColumn;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<BinaryData>>(*this);
@@ -1640,10 +1646,10 @@ template <> class Columns<BinaryData> : public QColumns<BinaryData>
 };
 
 
-template <> class Columns<StringData> : public QColumns<StringData>
+template <> class Columns<StringData> : public SimpleColumn<StringData>
 {
 public:
-    using QColumns::QColumns;
+    using SimpleColumn::SimpleColumn;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* np = nullptr) const override
     {
         return make_subexpr<Columns<StringData>>(*this);
