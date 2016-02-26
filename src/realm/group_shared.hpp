@@ -533,10 +533,10 @@ private:
     const char* m_key;
     TransactStage m_transact_stage;
     util::Mutex m_handover_lock;
-#ifndef _WIN32
     util::EmulatedRobustMutex m_writemutex;
     util::EmulatedRobustMutex m_balancemutex;
     util::EmulatedRobustMutex m_controlmutex;
+#ifndef _WIN32
     util::PlatformSpecificCondVar m_room_to_write;
     util::PlatformSpecificCondVar m_work_to_do;
     util::PlatformSpecificCondVar m_daemon_becomes_ready;

@@ -496,22 +496,15 @@ struct SharedGroup::SharedInfo {
 
 
 SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryType hist_type):
-#ifndef _WIN32
     size_of_mutex(sizeof(shared_writemutex)),
+#ifndef _WIN32
     size_of_condvar(sizeof(room_to_write)),
+#endif
     shared_writemutex(), // Throws
 #ifdef REALM_ASYNC_DAEMON
     shared_balancemutex(), // Throws
 #endif
     shared_controlmutex() // Throws
-#else
-    size_of_mutex(sizeof writemutex),
-    size_of_condvar(0),
-    writemutex(), // Throws
-#ifdef REALM_ASYNC_DAEMON
-    balancemutex() // Throws
-#endif
-#endif
 {
     durability = dura; // durability level is fixed from creation
     REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(hist_type+0));
@@ -837,13 +830,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // with EOWNERDEAD, because that would mark the mutex as consistent
         // again and prevent us from being notified below.
 
-#ifndef _WIN32
         m_writemutex.set_shared_part(info->shared_writemutex,m_db_path,"write");
 #ifdef REALM_ASYNC_DAEMON
         m_balancemutex.set_shared_part(info->shared_balancemutex,m_db_path,"balance");
 #endif
         m_controlmutex.set_shared_part(info->shared_controlmutex,m_db_path,"control");
-#endif
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
