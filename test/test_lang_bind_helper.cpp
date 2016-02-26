@@ -11574,7 +11574,6 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
     }
 }
 
-
 TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11582,7 +11581,7 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
     SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    LangBindHelper::promote_to_write(sg_w, *hist);
+    LangBindHelper::promote_to_write(sg_w);
 
     TableRef source_a = group_w.add_table("source_a");
     TableRef source_b = group_w.add_table("source_b");
@@ -11597,10 +11596,10 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
     LangBindHelper::commit_and_continue_as_read(sg_w);
 
     {
-        LangBindHelper::promote_to_write(sg_w, *hist);
+        LangBindHelper::promote_to_write(sg_w);
 
         group_w.remove_table("source_a");
-        LangBindHelper::rollback_and_continue_as_read(sg_w, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
     }
     CHECK_EQUAL(group_w.size(), 4);
     CHECK_EQUAL(group_w.get_table_name(0), StringData("source_a"));
