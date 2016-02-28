@@ -1,10 +1,10 @@
+#include <functional>
+#include <memory>
 #include <stdexcept>
 #include <map>
 #include <string>
 #include <iostream>
-#include <functional>
 
-#include <memory>
 #include <realm/util/thread.hpp>
 
 #include "demangle.hpp"
@@ -26,21 +26,6 @@ using namespace realm::test_util::unit_test;
 
 
 namespace {
-
-
-struct SharedContext {
-    Reporter& m_reporter;
-    std::vector<Test*> m_tests;
-    Mutex m_mutex;
-    size_t m_next_test;
-
-    SharedContext(Reporter& reporter):
-        m_reporter(reporter),
-        m_next_test(0)
-    {
-    }
-};
-
 
 void replace_char(std::string& str, char c, const std::string& replacement)
 {
@@ -72,56 +57,69 @@ public:
     {
     }
 
-    void begin(const TestDetails& details) override
+    void begin(const TestContext& context) override
     {
-        test& t = m_tests[details.test_index];
-        t.m_details = details;
+        auto key = key_type(context.test_index, context.recurrence_index);
+        m_tests.emplace(key, test());
     }
 
-    void fail(const TestDetails& details, const std::string& message) override
+    void fail(const TestContext& context, const char* file_name, long line_number,
+              const std::string& message) override
     {
         failure f;
-        f.m_details = details;
-        f.m_message = message;
-        test& t = m_tests[details.test_index];
-        t.m_failures.push_back(f);
+        f.file_name   = file_name;
+        f.line_number = line_number;
+        f.message     = message;
+        auto key = key_type(context.test_index, context.recurrence_index);
+        auto i = m_tests.find(key);
+        i->second.failures.push_back(f);
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) override
+    void end(const TestContext& context, double elapsed_seconds) override
     {
-        test& t = m_tests[details.test_index];
-        t.m_elapsed_seconds = elapsed_seconds;
+        auto key = key_type(context.test_index, context.recurrence_index);
+        auto i = m_tests.find(key);
+        i->second.elapsed_seconds = elapsed_seconds;
     }
 
-    void summary(const Summary& summary) override
+    void summary(const ExecContext& context, const Summary& summary) override
     {
         m_out <<
             "<?xml version=\"1.0\"?>\n"
             "<unittest-results "
-            "tests=\"" << summary.num_included_tests << "\" "
+            "tests=\"" << summary.num_executed_tests << "\" "
             "failedtests=\"" << summary.num_failed_tests << "\" "
-            "checks=\"" << summary.num_checks << "\" "
+            "checks=\"" << summary.num_executed_checks << "\" "
             "failures=\"" << summary.num_failed_checks << "\" "
             "time=\"" << summary.elapsed_seconds << "\">\n";
-        typedef tests::const_iterator test_iter;
-        test_iter tests_end = m_tests.end();
-        for (test_iter i_1 = m_tests.begin(); i_1 != tests_end; ++i_1) {
-            const test& t = i_1->second;
+        std::ostringstream out;
+        out.imbue(std::locale::classic());
+        for (const auto& p: m_tests) {
+            auto key = p.first;
+            const test& t = p.second;
+            int test_index       = key.first;
+            int recurrence_index = key.second;
+            const TestDetails details = context.test_list.get_test_details(test_index);
+            out.str(std::string());
+            out << details.test_name;
+            if (context.num_recurrences > 1)
+                out << '#' << (recurrence_index+1);
+            std::string test_name = out.str();
             m_out <<
-                "  <test suite=\""<< xml_escape(t.m_details.suite_name) <<"\" "
-                "name=\"" << xml_escape(t.m_details.test_name) << "\" "
-                "time=\"" << t.m_elapsed_seconds << "\"";
-            if (t.m_failures.empty()) {
+                "  <test suite=\""<< xml_escape(details.suite_name) <<"\" "
+                "name=\"" << xml_escape(test_name) << "\" "
+                "time=\"" << t.elapsed_seconds << "\"";
+            if (t.failures.empty()) {
                 m_out << "/>\n";
                 continue;
             }
             m_out << ">\n";
             typedef std::vector<failure>::const_iterator fail_iter;
-            fail_iter fails_end = t.m_failures.end();
-            for (fail_iter i_2 = t.m_failures.begin(); i_2 != fails_end; ++i_2) {
-                std::string msg = xml_escape(i_2->m_message);
-                m_out << "    <failure message=\"" << i_2->m_details.file_name << ""
-                    "(" << i_2->m_details.line_number << ") : " << msg << "\"/>\n";
+            fail_iter fails_end = t.failures.end();
+            for (fail_iter i_2 = t.failures.begin(); i_2 != fails_end; ++i_2) {
+                std::string msg = xml_escape(i_2->message);
+                m_out << "    <failure message=\"" << i_2->file_name << ""
+                    "(" << i_2->line_number << ") : " << msg << "\"/>\n";
             }
             m_out << "  </test>\n";
         }
@@ -131,18 +129,18 @@ public:
 
 protected:
     struct failure {
-        TestDetails m_details;
-        std::string m_message;
+        const char* file_name;
+        long line_number;
+        std::string message;
     };
 
     struct test {
-        TestDetails m_details;
-        std::vector<failure> m_failures;
-        double m_elapsed_seconds;
+        std::vector<failure> failures;
+        double elapsed_seconds = 0;
     };
 
-    typedef std::map<long, test> tests; // Key is test index
-    tests m_tests;
+    using key_type = std::pair<size_t, int>; // (test index, recurrence index)
+    std::map<key_type, test> m_tests;
 
     std::ostream& m_out;
 };
@@ -240,158 +238,215 @@ namespace test_util {
 namespace unit_test {
 
 
-class TestList::ExecContext {
+class TestList::SharedContext: public ExecContext {
 public:
-    SharedContext* m_shared;
-    Mutex m_mutex;
-    std::atomic<long long> m_num_checks;
-    long long m_num_failed_checks;
-    long m_num_failed_tests;
-    bool m_errors_seen;
+    Reporter& reporter;
+    Mutex mutex;
+    struct Entry {
+        const Test* test;
+        size_t test_index;
+        int recurrence_index;
+    };
+    std::vector<Entry> concur_tests, no_concur_tests;
+    size_t next_concur_test = 0; // Index into `concur_tests`
+    long num_failed_tests = 0;
+    long long num_checks = 0;
+    long long num_failed_checks = 0;
+    int num_ended_threads = 0;
 
-    ExecContext():
-        m_shared(nullptr),
-        m_num_checks(0),
-        m_num_failed_checks(0),
-        m_num_failed_tests(0)
+    SharedContext(const TestList& test_list, int num_recurrences, int num_threads, Reporter& r):
+        ExecContext(test_list, num_recurrences, num_threads),
+        reporter(r)
+    {
+    }
+
+    void add(Entry entry)
+    {
+        const Test& test = *entry.test;
+        auto& tests = (test.allow_concur && num_threads > 1 ? concur_tests : no_concur_tests);
+        tests.push_back(entry);
+    }
+
+    void shuffle()
+    {
+        Random random(random_int<unsigned long>()); // Seed from slow global generator
+        random.shuffle(concur_tests.begin(), concur_tests.end());
+        random.shuffle(no_concur_tests.begin(), no_concur_tests.end());
+    }
+};
+
+
+
+class TestList::ThreadContext {
+public:
+    const int thread_index;
+    SharedContext& shared_context;
+    Mutex mutex;
+    std::atomic<long long> num_checks{0};
+    long long num_failed_checks = 0;
+    long num_failed_tests = 0;
+    bool errors_seen;
+
+    ThreadContext(int ti, SharedContext& sc):
+        thread_index(ti),
+        shared_context(sc)
     {
     }
 
     void run();
+
+    void run(SharedContext::Entry, UniqueLock&);
 };
 
 
-void TestList::add(Test& test, const char* suite, const std::string& name,
-                   const char* file, long line)
+void TestList::add(RunFunc run_func, IsEnabledFunc is_enabled_func, bool allow_concur,
+                   const char* suite, const std::string& name, const char* file, long line)
 {
-    test.test_results.m_test = &test;
-    test.test_results.m_list = this;
-    long index = long(m_tests.size());
-    TestDetails& details = test.test_details;
-    details.test_index  = index;
-    details.suite_name  = suite;
-    details.test_name   = name;
-    details.file_name   = file;
-    details.line_number = line;
-    m_tests.push_back(&test);
+    Test test;
+    test.run_func        = run_func;
+    test.is_enabled_func = is_enabled_func;
+    test.allow_concur    = allow_concur;
+    test.details.suite_name  = suite;
+    test.details.test_name   = name;
+    test.details.file_name   = file;
+    test.details.line_number = line;
+    m_tests.reserve(m_tests.size() + 1); // Throws
+    m_test_storage.push_back(test); // Throws
+    m_tests.push_back(&m_test_storage.back());
 }
 
-void TestList::reassign_indexes()
-{
-    long n = long(m_tests.size());
-    for (long i = 0; i != n; ++i) {
-        Test* test = m_tests[i];
-        test->test_details.test_index = i;
-    }
-}
 
-void TestList::ExecContext::run()
-{
-    Timer timer;
-    double time = 0;
-    Test* test = nullptr;
-    for (;;) {
-        double prev_time = time;
-        time = timer.get_elapsed_time();
-
-        // Next test
-        {
-            SharedContext& shared = *m_shared;
-            Reporter& reporter = shared.m_reporter;
-            LockGuard lock(shared.m_mutex);
-            if (test)
-                reporter.end(test->test_details, time - prev_time);
-            if (shared.m_next_test == shared.m_tests.size())
-                break;
-            test = shared.m_tests[shared.m_next_test++];
-            reporter.begin(test->test_details);
-        }
-
-        m_errors_seen = false;
-        test->test_results.m_context = this;
-
-        try {
-            test->test_run();
-        }
-        catch (std::exception& ex) {
-            std::string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
-            test->test_results.test_failed(message);
-        }
-        catch (...) {
-            m_errors_seen = true;
-            std::string message = "Unhandled exception of unknown type";
-            test->test_results.test_failed(message);
-        }
-
-        test->test_results.m_context = nullptr;
-        if (m_errors_seen)
-            ++m_num_failed_tests;
-    }
-}
-
-bool TestList::run(Reporter* reporter, Filter* filter, int num_threads, bool shuffle)
+bool TestList::run(Reporter* reporter, Filter* filter, int num_repetitions, int num_threads,
+                   bool shuffle)
 {
     Timer timer;
     Reporter fallback_reporter;
     Reporter& reporter_2 = reporter ? *reporter : fallback_reporter;
-    if (num_threads < 1 || num_threads > 1024)
+    if (num_repetitions < 0)
+        throw std::runtime_error("Bad number of repetitions");
+    if (num_threads < 1)
         throw std::runtime_error("Bad number of threads");
 
-    SharedContext shared(reporter_2);
-    size_t num_tests = m_tests.size(), num_disabled = 0;
-    for (size_t i = 0; i != num_tests; ++i) {
-        Test* test = m_tests[i];
-        if (!test->test_enabled()) {
+    // Filter
+    std::vector<std::pair<const Test*, size_t>> included_tests; // Second component is test index
+    size_t num_enabled = 0, num_disabled = 0;
+    for (size_t i = 0; i < m_tests.size(); ++i) {
+        const Test* test = m_tests[i];
+        if (!(*test->is_enabled_func)()) {
             ++num_disabled;
             continue;
         }
-        if (filter && !filter->include(test->test_details))
+        ++num_enabled;
+        if (filter && !filter->include(test->details))
             continue;
-        shared.m_tests.push_back(test);
+        included_tests.emplace_back(test, i);
     }
 
-    if (shuffle) {
-        Random random(random_int<unsigned long>()); // Seed from slow global generator
-        random.shuffle(shared.m_tests.begin(), shared.m_tests.end());
+    // Repeat
+    SharedContext shared_context(*this, num_repetitions, num_threads, reporter_2);
+    size_t num_executed_tests = 0;
+    for (int i = 0; i < num_repetitions; ++i) {
+        for (auto p: included_tests) {
+            SharedContext::Entry entry;
+            entry.test = p.first;
+            entry.test_index = p.second;
+            entry.recurrence_index = i;
+            shared_context.add(entry);
+            ++num_executed_tests;
+        }
     }
 
-    std::unique_ptr<ExecContext[]> thread_contexts(new ExecContext[num_threads]);
-    for (int i = 0; i != num_threads; ++i)
-        thread_contexts[i].m_shared = &shared;
+    // Shuffle
+    if (shuffle)
+        shared_context.shuffle();
 
+    // Execute
     if (num_threads == 1) {
-        thread_contexts[0].run();
+        ThreadContext thread_context(0, shared_context);
+        thread_context.run();
     }
     else {
+        auto thread = [&](int i) {
+            ThreadContext thread_context(i, shared_context);
+            thread_context.run();
+        };
         std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
         for (int i = 0; i != num_threads; ++i)
-            threads[i].start(std::bind(&ExecContext::run, &thread_contexts[i]));
+            threads[i].start([=] { thread(i); });
         for (int i = 0; i != num_threads; ++i)
             threads[i].join();
     }
 
-    long num_failed_tests = 0;
-    long long num_checks = 0;
-    long long num_failed_checks = 0;
+    // Summarize
+    Summary summary;
+    summary.num_disabled_tests  = long(num_disabled);
+    summary.num_excluded_tests  = long(num_enabled - included_tests.size());
+    summary.num_included_tests  = long(included_tests.size());
+    summary.num_executed_tests  = long(num_executed_tests);
+    summary.num_failed_tests    = shared_context.num_failed_tests;
+    summary.num_executed_checks = shared_context.num_checks;
+    summary.num_failed_checks   = shared_context.num_failed_checks;
+    summary.elapsed_seconds     = timer.get_elapsed_time();
+    reporter_2.summary(shared_context, summary);
 
-    for (int i = 0; i != num_threads; ++i) {
-        ExecContext& thread_context = thread_contexts[i];
-        num_failed_tests  += thread_context.m_num_failed_tests;
-        num_checks        += thread_context.m_num_checks;
-        num_failed_checks += thread_context.m_num_failed_checks;
+    return shared_context.num_failed_tests == 0;
+}
+
+
+void TestList::ThreadContext::run()
+{
+    UniqueLock lock(shared_context.mutex);
+
+    // First run the tests that can safely run concurrently with other threads
+    // and with itself.
+    while (shared_context.next_concur_test < shared_context.concur_tests.size()) {
+        auto entry = shared_context.concur_tests[shared_context.next_concur_test++];
+        run(entry, lock);
     }
 
-    Summary summary;
-    summary.num_included_tests = long(shared.m_tests.size());
-    summary.num_failed_tests   = num_failed_tests;
-    summary.num_excluded_tests = long(num_tests - num_disabled) - summary.num_included_tests;
-    summary.num_disabled_tests = long(num_disabled);
-    summary.num_checks         = num_checks;
-    summary.num_failed_checks  = num_failed_checks;
-    summary.elapsed_seconds    = timer.get_elapsed_time();
-    reporter_2.summary(summary);
+    // When only the last test thread running, we can run the tests that cannot
+    // safely run concurrently with other threads or with itself.
+    int num_remaining_threads = shared_context.num_threads - shared_context.num_ended_threads;
+    if (num_remaining_threads == 1) {
+        for (auto entry: shared_context.no_concur_tests)
+            run(entry, lock);
+    }
 
-    return num_failed_tests == 0;
+    shared_context.num_failed_tests  += num_failed_tests;
+    shared_context.num_checks        += num_checks;
+    shared_context.num_failed_checks += num_failed_checks;
+
+    ++shared_context.num_ended_threads;
+    shared_context.reporter.end_of_thread(shared_context, thread_index);
+}
+
+
+void TestList::ThreadContext::run(SharedContext::Entry entry, UniqueLock& lock)
+{
+    const Test& test = *entry.test;
+    TestContext test_context(*this, test.details, entry.test_index, entry.recurrence_index);
+    shared_context.reporter.begin(test_context);
+    lock.unlock();
+
+    errors_seen = false;
+    Timer timer;
+    try {
+        (*test.run_func)(test_context);
+    }
+    catch (std::exception& ex) {
+        std::string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
+        test_context.test_failed(message);
+    }
+    catch (...) {
+        std::string message = "Unhandled exception of unknown type";
+        test_context.test_failed(message);
+    }
+    double elapsed_time = timer.get_elapsed_time();
+    if (errors_seen)
+        ++num_failed_tests;
+
+    lock.lock();
+    shared_context.reporter.end(test_context, elapsed_time);
 }
 
 
@@ -402,54 +457,54 @@ TestList& get_default_test_list()
 }
 
 
-TestResults::TestResults():
-    m_test(nullptr),
-    m_list(nullptr),
-    m_context(nullptr)
+TestContext::TestContext(TestList::ThreadContext& tc, const TestDetails& td, size_t ti, int ri):
+    exec_context(tc.shared_context),
+    test_details(td),
+    test_index(ti),
+    recurrence_index(ri),
+    thread_index(tc.thread_index),
+    m_thread_context(tc)
 {
 }
 
 
-void TestResults::check_succeeded()
+void TestContext::check_succeeded()
 {
-    ++m_context->m_num_checks;
+    ++m_thread_context.num_checks;
 }
 
 
-void TestResults::check_failed(const char* file, long line, const std::string& message)
+void TestContext::check_failed(const char* file, long line, const std::string& message)
 {
     {
-        LockGuard lock(m_context->m_mutex);
-        ++m_context->m_num_checks;
-        ++m_context->m_num_failed_checks;
-        m_context->m_errors_seen = true;
+        LockGuard lock(m_thread_context.mutex);
+        ++m_thread_context.num_checks;
+        ++m_thread_context.num_failed_checks;
+        m_thread_context.errors_seen = true;
     }
-    SharedContext& shared = *m_context->m_shared;
-    TestDetails details = m_test->test_details; // Copy
-    details.file_name   = file;
-    details.line_number = line;
     {
-        LockGuard lock(shared.m_mutex);
-        shared.m_reporter.fail(details, message);
-    }
-}
-
-
-void TestResults::test_failed(const std::string& message)
-{
-    {
-        LockGuard lock(m_context->m_mutex);
-        m_context->m_errors_seen = true;
-    }
-    SharedContext& shared = *m_context->m_shared;
-    {
-        LockGuard lock(shared.m_mutex);
-        shared.m_reporter.fail(m_test->test_details, message);
+        TestList::SharedContext& shared = m_thread_context.shared_context;
+        LockGuard lock(shared.mutex);
+        shared.reporter.fail(*this, file, line, message);
     }
 }
 
 
-void TestResults::cond_failed(const char* file, long line, const char* macro_name,
+void TestContext::test_failed(const std::string& message)
+{
+    {
+        LockGuard lock(m_thread_context.mutex);
+        m_thread_context.errors_seen = true;
+    }
+    {
+        TestList::SharedContext& shared = m_thread_context.shared_context;
+        LockGuard lock(shared.mutex);
+        shared.reporter.fail(*this, test_details.file_name, test_details.line_number, message);
+    }
+}
+
+
+void TestContext::cond_failed(const char* file, long line, const char* macro_name,
                               const char* cond_text)
 {
     std::string msg = std::string(macro_name)+"("+cond_text+") failed";
@@ -457,7 +512,7 @@ void TestResults::cond_failed(const char* file, long line, const char* macro_nam
 }
 
 
-void TestResults::compare_failed(const char* file, long line, const char* macro_name,
+void TestContext::compare_failed(const char* file, long line, const char* macro_name,
                                  const char* a_text, const char* b_text,
                                  const std::string& a_val, const std::string& b_val)
 {
@@ -466,7 +521,7 @@ void TestResults::compare_failed(const char* file, long line, const char* macro_
 }
 
 
-void TestResults::inexact_compare_failed(const char* file, long line, const char* macro_name,
+void TestContext::inexact_compare_failed(const char* file, long line, const char* macro_name,
                                          const char* a_text, const char* b_text,
                                          const char* eps_text, long double a, long double b,
                                          long double eps)
@@ -479,7 +534,7 @@ void TestResults::inexact_compare_failed(const char* file, long line, const char
 }
 
 
-void TestResults::throw_failed(const char* file, long line, const char* expr_text,
+void TestContext::throw_failed(const char* file, long line, const char* expr_text,
                                const char* exception_name)
 {
     std::ostringstream out;
@@ -488,7 +543,7 @@ void TestResults::throw_failed(const char* file, long line, const char* expr_tex
 }
 
 
-void TestResults::throw_ex_failed(const char* file, long line, const char* expr_text,
+void TestContext::throw_ex_failed(const char* file, long line, const char* expr_text,
                                   const char* exception_name, const char* exception_cond_text)
 {
     std::ostringstream out;
@@ -498,7 +553,7 @@ void TestResults::throw_ex_failed(const char* file, long line, const char* expr_
 }
 
 
-void TestResults::throw_ex_cond_failed(const char* file, long line, const char* expr_text,
+void TestContext::throw_ex_cond_failed(const char* file, long line, const char* expr_text,
                                        const char* exception_name, const char* exception_cond_text)
 {
     std::ostringstream out;
@@ -508,7 +563,7 @@ void TestResults::throw_ex_cond_failed(const char* file, long line, const char* 
 }
 
 
-void TestResults::throw_any_failed(const char* file, long line, const char* expr_text)
+void TestContext::throw_any_failed(const char* file, long line, const char* expr_text)
 {
     std::ostringstream out;
     out << "CHECK_THROW_ANY("<<expr_text<<") failed: Did not throw";
@@ -516,26 +571,30 @@ void TestResults::throw_any_failed(const char* file, long line, const char* expr
 }
 
 
-void Reporter::begin(const TestDetails&)
+void Reporter::begin(const TestContext&)
 {
 }
 
-void Reporter::fail(const TestDetails&, const std::string&)
+void Reporter::fail(const TestContext&, const char*, long, const std::string&)
 {
 }
 
-void Reporter::end(const TestDetails&, double)
+void Reporter::end(const TestContext&, double)
 {
 }
 
-void Reporter::summary(const Summary&)
+void Reporter::summary(const ExecContext&, const Summary&)
+{
+}
+
+void Reporter::end_of_thread(const ExecContext&, int)
 {
 }
 
 
 class PatternBasedFileOrder::state: public RefCountBase {
 public:
-    typedef std::map<TestDetails*, int> major_map;
+    typedef std::map<const void*, int> major_map; // Key is address of TestDetails object
     major_map m_major_map;
 
     typedef std::vector<wildcard_pattern> patterns;
@@ -551,21 +610,21 @@ public:
     {
     }
 
-    int get_major(TestDetails* details)
+    int get_major(const TestDetails& details)
     {
-        major_map::const_iterator i = m_major_map.find(details);
+        major_map::const_iterator i = m_major_map.find(&details);
         if (i != m_major_map.end())
             return i->second;
         patterns::const_iterator j = m_patterns.begin(), end = m_patterns.end();
-        while (j != end && !j->match(details->file_name))
+        while (j != end && !j->match(details.file_name))
             ++j;
         int major = int(j - m_patterns.begin());
-        m_major_map[details] = major;
+        m_major_map[&details] = major;
         return major;
     }
 };
 
-bool PatternBasedFileOrder::operator()(TestDetails* a, TestDetails* b)
+bool PatternBasedFileOrder::operator()(const TestDetails& a, const TestDetails& b)
 {
     int major_a = m_wrap.m_state->get_major(a);
     int major_b = m_wrap.m_state->get_major(b);
@@ -573,8 +632,8 @@ bool PatternBasedFileOrder::operator()(TestDetails* a, TestDetails* b)
         return true;
     if (major_a > major_b)
         return false;
-    int i = strcmp(a->file_name, b->file_name);
-    return i < 0 || (i == 0 && a->test_index < b->test_index);
+    int i = strcmp(a.file_name, b.file_name);
+    return i < 0;
 }
 
 PatternBasedFileOrder::wrap::wrap(const char** patterns_begin, const char** patterns_end):
@@ -603,33 +662,44 @@ SimpleReporter::SimpleReporter(bool report_progress)
     m_report_progress = report_progress;
 }
 
-void SimpleReporter::begin(const TestDetails& details)
+void SimpleReporter::begin(const TestContext& context)
 {
     if (!m_report_progress)
         return;
 
-    std::cout << details.file_name << ":" << details.line_number << ": "
-        "Begin " << details.test_name << "\n";
+    const TestDetails& details = context.test_details;
+    std::cout << details.file_name << ":" << details.line_number << ": ";
+    std::cout << "Begin " << details.test_name;
+    if (context.exec_context.num_recurrences > 1)
+        std::cout << '#' << (context.recurrence_index+1);
+    if (context.exec_context.num_threads > 1)
+        std::cout << " [test thread "<<(context.thread_index+1)<<"] ";
+    std::cout << "\n";
 }
 
-void SimpleReporter::fail(const TestDetails& details, const std::string& message)
+void SimpleReporter::fail(const TestContext& context, const char* file_name, long line_number,
+                          const std::string& message)
 {
-    std::cerr << details.file_name << ":" << details.line_number << ": "
-        "ERROR in " << details.test_name << ": " << message << "\n";
+    const TestDetails& details = context.test_details;
+    std::cerr << file_name << ":" << line_number << ": ";
+    std::cerr << "ERROR in " << details.test_name;
+    if (context.exec_context.num_recurrences > 1)
+        std::cout << '#' << (context.recurrence_index+1);
+    std::cerr << ": " << message << "\n";
 }
 
-void SimpleReporter::summary(const Summary& summary)
+void SimpleReporter::summary(const ExecContext&, const Summary& summary)
 {
     std::cout << "\n";
     if (summary.num_failed_tests == 0) {
-        std::cout << "Success: All "<<summary.num_included_tests<<" tests passed "
-            "("<<summary.num_checks<<" checks).\n";
+        std::cout << "Success: All "<<summary.num_executed_tests<<" tests passed "
+            "("<<summary.num_executed_checks<<" checks).\n";
     }
     else {
         std::cerr << "FAILURE: "<<summary.num_failed_tests<<" "
-            "out of "<<summary.num_included_tests<<" tests failed "
+            "out of "<<summary.num_executed_tests<<" tests failed "
             "("<<summary.num_failed_checks<<" "
-            "out of "<<summary.num_checks<<" checks failed).\n";
+            "out of "<<summary.num_executed_checks<<" checks failed).\n";
     }
     std::cout << "Test time: "<<Timer::format(summary.elapsed_seconds)<<"\n";
     if (summary.num_excluded_tests == 1) {
@@ -638,6 +708,15 @@ void SimpleReporter::summary(const Summary& summary)
     else if (summary.num_excluded_tests > 1) {
         std::cout << "\nNote: "<<summary.num_excluded_tests<<" tests were excluded!\n";
     }
+}
+
+void SimpleReporter::end_of_thread(const ExecContext& context, int thread_index)
+{
+    if (!m_report_progress)
+        return;
+
+    if (context.num_threads > 1)
+        std::cout << "End of test thread "<<(thread_index+1)<<"\n";
 }
 
 

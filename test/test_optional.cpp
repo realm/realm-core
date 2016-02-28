@@ -113,11 +113,15 @@ TEST(Optional_ValueAssignment)
     CHECK_EQUAL(*o, "bar");
 }
 
+namespace {
+
 struct SetBooleanOnDestroy {
     bool& m_b;
     explicit SetBooleanOnDestroy(bool& b) : m_b(b) {}
     ~SetBooleanOnDestroy() { m_b = true; }
 };
+
+} // unnamed namespace
 
 TEST(Optional_Destructor)
 {
@@ -175,7 +179,7 @@ int make_rvalue()
     return 1;
 }
 
-}
+} // unnamed namespace
 
 TEST(Optional_RvalueReferences)
 {
@@ -217,7 +221,8 @@ struct TestingReferenceBinding {
         REALM_ASSERT(false);
     }
 };
-}
+
+} // unnamed namespace
 
 TEST(Optional_ReferenceBinding)
 {
