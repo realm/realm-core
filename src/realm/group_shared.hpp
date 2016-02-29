@@ -539,7 +539,18 @@ private:
     util::PlatformSpecificCondVar m_daemon_becomes_ready;
     util::PlatformSpecificCondVar m_new_commit_available;
 #endif
-
+    void initialize_lockfile(DurabilityLevel durability, 
+                             Replication::HistoryType history_type);
+    // true if the lockfile is ok, false to retry.
+    // throws if consistency check fails
+    bool validate_lockfile();
+    int validate_file_format(bool is_session_initiator, 
+                             ref_type top_ref,
+                             Replication::HistoryType history_type,
+                             DurabilityLevel durability); // throws if validation fails
+    ref_type attach_database(bool is_session_initiator,
+                             DurabilityLevel durability,
+                             bool no_create_file); // throws 
     void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
                  const char* encryption_key, bool allow_file_format_upgrade);
 

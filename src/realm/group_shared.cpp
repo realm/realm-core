@@ -685,39 +685,9 @@ void spawn_daemon(const std::string& file)
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void SharedGroup::do_open(const std::string& path, bool no_create_file, DurabilityLevel durability,
-                          bool is_backend, const char* encryption_key,
-                          bool allow_upgrafe_file_format)
+void SharedGroup::initialize_lockfile(DurabilityLevel durability, 
+                                      Replication::HistoryType history_type)
 {
-    // Exception safety: Since do_open() is called from constructors, if it
-    // throws, it must leave the file closed.
-
-    // FIXME: Asses the exception safety of this function.
-
-    REALM_ASSERT(!is_attached());
-
-#ifndef REALM_ASYNC_DAEMON
-    if (durability == durability_Async)
-        throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
-#endif
-
-    m_db_path = path;
-    m_key = encryption_key;
-    m_lockfile_path = path + ".lock";
-    SlabAlloc& alloc = m_group.m_alloc;
-
-    Replication::HistoryType history_type = Replication::hist_None;
-    if (Replication* repl = m_group.get_replication())
-        history_type = repl->get_history_type();
-
-    int target_file_format_version;
-
-    for (;;) {
-        m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
-        File::CloseGuard fcg(m_file);
-
-        if (m_file.try_lock_exclusive()) { // Throws
-            File::UnlockGuard ulg(m_file);
 
             // We're alone in the world, and it is Ok to initialize the
             // file. Start by truncating the file, to maximize the chance of a
@@ -735,25 +705,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             char buffer[sizeof (SharedInfo)] = {0};
             new (buffer) SharedInfo(durability, history_type); // Throws
             m_file.write(buffer, sizeof buffer); // Throws
+}
 
-            // Mark the file as completely initialized via a memory
-            // mapping. Since this is done as a separate final step (involving
-            // separate system calls) there is no chance of the individual
-            // modifications to get reordered, even in case of a crash at a
-            // random position during the initialization (except if it happens
-            // before the truncation). This could also have been done by a
-            // util::File::write(), but it is more convenient to manipulate the
-            // structure via its type.
-            m_file_map.map(m_file, File::access_ReadWrite,
-                           sizeof (SharedInfo), File::map_NoSync); // Throws
-            File::UnmapGuard fug(m_file_map);
-            SharedInfo* info_2 = m_file_map.get_addr();
-            info_2->init_complete = 1;
-        }
 
-        // We hold the shared lock from here until we close the file!
-        m_file.lock_shared(); // Throws
-
+bool SharedGroup::validate_lockfile()
+{
         // If the file is not completely initialized at this point in time, the
         // preceeding initialization attempt must have failed. We know that an
         // initialization process was in progress, because this thread (or
@@ -783,7 +739,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             auto file_size = m_file.get_size();
             if (util::int_less_than(file_size, info_size)) {
                 if (file_size == 0)
-                    continue; // Retry
+                    return false; // Retry
                 info_size = size_t(file_size);
             }
         }
@@ -798,7 +754,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         static_assert(offsetof(SharedInfo, init_complete) + sizeof SharedInfo::init_complete <= 1,
                       "Unexpected position or size of SharedInfo::init_complete");
         if (info->init_complete == 0)
-            continue;
+            return false;
         REALM_ASSERT(info->init_complete == 1);
 
         // At this time, we know that the file was completely initialized, but
@@ -838,6 +794,176 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         if (!info->controlmutex.is_valid())
             throw IncompatibleLockFile();
 
+        // Succes!
+        fug_1.release();
+        return true;
+}
+
+ref_type SharedGroup::attach_database(bool begin_new_session, DurabilityLevel durability,
+                                      bool no_create_file)
+{
+    SlabAlloc& alloc = m_group.m_alloc;
+    // proceed to initialize versioning and other metadata information related to
+    // the database. Also create the database if we're beginning a new session
+    SlabAlloc::Config cfg;
+    cfg.session_initiator = begin_new_session;
+    cfg.is_shared = true;
+    cfg.read_only = false;
+    cfg.skip_validate = !begin_new_session;
+
+    // only the session initiator is allowed to create the database, all other
+    // must assume that it already exists.
+    cfg.no_create = begin_new_session ? no_create_file : true;
+
+    // if we're opening a MemOnly file that isn't already opened by
+    // someone else then it's a file which should have been deleted on
+    // close previously, but wasn't (perhaps due to the process crashing)
+    cfg.clear_file = durability == durability_MemOnly && begin_new_session;
+    cfg.encryption_key = m_key;
+    return alloc.attach_file(m_db_path, cfg); // Throws
+}
+
+int SharedGroup::validate_file_format(bool begin_new_session, ref_type top_ref,
+                                       Replication::HistoryType history_type,
+                                       DurabilityLevel durability)
+{
+
+    // Determine target file format version for session (upgrade
+    // required if greater than file format version of attached file).
+    using gf = _impl::GroupFriend;
+    int target_file_format_version;
+    int current_file_format_version = gf::get_file_format_version(m_group);
+    target_file_format_version =
+        gf::get_target_file_format_version_for_session(current_file_format_version,
+                                                       history_type);
+    SlabAlloc& alloc = m_group.m_alloc;
+    SharedInfo* info = m_file_map.get_addr();
+
+    if (begin_new_session) {
+        // Determine version (snapshot number) and check history type
+        // compatibility
+        version_type version = 0;
+        int stored_history_type = 0;
+        gf::get_version_and_history_type(alloc, top_ref, version, stored_history_type);
+        bool good_history_type = false;
+        switch (history_type) {
+            case Replication::hist_None:
+            case Replication::hist_OutOfRealm:
+                good_history_type = (stored_history_type == Replication::hist_None);
+                break;
+            case Replication::hist_InRealm:
+                good_history_type = (stored_history_type == Replication::hist_InRealm ||
+                                     stored_history_type == Replication::hist_None);
+                break;
+            case Replication::hist_Sync:
+                good_history_type =
+                    ((stored_history_type == Replication::hist_Sync) ||
+                     (stored_history_type == Replication::hist_None && top_ref == 0));
+        }
+        if (!good_history_type)
+            throw InvalidDatabase("Bad or incompatible history type", m_db_path);
+
+        if (Replication* repl = gf::get_replication(m_group))
+            repl->initiate_session(version); // Throws
+
+#ifndef _WIN32
+        if (m_key) {
+            static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+            info->session_initiator_pid = uint_fast64_t(getpid());
+        }
+#endif
+        // Initially there is a single version in the file
+        info->number_of_versions = 1;
+
+        info->latest_version_number = version;
+
+        SharedInfo* r_info = m_reader_map.get_addr();
+        size_t file_size = alloc.get_baseline();
+        r_info->init_versioning(top_ref, file_size, version);
+        info->file_format_version = uint_fast8_t(target_file_format_version);
+    }
+    else {
+        // Durability setting must be consistent across a session. An
+        // inconsistency is a logic error, as the user is required to
+        // make sure that all possible concurrent session participants
+        // use the same durability setting for the same Realm file.
+        if (info->durability != durability)
+            throw LogicError(LogicError::mixed_durability);
+
+        // History type must be consistent across a session. An
+        // inconsistency is a logic error, as the user is required to
+        // make sure that all possible concurrent session participants
+        // use the same history type for the same Realm file.
+        if (info->history_type != history_type)
+            throw LogicError(LogicError::mixed_history_type);
+
+#ifndef _WIN32
+        if (m_key && info->session_initiator_pid != uint64_t(getpid()))
+            throw std::runtime_error(m_db_path + ": Encrypted interprocess sharing is currently unsupported");
+#endif
+        // We need per session agreement among all participants on the
+        // target Realm file format. From a technical perspective, the
+        // best way to ensure that, would be to require a bumping of the
+        // SharedInfo file format version on any change that could lead
+        // to a different result from
+        // get_target_file_format_for_session() given the same current
+        // Realm file format version and the same history type, as that
+        // would prevent the outcome of the Realm opening process from
+        // depending on race conditions. However, for practical reasons,
+        // we shall instead simply check that there is agreement, and
+        // throw the same kind of exception, as would have been thrown
+        // with a bumped SharedInfo file format version, if there isn't.
+        if (info->file_format_version != target_file_format_version)
+            throw IncompatibleLockFile();
+    }
+    return target_file_format_version;
+}
+
+void SharedGroup::do_open(const std::string& path, bool no_create_file, DurabilityLevel durability,
+                          bool is_backend, const char* encryption_key,
+                          bool allow_upgrafe_file_format)
+{
+    // Exception safety: Since do_open() is called from constructors, if it
+    // throws, it must leave the file closed.
+
+    // FIXME: Asses the exception safety of this function.
+
+    REALM_ASSERT(!is_attached());
+
+#ifndef REALM_ASYNC_DAEMON
+    if (durability == durability_Async)
+        throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
+#endif
+
+    m_db_path = path;
+    m_key = encryption_key;
+    m_lockfile_path = path + ".lock";
+    SlabAlloc& alloc = m_group.m_alloc;
+    int target_file_format_version;
+
+    Replication::HistoryType history_type = Replication::hist_None;
+    if (Replication* repl = m_group.get_replication())
+        history_type = repl->get_history_type();
+
+    for (;;) {
+        m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
+        File::CloseGuard fcg(m_file);
+
+        if (m_file.try_lock_exclusive()) { // Throws
+            //File::UnlockGuard ulg(m_file); <--- not needed, covered by the fcg close guard
+            initialize_lockfile(durability, history_type);
+            m_file_map.map(m_file, File::access_ReadWrite,
+                           sizeof (SharedInfo), File::map_NoSync); // Throws
+        }
+        else {
+            // We hold the shared lock from here until we close the file!
+            m_file.lock_shared(); // Throws
+            if (!validate_lockfile()) {
+                m_file_map.unmap();
+                continue; // retry
+            }
+        }
+
         // OK! lock file appears valid. We can now continue operations under the protection
         // of the controlmutex. The controlmutex protects the following activities:
         // - attachment of the database file
@@ -846,7 +972,17 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // - SharedGroup beginning/ending a session
         // - Waiting for and signalling database changes
         {
+            File::UnmapGuard fug_1(m_file_map);
+            SharedInfo* info = m_file_map.get_addr();
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+
+            ref_type top_ref;
+            bool begin_new_session = info->num_participants == 0;
+            try { top_ref = attach_database(begin_new_session, durability, no_create_file); }
+            catch (SlabAlloc::Retry&) {
+                continue;
+            }
+
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to later detect concurrent expansion of the ringbuffer.
             m_local_max_entry = info->readers.get_num_entries();
@@ -860,120 +996,22 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             m_reader_map.map(m_file, File::access_ReadWrite, reader_info_size, File::map_NoSync);
             File::UnmapGuard fug_2(m_reader_map);
 
-            // proceed to initialize versioning and other metadata information related to
-            // the database. Also create the database if we're beginning a new session
-            bool begin_new_session = (info->num_participants == 0);
-            SlabAlloc::Config cfg;
-            cfg.session_initiator = begin_new_session;
-            cfg.is_shared = true;
-            cfg.read_only = false;
-            cfg.skip_validate = !begin_new_session;
-
-            // only the session initiator is allowed to create the database, all other
-            // must assume that it already exists.
-            cfg.no_create = begin_new_session ? no_create_file : true;
-
-            // if we're opening a MemOnly file that isn't already opened by
-            // someone else then it's a file which should have been deleted on
-            // close previously, but wasn't (perhaps due to the process crashing)
-            cfg.clear_file = durability == durability_MemOnly && begin_new_session;
-
-            cfg.encryption_key = encryption_key;
-            ref_type top_ref;
-            try {
-                top_ref = alloc.attach_file(path, cfg); // Throws
-            }
-            catch (SlabAlloc::Retry&) {
-                continue;
-            }
-
-            // Determine target file format version for session (upgrade
-            // required if greater than file format version of attached file).
-            using gf = _impl::GroupFriend;
-            int current_file_format_version = gf::get_file_format_version(m_group);
-            target_file_format_version =
-                gf::get_target_file_format_version_for_session(current_file_format_version,
-                                                               history_type);
+            target_file_format_version = 
+                validate_file_format(begin_new_session, top_ref, history_type, durability);
 
             if (begin_new_session) {
-                // Determine version (snapshot number) and check history type
-                // compatibility
-                version_type version = 0;
-                int stored_history_type = 0;
-                gf::get_version_and_history_type(alloc, top_ref, version, stored_history_type);
-                bool good_history_type = false;
-                switch (history_type) {
-                    case Replication::hist_None:
-                    case Replication::hist_OutOfRealm:
-                        good_history_type = (stored_history_type == Replication::hist_None);
-                        break;
-                    case Replication::hist_InRealm:
-                        good_history_type = (stored_history_type == Replication::hist_InRealm ||
-                                             stored_history_type == Replication::hist_None);
-                        break;
-                    case Replication::hist_Sync:
-                        good_history_type =
-                            ((stored_history_type == Replication::hist_Sync) ||
-                             (stored_history_type == Replication::hist_None && top_ref == 0));
-                }
-                if (!good_history_type)
-                    throw InvalidDatabase("Bad or incompatible history type", path);
 
-                if (Replication* repl = gf::get_replication(m_group))
-                    repl->initiate_session(version); // Throws
-
-#ifndef _WIN32
-                if (encryption_key) {
-                    static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
-                    info->session_initiator_pid = uint_fast64_t(getpid());
-                }
-#endif
-
-                info->file_format_version = uint_fast8_t(target_file_format_version);
-
-                // Initially there is a single version in the file
-                info->number_of_versions = 1;
-
-                info->latest_version_number = version;
-
-                SharedInfo* r_info = m_reader_map.get_addr();
-                size_t file_size = alloc.get_baseline();
-                r_info->init_versioning(top_ref, file_size, version);
-            }
-            else { // Not the session initiator
-                // Durability setting must be consistent across a session. An
-                // inconsistency is a logic error, as the user is required to
-                // make sure that all possible concurrent session participants
-                // use the same durability setting for the same Realm file.
-                if (info->durability != durability)
-                    throw LogicError(LogicError::mixed_durability);
-
-                // History type must be consistent across a session. An
-                // inconsistency is a logic error, as the user is required to
-                // make sure that all possible concurrent session participants
-                // use the same history type for the same Realm file.
-                if (info->history_type != history_type)
-                    throw LogicError(LogicError::mixed_history_type);
-
-#ifndef _WIN32
-                if (encryption_key && info->session_initiator_pid != uint64_t(getpid()))
-                    throw std::runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
-#endif
-
-                // We need per session agreement among all participants on the
-                // target Realm file format. From a technical perspective, the
-                // best way to ensure that, would be to require a bumping of the
-                // SharedInfo file format version on any change that could lead
-                // to a different result from
-                // get_target_file_format_for_session() given the same current
-                // Realm file format version and the same history type, as that
-                // would prevent the outcome of the Realm opening process from
-                // depending on race conditions. However, for practical reasons,
-                // we shall instead simply check that there is agreement, and
-                // throw the same kind of exception, as would have been thrown
-                // with a bumped SharedInfo file format version, if there isn't.
-                if (info->file_format_version != target_file_format_version)
-                    throw IncompatibleLockFile();
+                // Mark the file as completely initialized via a memory
+                // mapping. Since this is done as a separate final step (involving
+                // separate system calls) there is no chance of the individual
+                // modifications to get reordered, even in case of a crash at a
+                // random position during the initialization (except if it happens
+                // before the truncation). This could also have been done by a
+                // util::File::write(), but it is more convenient to manipulate the
+                // structure via its type.
+                info->init_complete = 1;
+                // We hold the shared lock from here until we close the file!
+                m_file.lock_shared(); // Throws
             }
 
 #ifndef _WIN32
