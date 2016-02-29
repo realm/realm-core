@@ -8982,6 +8982,7 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
 }
 
 
+
 TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11564,6 +11565,48 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
         CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroup::durability_Full, crypt_key()),
                           LogicError::mixed_history_type);
     }
+}
+
+
+// Check that rollback of a transaction which deletes a table
+// containing a link will insert the associated backlink into
+// the correct index in the associated (linked) table. In this
+// case, backlink columns should not be appended (rather they
+// should be inserted into the previously used index).
+TEST(LangBindHelper_RollBackAfterRemovalOfTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+
+    TableRef source_a = group_w.add_table("source_a");
+    TableRef source_b = group_w.add_table("source_b");
+    TableRef target_b = group_w.add_table("target_b");
+
+    source_a->add_column_link(type_LinkList, "b", *target_b);
+    source_b->add_column_link(type_LinkList, "b", *target_b);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    {
+        LangBindHelper::promote_to_write(sg_w);
+
+        group_w.remove_table("source_a");
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+    }
+    using tf = _impl::TableFriend;
+    CHECK_EQUAL(group_w.size(), 3);
+    CHECK_EQUAL(group_w.get_table_name(0), StringData("source_a"));
+    CHECK_EQUAL(group_w.get_table(0)->get_column_count(), 1);
+    CHECK_EQUAL(group_w.get_table(0)->get_link_target(0), target_b);
+    CHECK_EQUAL(group_w.get_table(1)->get_link_target(0), target_b);
+    // backlink column index in target_b from source_a should be index 0
+    CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(0, 0), 0);
+    // backlink column index in target_b from source_b should be index 1
+    CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(1, 0), 1);
 }
 
 #endif

@@ -2,7 +2,10 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Backlink columns were always inserted at the end of a table, however on a
+  transaction rollback in certain cases, backlink columns were removed from
+  internal (not the end) indices and the roll back should put them back there.
+  This could cause a crash on rollback and was reported in ticket #1502.
 
 ### API breaking changes:
 

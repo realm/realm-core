@@ -128,7 +128,7 @@ void write_thread(TestContext& test_context, std::string path, int thread_ndx)
     for (int i = 0; i < ITER1; ++i) {
         {
             WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
+            TableRef table = wt.get_or_add_table("table");
             table->set_int(0, 0, w);
             rand_sleep(random);
             int64_t r = table->get_int(0, 0);
@@ -166,7 +166,7 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
     SharedGroup sg(path);
     {
         WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
+        TableRef table = wt.get_or_add_table("table");
         DescriptorRef desc = table->get_descriptor();
         desc->add_column(type_Int, "row");
         table->insert_empty_row(0, 1);
@@ -292,7 +292,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
 
         for (int i = 0; i < ITER; ++i) {
             WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
+            TableRef table = wt.get_or_add_table("table");
             size_t s = table->size();
 
             if (random.draw_bool() && s > 0) {
@@ -335,7 +335,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
 
     {
         WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
+        TableRef table = wt.get_or_add_table("table");
         DescriptorRef desc = table->get_descriptor();
         desc->add_column(type_Int, "row");
         wt.commit();
@@ -389,7 +389,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
         for (int i = 0; i < ITER; ++i) {
             {
                 WriteTransaction wt(sg);
-                TableRef table = wt.get_table("table");
+                TableRef table = wt.get_or_add_table("table");
                 table->set_int(0, 0, w);
                 rand_sleep(random);
                 int64_t r = table->get_int(0, 0);
@@ -421,7 +421,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
 
     {
         WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
+        TableRef table = wt.get_or_add_table("table");
         DescriptorRef desc = table->get_descriptor();
         desc->add_column(type_Int, "row");
         table->insert_empty_row(0, 1);
