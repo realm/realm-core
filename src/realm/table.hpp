@@ -39,6 +39,8 @@
 #include <realm/query.hpp>
 #include <realm/column.hpp>
 
+#include <realm/column_binary.hpp>
+
 namespace realm {
 
 class TableView;
@@ -403,6 +405,9 @@ public:
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
+
+    template<class T> T get(size_t c, size_t r) const noexcept;
+
     size_t get_link(size_t column_ndx, size_t row_ndx) const noexcept;
     bool is_null_link(size_t column_ndx, size_t row_ndx) const noexcept;
     LinkViewRef get_linklist(size_t column_ndx, size_t row_ndx);
@@ -1403,12 +1408,118 @@ protected:
 };
 
 
-
-
-
 // Implementation:
-inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
+
+template<typename T> inline T Table::get(size_t col_ndx, size_t ndx) const noexcept
+{ 
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Bool);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.get(ndx).value_or(0) != 0;
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.get(ndx) != 0;
+    }
+}
+
+template<> inline int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
+{ 
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Int);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.get(ndx).value_or(0);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.get(ndx);
+    }    
+}
+
+template<> inline DateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_DateTime);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    if (is_nullable(col_ndx)) {
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        return column.get(ndx).value_or(0);
+    }
+    else {
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        return column.get(ndx);
+    }
+}
+
+template<> inline float Table::get(size_t col_ndx, size_t ndx) const noexcept 
+{ 
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Float);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
+    float f = column.get(ndx);
+    if (null::is_null_float(f))
+        return 0.0f;
+    else
+        return f;
+}
+
+template<> inline double Table::get(size_t col_ndx, size_t ndx) const noexcept 
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Double);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
+    double d = column.get(ndx);
+    if (null::is_null_float(d))
+        return 0.0;
+    else
+        return d;
+}
+
+template<> inline StringData Table::get(size_t col_ndx, size_t ndx) const noexcept 
+{ 
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_7(get_real_column_type(col_ndx), == , col_type_String, ||, 
+                   get_real_column_type(col_ndx), == , col_type_StringEnum);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    StringData sd;
+    ColumnType type = get_real_column_type(col_ndx);
+    if (type == col_type_String) {
+        const StringColumn& column = get_column<StringColumn, col_type_String>(col_ndx);
+        sd = column.get(ndx);
+    }
+    else {
+        REALM_ASSERT(type == col_type_StringEnum);
+        const StringEnumColumn& column = get_column<StringEnumColumn, col_type_StringEnum>(col_ndx);
+        sd = column.get(ndx);
+    }
+    REALM_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
+    return sd;
+}
+
+template<> inline BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
+{ 
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Binary);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const BinaryColumn& column = get_column<BinaryColumn, col_type_Binary>(col_ndx);
+    return column.get(ndx);
+}
+
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 inline void Table::bump_version(bool bump_global) const noexcept
 {

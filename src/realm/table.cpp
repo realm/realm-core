@@ -2553,18 +2553,7 @@ size_t Table::get_index_in_group() const noexcept
 
 int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx).value_or(0);
-    }
-    else {
-        const IntegerColumn& column = get_column(col_ndx);
-        return column.get(ndx);
-    }
-
+    return get<int64_t>(col_ndx, ndx);
 }
 
 
@@ -2661,18 +2650,7 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx).value_or(0) != 0;
-    }
-    else {
-        const IntegerColumn& column = get_column(col_ndx);
-        return column.get(ndx) != 0;
-    }
+    return get<bool>(col_ndx, ndx);
 }
 
 
@@ -2699,18 +2677,7 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
 
 DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column_int_null(col_ndx);
-        return column.get(ndx).value_or(0);
-    }
-    else {
-        const IntegerColumn& column = get_column(col_ndx);
-        return column.get(ndx);
-    }
+    return get<DateTime>(col_ndx, ndx);
 }
 
 
@@ -2737,15 +2704,7 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
 
 float Table::get_float(size_t col_ndx, size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const FloatColumn& column = get_column_float(col_ndx);
-    float f = column.get(ndx);
-    if (null::is_null_float(f))
-        return 0.0f;
-    else
-        return f;
+    return get<float>(col_ndx, ndx);
 }
 
 
@@ -2765,16 +2724,7 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value)
 
 double Table::get_double(size_t col_ndx, size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const DoubleColumn& column = get_column_double(col_ndx);
-    double d = column.get(ndx);
-    if (null::is_null_float(d))
-        return 0.0;
-    else
-        return d;
-
+    return get<double>(col_ndx, ndx);
 }
 
 
@@ -2794,21 +2744,7 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value)
 
 StringData Table::get_string(size_t col_ndx, size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_3(ndx, <, m_size);
-    StringData sd;
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        const StringColumn& column = get_column_string(col_ndx);
-        sd = column.get(ndx);
-    }
-    else {
-        REALM_ASSERT(type == col_type_StringEnum);
-        const StringEnumColumn& column = get_column_string_enum(col_ndx);
-        sd = column.get(ndx);
-    }
-    REALM_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
-    return sd;
+    return get<StringData>(col_ndx, ndx);
 }
 
 
@@ -2932,11 +2868,7 @@ void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t 
 
 BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_3(ndx, <, m_size);
-
-    const BinaryColumn& column = get_column_binary(col_ndx);
-    return column.get(ndx);
+    return get<BinaryData>(col_ndx, ndx);
 }
 
 
