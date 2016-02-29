@@ -340,7 +340,7 @@ The `S` bit is at position 22 (float) or 51 (double).
 struct null {
     null(int) {}
     null() {}
-    operator StringData() { return StringData(0, 0); }
+    operator StringData() { return StringData(nullptr, 0); }
     operator int64_t() { throw(LogicError::type_mismatch); }
     template<class T>
     operator util::Optional<T>() { return util::none; }
