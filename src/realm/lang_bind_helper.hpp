@@ -106,6 +106,8 @@ public:
     static LinkView* get_linklist_ptr(Row&, size_t col_ndx);
     static void unbind_linklist_ptr(LinkView*);
 
+    using VersionID = SharedGroup::VersionID;
+
     //@{
 
     /// Continuous transactions.
@@ -167,25 +169,15 @@ public:
     /// \throw SharedGroup::BadVersion Thrown by advance_read() if the specified
     /// version does not correspond to a bound (or tethered) snapshot.
 
-    static void advance_read(SharedGroup&, History&,
-                             SharedGroup::VersionID version = SharedGroup::VersionID());
-    template<class O>
-    static void advance_read(SharedGroup&, History&, O&& observer,
-                             SharedGroup::VersionID version = SharedGroup::VersionID());
-    static void promote_to_write(SharedGroup&, History&);
-    template<class O>
-    static void promote_to_write(SharedGroup&, History&, O&& observer);
+    static void advance_read(SharedGroup&, VersionID = VersionID());
+    template<class O> static void advance_read(SharedGroup&, O&& observer, VersionID = VersionID());
+    static void promote_to_write(SharedGroup&);
+    template<class O> static void promote_to_write(SharedGroup&, O&& observer);
     static void commit_and_continue_as_read(SharedGroup&);
-    static void rollback_and_continue_as_read(SharedGroup&, History&);
-    template<class O>
-    static void rollback_and_continue_as_read(SharedGroup&, History&, O&& observer);
+    static void rollback_and_continue_as_read(SharedGroup&);
+    template<class O> static void rollback_and_continue_as_read(SharedGroup&, O&& observer);
 
     //@}
-
-    static Replication::version_type get_current_version(SharedGroup& sg)
-    {
-        return Replication::version_type(sg.get_current_version());
-    }
 
     /// Returns the name of the specified data type as follows:
     ///
@@ -346,55 +338,52 @@ inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
    link_view->unbind_ptr();
 }
 
-inline void LangBindHelper::advance_read(SharedGroup& sg, History& history,
-                                         SharedGroup::VersionID version)
+inline void LangBindHelper::advance_read(SharedGroup& sg, VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
     _impl::NullInstructionObserver* observer = nullptr;
-    sgf::advance_read(sg, history, observer, version);
+    sgf::advance_read(sg, observer, version); // Throws
 }
 
 template<class O>
-inline void LangBindHelper::advance_read(SharedGroup& sg, History& history, O&& observer,
-                                         SharedGroup::VersionID version)
+inline void LangBindHelper::advance_read(SharedGroup& sg, O&& observer, VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::advance_read(sg, history, &observer, version);
+    sgf::advance_read(sg, &observer, version); // Throws
 }
 
-inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history)
+inline void LangBindHelper::promote_to_write(SharedGroup& sg)
 {
     using sgf = _impl::SharedGroupFriend;
     _impl::NullInstructionObserver* observer = nullptr;
-    sgf::promote_to_write(sg, history, observer);
+    sgf::promote_to_write(sg, observer); // Throws
 }
 
 template<class O>
-inline void LangBindHelper::promote_to_write(SharedGroup& sg, History& history, O&& observer)
+inline void LangBindHelper::promote_to_write(SharedGroup& sg, O&& observer)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::promote_to_write(sg, history, &observer);
+    sgf::promote_to_write(sg, &observer); // Throws
 }
 
 inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::commit_and_continue_as_read(sg);
+    sgf::commit_and_continue_as_read(sg); // Throws
 }
 
-inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history)
+inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)
 {
     using sgf = _impl::SharedGroupFriend;
     _impl::NullInstructionObserver* observer = nullptr;
-    sgf::rollback_and_continue_as_read(sg, history, observer);
+    sgf::rollback_and_continue_as_read(sg, observer); // Throws
 }
 
 template<class O>
-inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, History& history,
-                                                          O&& observer)
+inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, O&& observer)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::rollback_and_continue_as_read(sg, history, &observer);
+    sgf::rollback_and_continue_as_read(sg, &observer); // Throws
 }
 
 } // namespace realm

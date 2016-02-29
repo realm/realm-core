@@ -484,7 +484,6 @@ void Table::rename_subcolumn(const path_vec& path, size_t col_ndx, StringData na
 }
 
 
-
 void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent,
                  bool skip_create_column_accessors)
 {
@@ -1832,7 +1831,7 @@ const LinkColumnBase& Table::get_column_link_base(size_t ndx) const noexcept
 {
     const ColumnBase& col_base = get_column_base(ndx);
     REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
-                   m_spec.get_column_type(ndx) == col_type_LinkList);
+                 m_spec.get_column_type(ndx) == col_type_LinkList);
     const LinkColumnBase& col_link_base = static_cast<const LinkColumnBase&>(col_base);
     return col_link_base;
 }
@@ -1841,7 +1840,7 @@ LinkColumnBase& Table::get_column_link_base(size_t ndx)
 {
     ColumnBase& col_base = get_column_base(ndx);
     REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
-                   m_spec.get_column_type(ndx) == col_type_LinkList);
+                 m_spec.get_column_type(ndx) == col_type_LinkList);
     LinkColumnBase& col_link_base = static_cast<LinkColumnBase&>(col_base);
     return col_link_base;
 }
@@ -4311,7 +4310,11 @@ void Table::write(std::ostream& out, size_t offset, size_t size, StringData over
     if (!table_name)
         table_name = get_name();
     SliceWriter writer(*this, table_name, offset, size_2);
-    Group::write(out, writer, false); // Throws
+    bool no_top_array = false;
+    bool pad_for_encryption = false;
+    uint_fast64_t version_number = 0;
+    Group::write(out, get_alloc(), writer, no_top_array, pad_for_encryption,
+                 version_number); // Throws
 }
 
 
