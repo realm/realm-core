@@ -1016,16 +1016,8 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
     }
 
     for (auto& t : update_backlink_columns) {
-        Table* target_table = std::get<0>(t);
-        size_t backlink_col_ndx = std::get<1>(t);
-        size_t origin_col_ndx = std::get<2>(t);
-
         Spec& target_spec = target_table->m_spec;
-        target_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_ndx);
-
-        LinkColumnBase& link_col = get_column_link_base(origin_col_ndx);
-        BacklinkColumn& backlink_col = target_table->get_column_backlink(backlink_col_ndx);
-        backlink_col.set_origin_column(link_col, origin_col_ndx);
+        target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
     }
 }
 
@@ -1058,13 +1050,10 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             if (!is_link_type(m_spec.get_column_type(col_ndx)))
                 continue;
             LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[col_ndx]);
-
             Spec& target_spec = link_col->get_target_table().m_spec;
             size_t old_col_ndx = col_ndx + 1;
             size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
             target_spec.set_backlink_origin_column(backlink_col_ndx, col_ndx);
-            BacklinkColumn& backlink_col = link_col->get_target_table().get_column_backlink(backlink_col_ndx);
-            backlink_col.set_origin_column(*link_col, col_ndx);
         }
     }
     else if (moved_from > moved_to) {
@@ -1077,8 +1066,6 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             size_t old_col_ndx = col_ndx - 1;
             size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
             target_spec.set_backlink_origin_column(backlink_col_ndx, col_ndx);
-            BacklinkColumn& backlink_col = link_col->get_target_table().get_column_backlink(backlink_col_ndx);
-            backlink_col.set_origin_column(*link_col, col_ndx);
         }
     }
 }
