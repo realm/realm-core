@@ -18,7 +18,6 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
 
 
 // Test independence and thread-safety
@@ -52,7 +51,7 @@ using unit_test::TestResults;
 
 namespace {
 
-static bool generate_all = false;
+const bool generate_all = false;
 
 // After modifying json methods in core, set above generate_all = true to
 // make the unit tests output their results to files. Then inspect the

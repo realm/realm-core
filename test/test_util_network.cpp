@@ -894,14 +894,12 @@ char echo_body[] = {
     '\xD5', '\xFB', '\xAC', '\xE8', '\x67', '\x37', '\xFD', '\xF3'
 };
 
-void sync_server(network::acceptor* acceptor, unit_test::TestResults* test_results_ptr)
+void sync_server(network::acceptor& acceptor, unit_test::TestContext& test_context)
 {
-    unit_test::TestResults& test_results = *test_results_ptr;
-
-    network::io_service& service = acceptor->service();
+    network::io_service& service = acceptor.service();
     network::socket socket(service);
     network::endpoint endpoint;
-    acceptor->accept(socket, endpoint);
+    acceptor.accept(socket, endpoint);
 
     network::buffered_input_stream input_stream(socket);
     const size_t max_header_size = 32;
@@ -937,10 +935,8 @@ void sync_server(network::acceptor* acceptor, unit_test::TestResults* test_resul
 }
 
 
-void sync_client(unsigned short listen_port, unit_test::TestResults* test_results_ptr)
+void sync_client(unsigned short listen_port, unit_test::TestContext& test_context)
 {
-    unit_test::TestResults& test_results = *test_results_ptr;
-
     network::io_service service;
     network::socket socket(service);
     {
@@ -999,8 +995,8 @@ TEST(Network_Sync)
     acceptor.listen();
 
     ThreadWrapper server_thread, client_thread;
-    server_thread.start([&] { sync_server(&acceptor,   &test_results); });
-    client_thread.start([&] { sync_client(listen_port, &test_results); });
+    server_thread.start([&] { sync_server(acceptor,   test_context); });
+    client_thread.start([&] { sync_client(listen_port, test_context); });
     client_thread.join();
     server_thread.join();
 }
@@ -1010,11 +1006,11 @@ namespace {
 
 class async_server {
 public:
-    async_server(unit_test::TestResults& test_results):
+    async_server(unit_test::TestContext& test_context):
         m_acceptor(m_service),
         m_socket(m_service),
         m_input_stream(m_socket),
-        m_test_results(test_results)
+        m_test_context(test_context)
     {
     }
 
@@ -1045,7 +1041,7 @@ private:
     char m_header_buffer[s_max_header_size];
     size_t m_body_size;
     std::unique_ptr<char[]> m_body_buffer;
-    unit_test::TestResults& m_test_results;
+    unit_test::TestContext& m_test_context;
 
     void handle_accept(std::error_code ec)
     {
@@ -1061,7 +1057,7 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        unit_test::TestResults& test_results = m_test_results;
+        unit_test::TestContext& test_context = m_test_context;
         if (!CHECK_GREATER(n, 0))
             return;
         if (!CHECK_LESS_EQUAL(n, s_max_header_size+0))
@@ -1090,7 +1086,7 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        unit_test::TestResults& test_results = m_test_results;
+        unit_test::TestContext& test_context = m_test_context;
         if (!CHECK_EQUAL(n, m_body_size))
             return;
         MemoryOutputStream out;
@@ -1126,7 +1122,7 @@ private:
     {
         if (ec && ec != network::end_of_input)
             throw std::system_error(ec);
-        unit_test::TestResults& test_results = m_test_results;
+        unit_test::TestContext& test_context = m_test_context;
         CHECK(ec == network::end_of_input);
     }
 };
@@ -1134,11 +1130,11 @@ private:
 
 class async_client {
 public:
-    async_client(unsigned short listen_port, unit_test::TestResults& test_results):
+    async_client(unsigned short listen_port, unit_test::TestContext& test_context):
         m_listen_port(listen_port),
         m_socket(m_service),
         m_input_stream(m_socket),
-        m_test_results(test_results)
+        m_test_context(test_context)
     {
     }
 
@@ -1174,7 +1170,7 @@ private:
     char m_header_buffer[s_max_header_size];
     size_t m_body_size;
     std::unique_ptr<char[]> m_body_buffer;
-    unit_test::TestResults& m_test_results;
+    unit_test::TestContext& m_test_context;
 
     void handle_write_header(std::error_code ec)
     {
@@ -1200,7 +1196,7 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        unit_test::TestResults& test_results = m_test_results;
+        unit_test::TestContext& test_context = m_test_context;
         if (!CHECK_GREATER(n, 0))
             return;
         if (!CHECK_LESS_EQUAL(n, s_max_header_size+0))
@@ -1229,7 +1225,7 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        unit_test::TestResults& test_results = m_test_results;
+        unit_test::TestContext& test_context = m_test_context;
         if (!CHECK_EQUAL(n, m_body_size))
             return;
         if (!CHECK_EQUAL(m_body_size, sizeof echo_body))
@@ -1243,9 +1239,9 @@ private:
 
 TEST(Network_Async)
 {
-    async_server server(test_results);
+    async_server server(test_context);
     unsigned short listen_port = server.init();
-    async_client client(listen_port, test_results);
+    async_client client(listen_port, test_context);
 
     ThreadWrapper server_thread, client_thread;
     server_thread.start([&] { server.run(); });

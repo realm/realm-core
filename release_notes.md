@@ -60,6 +60,13 @@
   process.
 * Introducing `RefOrTagged` value type whan can be used to make it safer to work
   with "tagged integers" in arrays having the "has refs" flag.
+* New features in the unit test framework: Ability to specify number of internal
+  repetitions of the set of selected tests. Also, progress reporting now
+  includes information about which test thread runs which unit test. Also, new
+  test introduction macro `NO_CONCUR_TEST()` for those tests that cannot run
+  concurrently with other tests, or with other executions of themselves. From
+  now on, all unit tests must be able to run multiple times, and must either be
+  fully thread safe, or must be introduced with `NO_CONCUR_TEST()`.
 
 ----------------------------------------------
 

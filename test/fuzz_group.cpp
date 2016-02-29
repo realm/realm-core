@@ -394,13 +394,6 @@ int run_fuzzy(int argc, const char* argv[])
         exit(1);
     }
 
-    test_util::unit_test::TestDetails test_details;
-    test_details.test_index = 0;
-    test_details.suite_name = "FuzzyTest";
-    test_details.test_name = "Group";
-    test_details.file_name = __FILE__;
-    test_details.line_number = __LINE__;
-
     Group group;
 
     try {
