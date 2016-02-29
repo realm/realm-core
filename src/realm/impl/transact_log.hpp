@@ -873,13 +873,13 @@ inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, 
     if (link.is_valid()) {
         typedef _impl::TableFriend tf;
         typedef _impl::DescriptorFriend df;
-        size_t target_table_ndx = link.target_table->get_index_in_group();
+        size_t target_table_ndx = link.m_target_table->get_index_in_group();
         const Table& origin_table = df::get_root_table(desc);
         REALM_ASSERT(origin_table.is_group_level());
-        const Spec& target_spec = tf::get_spec(*(link.target_table));
+        const Spec& target_spec = tf::get_spec(*(link.m_target_table));
         size_t origin_table_ndx = origin_table.get_index_in_group();
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
-        REALM_ASSERT_3(backlink_col_ndx, ==, link.backlink_col_ndx);
+        REALM_ASSERT_3(backlink_col_ndx, ==, link.m_backlink_col_ndx);
         m_encoder.insert_link_column(col_ndx, type, name, target_table_ndx, backlink_col_ndx); // Throws
     }
     else {

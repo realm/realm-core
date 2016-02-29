@@ -685,7 +685,7 @@ void Table::do_insert_column_unless_exists(Descriptor& desc, size_t col_ndx, Dat
             }
             if (tf::is_link_type(ColumnType(type)) &&
                 spec.get_opposite_link_table_ndx(col_ndx) !=
-                link.target_table->get_index_in_group()) {
+                link.m_target_table->get_index_in_group()) {
                 throw LogicError(LogicError::type_mismatch);
             }
 
@@ -828,21 +828,21 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
     // established by Table::refresh_column_accessors() when it is invoked for
     // the target table below.
     if (link.is_valid()) {
-        size_t target_table_ndx = link.target_table->get_index_in_group();
+        size_t target_table_ndx = link.m_target_table->get_index_in_group();
         m_spec.set_opposite_link_table_ndx(col_ndx, target_table_ndx); // Throws
-        link.target_table->mark();
+        link.m_target_table->mark();
     }
 
     refresh_column_accessors(col_ndx); // Throws
 
     if (link.is_valid()) {
-        link.target_table->unmark();
+        link.m_target_table->unmark();
         size_t origin_table_ndx = get_index_in_group();
-        if (link.backlink_col_ndx == realm::npos) {
-            const Spec& target_spec = tf::get_spec(*(link.target_table));
-            link.backlink_col_ndx = target_spec.get_column_count();   // insert at back of target
+        if (link.m_backlink_col_ndx == realm::npos) {
+            const Spec& target_spec = tf::get_spec(*(link.m_target_table));
+            link.m_backlink_col_ndx = target_spec.get_column_count();   // insert at back of target
         }
-        link.target_table->insert_backlink_column(origin_table_ndx, col_ndx, link.backlink_col_ndx); // Throws
+        link.m_target_table->insert_backlink_column(origin_table_ndx, col_ndx, link.m_backlink_col_ndx); // Throws
     }
 }
 

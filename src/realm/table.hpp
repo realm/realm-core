@@ -1901,16 +1901,13 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 }
 
 // This class groups together information about the target of a link column
-// Either all information is provided or this is not a valid link.
+// This is not a valid link if the target table == nullptr
 struct LinkTargetInfo {
-    LinkTargetInfo() : target_table(nullptr), backlink_col_ndx(realm::npos) {}
-    LinkTargetInfo(Table* target)
-        : target_table(target), backlink_col_ndx(realm::npos) {}
-    LinkTargetInfo(Table* target, size_t backlink_ndx)
-        : target_table(target), backlink_col_ndx(backlink_ndx) {}
-    bool is_valid() const { return (target_table != nullptr); }
-    Table* target_table;
-    size_t backlink_col_ndx;    // a value of npos indicates the backlink should be appended
+    LinkTargetInfo(Table* target = nullptr, size_t backlink_ndx = realm::npos)
+        : m_target_table(target), m_backlink_col_ndx(backlink_ndx) {}
+    bool is_valid() const { return (m_target_table != nullptr); }
+    Table* m_target_table;
+    size_t m_backlink_col_ndx; // a value of npos indicates the backlink should be appended
 };
 
 // The purpose of this class is to give internal access to some, but

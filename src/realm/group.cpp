@@ -1506,7 +1506,8 @@ public:
         return true;
     }
 
-    bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx, size_t backlink_column_ndx)
+    bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx,
+                            size_t backlink_column_ndx)
     {
         if (m_table) {
             InsertColumnUpdater updater(col_ndx);
