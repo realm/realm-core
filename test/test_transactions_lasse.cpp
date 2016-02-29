@@ -159,7 +159,7 @@ void read_thread(TestResults* test_results_ptr, std::string path)
 } // anonymous namespace
 
 
-TEST(Transactions_Stress1, TEST_DURATION >= 3)
+TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
 {
     test_util::ThreadWrapper read_threads[READERS1];
     test_util::ThreadWrapper write_threads[WRITERS1];
