@@ -11574,6 +11574,12 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
     }
 }
 
+
+// Check that rollback of a transaction which deletes a table
+// containing a link will insert the associated backlink into
+// the correct index in the associated (linked) table. In this
+// case, backlink columns should not be appended (rather they
+// should be inserted into the previously used index).
 TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11585,11 +11591,8 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 
     TableRef source_a = group_w.add_table("source_a");
     TableRef source_b = group_w.add_table("source_b");
-    TableRef target_a = group_w.add_table("target_a");
     TableRef target_b = group_w.add_table("target_b");
 
-
-    //source_a->add_column_link(type_Link, "a", *target_a);
     source_a->add_column_link(type_LinkList, "b", *target_b);
     source_b->add_column_link(type_LinkList, "b", *target_b);
 
@@ -11601,11 +11604,16 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
         group_w.remove_table("source_a");
         LangBindHelper::rollback_and_continue_as_read(sg_w);
     }
-    CHECK_EQUAL(group_w.size(), 4);
+    using tf = _impl::TableFriend;
+    CHECK_EQUAL(group_w.size(), 3);
     CHECK_EQUAL(group_w.get_table_name(0), StringData("source_a"));
     CHECK_EQUAL(group_w.get_table(0)->get_column_count(), 1);
     CHECK_EQUAL(group_w.get_table(0)->get_link_target(0), target_b);
     CHECK_EQUAL(group_w.get_table(1)->get_link_target(0), target_b);
+    // backlink column index in target_b from source_a should be index 0
+    CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(0, 0), 0);
+    // backlink column index in target_b from source_b should be index 1
+    CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(1, 0), 1);
 }
 
 #endif
