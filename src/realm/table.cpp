@@ -1016,7 +1016,7 @@ void Table::update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_n
     }
 
     for (auto& t : update_backlink_columns) {
-        Spec& target_spec = target_table->m_spec;
+        Spec& target_spec = std::get<0>(t)->m_spec;
         target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
     }
 }
