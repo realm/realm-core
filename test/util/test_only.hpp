@@ -26,9 +26,9 @@
     realm::test_util::SetTestOnly realm_set_test_only__##name(#name); \
     TEST(name)
 
-#define NO_CUNCUR_ONLY(name) \
+#define NONCUNCURRENT_ONLY(name) \
     realm::test_util::SetTestOnly realm_set_test_only__##name(#name); \
-    NO_CONCUR_TEST(name)
+    NONCONCURRENT_TEST(name)
 
 namespace realm {
 namespace test_util {

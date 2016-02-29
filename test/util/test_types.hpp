@@ -31,10 +31,10 @@
     TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, true, \
                   __VA_ARGS__)
 
-#define NO_CONCUR_TEST_TYPES(name, ...) \
-    NO_CONCUR_TEST_TYPES_IF(name, true, __VA_ARGS__)
+#define NONCONCURRENT_TEST_TYPES(name, ...) \
+    NONCONCURRENT_TEST_TYPES_IF(name, true, __VA_ARGS__)
 
-#define NO_CONCUR_TEST_TYPES_IF(name, enabled, ...) \
+#define NONCONCURRENT_TEST_TYPES_IF(name, enabled, ...) \
     TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, false, \
                   __VA_ARGS__)
 

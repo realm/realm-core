@@ -51,10 +51,10 @@
 
 /// Add a test that must neither execute concurrently with other tests, nor with
 /// itself.
-#define NO_CONCUR_TEST(name) \
-    NO_CONCUR_TEST_IF(name, true)
+#define NONCONCURRENT_TEST(name) \
+    NONCONCURRENT_TEST_IF(name, true)
 
-#define NO_CONCUR_TEST_IF(name, enabled) \
+#define NONCONCURRENT_TEST_IF(name, enabled) \
     TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, false)
 
 #define TEST_EX(name, list, enabled, allow_concur) \

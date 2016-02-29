@@ -605,7 +605,7 @@ TEST(TableView_FindAllString)
 }
 
 
-NO_CONCUR_TEST(TableView_StringSort)
+NONCONCURRENT_TEST(TableView_StringSort)
 {
     // WARNING: Do not use the C++11 method (set_string_compare_method(1)) on Windows 8.1 because it has a bug that
     // takes length in count when sorting ("b" comes before "aaaa"). Bug is not present in Windows 7.
