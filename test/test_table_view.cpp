@@ -604,19 +604,8 @@ TEST(TableView_FindAllString)
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
-namespace {
 
-// primitive C locale comparer. But that's OK since all we want to test is if the callback is invoked
-bool got_called = false;
-bool comparer(const char* s1, const char* s2)
-{
-    got_called = true;
-    return *s1 < *s2;
-}
-
-} // unnamed namespace
-
-TEST(TableView_StringSort)
+NONCONCURRENT_TEST(TableView_StringSort)
 {
     // WARNING: Do not use the C++11 method (set_string_compare_method(1)) on Windows 8.1 because it has a bug that
     // takes length in count when sorting ("b" comes before "aaaa"). Bug is not present in Windows 7.
@@ -652,8 +641,16 @@ TEST(TableView_StringSort)
     CHECK_EQUAL("zebra", v[1].first);
     CHECK_EQUAL("ZEBRA", v[0].first);
 
+    // primitive C locale comparer. But that's OK since all we want to test is
+    // if the callback is invoked
+    bool got_called = false;
+    auto comparer = [&](const char* s1, const char* s2) {
+        got_called = true;
+        return *s1 < *s2;
+    };
+
     // Test if callback comparer works. Our callback is a primitive dummy-comparer
-    set_string_compare_method(STRING_COMPARE_CALLBACK, &comparer);
+    set_string_compare_method(STRING_COMPARE_CALLBACK, comparer);
     v.column().first.sort();
     CHECK_EQUAL("ALPHA", v[0].first);
     CHECK_EQUAL("ZEBRA", v[1].first);
@@ -679,6 +676,7 @@ TEST(TableView_StringSort)
     // Set back to default for use by other unit tests
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
+
 
 TEST(TableView_FloatDoubleSort)
 {

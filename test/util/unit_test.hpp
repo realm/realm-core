@@ -20,10 +20,12 @@
 #ifndef REALM_TEST_UTIL_UNIT_TEST_HPP
 #define REALM_TEST_UTIL_UNIT_TEST_HPP
 
+#include <stddef.h>
 #include <cmath>
 #include <cstring>
 #include <algorithm>
 #include <vector>
+#include <list>
 #include <string>
 #include <sstream>
 #include <ostream>
@@ -34,7 +36,8 @@
 #include <realm/util/bind_ptr.hpp>
 
 
-#define TEST(name) TEST_IF(name, true)
+#define TEST(name) \
+    TEST_IF(name, true)
 
 /// Allows you to control whether the test will be enabled or
 /// disabled. The test will be compiled in both cases. You can pass
@@ -44,43 +47,51 @@
 /// variables which can then be adjusted before calling
 /// TestList::run().
 #define TEST_IF(name, enabled) \
-    TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled)
+    TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, true)
 
-#define TEST_EX(name, list, enabled) \
-    struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
-        bool test_enabled() const { return bool(enabled); } \
+/// Add a test that must neither execute concurrently with other tests, nor with
+/// itself.
+#define NONCONCURRENT_TEST(name) \
+    NONCONCURRENT_TEST_IF(name, true)
+
+#define NONCONCURRENT_TEST_IF(name, enabled) \
+    TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, false)
+
+#define TEST_EX(name, list, enabled, allow_concur) \
+    struct Realm_UnitTest__##name: realm::test_util::unit_test::TestBase { \
+        static bool test_enabled() { return bool(enabled); } \
+        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c): TestBase(c) {} \
         void test_run(); \
     }; \
-    Realm_UnitTest__##name realm_unit_test__##name; \
-    realm::test_util::unit_test::RegisterTest \
-        realm_unit_test_reg__##name((list), realm_unit_test__##name, \
-                                      "DefaultSuite", #name, __FILE__, __LINE__); \
+    realm::test_util::unit_test::RegisterTest<Realm_UnitTest__##name> \
+        realm_unit_test_reg__##name((list), (allow_concur), "DefaultSuite", \
+                                    #name, __FILE__, __LINE__); \
     void Realm_UnitTest__##name::test_run()
 
 
 #define CHECK(cond) \
-    test_results.check(bool(cond), __FILE__, __LINE__, #cond)
+    test_context.check(bool(cond), __FILE__, __LINE__, #cond)
 
 #define CHECK_NOT(cond) \
-    test_results.check_not(bool(cond), __FILE__, __LINE__, #cond)
+    test_context.check_not(bool(cond), __FILE__, __LINE__, #cond)
 
 #define CHECK_EQUAL(a,b) \
-    test_results.check_equal((a), (b), __FILE__, __LINE__, #a, #b)
+    test_context.check_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_NOT_EQUAL(a,b) \
-    test_results.check_not_equal((a), (b), __FILE__, __LINE__, #a, #b)
+    test_context.check_not_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_LESS(a,b) \
-    test_results.check_less((a), (b), __FILE__, __LINE__, #a, #b)
+    test_context.check_less((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_LESS_EQUAL(a,b) \
-    test_results.check_less_equal((a), (b), __FILE__, __LINE__, #a, #b)
+    test_context.check_less_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_GREATER(a,b) \
-    test_results.check_greater((a), (b), __FILE__, __LINE__, #a, #b)
+    test_context.check_greater((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_GREATER_EQUAL(a,b) \
-    test_results.check_greater_equal((a), (b), __FILE__, __LINE__, #a, #b)
+    test_context.check_greater_equal((a), (b), __FILE__, __LINE__, #a, #b)
 
 #define CHECK_OR_RETURN(cond) \
     do { \
@@ -94,10 +105,10 @@
     do { \
         try { \
             (expr); \
-            test_results.throw_failed(__FILE__, __LINE__, #expr, #exception_class); \
+            test_context.throw_failed(__FILE__, __LINE__, #expr, #exception_class); \
         } \
         catch (exception_class&) { \
-            test_results.check_succeeded(); \
+            test_context.check_succeeded(); \
         } \
     } \
     while(false)
@@ -106,15 +117,15 @@
     do { \
         try { \
             (expr); \
-            test_results.throw_ex_failed(__FILE__, __LINE__, #expr, #exception_class, \
+            test_context.throw_ex_failed(__FILE__, __LINE__, #expr, #exception_class, \
                                          #exception_cond); \
         } \
         catch (exception_class& e) { \
             if (exception_cond) { \
-                test_results.check_succeeded(); \
+                test_context.check_succeeded(); \
             } \
             else { \
-                test_results.throw_ex_cond_failed(__FILE__, __LINE__, #expr, #exception_class, \
+                test_context.throw_ex_cond_failed(__FILE__, __LINE__, #expr, #exception_class, \
                                                   #exception_cond); \
             } \
         } \
@@ -125,10 +136,10 @@
     do { \
         try { \
             (expr); \
-            test_results.throw_any_failed(__FILE__, __LINE__, #expr); \
+            test_context.throw_any_failed(__FILE__, __LINE__, #expr); \
         } \
         catch (...) { \
-            test_results.check_succeeded(); \
+            test_context.check_succeeded(); \
         } \
     } \
     while (false)
@@ -154,19 +165,19 @@
 /// multiple of the machine epsilon.
 
 #define CHECK_APPROXIMATELY_EQUAL(a, b, epsilon) \
-    test_results.check_approximately_equal((a), (b), (epsilon), \
+    test_context.check_approximately_equal((a), (b), (epsilon), \
                                            __FILE__, __LINE__, #a, #b, #epsilon)
 
 #define CHECK_ESSENTIALLY_EQUAL(a, b, epsilon) \
-    test_results.check_essentially_equal((a), (b), (epsilon), \
+    test_context.check_essentially_equal((a), (b), (epsilon), \
                                          __FILE__, __LINE__, #a, #b, #epsilon)
 
 #define CHECK_DEFINITELY_LESS(a, b, epsilon) \
-    test_results.check_definitely_less((a), (b), (epsilon), \
+    test_context.check_definitely_less((a), (b), (epsilon), \
                                        __FILE__, __LINE__, #a, #b, #epsilon)
 
 #define CHECK_DEFINITELY_GREATER(a, b, epsilon) \
-    test_results.check_definitely_greater((a), (b), (epsilon), \
+    test_context.check_definitely_greater((a), (b), (epsilon), \
                                           __FILE__, __LINE__, #a, #b, #epsilon)
 
 //@}
@@ -176,13 +187,11 @@ namespace realm {
 namespace test_util {
 namespace unit_test {
 
-
-class Test;
-class TestResults;
+class TestContext;
+class ExecContext;
 
 
 struct TestDetails {
-    long test_index;
     const char* suite_name;
     std::string test_name;
     const char* file_name;
@@ -191,22 +200,25 @@ struct TestDetails {
 
 
 struct Summary {
-    long num_included_tests;
-    long num_failed_tests;
-    long num_excluded_tests;
-    long num_disabled_tests;
-    long long num_checks;
-    long long num_failed_checks;
+    long num_disabled_tests;     // TEST_IF()
+    long num_excluded_tests;     // Excluded by filtering
+    long num_included_tests;     // Included by filtering
+    long num_executed_tests;     // num_included_tests times num_recurrences
+    long num_failed_tests;       // Out of num_executed_tests
+    long long num_executed_checks;
+    long long num_failed_checks; // Out of num_executed_checks
     double elapsed_seconds;
 };
 
 
 class Reporter {
 public:
-    virtual void begin(const TestDetails&);
-    virtual void fail(const TestDetails&, const std::string& message);
-    virtual void end(const TestDetails&, double elapsed_seconds);
-    virtual void summary(const Summary&);
+    virtual void begin(const TestContext&);
+    virtual void fail(const TestContext&, const char* file_name, long line_number,
+                      const std::string& message);
+    virtual void end(const TestContext&, double elapsed_seconds);
+    virtual void summary(const ExecContext&, const Summary&);
+    virtual void end_of_thread(const ExecContext&, int thread_index);
     virtual ~Reporter() noexcept {}
 };
 
@@ -220,44 +232,60 @@ public:
 
 class TestList {
 public:
-    /// Call this function to change the underlying order of tests in
-    /// this list. The underlying order is the order reflected by
-    /// TestDetails::test_index. This is also the execution order
-    /// unless you ask for shuffling, or for multiple execution
-    /// threads when calling run().
+    /// Call this function to change the order of tests in the list. This order
+    /// is the execution order unless you ask for shuffling, or for multiple
+    /// execution threads when calling run().
     ///
-    /// Within a particular translation unit, the default underlying
-    /// order is the order in which the tests occur in the source
-    /// file. The default underlying order of tests between
-    /// translation units is uncertain, but will in general depend on
-    /// the order in which the files are linked together. With a
-    /// suitable comparison operation, this function can be used to
-    /// eliminate the uncertainty of the underlying order. An example
-    /// of a suitable comparison operation would be one that uses the
-    /// file name as primary sorting criterium, and the original
-    /// underlying order (TestDetails::test_index) as secondary
-    /// criterium. See the class PatternBasedFileOrder for a slightly
-    /// more advanced alternative.
-    template<class Compare>
-    void sort(Compare);
+    /// Within a particular translation unit, the default order is the order in
+    /// which the tests occur in the source file. The default order of tests
+    /// between translation units is uncertain, but will in general depend on
+    /// the order in which the files are linked together. With a suitable
+    /// comparison operation, this function can be used to eliminate the
+    /// uncertainty of the order. An example of a suitable comparison operation
+    /// would be one that compares file names, such as
+    /// PatternBasedFileOrder.
+    ///
+    /// The sorting function should have the following signature:
+    ///
+    ///     bool compare(const TestDetails& a, const TestDetails& b)
+    ///
+    /// It must return true if, and only if `a` is less that `b`. The sorting
+    /// function is allowed to assume that a particular TestDetails object
+    /// remains allocated on the same address across all invocations.
+    ///
+    ///  The sorting operation is stable.
+    template<class Compare> void sort(Compare);
 
     /// Run all the tests in this list (or a filtered subset of them).
-    bool run(Reporter* = nullptr, Filter* = nullptr, int num_threads = 1, bool shuffle = false);
+    bool run(Reporter* = nullptr, Filter* = nullptr, int num_repetitions = 1, int num_threads = 1,
+             bool shuffle = false);
+
+    using RunFunc = void (*)(TestContext&);
+    using IsEnabledFunc = bool (*)();
 
     /// Called automatically when you use the `TEST` macro (or one of
     /// its friends).
-    void add(Test&, const char* suite, const std::string& name, const char* file, long line);
+    void add(RunFunc, IsEnabledFunc, bool allow_concur, const char* suite,
+             const std::string& name, const char* file, long line);
+
+    size_t size() const noexcept;
+    const TestDetails& get_test_details(size_t i) const noexcept;
 
 private:
-    class ExecContext;
-    template<class Compare>
-    class CompareAdaptor;
+    class SharedContext;
+    class ThreadContext;
 
-    std::vector<Test*> m_tests;
+    struct Test {
+        RunFunc run_func;
+        IsEnabledFunc is_enabled_func;
+        bool allow_concur;
+        TestDetails details;
+    };
+    std::list<Test> m_test_storage;
+    std::vector<const Test*> m_tests;
 
-    void reassign_indexes();
-
-    friend class TestResults;
+    friend class TestContext;
+    friend class ExecContext;
 };
 
 TestList& get_default_test_list();
@@ -270,7 +298,7 @@ struct PatternBasedFileOrder {
     template<size_t N>
     PatternBasedFileOrder(const char* (&patterns)[N]);
 
-    bool operator()(TestDetails*, TestDetails*);
+    bool operator()(const TestDetails&, const TestDetails&);
 
 private:
     class state;
@@ -289,9 +317,10 @@ class SimpleReporter: public Reporter {
 public:
     explicit SimpleReporter(bool report_progress = false);
 
-    void begin(const TestDetails&) override;
-    void fail(const TestDetails&, const std::string&) override;
-    void summary(const Summary&) override;
+    void begin(const TestContext&) override;
+    void fail(const TestContext&, const char*, long, const std::string&) override;
+    void summary(const ExecContext&, const Summary&) override;
+    void end_of_thread(const ExecContext&, int) override;
 
 protected:
     bool m_report_progress;
@@ -332,8 +361,26 @@ Reporter* create_xml_reporter(std::ostream&);
 Filter* create_wildcard_filter(const std::string&);
 
 
-class TestResults {
+class TestContext {
 public:
+    const ExecContext& exec_context;
+    const TestDetails& test_details;
+
+    /// Index of executing test with respect to the order of the tests in
+    /// `exec_context.test_list`. `exec_context.test_list.size()` specifies the
+    /// number of distinct tests.
+    const size_t test_index;
+
+    /// An index into the sequence of repeated executions of this
+    /// test. `exec_context.num_recurrences` specifies the number of requested
+    /// repetitions.
+    const int recurrence_index;
+
+    /// The index of the test thread that is executing the test this
+    /// time. `exec_context.num_threads` specifies the number of requested test
+    /// threads.
+    const int thread_index;
+
     bool check_cond(bool cond, const char* file, long line, const char* macro_name,
                     const char* cond_text);
 
@@ -401,12 +448,13 @@ public:
                               const char* exception_name, const char* exception_cond_text);
     void throw_any_failed(const char* file, long line, const char* expr_text);
 
-private:
-    Test* m_test;
-    TestList* m_list;
-    TestList::ExecContext* m_context;
+    TestContext(const TestContext&) = delete;
+    void operator=(const TestContext&) = delete;
 
-    TestResults();
+private:
+    TestList::ThreadContext& m_thread_context;
+
+    TestContext(TestList::ThreadContext&, const TestDetails&, size_t test_index, int recurrence_index);
 
     void test_failed(const std::string& message);
     void check_failed(const char* file, long line, const std::string& message);
@@ -418,24 +466,30 @@ private:
                                 const char* a_text, const char* b_text, const char* eps_text,
                                 long double a, long double b, long double eps);
 
-    friend class Test;
-    friend class TestList;
+    friend class TestList::ThreadContext;
 };
 
 
-class Test {
+class ExecContext {
 public:
-    virtual bool test_enabled() const = 0;
-    virtual void test_run() = 0;
+    const TestList& test_list;
+    const int num_recurrences;
+    const int num_threads;
 
-protected:
-    TestDetails test_details;
-    TestResults test_results;
-    Test() {}
+    ExecContext(const ExecContext&) = delete;
+    void operator=(const ExecContext&) = delete;
 
 private:
-    friend class TestList;
-    friend class TestResults;
+    ExecContext(const TestList&, int num_recurrences, int num_threads);
+
+    friend class TestList::SharedContext;
+};
+
+
+class TestBase {
+protected:
+    TestContext& test_context;
+    TestBase(TestContext&);
 };
 
 
@@ -443,44 +497,38 @@ private:
 
 // Implementation
 
-struct RegisterTest {
-    RegisterTest(TestList& list, Test& test, const char* suite,
-                 const char* name, const char* file, long line)
+template<class Test> struct RegisterTest {
+    RegisterTest(TestList& list, bool allow_concur, const char* suite,
+                 std::string name, const char* file, long line)
     {
-        register_test(list, test, suite, name, file, line);
+        list.add(&RegisterTest::run_test, &Test::test_enabled,
+                 allow_concur, suite, name, file, line);
     }
-    static void register_test(TestList& list, Test& test, const char* suite,
-                              const std::string& name, const char* file, long line)
+    static void run_test(TestContext& test_context)
     {
-        list.add(test, suite, name, file, line);
+        Test test(test_context);
+        test.test_run();
     }
 };
 
 
-template<class Compare>
-class TestList::CompareAdaptor {
-public:
-    CompareAdaptor(const Compare& compare):
-        m_compare(compare)
-    {
-    }
-
-    bool operator()(Test* a, Test* b)
-    {
-        return m_compare(&a->test_details, &b->test_details);
-    }
-
-private:
-    Compare m_compare;
-};
-
-template<class Compare>
-inline void TestList::sort(Compare compare)
+template<class Compare> inline void TestList::sort(Compare compare)
 {
-    std::sort(m_tests.begin(), m_tests.end(), CompareAdaptor<Compare>(compare));
-    reassign_indexes();
+    auto compare_2 = [&](const Test* a, const Test* b) {
+        return compare(a->details, b->details);
+    };
+    std::stable_sort(m_tests.begin(), m_tests.end(), compare_2);
 }
 
+inline size_t TestList::size() const noexcept
+{
+    return m_tests.size();
+}
+
+inline const TestDetails& TestList::get_test_details(size_t i) const noexcept
+{
+    return m_tests[i]->details;
+}
 
 inline PatternBasedFileOrder::PatternBasedFileOrder(const char** patterns_begin,
                                                     const char** patterns_end):
@@ -592,7 +640,7 @@ void to_string(const T& value, std::string& str)
 }
 
 
-inline bool TestResults::check_cond(bool cond, const char* file, long line, const char* macro_name,
+inline bool TestContext::check_cond(bool cond, const char* file, long line, const char* macro_name,
                                     const char* cond_text)
 {
     if (REALM_LIKELY(cond)) {
@@ -604,18 +652,18 @@ inline bool TestResults::check_cond(bool cond, const char* file, long line, cons
     return cond;
 }
 
-inline bool TestResults::check(bool cond, const char* file, long line, const char* cond_text)
+inline bool TestContext::check(bool cond, const char* file, long line, const char* cond_text)
 {
     return check_cond(cond, file, line, "CHECK", cond_text);
 }
 
-inline bool TestResults::check_not(bool cond, const char* file, long line, const char* cond_text)
+inline bool TestContext::check_not(bool cond, const char* file, long line, const char* cond_text)
 {
     return check_cond(!cond, file, line, "CHECK_NOT", cond_text);
 }
 
 template<class A, class B>
-inline bool TestResults::check_compare(bool cond, const A& a, const B& b,
+inline bool TestContext::check_compare(bool cond, const A& a, const B& b,
                                        const char* file, long line, const char* macro_name,
                                        const char* a_text, const char* b_text)
 {
@@ -631,7 +679,7 @@ inline bool TestResults::check_compare(bool cond, const A& a, const B& b,
     return cond;
 }
 
-inline bool TestResults::check_inexact_compare(bool cond, long double a, long double b,
+inline bool TestContext::check_inexact_compare(bool cond, long double a, long double b,
                                                long double eps, const char* file, long line,
                                                const char* macro_name, const char* a_text,
                                                const char* b_text, const char* eps_text)
@@ -646,7 +694,7 @@ inline bool TestResults::check_inexact_compare(bool cond, long double a, long do
 }
 
 template<class A, class B>
-inline bool TestResults::check_equal(const A& a, const B& b,
+inline bool TestContext::check_equal(const A& a, const B& b,
                                      const char* file, long line,
                                      const char* a_text, const char* b_text)
 {
@@ -655,7 +703,7 @@ inline bool TestResults::check_equal(const A& a, const B& b,
 }
 
 template<class A, class B>
-inline bool TestResults::check_not_equal(const A& a, const B& b,
+inline bool TestContext::check_not_equal(const A& a, const B& b,
                                          const char* file, long line,
                                          const char* a_text, const char* b_text)
 {
@@ -664,7 +712,7 @@ inline bool TestResults::check_not_equal(const A& a, const B& b,
 }
 
 template<class A, class B>
-inline bool TestResults::check_less(const A& a, const B& b,
+inline bool TestContext::check_less(const A& a, const B& b,
                                     const char* file, long line,
                                     const char* a_text, const char* b_text)
 {
@@ -673,7 +721,7 @@ inline bool TestResults::check_less(const A& a, const B& b,
 }
 
 template<class A, class B>
-inline bool TestResults::check_less_equal(const A& a, const B& b,
+inline bool TestContext::check_less_equal(const A& a, const B& b,
                                           const char* file, long line,
                                           const char* a_text, const char* b_text)
 {
@@ -682,7 +730,7 @@ inline bool TestResults::check_less_equal(const A& a, const B& b,
 }
 
 template<class A, class B>
-inline bool TestResults::check_greater(const A& a, const B& b,
+inline bool TestContext::check_greater(const A& a, const B& b,
                                        const char* file, long line,
                                        const char* a_text, const char* b_text)
 {
@@ -691,7 +739,7 @@ inline bool TestResults::check_greater(const A& a, const B& b,
 }
 
 template<class A, class B>
-inline bool TestResults::check_greater_equal(const A& a, const B& b,
+inline bool TestContext::check_greater_equal(const A& a, const B& b,
                                              const char* file, long line,
                                              const char* a_text, const char* b_text)
 {
@@ -699,7 +747,7 @@ inline bool TestResults::check_greater_equal(const A& a, const B& b,
     return check_compare(cond, a, b, file, line, "CHECK_GREATER_EQUAL", a_text, b_text);
 }
 
-inline bool TestResults::check_approximately_equal(long double a, long double b,
+inline bool TestContext::check_approximately_equal(long double a, long double b,
                                                    long double eps, const char* file, long line,
                                                    const char* a_text, const char* b_text,
                                                    const char* eps_text)
@@ -709,7 +757,7 @@ inline bool TestResults::check_approximately_equal(long double a, long double b,
                                  a_text, b_text, eps_text);
 }
 
-inline bool TestResults::check_essentially_equal(long double a, long double b,
+inline bool TestContext::check_essentially_equal(long double a, long double b,
                                                  long double eps, const char* file, long line,
                                                  const char* a_text, const char* b_text,
                                                  const char* eps_text)
@@ -719,7 +767,7 @@ inline bool TestResults::check_essentially_equal(long double a, long double b,
                                  a_text, b_text, eps_text);
 }
 
-inline bool TestResults::check_definitely_less(long double a, long double b,
+inline bool TestContext::check_definitely_less(long double a, long double b,
                                                long double eps, const char* file, long line,
                                                const char* a_text, const char* b_text,
                                                const char* eps_text)
@@ -729,7 +777,7 @@ inline bool TestResults::check_definitely_less(long double a, long double b,
                                  a_text, b_text, eps_text);
 }
 
-inline bool TestResults::check_definitely_greater(long double a, long double b,
+inline bool TestContext::check_definitely_greater(long double a, long double b,
                                                   long double eps, const char* file, long line,
                                                   const char* a_text, const char* b_text,
                                                   const char* eps_text)
@@ -739,6 +787,17 @@ inline bool TestResults::check_definitely_greater(long double a, long double b,
                                  a_text, b_text, eps_text);
 }
 
+inline ExecContext::ExecContext(const TestList& tl, int nr, int nt):
+    test_list(tl),
+    num_recurrences(nr),
+    num_threads(nt)
+{
+}
+
+inline TestBase::TestBase(TestContext& context):
+    test_context(context)
+{
+}
 
 } // namespace unit_test
 } // namespace test_util

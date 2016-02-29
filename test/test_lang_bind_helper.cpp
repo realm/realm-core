@@ -38,7 +38,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -7328,7 +7328,7 @@ namespace {
 // the entire interface
 class NoOpTransactionLogParser {
 public:
-    NoOpTransactionLogParser(TestResults& test_results) : test_results(test_results) { }
+    NoOpTransactionLogParser(TestContext& test_context) : test_context(test_context) { }
 
     size_t get_current_table() const
     {
@@ -7341,7 +7341,7 @@ public:
     }
 
 protected:
-    TestResults& test_results;
+    TestContext& test_context;
 
 private:
     size_t m_current_table = realm::npos;
@@ -7430,7 +7430,8 @@ struct PromoteThenRollback {
         LangBindHelper::rollback_and_continue_as_read(sg);
     }
 };
-}
+
+} // unnamed namespace
 
 
 TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, PromoteThenRollback)
@@ -7455,7 +7456,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
             {
                 CHECK(false);
             }
-        } parser(test_results);
+        } parser(test_context);
         TEST_TYPE::call(sg, parser);
     }
 
@@ -7474,7 +7475,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
             {
                 called = true;
             }
-        } parser(test_results);
+        } parser(test_context);
         TEST_TYPE::call(sg, parser);
         CHECK(parser.called);
     }
@@ -7503,7 +7504,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
                 return true;
             }
-        } parser(test_results);
+        } parser(test_context);
         TEST_TYPE::call(sg, parser);
         CHECK_EQUAL(2, parser.expected_table);
     }
@@ -7557,7 +7558,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK_EQUAL(0, row_ndx);
                 return true;
             }
-        } parser(test_results);
+        } parser(test_context);
         TEST_TYPE::call(sg, parser);
     }
 
@@ -7591,7 +7592,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK_EQUAL(3, old_list_size);
                 return true;
             }
-        } parser(test_results);
+        } parser(test_context);
         TEST_TYPE::call(sg, parser);
     }
 }
@@ -7633,7 +7634,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
             {
                 throw ObserverError();
             }
-        } parser(test_results);
+        } parser(test_context);
 
         LangBindHelper::advance_read(sg, parser);
         CHECK(false); // Should not be reached
@@ -8445,7 +8446,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
             {
                 CHECK(false);
             }
-        } parser(test_results);
+        } parser(test_context);
         LangBindHelper::promote_to_write(sg);
         LangBindHelper::rollback_and_continue_as_read(sg, parser);
     }
@@ -8474,7 +8475,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
                 return true;
             }
-        } parser(test_results);
+        } parser(test_context);
         LangBindHelper::rollback_and_continue_as_read(sg, parser);
         CHECK_EQUAL(0, parser.expected_table + 1);
     }
@@ -8542,7 +8543,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 set_link_called = true;
                 return true;
             }
-        } parser(test_results);
+        } parser(test_context);
         LangBindHelper::rollback_and_continue_as_read(sg, parser);
         CHECK_EQUAL(0, parser.expected_table + 1);
         CHECK(parser.link_list_insert_called);
@@ -8581,7 +8582,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 ++list_ndx;
                 return true;
             }
-        } parser(test_results);
+        } parser(test_context);
         LangBindHelper::rollback_and_continue_as_read(sg, parser);
         CHECK_EQUAL(parser.list_ndx, 3);
     }
@@ -8683,9 +8684,8 @@ void multiple_trackers_writer_thread(std::string path)
     }
 }
 
-void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string path)
+void multiple_trackers_reader_thread(TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>());
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
@@ -8738,11 +8738,11 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     // FIXME: Use separate arrays for reader and writer threads for safety and readability.
     Thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
-        threads[i].start(std::bind(multiple_trackers_writer_thread, std::string(path)));
+        threads[i].start([&] { multiple_trackers_writer_thread(path); });
     sched_yield();
     for (int i = 0; i < read_thread_count; ++i) {
-        threads[write_thread_count + i].start(std::bind(multiple_trackers_reader_thread,
-                                                        &test_results, std::string(path)));
+        threads[write_thread_count + i].
+            start([&] { multiple_trackers_reader_thread(test_context, path); });
     }
 
     // Wait for all writer threads to complete
@@ -8829,7 +8829,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < read_process_count; ++i) {
         readpids[i] = fork();
         if (readpids[i] == 0) {
-            multiple_trackers_reader_thread(&test_results, std::string(path));
+            multiple_trackers_reader_thread(test_context, path);
             exit(0);
         }
     }
@@ -8980,6 +8980,7 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
     sg.end_read();
     sg_w.end_read();
 }
+
 
 
 TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
@@ -9638,9 +9639,8 @@ void handover_writer(std::string path)
 
 
 void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control,
-                      TestResults* test_results_ptr, std::string path)
+                      TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     // We need to ensure that the initial version observed is *before* the final
@@ -9648,7 +9648,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
     // to the initial version before even starting the writer.
     Group& g = const_cast<Group&>(sg.begin_read());
     Thread writer;
-    writer.start(bind(&handover_writer, path));
+    writer.start([&] { handover_writer(path); });
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
@@ -9678,9 +9678,8 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
 }
 
 void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control,
-                       TestResults* test_results_ptr, std::string path)
+                       TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (;;) {
@@ -9733,8 +9732,7 @@ void attacher(std::string path)
 TEST(LangBindHelper_RacingAttachers)
 {
     const int num_attachers = 10;
-    SHARED_GROUP_TEST_PATH(p);
-    std::string path(p);
+    SHARED_GROUP_TEST_PATH(path);
     {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
@@ -9745,7 +9743,7 @@ TEST(LangBindHelper_RacingAttachers)
     }
     Thread attachers[num_attachers];
     for (int i=0; i<num_attachers; ++i) {
-        attachers[i].start(bind(&attacher, path));
+        attachers[i].start([&] { attacher(path); });
     }
     for (int i=0; i<num_attachers; ++i) {
         attachers[i].join();
@@ -9756,8 +9754,7 @@ TEST(LangBindHelper_RacingAttachers)
 
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
-    SHARED_GROUP_TEST_PATH(p);
-    std::string path(p);
+    SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = sg.begin_write();
@@ -9770,8 +9767,8 @@ TEST(LangBindHelper_HandoverBetweenThreads)
 
     HandoverControl<SharedGroup::Handover<TableView>> control;
     Thread querier, verifier;
-    querier.start(bind(&handover_querier, &control, &test_results, path));
-    verifier.start(bind(&handover_verifier, &control, &test_results, path));
+    querier.start([&] { handover_querier(&control, test_context, path); });
+    verifier.start([&] { handover_verifier(&control, test_context, path); });
     querier.join();
     verifier.join();
 
@@ -9789,9 +9786,8 @@ struct StealingInfo {
 
 
 void stealing_querier(HandoverControl<StealingInfo>* control,
-                      TestResults* test_results_ptr, std::string path)
+                      TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     // We need to ensure that the initial version observed is *before* the final
@@ -9799,7 +9795,7 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
     // to the initial version before even starting the writer.
     Group& g = const_cast<Group&>(sg.begin_read());
     Thread writer;
-    writer.start(bind(&handover_writer, path));
+    writer.start([&] { handover_writer(path); });
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
@@ -9831,9 +9827,8 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
 }
 
 void stealing_verifier(HandoverControl<StealingInfo>* control,
-                       TestResults* test_results_ptr, std::string path)
+                       TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (;;) {
@@ -9878,8 +9873,7 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
 
 TEST(LangBindHelper_HandoverStealing)
 {
-    SHARED_GROUP_TEST_PATH(p);
-    std::string path(p);
+    SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = sg.begin_write();
@@ -9892,8 +9886,8 @@ TEST(LangBindHelper_HandoverStealing)
     HandoverControl<StealingInfo> control;
 
     Thread querier, verifier;
-    querier.start(bind(&stealing_querier, &control, &test_results, path));
-    verifier.start(bind(&stealing_verifier, &control, &test_results, path));
+    querier.start([&] { stealing_querier(&control, test_context, path); });
+    verifier.start([&] { stealing_verifier(&control, test_context, path); });
     querier.join();
     verifier.join();
 
@@ -11571,6 +11565,48 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
         CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroup::durability_Full, crypt_key()),
                           LogicError::mixed_history_type);
     }
+}
+
+
+// Check that rollback of a transaction which deletes a table
+// containing a link will insert the associated backlink into
+// the correct index in the associated (linked) table. In this
+// case, backlink columns should not be appended (rather they
+// should be inserted into the previously used index).
+TEST(LangBindHelper_RollBackAfterRemovalOfTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+
+    TableRef source_a = group_w.add_table("source_a");
+    TableRef source_b = group_w.add_table("source_b");
+    TableRef target_b = group_w.add_table("target_b");
+
+    source_a->add_column_link(type_LinkList, "b", *target_b);
+    source_b->add_column_link(type_LinkList, "b", *target_b);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    {
+        LangBindHelper::promote_to_write(sg_w);
+
+        group_w.remove_table("source_a");
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+    }
+    using tf = _impl::TableFriend;
+    CHECK_EQUAL(group_w.size(), 3);
+    CHECK_EQUAL(group_w.get_table_name(0), StringData("source_a"));
+    CHECK_EQUAL(group_w.get_table(0)->get_column_count(), 1);
+    CHECK_EQUAL(group_w.get_table(0)->get_link_target(0), target_b);
+    CHECK_EQUAL(group_w.get_table(1)->get_link_target(0), target_b);
+    // backlink column index in target_b from source_a should be index 0
+    CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(0, 0), 0);
+    // backlink column index in target_b from source_b should be index 1
+    CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(1, 0), 1);
 }
 
 #endif
