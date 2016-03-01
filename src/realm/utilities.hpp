@@ -78,8 +78,7 @@ struct NewDate
     int64_t m_nanoseconds = 0;
 };
 
-
-typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
+typedef std::function< bool(const char* string1, const char* string2) > StringCompareCallback;
 
 extern signed char sse_support;
 extern signed char avx_support;
