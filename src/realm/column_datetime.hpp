@@ -43,6 +43,11 @@ struct NewDate {
 
 class DateTimeColumn : public ColumnBase {
 public:
+    DateTimeColumn() : m_seconds(Allocator::get_default(), IntNullColumn::create(Allocator::get_default())),
+                       m_nanoseconds(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()))
+    {
+    }
+
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
     size_t size() const noexcept override {

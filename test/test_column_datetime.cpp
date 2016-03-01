@@ -43,8 +43,7 @@ TEST(DateTimeColumn_Basic)
     DateTimeColumn c;
     c.add(NewDate(123,123));
     NewDate ndt = c.get(0);
-
-    CHECK(true);
+    CHECK(ndt == NewDate(123, 123));
 }
 
 
