@@ -523,7 +523,6 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Binary:
             case col_type_Mixed:
             case col_type_DateTime:
-            case col_type_Reserved1:
             case col_type_Float:
             case col_type_Double:
             case col_type_Reserved4:

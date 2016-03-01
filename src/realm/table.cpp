@@ -1438,7 +1438,6 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             // Origin table will be set by group after entire table has been created
             col = new BacklinkColumn(alloc, ref); // Throws
             break;
-        case col_type_Reserved1:
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
             break;
@@ -1567,7 +1566,6 @@ void Table::upgrade_file_format()
             case col_type_Binary:
             case col_type_Table:
             case col_type_Mixed:
-            case col_type_Reserved1:
             case col_type_Float:
             case col_type_Double:
             case col_type_Reserved4:
@@ -1957,7 +1955,6 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_BackLink:
             return BacklinkColumn::create(alloc, size); // Throws
         case col_type_StringEnum:
-        case col_type_Reserved1:
         case col_type_Reserved4:
             break;
     }
@@ -4903,7 +4900,6 @@ bool Table::compare_rows(const Table& t) const
                 continue;
             }
             case col_type_BackLink:
-            case col_type_Reserved1:
             case col_type_Reserved4:
                 break;
         }
