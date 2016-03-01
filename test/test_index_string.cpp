@@ -16,7 +16,7 @@ using namespace util;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -1200,7 +1200,7 @@ TEST(StringIndex_Duplicate_Values)
 
 namespace {
 
-void verify_single_move_last_over(TestResults& test_results, StringColumn& col, size_t index) {
+void verify_single_move_last_over(TestContext& test_context, StringColumn& col, size_t index) {
     std::string value = col.get(col.size() - 1);
     size_t orig_size = col.size();
     col.move_last_over(index);
@@ -1251,12 +1251,12 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     col.create_search_index();
 
     // switch out entire first leaf on a tree where MAX_BPNODE_SIZE == 4
-    ::verify_single_move_last_over(test_results, col, 0);
-    ::verify_single_move_last_over(test_results, col, 1);
-    ::verify_single_move_last_over(test_results, col, 2);
-    ::verify_single_move_last_over(test_results, col, 3);
-    ::verify_single_move_last_over(test_results, col, 4);
-    ::verify_single_move_last_over(test_results, col, 5);
+    verify_single_move_last_over(test_context, col, 0);
+    verify_single_move_last_over(test_context, col, 1);
+    verify_single_move_last_over(test_context, col, 2);
+    verify_single_move_last_over(test_context, col, 3);
+    verify_single_move_last_over(test_context, col, 4);
+    verify_single_move_last_over(test_context, col, 5);
 
     // move_last_over for last index should remove the last item
     size_t last_size = col.size();
@@ -1266,7 +1266,7 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     // randomly remove remaining elements until col.size() == 1
     while (col.size() > 1) {
         size_t random_index = random.draw_int<size_t>(0, col.size() - 2);
-        ::verify_single_move_last_over(test_results, col, random_index);
+        verify_single_move_last_over(test_context, col, random_index);
     }
 
     // remove final element

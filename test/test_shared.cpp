@@ -32,7 +32,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -121,7 +121,7 @@ void writer(std::string path, int id)
 
 #if !REALM_PLATFORM_APPLE && !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 
-void killer(TestResults& test_results, int pid, std::string path, int id)
+void killer(TestContext& test_context, int pid, std::string path, int id)
 {
     {
         SharedGroup sg(path, true, SharedGroup::durability_Full, crypt_key());
@@ -216,11 +216,11 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
             }
             else {
                 // std::cerr << "New process " << pid << " killing old " << pid2 << std::endl;
-                killer(test_results, pid2, path, k-1);
+                killer(test_context, pid2, path, k-1);
             }
         }
         // std::cerr << "Killing last one: " << pid << std::endl;
-        killer(test_results, pid, path, num_processes-1);
+        killer(test_context, pid, path, num_processes-1);
     }
 }
 #endif
@@ -1248,10 +1248,8 @@ TEST(Shared_WritesSpecialOrder)
 
 namespace  {
 
-void writer_threads_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
+void writer_threads_thread(TestContext& test_context, std::string path, size_t row_ndx)
 {
-    TestResults& test_results = *test_results_ptr;
-
     // Open shared db
     SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
 
@@ -1309,7 +1307,7 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i)
-            threads[i].start(std::bind(&writer_threads_thread, &test_results, std::string(path), i));
+            threads[i].start([this, &path, i] { writer_threads_thread(test_context, path, i); });
 
         // Wait for all threads to complete
         for (size_t i = 0; i < thread_count; ++i)
@@ -1877,10 +1875,8 @@ namespace  {
 
 #define multiprocess_increments 100
 
-void multiprocess_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
+void multiprocess_thread(TestContext& test_context, std::string path, size_t row_ndx)
 {
-    TestResults& test_results = *test_results_ptr;
-
     // Open shared db
     bool no_create = false;
     SharedGroup sg(path, no_create, SharedGroup::durability_Async);
@@ -1986,7 +1982,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
 #endif
 }
 
-void multiprocess_threaded(TestResults& test_results, std::string path, size_t num_threads, size_t base)
+void multiprocess_threaded(TestContext& test_context, std::string path, size_t num_threads, size_t base)
 {
     // Do some changes in a async db
     std::unique_ptr<test_util::ThreadWrapper[]> threads;
@@ -1994,7 +1990,8 @@ void multiprocess_threaded(TestResults& test_results, std::string path, size_t n
 
     // Start threads
     for (size_t i = 0; i != num_threads; ++i)
-        threads[i].start(std::bind(&multiprocess_thread, &test_results, path, base+i));
+        threads[i].start([&test_context, &path, base, i]
+                         { multiprocess_thread(test_context, path, base+i); });
 
     // Wait for threads to finish
     for (size_t i = 0; i != num_threads; ++i) {
@@ -2022,7 +2019,7 @@ void multiprocess_threaded(TestResults& test_results, std::string path, size_t n
     }
 }
 
-void multiprocess_validate_and_clear(TestResults& test_results, std::string path, std::string lock_path,
+void multiprocess_validate_and_clear(TestContext& test_context, std::string path, std::string lock_path,
                                      size_t rows, int result)
 {
     // Wait for async_commit process to shutdown
@@ -2046,12 +2043,12 @@ void multiprocess_validate_and_clear(TestResults& test_results, std::string path
     }
 }
 
-void multiprocess(TestResults& test_results, std::string path, int num_procs, size_t num_threads)
+void multiprocess(TestContext& test_context, std::string path, int num_procs, size_t num_threads)
 {
     int* pids = new int[num_procs];
     for (int i = 0; i != num_procs; ++i) {
         if (0 == (pids[i] = fork())) {
-            multiprocess_threaded(test_results, path, num_threads, i*num_threads);
+            multiprocess_threaded(test_context, path, num_threads, i*num_threads);
             _exit(0);
         }
     }
@@ -2075,25 +2072,25 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #if TEST_DURATION < 1
     multiprocess_make_table(path, path.get_lock_path(), alone_path, 4);
 
-    multiprocess_threaded(test_results, path, 2, 0);
-    multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+    multiprocess_threaded(test_context, path, 2, 0);
+    multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
                                     2, multiprocess_increments);
 
     for (int k = 1; k < 3; ++k) {
-        multiprocess(test_results, path, 2, 2);
-        multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+        multiprocess(test_context, path, 2, 2);
+        multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
                                         4, multiprocess_increments);
     }
 #else
     multiprocess_make_table(path, path.get_lock_path(), alone_path, 100);
 
-    multiprocess_threaded(test_results, path, 10, 0);
-    multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+    multiprocess_threaded(test_context, path, 10, 0);
+    multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
                                     10, multiprocess_increments);
 
     for (int k = 1; k < 10; ++k) {
-        multiprocess(test_results, path, 10, 10);
-        multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+        multiprocess(test_context, path, 10, 10);
+        multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
                                         100, multiprocess_increments);
     }
 #endif
@@ -2107,74 +2104,69 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 // Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
 /*
 
-namespace {
-
-const int num_threads = 3;
-int shared_state[num_threads];
-SharedGroup* sgs[num_threads];
-Mutex* muu;
-
-void waiter(std::string path, int i)
-{
-    SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 1;
-        sgs[i] = sg;
-    }
-    sg->wait_for_change();
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 2; // this state should not be observed by the writer
-    }
-    sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 3;
-    }
-    sg->begin_read();
-    sg->end_read();
-    sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 4;
-    }
-    // works within a read transaction as well
-    sg->begin_read();
-    sg->wait_for_change();
-    sg->end_read();
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 5;
-    }
-    sg->begin_read();
-    sg->end_read();
-    sg->wait_for_change(); // wait until wait_for_change is released
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 6;
-    }
-}
-
-} // anonymous namespace
-
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
-    muu = new Mutex;
+    const int num_threads = 3;
+    Mutex mutex;
+    int shared_state[num_threads];
+    SharedGroup* sgs[num_threads];
+
+    auto waiter = [&](std::string path, int i) {
+        SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 1;
+            sgs[i] = sg;
+        }
+        sg->wait_for_change();
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 2; // this state should not be observed by the writer
+        }
+        sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 3;
+        }
+        sg->begin_read();
+        sg->end_read();
+        sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 4;
+        }
+        // works within a read transaction as well
+        sg->begin_read();
+        sg->wait_for_change();
+        sg->end_read();
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 5;
+        }
+        sg->begin_read();
+        sg->end_read();
+        sg->wait_for_change(); // wait until wait_for_change is released
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 6;
+        }
+    };
+
     SHARED_GROUP_TEST_PATH(path);
     for (int j=0; j < num_threads; j++)
         shared_state[j] = 0;
     SharedGroup sg(path, false, SharedGroup::durability_Full);
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
-        threads[j].start(std::bind(&waiter, std::string(path), j));
+        threads[j].start([waiter, &path, j] { waiter(path, j); });
     bool try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
-            if (shared_state[j] != 1) try_again = true;
+            LockGuard l(mutex);
+            if (shared_state[j] != 1)
+                try_again = true;
         }
     }
 
@@ -2184,7 +2176,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(mutex);
             if (3 != shared_state[j]) try_again = true;
         }
     }
@@ -2195,7 +2187,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(mutex);
             if (4 != shared_state[j]) try_again = true;
         }
     }
@@ -2205,7 +2197,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(mutex);
             if (5 != shared_state[j]) try_again = true;
         }
     }
@@ -2213,7 +2205,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(mutex);
             if (sgs[j]) {
                 sgs[j]->wait_for_change_release();
             }
@@ -2228,7 +2220,6 @@ TEST(Shared_WaitForChange)
         delete sgs[j];
         sgs[j] = 0;
     }
-    delete muu;
 }
 
 */

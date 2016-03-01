@@ -15,7 +15,7 @@
 
 using namespace realm;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -50,7 +50,7 @@ using unit_test::TestResults;
 
 namespace {
 
-void has_zero_byte(TestResults& test_results, int64_t value, size_t reps)
+void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 {
     Array a(Allocator::get_default());
     a.create(Array::type_Normal);
@@ -846,13 +846,13 @@ TEST(Array_FindHasZeroByte)
 {
     // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
     size_t n = 73;
-    has_zero_byte(test_results, 1, n); // width = 1
-    has_zero_byte(test_results, 3, n); // width = 2
-    has_zero_byte(test_results, 13, n); // width = 4
-    has_zero_byte(test_results, 100, n); // 8
-    has_zero_byte(test_results, 10000, n); // 16
-    has_zero_byte(test_results, 100000, n); // 32
-    has_zero_byte(test_results, 8000000000LL, n); // 64
+    has_zero_byte(test_context, 1, n); // width = 1
+    has_zero_byte(test_context, 3, n); // width = 2
+    has_zero_byte(test_context, 13, n); // width = 4
+    has_zero_byte(test_context, 100, n); // 8
+    has_zero_byte(test_context, 10000, n); // 16
+    has_zero_byte(test_context, 100000, n); // 32
+    has_zero_byte(test_context, 8000000000LL, n); // 64
 }
 
 // New find test for SSE search, to trigger partial finds (see find_sse()) before and after the aligned data area
