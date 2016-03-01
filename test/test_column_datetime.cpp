@@ -38,5 +38,10 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
+TEST(DateTimeColumn_Basic)
+{
+    CHECK(true);
+}
+
 
 #endif // TEST_COLUMN_DATETIME
