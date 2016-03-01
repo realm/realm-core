@@ -6566,6 +6566,31 @@ TEST(Table_ChangeLinkTargets_LinkLists)
     CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
 }
 
+// Minimal test case causing an assertion error because
+// backlink columns are storing stale values referencing
+// their respective link column index. If a link column
+// index changes, the backlink column accessors must also
+// be updated.
+TEST(Table_MinimalStaleLinkColumnIndex)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    t->add_column(type_Int, "int1");
+    t->add_search_index(0);
+    t->add_empty_row(2);
+    t->set_int(0, 1, 4444);
+
+    TableRef t2 = g.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->remove_column(0);
+
+    t->set_int_unique(0, 0, 4444); // crashed here
+
+    CHECK_EQUAL(t->get_int(0, 0), 4444);
+    CHECK_EQUAL(t->get_int(0, 1), 0);
+}
+
 // This test case is a simplified version of a bug revealed by fuzz testing
 // set_int_unique triggers backlinks to update if the element to insert is
 // not unique. The expected behaviour is that the old row containing the
