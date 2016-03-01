@@ -34,11 +34,11 @@ enum DataType {
     type_String     =  2,
     type_Binary     =  4,
     type_DateTime   =  7,
+    type_NewDate    =  8,
     type_Table      =  5,
     type_Mixed      =  6,
     type_Link       = 12,
-    type_LinkList   = 13,
-    type_NewDate    = 15
+    type_LinkList   = 13
 };
 
 /// See Descriptor::set_link_type().
