@@ -35,15 +35,13 @@ enum ColumnType {
     col_type_Table       =  5,
     col_type_Mixed       =  6,
     col_type_DateTime    =  7,
-    col_type_Reserved1   =  8, // new date
+    col_type_NewDate     =  8, // new date
     col_type_Float       =  9,
     col_type_Double      = 10,
     col_type_Reserved4   = 11, // Decimal
     col_type_Link        = 12,
     col_type_LinkList    = 13,
-    col_type_BackLink    = 14,
-    col_type_NewDate     = 15 // FIXME, can it be moved up?
-
+    col_type_BackLink    = 14
 };
 
 
