@@ -292,6 +292,7 @@
 		5DC597321B854C960020D712 /* column_type_traits.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5DC597311B854C960020D712 /* column_type_traits.hpp */; };
 		5DC597331B854CB90020D712 /* column_type_traits.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5DC597311B854C960020D712 /* column_type_traits.hpp */; };
 		5DC597341B854CBA0020D712 /* column_type_traits.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5DC597311B854C960020D712 /* column_type_traits.hpp */; };
+		650FBA3D1C84954C00F8771B /* null.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650FBA3C1C84954C00F8771B /* null.hpp */; };
 		651AEEA31B31945F0048C8EE /* test_upgrade_database_4_1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEE9D1B31945F0048C8EE /* test_upgrade_database_4_1.realm */; };
 		651AEEA41B31945F0048C8EE /* test_upgrade_database_4_2.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEE9E1B31945F0048C8EE /* test_upgrade_database_4_2.realm */; };
 		651AEEA51B31945F0048C8EE /* test_upgrade_database_4_3.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEE9F1B31945F0048C8EE /* test_upgrade_database_4_3.realm */; };
@@ -923,6 +924,7 @@
 		52F6359316B43C79006117C4 /* alloc.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = alloc.cpp; path = realm/alloc.cpp; sourceTree = "<group>"; };
 		5D8EC9911BBB67C000447FF8 /* owned_data.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = owned_data.hpp; path = realm/owned_data.hpp; sourceTree = "<group>"; };
 		5DC597311B854C960020D712 /* column_type_traits.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_type_traits.hpp; path = realm/column_type_traits.hpp; sourceTree = "<group>"; };
+		650FBA3C1C84954C00F8771B /* null.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = null.hpp; path = realm/null.hpp; sourceTree = "<group>"; };
 		651AEE9D1B31945F0048C8EE /* test_upgrade_database_4_1.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_1.realm; sourceTree = "<group>"; };
 		651AEE9E1B31945F0048C8EE /* test_upgrade_database_4_2.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_2.realm; sourceTree = "<group>"; };
 		651AEE9F1B31945F0048C8EE /* test_upgrade_database_4_3.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_3.realm; sourceTree = "<group>"; };
@@ -1222,6 +1224,7 @@
 				36AA59E61937552000D691E0 /* link_view.cpp */,
 				36AA59E71937552000D691E0 /* link_view.hpp */,
 				365CCE1C157CC37D00172BF8 /* mixed.hpp */,
+				650FBA3C1C84954C00F8771B /* null.hpp */,
 				5D8EC9911BBB67C000447FF8 /* owned_data.hpp */,
 				365CCE1D157CC37D00172BF8 /* query_conditions.hpp */,
 				F4C28BBC1A696DB500F8BB2A /* query_engine.cpp */,
@@ -1676,6 +1679,7 @@
 				52D7C4911852A01700633748 /* utf8.hpp in Headers */,
 				365CCE76157CC37D00172BF8 /* utilities.hpp in Headers */,
 				80ADCCEB18A23DD00049D472 /* version.hpp in Headers */,
+				650FBA3D1C84954C00F8771B /* null.hpp in Headers */,
 				4852311E1B2E930F003C72AF /* network.hpp in Headers */,
 				42F862D419BDE3460053C134 /* views.hpp in Headers */,
 			);

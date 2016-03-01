@@ -5,6 +5,10 @@
 * Backlink columns were not being refreshed when the connected link column
   updated it's index in the table (insert/remove/move column). This is now
   fixed. See issue #1499.
+* Backlink columns were always inserted at the end of a table, however on a
+  transaction rollback in certain cases, backlink columns were removed from
+  internal (not the end) indices and the roll back should put them back there.
+  This could cause a crash on rollback and was reported in ticket #1502.
 
 ### API breaking changes:
 
@@ -59,6 +63,13 @@
   process.
 * Introducing `RefOrTagged` value type whan can be used to make it safer to work
   with "tagged integers" in arrays having the "has refs" flag.
+* New features in the unit test framework: Ability to specify number of internal
+  repetitions of the set of selected tests. Also, progress reporting now
+  includes information about which test thread runs which unit test. Also, new
+  test introduction macro `NO_CONCUR_TEST()` for those tests that cannot run
+  concurrently with other tests, or with other executions of themselves. From
+  now on, all unit tests must be able to run multiple times, and must either be
+  fully thread safe, or must be introduced with `NO_CONCUR_TEST()`.
 
 ----------------------------------------------
 

@@ -627,7 +627,7 @@ private:
 
 
 void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
-                             StringData name, Table* link_target_table, bool nullable)
+                             StringData name, LinkTargetInfo& link, bool nullable)
 {
     REALM_ASSERT(desc.is_attached());
 
@@ -640,7 +640,7 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
 
     if (desc.is_root()) {
         root_table.bump_version();
-        root_table.insert_root_column(col_ndx, type, name, link_target_table, nullable); // Throws
+        root_table.insert_root_column(col_ndx, type, name, link, nullable); // Throws
     }
     else {
         Spec& spec = df::get_spec(desc);
@@ -654,12 +654,12 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
     }
 
     if (Replication* repl = root_table.get_repl())
-        repl->insert_column(desc, col_ndx, type, name, link_target_table, nullable); // Throws
+        repl->insert_column(desc, col_ndx, type, name, link, nullable); // Throws
 }
 
 
 void Table::do_insert_column_unless_exists(Descriptor& desc, size_t col_ndx, DataType type,
-                                           StringData name, Table *link_target_table, bool nullable,
+                                           StringData name, LinkTargetInfo& link, bool nullable,
                                            bool* was_inserted)
 {
     using df = _impl::DescriptorFriend;
@@ -685,7 +685,7 @@ void Table::do_insert_column_unless_exists(Descriptor& desc, size_t col_ndx, Dat
             }
             if (tf::is_link_type(ColumnType(type)) &&
                 spec.get_opposite_link_table_ndx(col_ndx) !=
-                link_target_table->get_index_in_group()) {
+                link.m_target_table->get_index_in_group()) {
                 throw LogicError(LogicError::type_mismatch);
             }
 
@@ -700,7 +700,7 @@ void Table::do_insert_column_unless_exists(Descriptor& desc, size_t col_ndx, Dat
         }
     }
 
-    do_insert_column(desc, col_ndx, type, name, link_target_table, nullable);
+    do_insert_column(desc, col_ndx, type, name, link, nullable);
     if (was_inserted) {
         *was_inserted = true;
     }
@@ -808,10 +808,11 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
         repl->rename_column(desc, col_ndx, name); // Throws
 }
 
-
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
-                               Table* link_target_table, bool nullable)
+                               LinkTargetInfo& link, bool nullable)
 {
+    using tf = _impl::TableFriend;
+
     REALM_ASSERT_3(col_ndx, <=, m_spec.get_public_column_count());
 
     do_insert_root_column(col_ndx, ColumnType(type), name, nullable); // Throws
@@ -826,18 +827,22 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
     // it should not try to establish the connection yet. The connection will be
     // established by Table::refresh_column_accessors() when it is invoked for
     // the target table below.
-    if (link_target_table) {
-        size_t target_table_ndx = link_target_table->get_index_in_group();
+    if (link.is_valid()) {
+        size_t target_table_ndx = link.m_target_table->get_index_in_group();
         m_spec.set_opposite_link_table_ndx(col_ndx, target_table_ndx); // Throws
-        link_target_table->mark();
+        link.m_target_table->mark();
     }
 
     refresh_column_accessors(col_ndx); // Throws
 
-    if (link_target_table) {
-        link_target_table->unmark();
+    if (link.is_valid()) {
+        link.m_target_table->unmark();
         size_t origin_table_ndx = get_index_in_group();
-        link_target_table->insert_backlink_column(origin_table_ndx, col_ndx); // Throws
+        if (link.m_backlink_col_ndx == realm::npos) {
+            const Spec& target_spec = tf::get_spec(*(link.m_target_table));
+            link.m_backlink_col_ndx = target_spec.get_column_count();   // insert at back of target
+        }
+        link.m_target_table->insert_backlink_column(origin_table_ndx, col_ndx, link.m_backlink_col_ndx); // Throws
     }
 }
 
@@ -959,9 +964,9 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
 }
 
 
-void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx)
+void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx)
 {
-    size_t backlink_col_ndx = m_cols.size();
+    REALM_ASSERT_3(backlink_col_ndx, <=, m_cols.size());
     do_insert_root_column(backlink_col_ndx, col_type_BackLink, ""); // Throws
     adj_insert_column(backlink_col_ndx); // Throws
     m_spec.set_opposite_link_table_ndx(backlink_col_ndx, origin_table_ndx); // Throws
@@ -5395,7 +5400,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             // between it and the corresponding backlink column. This, however,
             // cannot be done until both the origin and the target table
             // accessor have been sufficiently refreshed. The solution is to
-            // attempt the connection establishment when the link coumn is
+            // attempt the connection establishment when the link column is
             // created, and when the backlink column is created. In both cases,
             // if the opposite table accessor is still dirty, the establishment
             // of the connection is postponed.

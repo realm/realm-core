@@ -378,9 +378,9 @@ public:
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
                 log("desc->insert_column(%1, %2, \"%3\", %4);", col_ndx, data_type_to_str(type),
                     name, nullable); // Throws
-                Table* link_target_table = nullptr;
+                LinkTargetInfo invalid_link;
                 using tf = _impl::TableFriend;
-                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
+                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, invalid_link, nullable); // Throws
                 return true;
             }
         }
@@ -388,16 +388,17 @@ public:
     }
 
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
-                       size_t link_target_table_ndx, size_t)
+                       size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
         if (REALM_LIKELY(m_desc)) {
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
-                log("desc->insert_column_link(%1, %2, \"%3\", group->get_table(%4));", col_ndx,
-                    data_type_to_str(type), name, link_target_table_ndx); // Throws
+                log("desc->insert_column_link(%1, %2, \"%3\", LinkTargetInfo(group->get_table(%4), %5));",
+                    col_ndx, data_type_to_str(type), name, link_target_table_ndx, backlink_col_ndx); // Throws
                 using gf = _impl::GroupFriend;
                 using tf = _impl::TableFriend;
                 Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
-                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
+                LinkTargetInfo link(link_target_table, backlink_col_ndx);
+                tf::insert_column(*m_desc, col_ndx, type, name, link); // Throws
                 return true;
             }
         }
