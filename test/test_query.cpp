@@ -8562,7 +8562,7 @@ TEST(Query_NewDate)
     match = (first != NewDate(111, 222)).find();
     CHECK_EQUAL(match, not_found);
 
-    table.get<int64_t>(0, 0);
+    table.get<NewDate>(0, 0);
     
 }
 

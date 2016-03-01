@@ -2647,9 +2647,9 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         repl->set_int_unique(this, col_ndx, ndx, value); // Throws
 }
 
-NewDate Table::get_newdate(size_t, size_t) const noexcept
+NewDate Table::get_newdate(size_t col_ndx, size_t ndx) const noexcept
 {
-    return NewDate(111, 222);
+    return get<NewDate>(col_ndx, ndx);
 }
 
 void Table::set_newdate(size_t, size_t, NewDate)

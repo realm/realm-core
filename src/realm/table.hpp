@@ -405,6 +405,7 @@ public:
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
+    NewDate     get_newdate(size_t column_ndx, size_t row_ndx) const noexcept;
 
     template<class T> T get(size_t c, size_t r) const noexcept;
 
@@ -468,6 +469,7 @@ public:
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
+    void set_newdate(size_t column_ndx, size_t row_ndx, NewDate value);
     template<class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
@@ -1410,6 +1412,10 @@ protected:
 
 // Implementation:
 
+template<> inline NewDate Table::get(size_t, size_t) const noexcept
+{
+    return NewDate(111, 222);
+}
 
 template<> inline bool Table::get(size_t col_ndx, size_t ndx) const noexcept
 { 
