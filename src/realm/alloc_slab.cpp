@@ -626,10 +626,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         // Also don't compare reserved fields (todo, is it correct to ignore?)
         static_cast<void>(header);
         REALM_ASSERT_3(header.m_flags, == , 0);
-        REALM_ASSERT_3(header.m_mnemonic[0], == , uint_fast8_t('T'));
-        REALM_ASSERT_3(header.m_mnemonic[1], == , uint_fast8_t('-'));
-        REALM_ASSERT_3(header.m_mnemonic[2], == , uint_fast8_t('D'));
-        REALM_ASSERT_3(header.m_mnemonic[3], == , uint_fast8_t('B'));
+        REALM_ASSERT_3(header.m_mnemonic[0], == , uint8_t('T'));
+        REALM_ASSERT_3(header.m_mnemonic[1], == , uint8_t('-'));
+        REALM_ASSERT_3(header.m_mnemonic[2], == , uint8_t('D'));
+        REALM_ASSERT_3(header.m_mnemonic[3], == , uint8_t('B'));
         REALM_ASSERT_3(header.m_top_ref[0], == , 0xFFFFFFFFFFFFFFFFULL);
         REALM_ASSERT_3(header.m_top_ref[1], == , 0);
 
