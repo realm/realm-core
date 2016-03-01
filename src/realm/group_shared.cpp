@@ -667,137 +667,122 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 
-// NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
-//
-// According to the 'process-sharing example' in the POSIX man page
-// for pthread_mutexattr_init() other processes may continue to use a
-// process-shared mutex after exit of the process that initialized
-// it. Also, the example does not contain any call to
-// pthread_mutex_destroy(), so apparently a process-shared mutex need
-// not be destroyed at all, nor can it be that a process-shared mutex
-// is associated with any resources that are local to the initializing
-// process, because that would imply a leak.
-//
-// While it is not explicitely guaranteed in the man page, we shall
-// assume that is is valid to initialize a process-shared mutex twice
-// without an intervending call to pthread_mutex_destroy(). We need to
-// be able to reinitialize a process-shared mutex if the first
-// initializing process crashes and leaves the shared memory in an
-// undefined state.
 
 void SharedGroup::initialize_lockfile(DurabilityLevel durability, 
                                       Replication::HistoryType history_type)
 {
+    // We're alone in the world, and it is Ok to initialize the
+    // file. Start by truncating the file, to maximize the chance of a
+    // an incorrectly initialized file gets rejected by other session
+    // participants that get the shared file lock after the initiator
+    // has dies half way through the initialization. Note, however, that
+    // this can still happen if the initializing process is dies before
+    // the truncation, but after obtaining the exclusive file lock.
+    m_file.resize(0);
 
-            // We're alone in the world, and it is Ok to initialize the
-            // file. Start by truncating the file, to maximize the chance of a
-            // an incorrectly initialized file gets rejected by other session
-            // participants that get the shared file lock after the initiator
-            // has dies half way through the initialization. Note, however, that
-            // this can still happen if the initializing process is dies before
-            // the truncation, but after obtaining the exclusive file lock.
-            m_file.resize(0);
-
-            // Write an initialized SharedInfo structure to the file, but with
-            // init_complete = 0. Need to fill with zeros before constructing
-            // due to the bit field members. Otherwise we would write
-            // uninitialized bits to the file.
-            char buffer[sizeof (SharedInfo)] = {0};
-            new (buffer) SharedInfo(durability, history_type); // Throws
-            m_file.write(buffer, sizeof buffer); // Throws
+    // Write an initialized SharedInfo structure to the file, but with
+    // init_complete = 0. Need to fill with zeros before constructing
+    // due to the bit field members. Otherwise we would write
+    // uninitialized bits to the file.
+    char buffer[sizeof (SharedInfo)] = {0};
+    new (buffer) SharedInfo(durability, history_type); // Throws
+    m_file.write(buffer, sizeof buffer); // Throws
+    m_file_map.map(m_file, File::access_ReadWrite,
+                   sizeof (SharedInfo), File::map_NoSync); // Throws
 }
 
 
 bool SharedGroup::validate_lockfile()
 {
-        // If the file is not completely initialized at this point in time, the
-        // preceeding initialization attempt must have failed. We know that an
-        // initialization process was in progress, because this thread (or
-        // process) failed to get an exclusive lock on the file. Because this
-        // thread (or process) currently has a shared lock on the file, we also
-        // know that the initialization process can no longer be in progress, so
-        // the initialization must either have completed or failed at this time.
+    // If the file is not completely initialized at this point in time, the
+    // preceeding initialization attempt must have failed. We know that an
+    // initialization process was in progress, because this thread (or
+    // process) failed to get an exclusive lock on the file. Because this
+    // thread (or process) currently has a shared lock on the file, we also
+    // know that the initialization process can no longer be in progress, so
+    // the initialization must either have completed or failed at this time.
 
-        // The file is taken to be completely initialized if it is large enough
-        // to contain the `init_complete` field, and `init_complete` is true. If
-        // the file was not completely initialized, this thread must give up its
-        // shared lock, and retry to become the initializer. Eventually, one of
-        // two things must happen; either this thread, or another thread
-        // succeeds in completing the initialization, or this thread becomes the
-        // initializer, and fails the initialization. In either case, the retry
-        // loop will eventually terminate.
+    // The file is taken to be completely initialized if it is large enough
+    // to contain the `init_complete` field, and `init_complete` is true. If
+    // the file was not completely initialized, this thread must give up its
+    // shared lock, and retry to become the initializer. Eventually, one of
+    // two things must happen; either this thread, or another thread
+    // succeeds in completing the initialization, or this thread becomes the
+    // initializer, and fails the initialization. In either case, the retry
+    // loop will eventually terminate.
 
-        // FIXME: This scheme fails to guarantee reinitialization after
-        // system-level crash. If the system crashes (e.g. due to abrupt power
-        // off), the lock file is generally left in an abitrary, and likely
-        // inconsistent state, but it will still appear properly initialized to
-        // a subsequent session initiator.
+    // FIXME: This scheme fails to guarantee reinitialization after
+    // system-level crash. If the system crashes (e.g. due to abrupt power
+    // off), the lock file is generally left in an abitrary, and likely
+    // inconsistent state, but it will still appear properly initialized to
+    // a subsequent session initiator.
 
-        // An empty file is (and was) never a successfully initialized file.
-        size_t info_size = sizeof (SharedInfo);
-        {
-            auto file_size = m_file.get_size();
-            if (util::int_less_than(file_size, info_size)) {
-                if (file_size == 0)
-                    return false; // Retry
-                info_size = size_t(file_size);
-            }
+    // An empty file is (and was) never a successfully initialized file.
+    size_t info_size = sizeof (SharedInfo);
+    {
+        auto file_size = m_file.get_size();
+        if (util::int_less_than(file_size, info_size)) {
+            if (file_size == 0)
+                return false; // Retry
+            info_size = size_t(file_size);
         }
+    }
 
-        // Map the initial section of the SharedInfo file that corresponds to
-        // the SharedInfo struct, or less if the file is smaller. We know that
-        // we have at least one byte, and that is enough to read the
-        // `init_complete` flag.
-        m_file_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
-        File::UnmapGuard fug_1(m_file_map);
-        SharedInfo* info = m_file_map.get_addr();
-        static_assert(offsetof(SharedInfo, init_complete) + sizeof SharedInfo::init_complete <= 1,
-                      "Unexpected position or size of SharedInfo::init_complete");
-        if (info->init_complete == 0)
-            return false;
-        REALM_ASSERT(info->init_complete == 1);
+    // Map the initial section of the SharedInfo file that corresponds to
+    // the SharedInfo struct, or less if the file is smaller. We know that
+    // we have at least one byte, and that is enough to read the
+    // `init_complete` flag.
+    m_file_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
+    File::UnmapGuard fug_1(m_file_map);
+    SharedInfo* info = m_file_map.get_addr();
+    static_assert(offsetof(SharedInfo, init_complete) + sizeof SharedInfo::init_complete <= 1,
+                  "Unexpected position or size of SharedInfo::init_complete");
+    if (info->init_complete == 0)
+        return false;
+    REALM_ASSERT(info->init_complete == 1);
 
-        // At this time, we know that the file was completely initialized, but
-        // we still need to verify that is was initialized with the memory
-        // layout expected by this session participant. We could find that it is
-        // initializaed with a different memory layout if other concurrent
-        // session participants use different versions of the core library.
-        if (info_size < sizeof (SharedInfo))
-            throw IncompatibleLockFile();
-        if (info->shared_info_version != g_shared_info_version)
-            throw IncompatibleLockFile();
-        // Validate compatible sizes of mutex and condvar types. Sizes of all
-        // other fields are architecture independent, so if condvar and mutex
-        // sizes match, the entire struct matches. The offsets of
-        // `size_of_mutex` and `size_of_condvar` are known to be as expected due
-        // to the preceeding check in `shared_info_version`.
-        if (info->size_of_mutex != sizeof info->controlmutex)
-            throw IncompatibleLockFile();
+    // At this time, we know that the file was completely initialized, but
+    // we still need to verify that is was initialized with the memory
+    // layout expected by this session participant. We could find that it is
+    // initializaed with a different memory layout if other concurrent
+    // session participants use different versions of the core library.
+    if (info_size < sizeof (SharedInfo))
+        throw IncompatibleLockFile();
+    if (info->shared_info_version != g_shared_info_version)
+        throw IncompatibleLockFile();
+    // Validate compatible sizes of mutex and condvar types. Sizes of all
+    // other fields are architecture independent, so if condvar and mutex
+    // sizes match, the entire struct matches. The offsets of
+    // `size_of_mutex` and `size_of_condvar` are known to be as expected due
+    // to the preceeding check in `shared_info_version`.
+    if (info->size_of_mutex != sizeof info->controlmutex)
+        throw IncompatibleLockFile();
 #ifndef _WIN32
-        if (info->size_of_condvar != sizeof info->room_to_write)
-            throw IncompatibleLockFile();
+    if (info->size_of_condvar != sizeof info->room_to_write)
+        throw IncompatibleLockFile();
 #endif
-        // Even though fields match wrt alignment and size, there may still be
-        // incompatibilities between implementations, so lets ask one of the
-        // mutexes if it thinks it'll work.
-        //
-        // FIXME: Calling util::RobustMutex::is_valid() on a mutex object of
-        // unknown, and possibly invalid state has undefined behaviour, and is
-        // therfore dangerous. It should not be done.
-        //
-        // FIXME: This check tries to lock the mutex, and only unlocks it if the
-        // return value is zero. If pthread_mutex_trylock() fails with
-        // EOWNERDEAD, this leads to deadlock during the following propper
-        // attempt to lock. This cannot be fixed by also unlocking on failure
-        // with EOWNERDEAD, because that would mark the mutex as consistent
-        // again and prevent us from being notified below.
-        if (!info->controlmutex.is_valid())
-            throw IncompatibleLockFile();
+    // Even though fields match wrt alignment and size, there may still be
+    // incompatibilities between implementations, so lets ask one of the
+    // mutexes if it thinks it'll work.
+    //
+    // FIXME: Calling util::RobustMutex::is_valid() on a mutex object of
+    // unknown, and possibly invalid state has undefined behaviour, and is
+    // therfore dangerous. It should not be done.
+    //
+    // FIXME: This check tries to lock the mutex, and only unlocks it if the
+    // return value is zero. If pthread_mutex_trylock() fails with
+    // EOWNERDEAD, this leads to deadlock during the following propper
+    // attempt to lock. This cannot be fixed by also unlocking on failure
+    // with EOWNERDEAD, because that would mark the mutex as consistent
+    // again and prevent us from being notified below.
+    if (!info->controlmutex.is_valid())
+        throw IncompatibleLockFile();
 
-        // Succes!
-        fug_1.release();
-        return true;
+    // Succes!
+    fug_1.release();
+    return true;
 }
+
 
 ref_type SharedGroup::attach_database(bool begin_new_session, DurabilityLevel durability,
                                       bool no_create_file)
@@ -823,14 +808,42 @@ ref_type SharedGroup::attach_database(bool begin_new_session, DurabilityLevel du
     return alloc.attach_file(m_db_path, cfg); // Throws
 }
 
-int SharedGroup::validate_file_format(ref_type top_ref,
-                                      Replication::HistoryType history_type)
+
+void SharedGroup::initialize_session(ref_type top_ref, version_type version)
+{
+    using gf = _impl::GroupFriend;
+    SlabAlloc& alloc = m_group.m_alloc;
+    SharedInfo* info = m_file_map.get_addr();
+
+    if (Replication* repl = gf::get_replication(m_group))
+        repl->initiate_session(version); // Throws
+
+#ifndef _WIN32
+    if (m_key) {
+        static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+        info->session_initiator_pid = uint_fast64_t(getpid());
+    }
+#endif
+    // Initially there is a single version in the file
+    info->number_of_versions = 1;
+
+    info->latest_version_number = version;
+
+    SharedInfo* r_info = m_reader_map.get_addr();
+    size_t file_size = alloc.get_baseline();
+    r_info->init_versioning(top_ref, file_size, version);
+}
+
+
+void SharedGroup::validate_file_format(ref_type top_ref, 
+                                       Replication::HistoryType history_type,
+                                       version_type& snapshot_version,
+                                       int& target_file_format_version)
 {
 
     // Determine target file format version for session (upgrade
     // required if greater than file format version of attached file).
     using gf = _impl::GroupFriend;
-    int target_file_format_version;
     int current_file_format_version = gf::get_file_format_version(m_group);
     target_file_format_version =
         gf::get_target_file_format_version_for_session(current_file_format_version,
@@ -838,56 +851,36 @@ int SharedGroup::validate_file_format(ref_type top_ref,
     SlabAlloc& alloc = m_group.m_alloc;
     SharedInfo* info = m_file_map.get_addr();
 
-    {
-        // Determine version (snapshot number) and check history type
-        // compatibility
-        version_type version = 0;
-        int stored_history_type = 0;
-        gf::get_version_and_history_type(alloc, top_ref, version, stored_history_type);
-        bool good_history_type = false;
-        switch (history_type) {
-            case Replication::hist_None:
-            case Replication::hist_OutOfRealm:
-                good_history_type = (stored_history_type == Replication::hist_None);
-                break;
-            case Replication::hist_InRealm:
-                good_history_type = (stored_history_type == Replication::hist_InRealm ||
-                                     stored_history_type == Replication::hist_None);
-                break;
-            case Replication::hist_Sync:
-                good_history_type =
-                    ((stored_history_type == Replication::hist_Sync) ||
-                     (stored_history_type == Replication::hist_None && top_ref == 0));
-        }
-        if (!good_history_type)
-            throw InvalidDatabase("Bad or incompatible history type", m_db_path);
-
-        if (Replication* repl = gf::get_replication(m_group))
-            repl->initiate_session(version); // Throws
-
-#ifndef _WIN32
-        if (m_key) {
-            static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
-            info->session_initiator_pid = uint_fast64_t(getpid());
-        }
-#endif
-        // Initially there is a single version in the file
-        info->number_of_versions = 1;
-
-        info->latest_version_number = version;
-
-        SharedInfo* r_info = m_reader_map.get_addr();
-        size_t file_size = alloc.get_baseline();
-        r_info->init_versioning(top_ref, file_size, version);
-        info->file_format_version = uint_fast8_t(target_file_format_version);
+    // Determine version (snapshot number) and check history type
+    // compatibility
+    snapshot_version = 0;
+    int stored_history_type = 0;
+    gf::get_version_and_history_type(alloc, top_ref, snapshot_version, 
+                                     stored_history_type);
+    bool good_history_type = false;
+    switch (history_type) {
+        case Replication::hist_None:
+        case Replication::hist_OutOfRealm:
+            good_history_type = (stored_history_type == Replication::hist_None);
+            break;
+        case Replication::hist_InRealm:
+            good_history_type = (stored_history_type == Replication::hist_InRealm ||
+                                 stored_history_type == Replication::hist_None);
+            break;
+        case Replication::hist_Sync:
+            good_history_type =
+                ((stored_history_type == Replication::hist_Sync) ||
+                 (stored_history_type == Replication::hist_None && top_ref == 0));
     }
-    return target_file_format_version;
+    if (!good_history_type)
+        throw InvalidDatabase("Bad or incompatible history type", m_db_path);
+
+    info->file_format_version = uint_fast8_t(target_file_format_version);
 }
 
 
-
-void SharedGroup::join_session(Replication::HistoryType history_type,
-                               DurabilityLevel durability)
+int SharedGroup::join_session(Replication::HistoryType history_type,
+                              DurabilityLevel durability)
 {
 
     // Determine target file format version for session (upgrade
@@ -932,7 +925,27 @@ void SharedGroup::join_session(Replication::HistoryType history_type,
     // with a bumped SharedInfo file format version, if there isn't.
     if (info->file_format_version != target_file_format_version)
         throw IncompatibleLockFile();
+    return target_file_format_version;
 }
+
+
+void SharedGroup::setup_ringbuffer_mapping()
+{
+    SharedInfo* info = m_file_map.get_addr();
+
+    // we need a thread-local copy of the number of ringbuffer entries in order
+    // to later detect concurrent expansion of the ringbuffer.
+    m_local_max_entry = info->readers.get_num_entries();
+
+    // We need to map the info file once more for the readers part
+    // since that part can be resized and as such remapped which
+    // could move our mutexes (which we don't want to risk moving while
+    // they are locked)
+    size_t reader_info_size =
+        sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
+    m_reader_map.map(m_file, File::access_ReadWrite, reader_info_size, File::map_NoSync);
+}
+
 
 void SharedGroup::do_open(const std::string& path, bool no_create_file, DurabilityLevel durability,
                           bool is_backend, const char* encryption_key,
@@ -968,45 +981,30 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             // Initializing a session:
 
             initialize_lockfile(durability, history_type);
-            m_file_map.map(m_file, File::access_ReadWrite,
-                           sizeof (SharedInfo), File::map_NoSync); // Throws
             File::UnmapGuard fug_1(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
             ref_type top_ref;
             bool begin_new_session = true;
-            try { top_ref = attach_database(begin_new_session, durability, no_create_file); }
+            try { 
+                top_ref = attach_database(begin_new_session, durability, no_create_file); 
+            }
             catch (SlabAlloc::Retry&) {
                 continue;
             }
 
             // make our presence noted:
             info->num_participants = 1;
-
-            // we need a thread-local copy of the number of ringbuffer entries in order
-            // to later detect concurrent expansion of the ringbuffer.
-            m_local_max_entry = info->readers.get_num_entries();
-
-            // We need to map the info file once more for the readers part
-            // since that part can be resized and as such remapped which
-            // could move our mutexes (which we don't want to risk moving while
-            // they are locked)
-            size_t reader_info_size =
-                sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
-            m_reader_map.map(m_file, File::access_ReadWrite, reader_info_size, File::map_NoSync);
+            setup_ringbuffer_mapping();
             File::UnmapGuard fug_2(m_reader_map);
 
-            target_file_format_version = validate_file_format(top_ref, history_type);
+            version_type snapshot_version;
+            validate_file_format(top_ref, history_type, snapshot_version,
+                                 target_file_format_version);
+            initialize_session(top_ref, snapshot_version);
 
-            // Mark the file as completely initialized via a memory
-            // mapping. Since this is done as a separate final step (involving
-            // separate system calls) there is no chance of the individual
-            // modifications to get reordered, even in case of a crash at a
-            // random position during the initialization (except if it happens
-            // before the truncation). This could also have been done by a
-            // util::File::write(), but it is more convenient to manipulate the
-            // structure via its type.
-
-            // FIXME: Correct above, add a memory barrier if needed!
+            // Prevent compiler reordering, making sure that a crash cannot manage
+            // to set init_complete = 1, but somehow "forget" earlier initialization
+            asm volatile("": : :"memory");
             info->init_complete = 1;
             // We hold the shared lock from here until we close the file!
             m_file.lock_shared(); // Throws
@@ -1017,9 +1015,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             fcg.release(); // Do not close
 
         }
-        else {
-
-            // Joining an existing session:
+        else {  // Joining an existing session:
 
             m_file.lock_shared(); // Throws
             if (!validate_lockfile()) {
@@ -1038,20 +1034,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             // make our presence noted:
             ++info->num_participants;
 
-            join_session(history_type, durability);
-
-            // we need a thread-local copy of the number of ringbuffer entries in order
-            // to later detect concurrent expansion of the ringbuffer.
-            m_local_max_entry = info->readers.get_num_entries();
-
-            // We need to map the info file once more for the readers part
-            // since that part can be resized and as such remapped which
-            // could move our mutexes (which we don't want to risk moving while
-            // they are locked)
-            size_t reader_info_size =
-                sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
-            m_reader_map.map(m_file, File::access_ReadWrite, reader_info_size, File::map_NoSync);
-
+            target_file_format_version = join_session(history_type, durability);
+            setup_ringbuffer_mapping();
             // Keep the mappings and file open:
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close
@@ -1089,11 +1073,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                     m_daemon_becomes_ready.wait(info->controlmutex, &recover_from_dead_write_transact, 0);
                     // std::cerr << " - notified" << std::endl;
                 }
+                // std::cerr << "daemon should be ready" << std::endl;
             }
             else { // is_backend
                 do_async_commits();
             }
-            // std::cerr << "daemon should be ready" << std::endl;
         }
 #else
         static_cast<void>(is_backend);

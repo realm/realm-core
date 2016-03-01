@@ -539,15 +539,19 @@ private:
     util::PlatformSpecificCondVar m_daemon_becomes_ready;
     util::PlatformSpecificCondVar m_new_commit_available;
 #endif
+    // internal helper functions assisting do_open()
     void initialize_lockfile(DurabilityLevel durability, 
                              Replication::HistoryType history_type);
     // true if the lockfile is ok, false to retry.
     // throws if consistency check fails
     bool validate_lockfile();
-    int validate_file_format(ref_type top_ref,
-                             Replication::HistoryType history_type); // throws if validation fails
-    void join_session(Replication::HistoryType history_type,
-                      DurabilityLevel durability); // throws if validation fails
+    void validate_file_format(ref_type top_ref, Replication::HistoryType history_type,
+                              version_type& snapshot_version, 
+                              int& target_file_format_version); // throws if validation fails
+    void initialize_session(ref_type top_ref, version_type version);
+    void setup_ringbuffer_mapping();
+    int join_session(Replication::HistoryType history_type,
+                     DurabilityLevel durability); // throws if validation fails
     ref_type attach_database(bool is_session_initiator,
                              DurabilityLevel durability,
                              bool no_create_file); // throws 
