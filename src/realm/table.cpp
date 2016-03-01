@@ -5362,13 +5362,33 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             }
         }
 
+        ColumnType col_type = m_spec.get_column_type(col_ndx);
         if (col) {
             // Refresh the column accessor
             col->set_ndx_in_parent(ndx_in_parent);
             col->refresh_accessor_tree(col_ndx, m_spec); // Throws
+
+            // If a link column has been updated and the connected
+            // backlink column is part of a table that will not be
+            // otherwise updated (is not 'marked' for accessor updates)
+            // then we need to also update the connected backlink
+            // column in case this link column has had it's index changed.
+            if (is_link_type(col_type)) {
+                typedef _impl::GroupFriend gf;
+                Group& group = *get_parent_group();
+                size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
+                Table& target_table = gf::get_table(group, target_table_ndx); // Throws
+                if (!target_table.is_marked() && &target_table != this) {
+                    LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
+                    BacklinkColumn& backlink_col = link_col->get_backlink_column();
+                    size_t origin_ndx_in_group = m_top.get_ndx_in_parent();
+                    size_t backlink_col_ndx =
+                        target_table.m_spec.find_backlink_column(origin_ndx_in_group, col_ndx);
+                    backlink_col.refresh_accessor_tree(backlink_col_ndx, target_table.m_spec);
+                }
+            }
         }
         else {
-            ColumnType col_type = m_spec.get_column_type(col_ndx);
             col = create_column_accessor(col_type, col_ndx, ndx_in_parent); // Throws
             m_cols[col_ndx] = col;
             // In the case of a link-type column, we must establish a connection
