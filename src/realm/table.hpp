@@ -1411,18 +1411,18 @@ protected:
 // Implementation:
 
 
-template<typename T> inline T Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<> inline bool Table::get(size_t col_ndx, size_t ndx) const noexcept
 { 
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Bool);
     REALM_ASSERT_3(ndx, <, m_size);
-
+    
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return column.get(ndx).value_or(0) != 0;
+        const IntNullColumn& column = get_column_int_null(col_ndx);
+        return column.get(ndx).value_or(0) != 0;       
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        const IntegerColumn& column = get_column(col_ndx);
         return column.get(ndx) != 0;
     }
 }
