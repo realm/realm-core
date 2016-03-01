@@ -38,8 +38,8 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
-
 #include <realm/column_binary.hpp>
+#include <realm/column_datetime.hpp>
 
 namespace realm {
 

@@ -20,7 +20,25 @@
 #ifndef REALM_COLUMN_DATETIME_HPP
 #define REALM_COLUMN_DATETIME_HPP
 
+#include <realm/column.hpp>
+
 namespace realm {
+
+struct NewDate
+{
+    NewDate(int64_t seconds, int64_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds) { }
+    NewDate() { }
+
+    bool is_null() const { return m_seconds == 0 && m_seconds == 0; }
+    bool operator == (const NewDate& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
+    bool operator != (const NewDate& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
+    bool operator > (const NewDate& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_seconds > rhs.m_nanoseconds); }
+    bool operator < (const NewDate& rhs) const { return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_seconds < rhs.m_nanoseconds); }
+    NewDate& operator = (const NewDate& rhs) = default;
+
+    int64_t m_seconds = 0;
+    int64_t m_nanoseconds = 0;
+};
 
 class DateTimeColumn {
 public:
