@@ -967,6 +967,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     m_key = encryption_key;
     m_lockfile_path = path + ".lock";
     int target_file_format_version;
+    SlabAlloc& alloc = m_group.m_alloc;
 
     Replication::HistoryType history_type = Replication::hist_None;
     if (Replication* repl = m_group.get_replication())
@@ -991,17 +992,17 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             catch (SlabAlloc::Retry&) {
                 continue;
             }
-            // make our presence noted (must be done before the closeguard):
-            m_transact_stage = transact_Ready;
-            info->num_participants = 1;
-
-            CloseGuard cg(*this);
+            SlabAlloc::DetachGuard dg(alloc);
             version_type snapshot_version;
             validate_file_format(top_ref, history_type, snapshot_version,
                                  target_file_format_version);
             setup_ringbuffer_mapping();
             File::UnmapGuard fug_2(m_reader_map);
             initialize_session(top_ref, snapshot_version);
+
+            // make our presence noted:
+            m_transact_stage = transact_Ready;
+            info->num_participants = 1;
 
             // Make sure that a crash cannot manage to set init_complete = 1, 
             // but somehow "forget" earlier initialization
@@ -1011,7 +1012,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             m_file.lock_shared(); // Throws
 
             // Keep the mappings and file open:
-            cg.release();
+            dg.release();
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close
@@ -1032,16 +1033,16 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             catch (SlabAlloc::Retry&) {
                 continue;
             }
-            // make our presence noted (must happen before the close guard)
-            ++info->num_participants;
-            m_transact_stage = transact_Ready;
-            CloseGuard cg(*this);
-
+            SlabAlloc::DetachGuard dg(alloc);
             target_file_format_version = join_session(history_type, durability);
             setup_ringbuffer_mapping();
 
+            // make our presence noted
+            ++info->num_participants;
+            m_transact_stage = transact_Ready;
+
             // Keep the mappings and file open:
-            cg.release();
+            dg.release();
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close
         }
