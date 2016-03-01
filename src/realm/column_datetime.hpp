@@ -26,7 +26,7 @@ namespace realm {
 
 struct NewDate
 {
-    NewDate(int64_t seconds, int64_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds) { }
+    NewDate(int64_t seconds, int32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds) { }
     NewDate() { }
 
     bool is_null() const { return m_seconds == 0 && m_seconds == 0; }
@@ -37,7 +37,7 @@ struct NewDate
     NewDate& operator = (const NewDate& rhs) = default;
 
     int64_t m_seconds = 0;
-    int64_t m_nanoseconds = 0;
+    int32_t m_nanoseconds = 0;
 };
 
 class DateTimeColumn {
