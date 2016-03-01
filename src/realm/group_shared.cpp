@@ -991,25 +991,27 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             catch (SlabAlloc::Retry&) {
                 continue;
             }
-
-            // make our presence noted:
+            // make our presence noted (must be done before the closeguard):
+            m_transact_stage = transact_Ready;
             info->num_participants = 1;
-            setup_ringbuffer_mapping();
-            File::UnmapGuard fug_2(m_reader_map);
 
+            CloseGuard cg(*this);
             version_type snapshot_version;
             validate_file_format(top_ref, history_type, snapshot_version,
                                  target_file_format_version);
+            setup_ringbuffer_mapping();
+            File::UnmapGuard fug_2(m_reader_map);
             initialize_session(top_ref, snapshot_version);
 
-            // Prevent compiler reordering, making sure that a crash cannot manage
-            // to set init_complete = 1, but somehow "forget" earlier initialization
-            asm volatile("": : :"memory");
+            // Make sure that a crash cannot manage to set init_complete = 1, 
+            // but somehow "forget" earlier initialization
+            m_file.sync();
             info->init_complete = 1;
             // We hold the shared lock from here until we close the file!
             m_file.lock_shared(); // Throws
 
             // Keep the mappings and file open:
+            cg.release();
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close
@@ -1030,19 +1032,22 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             catch (SlabAlloc::Retry&) {
                 continue;
             }
-
-            // make our presence noted:
+            // make our presence noted (must happen before the close guard)
             ++info->num_participants;
+            m_transact_stage = transact_Ready;
+            CloseGuard cg(*this);
 
             target_file_format_version = join_session(history_type, durability);
             setup_ringbuffer_mapping();
+
             // Keep the mappings and file open:
+            cg.release();
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close
         }
         break;
     }
-
+    CloseGuard cg(*this);
     {
         SharedInfo* info = m_file_map.get_addr();
         RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
@@ -1052,8 +1057,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
         // Initially wait_for_change is enabled
         m_wait_for_change_enabled = true;
-
-        m_transact_stage = transact_Ready;
 
 #ifndef _WIN32
         m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_db_path,0);
@@ -1084,28 +1087,23 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 #endif // REALM_ASYNC_DAEMON
 #endif // !defined _WIN32
     }
-    try {
-        using gf = _impl::GroupFriend;
-        int current_file_format_version = gf::get_file_format_version(m_group);
-        if (current_file_format_version == 0) {
-            // If the current file format is still undecided, no upgrade is
-            // necessary, but we still need to make the chosen file format
-            // visible to the rest of the core library by updating that value
-            // that will be subsequently returned by
-            // Group::get_file_format_version(). For this to work, all session
-            // participants must adopt the chosen target Realm file format when
-            // the stored file format version is zero regardless of the version
-            // of the core library used.
-            gf::set_file_format_version(m_group, target_file_format_version);
-        }
-        else {
-            upgrade_file_format(allow_upgrafe_file_format, target_file_format_version); // Throws
-        }
+    using gf = _impl::GroupFriend;
+    int current_file_format_version = gf::get_file_format_version(m_group);
+    if (current_file_format_version == 0) {
+        // If the current file format is still undecided, no upgrade is
+        // necessary, but we still need to make the chosen file format
+        // visible to the rest of the core library by updating that value
+        // that will be subsequently returned by
+        // Group::get_file_format_version(). For this to work, all session
+        // participants must adopt the chosen target Realm file format when
+        // the stored file format version is zero regardless of the version
+        // of the core library used.
+        gf::set_file_format_version(m_group, target_file_format_version);
     }
-    catch (...) {
-        close();
-        throw;
+    else {
+        upgrade_file_format(allow_upgrafe_file_format, target_file_format_version); // Throws
     }
+    cg.release();
 }
 
 

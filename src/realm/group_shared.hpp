@@ -214,6 +214,16 @@ public:
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
 
+    /// CloseGuard for SharedGroup, useful for ensuring it is closed properly.
+    class CloseGuard {
+    public:
+        CloseGuard(SharedGroup& sg) { m_sg = &sg; }
+        ~CloseGuard() { if (m_sg) { m_sg->close(); m_sg = nullptr; } }
+        void release() { m_sg = nullptr; }
+    private:
+        SharedGroup* m_sg = nullptr;
+    };
+
     /// A SharedGroup may be created in the unattached state, and then
     /// later attached to a file with a call to open(). Calling any
     /// function other than open(), is_attached(), and ~SharedGroup()
