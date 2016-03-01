@@ -97,7 +97,7 @@ public:
         for (const auto& p: m_tests) {
             auto key = p.first;
             const test& t = p.second;
-            int test_index       = key.first;
+            size_t test_index    = key.first;
             int recurrence_index = key.second;
             const TestDetails details = context.test_list.get_test_details(test_index);
             out.str(std::string());
