@@ -544,10 +544,10 @@ private:
     // true if the lockfile is ok, false to retry.
     // throws if consistency check fails
     bool validate_lockfile();
-    int validate_file_format(bool is_session_initiator, 
-                             ref_type top_ref,
-                             Replication::HistoryType history_type,
-                             DurabilityLevel durability); // throws if validation fails
+    int validate_file_format(ref_type top_ref,
+                             Replication::HistoryType history_type); // throws if validation fails
+    void join_session(Replication::HistoryType history_type,
+                      DurabilityLevel durability); // throws if validation fails
     ref_type attach_database(bool is_session_initiator,
                              DurabilityLevel durability,
                              bool no_create_file); // throws 
