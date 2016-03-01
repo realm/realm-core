@@ -6588,7 +6588,7 @@ TEST(Table_MinimalStaleLinkColumnIndex)
     t->set_int_unique(0, 0, 4444); // crashed here
 
     CHECK_EQUAL(t->get_int(0, 0), 4444);
-    CHECK_EQUAL(t->get_int(0, 1), 0);
+    CHECK_EQUAL(t->size(), 1);
 }
 
 // This test case is a simplified version of a bug revealed by fuzz testing
