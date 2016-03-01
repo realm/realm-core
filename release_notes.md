@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Backlink columns were not being refreshed when the connected link column
+  updated it's index in the table (insert/remove/move column). This is now
+  fixed. See issue #1499.
 
 ### API breaking changes:
 
