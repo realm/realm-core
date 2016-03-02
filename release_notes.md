@@ -8,7 +8,7 @@
   This could cause a crash on rollback and was reported in ticket #1502.
 * Bumps table version when `Table::set_null()` called.
   `TableView::sync_if_needed()` wouldn't be able to see the version changes
-  after `Table::set_null()` called.
+  after `Table::set_null()` was called.
   (https://github.com/realm/realm-java/issues/2366)
 
 ### API breaking changes:
