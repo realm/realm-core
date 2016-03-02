@@ -8551,9 +8551,10 @@ TEST(Query_NewDate)
     size_t match;
 
     Columns<NewDate> first = table.column<NewDate>(0);
-    table.add_empty_row(2);
+    table.add_empty_row(3);
     table.set_newdate(0, 0, NewDate(111, 222));
     table.set_newdate(0, 1, NewDate(333, 444));
+    table.set_newdate(0, 2, NewDate(null()));
 
     CHECK(table.get_newdate(0, 0) == NewDate(111, 222));
     CHECK(table.get_newdate(0, 1) == NewDate(333, 444));
@@ -8569,6 +8570,12 @@ TEST(Query_NewDate)
 
     match = (first == NewDate(777, 888)).find();
     CHECK_EQUAL(match, not_found);
+    
+    match = (first == NewDate(null())).find();
+    CHECK_EQUAL(match, 2);
+
+    TableView tv = (first != NewDate(null())).find_all();
+    CHECK_EQUAL(tv.size(), 2);
 
     table.get<NewDate>(0, 0);
     
