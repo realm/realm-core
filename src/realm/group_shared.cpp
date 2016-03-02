@@ -972,7 +972,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     Replication::HistoryType history_type = Replication::hist_None;
     if (Replication* repl = m_group.get_replication())
         history_type = repl->get_history_type();
-
+    int sleep_amount = 0;
     for (;;) {
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
@@ -1006,11 +1006,12 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
             // Make sure that a crash cannot manage to set init_complete = 1, 
             // but somehow "forget" earlier initialization
-            m_file.sync();
+            //m_file.sync(); <-- this has dramatic consequences (x5 slower unittest in release mode)
+            asm volatile ("" : : : "memory");
             info->init_complete = 1;
             // We hold the shared lock from here until we close the file!
             m_file.lock_shared(); // Throws
-
+            sched_yield();
             // Keep the mappings and file open:
             dg.release();
             fug_2.release(); // Do not unmap
@@ -1020,6 +1021,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         }
         else {  // Joining an existing session:
 
+            // exponential backoff (if not, a stream of failing readers can prevent initialization):
+            if (sleep_amount) {
+                //std::cerr << "backoff value " << sleep_amount << std::endl;
+                millisleep(sleep_amount);
+            }
+            if (sleep_amount < 500) sleep_amount = 2 * sleep_amount + 1;
+
             m_file.lock_shared(); // Throws
             if (!validate_lockfile()) {
                 continue; // retry
@@ -1027,6 +1035,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             File::UnmapGuard fug_1(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+            if (info->num_participants == 0) {
+                continue; // retry, since the session has already been shut down.
+            }
 
             bool begin_new_session = false;
             try { attach_database(begin_new_session, durability, no_create_file); }
@@ -1242,11 +1253,11 @@ void SharedGroup::close() noexcept
     m_daemon_becomes_ready.close();
     m_new_commit_available.close();
 #endif
+    m_file_map.unmap();
+    m_reader_map.unmap();
     m_file.unlock();
     // info->~SharedInfo(); // DO NOT Call destructor
     m_file.close();
-    m_file_map.unmap();
-    m_reader_map.unmap();
 }
 
 bool SharedGroup::has_changed()

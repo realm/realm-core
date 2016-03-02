@@ -218,7 +218,13 @@ public:
     class CloseGuard {
     public:
         CloseGuard(SharedGroup& sg) { m_sg = &sg; }
-        ~CloseGuard() { if (m_sg) { m_sg->close(); m_sg = nullptr; } }
+        ~CloseGuard()
+        {
+            if (m_sg) { 
+                m_sg->close(); 
+                m_sg = nullptr; 
+            } 
+        }
         void release() { m_sg = nullptr; }
     private:
         SharedGroup* m_sg = nullptr;
