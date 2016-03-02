@@ -6620,7 +6620,7 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     t.set_string(col_string, 0, "foo");
     _CHECK_VER_BUMP();
 
-    t.set_float(col_float, 0, 0.42);
+    t.set_float(col_float, 0, 0.42f);
     _CHECK_VER_BUMP();
 
     t.set_double(col_double, 0, 0.42);
