@@ -65,7 +65,7 @@ public:
 #ifdef REALM_CONDVAR_EMULATION
     struct SharedPart {
         uint64_t signal_counter;
-        uint32_t wait_counter;
+        uint64_t wait_counter;
     };
 #else
     typedef CondVar SharedPart;
@@ -101,12 +101,7 @@ public:
     /// Cleanup and release system resources if possible.
     void close() noexcept;
 
-    /// For platforms imposing naming restrictions on system resources,
-    /// a prefix can be set. This must be done before setting any SharedParts.
-    static void set_resource_naming_prefix(std::string prefix);
 private:
-    sem_t* get_semaphore(std::string path, size_t offset_of_condvar);
-
     // non-zero if a shared part has been registered (always 0 on process local instances)
     SharedPart* m_shared_part = nullptr;
 
@@ -114,10 +109,6 @@ private:
     // pipe used for emulation
     int m_fd_read = -1;
     int m_fd_write = -1;
-
-    // name of the pipe - FIXME: generate a name based on inode, device and offset of
-    // the file used for memory mapping.
-    static std::string internal_naming_prefix;
 };
 
 

@@ -42,27 +42,18 @@ void notify_fd(int fd)
             break;
         }
 
-        // If the pipe's buffer is full, we need to read some of the old data in
-        // it to make space. We don't just read in the code waiting for
-        // notifications so that we can notify multiple waiters with a single
-        // write. (This code is copied from the cocoa binding, but because our
-        // implementation of wait/signal is different, it may never be executed).
-        REALM_ASSERT(ret == -1 && errno == EAGAIN);
-        char buff[1024];
-        int result = read(fd, buff, sizeof buff);
-        static_cast<void>(result); // silence a warning
+        // If the pipe's buffer is full, we need to wait a bit for any waiter
+        // to consume data before we proceed. This situation should not arise
+        // under normal circumstances (it requires more pending waits than the
+        // size of the buffer, which is not a likely scenario)
+        REALM_ASSERT_EX(ret == -1 && errno == EAGAIN, errno);
+        millisleep(1);
+        continue;
     }
 }
 } // anonymous namespace
 #endif // REALM_CONDVAR_EMULATION
 
-
-std::string PlatformSpecificCondVar::internal_naming_prefix = "";
-
-void PlatformSpecificCondVar::set_resource_naming_prefix(std::string prefix)
-{
-    internal_naming_prefix = prefix + "RLM";
-}
 
 PlatformSpecificCondVar::PlatformSpecificCondVar()
 {
@@ -103,7 +94,7 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
     static_cast<void>(offset_of_condvar);
 #ifdef REALM_CONDVAR_EMULATION
 #if !TARGET_OS_TV
-    auto path = internal_naming_prefix + base_path + ".cv";
+    auto path = base_path + ".cv";
 
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);
@@ -114,6 +105,9 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
             std::ostringstream ss;
+            // FIXME: getenv() is not classified as thread safe, but I'm
+            // leaving it as is for now.
+            // FIXME: Let's create our own thread-safe version in util.
             ss << getenv("TMPDIR");
             ss << "realm_" << std::hash<std::string>()(path) << ".cv";
             path = ss.str();

@@ -30,6 +30,8 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
+#include <realm/utilities.hpp>
+#include <mutex>
 
 namespace realm {
 namespace util {
@@ -113,9 +115,8 @@ inline void EmulatedRobustMutex::set_shared_part(SharedPart& shared_part,
         m_file.close();
     }
     m_filename = path + "." + mutex_name + ".mx";
-    m_local_mutex.lock();
+    std::lock_guard<Mutex> guard(m_local_mutex);
     m_file.open(m_filename, File::mode_Write);
-    m_local_mutex.unlock();
 #else
     m_shared_part = &shared_part;
     static_cast<void>(path);
@@ -128,7 +129,11 @@ inline void EmulatedRobustMutex::lock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     m_local_mutex.lock();
-    m_file.lock_exclusive();
+    try {
+        m_file.lock_exclusive();
+    } catch (...) {
+        m_local_mutex.unlock();
+    }
 #else
     REALM_ASSERT(m_shared_part);
     m_shared_part->lock([](){});
