@@ -6608,7 +6608,7 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
 
 #define _CHECK_VER_BUMP() \
     newVer = t.get_version_counter();\
-    CHECK_EQUAL(ver + 1, newVer); \
+    CHECK_GREATER(newVer, ver); \
     ver = newVer;
 
     t.set_bool(col_bool, 0, true);
