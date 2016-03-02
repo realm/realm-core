@@ -6,6 +6,7 @@
   transaction rollback in certain cases, backlink columns were removed from
   internal (not the end) indices and the roll back should put them back there.
   This could cause a crash on rollback and was reported in ticket #1502.
+* Bumps table version when `Table::set_null()` called.
 
 ### API breaking changes:
 
