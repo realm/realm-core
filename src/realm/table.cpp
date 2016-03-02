@@ -2664,6 +2664,17 @@ template<> BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
+template<> NewDate Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_NewDate);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
+    return column.get(ndx);
+}
+
+
 int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<int64_t>(col_ndx, ndx);
@@ -2761,10 +2772,12 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         repl->set_int_unique(this, col_ndx, ndx, value); // Throws
 }
 
+
 NewDate Table::get_newdate(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<NewDate>(col_ndx, ndx);
 }
+
 
 void Table::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
 {
@@ -2773,10 +2786,10 @@ void Table::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    if (is_nullable(col_ndx)) {
-        DateTimeColumn& column = get_column<DateTimeColumn, col_type_DateTime>(col_ndx);
-        column.set(ndx, value);
-    }
+
+    DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
+    column.set(ndx, value);
+
     /*
     if (Replication* repl = get_repl())
         repl->set_bool(this, col_ndx, ndx, value); // Throws
@@ -3259,8 +3272,6 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
     if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
-
-    bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_null(row_ndx);
 

@@ -1410,11 +1410,6 @@ protected:
 
 // Implementation:
 
-template<> inline NewDate Table::get(size_t, size_t) const noexcept
-{
-    return NewDate(111, 222);
-}
-
 inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 inline void Table::bump_version(bool bump_global) const noexcept

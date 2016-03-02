@@ -8555,6 +8555,9 @@ ONLY(Query_NewDate)
     table.set_newdate(0, 0, NewDate(111, 222));
     table.set_newdate(0, 1, NewDate(333, 444));
 
+    CHECK(table.get_newdate(0, 0) == NewDate(111, 222));
+    CHECK(table.get_newdate(0, 1) == NewDate(333, 444));
+
     match = (first == NewDate(111, 222)).find();
     CHECK_EQUAL(match, 0);
 
