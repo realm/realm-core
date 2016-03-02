@@ -1651,18 +1651,18 @@ inline TableRef Table::copy(Allocator& alloc) const
 
 // For use by queries
 template<class T>
-inline Columns<T> Table::column(size_t column)
+inline Columns<T> Table::column(size_t col_ndx)
 {
     std::vector<size_t> tmp = m_link_chain;
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
-        tmp.push_back(column);
+        tmp.push_back(col_ndx);
     }
 
     // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
     const Table* table = get_link_chain_target(m_link_chain);
 
-    realm::DataType ct = table->get_column_type(column);
+    realm::DataType ct = table->get_column_type(col_ndx);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
@@ -1676,7 +1676,7 @@ inline Columns<T> Table::column(size_t column)
 
 
     m_link_chain.clear();
-    return Columns<T>(column, this, tmp);
+    return Columns<T>(col_ndx, this, tmp);
 }
 
 template<class T>
