@@ -34,6 +34,7 @@
 
 #include "test.hpp"
 #include "crypt_key.hpp"
+#include "util/thread_wrapper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -11108,6 +11109,130 @@ TEST(LangBindHelper_TableViewClear)
 
         CHECK_EQUAL(number_of_history, history->size());
         CHECK_EQUAL(number_of_line, line->size());
+    }
+}
+
+
+namespace {
+    void background_querier(long handover_query, long *handover_tableview, std::string path) {
+        std::unique_ptr<ClientHistory> hist_r = make_client_history(path, crypt_key());
+        SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+
+        SharedGroup::Handover<Query> *ho_query_ptr = reinterpret_cast<realm::SharedGroup::Handover<Query>*>(handover_query);
+        std::unique_ptr<SharedGroup::Handover<Query>> ho_query(ho_query_ptr);
+        SharedGroup::VersionID current_vid;
+        std::unique_ptr<Query> query;
+        TableRef table;
+        bool different_version;
+
+        sg_r.end_read();
+        current_vid = sg_r.get_version_of_current_transaction();
+        different_version = (current_vid != ho_query->version);
+
+        if (different_version) {
+            sg_r.begin_read(ho_query->version);
+        }
+        else {
+            sg_r.begin_read();
+        }
+        query = sg_r.import_from_handover(std::move(ho_query));
+        if (different_version) {
+            LangBindHelper::advance_read(sg_r, *hist_r);
+        }
+
+        table = query->get_table();
+        TableView p_tv = query->find_all(0, static_cast<size_t>(-1), static_cast<size_t>(-1));
+
+        TableView tv = p_tv.distinct(1);
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover = sg_r.export_for_handover(tv, MutableSourcePayload::Move);
+        *handover_tableview = reinterpret_cast<long>(handover.release());
+    }
+
+} // anonymous namespace
+
+
+TEST(LangBindHelper_MultiThreadHandoverDistinctViewViaImplicitTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<ClientHistory> hist_w = make_client_history(path, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    const int num_blocks = 25;
+    const int num_objs = 10;
+    long ho_distinct_view;
+    long ho_query_w;
+    {
+        Group& group_w = const_cast<Group&>(sg_w.begin_read());
+        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        TableRef table = group_w.add_table("AnnotationIndexTypes");
+
+        std::unique_ptr<SharedGroup::Handover<Query> > ho_query_ptr;
+        Query query_w;
+        TableView tv;
+
+        table->add_column(type_Bool, "indexBoolean");
+        table->add_column(type_Int, "indexLong");
+        table->add_column(type_DateTime, "indexDate");
+        table->add_column(type_String, "indexString");
+        table->add_column(type_Bool, "notIndexBoolean");
+        table->add_column(type_Int, "notIndexLong");
+        table->add_column(type_DateTime, "notIndexDate");
+        table->add_column(type_String, "notIndexString");
+
+        table->add_search_index(0);
+        CHECK(table->has_search_index(0));
+        table->add_search_index(1);
+        CHECK(table->has_search_index(1));
+        table->add_search_index(2);
+        CHECK(table->has_search_index(2));
+        table->add_search_index(3);
+        CHECK(table->has_search_index(3));
+
+        for (int i = 0; i < num_objs * num_blocks; ++i) {
+            for (int j = 0; j < num_blocks; ++j) {
+                int r = i * num_blocks + j;
+
+                std::stringstream str_data;
+                str_data << "Test " << i;
+
+                table->add_empty_row();
+                table->set_bool(0, r, (j % 2 == 0));
+                table->set_int(1, r, j);
+                table->set_datetime(2, r, DateTime(1000 * (long)j));
+                table->set_string(3, r, StringData(str_data.str()));
+                table->set_bool(4, r, (j % 2 == 0));
+                table->set_int(5, r, j);
+                table->set_datetime(6, r, DateTime(1000 * (long)j));
+                table->set_string(7, r, StringData(str_data.str()));
+            }
+        }
+        LangBindHelper::commit_and_continue_as_read(sg_w);
+
+        tv = table->where().find_all();
+        query_w = tv.get_query();
+        ho_query_ptr = sg_w.export_for_handover(query_w, ConstSourcePayload::Copy);
+        ho_query_w = reinterpret_cast<long>(ho_query_ptr.release());
+    }
+    //background query thread
+    {
+        std::string p(path);
+        ThreadWrapper querier, verifier;
+        querier.start(bind(&background_querier, ho_query_w, &ho_distinct_view, p));
+        CHECK(!querier.join());
+    }
+    // foreground distinct view count check
+    {
+        SharedGroup::Handover<TableView>* ho_distinct_ptr = reinterpret_cast<SharedGroup::Handover<TableView>*>(ho_distinct_view);
+        std::unique_ptr<SharedGroup::Handover<TableView>> ho_distinct_view(ho_distinct_ptr);
+        std::unique_ptr<TableView> distinct_view_ptr;
+        TableView* distinct_view;
+
+        CHECK(sg_w.is_attached());
+        distinct_view_ptr = sg_w.import_from_handover(std::move(ho_distinct_view));
+        distinct_view = reinterpret_cast<TableView*>(distinct_view_ptr.release());
+        CHECK(distinct_view->is_in_sync());
+        CHECK(distinct_view->is_attached());
+        CHECK_EQUAL(distinct_view->size(), num_blocks);
+        CHECK_EQUAL(distinct_view->size(), num_blocks);
     }
 }
 
