@@ -1440,6 +1440,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             break;
         case col_type_NewDate:
             // Origin table will be set by group after entire table has been created
+            // FIXME: Not correctly implemented
             col = new DateTimeColumn(); // Throws
             break;
         case col_type_Reserved4:
@@ -2790,6 +2791,7 @@ void Table::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
     DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
     column.set(ndx, value);
 
+    // FIXME: Add replication
     /*
     if (Replication* repl = get_repl())
         repl->set_bool(this, col_ndx, ndx, value); // Throws
