@@ -206,11 +206,11 @@ public:
         return get(row_ndx);
     }
 
-    void set(size_t index, const NewDate& ndt) {
+    void set(size_t row_ndx, const NewDate& ndt) {
         util::Optional<int64_t> seconds = ndt.is_null() ? util::none : util::make_optional(ndt.m_seconds);
         int32_t nanoseconds = ndt.is_null() ? 0 : ndt.m_nanoseconds;
-        m_seconds.set(index, seconds);
-        m_nanoseconds.set(index, nanoseconds);
+        m_seconds.set(row_ndx, seconds);
+        m_nanoseconds.set(row_ndx, nanoseconds);
     }
 
 private:
