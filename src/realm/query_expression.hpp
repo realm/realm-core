@@ -1608,11 +1608,23 @@ public:
             destination.import(v);
         }
         else {
+
+
             // Not a link column
             const Table* target_table = m_link_map.target_table();
+            const ColumnBase* cb = &target_table->get_column_base(m_column);
+
+            const ColumnTemplate<T>* ct = dynamic_cast<const ColumnTemplate<T>*>(cb);
+
             for (size_t t = 0; t < destination.m_values && index + t < target_table->size(); t++) {
-                d.m_storage.set(t, target_table->get<T>(m_column, index + t));
+                T v = ct->get_val(index + t);
+                //                d.m_storage.set(t, target_table->get<T>(m_column, index + t));
+                d.m_storage.set(t, v);
+
+
             }
+
+
         }
     }
 

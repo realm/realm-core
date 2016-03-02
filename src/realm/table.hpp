@@ -1359,16 +1359,14 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
-    template<class>
-    friend class util::bind_ptr;
+    template<class> friend class util::bind_ptr;
+    template<class> friend class SimpleColumn;
     friend class LangBindHelper;
     friend class TableViewBase;
-    template<class T>
-    friend class Columns;
+    template<class T> friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
-    template<class>
-    friend class SequentialGetter;
+    template<class> friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;

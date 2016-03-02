@@ -8543,23 +8543,28 @@ TEST(Query_SubQueries)
 }
 
 
-TEST(Query_NewDate)
+ONLY(Query_NewDate)
 {
     Table table;
-    table.add_column(type_Int, "first1");
+    table.add_column(type_NewDate, "first1");
 
     size_t match;
 
     Columns<NewDate> first = table.column<NewDate>(0);
     table.add_empty_row(2);
-    
+    table.set_newdate(0, 0, NewDate(111, 222));
+    table.set_newdate(0, 1, NewDate(333, 444));
+
     match = (first == NewDate(111, 222)).find();
     CHECK_EQUAL(match, 0);
-    
+
     match = (first > NewDate(111, 222)).find();
-    CHECK_EQUAL(match, 0);
+    CHECK_EQUAL(match, 1);
 
     match = (first != NewDate(111, 222)).find();
+    CHECK_EQUAL(match, 1);
+
+    match = (first == NewDate(777, 888)).find();
     CHECK_EQUAL(match, not_found);
 
     table.get<NewDate>(0, 0);

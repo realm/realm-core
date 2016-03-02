@@ -41,7 +41,7 @@ struct NewDate {
     bool m_is_null;
 };
 
-class DateTimeColumn : public ColumnBase {
+class DateTimeColumn : public ColumnBase, public ColumnTemplate<NewDate> {
 public:
     DateTimeColumn() : m_seconds(Allocator::get_default(), IntNullColumn::create(Allocator::get_default())),
                        m_nanoseconds(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()))
@@ -200,6 +200,10 @@ public:
     NewDate get(size_t row_ndx) const noexcept {
         util::Optional<int64_t> seconds = m_seconds.get(row_ndx);
         return seconds ? NewDate(*seconds, m_nanoseconds.get(row_ndx)) : NewDate();
+    }
+
+    NewDate get_val(size_t row_ndx) const override {
+        return get(row_ndx);
     }
 
 private:

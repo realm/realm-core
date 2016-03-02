@@ -1438,6 +1438,10 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             // Origin table will be set by group after entire table has been created
             col = new BacklinkColumn(alloc, ref); // Throws
             break;
+        case col_type_NewDate:
+            // Origin table will be set by group after entire table has been created
+            col = new DateTimeColumn(); // Throws
+            break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
             break;
@@ -1936,6 +1940,8 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
             else {
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
+        case col_type_NewDate:
+            return DateTimeColumn().get_ref(); // Throws
         case col_type_Float:
             return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Double:
@@ -2760,9 +2766,21 @@ NewDate Table::get_newdate(size_t col_ndx, size_t ndx) const noexcept
     return get<NewDate>(col_ndx, ndx);
 }
 
-void Table::set_newdate(size_t, size_t, NewDate)
+void Table::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
 {
-        
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_NewDate);
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    if (is_nullable(col_ndx)) {
+        DateTimeColumn& column = get_column<DateTimeColumn, col_type_DateTime>(col_ndx);
+        column.set(ndx, value);
+    }
+    /*
+    if (Replication* repl = get_repl())
+        repl->set_bool(this, col_ndx, ndx, value); // Throws
+        */
 }
 
 
