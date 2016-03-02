@@ -79,7 +79,7 @@ public:
     /// subsequent commits on the Realm file failed.
     ///
     /// The default implementation does nothing.
-    virtual void initiate_session(version_type version);
+    virtual void initiate_session(version_type version) = 0;
 
     /// Called by the associated SharedGroup object when a session is
     /// terminated. See initiate_session() for the definition of a
@@ -87,7 +87,7 @@ public:
     /// last SharedGroup object within the session.
     ///
     /// The default implementation does nothing.
-    virtual void terminate_session() noexcept;
+    virtual void terminate_session() noexcept = 0;
 
 
     //@{
@@ -454,16 +454,6 @@ private:
 inline Replication::Replication():
     _impl::TransactLogConvenientEncoder(static_cast<_impl::TransactLogStream&>(*this))
 {
-}
-
-inline void Replication::initiate_session(version_type)
-{
-    // No-op by default
-}
-
-inline void Replication::terminate_session() noexcept
-{
-    // No-op by default
 }
 
 inline void Replication::initiate_transact(version_type current_version, bool history_updated)
