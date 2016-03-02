@@ -3259,6 +3259,8 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
     if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
+
+    bump_version();
     ColumnBase& col = get_column_base(col_ndx);
     col.set_null(row_ndx);
 

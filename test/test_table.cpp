@@ -6591,4 +6591,49 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->set_link(3, 0, 0), LogicError::detached_accessor);
 }
 
+TEST(Table_getVersionCounterAfterRowAccessor) {
+    Table t;
+    size_t col_bool   = t.add_column(type_Bool,     "bool",   true);
+    size_t col_int    = t.add_column(type_Int,      "int",    true);
+    size_t col_string = t.add_column(type_String,   "string", true);
+    size_t col_float  = t.add_column(type_Float,    "float",  true);
+    size_t col_double = t.add_column(type_Double,   "double", true);
+    size_t col_date   = t.add_column(type_DateTime, "date",   true);
+    size_t col_binary = t.add_column(type_Binary,   "binary", true);
+
+    t.add_empty_row(1);
+
+    int_fast64_t ver = t.get_version_counter();
+    int_fast64_t newVer;
+
+#define _CHECK_VER_BUMP() \
+    newVer = t.get_version_counter();\
+    CHECK_EQUAL(ver + 1, newVer); \
+    ver = newVer;
+
+    t.set_bool(col_bool, 0, true);
+    _CHECK_VER_BUMP();
+
+    t.set_int(col_int, 0, 42);
+    _CHECK_VER_BUMP();
+
+    t.set_string(col_string, 0, "foo");
+    _CHECK_VER_BUMP();
+
+    t.set_float(col_float, 0, 0.42f);
+    _CHECK_VER_BUMP();
+
+    t.set_double(col_double, 0, 0.42);
+    _CHECK_VER_BUMP();
+
+    t.set_datetime(col_date, 0, 1234);
+    _CHECK_VER_BUMP();
+
+    t.set_binary(col_binary, 0, BinaryData("binary", 7));
+    _CHECK_VER_BUMP();
+
+    t.set_null(0, 0);
+    _CHECK_VER_BUMP();
+}
+
 #endif // TEST_TABLE
