@@ -122,8 +122,6 @@ protected:
     REALM_NORETURN static void lock_failed(int) noexcept;
 
     friend class CondVar;
-    friend class PlatformSpecificCondVar;
-    friend class EmulatedRobustMutex;
 };
 
 
@@ -136,7 +134,6 @@ public:
 private:
     Mutex& m_mutex;
     friend class CondVar;
-    friend class PlatformSpecificCondVar;
 };
 
 
