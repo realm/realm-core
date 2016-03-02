@@ -2660,32 +2660,6 @@ template<> BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
     return column.get(ndx);
 }
 
-
-int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
-{
-    return get<int64_t>(col_ndx, ndx);
-}
-
-
-void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    if (is_nullable(col_ndx)) {
-        auto& col = get_column_int_null(col_ndx);
-        col.set(ndx, value);
-    }
-    else {
-        auto& col = get_column(col_ndx);
-        col.set(ndx, value);
-    }
-
-    if (Replication* repl = get_repl())
-        repl->set_int(this, col_ndx, ndx, value); // Throws
-}
-
 } // namespace realm;
 
 template<class ColType, class T>
@@ -2734,6 +2708,10 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
     return ndx;
 }
 
+int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
+{
+    return get<int64_t>(col_ndx, ndx);
+}
 
 void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
@@ -2758,6 +2736,24 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         repl->set_int_unique(this, col_ndx, ndx, value); // Throws
 }
 
+void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    if (is_nullable(col_ndx)) {
+        auto& col = get_column_int_null(col_ndx);
+        col.set(ndx, value);
+    }
+    else {
+        auto& col = get_column(col_ndx);
+        col.set(ndx, value);
+    }
+
+    if (Replication* repl = get_repl())
+        repl->set_int(this, col_ndx, ndx, value); // Throws
+}
 
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
