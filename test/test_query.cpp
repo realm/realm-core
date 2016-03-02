@@ -8543,7 +8543,7 @@ TEST(Query_SubQueries)
 }
 
 
-ONLY(Query_NewDate)
+TEST(Query_NewDate)
 {
     Table table;
     table.add_column(type_NewDate, "first1");
