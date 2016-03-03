@@ -49,6 +49,7 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
     src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
+    m_distinct_columns = src.m_distinct_columns;
     m_sorting_predicate = src.m_sorting_predicate;
     m_auto_sort = src.m_auto_sort;
     m_start = src.m_start;
@@ -78,6 +79,7 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
     m_table = TableRef();
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
+    m_distinct_columns = src.m_distinct_columns;
     m_sorting_predicate = src.m_sorting_predicate;
     m_auto_sort = src.m_auto_sort;
     m_start = src.m_start;

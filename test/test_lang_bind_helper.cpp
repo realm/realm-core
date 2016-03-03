@@ -11114,7 +11114,7 @@ TEST(LangBindHelper_TableViewClear)
 
 
 namespace {
-    void background_querier(long handover_query, long *handover_tableview, std::string path) {
+    void background_querier(void* handover_query, void** handover_tableview, std::string path) {
         std::unique_ptr<ClientHistory> hist_r = make_client_history(path, crypt_key());
         SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
 
@@ -11145,7 +11145,7 @@ namespace {
 
         TableView tv = p_tv.distinct(1);
         std::unique_ptr<SharedGroup::Handover<TableView>> handover = sg_r.export_for_handover(tv, MutableSourcePayload::Move);
-        *handover_tableview = reinterpret_cast<long>(handover.release());
+        *handover_tableview = reinterpret_cast<void*>(handover.release());
     }
 
 } // anonymous namespace
@@ -11158,8 +11158,8 @@ TEST(LangBindHelper_MultiThreadHandoverDistinctViewViaImplicitTransaction)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     const int num_blocks = 25;
     const int num_objs = 10;
-    long ho_distinct_view;
-    long ho_query_w;
+    void* ho_distinct_view;
+    void* ho_query_w;
     {
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
         LangBindHelper::promote_to_write(sg_w, *hist_w);
@@ -11210,7 +11210,7 @@ TEST(LangBindHelper_MultiThreadHandoverDistinctViewViaImplicitTransaction)
         tv = table->where().find_all();
         query_w = tv.get_query();
         ho_query_ptr = sg_w.export_for_handover(query_w, ConstSourcePayload::Copy);
-        ho_query_w = reinterpret_cast<long>(ho_query_ptr.release());
+        ho_query_w = reinterpret_cast<void*>(ho_query_ptr.release());
     }
     //background query thread
     {

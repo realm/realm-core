@@ -901,6 +901,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_end = tv.m_end;
     m_limit = tv.m_limit;
     m_linkview_source = tv.m_linkview_source;
+    m_distinct_column_source = tv.m_distinct_column_source;
     m_distinct_columns = tv.m_distinct_columns;
     m_sorting_predicate = tv.m_sorting_predicate;
 
