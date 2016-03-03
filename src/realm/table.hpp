@@ -393,7 +393,7 @@ public:
     /// \sa Table::set_string_unique()
     void change_link_targets(size_t row_ndx, size_t new_row_ndx);
 
-    // Get cell values
+    // Get cell values. Will assert if the requested type does not match the column type
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
     DateTime    get_datetime(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -403,6 +403,9 @@ public:
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
+
+    template<class T> T get(size_t c, size_t r) const noexcept;
+
     size_t get_link(size_t column_ndx, size_t row_ndx) const noexcept;
     bool is_null_link(size_t column_ndx, size_t row_ndx) const noexcept;
     LinkViewRef get_linklist(size_t column_ndx, size_t row_ndx);
@@ -1403,12 +1406,10 @@ protected:
 };
 
 
-
-
-
 // Implementation:
-inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
+
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 inline void Table::bump_version(bool bump_global) const noexcept
 {
