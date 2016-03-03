@@ -667,7 +667,10 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 
-
+// Initialize the lockfile. This is the very first thing done when a new
+// session is being established. It must be called with an exclusive lock
+// on the lockfile. It returns with a valid memory mapping for the lockfile
+// or throws.
 void SharedGroup::initialize_lockfile(DurabilityLevel durability, 
                                       Replication::HistoryType history_type)
 {
@@ -692,6 +695,11 @@ void SharedGroup::initialize_lockfile(DurabilityLevel durability,
 }
 
 
+// This is the first step taken by anyone who wants to join an established
+// session. It presumes that a session is already established, because the
+// caller has failed to obtain an exclusive lock but succeeded in getting
+// a shared lock on the lockfile. It either throws or returns with an
+// established memory mapping of the lockfile.
 bool SharedGroup::validate_lockfile()
 {
     // If the file is not completely initialized at this point in time, the
@@ -784,6 +792,7 @@ bool SharedGroup::validate_lockfile()
 }
 
 
+// Simple helper function which attaches the database (establishes a memory mapping)
 ref_type SharedGroup::attach_database(bool begin_new_session, DurabilityLevel durability,
                                       bool no_create_file)
 {
@@ -809,32 +818,9 @@ ref_type SharedGroup::attach_database(bool begin_new_session, DurabilityLevel du
 }
 
 
-void SharedGroup::initialize_session(ref_type top_ref, version_type version)
-{
-    using gf = _impl::GroupFriend;
-    SlabAlloc& alloc = m_group.m_alloc;
-    SharedInfo* info = m_file_map.get_addr();
-
-    if (Replication* repl = gf::get_replication(m_group))
-        repl->initiate_session(version); // Throws
-
-#ifndef _WIN32
-    if (m_key) {
-        static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
-        info->session_initiator_pid = uint_fast64_t(getpid());
-    }
-#endif
-    // Initially there is a single version in the file
-    info->number_of_versions = 1;
-
-    info->latest_version_number = version;
-
-    SharedInfo* r_info = m_reader_map.get_addr();
-    size_t file_size = alloc.get_baseline();
-    r_info->init_versioning(top_ref, file_size, version);
-}
-
-
+// Validate the file format and obtain version information from
+// the database. Both file format version and snapshot version
+// are fetched from the database and returned for later use.
 void SharedGroup::validate_file_format(ref_type top_ref, 
                                        Replication::HistoryType history_type,
                                        version_type& snapshot_version,
@@ -879,6 +865,36 @@ void SharedGroup::validate_file_format(ref_type top_ref,
 }
 
 
+// Initialize the session data in the lockfile, most importantly the
+// ringbuffer which holds all open transactions. Also informs the replication
+// object that a session is being initialized.
+void SharedGroup::initialize_session(ref_type top_ref, version_type version)
+{
+    using gf = _impl::GroupFriend;
+    SlabAlloc& alloc = m_group.m_alloc;
+    SharedInfo* info = m_file_map.get_addr();
+
+    if (Replication* repl = gf::get_replication(m_group))
+        repl->initiate_session(version); // Throws
+
+#ifndef _WIN32
+    if (m_key) {
+        static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+        info->session_initiator_pid = uint_fast64_t(getpid());
+    }
+#endif
+    // Initially there is a single version in the file
+    info->number_of_versions = 1;
+
+    info->latest_version_number = version;
+
+    SharedInfo* r_info = m_reader_map.get_addr();
+    size_t file_size = alloc.get_baseline();
+    r_info->init_versioning(top_ref, file_size, version);
+}
+
+
+// Join an already initialised session
 int SharedGroup::join_session(Replication::HistoryType history_type,
                               DurabilityLevel durability)
 {
@@ -929,6 +945,8 @@ int SharedGroup::join_session(Replication::HistoryType history_type,
 }
 
 
+// Make sure the ringbuffer (active transaction list) is memory mapped
+// so that it is safe to access it.
 void SharedGroup::setup_ringbuffer_mapping()
 {
     SharedInfo* info = m_file_map.get_addr();
@@ -1006,12 +1024,12 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
             // Make sure that a crash cannot manage to set init_complete = 1, 
             // but somehow "forget" earlier initialization
-            //m_file.sync(); <-- this has dramatic consequences (x5 slower unittest in release mode)
+            //m_file.sync(); <-- this is theoretically better but has dramatic consequences 
+            // (x5 slower unittest in release mode)
             asm volatile ("" : : : "memory");
             info->init_complete = 1;
             // We hold the shared lock from here until we close the file!
             m_file.lock_shared(); // Throws
-            sched_yield();
             // Keep the mappings and file open:
             dg.release();
             fug_2.release(); // Do not unmap
@@ -1019,7 +1037,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             fcg.release(); // Do not close
 
         }
-        else {  // Joining an existing session:
+        else {  // We failed to get the exclusive lock, so most often we'll be joining
+            // an existing session. However, two conditions/scenarios can lead us to
+            // get here without a valid session to join
+            // scenario A: The session is already over
+            // scenario B: The session was never fully initialized due to a crash
+            // we detect both scenarios below and start over, hoping to get the
+            // exclusive lock next time round.
 
             // exponential backoff (if not, a stream of failing readers can prevent initialization):
             if (sleep_amount) {
@@ -1030,13 +1054,15 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
             m_file.lock_shared(); // Throws
             if (!validate_lockfile()) {
-                continue; // retry
+                continue; // retry due to scenario B
             }
             File::UnmapGuard fug_1(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
             RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
             if (info->num_participants == 0) {
-                continue; // retry, since the session has already been shut down.
+                continue; // retry due to scenario A
+                // Important: For some access patterns this can lead to livelock
+                // unless exponential backoff is used (as above).
             }
 
             bool begin_new_session = false;
