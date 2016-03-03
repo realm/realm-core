@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.1)
+project(Realm)
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
-project(Realm)
+include(FindOpenSSL)
 set(CMAKE_CXX_STANDARD 11)
 enable_testing()
 
@@ -13,6 +14,7 @@ set(REALM_VERSION "${REALM_VERSION_MAJOR}.${REALM_VERSION_MINOR}.${REALM_VERSION
 set(REALM_ENABLE_ASSERTIONS "0" CACHE STRING "Enable assertions in release mode.")
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node side.")
 set(REALM_ENABLE_ALLOC_SET_ZERO "0" CACHE STRING "Zero all allocations.")
+set(REALM_ENABLE_ENCRYPTION "0" CACHE STRING "Enable encryption.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
 
