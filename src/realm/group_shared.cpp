@@ -1026,7 +1026,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             // but somehow "forget" earlier initialization
             //m_file.sync(); <-- this is theoretically better but has dramatic consequences 
             // (x5 slower unittest in release mode)
-            asm volatile ("" : : : "memory");
+            atomic_thread_fence(std::memory_order_release);
             info->init_complete = 1;
             // We hold the shared lock from here until we close the file!
             m_file.lock_shared(); // Throws
