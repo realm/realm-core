@@ -2,9 +2,9 @@
 
 using namespace realm::_impl;
 
-void SimulatedFailure::do_fail(void* userdata)
+void SimulatedFailure::do_fail(type event, void* userdata)
 {
-    auto event = static_cast<DebugTrace::Event>(reinterpret_cast<size_t>(userdata));
+    static_cast<void>(userdata);
     unprime(event);
     throw SimulatedFailure();
 }

@@ -42,7 +42,7 @@ public:
 
 private:
 #ifdef REALM_DEBUG
-    static void do_fail(void*);
+    static void do_fail(type, void*);
 #endif
 };
 
@@ -73,7 +73,7 @@ private:
 inline void SimulatedFailure::prime(type failure_type)
 {
 #ifdef REALM_DEBUG
-    DebugTrace::install(failure_type, DebugTrace::Callback{&SimulatedFailure::do_fail, reinterpret_cast<void*>(failure_type)});
+    DebugTrace::install(failure_type, DebugTrace::Callback{&SimulatedFailure::do_fail, nullptr});
 #else
     static_cast<void>(failure_type);
 #endif

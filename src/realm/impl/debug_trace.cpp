@@ -86,7 +86,7 @@ void DebugTrace::do_trace(Event event)
     size_t event_ndx = static_cast<size_t>(event);
     Callback& callback = callbacks[event_ndx];
     if (callback) {
-        callback();
+        callback(event);
     }
 }
 

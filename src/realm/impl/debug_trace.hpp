@@ -75,7 +75,7 @@ private:
 };
 
 struct DebugTrace::Callback {
-    void(*m_function)(void*);
+    void(*m_function)(Event, void*);
     void* m_userdata;
     
     explicit operator bool() const
@@ -83,9 +83,9 @@ struct DebugTrace::Callback {
         return m_userdata != nullptr;
     }
 
-    void operator()() const
+    void operator()(Event event) const
     {
-        m_function(m_userdata);
+        m_function(event, m_userdata);
     }
 };
 
