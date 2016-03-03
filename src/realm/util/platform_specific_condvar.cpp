@@ -276,7 +276,7 @@ void PlatformSpecificCondVar::wait(EmulatedRobustMutex& m, const struct timespec
 
 
 // Notify:
-// invariant: The caller holds the mutex guarding the condition variable.
+// precondition: The caller holds the mutex guarding the condition variable.
 // operation: If a waiter is present, we wake her up by writing a single
 // byte to the fifo.
 
@@ -295,7 +295,7 @@ void PlatformSpecificCondVar::notify() noexcept
 
 
 // Notify_all:
-// invariant: The caller holds the mutex guarding the condition variable.
+// precondition: The caller holds the mutex guarding the condition variable.
 // operation: If waiters are present, we wake them up by writing a single
 // byte to the fifo for each waiter.
 
