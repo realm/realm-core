@@ -12,6 +12,14 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   set(EXTRA_TEST_CFLAGS ${PROCPS_INCLUDE_DIR})
 endif()
 
+# Resources required for running the tests
+file(GLOB REQUIRED_TEST_FILES
+     "*.json"
+     "*.realm"
+     "expect_string.txt")
+file(COPY ${REQUIRED_TEST_FILES}
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 # FIXME: Resources
 # FIXME: Benchmarks
 
