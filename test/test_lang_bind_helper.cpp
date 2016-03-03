@@ -10460,6 +10460,9 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryOr;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAnd;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryNot;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAndAndOr;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryWithExpression;
 
     {
         LangBindHelper::promote_to_write(sg_w);
@@ -10482,14 +10485,23 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 
         LangBindHelper::commit_and_continue_as_read(sg_w);
 
-        realm::Query query = source->where().links_to(col_link, target->get(0));
+        Query query = source->where().links_to(col_link, target->get(0));
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
 
-        realm::Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
+        Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
         handoverQueryOr = sg_w.export_for_handover(queryOr, ConstSourcePayload::Copy);
 
-        realm::Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
+        Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
         handoverQueryAnd = sg_w.export_for_handover(queryAnd, ConstSourcePayload::Copy);
+
+        Query queryNot = source->where().Not().links_to(col_link, target->get(0)).links_to(col_link, target->get(1));
+        handoverQueryNot = sg_w.export_for_handover(queryNot, ConstSourcePayload::Copy);
+
+        Query queryAndAndOr = source->where().group().and_query(queryOr).end_group().and_query(queryAnd);
+        handoverQueryAndAndOr = sg_w.export_for_handover(queryAndAndOr, ConstSourcePayload::Copy);
+
+        Query queryWithExpression = source->column<LinkList>(col_link).is_not_null() && query;
+        handoverQueryWithExpression = sg_w.export_for_handover(queryWithExpression, ConstSourcePayload::Copy);
     }
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
@@ -10499,10 +10511,16 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         std::unique_ptr<Query> query(sg.import_from_handover(move(handoverQuery)));
         std::unique_ptr<Query> queryOr(sg.import_from_handover(move(handoverQueryOr)));
         std::unique_ptr<Query> queryAnd(sg.import_from_handover(move(handoverQueryAnd)));
+        std::unique_ptr<Query> queryNot(sg.import_from_handover(move(handoverQueryNot)));
+        std::unique_ptr<Query> queryAndAndOr(sg.import_from_handover(move(handoverQueryAndAndOr)));
+        std::unique_ptr<Query> queryWithExpression(sg.import_from_handover(move(handoverQueryWithExpression)));
 
         CHECK_EQUAL(1, query->count());
         CHECK_EQUAL(2, queryOr->count());
         CHECK_EQUAL(1, queryAnd->count());
+        CHECK_EQUAL(1, queryNot->count());
+        CHECK_EQUAL(1, queryAndAndOr->count());
+        CHECK_EQUAL(1, queryWithExpression->count());
 
 
         // Remove the linked-to row.
@@ -10519,6 +10537,9 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         CHECK_EQUAL(1, query->count());
         CHECK_EQUAL(2, queryOr->count());
         CHECK_EQUAL(1, queryAnd->count());
+        CHECK_EQUAL(1, queryNot->count());
+        CHECK_EQUAL(1, queryAndAndOr->count());
+        CHECK_EQUAL(1, queryWithExpression->count());
     }
 }
 
