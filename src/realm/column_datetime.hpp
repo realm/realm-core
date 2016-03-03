@@ -78,10 +78,12 @@ public:
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept override;
     void update_from_parent(size_t old_baseline) noexcept override;
     void refresh_accessor_tree(size_t new_col_ndx, const Spec&) override;
+#ifdef REALM_DEBUG
     void verify() const override;
     void to_dot(std::ostream&, StringData title = StringData()) const override;
     void do_dump_node_structure(std::ostream&, int level) const override;
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
+#endif
     void add(const NewDate& ndt = NewDate{});
     NewDate get(size_t row_ndx) const noexcept;
     NewDate get_val(size_t row_ndx) const override;
@@ -247,6 +249,8 @@ inline void DateTimeColumn::refresh_accessor_tree(size_t /*new_col_ndx*/, const 
     // FIXME: Dummy implementation
 }
 
+#ifdef REALM_DEBUG
+
 inline void DateTimeColumn::verify() const
 {
     // FIXME: Dummy implementation
@@ -266,6 +270,8 @@ inline void DateTimeColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_pa
 {
     // FIXME: Dummy implementation
 }
+
+#endif
 
 inline void DateTimeColumn::add(const NewDate& ndt)
 {
