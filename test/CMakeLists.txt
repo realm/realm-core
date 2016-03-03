@@ -6,12 +6,28 @@ set(FUZZY_TESTS fuzz_group.cpp)
 
 set(TESTS ${NORMAL_TESTS} ${LARGE_TESTS} ${FUZZY_TESTS})
 
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+  include(Findprocps)
+  set(EXTRA_TEST_LIBS ${PROCPS_LIBRARY} rt)
+  set(EXTRA_TEST_CFLAGS ${PROCPS_INCLUDE_DIR})
+endif()
+
 # FIXME: Resources
 # FIXME: Benchmarks
 
 add_executable(realm-tests ${TESTS} main.cpp)
-target_link_libraries(realm-tests realm test-util)
-# FIXME: Link with procps and define HAVE_PROCPS
+
+target_link_libraries(
+  realm-tests
+  realm test-util
+  ${EXTRA_TEST_LIBS}
+)
+
+target_include_directories(
+  realm-tests
+  PUBLIC ${EXTRA_TEST_CFLAGS}
+)
+
 add_test(RealmTests realm-tests)
 
 
