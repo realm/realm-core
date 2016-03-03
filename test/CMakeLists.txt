@@ -20,7 +20,6 @@ file(GLOB REQUIRED_TEST_FILES
 file(COPY ${REQUIRED_TEST_FILES}
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-# FIXME: Resources
 # FIXME: Benchmarks
 
 add_executable(realm-tests ${TESTS} main.cpp)
@@ -36,8 +35,10 @@ target_include_directories(
   PUBLIC ${EXTRA_TEST_CFLAGS}
 )
 
-add_test(RealmTests realm-tests)
-
+add_test(
+  NAME RealmTests
+  COMMAND realm-tests
+)
 
 set(BENCHMARKS benchmark-common-tasks/main.cpp)
 add_executable(realm-benchmark-common-tasks ${BENCHMARKS})
@@ -45,4 +46,3 @@ target_link_libraries(realm-benchmark-common-tasks realm test-util)
 add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
 
 # FIXME: Add other benchmarks
-
