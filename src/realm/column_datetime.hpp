@@ -275,8 +275,9 @@ inline void DateTimeColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_pa
 
 inline void DateTimeColumn::add(const NewDate& ndt)
 {
-    util::Optional<int64_t> seconds = ndt.is_null() ? util::none : util::make_optional(ndt.m_seconds);
-    int32_t nanoseconds = ndt.is_null() ? 0 : ndt.m_nanoseconds;
+    bool is_null = ndt.is_null();
+    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ndt.m_seconds);
+    int32_t nanoseconds = is_null ? 0 : ndt.m_nanoseconds;
     m_seconds.add(seconds);
     m_nanoseconds.add(nanoseconds);
 }
@@ -294,8 +295,9 @@ inline NewDate DateTimeColumn::get_val(size_t row_ndx) const
 
 inline void DateTimeColumn::set(size_t row_ndx, const NewDate& ndt)
 {
-    util::Optional<int64_t> seconds = ndt.is_null() ? util::none : util::make_optional(ndt.m_seconds);
-    int32_t nanoseconds = ndt.is_null() ? 0 : ndt.m_nanoseconds;
+    bool is_null = ndt.is_null();
+    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ndt.m_seconds);
+    int32_t nanoseconds = is_null ? 0 : ndt.m_nanoseconds;
     m_seconds.set(row_ndx, seconds);
     m_nanoseconds.set(row_ndx, nanoseconds);
 }
