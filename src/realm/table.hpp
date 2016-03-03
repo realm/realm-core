@@ -1342,6 +1342,11 @@ private:
 
     void refresh_column_accessors(size_t col_ndx_begin = 0);
 
+    // Look for link columns starting from col_ndx_begin.
+    // If a link column is found, follow the link and update it's
+    // backlink column accessor if it is in different table.
+    void refresh_link_target_accessors(size_t col_ndx_begin = 0);
+
     bool is_cross_table_link_target() const noexcept;
 
 #ifdef REALM_DEBUG

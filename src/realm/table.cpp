@@ -850,6 +850,8 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
         link.m_target_table->unmark();
         link.m_target_table->refresh_column_accessors(link.m_backlink_col_ndx);
     }
+
+    refresh_link_target_accessors(col_ndx);
 }
 
 
@@ -871,6 +873,7 @@ void Table::erase_root_column(size_t col_ndx)
     adj_erase_column(col_ndx);
     update_link_target_tables(col_ndx + 1, col_ndx); // Throws
     refresh_column_accessors(col_ndx);
+    refresh_link_target_accessors(col_ndx);
 }
 
 
@@ -882,7 +885,9 @@ void Table::move_root_column(size_t from, size_t to)
     adj_move_column(from, to);
     update_link_target_tables_after_column_move(from, to);
 
-    refresh_column_accessors(std::min(from, to));
+    size_t min_ndx = std::min(from, to);
+    refresh_column_accessors(min_ndx);
+    refresh_link_target_accessors(min_ndx);
 }
 
 
@@ -5428,6 +5433,38 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
     else {
         ColumnBase* first_col = m_cols[0];
         m_size = first_col->size();
+    }
+}
+
+
+void Table::refresh_link_target_accessors(size_t col_ndx_begin)
+{
+    REALM_ASSERT_3(col_ndx_begin, <=, m_spec.get_public_column_count());
+    typedef _impl::GroupFriend gf;
+
+    Group* group = get_parent_group();
+    // Only update backlink columns that belong to a different table (in the same group).
+    // If a table is linked to itself, backlinks will be updated correctly as part
+    // of refresh_column_accessors(), so the case of free standing tables is already handled.
+    if (group) {
+        size_t origin_ndx_in_group = m_top.get_ndx_in_parent();
+        size_t col_ndx_end = m_spec.get_public_column_count(); // No need to check backlink columns
+
+        for (size_t col_ndx = col_ndx_begin; col_ndx != col_ndx_end; ++col_ndx) {
+            ColumnType col_type = m_spec.get_column_type(col_ndx);
+            if (is_link_type(col_type)) {
+                size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
+                Table& target_table = gf::get_table(*group, target_table_ndx); // Throws
+                ColumnBase* col = m_cols[col_ndx];
+                if (col && !target_table.is_marked() && &target_table != this) {
+                    LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
+                    BacklinkColumn& backlink_col = link_col->get_backlink_column();
+                    size_t backlink_col_ndx =
+                        target_table.m_spec.find_backlink_column(origin_ndx_in_group, col_ndx);
+                    backlink_col.refresh_accessor_tree(backlink_col_ndx, target_table.m_spec);
+                }
+            }
+        }
     }
 }
 
