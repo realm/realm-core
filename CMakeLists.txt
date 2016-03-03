@@ -5,6 +5,7 @@ include(CheckIncludeFiles)
 include(FindOpenSSL)
 set(CMAKE_CXX_STANDARD 11)
 enable_testing()
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake" ${CMAKE_MODULE_PATH})
 
 set(REALM_VERSION_MAJOR 0)
 set(REALM_VERSION_MINOR 96)
