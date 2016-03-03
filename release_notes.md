@@ -2,6 +2,10 @@
 
 ### Bugfixes:
 
+* Fix for #1498: A crash during opening of a Realm could lead to Realm files
+  which could not later be read. The symptom would be a realm file with zeroes
+  in the end but on streaming form (which requires a footer at the end of the
+  file instead).
 * Backlink columns were always inserted at the end of a table, however on a
   transaction rollback in certain cases, backlink columns were removed from
   internal (not the end) indices and the roll back should put them back there.
@@ -20,6 +24,8 @@
 
 ### Enhancements:
 
+* The opening of the realm file (SharedGroup::do_open) has been made more robust
+  and easier to understand.
 * Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
   keeps the current history implementation as the default for now
   (`<realm/commit_log.hpp>`).
