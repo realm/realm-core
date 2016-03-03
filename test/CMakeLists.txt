@@ -2,7 +2,7 @@ add_subdirectory(util)
 
 file(GLOB NORMAL_TESTS "test_*.cpp")
 file(GLOB LARGE_TESTS "large_tests/*.cpp")
-set(FUZZY_TESTS fuzz_group.cpp)
+file(GLOB FUZZY_TESTS "fuzz_*.cpp")
 
 set(TESTS ${NORMAL_TESTS} ${LARGE_TESTS} ${FUZZY_TESTS})
 
