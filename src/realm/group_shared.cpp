@@ -1029,6 +1029,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             atomic_thread_fence(std::memory_order_release);
             info->init_complete = 1;
             // We hold the shared lock from here until we close the file!
+            m_file.unlock();
             m_file.lock_shared(); // Throws
             // Keep the mappings and file open:
             dg.release();
