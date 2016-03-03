@@ -23,19 +23,14 @@
 
 #include <exception>
 
-#include <realm/util/features.h>
+#include <realm/impl/debug_trace.hpp>
 
 namespace realm {
 namespace _impl {
 
 class SimulatedFailure: public std::exception {
 public:
-    enum type {
-        slab_alloc__reset_free_space_tracking,
-        slab_alloc__remap,
-        shared_group__grow_reader_mapping,
-        _num_failure_types
-    };
+    using type = DebugTrace::Event;
 
     class PrimeGuard;
 
@@ -45,17 +40,9 @@ public:
     // Unprime the specified failure type on the calling thread.
     static void unprime(type) noexcept;
 
-    // If the specified failure type was primed on the calling thread and
-    // REALM_DEBUG was defined during compilation, then this throw
-    // SimulatedFailure after unpriming the failure type. If REALM_DEBUG was not
-    // defined, this function does nothing.
-    static void check(type);
-
 private:
 #ifdef REALM_DEBUG
-    static void do_prime(type);
-    static void do_unprime(type) noexcept;
-    static void do_check(type);
+    static void do_fail(void*);
 #endif
 };
 
@@ -86,7 +73,7 @@ private:
 inline void SimulatedFailure::prime(type failure_type)
 {
 #ifdef REALM_DEBUG
-    do_prime(failure_type);
+    DebugTrace::install(failure_type, DebugTrace::Callback{&SimulatedFailure::do_fail, reinterpret_cast<void*>(failure_type)});
 #else
     static_cast<void>(failure_type);
 #endif
@@ -95,16 +82,7 @@ inline void SimulatedFailure::prime(type failure_type)
 inline void SimulatedFailure::unprime(type failure_type) noexcept
 {
 #ifdef REALM_DEBUG
-    do_unprime(failure_type);
-#else
-    static_cast<void>(failure_type);
-#endif
-}
-
-inline void SimulatedFailure::check(type failure_type)
-{
-#ifdef REALM_DEBUG
-    do_check(failure_type);
+    DebugTrace::install(failure_type, DebugTrace::Callback{nullptr, nullptr});
 #else
     static_cast<void>(failure_type);
 #endif
