@@ -2,6 +2,7 @@
 #include <system_error>
 
 #include <realm/impl/debug_trace.hpp>
+#include <realm/util/basic_system_errors.hpp>
 
 #if REALM_IOS
 #  define USE_PTHREADS_IMPL 1
