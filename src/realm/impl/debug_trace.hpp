@@ -42,7 +42,8 @@ public:
     template <class>
     class InstallGuard;
 
-    // Install a callback to be triggered when the gived event is occuring.
+    // Install a callback to be triggered when the gived event is occuring on
+    // the current thread.
     //
     // If a callback was previous installed for the given event, that callback
     // is replaced by the incoming callback, and the old callback is returned. The
@@ -70,7 +71,6 @@ public:
     template <class F>
     static InstallGuard<F> install_guard(Event, F&&);
 private:
-    static Callback do_install(Event, Callback) noexcept;
     static void do_trace(Event);
 };
 

@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <system_error>
+
 #include <realm/impl/debug_trace.hpp>
 
 #if REALM_IOS
@@ -68,7 +71,7 @@ DebugTrace::Callback* get_callback_vector() noexcept
 } // unnamed namespace
 
 
-DebugTrace::Callback DebugTrace::do_install(Event event, Callback callback) noexcept
+DebugTrace::Callback DebugTrace::install(Event event, Callback callback) noexcept
 {
     auto callbacks = get_callback_vector();
     size_t event_ndx = static_cast<size_t>(event);
