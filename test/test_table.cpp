@@ -18,7 +18,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -3715,7 +3715,7 @@ TEST(Table_Pivot)
 
 namespace {
 
-void compare_table_with_slice(TestResults& test_results, const Table& table,
+void compare_table_with_slice(TestContext& test_context, const Table& table,
                               const Table& slice, size_t offset, size_t size)
 {
     ConstDescriptorRef table_desc = table.get_descriptor();
@@ -3834,7 +3834,7 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
 }
 
 
-void test_write_slice_name(TestResults& test_results, const Table& table,
+void test_write_slice_name(TestContext& test_context, const Table& table,
                            StringData expect_name, bool override_name)
 {
     size_t offset = 0, size = 0;
@@ -3853,7 +3853,7 @@ void test_write_slice_name(TestResults& test_results, const Table& table,
     CHECK(slice);
 }
 
-void test_write_slice_contents(TestResults& test_results, const Table& table,
+void test_write_slice_contents(TestContext& test_context, const Table& table,
                                size_t offset, size_t size)
 {
     std::ostringstream out;
@@ -3871,7 +3871,7 @@ void test_write_slice_contents(TestResults& test_results, const Table& table,
             size_2 = remaining_size;
         CHECK_EQUAL(size_2, slice->size());
         if (size_2 == slice->size())
-            compare_table_with_slice(test_results, table, *slice, offset, size_2);
+            compare_table_with_slice(test_context, table, *slice, offset, size_2);
     }
 }
 
@@ -3883,16 +3883,16 @@ TEST(Table_WriteSlice)
     // check that the name of the written table is as expected
     {
         Table table;
-        test_write_slice_name(test_results, table, "",    false);
-        test_write_slice_name(test_results, table, "foo", true); // Override
-        test_write_slice_name(test_results, table, "",    true); // Override
+        test_write_slice_name(test_context, table, "",    false);
+        test_write_slice_name(test_context, table, "foo", true); // Override
+        test_write_slice_name(test_context, table, "",    true); // Override
     }
     {
         Group group;
         TableRef table = group.add_table("test");
-        test_write_slice_name(test_results, *table, "test", false);
-        test_write_slice_name(test_results, *table, "foo",  true); // Override
-        test_write_slice_name(test_results, *table, "",     true); // Override
+        test_write_slice_name(test_context, *table, "test", false);
+        test_write_slice_name(test_context, *table, "foo",  true); // Override
+        test_write_slice_name(test_context, *table, "",     true); // Override
     }
 
     // Run through a 3-D matrix of table sizes, slice offsets, and
@@ -3914,7 +3914,7 @@ TEST(Table_WriteSlice)
                 int size = table_sizes[size_i];
                 // This also checks that the range can extend beyond
                 // end of table
-                test_write_slice_contents(test_results, *table, offset, size);
+                test_write_slice_contents(test_context, *table, offset, size);
                 if (offset + size > table_size)
                     break;
             }
@@ -6589,6 +6589,51 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->remove_substring(1, 0, 0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_binary(2, 0, BinaryData()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_link(3, 0, 0), LogicError::detached_accessor);
+}
+
+TEST(Table_getVersionCounterAfterRowAccessor) {
+    Table t;
+    size_t col_bool   = t.add_column(type_Bool,     "bool",   true);
+    size_t col_int    = t.add_column(type_Int,      "int",    true);
+    size_t col_string = t.add_column(type_String,   "string", true);
+    size_t col_float  = t.add_column(type_Float,    "float",  true);
+    size_t col_double = t.add_column(type_Double,   "double", true);
+    size_t col_date   = t.add_column(type_DateTime, "date",   true);
+    size_t col_binary = t.add_column(type_Binary,   "binary", true);
+
+    t.add_empty_row(1);
+
+    int_fast64_t ver = t.get_version_counter();
+    int_fast64_t newVer;
+
+#define _CHECK_VER_BUMP() \
+    newVer = t.get_version_counter();\
+    CHECK_GREATER(newVer, ver); \
+    ver = newVer;
+
+    t.set_bool(col_bool, 0, true);
+    _CHECK_VER_BUMP();
+
+    t.set_int(col_int, 0, 42);
+    _CHECK_VER_BUMP();
+
+    t.set_string(col_string, 0, "foo");
+    _CHECK_VER_BUMP();
+
+    t.set_float(col_float, 0, 0.42f);
+    _CHECK_VER_BUMP();
+
+    t.set_double(col_double, 0, 0.42);
+    _CHECK_VER_BUMP();
+
+    t.set_datetime(col_date, 0, 1234);
+    _CHECK_VER_BUMP();
+
+    t.set_binary(col_binary, 0, BinaryData("binary", 7));
+    _CHECK_VER_BUMP();
+
+    t.set_null(0, 0);
+    _CHECK_VER_BUMP();
 }
 
 #endif // TEST_TABLE

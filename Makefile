@@ -67,6 +67,11 @@ benchmark-common-tasks: check-norun/subdir/src
 benchmark-util-network: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-util-network
 
+# Build and run the "history types" benchmarking program
+.PHONY: benchmark-history-types
+benchmark-history-types: check-norun/subdir/src
+	@$(MAKE) -C test benchmark-history-types
+
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
 lcov: check-cover

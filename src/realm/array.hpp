@@ -45,6 +45,7 @@ Searching: The main finding function is:
 #include <utility>
 #include <vector>
 #include <ostream>
+#include <sstream>
 
 #include <stdint.h> // unint8_t etc
 
@@ -170,7 +171,42 @@ public:
     size_t used;
     size_t array_count;
 };
+template<class C, class T>
+std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats)
+{
+    std::ostringstream out_2;
+    out_2.setf(std::ios::fixed);
+    out_2.precision(1);
+    double used_percent = 100.0 * stats.used / stats.allocated;
+    out_2 << "allocated = "<<stats.allocated<<", used = "<<stats.used<<" ("<<used_percent<<"%), "
+        "array_count = "<<stats.array_count;
+    out << out_2.str();
+    return out;
+}
 #endif
+
+
+// Stores a value obtained from Array::get(). It is a ref if the least
+// significant bit is clear, otherwise it is a tagged integer. A tagged interger
+// is obtained from a logical integer value by left shifting by one bit position
+// (multiplying by two), and then setting the least significant bit to
+// one. Clearly, this means that the maximum value that can be stored as a
+// tagged integer is 2**63 - 1.
+class RefOrTagged {
+public:
+    bool is_ref() const noexcept;
+    bool is_tagged() const noexcept;
+    ref_type get_as_ref() const noexcept;
+    uint_fast64_t get_as_int() const noexcept;
+
+    static RefOrTagged make_ref(ref_type) noexcept;
+    static RefOrTagged make_tagged(uint_fast64_t) noexcept;
+
+private:
+    int_fast64_t m_value;
+    RefOrTagged(int_fast64_t) noexcept;
+    friend class Array;
+};
 
 
 class ArrayParent
@@ -398,6 +434,11 @@ public:
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
     ref_type get_as_ref(size_t ndx) const noexcept;
+
+    RefOrTagged get_as_ref_or_tagged(size_t ndx) const noexcept;
+    void set(size_t ndx, RefOrTagged);
+    void add(RefOrTagged);
+    void ensure_minimum_width(RefOrTagged);
 
     int64_t front() const noexcept;
     int64_t back() const noexcept;
@@ -1461,7 +1502,46 @@ public:
     }
 };
 
+inline bool RefOrTagged::is_ref() const noexcept
+{
+    return (m_value & 1) == 0;
+}
 
+inline bool RefOrTagged::is_tagged() const noexcept
+{
+    return !is_ref();
+}
+
+inline ref_type RefOrTagged::get_as_ref() const noexcept
+{
+    // to_ref() is defined in <alloc.hpp>
+    return to_ref(m_value);
+}
+
+inline uint_fast64_t RefOrTagged::get_as_int() const noexcept
+{
+    // The bitwise AND is there in case uint_fast64_t is wider than 64 bits.
+    return (uint_fast64_t(m_value) & 0xFFFFFFFFFFFFFFFFULL) >> 1;
+}
+
+inline RefOrTagged RefOrTagged::make_ref(ref_type ref) noexcept
+{
+    // from_ref() is defined in <alloc.hpp>
+    int_fast64_t value = from_ref(ref);
+    return RefOrTagged(value);
+}
+
+inline RefOrTagged RefOrTagged::make_tagged(uint_fast64_t i) noexcept
+{
+    REALM_ASSERT(i < (1ULL << 63));
+    int_fast64_t value = util::from_twos_compl<int_fast64_t>((i << 1) | 1);
+    return RefOrTagged(value);
+}
+
+inline RefOrTagged::RefOrTagged(int_fast64_t value) noexcept:
+    m_value(value)
+{
+}
 
 inline Array::Array(Allocator& alloc) noexcept:
     m_alloc(alloc)
@@ -1557,6 +1637,30 @@ inline ref_type Array::get_as_ref(size_t ndx) const noexcept
     REALM_ASSERT_DEBUG(m_has_refs);
     int64_t v = get(ndx);
     return to_ref(v);
+}
+
+inline RefOrTagged Array::get_as_ref_or_tagged(size_t ndx) const noexcept
+{
+    REALM_ASSERT(has_refs());
+    return RefOrTagged(get(ndx));
+}
+
+inline void Array::set(size_t ndx, RefOrTagged ref_or_tagged)
+{
+    REALM_ASSERT(has_refs());
+    set(ndx, ref_or_tagged.m_value); // Throws
+}
+
+inline void Array::add(RefOrTagged ref_or_tagged)
+{
+    REALM_ASSERT(has_refs());
+    add(ref_or_tagged.m_value); // Throws
+}
+
+inline void Array::ensure_minimum_width(RefOrTagged ref_or_tagged)
+{
+    REALM_ASSERT(has_refs());
+    ensure_minimum_width(ref_or_tagged.m_value); // Throws
 }
 
 inline bool Array::is_inner_bptree_node() const noexcept

@@ -18,7 +18,7 @@
 
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -79,7 +79,7 @@ TEST(SafeIntOps_AddWithOverflowDetect)
 namespace {
 
 template<class T_1, class T_2>
-void test_two_args(TestResults& test_results, const std::set<super_int>& values)
+void test_two_args(TestContext& test_context, const std::set<super_int>& values)
 {
 //    if (!(std::is_same<T_1, bool>::value && std::is_same<T_2, char>::value))
 //        return;
@@ -207,14 +207,14 @@ template<class T_1, int>
 struct test_two_args_1 {
     template<class T_2, int>
     struct test_two_args_2 {
-        static void exec(TestResults* test_results, const std::set<super_int>* values)
+        static void exec(TestContext* test_context, const std::set<super_int>* values)
         {
-            test_two_args<T_1, T_2>(*test_results, *values);
+            test_two_args<T_1, T_2>(*test_context, *values);
         }
     };
-    static void exec(TestResults* test_results, const std::set<super_int>* values)
+    static void exec(TestContext* test_context, const std::set<super_int>* values)
     {
-        ForEachType<types, test_two_args_2>::exec(test_results, values);
+        ForEachType<types, test_two_args_2>::exec(test_context, values);
     }
 };
 
@@ -281,5 +281,5 @@ TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
     }
 */
 
-    ForEachType<types, test_two_args_1>::exec(&test_results, &values);
+    ForEachType<types, test_two_args_1>::exec(&test_context, &values);
 }

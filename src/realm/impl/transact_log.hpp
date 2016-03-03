@@ -275,8 +275,8 @@ private:
     // These two delimit a contiguous region of free space in a
     // transaction log buffer following the last written data. It may
     // be empty.
-    char* m_transact_log_free_begin;
-    char* m_transact_log_free_end;
+    char* m_transact_log_free_begin = 0;
+    char* m_transact_log_free_end   = 0;
 
     char* reserve(size_t size);
     /// \param ptr Must be in the range [m_transact_log_free_begin, m_transact_log_free_end]
@@ -310,7 +310,7 @@ public:
     void rename_group_level_table(size_t table_ndx, StringData new_name);
     void move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
     void insert_column(const Descriptor&, size_t col_ndx, DataType type, StringData name,
-                       const Table* link_target_table, bool nullable = false);
+                       LinkTargetInfo& link, bool nullable = false);
     void erase_column(const Descriptor&, size_t col_ndx);
     void rename_column(const Descriptor&, size_t col_ndx, StringData name);
     void move_column(const Descriptor&, size_t from, size_t to);
@@ -506,9 +506,7 @@ inline const char* TransactLogBufferStream::transact_log_data() const
 }
 
 inline TransactLogEncoder::TransactLogEncoder(TransactLogStream& stream):
-    m_stream(stream),
-    m_transact_log_free_begin(nullptr),
-    m_transact_log_free_end(nullptr)
+    m_stream(stream)
 {
 }
 
@@ -868,19 +866,20 @@ inline bool TransactLogEncoder::insert_link_column(size_t col_ndx, DataType type
 inline void TransactLogConvenientEncoder::insert_column(const Descriptor& desc, size_t col_ndx,
                                                         DataType type,
                                                         StringData name,
-                                                        const Table* link_target_table,
+                                                        LinkTargetInfo& link,
                                                         bool nullable)
 {
     select_desc(desc); // Throws
-    if (link_target_table) {
+    if (link.is_valid()) {
         typedef _impl::TableFriend tf;
         typedef _impl::DescriptorFriend df;
-        size_t target_table_ndx = link_target_table->get_index_in_group();
+        size_t target_table_ndx = link.m_target_table->get_index_in_group();
         const Table& origin_table = df::get_root_table(desc);
         REALM_ASSERT(origin_table.is_group_level());
-        const Spec& target_spec = tf::get_spec(*link_target_table);
+        const Spec& target_spec = tf::get_spec(*(link.m_target_table));
         size_t origin_table_ndx = origin_table.get_index_in_group();
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, col_ndx);
+        REALM_ASSERT_3(backlink_col_ndx, ==, link.m_backlink_col_ndx);
         m_encoder.insert_link_column(col_ndx, type, name, target_table_ndx, backlink_col_ndx); // Throws
     }
     else {

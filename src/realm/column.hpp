@@ -214,9 +214,12 @@ public:
     virtual size_t get_ndx_in_parent() const noexcept = 0;
     virtual void set_ndx_in_parent(size_t ndx_in_parent) noexcept = 0;
 
-    /// Called in the context of Group::commit() and
-    /// SharedGroup::commit_and_continue_as_read()() to ensure that attached
-    /// table and link list accessors stay valid across a commit.
+    /// Called to update refs and memory pointers of this column accessor and
+    /// all its nested accessors, but only in cases where the logical contents
+    /// in strictly unchanged. Group::commit(), and
+    /// SharedGroup::commit_and_continue_as_read()() are examples of such
+    /// cases. In both those cases, the purpose is to keep user visible
+    /// accessors in a valid state across a commit.
     virtual void update_from_parent(size_t old_baseline) noexcept = 0;
 
     //@{

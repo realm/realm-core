@@ -84,7 +84,7 @@ TEST(UTF_Fuzzy_utf8_to_utf16)
 
         // number of utf16 codepoints should not exceed number of utf8 codepoints
         CHECK(needed <= size);
-        
+
         // we should not read beyond input buffer
         CHECK(read <= size);
 
@@ -100,7 +100,8 @@ TEST(UTF_Fuzzy_utf8_to_utf16)
 }
 
 
-TEST(UTF8_Compare_Core_ASCII) {
+NONCONCURRENT_TEST(UTF8_Compare_Core_ASCII)
+{
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), std::string("b"));
 
@@ -153,7 +154,7 @@ TEST(UTF8_Compare_Core_ASCII) {
 }
 
 
-TEST(UTF8_Compare_Core_utf8)
+NONCONCURRENT_TEST(UTF8_Compare_Core_utf8)
 {
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), std::string("b"));
@@ -185,7 +186,8 @@ TEST(UTF8_Compare_Core_utf8)
     CHECK_EQUAL(false, utf8_compare(u16sur2, u16sur2));
 }
 
-TEST(UTF8_Compare_Core_utf8_invalid)
+
+NONCONCURRENT_TEST(UTF8_Compare_Core_utf8_invalid)
 {
     // Test that invalid utf8 won't make decisions on data beyond Realm payload. Do that by placing an utf8 header that
     // indicate 5 octets will follow, and put spurious1 and spurious2 after them to see if Realm will access these too
@@ -208,8 +210,10 @@ TEST(UTF8_Compare_Core_utf8_invalid)
     bool ret = utf8_compare(i1, i2);
     CHECK_EQUAL(ret, utf8_compare(i2, i1)); // must sort the same as before regardless of succeeding data
 }
+
+
 /* shows uninitialized data access i Valgrind (by design). Disabled until supressed or we find another way to test
-TEST(Compare_Core_utf8_invalid_crash)
+NONCONCURRENT_TEST(Compare_Core_utf8_invalid_crash)
 {
     // See if we can crash Realm with random data
     char str1[20];
@@ -229,6 +233,8 @@ TEST(Compare_Core_utf8_invalid_crash)
     }
 }
 */
+
+
 TEST(UTF8_Compare_Core_utf8_zero)
 {
     // Realm must support 0 characters in utf8 strings

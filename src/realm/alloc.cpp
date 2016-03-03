@@ -4,6 +4,8 @@
 #include <algorithm>
 
 #include <realm/alloc_slab.hpp>
+#include <realm/group.hpp>
+#include <realm/replication.hpp>
 
 using namespace realm;
 
@@ -40,6 +42,10 @@ public:
     DefaultAllocator()
     {
         m_baseline = 1; // Zero is not available
+
+        using gf = _impl::GroupFriend;
+        Replication::HistoryType history_type = Replication::hist_None;
+        m_file_format_version = gf::get_target_file_format_version_for_session(0, history_type);
     }
 
     MemRef do_alloc(size_t size) override

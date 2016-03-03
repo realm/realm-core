@@ -607,6 +607,7 @@
     <ClCompile Include="..\..\src\realm\column_string.cpp" />
     <ClCompile Include="..\..\src\realm\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\realm\column_table.cpp" />
+    <ClCompile Include="..\..\src\realm\history.cpp" />
     <ClCompile Include="..\..\src\realm\commit_log.cpp" />
     <ClCompile Include="..\..\src\realm\descriptor.cpp" />
     <ClCompile Include="..\..\src\realm\disable_sync_to_disk.cpp" />
@@ -641,6 +642,7 @@
     <ClCompile Include="..\..\src\realm\group.cpp" />
     <ClCompile Include="..\..\src\realm\group_shared.cpp" />
     <ClCompile Include="..\..\src\realm\group_writer.cpp" />
+    <ClCompile Include="..\..\src\realm\impl\continuous_transactions_history.cpp" />
     <ClCompile Include="..\..\src\realm\index_string.cpp" />
     <ClCompile Include="..\..\src\realm\query.cpp" />
     <ClCompile Include="..\..\src\realm\spec.cpp" />
@@ -1132,6 +1134,7 @@
     <ClInclude Include="..\..\src\realm\importer.hpp" />
     <ClInclude Include="..\..\src\realm\link_view.hpp" />
     <ClInclude Include="..\..\src\realm\link_view_fwd.hpp" />
+    <ClInclude Include="..\..\src\realm\null.hpp" />
     <ClInclude Include="..\..\src\realm\query_expression.hpp" />
     <ClInclude Include="..\..\src\realm\string_data.hpp" />
     <ClInclude Include="..\..\src\realm\table_basic_fwd.hpp" />
@@ -1169,6 +1172,7 @@
     <ClInclude Include="..\..\src\realm\datetime.hpp" />
     <ClInclude Include="..\..\src\realm\group.hpp" />
     <ClInclude Include="..\..\src\realm\group_shared.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\continuous_transactions_history.hpp" />
     <ClInclude Include="..\..\src\realm\group_writer.hpp" />
     <ClInclude Include="..\..\src\realm\index_string.hpp" />
     <ClInclude Include="..\..\src\realm\lang_bind_helper.hpp" />
