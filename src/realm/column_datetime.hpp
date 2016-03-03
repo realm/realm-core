@@ -43,180 +43,222 @@ struct NewDate {
 
 class DateTimeColumn : public ColumnBase, public ColumnTemplate<NewDate> {
 public:
-    DateTimeColumn() : m_seconds(Allocator::get_default(), IntNullColumn::create(Allocator::get_default())),
-                       m_nanoseconds(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()))
-    {
-    }
-
+    DateTimeColumn();
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
-    size_t size() const noexcept override {
-        // FIXME: Consider debug asserts on the columns having the same size
-        return m_seconds.size();
-    }
-
+    size_t size() const noexcept override;
     /// Whether or not this column is nullable.
-    bool is_nullable() const noexcept override {
-        return m_seconds.is_nullable();
-    }
-
+    bool is_nullable() const noexcept override;
     /// Whether or not the value at \a row_ndx is NULL. If the column is not
     /// nullable, always returns false.
-    bool is_null(size_t row_ndx) const noexcept override {
-        return m_seconds.is_null(row_ndx);
-    }
-
+    bool is_null(size_t row_ndx) const noexcept override;
     /// Sets the value at \a row_ndx to be NULL.
     /// \throw LogicError Thrown if this column is not nullable.
-    void set_null(size_t row_ndx) override {
-        m_seconds.set_null(row_ndx);
-    }
-
-    void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) override {
-        m_seconds.insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, nullable);
-        m_nanoseconds.insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, nullable);
-    }
-    
+    void set_null(size_t row_ndx) override;
+    void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) override;
     void erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
-                    bool broken_reciprocal_backlinks) override {
-        m_seconds.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks);
-        m_nanoseconds.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks);
-    }
-
+                    bool broken_reciprocal_backlinks) override;
     void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                            bool broken_reciprocal_backlinks) override {
-        m_seconds.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks);
-        m_nanoseconds.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks);
-    }
-
-    void clear(size_t num_rows, bool broken_reciprocal_backlinks) override {
-        m_seconds.clear(num_rows, broken_reciprocal_backlinks);
-        m_nanoseconds.clear(num_rows, broken_reciprocal_backlinks);
-    }
-
-    void swap_rows(size_t row_ndx_1, size_t row_ndx_2) override {
-        m_seconds.swap_rows(row_ndx_1, row_ndx_2);
-        m_nanoseconds.swap_rows(row_ndx_1, row_ndx_2);
-    }
-
-    void destroy() noexcept override {
-        m_seconds.destroy();
-        m_nanoseconds.destroy();
-    }
-
-    StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept override {
-        // FIXME: Dummy implementation
-        return null();
-    }
-
-    Allocator& get_alloc() const noexcept override {
-        // FIXME: Dummy implementation
-        return Allocator::get_default();
-    }
-
+                            bool broken_reciprocal_backlinks) override;
+    void clear(size_t num_rows, bool broken_reciprocal_backlinks) override;
+    void swap_rows(size_t row_ndx_1, size_t row_ndx_2) override;
+    void destroy() noexcept override;
+    StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept override;
+    Allocator& get_alloc() const noexcept override;
     /// Returns the 'ref' of the root array.
-    ref_type get_ref() const noexcept override {
-        // FIXME: Dummy implementation
-        return 0;
-    }
-    MemRef get_mem() const noexcept override {
-        // FIXME: Dummy implementation
-        return MemRef();
-    }
-
-    void replace_root_array(std::unique_ptr<Array> leaf) override {
-        // FIXME: Dummy implementation
-
-    }
-
-    MemRef clone_deep(Allocator& alloc) const override {
-        // FIXME: Dummy implementation
-        return MemRef();
-
-    }
-
-    void detach() override {
-        m_seconds.detach();
-        m_nanoseconds.detach();
-    }
-
-    bool is_attached() const noexcept override {
-        // FIXME: Assert on both columns having same attached state?
-        return m_seconds.is_attached();
-    }
-
-    ref_type write(size_t slice_offset, size_t slice_size,
-                   size_t table_size, _impl::OutputStream&) const override {
-        // FIXME: Dummy implementation
-        return 0;
-    }
-
-    void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept override {
-        // FIXME: Dummy implementation
-
-    }
-
-    size_t get_ndx_in_parent() const noexcept override {
-        // FIXME: Dummy implementation
-        return 0;
-    }
-
-    void set_ndx_in_parent(size_t ndx_in_parent) noexcept override {
-        // FIXME: Dummy implementation
-    }
-
-    void update_from_parent(size_t old_baseline) noexcept override {
-        // FIXME: Dummy implementation
-    }
-
-    void refresh_accessor_tree(size_t new_col_ndx, const Spec&) override {
-        // FIXME: Dummy implementation
-    }
-
-    void verify() const override {
-        // FIXME: Dummy implementation
-    }
-
-    void to_dot(std::ostream&, StringData title = StringData()) const override {
-        // FIXME: Dummy implementation
-    }
-
-    void do_dump_node_structure(std::ostream&, int level) const override {
-        // FIXME: Dummy implementation
-    }
-
-    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
-                     std::ostream&) const override {
-        // FIXME: Dummy implementation
-    }
-
-    void add(const NewDate& ndt = NewDate{}) {
-        util::Optional<int64_t> seconds = ndt.is_null() ? util::none : util::make_optional(ndt.m_seconds);
-        int32_t nanoseconds = ndt.is_null() ? 0 : ndt.m_nanoseconds;
-        m_seconds.add(seconds);
-        m_nanoseconds.add(nanoseconds);
-    }
-
-    NewDate get(size_t row_ndx) const noexcept {
-        util::Optional<int64_t> seconds = m_seconds.get(row_ndx);
-        return seconds ? NewDate(*seconds, m_nanoseconds.get(row_ndx)) : NewDate();
-    }
-
-    NewDate get_val(size_t row_ndx) const override {
-        return get(row_ndx);
-    }
-
-    void set(size_t row_ndx, const NewDate& ndt) {
-        util::Optional<int64_t> seconds = ndt.is_null() ? util::none : util::make_optional(ndt.m_seconds);
-        int32_t nanoseconds = ndt.is_null() ? 0 : ndt.m_nanoseconds;
-        m_seconds.set(row_ndx, seconds);
-        m_nanoseconds.set(row_ndx, nanoseconds);
-    }
-
+    ref_type get_ref() const noexcept override;
+    MemRef get_mem() const noexcept override;
+    void replace_root_array(std::unique_ptr<Array> leaf) override;
+    MemRef clone_deep(Allocator& alloc) const override;
+    void detach() override;
+    bool is_attached() const noexcept override;
+    ref_type write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream&) const override;
+    void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept override;
+    size_t get_ndx_in_parent() const noexcept override;
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept override;
+    void update_from_parent(size_t old_baseline) noexcept override;
+    void refresh_accessor_tree(size_t new_col_ndx, const Spec&) override;
+    void verify() const override;
+    void to_dot(std::ostream&, StringData title = StringData()) const override;
+    void do_dump_node_structure(std::ostream&, int level) const override;
+    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
+    void add(const NewDate& ndt = NewDate{});
+    NewDate get(size_t row_ndx) const noexcept;
+    NewDate get_val(size_t row_ndx) const override;
+    void set(size_t row_ndx, const NewDate& ndt);
 private:
     IntNullColumn m_seconds;
     IntegerColumn m_nanoseconds;
 };
+
+
+// Implementation
+
+inline DateTimeColumn::DateTimeColumn() : m_seconds(Allocator::get_default(), IntNullColumn::create(Allocator::get_default())),
+m_nanoseconds(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()))
+{
+}
+
+/// Get the number of entries in this column. This operation is relatively
+/// slow.
+inline size_t DateTimeColumn::size() const noexcept {
+    // FIXME: Consider debug asserts on the columns having the same size
+    return m_seconds.size();
+}
+
+/// Whether or not this column is nullable.
+inline bool DateTimeColumn::is_nullable() const noexcept {
+    return m_seconds.is_nullable();
+}
+
+/// Whether or not the value at \a row_ndx is NULL. If the column is not
+/// nullable, always returns false.
+inline bool DateTimeColumn::is_null(size_t row_ndx) const noexcept {
+    return m_seconds.is_null(row_ndx);
+}
+
+/// Sets the value at \a row_ndx to be NULL.
+/// \throw LogicError Thrown if this column is not nullable.
+inline void DateTimeColumn::set_null(size_t row_ndx) {
+    m_seconds.set_null(row_ndx);
+}
+
+inline void DateTimeColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) {
+    m_seconds.insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, nullable);
+    m_nanoseconds.insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, nullable);
+}
+
+inline void DateTimeColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                                bool broken_reciprocal_backlinks) {
+    m_seconds.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks);
+    m_nanoseconds.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks);
+}
+
+inline void DateTimeColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+                                        bool broken_reciprocal_backlinks) {
+    m_seconds.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks);
+    m_nanoseconds.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks);
+}
+
+inline void DateTimeColumn::clear(size_t num_rows, bool broken_reciprocal_backlinks) {
+    m_seconds.clear(num_rows, broken_reciprocal_backlinks);
+    m_nanoseconds.clear(num_rows, broken_reciprocal_backlinks);
+}
+
+inline void DateTimeColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2) {
+    m_seconds.swap_rows(row_ndx_1, row_ndx_2);
+    m_nanoseconds.swap_rows(row_ndx_1, row_ndx_2);
+}
+
+inline void DateTimeColumn::destroy() noexcept {
+    m_seconds.destroy();
+    m_nanoseconds.destroy();
+}
+
+inline StringData DateTimeColumn::get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept {
+    // FIXME: Dummy implementation
+    return null();
+}
+
+inline Allocator& DateTimeColumn::get_alloc() const noexcept {
+    // FIXME: Dummy implementation
+    return Allocator::get_default();
+}
+
+inline ref_type DateTimeColumn::get_ref() const noexcept {
+    // FIXME: Dummy implementation
+    return 0;
+}
+
+inline MemRef DateTimeColumn::get_mem() const noexcept {
+    // FIXME: Dummy implementation
+    return MemRef();
+}
+
+inline void DateTimeColumn::replace_root_array(std::unique_ptr<Array> leaf) {
+    // FIXME: Dummy implementation
+}
+
+inline MemRef DateTimeColumn::clone_deep(Allocator& alloc) const {
+    // FIXME: Dummy implementation
+    return MemRef();
+}
+
+inline void DateTimeColumn::detach() {
+    m_seconds.detach();
+    m_nanoseconds.detach();
+}
+
+inline bool DateTimeColumn::is_attached() const noexcept {
+    // FIXME: Assert on both columns having same attached state?
+    return m_seconds.is_attached();
+}
+
+inline ref_type DateTimeColumn::write(size_t slice_offset, size_t slice_size,
+                               size_t table_size, _impl::OutputStream&) const {
+    // FIXME: Dummy implementation
+    return 0;
+}
+
+inline void DateTimeColumn::set_parent(ArrayParent*, size_t ndx_in_parent) noexcept {
+    // FIXME: Dummy implementation
+}
+
+inline size_t DateTimeColumn::get_ndx_in_parent() const noexcept {
+    // FIXME: Dummy implementation
+    return 0;
+}
+
+inline void DateTimeColumn::set_ndx_in_parent(size_t ndx_in_parent) noexcept {
+    // FIXME: Dummy implementation
+}
+
+inline void DateTimeColumn::update_from_parent(size_t old_baseline) noexcept {
+    // FIXME: Dummy implementation
+}
+
+inline void DateTimeColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec&) {
+    // FIXME: Dummy implementation
+}
+
+inline void DateTimeColumn::verify() const {
+    // FIXME: Dummy implementation
+}
+
+inline void DateTimeColumn::to_dot(std::ostream&, StringData title) const {
+    // FIXME: Dummy implementation
+}
+
+inline void DateTimeColumn::do_dump_node_structure(std::ostream&, int level) const {
+    // FIXME: Dummy implementation
+}
+
+inline void DateTimeColumn::leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const {
+    // FIXME: Dummy implementation
+}
+
+inline void DateTimeColumn::add(const NewDate& ndt) {
+    util::Optional<int64_t> seconds = ndt.is_null() ? util::none : util::make_optional(ndt.m_seconds);
+    int32_t nanoseconds = ndt.is_null() ? 0 : ndt.m_nanoseconds;
+    m_seconds.add(seconds);
+    m_nanoseconds.add(nanoseconds);
+}
+
+inline NewDate DateTimeColumn::get(size_t row_ndx) const noexcept {
+    util::Optional<int64_t> seconds = m_seconds.get(row_ndx);
+    return seconds ? NewDate(*seconds, m_nanoseconds.get(row_ndx)) : NewDate();
+}
+
+inline NewDate DateTimeColumn::get_val(size_t row_ndx) const {
+    return get(row_ndx);
+}
+
+inline void DateTimeColumn::set(size_t row_ndx, const NewDate& ndt) {
+    util::Optional<int64_t> seconds = ndt.is_null() ? util::none : util::make_optional(ndt.m_seconds);
+    int32_t nanoseconds = ndt.is_null() ? 0 : ndt.m_nanoseconds;
+    m_seconds.set(row_ndx, seconds);
+    m_nanoseconds.set(row_ndx, nanoseconds);
+}
 
 } // namespace realm
 
