@@ -170,6 +170,7 @@ set(REALM_HEADERS
 add_library(realm ${REALM_SOURCES} ${REALM_HEADERS})
 set_target_properties(realm PROPERTIES SOVERSION "9.0.0")
 target_link_libraries(realm ${REALM_EXTRA_LIBS})
+target_link_libraries(realm Threads::Threads)
 
 add_executable(realm-config config_tool.cpp)
 
