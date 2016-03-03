@@ -167,7 +167,7 @@ inline void DateTimeColumn::destroy() noexcept
     m_nanoseconds.destroy();
 }
 
-inline StringData DateTimeColumn::get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept
+inline StringData DateTimeColumn::get_index_data(size_t, StringIndex::StringConversionBuffer& /*buffer*/) const noexcept
 {
     // FIXME: Dummy implementation
     return null();
@@ -191,12 +191,12 @@ inline MemRef DateTimeColumn::get_mem() const noexcept
     return MemRef();
 }
 
-inline void DateTimeColumn::replace_root_array(std::unique_ptr<Array> leaf)
+inline void DateTimeColumn::replace_root_array(std::unique_ptr<Array> /*leaf*/)
 {
     // FIXME: Dummy implementation
 }
 
-inline MemRef DateTimeColumn::clone_deep(Allocator& alloc) const
+inline MemRef DateTimeColumn::clone_deep(Allocator& /*alloc*/) const
 {
     // FIXME: Dummy implementation
     return MemRef();
@@ -214,14 +214,14 @@ inline bool DateTimeColumn::is_attached() const noexcept
     return m_seconds.is_attached();
 }
 
-inline ref_type DateTimeColumn::write(size_t slice_offset, size_t slice_size, size_t table_size,
+inline ref_type DateTimeColumn::write(size_t /*slice_offset*/, size_t /*slice_size*/, size_t /*table_size*/,
                                       _impl::OutputStream&) const
 {
     // FIXME: Dummy implementation
     return 0;
 }
 
-inline void DateTimeColumn::set_parent(ArrayParent*, size_t ndx_in_parent) noexcept
+inline void DateTimeColumn::set_parent(ArrayParent*, size_t /*ndx_in_parent*/) noexcept
 {
     // FIXME: Dummy implementation
 }
@@ -232,17 +232,17 @@ inline size_t DateTimeColumn::get_ndx_in_parent() const noexcept
     return 0;
 }
 
-inline void DateTimeColumn::set_ndx_in_parent(size_t ndx_in_parent) noexcept
+inline void DateTimeColumn::set_ndx_in_parent(size_t /*ndx_in_parent*/) noexcept
 {
     // FIXME: Dummy implementation
 }
 
-inline void DateTimeColumn::update_from_parent(size_t old_baseline) noexcept
+inline void DateTimeColumn::update_from_parent(size_t /*old_baseline*/) noexcept
 {
     // FIXME: Dummy implementation
 }
 
-inline void DateTimeColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec&)
+inline void DateTimeColumn::refresh_accessor_tree(size_t /*new_col_ndx*/, const Spec&)
 {
     // FIXME: Dummy implementation
 }
@@ -252,17 +252,17 @@ inline void DateTimeColumn::verify() const
     // FIXME: Dummy implementation
 }
 
-inline void DateTimeColumn::to_dot(std::ostream&, StringData title) const
+inline void DateTimeColumn::to_dot(std::ostream&, StringData /*title*/) const
 {
     // FIXME: Dummy implementation
 }
 
-inline void DateTimeColumn::do_dump_node_structure(std::ostream&, int level) const
+inline void DateTimeColumn::do_dump_node_structure(std::ostream&, int /*level*/) const
 {
     // FIXME: Dummy implementation
 }
 
-inline void DateTimeColumn::leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const
+inline void DateTimeColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/, std::ostream&) const
 {
     // FIXME: Dummy implementation
 }
@@ -278,7 +278,7 @@ inline void DateTimeColumn::add(const NewDate& ndt)
 inline NewDate DateTimeColumn::get(size_t row_ndx) const noexcept
 {
     util::Optional<int64_t> seconds = m_seconds.get(row_ndx);
-    return seconds ? NewDate(*seconds, m_nanoseconds.get(row_ndx)) : NewDate();
+    return seconds ? NewDate(*seconds, int32_t(m_nanoseconds.get(row_ndx))) : NewDate(null());
 }
 
 inline NewDate DateTimeColumn::get_val(size_t row_ndx) const
