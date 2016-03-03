@@ -80,7 +80,7 @@ struct DebugTrace::Callback {
     
     explicit operator bool() const
     {
-        return m_userdata != nullptr;
+        return m_function != nullptr;
     }
 
     void operator()(Event event) const
