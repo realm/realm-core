@@ -133,6 +133,7 @@ inline void EmulatedRobustMutex::lock()
         m_file.lock_exclusive();
     } catch (...) {
         m_local_mutex.unlock();
+        throw;
     }
 #else
     REALM_ASSERT(m_shared_part);
