@@ -2552,7 +2552,8 @@ size_t Table::get_index_in_group() const noexcept
 
 namespace realm {
 
-template<> bool Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+bool Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Bool);
@@ -2568,7 +2569,8 @@ template<> bool Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<> int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Int);
@@ -2584,7 +2586,8 @@ template<> int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<> DateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+DateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_DateTime);
@@ -2600,7 +2603,8 @@ template<> DateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<> float Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+float Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Float);
@@ -2614,7 +2618,8 @@ template<> float Table::get(size_t col_ndx, size_t ndx) const noexcept
         return f;
 }
 
-template<> double Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+double Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Double);
@@ -2628,7 +2633,8 @@ template<> double Table::get(size_t col_ndx, size_t ndx) const noexcept
         return d;
 }
 
-template<> StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_7(get_real_column_type(col_ndx), == , col_type_String, || ,
@@ -2650,7 +2656,8 @@ template<> StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
     return sd;
 }
 
-template<> BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Binary);
