@@ -27,47 +27,34 @@ namespace realm {
 namespace util {
 
 // LCOV_EXCL_START
-//
-// Because these are templated functions, every combination of output stream
-// type and value(s) type(s) generates a new function.  This makes LCOV/GCOVR
-// report over 70 functions in this file, with only 6.6% function coverage,
-// even though line coverage is at 100%.
 
-template<class OS, class T>
-void inspect_value(OS& os, const T& value)
+std::string inspect(const std::string& str);
+std::string inspect(const char* str);
+std::string inspect(const void*);
+std::string inspect_pointer(const char* type_name, const void*);
+
+inline
+std::string inspect(void* ptr)
 {
-    os << value;
+    return inspect(static_cast<const void*>(ptr));
 }
 
-template<class OS>
-void inspect_value(OS& os, const std::string& value)
+template<class T>
+std::string inspect(T* ptr)
 {
-    // FIXME: Escape the string.
-    os << "\"" << value << "\"";
+    return inspect_pointer(typeid(T).name(), ptr);
 }
 
-template<class OS>
-void inspect_value(OS& os, const char* value)
+template<class T>
+std::string inspect(const T& value)
 {
-    // FIXME: Escape the string.
-    os << "\"" << value << "\"";
+    return std::to_string(value);
 }
 
-template<class OS>
-void inspect_all(OS&)
+inline
+std::string inspect(const char* str)
 {
-    // No-op
-}
-
-/// Convert all arguments to strings, and quote string arguments.
-template<class OS, class First, class... Args>
-void inspect_all(OS& os, First&& first, Args&&... args)
-{
-    inspect_value(os, std::forward<First>(first));
-    if (sizeof...(Args) != 0) {
-        os << ", ";
-    }
-    inspect_all(os, std::forward<Args>(args)...);
+    return inspect(std::string{str});
 }
 
 // LCOV_EXCL_STOP

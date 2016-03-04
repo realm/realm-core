@@ -41,26 +41,14 @@ TEST(Utils_Inspect)
 {
     // inspect_value() for char*
     {
-        std::stringstream ss;
-        inspect_value(ss, "foo");
-
-        CHECK_EQUAL(ss.str(), "\"foo\"");
+        auto s = inspect("foo");
+        CHECK_EQUAL(s, "\"foo\"");
     }
 
     // inspect_value() for any type
     {
-        std::stringstream ss;
-        inspect_value(ss, 123);
-
-        CHECK_EQUAL(ss.str(), "123");
-    }
-
-    // inspect_all()
-    {
-        std::stringstream ss;
-        inspect_all(ss, "foo", 123);
-
-        CHECK_EQUAL(ss.str(), "\"foo\", 123");
+        auto s = inspect(123);
+        CHECK_EQUAL(s, "123");
     }
 }
 

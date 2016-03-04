@@ -468,6 +468,8 @@
 		C0552C571B45CEA8007FF3AA /* simulated_failure.hpp in Headers */ = {isa = PBXBuildFile; fileRef = C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */; };
 		C08FE2B81B45BD750037AFCE /* simulated_failure.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C08FE2B61B45BD750037AFCE /* simulated_failure.cpp */; };
 		C08FE2B91B45BD750037AFCE /* simulated_failure.hpp in Headers */ = {isa = PBXBuildFile; fileRef = C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */; };
+		F42AA61A1C89BDB7005F20D5 /* inspect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42AA6191C89BDB7005F20D5 /* inspect.cpp */; };
+		F42AA61B1C89BDBB005F20D5 /* inspect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42AA6191C89BDB7005F20D5 /* inspect.cpp */; };
 		F43098B21B021C04000A2333 /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F43098B01B021C04000A2333 /* bptree.cpp */; };
 		F43098B31B021C04000A2333 /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F43098B01B021C04000A2333 /* bptree.cpp */; };
 		F43098B41B021C04000A2333 /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F43098B11B021C04000A2333 /* bptree.hpp */; };
@@ -992,6 +994,7 @@
 		C008FF991B67F02F0042669E /* liblibrealm watchos.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibrealm watchos.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C08FE2B61B45BD750037AFCE /* simulated_failure.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simulated_failure.cpp; sourceTree = "<group>"; };
 		C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = simulated_failure.hpp; sourceTree = "<group>"; };
+		F42AA6191C89BDB7005F20D5 /* inspect.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = inspect.cpp; sourceTree = "<group>"; };
 		F43098B01B021C04000A2333 /* bptree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bptree.cpp; path = realm/bptree.cpp; sourceTree = "<group>"; };
 		F43098B11B021C04000A2333 /* bptree.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = bptree.hpp; path = realm/bptree.hpp; sourceTree = "<group>"; };
 		F44D4CE51B381D27009ADAB9 /* input_stream.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = input_stream.hpp; sourceTree = "<group>"; };
@@ -1432,6 +1435,7 @@
 		52D7C4661852A01700633748 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				F42AA6191C89BDB7005F20D5 /* inspect.cpp */,
 				F450A3161C5FBB660008F287 /* to_string.hpp */,
 				65F666FD1BFD01DC00749FA2 /* aes_cryptor.hpp */,
 				52D7C4671852A01700633748 /* assert.hpp */,
@@ -2180,6 +2184,7 @@
 				3658CE711921AC6F009A7085 /* column_backlink.cpp in Sources */,
 				365CCE46157CC37D00172BF8 /* column_binary.cpp in Sources */,
 				3FF6A2A21A02B1FD0074A601 /* column_link.cpp in Sources */,
+				F42AA61A1C89BDB7005F20D5 /* inspect.cpp in Sources */,
 				5285BD0A197D5A830031FD44 /* column_link_base.cpp in Sources */,
 				3658CE7A19245BE5009A7085 /* column_linklist.cpp in Sources */,
 				365CCE49157CC37D00172BF8 /* column_mixed.cpp in Sources */,
@@ -2321,6 +2326,7 @@
 				4142C9421623478700B3B902 /* column_binary.cpp in Sources */,
 				3FF6A2A11A02B1FC0074A601 /* column_link.cpp in Sources */,
 				F4D0FC851B00F62C0040956A /* column_link_base.cpp in Sources */,
+				F42AA61B1C89BDBB005F20D5 /* inspect.cpp in Sources */,
 				F4D0FC861B00F62C0040956A /* column_linklist.cpp in Sources */,
 				4142C9431623478700B3B902 /* column_mixed.cpp in Sources */,
 				4142C9451623478700B3B902 /* column_string.cpp in Sources */,
