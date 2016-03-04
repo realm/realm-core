@@ -8,6 +8,7 @@
 #include <ostream>
 
 #include <realm.hpp>
+#include <realm/commit_log.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/buffer.hpp>
 
@@ -6722,6 +6723,37 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->remove_substring(1, 0, 0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_binary(2, 0, BinaryData()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_link(3, 0, 0), LogicError::detached_accessor);
+}
+
+// This test reproduces a user reported assertion failure. The problem was
+// due to BacklinkColumn::m_origin_column_ndx not being updated when the
+// linked table removed/inserted columns (this happened on a migration)
+TEST(Table_StaleLinkIndexOnTableRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+    TableRef t = group_w.add_table("table1");
+    t->add_column(type_Int, "int1");
+    t->add_empty_row(2);
+
+    TableRef t2 = group_w.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->add_empty_row();
+    t2->set_link(1, 0, 1);
+    t2->remove_column(0); // after this call LinkColumnBase::m_column_ndx was incorrect
+    t2->add_column(type_Int, "int_col2");
+
+    // The stale backlink index would still be "1" which is now an integer column in t2
+    // so the assertion in Spec::get_opposite_link_table() would fail when removing a link
+    t->remove(1);
+
+    CHECK_EQUAL(t->size(), 1);
+    CHECK_EQUAL(t2->get_link(0, 0), realm::npos); // no link
 }
 
 #endif // TEST_TABLE
