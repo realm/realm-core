@@ -828,19 +828,8 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
     // established by Table::refresh_column_accessors() when it is invoked for
     // the target table below.
     if (link.is_valid()) {
-        size_t origin_table_ndx = get_index_in_group();
         size_t target_table_ndx = link.m_target_table->get_index_in_group();
         m_spec.set_opposite_link_table_ndx(col_ndx, target_table_ndx); // Throws
-
-        Spec& target_spec = tf::get_spec(*(link.m_target_table));
-        if (link.m_backlink_col_ndx == realm::npos) {
-            link.m_backlink_col_ndx = target_spec.get_column_count(); // Insert at back of target
-        }
-        REALM_ASSERT_3(link.m_backlink_col_ndx, <=, link.m_target_table->m_cols.size());
-        link.m_target_table->do_insert_root_column(link.m_backlink_col_ndx, col_type_BackLink, ""); // Throws
-        link.m_target_table->adj_insert_column(link.m_backlink_col_ndx);
-        target_spec.set_opposite_link_table_ndx(link.m_backlink_col_ndx, origin_table_ndx); // Throws
-        target_spec.set_backlink_origin_column(link.m_backlink_col_ndx, col_ndx); // Throws
         link.m_target_table->mark();
     }
 
@@ -848,7 +837,12 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
 
     if (link.is_valid()) {
         link.m_target_table->unmark();
-        link.m_target_table->refresh_column_accessors(link.m_backlink_col_ndx);
+        size_t origin_table_ndx = get_index_in_group();
+        if (link.m_backlink_col_ndx == realm::npos) {
+            const Spec& target_spec = tf::get_spec(*(link.m_target_table));
+            link.m_backlink_col_ndx = target_spec.get_column_count();   // insert at back of target
+        }
+        link.m_target_table->insert_backlink_column(origin_table_ndx, col_ndx, link.m_backlink_col_ndx); // Throws
     }
 
     refresh_link_target_accessors(col_ndx);
@@ -972,6 +966,17 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
 
     if (Replication* repl = get_repl())
         repl->set_link_type(this, col_ndx, link_type); // Throws
+}
+
+
+void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx)
+{
+    REALM_ASSERT_3(backlink_col_ndx, <=, m_cols.size());
+    do_insert_root_column(backlink_col_ndx, col_type_BackLink, ""); // Throws
+    adj_insert_column(backlink_col_ndx); // Throws
+    m_spec.set_opposite_link_table_ndx(backlink_col_ndx, origin_table_ndx); // Throws
+    m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_ndx); // Throws
+    refresh_column_accessors(backlink_col_ndx); // Throws
 }
 
 
