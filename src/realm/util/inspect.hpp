@@ -22,6 +22,7 @@
 #define REALM_UTIL_INSPECT_HPP
 
 #include <string>
+#include <typeinfo>
 
 namespace realm {
 namespace util {
