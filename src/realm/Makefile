@@ -133,6 +133,7 @@ util/network.cpp \
 util/event_loop.cpp \
 util/uri.cpp \
 util/platform_specific_condvar.cpp \
+util/inspect.cpp \
 alloc.cpp \
 alloc_slab.cpp \
 array.cpp \

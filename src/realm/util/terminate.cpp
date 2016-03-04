@@ -125,6 +125,26 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line) 
     ss << file << ":" << line << ": " REALM_VER_CHUNK " " << message << '\n';
     terminate_internal(ss);
 }
+
+
+REALM_NORETURN
+void terminate_internal(const char* message, const char* file, long line,
+                        const char* interesting_names,
+                        std::initializer_list<std::string> interesting_values_stringified) noexcept
+{
+    std::stringstream ss;
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " ";
+    ss << message << " with " << interesting_names << " = (";
+    for (auto it = interesting_values_stringified.begin(); it != interesting_values_stringified.end(); ++it) {
+        ss << *it;
+        if (it + 1 != interesting_values_stringified.end()) {
+            ss << ", ";
+        }
+    }
+    ss << "). \n";
+    terminate_internal(ss);
+}
+
 // LCOV_EXCL_STOP
 
 } // namespace util
