@@ -2556,7 +2556,8 @@ size_t Table::get_index_in_group() const noexcept
 
 namespace realm {
 
-template<> bool Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+bool Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Bool);
@@ -2572,7 +2573,8 @@ template<> bool Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<> int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Int);
@@ -2588,7 +2590,8 @@ template<> int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<> DateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+DateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_DateTime);
@@ -2604,7 +2607,8 @@ template<> DateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<> float Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+float Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Float);
@@ -2618,7 +2622,8 @@ template<> float Table::get(size_t col_ndx, size_t ndx) const noexcept
         return f;
 }
 
-template<> double Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+double Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Double);
@@ -2632,7 +2637,8 @@ template<> double Table::get(size_t col_ndx, size_t ndx) const noexcept
         return d;
 }
 
-template<> StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_7(get_real_column_type(col_ndx), == , col_type_String, || ,
@@ -2654,7 +2660,8 @@ template<> StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
     return sd;
 }
 
-template<> BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Binary);
@@ -2664,8 +2671,8 @@ template<> BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
     return column.get(ndx);
 }
 
-
-template<> NewDate Table::get(size_t col_ndx, size_t ndx) const noexcept
+template<>
+NewDate Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_NewDate);
@@ -2675,31 +2682,6 @@ template<> NewDate Table::get(size_t col_ndx, size_t ndx) const noexcept
     return column.get(ndx);
 }
 
-
-int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
-{
-    return get<int64_t>(col_ndx, ndx);
-}
-
-
-void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
-{
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
-
-    if (is_nullable(col_ndx)) {
-        auto& col = get_column_int_null(col_ndx);
-        col.set(ndx, value);
-    }
-    else {
-        auto& col = get_column(col_ndx);
-        col.set(ndx, value);
-    }
-
-    if (Replication* repl = get_repl())
-        repl->set_int(this, col_ndx, ndx, value); // Throws
-}
 
 } // namespace realm;
 
@@ -2749,6 +2731,10 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
     return ndx;
 }
 
+int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
+{
+    return get<int64_t>(col_ndx, ndx);
+}
 
 void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
@@ -2773,6 +2759,24 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         repl->set_int_unique(this, col_ndx, ndx, value); // Throws
 }
 
+void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    if (is_nullable(col_ndx)) {
+        auto& col = get_column_int_null(col_ndx);
+        col.set(ndx, value);
+    }
+    else {
+        auto& col = get_column(col_ndx);
+        col.set(ndx, value);
+    }
+
+    if (Replication* repl = get_repl())
+        repl->set_int(this, col_ndx, ndx, value); // Throws
+}
 
 NewDate Table::get_newdate(size_t col_ndx, size_t ndx) const noexcept
 {
