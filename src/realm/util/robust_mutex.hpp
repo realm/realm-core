@@ -37,7 +37,7 @@ namespace realm {
 namespace util {
 
 // fwd decl to support friend decl below
-class PlatformSpecificCondVar;
+class InterprocessCondVar;
 
 
 /// Emulation of a Robust Mutex.
@@ -88,7 +88,7 @@ private:
 #else
     SharedPart* m_shared_part = 0;
 #endif
-    friend class PlatformSpecificCondVar;
+    friend class InterprocessCondVar;
 };
 
 

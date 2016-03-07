@@ -15,7 +15,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-#include <realm/util/platform_specific_condvar.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/robust_mutex.hpp>
 
@@ -484,7 +484,7 @@ namespace {
 
 static int signals;
 
-void signaller(RobustMutex* mutex, PlatformSpecificCondVar* cv)
+void signaller(RobustMutex* mutex, InterprocessCondVar* cv)
 {
     millisleep(1000);
     signals = 1;
@@ -513,7 +513,7 @@ void signaller(RobustMutex* mutex, PlatformSpecificCondVar* cv)
 }
 
 static int signal_state;
-void wakeup_signaller(RobustMutex* mutex, PlatformSpecificCondVar* cv)
+void wakeup_signaller(RobustMutex* mutex, InterprocessCondVar* cv)
 {
     millisleep(1000);
     signal_state = 2;
@@ -522,7 +522,7 @@ void wakeup_signaller(RobustMutex* mutex, PlatformSpecificCondVar* cv)
 }
 
 static int wait_counter;
-void waiter_with_count(RobustMutex* mutex, PlatformSpecificCondVar* cv)
+void waiter_with_count(RobustMutex* mutex, InterprocessCondVar* cv)
 {
     std::lock_guard<RobustMutex> l(*mutex);
     ++wait_counter;
@@ -530,7 +530,7 @@ void waiter_with_count(RobustMutex* mutex, PlatformSpecificCondVar* cv)
     --wait_counter;
 }
 
-void waiter(RobustMutex* mutex, PlatformSpecificCondVar* cv)
+void waiter(RobustMutex* mutex, InterprocessCondVar* cv)
 {
     std::lock_guard<RobustMutex> l(*mutex);
     cv->wait(*mutex, nullptr);
@@ -538,7 +538,7 @@ void waiter(RobustMutex* mutex, PlatformSpecificCondVar* cv)
 
 /* no use for this yet.
 
-void burst_signaller(RobustMutex* mutex, PlatformSpecificCondVar* cv)
+void burst_signaller(RobustMutex* mutex, InterprocessCondVar* cv)
 {
     millisleep(1000);
     std::lock_guard<RobustMutex> l(*mutex);
@@ -556,8 +556,8 @@ TEST(Thread_CondvarWaits)
 {
     RobustMutex mutex;
     RobustMutex::SharedPart mutex_part;
-    PlatformSpecificCondVar changed;
-    PlatformSpecificCondVar::SharedPart condvar_part;
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
     mutex.set_shared_part(mutex_part, "Thread_CondvarWaits", "");
     changed.set_shared_part(condvar_part, "Thread_CondvarWaits", 0);
     changed.init_shared_part(condvar_part);
@@ -582,9 +582,9 @@ TEST(Thread_CondvarIsStateless)
 {
     RobustMutex mutex;
     RobustMutex::SharedPart mutex_part;
-    PlatformSpecificCondVar changed;
-    PlatformSpecificCondVar::SharedPart condvar_part;
-    PlatformSpecificCondVar::init_shared_part(condvar_part);
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
     mutex.set_shared_part(mutex_part, "Thread_CondvarIsStateless", "");
     changed.set_shared_part(condvar_part, "Thread_CondvarIsStateless", 0);
     Thread signal_thread;
@@ -614,9 +614,9 @@ TEST(Thread_CondvarTimeout)
 {
     RobustMutex mutex;
     RobustMutex::SharedPart mutex_part;
-    PlatformSpecificCondVar changed;
-    PlatformSpecificCondVar::SharedPart condvar_part;
-    PlatformSpecificCondVar::init_shared_part(condvar_part);
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
     mutex.set_shared_part(mutex_part, "Thread_CondvarTimeout", "");
     changed.set_shared_part(condvar_part, "Thread_CondvarTimeout", 0);
     struct timespec time;
@@ -636,9 +636,9 @@ TEST(Thread_CondvarNotifyAllWakeup)
 {
     RobustMutex mutex;
     RobustMutex::SharedPart mutex_part;
-    PlatformSpecificCondVar changed;
-    PlatformSpecificCondVar::SharedPart condvar_part;
-    PlatformSpecificCondVar::init_shared_part(condvar_part);
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
     mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyAllWakeup", "");
     changed.set_shared_part(condvar_part, "Thread_CondvarNotifyAllWakeup", 0);
     const int num_waiters = 10;
@@ -661,9 +661,9 @@ TEST(Thread_CondvarNotifyWakeup)
     wait_counter = 0;
     RobustMutex mutex;
     RobustMutex::SharedPart mutex_part;
-    PlatformSpecificCondVar changed;
-    PlatformSpecificCondVar::SharedPart condvar_part;
-    PlatformSpecificCondVar::init_shared_part(condvar_part);
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
     mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyWakeup", "");
     changed.set_shared_part(condvar_part, "Thread_CondvarNotifyWakeup", 0);
     const int num_waiters = 10;

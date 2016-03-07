@@ -24,8 +24,8 @@ util/event_loop.hpp \
 util/uri.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
-util/platform_specific_condvar.hpp \
-util/emulated_robust_mutex.hpp \
+util/interprocess_condvar.hpp \
+util/robust_mutex.hpp \
 util/file_mapper.hpp \
 util/encrypted_file_mapping.hpp \
 util/miscellaneous.hpp \
@@ -132,7 +132,7 @@ util/thread.cpp \
 util/network.cpp \
 util/event_loop.cpp \
 util/uri.cpp \
-util/platform_specific_condvar.cpp \
+util/interprocess_condvar.cpp \
 alloc.cpp \
 alloc_slab.cpp \
 array.cpp \

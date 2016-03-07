@@ -28,7 +28,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-#include <realm/util/platform_specific_condvar.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/robust_mutex.hpp>
 #include <realm/group.hpp>
@@ -539,10 +539,10 @@ private:
     util::RobustMutex m_balancemutex;
     util::RobustMutex m_controlmutex;
 #ifndef _WIN32
-    util::PlatformSpecificCondVar m_room_to_write;
-    util::PlatformSpecificCondVar m_work_to_do;
-    util::PlatformSpecificCondVar m_daemon_becomes_ready;
-    util::PlatformSpecificCondVar m_new_commit_available;
+    util::InterprocessCondVar m_room_to_write;
+    util::InterprocessCondVar m_work_to_do;
+    util::InterprocessCondVar m_daemon_becomes_ready;
+    util::InterprocessCondVar m_new_commit_available;
 #endif
 
     void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,

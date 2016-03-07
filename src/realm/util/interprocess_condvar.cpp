@@ -18,7 +18,7 @@
  *
  **************************************************************************/
 
-#include <realm/util/platform_specific_condvar.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 
 #include <fcntl.h>
 #include <system_error>
@@ -55,7 +55,7 @@ void notify_fd(int fd)
 #endif // REALM_CONDVAR_EMULATION
 
 
-PlatformSpecificCondVar::PlatformSpecificCondVar()
+InterprocessCondVar::InterprocessCondVar()
 {
 }
 
@@ -64,7 +64,7 @@ PlatformSpecificCondVar::PlatformSpecificCondVar()
 
 
 
-void PlatformSpecificCondVar::close() noexcept
+void InterprocessCondVar::close() noexcept
 {
     if (uses_emulation) { // true if emulating a process shared condvar
         uses_emulation = false;
@@ -77,14 +77,14 @@ void PlatformSpecificCondVar::close() noexcept
 }
 
 
-PlatformSpecificCondVar::~PlatformSpecificCondVar() noexcept
+InterprocessCondVar::~InterprocessCondVar() noexcept
 {
     close();
 }
 
 
 
-void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, 
+void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, 
                                               size_t offset_of_condvar)
 {
     close();
@@ -162,7 +162,7 @@ void PlatformSpecificCondVar::set_shared_part(SharedPart& shared_part, std::stri
 }
 
 
-void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
+void InterprocessCondVar::init_shared_part(SharedPart& shared_part) {
 #ifdef REALM_CONDVAR_EMULATION
     shared_part.wait_counter = 0;
     shared_part.signal_counter = 0;
@@ -176,7 +176,7 @@ void PlatformSpecificCondVar::init_shared_part(SharedPart& shared_part) {
 //          = (wait_counter - signal_counter)
 // - holds at the point of entry/exit from the critical section.
 
-void PlatformSpecificCondVar::wait(RobustMutex& m, const struct timespec* tp)
+void InterprocessCondVar::wait(RobustMutex& m, const struct timespec* tp)
 {
     // precondition: Caller holds the mutex ensuring exclusive access to variables
     // in the shared part.
@@ -280,7 +280,7 @@ void PlatformSpecificCondVar::wait(RobustMutex& m, const struct timespec* tp)
 // operation: If a waiter is present, we wake her up by writing a single
 // byte to the fifo.
 
-void PlatformSpecificCondVar::notify() noexcept
+void InterprocessCondVar::notify() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
@@ -299,7 +299,7 @@ void PlatformSpecificCondVar::notify() noexcept
 // operation: If waiters are present, we wake them up by writing a single
 // byte to the fifo for each waiter.
 
-void PlatformSpecificCondVar::notify_all() noexcept
+void InterprocessCondVar::notify_all() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION

@@ -467,10 +467,10 @@ struct SharedGroup::SharedInfo {
     RobustMutex::SharedPart shared_controlmutex;
 #ifndef _WIN32
     // FIXME: windows pthread support for condvar not ready
-    PlatformSpecificCondVar::SharedPart room_to_write;
-    PlatformSpecificCondVar::SharedPart work_to_do;
-    PlatformSpecificCondVar::SharedPart daemon_becomes_ready;
-    PlatformSpecificCondVar::SharedPart new_commit_available;
+    InterprocessCondVar::SharedPart room_to_write;
+    InterprocessCondVar::SharedPart work_to_do;
+    InterprocessCondVar::SharedPart daemon_becomes_ready;
+    InterprocessCondVar::SharedPart new_commit_available;
 #endif
 
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
@@ -510,11 +510,11 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
     REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(hist_type+0));
     history_type = hist_type;
 #ifndef _WIN32
-    PlatformSpecificCondVar::init_shared_part(new_commit_available); // Throws
+    InterprocessCondVar::init_shared_part(new_commit_available); // Throws
 #ifdef REALM_ASYNC_DAEMON
-    PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
-    PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
-    PlatformSpecificCondVar::init_shared_part(daemon_becomes_ready); // Throws
+    InterprocessCondVar::init_shared_part(room_to_write); // Throws
+    InterprocessCondVar::init_shared_part(work_to_do); // Throws
+    InterprocessCondVar::init_shared_part(daemon_becomes_ready); // Throws
 #endif
 #endif
     daemon_started = 0;
