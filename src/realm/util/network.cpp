@@ -393,7 +393,6 @@ public:
         OwnersOperPtr temp_owners_ptr;
         OwnersOperPtr* owners_ptr_ptr = &owners_ptr;
         void* addr = owners_ptr.get();
-        size_t size_2;
         if (REALM_LIKELY(addr)) {
             // Two operations of a single type are generally not allowed to
             // overlap in time, but in the case of post operations, they
@@ -403,7 +402,7 @@ public:
                 owners_ptr_ptr = &temp_owners_ptr;
                 goto no_object;
             }
-            size_2 = owners_ptr->m_size;
+            size_t size_2 = owners_ptr->m_size;
             // We can use static dispatch in the destructor call here, since an
             // object, that is not in use, is always an instance of UnusedOper.
             REALM_ASSERT(dynamic_cast<UnusedOper*>(owners_ptr.get()));
@@ -417,7 +416,6 @@ public:
         else {
           no_object:
             addr = new char[size]; // Throws
-            size_2 = size;
             owners_ptr_ptr->reset(static_cast<async_oper*>(addr));
         }
         LendersOperPtr lenders_ptr;

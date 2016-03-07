@@ -442,6 +442,16 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     m_table->to_string_row(real_ndx, out, widths);
 }
 
+
+bool TableViewBase::depends_on_deleted_linklist() const
+{
+    uint64_t max = std::numeric_limits<uint64_t>::max();
+    // outside_version() will call itself recursively for each TableView in the dependency chain
+    // and terminate with `max` if the deepest depends on a deleted LinkList
+    return outside_version() == max;
+}
+
+// Return version of whatever this TableView depends on
 uint64_t TableViewBase::outside_version() const
 {
     check_cookie();
@@ -451,16 +461,22 @@ uint64_t TableViewBase::outside_version() const
     // later
     uint64_t max = std::numeric_limits<uint64_t>::max();
 
-    // Return version of whatever this TableView depends on
     LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
     if (lvp) {
-        // Depends on Query that depends on LinkList. 
+        // This LinkView depends on Query that is restricted by LinkList (with where(&linklist))
         if (lvp->is_attached()) {
             return lvp->get_origin_table().m_version;
         }
         else {
+            // LinkList was deleted
             return max;
         }
+    }
+
+    TableView* tvp = dynamic_cast<TableView*>(m_query.m_view);
+    if (tvp) {
+        // This LinkView depends on a Query that is restricted by a LinkView (with where(&linkview))
+        return tvp->outside_version();
     }
 
     if (m_linkview_source) {
