@@ -63,6 +63,10 @@ public:
     /// elsewhere.
     void set_shared_part(SharedPart& shared_part, std::string path, std::string mutex_name);
 
+    /// Destroy shared object. Potentially release system resources. Caller must
+    /// ensure that the shared_part is not in use at the point of call.
+    void release_shared_part();
+
     /// Lock the mutex. If the mutex is already locked, wait for it to be unlocked.
     void lock();
 
@@ -122,6 +126,17 @@ inline void RobustMutex::set_shared_part(SharedPart& shared_part,
     static_cast<void>(path);
     static_cast<void>(mutex_name);
 
+#endif
+}
+
+inline void RobustMutex::release_shared_part()
+{
+#ifdef REALM_ROBUST_MUTEX_EMULATION
+// FIXME: Validate if this triggers a bug on windows
+    File::try_remove(m_filename);
+#else
+    m_shared_part->~PosixRobustMutex();
+    m_shared_part = nullptr;
 #endif
 }
 

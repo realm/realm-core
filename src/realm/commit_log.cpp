@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <map>
+#include <mutex>
 
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
@@ -29,7 +30,7 @@
 #include <realm/impl/input_stream.hpp>
 #include <realm/commit_log.hpp>
 #include <realm/disable_sync_to_disk.hpp>
-
+#include <realm/util/robust_mutex.hpp>
 using namespace realm::util;
 
 namespace {
@@ -43,11 +44,6 @@ public:
 inline uint_fast64_t aligned_to(uint_fast64_t alignment, uint_fast64_t value)
 {
     return (value + alignment - 1) & ~(alignment - 1);
-}
-
-void recover_from_dead_owner()
-{
-    // nothing!
 }
 
 } // unnamed namespace
@@ -161,8 +157,8 @@ protected:
 
     // The header:
     struct CommitLogHeader {
-        // lock:
-        PosixRobustMutex lock;
+        // shared part of lock:
+        RobustMutex::SharedPart shared_part_of_lock;
 
         // selector:
         bool use_preamble_a;
@@ -204,6 +200,7 @@ protected:
     CommitLogMetadata m_log_b;
     util::Buffer<char> m_transact_log_buffer;
     mutable util::File::Map<CommitLogHeader> m_header;
+    mutable RobustMutex m_lock;
 
     // last seen version and associated offset - 0 for invalid
     mutable uint_fast64_t m_read_version;
@@ -329,6 +326,7 @@ inline void WriteLogCollector::map_header_if_needed() const
         File header_file(m_header_name, File::mode_Update);
         m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
     }
+    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, m_header_name, "0");
 }
 
 
@@ -450,7 +448,7 @@ Replication::version_type
 WriteLogCollector::internal_submit_log(HistoryEntry entry)
 {
     map_header_if_needed();
-    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    std::lock_guard<RobustMutex> rlg(m_lock);
     CommitLogPreamble* preamble = get_preamble_for_write();
 
     CommitLogMetadata* active_log = get_active_log(preamble);
@@ -526,7 +524,7 @@ void WriteLogCollector::initiate_session(version_type version)
     new (m_header.get_addr()) CommitLogHeader(version);
     // This protects us against deadlock when we restart after crash on a
     // platform without support for robust mutexes.
-    new (& m_header.get_addr()->lock) PosixRobustMutex;
+    new (& m_header.get_addr()->shared_part_of_lock) RobustMutex::SharedPart();
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_header.sync(); // Throws
@@ -536,6 +534,7 @@ void WriteLogCollector::initiate_session(version_type version)
 void WriteLogCollector::terminate_session() noexcept
 {
     // Cleanup, remove any log files
+    m_lock.release_shared_part();
 #ifdef _WIN32
     // FIXME: on Windows, terminate_session() fails to delete a file because it's open
     try {
@@ -571,7 +570,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
                                                     T* logs_buffer) const noexcept
 {
     map_header_if_needed();
-    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    std::lock_guard<RobustMutex> rlg(m_lock);
     const CommitLogPreamble* preamble = get_preamble();
     REALM_ASSERT_3(from_version, >=, preamble->begin_oldest_commit_range);
     REALM_ASSERT_3(to_version, <=, preamble->end_commit_range);
@@ -739,7 +738,7 @@ void WriteLogCollector::get_changesets(version_type from_version, version_type t
 void WriteLogCollector::set_oldest_bound_version(version_type version)
 {
     map_header_if_needed();
-    RobustLockGuard rlg(m_header.get_addr()->lock, &recover_from_dead_owner);
+    std::lock_guard<RobustMutex> rlg(m_lock);
     CommitLogPreamble* preamble = get_preamble_for_write();
     preamble->last_version_seen_locally = version;
     cleanup_stale_versions(preamble);
