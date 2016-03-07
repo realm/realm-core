@@ -2,6 +2,9 @@
 
 ### Bugfixes:
 
+* Backlink columns were not being refreshed when the connected link column
+  updated it's index in the table (insert/remove/move column). This is now
+  fixed. See issue #1499.
 * Backlink columns were always inserted at the end of a table, however on a
   transaction rollback in certain cases, backlink columns were removed from
   internal (not the end) indices and the roll back should put them back there.

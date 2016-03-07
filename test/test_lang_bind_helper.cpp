@@ -11598,6 +11598,36 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
     }
 }
 
+// Check that stored column indices are correct after a
+// column removal. Not updating the stored index was
+// causing an assertion failure when a table was cleared.
+TEST(LangBindHelper_StaleLinkIndexOnTableClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+    TableRef t = group_w.add_table("table1");
+    t->add_column(type_Int, "int1");
+    t->add_search_index(0);
+    t->add_empty_row(2);
+
+    TableRef t2 = group_w.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->add_empty_row();
+    t2->set_link(1, 0, 1);
+    t2->remove_column(0); // after this call LinkColumnBase::m_column_ndx was incorrect
+
+    // which would cause an index out of bounds assertion failure triggered
+    // from a table clear() (assert in Spec::get_opposite_link_table_ndx)
+    t->clear();
+
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_EQUAL(t2->get_link(0, 0), realm::npos); // no link
+}
 
 // Check that rollback of a transaction which deletes a table
 // containing a link will insert the associated backlink into
