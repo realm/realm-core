@@ -284,7 +284,7 @@ public:
     bool is_in_sync() const;
 
     // Tells if this TableView depends on a LinkList that has been deleted.
-    bool depends_deleted_linklist() const;
+    bool depends_on_deleted_linklist() const;
 
     // Synchronize a view to match a table or tableview from which it
     // has been derived. Synchronization is achieved by rerunning the
