@@ -10,6 +10,9 @@
   `TableView::sync_if_needed()` wouldn't be able to see the version changes
   after `Table::set_null()` was called.
   (https://github.com/realm/realm-java/issues/2366)
+* Fix an assertion failure in `Query::apply_patch` when handing over
+  certain queries.
+* Fix incorrect results from certain handed-over queries.
 
 ### API breaking changes:
 

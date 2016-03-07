@@ -398,6 +398,7 @@ public:
     void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
     {
         m_condition->apply_handover_patch(patches, group);
+        ParentNode::apply_handover_patch(patches, group);
     }
 
     std::unique_ptr<ParentNode> m_condition;
@@ -1377,6 +1378,8 @@ public:
     {
         for (auto it = m_conditions.rbegin(); it != m_conditions.rend(); ++it)
             (*it)->apply_handover_patch(patches, group);
+
+        ParentNode::apply_handover_patch(patches, group);
     }
 
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
@@ -1460,6 +1463,7 @@ public:
     void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
     {
         m_condition->apply_handover_patch(patches, group);
+        ParentNode::apply_handover_patch(patches, group);
     }
 
     std::unique_ptr<ParentNode> m_condition;
@@ -1621,6 +1625,7 @@ public:
     void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
     {
         m_expression->apply_handover_patch(patches, group);
+        ParentNode::apply_handover_patch(patches, group);
     }
 
 private:

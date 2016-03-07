@@ -1575,8 +1575,8 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 // To get faster Query support, either add SequentialGetter support (faster) or create a query_engine.hpp
 // node for it (super fast).
 
-template <class T> class SimpleColumn: public Subexpr2<T>
-{
+template <class T>
+class SimpleColumn : public Subexpr2<T> {
 public:
     SimpleColumn(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
         m_column(column), m_link_map(table, links)
@@ -1627,8 +1627,8 @@ public:
 };
 
 
-template <> class Columns<NewDate> : public SimpleColumn<NewDate>
-{
+template <>
+class Columns<NewDate> : public SimpleColumn<NewDate> {
     using SimpleColumn::SimpleColumn;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
@@ -1636,8 +1636,8 @@ template <> class Columns<NewDate> : public SimpleColumn<NewDate>
     }
 };
 
-template <> class Columns<BinaryData> : public SimpleColumn<BinaryData>
-{
+template <>
+class Columns<BinaryData> : public SimpleColumn<BinaryData> {
     using SimpleColumn::SimpleColumn;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
@@ -1646,8 +1646,8 @@ template <> class Columns<BinaryData> : public SimpleColumn<BinaryData>
 };
 
 
-template <> class Columns<StringData> : public SimpleColumn<StringData>
-{
+template <>
+class Columns<StringData> : public SimpleColumn<StringData> {
 public:
     using SimpleColumn::SimpleColumn;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* np = nullptr) const override
