@@ -443,7 +443,7 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
 }
 
 
-bool TableViewBase::depends_deleted_linklist() const
+bool TableViewBase::depends_on_deleted_linklist() const
 {
     uint64_t max = std::numeric_limits<uint64_t>::max();
     // outside_version() will call itself recursively for each TableView in the dependency chain
