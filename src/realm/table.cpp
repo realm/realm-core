@@ -5461,7 +5461,7 @@ void Table::refresh_link_target_accessors(size_t col_ndx_begin)
                 size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
                 Table& target_table = gf::get_table(*group, target_table_ndx); // Throws
                 ColumnBase* col = m_cols[col_ndx];
-                if (col && !target_table.is_marked() && &target_table != this) {
+                if (col && !target_table.is_marked() && (&target_table != this)) {
                     LinkColumnBase* link_col = static_cast<LinkColumnBase*>(col);
                     BacklinkColumn& backlink_col = link_col->get_backlink_column();
                     size_t backlink_col_ndx =

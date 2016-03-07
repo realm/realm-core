@@ -6599,7 +6599,7 @@ TEST(Table_MinimalStaleLinkColumnIndex)
 // uniques without throwing errors. This test was crashing (assert failed)
 // when inserting a unique duplicate because backlink indices hadn't been
 // updated after a column had been removed from the table containing the link.
-TEST(Table_FailingFuzzyTestcase)
+TEST(Table_FuzzTestRevealed_SetUniqueAssert)
 {
     Group g;
     g.add_table("string_index_test_table");
