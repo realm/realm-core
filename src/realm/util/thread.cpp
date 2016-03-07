@@ -182,7 +182,7 @@ REALM_NORETURN void Mutex::lock_failed(int err) noexcept
 }
 
 
-bool RobustMutex::is_robust_on_this_platform() noexcept
+bool PosixRobustMutex::is_robust_on_this_platform() noexcept
 {
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
     return true;
@@ -191,7 +191,7 @@ bool RobustMutex::is_robust_on_this_platform() noexcept
 #endif
 }
 
-bool RobustMutex::low_level_lock()
+bool PosixRobustMutex::low_level_lock()
 {
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
@@ -205,7 +205,7 @@ bool RobustMutex::low_level_lock()
     lock_failed(r);
 }
 
-bool RobustMutex::is_valid() noexcept
+bool PosixRobustMutex::is_valid() noexcept
 {
     // FIXME: This check tries to lock the mutex, and only unlocks it if the
     // return value is zero. If pthread_mutex_trylock() fails with EOWNERDEAD,
@@ -224,7 +224,7 @@ bool RobustMutex::is_valid() noexcept
 }
 
 
-void RobustMutex::mark_as_consistent() noexcept
+void PosixRobustMutex::mark_as_consistent() noexcept
 {
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
     int r = pthread_mutex_consistent(&m_impl);
@@ -270,7 +270,7 @@ void CondVar::handle_wait_error(int err)
     switch (err) {
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
         case ENOTRECOVERABLE:
-            throw RobustMutex::NotRecoverable();
+            throw PosixRobustMutex::NotRecoverable();
         case EOWNERDEAD:
             return;
 #endif

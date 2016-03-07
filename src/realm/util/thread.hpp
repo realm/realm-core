@@ -166,10 +166,10 @@ private:
 /// mutexes, this mutex class behaves as a regular process-shared
 /// mutex, which means that if a thread dies while holding a lock, any
 /// future attempt at locking will block indefinitely.
-class RobustMutex: private Mutex {
+class PosixRobustMutex: private Mutex {
 public:
-    RobustMutex();
-    ~RobustMutex() noexcept;
+    PosixRobustMutex();
+    ~PosixRobustMutex() noexcept;
 
     static bool is_robust_on_this_platform() noexcept;
 
@@ -235,7 +235,7 @@ public:
     friend class CondVar;
 };
 
-class RobustMutex::NotRecoverable: public std::exception {
+class PosixRobustMutex::NotRecoverable: public std::exception {
 public:
     const char* what() const noexcept override
     {
@@ -247,13 +247,13 @@ public:
 /// A simple robust mutex ownership wrapper.
 class RobustLockGuard {
 public:
-    /// \param recover_func See RobustMutex::lock().
+    /// \param recover_func See PosixRobustMutex::lock().
     template<class TFunc>
-    RobustLockGuard(RobustMutex&, TFunc func);
+    RobustLockGuard(PosixRobustMutex&, TFunc func);
     ~RobustLockGuard() noexcept;
 
 private:
-    RobustMutex& m_mutex;
+    PosixRobustMutex& m_mutex;
     friend class CondVar;
 };
 
@@ -281,7 +281,7 @@ public:
     /// Wait for another thread to call notify() or notify_all().
     void wait(LockGuard& l) noexcept;
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = nullptr);
+    void wait(PosixRobustMutex& m, Func recover_func, const struct timespec* tp = nullptr);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -455,7 +455,7 @@ inline void UniqueLock::unlock() noexcept
 }
 
 template<typename TFunc>
-inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) :
+inline RobustLockGuard::RobustLockGuard(PosixRobustMutex& m, TFunc func) :
     m_mutex(m)
 {
     m_mutex.lock(func);
@@ -468,19 +468,19 @@ inline RobustLockGuard::~RobustLockGuard() noexcept
 
 
 
-inline RobustMutex::RobustMutex():
+inline PosixRobustMutex::PosixRobustMutex():
     Mutex(no_init_tag())
 {
     bool robust_if_available = true;
     init_as_process_shared(robust_if_available);
 }
 
-inline RobustMutex::~RobustMutex() noexcept
+inline PosixRobustMutex::~PosixRobustMutex() noexcept
 {
 }
 
 template<class Func>
-inline void RobustMutex::lock(Func recover_func)
+inline void PosixRobustMutex::lock(Func recover_func)
 {
     bool no_thread_has_died = low_level_lock(); // Throws
     if (REALM_LIKELY(no_thread_has_died))
@@ -503,7 +503,7 @@ inline void RobustMutex::lock(Func recover_func)
     }
 }
 
-inline void RobustMutex::unlock() noexcept
+inline void PosixRobustMutex::unlock() noexcept
 {
     Mutex::unlock();
 }
@@ -534,7 +534,7 @@ inline void CondVar::wait(LockGuard& l) noexcept
 }
 
 template<class Func>
-inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
+inline void CondVar::wait(PosixRobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
 

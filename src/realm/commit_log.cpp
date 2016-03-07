@@ -162,7 +162,7 @@ protected:
     // The header:
     struct CommitLogHeader {
         // lock:
-        RobustMutex lock;
+        PosixRobustMutex lock;
 
         // selector:
         bool use_preamble_a;
@@ -526,7 +526,7 @@ void WriteLogCollector::initiate_session(version_type version)
     new (m_header.get_addr()) CommitLogHeader(version);
     // This protects us against deadlock when we restart after crash on a
     // platform without support for robust mutexes.
-    new (& m_header.get_addr()->lock) RobustMutex;
+    new (& m_header.get_addr()->lock) PosixRobustMutex;
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_header.sync(); // Throws
