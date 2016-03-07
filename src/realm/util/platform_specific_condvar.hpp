@@ -24,7 +24,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#include <realm/util/emulated_robust_mutex.hpp>
+#include <realm/util/robust_mutex.hpp>
 #include <stdint.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -86,7 +86,7 @@ public:
     /// variable. The call to wait() may return spuriously, so the caller should
     /// always re-evaluate the condition on which to wait and loop on wait()
     /// if necessary.
-    void wait(EmulatedRobustMutex& m, const struct timespec* tp);
+    void wait(RobustMutex& m, const struct timespec* tp);
 
     /// If any threads are waiting for this condition, wake up at least one.
     /// (Current implementation may actually wake all :-O ). The caller must

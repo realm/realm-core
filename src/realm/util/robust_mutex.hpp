@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_UTIL_EMULATED_ROBUST_MUTEX
-#define REALM_UTIL_EMULATED_ROBUST_MUTEX
+#ifndef REALM_UTIL_ROBUST_MUTEX
+#define REALM_UTIL_ROBUST_MUTEX
 
 // Enable this only on platforms where it might be needed
 // currently APPLE.
@@ -47,10 +47,10 @@ class PlatformSpecificCondVar;
 /// participants that they have been granted a lock after a crash of
 /// the process holding it (though it could be added if needed).
 
-class EmulatedRobustMutex {
+class RobustMutex {
 public:
-    EmulatedRobustMutex();
-    ~EmulatedRobustMutex() noexcept;
+    RobustMutex();
+    ~RobustMutex() noexcept;
 
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     struct SharedPart { };
@@ -92,11 +92,11 @@ private:
 };
 
 
-inline EmulatedRobustMutex::EmulatedRobustMutex()
+inline RobustMutex::RobustMutex()
 {
 }
 
-inline EmulatedRobustMutex::~EmulatedRobustMutex() noexcept
+inline RobustMutex::~RobustMutex() noexcept
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     m_local_mutex.lock();
@@ -105,7 +105,7 @@ inline EmulatedRobustMutex::~EmulatedRobustMutex() noexcept
 #endif
 }
 
-inline void EmulatedRobustMutex::set_shared_part(SharedPart& shared_part,
+inline void RobustMutex::set_shared_part(SharedPart& shared_part,
                                                  std::string path,
                                                  std::string mutex_name)
 {
@@ -125,7 +125,7 @@ inline void EmulatedRobustMutex::set_shared_part(SharedPart& shared_part,
 #endif
 }
 
-inline void EmulatedRobustMutex::lock()
+inline void RobustMutex::lock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     m_local_mutex.lock();
@@ -142,7 +142,7 @@ inline void EmulatedRobustMutex::lock()
 }
 
 
-inline void EmulatedRobustMutex::unlock()
+inline void RobustMutex::unlock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     m_file.unlock();
@@ -154,7 +154,7 @@ inline void EmulatedRobustMutex::unlock()
 }
 
 
-inline bool EmulatedRobustMutex::is_valid() noexcept
+inline bool RobustMutex::is_valid() noexcept
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     return true;
@@ -168,4 +168,4 @@ inline bool EmulatedRobustMutex::is_valid() noexcept
 } // namespace util
 } // namespace realm
 
-#endif // #ifndef REALM_UTIL_EMULATED_ROBUST_MUTEX
+#endif // #ifndef REALM_UTIL_ROBUST_MUTEX

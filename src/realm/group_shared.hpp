@@ -30,7 +30,7 @@
 #ifndef _WIN32
 #include <realm/util/platform_specific_condvar.hpp>
 #endif
-#include <realm/util/emulated_robust_mutex.hpp>
+#include <realm/util/robust_mutex.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
@@ -535,9 +535,9 @@ private:
     const char* m_key;
     TransactStage m_transact_stage;
     util::Mutex m_handover_lock;
-    util::EmulatedRobustMutex m_writemutex;
-    util::EmulatedRobustMutex m_balancemutex;
-    util::EmulatedRobustMutex m_controlmutex;
+    util::RobustMutex m_writemutex;
+    util::RobustMutex m_balancemutex;
+    util::RobustMutex m_controlmutex;
 #ifndef _WIN32
     util::PlatformSpecificCondVar m_room_to_write;
     util::PlatformSpecificCondVar m_work_to_do;
