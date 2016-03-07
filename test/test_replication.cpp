@@ -14,7 +14,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -61,6 +61,16 @@ public:
         for (const Buffer<char>& changeset: m_changesets)
             apply_changeset(changeset.data(), changeset.size(), target, replay_logger);
         m_changesets.clear();
+    }
+
+    void initiate_session(version_type) override
+    {
+        // No-op
+    }
+
+    void terminate_session() noexcept override
+    {
+        // No-op
     }
 
     HistoryType get_history_type() const noexcept override
@@ -204,7 +214,7 @@ TEST(Replication_General)
 }
 
 
-void check(TestResults& test_results, SharedGroup& sg_1, const ReadTransaction& rt_2)
+void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& rt_2)
 {
     ReadTransaction rt_1(sg_1);
     rt_1.get_group().verify();
@@ -266,7 +276,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
     }
     {
         WriteTransaction wt(sg_1);
@@ -283,7 +293,7 @@ TEST(Replication_Links)
     // O_2: F_1
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
     }
     {
         WriteTransaction wt(sg_1);
@@ -300,7 +310,7 @@ TEST(Replication_Links)
     // O_2: L_2->T_1   F_1
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
     }
     {
         WriteTransaction wt(sg_1);
@@ -320,7 +330,7 @@ TEST(Replication_Links)
     // O_2: L_2->T_1   F_1   LL_3->T_2
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
     }
     {
         WriteTransaction wt(sg_1);
@@ -338,7 +348,7 @@ TEST(Replication_Links)
     // O_2: L_2->T_1   F_1   LL_3->T_2   L_4->T_2
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
     }
     {
         WriteTransaction wt(sg_1);
@@ -355,7 +365,7 @@ TEST(Replication_Links)
     // O_2: L_2->T_1   F_1   LL_3->T_2   F_5   L_4->T_2
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
     }
     {
         WriteTransaction wt(sg_1);
@@ -374,7 +384,7 @@ TEST(Replication_Links)
     // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -454,7 +464,7 @@ TEST(Replication_Links)
     // null       null       []
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -511,7 +521,7 @@ TEST(Replication_Links)
     // null       null       []
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -575,7 +585,7 @@ TEST(Replication_Links)
     // null       null       []                     T_1[1]     []                     T_2[0]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -642,7 +652,7 @@ TEST(Replication_Links)
     // T_1[1]     null       []                     null       []                     T_2[1]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -707,7 +717,7 @@ TEST(Replication_Links)
     // T_1[1]     null       [ T_1[0], T_1[1] ]     null       [ T_2[0] ]             T_2[1]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -781,7 +791,7 @@ TEST(Replication_Links)
     // T_1[1]     null       [ T_1[1] ]             null       [ T_2[0], T_2[1] ]     T_2[1]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -855,7 +865,7 @@ TEST(Replication_Links)
     // T_1[1]     null       []                     null       [ T_2[1], T_2[0] ]     T_2[1]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -924,7 +934,7 @@ TEST(Replication_Links)
     // T_1[1]     null       []                     null       [ T_2[0], T_2[1] ]     T_2[1]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -993,7 +1003,7 @@ TEST(Replication_Links)
     // T_1[1]     null       []                     null       [ T_2[0], T_2[1] ]     T_2[1]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1080,7 +1090,7 @@ TEST(Replication_Links)
     // T_1[0]     T_2[1]     [ T_1[0] ]             null       [ T_2[0], T_2[1] ]     T_2[0]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1148,7 +1158,7 @@ TEST(Replication_Links)
     // null       T_2[0]     []
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1214,7 +1224,7 @@ TEST(Replication_Links)
     // null       T_2[0]     []
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1274,7 +1284,7 @@ TEST(Replication_Links)
     //                                              T_1[1]     [ T_2[1], T_2[0] ]     T_2[0]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1343,7 +1353,7 @@ TEST(Replication_Links)
     // T_1[0]     T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1], T_2[0] ]     T_2[0]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1429,7 +1439,7 @@ TEST(Replication_Links)
     // T_1[0]     T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1], T_2[2] ]     T_2[0]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1512,7 +1522,7 @@ TEST(Replication_Links)
     // null       T_2[0]     [ T_1[1] ]             T_1[1]     [ T_2[1] ]             T_2[0]
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1609,7 +1619,7 @@ TEST(Replication_Links)
     // T_1[2]     null       [ T_1[1] ]             T_1[1]     [ T_2[0] ]             null
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1703,7 +1713,7 @@ TEST(Replication_Links)
     // T_1[1]     null       []                     null       []                     null
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1790,7 +1800,7 @@ TEST(Replication_Links)
     // null       T_2[0]     []                     null       [ T_2[0] ]             null
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1881,7 +1891,7 @@ TEST(Replication_Links)
     // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -1974,7 +1984,7 @@ TEST(Replication_Links)
     // T_1[0]     T_2[0]     []
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2040,7 +2050,7 @@ TEST(Replication_Links)
     // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2119,7 +2129,7 @@ TEST(Replication_Links)
     // T_1[0]     null       []                     T_1[1]     []                     null
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2195,7 +2205,7 @@ TEST(Replication_Links)
     // T_1[0]     T_2[0]     []                     T_1[1]     [ T_2[0] ]             null
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2265,7 +2275,7 @@ TEST(Replication_Links)
     // from it
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
         CHECK_EQUAL(5, origin_1->get_column_count());
@@ -2293,7 +2303,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2382,7 +2392,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2470,7 +2480,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2562,7 +2572,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2682,7 +2692,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2806,7 +2816,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2894,7 +2904,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2938,7 +2948,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -2982,7 +2992,7 @@ TEST(Replication_Links)
     repl.replay_transacts(sg_2, replay_logger.get());
     {
         ReadTransaction rt(sg_2);
-        check(test_results, sg_1, rt);
+        check(test_context, sg_1, rt);
         CHECK_EQUAL(4, rt.get_group().size());
         ConstTableRef origin_1 = rt.get_table("origin_1");
         ConstTableRef origin_2 = rt.get_table("origin_2");

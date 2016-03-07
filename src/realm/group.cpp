@@ -1506,7 +1506,8 @@ public:
         return true;
     }
 
-    bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx, size_t)
+    bool insert_link_column(size_t col_ndx, DataType, StringData, size_t link_target_table_ndx,
+                            size_t backlink_column_ndx)
     {
         if (m_table) {
             InsertColumnUpdater updater(col_ndx);
@@ -1524,7 +1525,7 @@ public:
         if (link_target_table_ndx < m_group.m_table_accessors.size()) {
             if (Table* target = m_group.m_table_accessors[link_target_table_ndx]) {
                 using tf = _impl::TableFriend;
-                tf::adj_add_column(*target); // Throws
+                tf::adj_insert_column(*target, backlink_column_ndx); // Throws
                 tf::mark(*target);
             }
         }

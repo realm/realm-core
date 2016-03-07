@@ -23,8 +23,9 @@
 #include <stdint.h>
 #include <cstdlib>
 #include <cstdlib> // size_t
-#include <algorithm>
 #include <cstdio>
+#include <algorithm>
+#include <functional>
 
 #ifdef _MSC_VER
 #  include <win32/types.h>
@@ -60,7 +61,7 @@
 
 namespace realm {
 
-typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
+using StringCompareCallback = std::function<bool(const char* string1, const char* string2)>;
 
 extern signed char sse_support;
 extern signed char avx_support;

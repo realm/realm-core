@@ -46,6 +46,7 @@ impl/array_writer.hpp \
 impl/destroy_guard.hpp \
 impl/output_stream.hpp \
 impl/simulated_failure.hpp \
+null.hpp \
 datetime.hpp \
 string_data.hpp \
 impl/input_stream.hpp \

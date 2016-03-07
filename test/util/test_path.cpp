@@ -38,12 +38,14 @@ void keep_test_files()
     keep_files = true;
 }
 
-std::string get_test_path(const TestDetails& test_details, const std::string& suffix)
+std::string get_test_path(const TestContext& context, const std::string& suffix)
 {
-    std::string path = path_prefix;
-    path += sanitize_for_file_name(test_details.test_name);
-    path += suffix;
-    return path;
+    std::string  test_name = context.test_details.test_name;
+    int recurrence_index = context.recurrence_index;
+    std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out << path_prefix << sanitize_for_file_name(test_name) << '.' << recurrence_index << suffix;
+    return out.str();
 }
 
 void set_test_path_prefix(const std::string& prefix)
