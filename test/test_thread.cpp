@@ -95,6 +95,7 @@ struct SharedWithEmulated {
     int m_value;
 
     SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
+    ~SharedWithEmulated() { m_mutex.release_shared_part(); }
 
     // 10000 takes less than 0.1 sec
     void increment_10000_times()
@@ -574,6 +575,7 @@ TEST(Thread_CondvarWaits)
         CHECK_EQUAL(signals, 3);
     }
     signal_thread.join();
+    mutex.release_shared_part();
 }
 
 // Verify that a condition variable looses its signal if no one
@@ -606,6 +608,7 @@ TEST(Thread_CondvarIsStateless)
         CHECK_EQUAL(signal_state, 2);
     }
     signal_thread.join();
+    mutex.release_shared_part();
 }
 
 
@@ -627,6 +630,7 @@ TEST(Thread_CondvarTimeout)
         for (int i=0; i<5; ++i)
             changed.wait(mutex, &time);
     }
+    mutex.release_shared_part();
 }
 
 
@@ -651,6 +655,7 @@ TEST(Thread_CondvarNotifyAllWakeup)
     for (int i=0; i<num_waiters; ++i) {
         waiters[i].join();
     }
+    mutex.release_shared_part();
 }
 
 
@@ -683,6 +688,7 @@ TEST(Thread_CondvarNotifyWakeup)
     for (int i=0; i<num_waiters; ++i) {
         waiters[i].join();
     }
+    mutex.release_shared_part();
 }
 
 #endif // _WIN32
