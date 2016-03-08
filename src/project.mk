@@ -3,15 +3,6 @@ ENABLE_INSTALL_STATIC_LIBS = 1
 ENABLE_INSTALL_DEBUG_LIBS  = 1
 ENABLE_INSTALL_DEBUG_PROGS = 1
 
-# Construct fat binaries on Darwin when using Clang
-ifneq ($(REALM_ENABLE_FAT_BINARIES),)
-  ifeq ($(OS),Darwin)
-    ifeq ($(COMPILER_IS),clang)
-      CFLAGS_ARCH += -arch i386 -arch x86_64
-    endif
-  endif
-endif
-
 ifeq ($(OS),Darwin)
   CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++ -Wno-nested-anon-types
   VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
