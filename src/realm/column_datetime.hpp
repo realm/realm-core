@@ -25,7 +25,10 @@
 namespace realm {
 
 struct NewDate {
-    NewDate(int64_t seconds, int32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false) { }
+    NewDate(int64_t seconds, uint32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false) 
+    {
+        REALM_ASSERT_3(nanoseconds, <, 1000000000);
+    }
     NewDate(const null&) : m_is_null(true) { }
     NewDate() : NewDate(null()) { }
 
