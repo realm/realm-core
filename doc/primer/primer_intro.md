@@ -98,9 +98,9 @@ you can get to know who you are working with and what they are working on. If yo
 get a feel for what people are working on, you can know who to ask when you have
 questions about that particular topic. You should also get some team members to
 give you a general overview of the code structure and design, and use the one on
-one time to ask your questions. It can be difficult to know how much you don't 
+one time to ask your questions. It can be difficult to know how much you don't
 yet understand so to guide you on your quest to understanding the code, try to
-make sure that you understand everything on the list of [realm terminology][realm-terms]. 
+make sure that you understand everything on the list of [realm terminology][realm-terms].
 The list can be used as a guide when asking team members about the code, and if
 you understand all the terms, you are definitely in a good place of understanding
 how everything works. Please update the list as you discover terms that are
