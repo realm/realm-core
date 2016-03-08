@@ -403,6 +403,7 @@ void WriteLogCollector::reset_header()
     if (!disable_sync)
         header_file.sync(); // Throws
     m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
+    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, m_header_name, "0");
 }
 
 
