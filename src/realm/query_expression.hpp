@@ -527,8 +527,8 @@ public:
 
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=},
         // but only if both columns are non-nullable, and aren't in linked tables.
-        if (left_col && right_col && std::is_same<L, R>::value && !left_col->m_nullable && !right_col->m_nullable
-            && !left_col->links_exist() && !right_col->links_exist()) {
+        if (left_col && right_col && std::is_same<L, R>::value && !left_col->is_nullable() && !right_col->is_nullable()
+            && !left_col->links_exist() && !right_col->links_exist() && !std::is_same<L, NewDate>::value) {
             const Table* t = left_col->get_base_table();
             Query q = Query(*t);
 
@@ -1583,6 +1583,11 @@ public:
     {
     }
 
+    bool is_nullable() const noexcept
+    {
+        return m_link_map.base_table()->is_nullable(m_column);
+    }
+
     const Table* get_base_table() const override
     {
         return m_link_map.base_table();
@@ -2067,6 +2072,11 @@ public:
         return m_link_map.m_link_columns.size() > 0;
     }
 
+    bool is_nullable() const
+    {
+        return m_nullable;
+    }
+
     LinkMap m_link_map;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
@@ -2075,6 +2085,7 @@ public:
     // Column index of payload column of m_table
     size_t m_column;
 
+private:
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
     // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
     bool m_nullable = false;

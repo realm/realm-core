@@ -1389,6 +1389,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
                                   col_type != col_type_Float &&
                                   col_type != col_type_Double &&
                                   col_type != col_type_DateTime &&
+                                  col_type != col_type_NewDate &&
                                   col_type != col_type_Bool &&
                                   col_type != col_type_Link)));
 

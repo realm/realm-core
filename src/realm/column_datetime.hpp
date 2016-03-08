@@ -34,6 +34,8 @@ struct NewDate {
     bool operator != (const NewDate& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
     bool operator > (const NewDate& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
     bool operator < (const NewDate& rhs) const { return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds); }
+    bool operator <= (const NewDate& rhs) const { return *this < rhs || *this == rhs; }
+    bool operator >= (const NewDate& rhs) const { return *this > rhs || *this == rhs; }
     NewDate& operator = (const NewDate& rhs) = default;
 
     int64_t m_seconds;
@@ -134,7 +136,7 @@ inline void DateTimeColumn::insert_rows(size_t row_ndx, size_t num_rows_to_inser
                                         bool nullable)
 {
     m_seconds.insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, nullable);
-    m_nanoseconds.insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, nullable);
+    m_nanoseconds.insert_rows(row_ndx, num_rows_to_insert, prior_num_rows, false);
 }
 
 inline void DateTimeColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
