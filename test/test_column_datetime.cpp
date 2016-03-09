@@ -2,6 +2,7 @@
 #ifdef TEST_COLUMN_DATETIME
 
 #include <realm/column_datetime.hpp>
+#include <realm.hpp>
 
 #include "test.hpp"
 
@@ -46,5 +47,19 @@ TEST(DateTimeColumn_Basic)
     CHECK(ndt == NewDate(123, 123));
 }
 
+TEST(DateTimeColumn_Basic_Nulls)
+{
+    // Test that default value is null() for nullable column and non-null for non-nullable column
+    Table t;
+    t.add_column(type_NewDate, "date", false /*nullable*/);
+    t.add_column(type_NewDate, "date", true  /*nullable*/);
+
+    t.add_empty_row();
+    CHECK(!t.is_null(0, 0));
+    CHECK(t.is_null(1, 0));
+
+    CHECK_THROW_ANY(t.set_null(0, 0));
+    t.set_null(1, 0);
+}
 
 #endif // TEST_COLUMN_DATETIME

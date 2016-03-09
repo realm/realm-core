@@ -8635,4 +8635,22 @@ TEST(Query_NewDate)
 
 }
 
+TEST(Query_NewDate_Null)
+{
+    // Test that querying for null on non-nullable column (with default value being non-null value) is
+    // possible (i.e. does not throw or fail) and also gives no search matches.
+    Table table;
+    size_t match;
+
+    table.add_column(type_NewDate, "first", false);
+    table.add_column(type_NewDate, "second", true);
+    Columns<NewDate> first = table.column<NewDate>(0);
+    Columns<NewDate> second = table.column<NewDate>(0);
+
+    match = (first == NewDate(null())).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (second == NewDate(null())).find();
+    CHECK_EQUAL(match, 0);
+}
 #endif // TEST_QUERY
