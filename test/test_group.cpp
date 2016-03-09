@@ -2360,7 +2360,7 @@ TEST(Group_Fuzzy)
             // to get a reproduction test case
 
             //parse_and_apply_instructions(instr, g, std::cerr);
-            parse_and_apply_instructions(instr, path, std::cout /*util::none*/);
+            parse_and_apply_instructions(instr, path, util::none);
         }
     }
 }

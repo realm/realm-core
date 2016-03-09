@@ -98,7 +98,27 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
         if (log) {
             *log << "\n\n\n----------------------------------------------------------------------\n";
-            *log << "Group g;\n\n";
+            const char* key = crypt_key();
+            std::string pritable_key;
+            if (!key) {
+                pritable_key = "0";
+            }
+            else {
+                pritable_key = std::string("\"") + key + "\"";
+            }
+            *log << "std::unique_ptr<ClientHistory> hist_r(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
+            *log << "std::unique_ptr<ClientHistory> hist_w(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
+
+            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << pritable_key << ");\n";
+            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << pritable_key << ");\n";
+
+            *log << "ReadTransaction rt(sg_r);\n";
+            *log << "WriteTransaction wt(sg_w);\n";
+
+            *log << "const Group& g_r = rt.get_group();\n";
+            *log << "Group& g = wt.get_group();\n";
+
+            *log << "\n\n";
         }
 
         for (;;) {
@@ -386,7 +406,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             }
             else if (instr == ROLLBACK) {
                 if (log) {
-                    *log << "LangBindHelper::rollback_and_continue_as_read(sg_w);\n";
+                    *log << "LangBindHelper::rollback_and_continue_as_read(sg_w, *hist_w);\n";
                     *log << "g.verify();\n";
                 }
                 LangBindHelper::rollback_and_continue_as_read(sg_w, *hist_w);
@@ -400,7 +420,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             }
             else if (instr == ADVANCE) {
                 if (log) {
-                    *log << "LangBindHelper::advance_read(sg_r, *hist);\n";
+                    *log << "LangBindHelper::advance_read(sg_r, *hist_r);\n";
                     *log << "g_r.verify();\n";
                 }
                 LangBindHelper::advance_read(sg_r, *hist_r);
@@ -452,7 +472,7 @@ int run_fuzzy(int argc, const char* argv[])
     test_details.file_name = __FILE__;
     test_details.line_number = __LINE__;
 
-    Group group;
+    SHARED_GROUP_TEST_PATH(path);
 
     try {
         if (log) {
@@ -467,7 +487,7 @@ int run_fuzzy(int argc, const char* argv[])
             *log << "Group g;\n";
         }
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-        //        parse_and_apply_instructions(contents, path, std::cerr);
+        parse_and_apply_instructions(contents, path, log);
     }
     catch (const EndOfFile&) {
         return 0;
