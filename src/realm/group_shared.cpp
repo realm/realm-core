@@ -690,8 +690,14 @@ void SharedGroup::initialize_lockfile(DurabilityLevel durability,
     char buffer[sizeof (SharedInfo)] = {0};
     new (buffer) SharedInfo(durability, history_type); // Throws
     m_file.write(buffer, sizeof buffer); // Throws
+    // Make sure that a crash cannot manage to set init_complete = 1, 
+    // but somehow "forget" earlier initialization - we achieve this as
+    // a side effect of the system call implied by mmapping
     m_file_map.map(m_file, File::access_ReadWrite,
                    sizeof (SharedInfo), File::map_NoSync); // Throws
+    SharedInfo* info = m_file_map.get_addr();
+    info->init_complete = 1;
+    m_file_map.unmap();
 }
 
 
@@ -998,134 +1004,96 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         if (m_file.try_lock_exclusive()) { // Throws
 
             // Initializing a session:
-
             initialize_lockfile(durability, history_type);
+            m_file.unlock();
+        }
+        // exponential backoff (if not, a stream of failing readers can prevent initialization):
+        if (sleep_amount) {
+            //std::cerr << "backoff value " << sleep_amount << std::endl;
+            millisleep(sleep_amount);
+        }
+        if (sleep_amount < 500) sleep_amount = 2 * sleep_amount + 1;
+
+        m_file.lock_shared(); // Throws
+        // if the lock file was never fully initialized due to a crash
+        // we detect this scenario below and start over, hoping to get the
+        // exclusive lock next time round.
+
+        if (!validate_lockfile()) {
+            continue; // retry due to scenario B
+        }
+        {
             File::UnmapGuard fug_1(m_file_map);
             SharedInfo* info = m_file_map.get_addr();
+            RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+            bool begin_new_session = (info->num_participants == 0);
             ref_type top_ref;
-            bool begin_new_session = true;
-            try { 
+            try {
                 top_ref = attach_database(begin_new_session, durability, no_create_file); 
             }
             catch (SlabAlloc::Retry&) {
-                continue;
+                continue; // retry!
             }
             SlabAlloc::DetachGuard dg(alloc);
-            version_type snapshot_version;
-            validate_file_format(top_ref, history_type, snapshot_version,
-                                 target_file_format_version);
             setup_ringbuffer_mapping();
             File::UnmapGuard fug_2(m_reader_map);
-            initialize_session(top_ref, snapshot_version);
-
-            // make our presence noted:
+            if (begin_new_session) {
+                version_type snapshot_version;
+                validate_file_format(top_ref, history_type, snapshot_version,
+                                     target_file_format_version);
+                initialize_session(top_ref, snapshot_version);
+            }
+            else { // not new session:
+                target_file_format_version = join_session(history_type, durability);
+            }
+            // make our presence noted
+            ++info->num_participants;
             m_transact_stage = transact_Ready;
-            info->num_participants = 1;
+            // Set initial version so we can track if other instances
+            // change the db
+            m_read_lock.m_version = get_version_of_latest_snapshot();
 
-            // Make sure that a crash cannot manage to set init_complete = 1, 
-            // but somehow "forget" earlier initialization
-            //m_file.sync(); <-- this is theoretically better but has dramatic consequences 
-            // (x5 slower unittest in release mode)
-            atomic_thread_fence(std::memory_order_release);
-            info->init_complete = 1;
-            // We hold the shared lock from here until we close the file!
-            m_file.unlock();
-            m_file.lock_shared(); // Throws
+            // Initially wait_for_change is enabled
+            m_wait_for_change_enabled = true;
+
+#ifndef _WIN32
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_db_path,0);
+            m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
+            m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
+            m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
+#ifdef REALM_ASYNC_DAEMON
+            if (durability == durability_Async) {
+                if (!is_backend) {
+                    while (info->daemon_ready == 0) {
+                        if (info->daemon_started == 0) {
+                            spawn_daemon(path);
+                            info->daemon_started = 1;
+                        }
+                        // FIXME: It might be more robust to sleep a little, then restart the loop
+                        // std::cerr << "Waiting for daemon" << std::endl;
+                        m_daemon_becomes_ready.wait(info->controlmutex, &recover_from_dead_write_transact, 0);
+                        // std::cerr << " - notified" << std::endl;
+                    }
+                    // std::cerr << "daemon should be ready" << std::endl;
+                }
+                else { // is_backend
+                    do_async_commits();
+                }
+            }
+#else
+            static_cast<void>(is_backend);
+#endif // REALM_ASYNC_DAEMON
+#endif // !defined _WIN32
+
             // Keep the mappings and file open:
             dg.release();
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close
-
         }
-        else {  // We failed to get the exclusive lock, so most often we'll be joining
-            // an existing session. However, two conditions/scenarios can lead us to
-            // get here without a valid session to join
-            // scenario A: The session is already over
-            // scenario B: The session was never fully initialized due to a crash
-            // we detect both scenarios below and start over, hoping to get the
-            // exclusive lock next time round.
-
-            // exponential backoff (if not, a stream of failing readers can prevent initialization):
-            if (sleep_amount) {
-                //std::cerr << "backoff value " << sleep_amount << std::endl;
-                millisleep(sleep_amount);
-            }
-            if (sleep_amount < 500) sleep_amount = 2 * sleep_amount + 1;
-
-            m_file.lock_shared(); // Throws
-            if (!validate_lockfile()) {
-                continue; // retry due to scenario B
-            }
-            File::UnmapGuard fug_1(m_file_map);
-            SharedInfo* info = m_file_map.get_addr();
-            RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
-            if (info->num_participants == 0) {
-                continue; // retry due to scenario A
-                // Important: For some access patterns this can lead to livelock
-                // unless exponential backoff is used (as above).
-            }
-
-            bool begin_new_session = false;
-            try { attach_database(begin_new_session, durability, no_create_file); }
-            catch (SlabAlloc::Retry&) {
-                continue;
-            }
-            SlabAlloc::DetachGuard dg(alloc);
-            target_file_format_version = join_session(history_type, durability);
-            setup_ringbuffer_mapping();
-
-            // make our presence noted
-            ++info->num_participants;
-            m_transact_stage = transact_Ready;
-
-            // Keep the mappings and file open:
-            dg.release();
-            fug_1.release(); // Do not unmap
-            fcg.release(); // Do not close
-        }
-        break;
+        break; // Succes, exit retry loop
     }
     CloseGuard cg(*this);
-    {
-        SharedInfo* info = m_file_map.get_addr();
-        RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
-        // Set initial version so we can track if other instances
-        // change the db
-        m_read_lock.m_version = get_version_of_latest_snapshot();
-
-        // Initially wait_for_change is enabled
-        m_wait_for_change_enabled = true;
-
-#ifndef _WIN32
-        m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_db_path,0);
-        m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
-        m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
-        m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
-#ifdef REALM_ASYNC_DAEMON
-        if (durability == durability_Async) {
-            if (!is_backend) {
-                while (info->daemon_ready == 0) {
-                    if (info->daemon_started == 0) {
-                        spawn_daemon(path);
-                        info->daemon_started = 1;
-                    }
-                    // FIXME: It might be more robust to sleep a little, then restart the loop
-                    // std::cerr << "Waiting for daemon" << std::endl;
-                    m_daemon_becomes_ready.wait(info->controlmutex, &recover_from_dead_write_transact, 0);
-                    // std::cerr << " - notified" << std::endl;
-                }
-                // std::cerr << "daemon should be ready" << std::endl;
-            }
-            else { // is_backend
-                do_async_commits();
-            }
-        }
-#else
-        static_cast<void>(is_backend);
-#endif // REALM_ASYNC_DAEMON
-#endif // !defined _WIN32
-    }
     using gf = _impl::GroupFriend;
     int current_file_format_version = gf::get_file_format_version(m_group);
     if (current_file_format_version == 0) {
