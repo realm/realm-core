@@ -260,7 +260,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -283,7 +283,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -305,7 +305,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -334,7 +334,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -364,7 +364,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -395,7 +395,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\win32;..\..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -420,7 +420,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
     </ClCompile>
@@ -449,7 +449,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
     </ClCompile>
@@ -509,7 +509,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /D__STDC_LIMIT_MACROS</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
@@ -540,7 +540,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions) /D__STDC_LIMIT_MACROS</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
