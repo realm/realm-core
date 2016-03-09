@@ -300,7 +300,7 @@ build_apple()
         cp "src/realm/librealm-$tag-dbg.a" "$temp_dir/platforms/$tag/librealm-dbg.a" || exit 1
     done
     all_caps_name=$(echo "$os_name" | tr "[:upper:]" "[:lower:]")
-    REALM_ENABLE_FAT_BINARIES="1" $MAKE -C "src/realm" "realm-config-$os_name" "realm-config-$os_name-dbg" BASE_DENOM="$os_name" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_$all_caps_name" AR="libtool" ARFLAGS="-o" || exit 1
+    $MAKE -C "src/realm" "realm-config-$os_name" "realm-config-$os_name-dbg" BASE_DENOM="$os_name" CFLAGS_ARCH="-fembed-bitcode -DREALM_CONFIG_$all_caps_name" AR="libtool" ARFLAGS="-o" || exit 1
     mkdir -p "$dir" || exit 1
     echo "Creating '$dir/librealm-$os_name$platform_suffix.a'"
     libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$dir/librealm-$os_name$platform_suffix.a"     || exit 1
@@ -683,7 +683,7 @@ EOF
     "build")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE || exit 1
+        $MAKE || exit 1
         echo "Done building"
         exit 0
         ;;
@@ -695,7 +695,7 @@ EOF
         # are such that <src/realm/util/config.h> is not recreated
         # automatically by src/realm/Makfile. Using --always-make is
         # a work-around.
-        REALM_ENABLE_FAT_BINARIES="1" $MAKE --always-make -C "src/realm" "realm-config" "realm-config-dbg" || exit 1
+        $MAKE --always-make -C "src/realm" "realm-config" "realm-config-dbg" || exit 1
         echo "Done building config programs"
         exit 0
         ;;
