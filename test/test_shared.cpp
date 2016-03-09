@@ -17,6 +17,8 @@
 #endif
 
 #include <realm.hpp>
+#include <realm/commit_log.hpp>
+#include <realm/lang_bind_helper.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
 #include <memory>
@@ -2809,6 +2811,135 @@ TEST(Shared_MovingSearchIndex)
     }
 }
 
+/* TODO: analyse this!
+TEST(Shared_FuzzTestFail)
+{
+    std::unique_ptr<ClientHistory> hist_r(make_client_history("Group_Fuzzy.path.realm", 0));
+    std::unique_ptr<ClientHistory> hist_w(make_client_history("Group_Fuzzy.path.realm", 0));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, 0);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    ReadTransaction rt(sg_r);
+    WriteTransaction wt(sg_w);
+    const Group& g_r = rt.get_group();
+    Group& g = wt.get_group();
+
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    g.add_table("dmikfphdeipdafegnrrdsstobgsobqrrtjtmkophpjqlepshahii");
+    g.insert_table(0, "mpdonhjscsplmdcofodjoilbqsoktbmgijdelobmqjkhcmateth");
+    g.get_table(0)->add_empty_row(61);
+    try { g.remove_table(0); } catch(...) { }
+    g.get_table(0)->clear();
+    g.get_table(0)->add_column(DataType(4), "rqhktieeqookcjisdqnnioiqmtnpcdr",true);
+    g.get_table(0)->add_empty_row(19);
+    try { g.remove_table(0); } catch(...) { }
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    g.insert_table(0, "plsnstemldmnsqljqoddtlkepnjdqcqcapfqgeqatls");
+    g.get_table(0)->add_column(DataType(2), "rrdkpodchmndoplmfipqsbriaekaef",false);
+    g.get_table(0)->add_column(DataType(10), "hfdrbfcknidsbjcbhcepgaflqidaffkehkjbcgeob",true);
+    g.get_table(0)->insert_empty_row(0, 73);
+    g.get_table(0)->insert_column(1, DataType(9), "mesprjsoambldiitjekfetgibqtjsok",true);
+    g.get_table(0)->insert_column(3, DataType(7), "ctpjtcihbefkgadrlsfodcimpstqldsjasc",true);
+    g.get_table(0)->add_column_link(type_Link, "febshljfrhbicqprjckhrgommdmongqrbhdkmtkreqmhhnif", *g.get_table(0));
+    g.insert_table(1, "irdbtfacnfqfosgrtfdglsmdelalntodrnrkjadlphnesgoetqt");
+    g.get_table(0)->insert_column_link(3, type_Link, "loasjjpccpgpbddkoihloqmdntsfitabpsdifhnrdhbccdnjatt", *g.get_table(1));
+    g.get_table(0)->add_column_link(type_LinkList, "s", *g.get_table(0));
+    g.add_table("sqnbjgjpbrsphthiatlstln");
+    g.get_table(2)->add_empty_row(245);
+    g.insert_table(1, "hsqiblrkaaebqoigpgcrahrhpjpbg");
+    g.get_table(2)->insert_empty_row(0, 89);
+    g.get_table(1)->add_column(DataType(10), "rdjlgtsgjisjjcgplihclhjkarbtqmqgioahocent",true);
+    g.get_table(3)->add_column_link(type_Link, "lplthjjkbmspbeggolnhnsorsaetntpdgmp", *g.get_table(0));
+    { TableRef t = g.get_table(1); t->remove_search_index(0); }
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    g.move_table(1, 3);
+    g.get_table(0)->insert_column_link(4, type_Link, "tqkabimnfnec", *g.get_table(3));
+    { TableRef t = g.get_table(3); t->remove_search_index(0); }
+    g.get_table(1)->insert_empty_row(33, 55);
+    g.insert_table(0, "tpjhlqehcbqadtfsldfrrachtcminfpiemqtnlpfhpmchk");
+    g.insert_table(1, "teqlirrmglaiijhrblcdchijdphjkqheabra");
+    g.get_table(2)->add_empty_row(214);
+    g.get_table(3)->add_empty_row(114);
+    g.get_table(2)->insert_empty_row(50, 124);
+    g.insert_table(6, "fkkksdpinkoelaserccgntkrhrkdacqhfgerqe");
+    g.get_table(6)->clear();
+    g.add_table("bcagfh");
+    g.get_table(4)->add_column_link(type_LinkList, "abttaerjctanchtemqgderkaopcgr", *g.get_table(1));
+    g.get_table(2)->add_column(DataType(0), "pgcldcljcgdcsgaasjppkdomcectjqtfbahcbbdlgoolpeecpbremgnasqspcd",true);
+    g.get_table(5)->insert_empty_row(0, 253);
+    g.get_table(5)->add_empty_row(18);
+    g.get_table(4)->add_column_link(type_LinkList, "qmbnjqijeglgcfgprtssqcqmglgrdpffcocmsnapgmbkekfgjhdlctni", *g.get_table(4));
+    g.get_table(1)->add_empty_row(186);
+    g.insert_table(2, "hssfsbbfnaogqe");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r, *hist_r);
+    g_r.verify();
+    g.get_table(6)->insert_column(1, DataType(1), "opptgmdrgfeengofsmtliomcghnbcsejpejetbneogfjcgpgobabfcofoepmf",false);
+    g.get_table(6)->insert_column_link(2, type_Link, "raharmdngflrccqnpkr", *g.get_table(8));
+    g.get_table(4)->insert_column(0, DataType(4), "aojq",true);
+    g.get_table(4)->set_null(0, 246);
+    g.get_table(4)->clear();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    g.get_table(2)->add_empty_row(121);
+    g.move_table(8, 7);
+    g.get_table(4)->add_column_link(type_Link, "hgsdbaarsjedqrrtahgjbmfqf", *g.get_table(8));
+    g.add_table("qnorqbdbqmhtlotttenfgqlsof");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    g.get_table(6)->insert_empty_row(84, 49);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    g.verify();
+    g.move_table(8, 9);
+    { TableRef t = g.get_table(5); t->remove_search_index(2); }
+    g.add_table("sscdmooihcgikeqrfhnlpadsorocaastpgmioqcaortqiqdsofcjdrt");
+    g.get_table(7)->add_column(DataType(7), "saiptsbhiqinrbsmihhmrmnajbdmopndkppbkrhethobbebjmfrhcdpgjnnti",true);
+    g.get_table(7)->insert_empty_row(0, 72);
+    { TableRef t = g.get_table(6); t->remove_column(2); }
+    g.get_table(4)->add_empty_row(117);
+    g.get_table(3)->add_column_link(type_Link, "jrib", *g.get_table(0));
+    g.get_table(4)->insert_column_link(1, type_Link, "ljbhbsegmjmsadscjbqsltrfnrmiiramqim", *g.get_table(5));
+    g.get_table(7)->add_column_link(type_LinkList, "boqepsdcjogcjd", *g.get_table(0));
+    g.get_table(9)->add_empty_row(186);
+    g.get_table(10)->clear();
+    g.move_table(8, 5);
+    g.get_table(2)->add_column_link(type_LinkList, "gsrdsghikkmqsnkochfbojteijitmqttdanhesitpqfqndltaktairtmd", *g.get_table(3));
+    g.get_table(7)->add_empty_row(60);
+    try { g.remove_table(8); } catch(...) { }
+    g.get_table(0)->insert_column(0, DataType(9), "mblchqthejdpkknnhnmorr",false);
+    g.get_table(9)->add_column(DataType(2), "jpoharqpsbbirolqtmalgqhaegelenoekaanoej",false);
+    g.insert_table(8, "ephitiloqnhiptnialmmjdmignbohssatkonttsoegrmae");
+    LangBindHelper::rollback_and_continue_as_read(sg_w, *hist_w);
+    g.verify();
+
+}
+*/
 
 TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 {
