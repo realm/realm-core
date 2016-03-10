@@ -25,7 +25,7 @@ util/uri.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/interprocess_condvar.hpp \
-util/robust_mutex.hpp \
+util/interprocess_mutex.hpp \
 util/file_mapper.hpp \
 util/encrypted_file_mapping.hpp \
 util/miscellaneous.hpp \
