@@ -41,16 +41,12 @@ set(CMAKE_CXX_FLAGS "-Wextra -Wpedantic -DREALM_HAVE_CONFIG" CACHE INTERNAL "")
 
 if(APPLE)
     set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
-
-    set(IOS_SDK_VERSION "9.2")
-    set(IOS_SDK_DEV_ROOT "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer")
-    set(IOS_SDK_ROOT "${IOS_SDK_DEV_ROOT}/SDKs/iPhoneOS${IOS_SDK_VERSION}.sdk")
-
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -framework CoreFoundation" CACHE INTERNAL "")
-    set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT) $(ARCHS_STANDARD_32_BIT)")
-    set(CMAKE_XCODE_EFFECTIVE_PLATFORMS "-iphoneos;-iphonesimulator")
-    set(CMAKE_OSX_SYSROOT "${IOS_SDK_ROOT}")
 endif(APPLE)
 
 include(FindOpenSSL)
 
+set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "macosx iphoneos iphonesimulator appletvos appletvsimulator watchos watchsimulator")
+set(CMAKE_XCODE_EFFECTIVE_PLATFORMS "-macosx;-iphoneos;-iphonesimulator;-appletvos;-appletvsimulator;-watchos;-watchsimulator")
+set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
+set(CMAKE_OSX_SYSROOT $(PLATFORM_NAME))
+set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "7.0")
