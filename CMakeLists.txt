@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.1)
 project(Realm)
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
-include(FindOpenSSL)
 set(CMAKE_CXX_STANDARD 11)
 enable_testing()
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake" ${CMAKE_MODULE_PATH})
@@ -40,6 +39,8 @@ set(CMAKE_CXX_FLAGS "-Wextra -Wpedantic -DREALM_HAVE_CONFIG" CACHE INTERNAL "")
 
 
 if(APPLE)
+    set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
+
     set(IOS_SDK_VERSION "9.2")
     set(IOS_SDK_DEV_ROOT "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer")
     set(IOS_SDK_ROOT "${IOS_SDK_DEV_ROOT}/SDKs/iPhoneOS${IOS_SDK_VERSION}.sdk")
@@ -49,4 +50,6 @@ if(APPLE)
     set(CMAKE_XCODE_EFFECTIVE_PLATFORMS "-iphoneos;-iphonesimulator")
     set(CMAKE_OSX_SYSROOT "${IOS_SDK_ROOT}")
 endif(APPLE)
+
+include(FindOpenSSL)
 
