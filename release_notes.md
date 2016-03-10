@@ -6,13 +6,48 @@
   which could not later be read. The symptom would be a realm file with zeroes
   in the end but on streaming form (which requires a footer at the end of the
   file instead).
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.97.0 Release notes
+
+### Bugfixes:
+
+* Backlink columns were not being refreshed when the connected link column
+  updated it's index in the table (insert/remove/move column). This is now
+  fixed. See issue #1499.
 * Backlink columns were always inserted at the end of a table, however on a
   transaction rollback in certain cases, backlink columns were removed from
   internal (not the end) indices and the roll back should put them back there.
   This could cause a crash on rollback and was reported in ticket #1502.
+* Bumps table version when `Table::set_null()` called.
+  `TableView::sync_if_needed()` wouldn't be able to see the version changes
+  after `Table::set_null()` was called.
+  (https://github.com/realm/realm-java/issues/2366)
+* Fix an assertion failure in `Query::apply_patch` when handing over
+  certain queries.
+* Fix incorrect results from certain handed-over queries.
 
 ### API breaking changes:
 
+* Language bindings can now test if a TableView depends on a deleted LinkList
+  (detached LinkView) using `bool TableViewBase::depends_deleted_linklist()`.
+  See https://github.com/realm/realm-core/issues/1509 and also 
+  TEST(Query_ReferDeletedLinkView) in test_query.cpp for details.
 * `LangBindHelper::advance_read()` and friends no longer take a history
   argument. Access to the history is now gained automatically via
   `Replication::get_history()`. Applications and bindings should simply delete

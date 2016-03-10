@@ -178,7 +178,10 @@ public:
 //    void set_operating_mode(mode);
 //    mode get_operating_mode();
     bool is_empty() const noexcept;
+
+    // Tells if the table that this TableView points at still exists or has been deleted.
     bool is_attached() const noexcept;
+    
     bool is_row_attached(size_t row_ndx) const noexcept;
     size_t size() const noexcept;
     size_t num_attached_rows() const noexcept;
@@ -280,6 +283,9 @@ public:
     // it, it too will become outdated.
     bool is_in_sync() const;
 
+    // Tells if this TableView depends on a LinkList that has been deleted.
+    bool depends_on_deleted_linklist() const;
+
     // Synchronize a view to match a table or tableview from which it
     // has been derived. Synchronization is achieved by rerunning the
     // query used to generate the view. If derived from another view, that
@@ -295,10 +301,6 @@ public:
 
     // Set this undetached TableView to be a distinct view, and sync immediately.
     void sync_distinct_view(size_t column_ndx);
-
-    // This TableView can be "born" from 4 different sources : LinkView, Table::get_distinct_view(),
-    // Table::find_all() or Query. Return the version of the source it was created from.
-    uint64_t outside_version() const;
 
     // Re-sort view according to last used criterias
     void re_sort();
@@ -324,6 +326,10 @@ public:
     virtual ~TableViewBase() noexcept;
 
 protected:
+    // This TableView can be "born" from 4 different sources : LinkView, Table::get_distinct_view(),
+    // Table::find_all() or Query. Return the version of the source it was created from.
+    uint64_t outside_version() const;
+
     void do_sync();
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;

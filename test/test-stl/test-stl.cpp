@@ -61,19 +61,6 @@ private:
     const Days m_target;
 };
 
-// Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
-uint64_t rand2()
-{
-    return (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand() * (uint64_t)rand();
-
-
-    static int64_t seed = 2862933555777941757ULL;
-    static int64_t seed2 = 0;
-    seed = (2862933555777941757ULL * seed + 3037000493ULL);
-    seed2++;
-    return seed * seed2 + seed2;
-}
-
 } // anonymous namespace
 
 

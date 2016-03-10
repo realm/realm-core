@@ -391,6 +391,12 @@ void BacklinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
     }
 }
 
+void BacklinkColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
+{
+    IntegerColumn::refresh_accessor_tree(col_ndx, spec); // Throws
+    size_t origin_col_ndx = spec.get_origin_column_ndx(col_ndx);
+    m_origin_column_ndx = origin_col_ndx;
+}
 
 #ifdef REALM_DEBUG
 

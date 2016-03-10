@@ -139,6 +139,16 @@ public:
     {
     }
 
+    void initiate_session(version_type) override
+    {
+        // No-op
+    }
+
+    void terminate_session() noexcept override
+    {
+        // No-op
+    }
+
     version_type prepare_changeset(const char* data, size_t size,
                                    version_type orig_version) override
     {
@@ -10460,6 +10470,9 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryOr;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAnd;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryNot;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAndAndOr;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryWithExpression;
 
     {
         LangBindHelper::promote_to_write(sg_w);
@@ -10482,14 +10495,23 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 
         LangBindHelper::commit_and_continue_as_read(sg_w);
 
-        realm::Query query = source->where().links_to(col_link, target->get(0));
+        Query query = source->where().links_to(col_link, target->get(0));
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
 
-        realm::Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
+        Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
         handoverQueryOr = sg_w.export_for_handover(queryOr, ConstSourcePayload::Copy);
 
-        realm::Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
+        Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
         handoverQueryAnd = sg_w.export_for_handover(queryAnd, ConstSourcePayload::Copy);
+
+        Query queryNot = source->where().Not().links_to(col_link, target->get(0)).links_to(col_link, target->get(1));
+        handoverQueryNot = sg_w.export_for_handover(queryNot, ConstSourcePayload::Copy);
+
+        Query queryAndAndOr = source->where().group().and_query(queryOr).end_group().and_query(queryAnd);
+        handoverQueryAndAndOr = sg_w.export_for_handover(queryAndAndOr, ConstSourcePayload::Copy);
+
+        Query queryWithExpression = source->column<LinkList>(col_link).is_not_null() && query;
+        handoverQueryWithExpression = sg_w.export_for_handover(queryWithExpression, ConstSourcePayload::Copy);
     }
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
@@ -10499,10 +10521,16 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         std::unique_ptr<Query> query(sg.import_from_handover(move(handoverQuery)));
         std::unique_ptr<Query> queryOr(sg.import_from_handover(move(handoverQueryOr)));
         std::unique_ptr<Query> queryAnd(sg.import_from_handover(move(handoverQueryAnd)));
+        std::unique_ptr<Query> queryNot(sg.import_from_handover(move(handoverQueryNot)));
+        std::unique_ptr<Query> queryAndAndOr(sg.import_from_handover(move(handoverQueryAndAndOr)));
+        std::unique_ptr<Query> queryWithExpression(sg.import_from_handover(move(handoverQueryWithExpression)));
 
         CHECK_EQUAL(1, query->count());
         CHECK_EQUAL(2, queryOr->count());
         CHECK_EQUAL(1, queryAnd->count());
+        CHECK_EQUAL(1, queryNot->count());
+        CHECK_EQUAL(1, queryAndAndOr->count());
+        CHECK_EQUAL(1, queryWithExpression->count());
 
 
         // Remove the linked-to row.
@@ -10519,6 +10547,9 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         CHECK_EQUAL(1, query->count());
         CHECK_EQUAL(2, queryOr->count());
         CHECK_EQUAL(1, queryAnd->count());
+        CHECK_EQUAL(1, queryNot->count());
+        CHECK_EQUAL(1, queryAndAndOr->count());
+        CHECK_EQUAL(1, queryWithExpression->count());
     }
 }
 
@@ -11567,6 +11598,36 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
     }
 }
 
+// Check that stored column indices are correct after a
+// column removal. Not updating the stored index was
+// causing an assertion failure when a table was cleared.
+TEST(LangBindHelper_StaleLinkIndexOnTableClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+    TableRef t = group_w.add_table("table1");
+    t->add_column(type_Int, "int1");
+    t->add_search_index(0);
+    t->add_empty_row(2);
+
+    TableRef t2 = group_w.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->add_empty_row();
+    t2->set_link(1, 0, 1);
+    t2->remove_column(0); // after this call LinkColumnBase::m_column_ndx was incorrect
+
+    // which would cause an index out of bounds assertion failure triggered
+    // from a table clear() (assert in Spec::get_opposite_link_table_ndx)
+    t->clear();
+
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_EQUAL(t2->get_link(0, 0), realm::npos); // no link
+}
 
 // Check that rollback of a transaction which deletes a table
 // containing a link will insert the associated backlink into
