@@ -12,10 +12,11 @@
 #endif
 
 #include <realm.hpp>
+#include <realm/util/to_string.hpp>
 #include <realm/util/file.hpp>
 #include <realm/commit_log.hpp>
 #include <realm/version.hpp>
-#include <realm/util/to_string.hpp>
+#include <realm/history.hpp>
 
 #include "test.hpp"
 
@@ -235,7 +236,7 @@ TEST(Upgrade_Database_2_3)
     {
       CHECK_OR_RETURN(File::copy(path, temp_copy));
 
-      std::unique_ptr<ClientHistory> hist = make_client_history(temp_copy);
+      std::unique_ptr<Replication> hist = make_client_history(temp_copy);
       SharedGroup sg(*hist);
       ReadTransaction rt(sg);
       ConstTableRef t = rt.get_table("table");
@@ -297,7 +298,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(3, sgf::get_file_format(g));
+    CHECK_EQUAL(3, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -437,7 +438,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(3, sgf::get_file_format(g));
+    CHECK_EQUAL(3, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -731,7 +732,7 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format)
     SharedGroup sg1(temp_copy);
     SharedGroup sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(sgf::get_file_format(sg1), sgf::get_file_format(sg2));
+    CHECK_EQUAL(sgf::get_file_format_version(sg1), sgf::get_file_format_version(sg2));
 }
 
 TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
@@ -763,5 +764,43 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
 #endif
 
 
+TEST(Upgrade_InRealmHistory)
+{
+    // When requesting a in-Realm history, an upgrade to at least file format
+    // version 4 is necessary.
+
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+
+    CHECK_OR_RETURN(File::exists(path));
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    SHARED_GROUP_TEST_PATH(temp_path);
+
+    {
+        CHECK_OR_RETURN(File::copy(path, temp_path));
+        std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
+        SharedGroup sg(*hist);
+        using sgf = _impl::SharedGroupFriend;
+        CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
+    }
+
+    // Try again, but do it in two steps (2->3, 3->4).
+    {
+        File::remove(temp_path);
+        CHECK_OR_RETURN(File::copy(path, temp_path));
+        bool no_create = true;
+        {
+            SharedGroup sg(temp_path, no_create);
+            using sgf = _impl::SharedGroupFriend;
+            CHECK_EQUAL(3, sgf::get_file_format_version(sg));
+        }
+        {
+            std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
+            SharedGroup sg(*hist);
+            using sgf = _impl::SharedGroupFriend;
+            CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
+        }
+    }
+}
 
 #endif // TEST_GROUP

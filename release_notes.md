@@ -20,16 +20,140 @@
 
 ----------------------------------------------
 
+# 0.97.0 Release notes
+
+### Bugfixes:
+
+* Backlink columns were not being refreshed when the connected link column
+  updated it's index in the table (insert/remove/move column). This is now
+  fixed. See issue #1499.
+* Backlink columns were always inserted at the end of a table, however on a
+  transaction rollback in certain cases, backlink columns were removed from
+  internal (not the end) indices and the roll back should put them back there.
+  This could cause a crash on rollback and was reported in ticket #1502.
+* Bumps table version when `Table::set_null()` called.
+  `TableView::sync_if_needed()` wouldn't be able to see the version changes
+  after `Table::set_null()` was called.
+  (https://github.com/realm/realm-java/issues/2366)
+* Fix an assertion failure in `Query::apply_patch` when handing over
+  certain queries.
+* Fix incorrect results from certain handed-over queries.
+
+### API breaking changes:
+
+* Language bindings can now test if a TableView depends on a deleted LinkList
+  (detached LinkView) using `bool TableViewBase::depends_deleted_linklist()`.
+  See https://github.com/realm/realm-core/issues/1509 and also 
+  TEST(Query_ReferDeletedLinkView) in test_query.cpp for details.
+* `LangBindHelper::advance_read()` and friends no longer take a history
+  argument. Access to the history is now gained automatically via
+  `Replication::get_history()`. Applications and bindings should simply delete
+  the history argument at each call site.
+* `SharedGroup::get_current_version()`, `LangBindHelper::get_current_version()`,
+  and `Replication::get_current_version()` were all removed. They are not used
+  by the Cocoa or Android binding, and `SharedGroup::get_current_version()` was
+  never supposed to be public.
+
+### Enhancements:
+
+* Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
+  keeps the current history implementation as the default for now
+  (`<realm/commit_log.hpp>`).
+* New methods `ReadTransaction::get_version()` and
+  `WriteTransaction::get_version()` for getting the version of the bound
+  snapshot during a transaction.
+
+-----------
+
+### Internals:
+
+* Bumps file format version from 3 to 4 due to support for in-Realm history of
+  changes (extra entries in `Group::m_top`). The bump is necessary due to lack
+  of forwards compatibility. The changes are backwards compatible, and automatic
+  upgrade is implemented.
+* Adds checks for consistent use of history types.
+* Removes the "server sync mode" flag from the Realm file header. This feature
+  is now superseded by the more powerful history type consistency checks. This
+  is not considered a file format change, as no released core version will ever
+  set the "server sync mode" flag.
+* The SharedInfo file format version was bumped due to addition of history type
+  information (all concurrent session participants must agree on SharedInfo file
+  format version).
+* Make it possible to open both file format version 3 and 4 files without
+  upgrading. If in-Realm history is required and the current file format version
+  is less than 4, upgrade to version 4. Otherwise, if the current file format
+  version is less than 3, upgrade to version 3.
+* The current file format version is available via
+  `Allocator::get_file_format_version()`.
+* Set Realm file format to zero (not yet decided) when creating a new empty
+  Realm where top-ref is zero. This was done to minimize the number of distinct
+  places in the code dealing with file format upgrade logic.
+* Check that all session participants agree on target Realm file format for that
+  session. File format upgrade required when larger than the actual file format.
+* Eliminate a temporary memory mapping of the SharedInfo file during the Realm
+  opening process.
+* Improved documentation of some of the complicated parts of the Realm opening
+  process.
+* Introducing `RefOrTagged` value type whan can be used to make it safer to work
+  with "tagged integers" in arrays having the "has refs" flag.
+* New features in the unit test framework: Ability to specify number of internal
+  repetitions of the set of selected tests. Also, progress reporting now
+  includes information about which test thread runs which unit test. Also, new
+  test introduction macro `NO_CONCUR_TEST()` for those tests that cannot run
+  concurrently with other tests, or with other executions of themselves. From
+  now on, all unit tests must be able to run multiple times, and must either be
+  fully thread safe, or must be introduced with `NO_CONCUR_TEST()`.
+
+----------------------------------------------
+
+# 0.96.2 Release notes
+
+### Bugfixes:
+
+* `Group::TransactAdvancer::move_group_level_table()` was forgetting some of its
+  duties (move the table accessor). That has been fixed.
+* While generating transaction logs, we didn't always deselect nested
+  accessors. For example, when performing a table-level operation, we didn't
+  deselect a selected link list. In some cases, it didn't matter, but in others
+  it did. The general rule is that an operation on a particular level must
+  deselect every accessor at deeper (more nested) levels. This is important for
+  the merge logic of the sync mechanism, and for transaction log reversal. This
+  has been fixed.
+* While reversing transaction logs, group level operations did not terminate the
+  preceding section of table level operations. Was fixed.
+* Table::clear() issues link nullification instructions for each link that did
+  point to a removed row. It did however issue those instructions after the
+  clear instruction, which is incorrect, as the links do not exist after the
+  clear operation. Was fixed.
+* `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
+  file after compacting.
+
+### Enhancements:
+
+* Add SharedGroup::get_transact_stage().
+
+### Internals:
+
+* Improve documentation of `Group::move_table()` and `LinkView::move()`.
+* Early out from `Group::move_table()` if `from_index == to_index`. This
+  behaviour agrees with `LinkView::move()` and is assumed by other parts of
+  core, and by the merge logic of the sync mechanism.
+* Convert some assertions on arguments of public `Group`, `Table`, and
+  `LinkView` methods to throwing checks.
+* Align argument naming of `Group::move_table()` and `LinkView::move()`.
+
+----------------------------------------------
+
 # 0.96.1 Release notes
 
 ### API breaking changes:
 
 * Important for language bindings: Any method on Query and TableView that
-  depends on a deleted LinkView will now return sane return values; 
+  depends on a deleted LinkView will now return sane return values;
   Query::find() returns npos, Query::find_all() returns empty TableView,
   Query::count() returns 0, TableView::sum() returns 0 (TableView created
   from LinkView::get_sorted_view). So they will no longer throw
-  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in 
+  DeletedLinkView or crash. See TEST(Query_ReferDeletedLinkView) in
   test_query.cpp for more info.
 
 ### Enhancements:
@@ -39,6 +163,8 @@
   thrown std::runtime_error. This is so that iOS and Android language
   bindings can specifically catch this case and handle it differently
   than the rest of the general std::runtime_errors.
+* Doubled the speed of TableView::clear() when parent table has an
+  indexed column.
 
 ----------------------------------------------
 

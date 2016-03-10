@@ -56,6 +56,14 @@ const char* LogicError::what() const noexcept
         case wrong_transact_state:
             return "Wrong transactional state (no active transaction, wrong type of transaction, "
                 "or transaction already in progress)";
+        case no_history:
+            return "Continuous transaction through SharedGroup object without history information";
+        case mixed_durability:
+            return "Durability setting (as passed to the SharedGroup constructor) was "
+                "not consistent across the session";
+        case mixed_history_type:
+            return "History type (as specified by the Replication implementation passed to "
+                "the SharedGroup constructor) was not consistent across the session";
     }
     return "Unknown error";
     // LCOV_EXCL_STOP (LogicError messages)

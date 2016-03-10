@@ -8,7 +8,7 @@
 #include <realm/table.hpp>
 
 using namespace realm;
-using test_util::unit_test::TestResults;
+using test_util::unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -74,7 +74,7 @@ const size_t num_double_values = size_of_array(double_values);
 
 
 template<class C>
-void BasicColumn_IsEmpty(TestResults& test_results)
+void BasicColumn_IsEmpty(TestContext& test_context)
 {
     ref_type ref = C::create(Allocator::get_default());
     C c(Allocator::get_default(), ref);
@@ -85,16 +85,16 @@ void BasicColumn_IsEmpty(TestResults& test_results)
 }
 TEST(FloatColumn_IsEmpty)
 {
-    BasicColumn_IsEmpty<FloatColumn>(test_results);
+    BasicColumn_IsEmpty<FloatColumn>(test_context);
 }
 TEST(DoubleColumn_IsEmpty)
 {
-    BasicColumn_IsEmpty<DoubleColumn>(test_results);
+    BasicColumn_IsEmpty<DoubleColumn>(test_context);
 }
 
 
 template<class C, typename T>
-void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values)
+void BasicColumn_AddGet(TestContext& test_context, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
     C c(Allocator::get_default(), ref);
@@ -112,16 +112,16 @@ void BasicColumn_AddGet(TestResults& test_results, T values[], size_t num_values
 }
 TEST(FloatColumn_AddGet)
 {
-    BasicColumn_AddGet<FloatColumn, float>(test_results, float_values, num_float_values);
+    BasicColumn_AddGet<FloatColumn, float>(test_context, float_values, num_float_values);
 }
 TEST(DoubleColumn_AddGet)
 {
-    BasicColumn_AddGet<DoubleColumn, double>(test_results, double_values, num_double_values);
+    BasicColumn_AddGet<DoubleColumn, double>(test_context, double_values, num_double_values);
 }
 
 
 template<class C, typename T>
-void BasicColumn_Clear(TestResults& test_results)
+void BasicColumn_Clear(TestContext& test_context)
 {
     ref_type ref = C::create(Allocator::get_default());
     C c(Allocator::get_default(), ref);
@@ -139,16 +139,16 @@ void BasicColumn_Clear(TestResults& test_results)
 }
 TEST(FloatColumn_Clear)
 {
-    BasicColumn_Clear<FloatColumn, float>(test_results);
+    BasicColumn_Clear<FloatColumn, float>(test_context);
 }
 TEST(DoubleColumn_Clear)
 {
-    BasicColumn_Clear<DoubleColumn, double>(test_results);
+    BasicColumn_Clear<DoubleColumn, double>(test_context);
 }
 
 
 template<class C, typename T>
-void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
+void BasicColumn_Set(TestContext& test_context, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
     C c(Allocator::get_default(), ref);
@@ -172,16 +172,16 @@ void BasicColumn_Set(TestResults& test_results, T values[], size_t num_values)
 }
 TEST(FloatColumn_Set)
 {
-    BasicColumn_Set<FloatColumn, float>(test_results, float_values, num_float_values);
+    BasicColumn_Set<FloatColumn, float>(test_context, float_values, num_float_values);
 }
 TEST(DoubleColumn_Set)
 {
-    BasicColumn_Set<DoubleColumn, double>(test_results, double_values, num_double_values);
+    BasicColumn_Set<DoubleColumn, double>(test_context, double_values, num_double_values);
 }
 
 
 template<class C, typename T>
-void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values)
+void BasicColumn_Insert(TestContext& test_context, T values[], size_t num_values)
 {
     static_cast<void>(num_values);
 
@@ -227,18 +227,18 @@ void BasicColumn_Insert(TestResults& test_results, T values[], size_t num_values
 }
 TEST(FloatColumn_Insert)
 {
-    BasicColumn_Insert<FloatColumn, float>(test_results, float_values, num_float_values);
+    BasicColumn_Insert<FloatColumn, float>(test_context, float_values, num_float_values);
 }
 TEST(DoubleColumn_Insert)
 {
-    BasicColumn_Insert<DoubleColumn, double>(test_results, double_values, num_double_values);
+    BasicColumn_Insert<DoubleColumn, double>(test_context, double_values, num_double_values);
 }
 
 
 template<class C, typename T>
-void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_values)
+void BasicColumn_Aggregates(TestContext& test_context, T values[], size_t num_values)
 {
-    static_cast<void>(test_results);
+    static_cast<void>(test_context);
     static_cast<void>(num_values);
     static_cast<void>(values);
 
@@ -255,16 +255,16 @@ void BasicColumn_Aggregates(TestResults& test_results, T values[], size_t num_va
 }
 TEST(FloatColumn_Aggregates)
 {
-    BasicColumn_Aggregates<FloatColumn, float>(test_results, float_values, num_float_values);
+    BasicColumn_Aggregates<FloatColumn, float>(test_context, float_values, num_float_values);
 }
 TEST(DoubleColumn_Aggregates)
 {
-    BasicColumn_Aggregates<DoubleColumn, double>(test_results, double_values, num_double_values);
+    BasicColumn_Aggregates<DoubleColumn, double>(test_context, double_values, num_double_values);
 }
 
 
 template<class C, typename T>
-void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values)
+void BasicColumn_Delete(TestContext& test_context, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
     C c(Allocator::get_default(), ref);
@@ -312,11 +312,11 @@ void BasicColumn_Delete(TestResults& test_results, T values[], size_t num_values
 }
 TEST(FloatColumn_Delete)
 {
-    BasicColumn_Delete<FloatColumn, float>(test_results, float_values, num_float_values);
+    BasicColumn_Delete<FloatColumn, float>(test_context, float_values, num_float_values);
 }
 TEST(DoubleColumn_Delete)
 {
-    BasicColumn_Delete<DoubleColumn, double>(test_results, double_values, num_double_values);
+    BasicColumn_Delete<DoubleColumn, double>(test_context, double_values, num_double_values);
 }
 
 TEST(FloatColumn_SwapRows)

@@ -28,65 +28,67 @@
     TEST_TYPES_IF(name, true, __VA_ARGS__)
 
 #define TEST_TYPES_IF(name, enabled, ...) \
-    TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, __VA_ARGS__)
+    TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, true, \
+                  __VA_ARGS__)
 
-#define TEST_TYPES_EX(name, list, enabled, ...) \
+#define NONCONCURRENT_TEST_TYPES(name, ...) \
+    NONCONCURRENT_TEST_TYPES_IF(name, true, __VA_ARGS__)
+
+#define NONCONCURRENT_TEST_TYPES_IF(name, enabled, ...) \
+    TEST_TYPES_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, false, \
+                  __VA_ARGS__)
+
+#define TEST_TYPES_EX(name, list, enabled, allow_concur, ...) \
     template<class> \
-    struct Realm_UnitTest__##name: realm::test_util::unit_test::Test { \
-        bool test_enabled() const { return bool(enabled); } \
+    struct Realm_UnitTest__##name: realm::test_util::unit_test::TestBase { \
+        static bool test_enabled() { return bool(enabled); } \
+        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c): TestBase(c) {} \
         void test_run(); \
     }; \
-    realm::test_util::unit_test::TestCons<Realm_UnitTest__##name, __VA_ARGS__> realm_unit_test__##name; \
-    realm::test_util::unit_test::RegisterTests \
-        realm_unit_test_reg__##name((list), realm_unit_test__##name, \
-                                    "DefaultSuite", #name, __FILE__, __LINE__); \
-    template<class TEST_TYPE> \
-    void Realm_UnitTest__##name<TEST_TYPE>::test_run()
+    realm::test_util::unit_test::RegisterTypeTests<Realm_UnitTest__##name, __VA_ARGS__> \
+        realm_unit_test_reg__##name((list), (allow_concur), "DefaultSuite", \
+                                    #name, __FILE__, __LINE__); \
+    template<class TEST_TYPE> void Realm_UnitTest__##name<TEST_TYPE>::test_run()
 
 
 namespace realm {
 namespace test_util {
 namespace unit_test {
 
+inline std::string sanitize_type_test_name(const char* test_name, std::string type_name)
+{
+    auto replace = [&](std::string a, std::string b) {
+        std::string::size_type offset = 0;
+        for (;;) {
+            std::string::size_type i = type_name.find(a, offset);
+            if (i == std::string::npos)
+                break;
+            type_name.replace(i, a.size(), b);
+            offset = i = b.size();
+        }
+    };
+    replace("(anonymous namespace)", "anon"); // GCC specific
+    replace(" >", ">");
+    replace(" ", "+"); // "long double" -> "long+double"
+    return std::string(test_name) + '<' + type_name + '>';
+}
 
-template<template<class> class Test, class...>
-class TestCons;
-
+template<template<class> class, class...> struct RegisterTypeTests;
 template<template<class> class Test, class Type, class... Types>
-class TestCons<Test, Type, Types...> {
-public:
-    Test<Type> head;
-    TestCons<Test, Types...> tail;
+struct RegisterTypeTests<Test, Type, Types...> {
+    RegisterTypeTests(TestList& list, bool allow_concur, const char* suite, const char* name,
+                      const char* file, long line)
+    {
+        std::string name_2 = sanitize_type_test_name(name, get_type_name<Type>());
+        RegisterTest<Test<Type>> dummy_1(list, allow_concur, suite, name_2, file, line);
+        RegisterTypeTests<Test, Types...> dummy_2(list, allow_concur, suite, name, file, line);
+    }
 };
-template<template<class> class Test>
-class TestCons<Test> {};
-
-
-struct RegisterTests {
-    template<template<class> class Test, class... Types>
-    RegisterTests(TestList& list, TestCons<Test, Types...>& tests, const char* suite,
-                 const char* name, const char* file, long line)
-    {
-        register_tests(list, tests, suite, name, file, line);
-    }
-    template<template<class> class Test, class Type, class... Types>
-    static void register_tests(TestList& list, TestCons<Test, Type, Types...>& tests,
-                               const char* suite, const char* name, const char* file, long line)
-    {
-        std::string name_2 = name;
-        name_2 += '<';
-        name_2 += get_type_name<Type>();
-        name_2 += '>';
-        RegisterTest::register_test(list, tests.head, suite, name_2, file, line);
-        register_tests(list, tests.tail, suite, name, file, line);
-    }
-    template<template<class> class Test>
-    static void register_tests(TestList&, TestCons<Test>&,
-                               const char*, const char*, const char*, long)
+template<template<class> class Test> struct RegisterTypeTests<Test> {
+    RegisterTypeTests(TestList&, bool, const char*, const char*, const char*, long)
     {
     }
 };
-
 
 } // namespace unit_test
 } // namespace test_util

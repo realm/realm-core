@@ -45,6 +45,7 @@ impl/array_writer.hpp \
 impl/destroy_guard.hpp \
 impl/output_stream.hpp \
 impl/simulated_failure.hpp \
+null.hpp \
 datetime.hpp \
 string_data.hpp \
 impl/input_stream.hpp \
@@ -65,7 +66,7 @@ descriptor_fwd.hpp \
 descriptor.hpp \
 group.hpp \
 group_shared.hpp \
-history.hpp \
+impl/continuous_transactions_history.hpp \
 handover_defs.hpp \
 replication.hpp \
 impl/sequential_getter.hpp \
@@ -76,6 +77,7 @@ realm_nmmintrin.h \
 importer.hpp \
 version.hpp \
 unicode.hpp \
+history.hpp \
 commit_log.hpp \
 link_view_fwd.hpp \
 link_view.hpp \
@@ -156,6 +158,7 @@ exceptions.cpp \
 group.cpp \
 group_shared.cpp \
 group_writer.cpp \
+impl/continuous_transactions_history.cpp \
 impl/output_stream.cpp \
 impl/transact_log.cpp \
 impl/simulated_failure.cpp \
@@ -174,6 +177,7 @@ utilities.cpp \
 version.cpp \
 views.cpp \
 replication.cpp \
+history.cpp \
 commit_log.cpp \
 disable_sync_to_disk.cpp
 

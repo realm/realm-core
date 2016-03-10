@@ -393,7 +393,7 @@ public:
         OwnersOperPtr temp_owners_ptr;
         OwnersOperPtr* owners_ptr_ptr = &owners_ptr;
         void* addr = owners_ptr.get();
-        size_t size_2;
+        size_t size_2; // The number of allocated bytes
         if (REALM_LIKELY(addr)) {
             // Two operations of a single type are generally not allowed to
             // overlap in time, but in the case of post operations, they
@@ -422,7 +422,7 @@ public:
         }
         LendersOperPtr lenders_ptr;
         try {
-            lenders_ptr.reset((*constr)(addr, size, cookie)); // Throws
+            lenders_ptr.reset((*constr)(addr, size_2, cookie)); // Throws
         }
         catch (...) {
             new (addr) UnusedOper(size); // Does not throw

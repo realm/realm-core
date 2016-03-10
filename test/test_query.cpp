@@ -50,93 +50,93 @@ using namespace realm::test_util;
 
 namespace {
 
-    REALM_TABLE_2(TwoIntTable,
-        first, Int,
-        second, Int)
+REALM_TABLE_2(TwoIntTable,
+              first, Int,
+              second, Int)
 
-        REALM_TABLE_1(SingleStringTable,
-        first, String)
+REALM_TABLE_1(SingleStringTable,
+              first, String)
 
-        REALM_TABLE_3(TripleTable,
-        first, String,
-        second, String,
-        third, Int)
+REALM_TABLE_3(TripleTable,
+              first, String,
+              second, String,
+              third, Int)
 
-        REALM_TABLE_1(OneIntTable,
-        first, Int)
+REALM_TABLE_1(OneIntTable,
+              first, Int)
 
-        REALM_TABLE_2(TupleTableType,
-        first, Int,
-        second, String)
+REALM_TABLE_2(TupleTableType,
+              first, Int,
+              second, String)
 
-        REALM_TABLE_5(DateIntStringFloatDouble,
-        first, Int,
-        second, String,
-        third, DateTime,
-        fourth, Float,
-        fifth, Double)
+REALM_TABLE_5(DateIntStringFloatDouble,
+              first, Int,
+              second, String,
+              third, DateTime,
+              fourth, Float,
+              fifth, Double)
 
-        REALM_TABLE_2(TupleTableTypeBin,
-        first, Int,
-        second, Binary)
+REALM_TABLE_2(TupleTableTypeBin,
+              first, Int,
+              second, Binary)
 
-        REALM_TABLE_2(BoolTupleTable,
-        first, Int,
-        second, Bool)
+REALM_TABLE_2(BoolTupleTable,
+              first, Int,
+              second, Bool)
 
-        REALM_TABLE_5(PeopleTable,
-        name, String,
-        age, Int,
-        male, Bool,
-        hired, DateTime,
-        photo, Binary)
+REALM_TABLE_5(PeopleTable,
+              name, String,
+              age, Int,
+              male, Bool,
+              hired, DateTime,
+              photo, Binary)
 
-        REALM_TABLE_2(FloatTable,
-        col_float, Float,
-        col_double, Double)
+REALM_TABLE_2(FloatTable,
+              col_float, Float,
+              col_double, Double)
 
-        REALM_TABLE_3(FloatTable3,
-        col_float, Float,
-        col_double, Double,
-        col_int, Int)
+REALM_TABLE_3(FloatTable3,
+              col_float, Float,
+              col_double, Double,
+              col_int, Int)
 
-        REALM_TABLE_3(PHPMinimumCrash,
-        firstname, String,
-        lastname, String,
-        salary, Int)
+REALM_TABLE_3(PHPMinimumCrash,
+              firstname, String,
+              lastname, String,
+              salary, Int)
 
-        REALM_TABLE_3(TableViewSum,
-        col_float, Float,
-        col_double, Double,
-        col_int, Int)
+REALM_TABLE_3(TableViewSum,
+              col_float, Float,
+              col_double, Double,
+              col_int, Int)
 
-        REALM_TABLE_5(GATable,
-        user_id, String,
-        country, String,
-        build, String,
-        event_1, Int,
-        event_2, Int)
+REALM_TABLE_5(GATable,
+              user_id, String,
+              country, String,
+              build, String,
+              event_1, Int,
+              event_2, Int)
 
-        REALM_TABLE_2(PeopleTable2,
-        name, String,
-        age, Int)
+REALM_TABLE_2(PeopleTable2,
+              name, String,
+              age, Int)
 
-        REALM_TABLE_5(ThreeColTable,
-        first, Int,
-        second, Float,
-        third, Double,
-        fourth, Bool,
-        fifth, String)
+REALM_TABLE_5(ThreeColTable,
+              first, Int,
+              second, Float,
+              third, Double,
+              fourth, Bool,
+              fifth, String)
 
-        REALM_TABLE_3(Books,
-        title, String,
-        author, String,
-        pages, Int)
+REALM_TABLE_3(Books,
+              title, String,
+              author, String,
+              pages, Int)
 
-        REALM_TABLE_3(Types,
-        ints, Int,
-        strings, String,
-        doubles, Double)
+REALM_TABLE_3(Types,
+              ints, Int,
+              strings, String,
+              doubles, Double)
 
 } // anonymous namespace
 
@@ -5356,15 +5356,15 @@ TEST(Query_Const)
 
 namespace {
 
-    REALM_TABLE_2(PhoneTable,
-        type, String,
-        number, String)
+REALM_TABLE_2(PhoneTable,
+              type, String,
+              number, String)
 
-        REALM_TABLE_4(EmployeeTable,
-        name, String,
-        age, Int,
-        hired, Bool,
-        phones, Subtable<PhoneTable>)
+REALM_TABLE_4(EmployeeTable,
+              name, String,
+              age, Int,
+              hired, Bool,
+              phones, Subtable<PhoneTable>)
 
 } // anonymous namespace
 
@@ -5507,21 +5507,25 @@ TEST(Query_AggregateSortedView)
     CHECK_APPROXIMATELY_EQUAL((count + 1) * count / 2, tv.sum_double(0), .1);
 }
 
-namespace {
-    REALM_TABLE_1(TestQuerySub,
-        age, Int)
 
-        REALM_TABLE_9(TestQueryAllTypes,
-        bool_col, Bool,
-        int_col, Int,
-        float_col, Float,
-        double_col, Double,
-        string_col, String,
-        binary_col, Binary,
-        date_col, DateTime,
-        table_col, Subtable<TestQuerySub>,
-        mixed_col, Mixed)
-}
+namespace {
+
+REALM_TABLE_1(TestQuerySub,
+              age, Int)
+
+REALM_TABLE_9(TestQueryAllTypes,
+              bool_col, Bool,
+              int_col, Int,
+              float_col, Float,
+              double_col, Double,
+              string_col, String,
+              binary_col, Binary,
+              date_col, DateTime,
+              table_col, Subtable<TestQuerySub>,
+              mixed_col, Mixed)
+
+} // unnamed namespace
+
 
 TEST(Query_AllTypesStaticallyTyped)
 {
@@ -8401,9 +8405,15 @@ TEST(Query_ReferDeletedLinkView)
     // TableView that depends on LinkView soon to be deleted
     TableView tv_sorted = links->get_sorted_view(1);
 
+    // First test depends_on_deleted_linklist()
+    CHECK(!tv_sorted.depends_on_deleted_linklist());
+    TableView tv2 = table->where(&tv).find_all();
+    CHECK(!tv2.depends_on_deleted_linklist());
+
     // Delete LinkList so LinkView gets detached
     table->move_last_over(0);
     CHECK(!links->is_attached());
+    CHECK(tv_sorted.depends_on_deleted_linklist());
 
     // See if "Query that depends on LinkView" returns sane "empty"-like values
     CHECK_EQUAL(q.find_all().size(), 0);

@@ -24,10 +24,10 @@ static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 
 #include "fuzz_group.hpp"
 #include "test.hpp"
-#include "crypt_key.hpp"
 
 using namespace realm;
 using namespace realm::util;
+using namespace realm::test_util;
 
 extern uint64_t unit_test_random_seed;
 
@@ -91,29 +91,65 @@ TEST(Group_UnattachedErrorHandling)
 {
     Group group((Group::unattached_tag()));
 
-    // FIXME: Uncomment the two commented lines below once #935 is fixed.
-
-//  CHECK_LOGIC_ERROR(group.is_empty(),                              LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.size(),                                  LogicError::detached_accessor);
-//  CHECK_LOGIC_ERROR(group.find_table("foo"),                       LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table(0),                            LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table("foo"),                        LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table("foo", false),                 LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(0),            LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>("foo"),        LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table<TestTableGroup>("foo", false), LogicError::detached_accessor);
+    CHECK_EQUAL(false, group.is_empty());
+    CHECK_EQUAL(0, group.size());
+    CHECK_EQUAL(0, group.find_table("foo"));
+    CHECK_LOGIC_ERROR(group.get_table(0),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table("foo"),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo", false),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.insert_table(0, "foo", false),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(0),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>("foo"),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table<TestTableGroup>("foo", false),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.insert_table<TestTableGroup>(0, "foo", false),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.remove_table("foo"),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.remove_table(0),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.rename_table(0, "bar", false),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.move_table(0,1),
+                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.commit(),
+                      LogicError::detached_accessor);
 
     {
-        const auto& const_group = group;
-        CHECK_LOGIC_ERROR(const_group.get_table(0),                 LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(const_group.get_table("foo"),             LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(const_group.get_table<TestTableGroup>(0), LogicError::detached_accessor);
+        const Group& const_group = group;
+        CHECK_LOGIC_ERROR(const_group.get_table(0),
+                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table("foo"),
+                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table<TestTableGroup>(0),
+                          LogicError::detached_accessor);
     }
 
     {
         bool f = false;
-        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f),                 LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_add_table<TestTableGroup>("foo", &f), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f),
+                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_insert_table(0, "foo", &f),
+                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_add_table<TestTableGroup>("foo", &f),
+                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_insert_table<TestTableGroup>(0, "foo", &f),
+                          LogicError::detached_accessor);
+    }
+    {
+        std::ostringstream out;
+        size_t link_depth = 0;
+        std::map<std::string, std::string> renames;
+        CHECK_LOGIC_ERROR(group.to_json(out, link_depth, &renames),
+                          LogicError::detached_accessor);
     }
 }
 
@@ -2347,7 +2383,7 @@ TEST(Group_Fuzzy)
                 char c = static_cast<char>(fastrand());
                 instr += c;
                 std::string tmp;
-                test_util::unit_test::to_string(static_cast<int>(c), tmp);
+                unit_test::to_string(static_cast<int>(c), tmp);
                 fastlog += tmp;
                 if (t + 1 < instructions) {
                     fastlog += ", ";
@@ -2416,6 +2452,22 @@ TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
 
     // Triggers "alloc.hpp:213: Assertion failed: v % 8 == 0"
     g.verify();
+}
+
+
+TEST(Group_WriteEmpty)
+{
+    GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
+    {
+        Group group;
+        group.write(path_2);
+    }
+    File::remove(path_2);
+    {
+        Group group(path_1, 0, Group::mode_ReadWrite);
+        group.write(path_2);
+    }
 }
 
 

@@ -65,11 +65,16 @@ public:
     void add(size_t target_row_ndx);
     void insert(size_t link_ndx, size_t target_row_ndx);
     void set(size_t link_ndx, size_t target_row_ndx);
-    /// Moves the link currently at `old_link_ndx` to `new_link_ndx`,
-    /// such that after the move, `get(new_link_ndx)` returns what
-    /// `get(old_link_ndx)` would have returned before the move.
-    /// The relative order of all other links in the list is preserved.
-    void move(size_t old_link_ndx, size_t new_link_ndx);
+    /// Move the link at \a from_ndx such that it ends up at \a to_ndx. Other
+    /// links are shifted as necessary in such a way that their order is
+    /// preserved.
+    ///
+    /// Note that \a to_ndx is the desired final index of the moved link,
+    /// therefore, `move(1,1)` is a no-op, while `move(1,2)` moves the link at
+    /// index 1 by one position, such that it ends up at index 2. A side-effect
+    /// of that, is that the link, that was originally at index 2, is moved to
+    /// index 1.
+    void move(size_t from_ndx, size_t to_ndx);
     void swap(size_t link1_ndx, size_t link2_ndx);
     void remove(size_t link_ndx);
     void clear();
