@@ -176,7 +176,7 @@ void InterprocessCondVar::init_shared_part(SharedPart& shared_part) {
 //          = (wait_counter - signal_counter)
 // - holds at the point of entry/exit from the critical section.
 
-void InterprocessCondVar::wait(EmulatedRobustMutex& m, const struct timespec* tp)
+void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
 {
     // precondition: Caller holds the mutex ensuring exclusive access to variables
     // in the shared part.
