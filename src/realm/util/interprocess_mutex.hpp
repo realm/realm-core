@@ -132,7 +132,6 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
 inline void InterprocessMutex::release_shared_part()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-// FIXME: Validate if this triggers a bug on windows
     File::try_remove(m_filename);
 #else
     m_shared_part->~RobustMutex();
@@ -143,13 +142,9 @@ inline void InterprocessMutex::release_shared_part()
 inline void InterprocessMutex::lock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    m_local_mutex.lock();
-    try {
-        m_file.lock_exclusive();
-    } catch (...) {
-        m_local_mutex.unlock();
-        throw;
-    }
+    std::unique_lock lock(m_local_mutex);
+    m_file.lock_exclusive();
+    lock.release();
 #else
     REALM_ASSERT(m_shared_part);
     m_shared_part->lock([](){});

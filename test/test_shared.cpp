@@ -2106,8 +2106,6 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #if !defined(_WIN32)
 
 
-// Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
-
 
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
