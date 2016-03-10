@@ -59,7 +59,7 @@ set(REALM_SOURCES
     disable_sync_to_disk.cpp
 ) # REALM_SOURCES
 
-set(REALM_HEADERS
+set(REALM_INSTALL_HEADERS
     util/features.h
     util/meta.hpp
     util/inspect.hpp
@@ -102,10 +102,6 @@ set(REALM_HEADERS
     column_type.hpp
     column_fwd.hpp
     spec.hpp
-    impl/array_writer.hpp
-    impl/destroy_guard.hpp
-    impl/output_stream.hpp
-    impl/simulated_failure.hpp
     datetime.hpp
     string_data.hpp
     impl/input_stream.hpp
@@ -129,7 +125,6 @@ set(REALM_HEADERS
     history.hpp
     handover_defs.hpp
     replication.hpp
-    impl/sequential_getter.hpp
     query.hpp
     query_conditions.hpp
     lang_bind_helper.hpp
@@ -165,22 +160,32 @@ set(REALM_HEADERS
     index_string.hpp
     query_engine.hpp
     query_expression.hpp
-) # REALM_HEADERS
+) # REALM_INSTALL_HEADERS
 
-add_library(realm ${REALM_SOURCES} ${REALM_HEADERS})
+add_library(realm ${REALM_SOURCES})
 set_target_properties(realm PROPERTIES SOVERSION "9.0.0")
 target_link_libraries(realm ${REALM_EXTRA_LIBS})
 target_link_libraries(realm Threads::Threads)
+install(TARGETS realm
+        DESTINATION lib)
+install(FILES ${REALM_INSTALL_HEADERS}
+        DESTINATION include)
 
 if(REALM_ENABLE_ENCRYPTION)
     target_link_libraries(realm ${OPENSSL_LIBRARIES})
 endif(REALM_ENABLE_ENCRYPTION)
 
 add_executable(realm-config config_tool.cpp)
+install(TARGETS realm-config
+        DESTINATION bin)
 
 add_executable(realm-importer importer_tool.cpp)
 target_link_libraries(realm-importer realm ${REALM_EXTRA_LIBS})
+install(TARGETS realm-importer
+        DESTINATION bin)
 
 add_executable(realmd realmd.cpp)
 target_link_libraries(realmd realm ${REALM_EXTRA_LIBS})
+install(TARGETS realmd
+        DESTINATION bin)
 
