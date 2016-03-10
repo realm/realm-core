@@ -157,7 +157,7 @@ protected:
 
     // The header:
     struct CommitLogHeader {
-        // shared part of lock:
+
         RobustMutex::SharedPart shared_part_of_lock;
 
         // selector:

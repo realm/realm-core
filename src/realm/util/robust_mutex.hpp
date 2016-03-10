@@ -55,7 +55,7 @@ public:
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     struct SharedPart { };
 #else
-    using SharedPart = PosixRobustMutex;
+    using SharedPart = RobustMutex;
 #endif
 
     /// You need to bind the emulation to a SharedPart in shared/mmapped memory.
@@ -81,7 +81,7 @@ public:
 #ifdef REALM_ROBUST_MUTEX_EMULATION
         return true;  // we're faking it!
 #else
-        return PosixRobustMutex::is_robust_on_this_platform();
+        return RobustMutex::is_robust_on_this_platform();
 #endif
     }
 private:

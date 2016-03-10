@@ -121,7 +121,7 @@ struct SharedWithEmulated {
 };
 
 struct Robust {
-    PosixRobustMutex m_mutex;
+    RobustMutex m_mutex;
     bool m_recover_called;
 
     void simulate_death()
@@ -146,7 +146,7 @@ struct Robust {
     void recover_throw()
     {
         m_recover_called = true;
-        throw PosixRobustMutex::NotRecoverable();
+        throw RobustMutex::NotRecoverable();
     }
 };
 
@@ -316,7 +316,7 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
-    if (!PosixRobustMutex::is_robust_on_this_platform())
+    if (!RobustMutex::is_robust_on_this_platform())
         return;
 
     Robust robust;
@@ -364,17 +364,17 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
     CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)),
-                PosixRobustMutex::NotRecoverable);
+                RobustMutex::NotRecoverable);
     CHECK(robust.m_recover_called);
 
     // Check that successive attempts at locking will throw
     robust.m_recover_called = false;
     CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                PosixRobustMutex::NotRecoverable);
+                RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
     CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                PosixRobustMutex::NotRecoverable);
+                RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
 }
 
@@ -383,7 +383,7 @@ TEST_IF(Thread_DeathDuringRecovery, TEST_THREAD_ROBUSTNESS)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
-    if (!PosixRobustMutex::is_robust_on_this_platform())
+    if (!RobustMutex::is_robust_on_this_platform())
         return;
 
     // This test checks that death during recovery causes a robust
