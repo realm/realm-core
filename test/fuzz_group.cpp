@@ -79,8 +79,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     const size_t max_rows = 100000;
 
     using realm::test_util::crypt_key;
-    SharedGroup sg_r(path, false, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(path, false, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
     ReadTransaction rt(sg_r);
     WriteTransaction wt(sg_w);
@@ -104,8 +107,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 pritable_key = std::string("\"") + key + "\"";
             }
 
-            *log << "SharedGroup sg_r(" << path << ", false, SharedGroup::durability_Full, " << pritable_key << ");\n";
-            *log << "SharedGroup sg_w(" << path << ", false, SharedGroup::durability_Full, " << pritable_key << ");\n";
+            *log << "std::unique_ptr<ClientHistory> hist_r(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
+            *log << "std::unique_ptr<ClientHistory> hist_w(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
+
+            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << pritable_key << ");\n";
+            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << pritable_key << ");\n";
 
             *log << "ReadTransaction rt(sg_r);\n";
             *log << "WriteTransaction wt(sg_w);\n";
@@ -456,11 +462,14 @@ int run_fuzzy(int argc, const char* argv[])
 
     std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
     if (!in.is_open()) {
-        fprintf(stderr, "Could not open file for reading: %s\n", argv[1]);
+        fprintf(stderr, "Could not open file for reading: %s\n", argv[file_arg]);
         exit(1);
     }
 
-    realm::test_util::SharedGroupTestPathGuard path("fuzz.realm.path");
+    disable_sync_to_disk();
+    std::string unique_path = std::string("fuzz.realm.") + argv[file_arg];
+    std::replace(unique_path.begin(), unique_path.end(), '/', '.');
+    realm::test_util::SharedGroupTestPathGuard path(unique_path);
 
     try {
         if (log) {
