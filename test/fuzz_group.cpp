@@ -107,8 +107,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 pritable_key = std::string("\"") + key + "\"";
             }
 
-            *log << "std::unique_ptr<ClientHistory> hist_r(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
-            *log << "std::unique_ptr<ClientHistory> hist_w(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
+            *log << "std::unique_ptr<Replication> hist_r(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
+            *log << "std::unique_ptr<Replication> hist_w(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
 
             *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << pritable_key << ");\n";
             *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << pritable_key << ");\n";
