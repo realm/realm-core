@@ -27,10 +27,11 @@ endif()
 
 configure_file(
     ${CMAKE_SOURCE_DIR}/src/realm/util/config.h.in
-    ${CMAKE_SOURCE_DIR}/src/realm/util/config.h
+    ${CMAKE_CURRENT_BINARY_DIR}/src/realm/util/config.h
 )
 
 include_directories(src)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
 
 add_subdirectory(src/realm)
 add_subdirectory(test)
