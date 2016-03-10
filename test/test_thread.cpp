@@ -17,7 +17,7 @@
 #ifndef _WIN32
 #include <realm/util/interprocess_condvar.hpp>
 #endif
-#include <realm/util/robust_mutex.hpp>
+#include <realm/util/emulated_robust_mutex.hpp>
 
 #include "test.hpp"
 
@@ -90,8 +90,8 @@ struct Shared {
 };
 
 struct SharedWithEmulated {
-    RobustMutex m_mutex;
-    RobustMutex::SharedPart m_shared_part;
+    EmulatedRobustMutex m_mutex;
+    EmulatedRobustMutex::SharedPart m_shared_part;
     int m_value;
 
     SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
@@ -101,7 +101,7 @@ struct SharedWithEmulated {
     void increment_10000_times()
     {
         for (int i=0; i<10000; ++i) {
-            std::lock_guard<RobustMutex> lock(m_mutex);
+            std::lock_guard<EmulatedRobustMutex> lock(m_mutex);
             ++m_value;
         }
     }
@@ -109,7 +109,7 @@ struct SharedWithEmulated {
     void increment_10000_times2()
     {
         for (int i=0; i<10000; ++i) {
-            std::lock_guard<RobustMutex> lock(m_mutex);
+            std::lock_guard<EmulatedRobustMutex> lock(m_mutex);
             // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
             double f = m_value;
@@ -485,12 +485,12 @@ namespace {
 
 static int signals;
 
-void signaller(RobustMutex* mutex, InterprocessCondVar* cv)
+void signaller(EmulatedRobustMutex* mutex, InterprocessCondVar* cv)
 {
     millisleep(1000);
     signals = 1;
     {
-        std::lock_guard<RobustMutex> l(*mutex);
+        std::lock_guard<EmulatedRobustMutex> l(*mutex);
         // wakeup any waiters
         cv->notify_all();
     }
@@ -498,14 +498,14 @@ void signaller(RobustMutex* mutex, InterprocessCondVar* cv)
     millisleep(1000);
     signals = 2;
     {
-        std::lock_guard<RobustMutex> l(*mutex);
+        std::lock_guard<EmulatedRobustMutex> l(*mutex);
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
     millisleep(1000);
     signals = 3;
     {
-        std::lock_guard<RobustMutex> l(*mutex);
+        std::lock_guard<EmulatedRobustMutex> l(*mutex);
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
@@ -514,40 +514,30 @@ void signaller(RobustMutex* mutex, InterprocessCondVar* cv)
 }
 
 static int signal_state;
-void wakeup_signaller(RobustMutex* mutex, InterprocessCondVar* cv)
+void wakeup_signaller(EmulatedRobustMutex* mutex, InterprocessCondVar* cv)
 {
     millisleep(1000);
     signal_state = 2;
-    std::lock_guard<RobustMutex> l(*mutex);
+    std::lock_guard<EmulatedRobustMutex> l(*mutex);
     cv->notify_all();
 }
 
 static int wait_counter;
-void waiter_with_count(RobustMutex* mutex, InterprocessCondVar* cv)
+
+void waiter_with_count(EmulatedRobustMutex* mutex, InterprocessCondVar* cv)
 {
-    std::lock_guard<RobustMutex> l(*mutex);
+    std::lock_guard<EmulatedRobustMutex> l(*mutex);
     ++wait_counter;
     cv->wait(*mutex, nullptr);
     --wait_counter;
 }
 
-void waiter(RobustMutex* mutex, InterprocessCondVar* cv)
+void waiter(EmulatedRobustMutex* mutex, InterprocessCondVar* cv)
 {
-    std::lock_guard<RobustMutex> l(*mutex);
+    std::lock_guard<EmulatedRobustMutex> l(*mutex);
     cv->wait(*mutex, nullptr);
 }
 
-/* no use for this yet.
-
-void burst_signaller(RobustMutex* mutex, InterprocessCondVar* cv)
-{
-    millisleep(1000);
-    std::lock_guard<RobustMutex> l(*mutex);
-    for (int i=0; i<100; ++i) {
-        cv->notify_all();
-    }
-}
-*/
 }
 
 // Verify, that a wait on a condition variable actually waits
@@ -555,8 +545,8 @@ void burst_signaller(RobustMutex* mutex, InterprocessCondVar* cv)
 //   may not hold on a heavily loaded system.
 TEST(Thread_CondvarWaits)
 {
-    RobustMutex mutex;
-    RobustMutex::SharedPart mutex_part;
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     mutex.set_shared_part(mutex_part, "Thread_CondvarWaits", "");
@@ -566,7 +556,7 @@ TEST(Thread_CondvarWaits)
     signals = 0;
     signal_thread.start(std::bind(signaller, &mutex, &changed));
     {
-        std::lock_guard<RobustMutex> l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         changed.wait(mutex, nullptr);
         CHECK_EQUAL(signals, 1);
         changed.wait(mutex, nullptr);
@@ -582,8 +572,8 @@ TEST(Thread_CondvarWaits)
 // is waiting on it
 TEST(Thread_CondvarIsStateless)
 {
-    RobustMutex mutex;
-    RobustMutex::SharedPart mutex_part;
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
@@ -593,7 +583,7 @@ TEST(Thread_CondvarIsStateless)
     signal_state = 1;
     // send some signals:
     {
-        std::lock_guard<RobustMutex> l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         for (int i=0; i<10; ++i)
             changed.notify_all();
     }
@@ -603,7 +593,7 @@ TEST(Thread_CondvarIsStateless)
     // Wait for a signal - the signals sent above should be lost, so
     // that this wait will actually wait for the thread to signal.
     {
-        std::lock_guard<RobustMutex> l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         changed.wait(mutex,0);
         CHECK_EQUAL(signal_state, 2);
     }
@@ -615,8 +605,8 @@ TEST(Thread_CondvarIsStateless)
 // this test hangs, if timeout doesn't work.
 TEST(Thread_CondvarTimeout)
 {
-    RobustMutex mutex;
-    RobustMutex::SharedPart mutex_part;
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
@@ -626,7 +616,7 @@ TEST(Thread_CondvarTimeout)
     time.tv_sec = 0;
     time.tv_nsec = 100000000; // 0.1 sec
     {
-        std::lock_guard<RobustMutex> l(mutex);
+        std::lock_guard<EmulatedRobustMutex> l(mutex);
         for (int i=0; i<5; ++i)
             changed.wait(mutex, &time);
     }
@@ -638,8 +628,8 @@ TEST(Thread_CondvarTimeout)
 // are many waiters:
 TEST(Thread_CondvarNotifyAllWakeup)
 {
-    RobustMutex mutex;
-    RobustMutex::SharedPart mutex_part;
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
@@ -664,8 +654,8 @@ TEST(Thread_CondvarNotifyAllWakeup)
 TEST(Thread_CondvarNotifyWakeup)
 {
     wait_counter = 0;
-    RobustMutex mutex;
-    RobustMutex::SharedPart mutex_part;
+    EmulatedRobustMutex mutex;
+    EmulatedRobustMutex::SharedPart mutex_part;
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);

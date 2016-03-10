@@ -18,8 +18,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_UTIL_ROBUST_MUTEX
-#define REALM_UTIL_ROBUST_MUTEX
+#ifndef REALM_UTIL_EMULATED_ROBUST_MUTEX
+#define REALM_UTIL_EMULATED_ROBUST_MUTEX
 
 // Enable this only on platforms where it might be needed
 // currently APPLE.
@@ -47,10 +47,10 @@ class InterprocessCondVar;
 /// participants that they have been granted a lock after a crash of
 /// the process holding it (though it could be added if needed).
 
-class RobustMutex {
+class EmulatedRobustMutex {
 public:
-    RobustMutex();
-    ~RobustMutex() noexcept;
+    EmulatedRobustMutex();
+    ~EmulatedRobustMutex() noexcept;
 
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     struct SharedPart { };
@@ -96,11 +96,11 @@ private:
 };
 
 
-inline RobustMutex::RobustMutex()
+inline EmulatedRobustMutex::EmulatedRobustMutex()
 {
 }
 
-inline RobustMutex::~RobustMutex() noexcept
+inline EmulatedRobustMutex::~EmulatedRobustMutex() noexcept
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     m_local_mutex.lock();
@@ -109,7 +109,7 @@ inline RobustMutex::~RobustMutex() noexcept
 #endif
 }
 
-inline void RobustMutex::set_shared_part(SharedPart& shared_part,
+inline void EmulatedRobustMutex::set_shared_part(SharedPart& shared_part,
                                                  std::string path,
                                                  std::string mutex_name)
 {
@@ -129,7 +129,7 @@ inline void RobustMutex::set_shared_part(SharedPart& shared_part,
 #endif
 }
 
-inline void RobustMutex::release_shared_part()
+inline void EmulatedRobustMutex::release_shared_part()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
 // FIXME: Validate if this triggers a bug on windows
@@ -140,7 +140,7 @@ inline void RobustMutex::release_shared_part()
 #endif
 }
 
-inline void RobustMutex::lock()
+inline void EmulatedRobustMutex::lock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     m_local_mutex.lock();
@@ -157,7 +157,7 @@ inline void RobustMutex::lock()
 }
 
 
-inline void RobustMutex::unlock()
+inline void EmulatedRobustMutex::unlock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     m_file.unlock();
@@ -169,7 +169,7 @@ inline void RobustMutex::unlock()
 }
 
 
-inline bool RobustMutex::is_valid() noexcept
+inline bool EmulatedRobustMutex::is_valid() noexcept
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     return true;
@@ -183,4 +183,4 @@ inline bool RobustMutex::is_valid() noexcept
 } // namespace util
 } // namespace realm
 
-#endif // #ifndef REALM_UTIL_ROBUST_MUTEX
+#endif // #ifndef REALM_UTIL_EMULATED_ROBUST_MUTEX

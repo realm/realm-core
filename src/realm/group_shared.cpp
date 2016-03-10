@@ -460,11 +460,11 @@ struct SharedGroup::SharedInfo {
 
     uint64_t number_of_versions; // Offset 32
 
-    RobustMutex::SharedPart shared_writemutex;
+    EmulatedRobustMutex::SharedPart shared_writemutex;
 #ifdef REALM_ASYNC_DAEMON
-    RobustMutex::SharedPart shared_balancemutex;
+    EmulatedRobustMutex::SharedPart shared_balancemutex;
 #endif
-    RobustMutex::SharedPart shared_controlmutex;
+    EmulatedRobustMutex::SharedPart shared_controlmutex;
 #ifndef _WIN32
     // FIXME: windows pthread support for condvar not ready
     InterprocessCondVar::SharedPart room_to_write;
@@ -561,7 +561,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
                   offsetof(SharedInfo, number_of_versions) == 32 &&
                   std::is_same<decltype(number_of_versions), uint64_t>::value &&
                   offsetof(SharedInfo, shared_writemutex) == 40 &&
-                  std::is_same<decltype(shared_writemutex), RobustMutex::SharedPart>::value,
+                  std::is_same<decltype(shared_writemutex), EmulatedRobustMutex::SharedPart>::value,
                   "Caught layout change requiring SharedInfo file format bumping");
 }
 
@@ -853,7 +853,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // - SharedGroup beginning/ending a session
         // - Waiting for and signalling database changes
         {
-            std::lock_guard<RobustMutex> lock(m_controlmutex); // Throws
+            std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex); // Throws
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to later detect concurrent expansion of the ringbuffer.
             m_local_max_entry = info->readers.get_num_entries();
@@ -1077,7 +1077,7 @@ bool SharedGroup::compact()
     }
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<RobustMutex> lock(m_controlmutex); // Throws
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex); // Throws
     if (info->num_participants > 1)
         return false;
 
@@ -1139,7 +1139,7 @@ bool SharedGroup::compact()
 uint_fast64_t SharedGroup::get_number_of_versions()
 {
     SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<RobustMutex> lock(m_controlmutex); // Throws
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
 }
 
@@ -1167,7 +1167,7 @@ void SharedGroup::close() noexcept
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
-        std::lock_guard<RobustMutex> lock(m_controlmutex);
+        std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
 
         if (m_group.m_alloc.is_attached())
             m_group.m_alloc.detach();
@@ -1213,7 +1213,7 @@ bool SharedGroup::has_changed()
 bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<RobustMutex> lock(m_controlmutex);
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
     while (m_read_lock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
         m_new_commit_available.wait(m_controlmutex, 0);
     }
@@ -1223,7 +1223,7 @@ bool SharedGroup::wait_for_change()
 
 void SharedGroup::wait_for_change_release()
 {
-    std::lock_guard<RobustMutex> lock(m_controlmutex);
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = false;
     m_new_commit_available.notify_all();
 }
@@ -1231,7 +1231,7 @@ void SharedGroup::wait_for_change_release()
 
 void SharedGroup::enable_wait_for_change()
 {
-    std::lock_guard<RobustMutex> lock(m_controlmutex);
+    std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
 }
 
@@ -1250,7 +1250,7 @@ void SharedGroup::do_async_commits()
     }
     // we must treat version and version_index the same way:
     {
-        std::lock_guard<RobustMutex> lock(m_controlmutex);
+        std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
         info->free_write_slots = max_write_slots;
         info->daemon_ready = 1;
         m_daemon_becomes_ready.notify_all();
@@ -1271,8 +1271,8 @@ void SharedGroup::do_async_commits()
         ReadLockInfo next_read_lock = m_read_lock;
         {
             // detect if we're the last "client", and if so, shutdown (must be under lock):
-            std::lock_guard<RobustMutex> lock2(m_writemutex);
-            std::lock_guard<RobustMutex> lock(m_controlmutex);
+            std::lock_guard<EmulatedRobustMutex> lock2(m_writemutex);
+            std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
             version_type old_version = next_read_lock.m_version;
             VersionID version_id = VersionID(); // Latest available snapshot
             grab_read_lock(next_read_lock, version_id);
@@ -1811,7 +1811,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.use_next();
     }
     {
-        std::lock_guard<RobustMutex> lock(m_controlmutex);
+        std::lock_guard<EmulatedRobustMutex> lock(m_controlmutex);
         info->number_of_versions = new_version - oldest_version + 1;
         info->latest_version_number = new_version;
 #ifndef _WIN32
