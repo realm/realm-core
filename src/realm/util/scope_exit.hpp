@@ -26,22 +26,30 @@ namespace util {
 template<class H>
 class ScopeExit {
 public:
-    ScopeExit(const H& handler) noexcept(noexcept(H(handler))):
+    explicit ScopeExit(const H& handler) noexcept(noexcept(H(handler))):
         m_handler(handler)
     {
     }
-    ScopeExit(ScopeExit&&) noexcept = default;
+
+    ScopeExit(ScopeExit&& se) noexcept:
+        m_handler(std::move(se.m_handler))
+    {
+        se.m_expired = true;
+    }
+
     ~ScopeExit()
     {
-        m_handler();
+        if (!m_expired)
+            m_handler();
     }
 private:
     H m_handler;
+    bool m_expired = false;
     static_assert(noexcept(m_handler()), "Handler must not throw");
 };
 
 template<class H>
-ScopeExit<H> make_scope_exit(const H& handler)
+ScopeExit<H> make_scope_exit(const H& handler) noexcept(noexcept(ScopeExit<H>(handler)))
 {
     return ScopeExit<H>(handler);
 }
