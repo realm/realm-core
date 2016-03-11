@@ -274,11 +274,11 @@ protected:
 
 WriteLogCollector::WriteLogCollector(const std::string& database_name,
                                      const char* encryption_key):
-    m_log_a(database_name + ".log_a"),
-    m_log_b(database_name + ".log_b")
+    m_log_a(database_name + ".management/log_a"),
+    m_log_b(database_name + ".management/log_b")
 {
     m_database_name = database_name;
-    m_header_name = database_name + ".log";
+    m_header_name = database_name + ".management/log_access";
     m_read_version = 0;
     m_read_offset = 0;
     m_log_a.file.set_encryption_key(encryption_key);

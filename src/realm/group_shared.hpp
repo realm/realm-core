@@ -532,6 +532,7 @@ private:
     bool m_wait_for_change_enabled;
     std::string m_lockfile_path;
     std::string m_db_path;
+    std::string m_coordination_dir;
     const char* m_key;
     TransactStage m_transact_stage;
     util::Mutex m_handover_lock;

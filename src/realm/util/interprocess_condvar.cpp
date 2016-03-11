@@ -85,16 +85,16 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
 
 
 void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, 
-                                              size_t offset_of_condvar)
+                                          std::string condvar_name)
 {
     close();
     uses_emulation = true;
     m_shared_part = &shared_part;
     static_cast<void>(base_path);
-    static_cast<void>(offset_of_condvar);
+    static_cast<void>(condvar_name);
 #ifdef REALM_CONDVAR_EMULATION
 #if !TARGET_OS_TV
-    auto path = base_path + ".cv";
+    auto path = base_path + "." + condvar_name + ".cv";
 
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);

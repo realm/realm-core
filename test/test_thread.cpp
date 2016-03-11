@@ -550,7 +550,7 @@ TEST(Thread_CondvarWaits)
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     mutex.set_shared_part(mutex_part, "Thread_CondvarWaits", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarWaits", 0);
+    changed.set_shared_part(condvar_part, "Thread_CondvarWaits", "");
     changed.init_shared_part(condvar_part);
     Thread signal_thread;
     signals = 0;
@@ -578,7 +578,7 @@ TEST(Thread_CondvarIsStateless)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     mutex.set_shared_part(mutex_part, "Thread_CondvarIsStateless", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarIsStateless", 0);
+    changed.set_shared_part(condvar_part, "Thread_CondvarIsStateless", "");
     Thread signal_thread;
     signal_state = 1;
     // send some signals:
@@ -611,7 +611,7 @@ TEST(Thread_CondvarTimeout)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     mutex.set_shared_part(mutex_part, "Thread_CondvarTimeout", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarTimeout", 0);
+    changed.set_shared_part(condvar_part, "Thread_CondvarTimeout", "");
     struct timespec time;
     time.tv_sec = 0;
     time.tv_nsec = 100000000; // 0.1 sec
@@ -634,7 +634,7 @@ TEST(Thread_CondvarNotifyAllWakeup)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyAllWakeup", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyAllWakeup", 0);
+    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyAllWakeup", "");
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i=0; i<num_waiters; ++i) {
@@ -660,7 +660,7 @@ TEST(Thread_CondvarNotifyWakeup)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyWakeup", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyWakeup", 0);
+    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyWakeup", "");
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i=0; i<num_waiters; ++i) {
