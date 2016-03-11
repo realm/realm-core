@@ -70,15 +70,25 @@ task :check => 'check-release'
 
 desc 'Run tests in debug mode under GDB'
 task 'gdb-debug' => 'build-debug' do
-    Dir.chdir("#{REALM_BUILD_DIR}/test") do
+    Dir.chdir("#{REALM_BUILD_DIR_DEBUG}/test") do
         sh "gdb ./realm-tests"
     end
 end
 
 desc 'Run tests in debug mode under LLDB'
 task 'lldb-debug' => 'build-debug' do
-    Dir.chdir("#{REALM_BUILD_DIR}/test") do
+    Dir.chdir("#{REALM_BUILD_DIR_DEBUG}/test") do
         sh "lldb ./realm-tests"
+    end
+end
+
+desc 'Run coverage test and process output with LCOV'
+task 'lcov' => ['check-cover', :tmpdir] do
+    Dir.chdir("#{REALM_BUILD_DIR_COVER}") do
+        sh "lcov --capture --directory . --output-file #{@tmpdir}/realm.lcov"
+        sh "lcov --extract #{@tmpdir}/realm.lcov '#{REALM_PROJECT_ROOT}/src/*' --output-file #{@tmpdir}/realm-clean.lcov"
+        FileUtils.rm_rf "cover_html"
+        sh "genhtml --prefix #{REALM_PROJECT_ROOT} --output-directory cover_html #{@tmpdir}/realm-clean.lcov"
     end
 end
 

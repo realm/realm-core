@@ -16,6 +16,16 @@ set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node side.")
 set(REALM_ENABLE_ALLOC_SET_ZERO "0" CACHE STRING "Zero all allocations.")
 set(REALM_ENABLE_ENCRYPTION "0" CACHE STRING "Enable encryption.")
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic -DREALM_HAVE_CONFIG")
+if(REALM_COVERAGE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -fno-inline -fno-elide-constructors")
+endif()
+
+if(APPLE)
+    set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
+    set(CMAKE_EXE_LINKER_FLAGS "-framework Foundation")
+endif(APPLE)
+
 check_include_files(malloc.h HAVE_MALLOC_H)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -35,14 +45,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like
 
 add_subdirectory(src/realm)
 add_subdirectory(test)
-
-set(CMAKE_CXX_FLAGS "-Wextra -Wpedantic -DREALM_HAVE_CONFIG" CACHE INTERNAL "")
-
-
-if(APPLE)
-    set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
-    set(CMAKE_EXE_LINKER_FLAGS "-framework Foundation" CACHE INTERNAL "" FORCE)
-endif(APPLE)
 
 include(FindOpenSSL)
 
