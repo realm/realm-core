@@ -18,6 +18,21 @@ namespace {
 
 enum DetachOrder { AttachOrder, RevAttOrder, RandomOrder };
 
+/// Benchmark the (=) operator on rows.
+///
+/// Here it is in pseduocode:
+///
+///     table = new table
+///     table.add_empty_row
+///     rows = replicate(table[0], n)
+///     time {
+///       repeat 10000 times {
+///         repeat 10000 times {
+///           rows[random(n)] = table[0]
+///         }
+///       }
+///     }
+///
 void heap(Timer& timer, BenchmarkResults& results, int n,
           const char* ident, const char* lead_text)
 {
@@ -26,11 +41,17 @@ void heap(Timer& timer, BenchmarkResults& results, int n,
     std::unique_ptr<Row[]> rows(new Row[n]);
     for (int i = 0; i < n; ++i)
         rows[i] = table[0];
+
+    // Generate random numbers before timing because Random is slooow
+    // (thread-safe):
     int m = 10000;
     std::unique_ptr<int[]> indexes(new int[m]);
     Random random;
     for (int i = 0; i < m; ++i)
         indexes[i] = random.draw_int_mod(n);
+    // indexes is not guaranteed to contain all indexes from 0 to n..
+
+    // Now get to business:
     timer.reset();
     for (int j = 0; j < 10000; ++j) {
         for (int i = 0; i < m; ++i)
