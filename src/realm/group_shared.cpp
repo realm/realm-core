@@ -25,6 +25,7 @@
 
 #include <fcntl.h>
 #include <atomic>
+#include <mutex>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
@@ -65,7 +66,8 @@ const uint16_t relaxed_sync_threshold = 50;
 // 4       Unknown
 // 5       Introduction of SharedInfo::file_format_version and
 //         SharedInfo::history_type.
-const uint_fast16_t g_shared_info_version = 5;
+// 6       Using new robust mutex emulation where applicable
+const uint_fast16_t g_shared_info_version = 6;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -459,15 +461,17 @@ struct SharedGroup::SharedInfo {
 
     uint64_t number_of_versions; // Offset 32
 
-    RobustMutex writemutex; // Offset 40
-    RobustMutex balancemutex;
-    RobustMutex controlmutex;
+    InterprocessMutex::SharedPart shared_writemutex;
+#ifdef REALM_ASYNC_DAEMON
+    InterprocessMutex::SharedPart shared_balancemutex;
+#endif
+    InterprocessMutex::SharedPart shared_controlmutex;
 #ifndef _WIN32
     // FIXME: windows pthread support for condvar not ready
-    PlatformSpecificCondVar::SharedPart room_to_write;
-    PlatformSpecificCondVar::SharedPart work_to_do;
-    PlatformSpecificCondVar::SharedPart daemon_becomes_ready;
-    PlatformSpecificCondVar::SharedPart new_commit_available;
+    InterprocessCondVar::SharedPart room_to_write;
+    InterprocessCondVar::SharedPart work_to_do;
+    InterprocessCondVar::SharedPart daemon_becomes_ready;
+    InterprocessCondVar::SharedPart new_commit_available;
 #endif
 
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
@@ -493,27 +497,26 @@ struct SharedGroup::SharedInfo {
 
 
 SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryType hist_type):
+    size_of_mutex(sizeof(shared_writemutex)),
 #ifndef _WIN32
-    size_of_mutex(sizeof writemutex),
-    size_of_condvar(sizeof room_to_write),
-    writemutex(), // Throws
-    balancemutex(), // Throws
-    controlmutex() // Throws
-#else
-    size_of_mutex(sizeof writemutex),
-    size_of_condvar(0),
-    writemutex(), // Throws
-    balancemutex() // Throws
+    size_of_condvar(sizeof(room_to_write)),
 #endif
+    shared_writemutex(), // Throws
+#ifdef REALM_ASYNC_DAEMON
+    shared_balancemutex(), // Throws
+#endif
+    shared_controlmutex() // Throws
 {
     durability = dura; // durability level is fixed from creation
     REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(hist_type+0));
     history_type = hist_type;
 #ifndef _WIN32
-    PlatformSpecificCondVar::init_shared_part(room_to_write); // Throws
-    PlatformSpecificCondVar::init_shared_part(work_to_do); // Throws
-    PlatformSpecificCondVar::init_shared_part(daemon_becomes_ready); // Throws
-    PlatformSpecificCondVar::init_shared_part(new_commit_available); // Throws
+    InterprocessCondVar::init_shared_part(new_commit_available); // Throws
+#ifdef REALM_ASYNC_DAEMON
+    InterprocessCondVar::init_shared_part(room_to_write); // Throws
+    InterprocessCondVar::init_shared_part(work_to_do); // Throws
+    InterprocessCondVar::init_shared_part(daemon_becomes_ready); // Throws
+#endif
 #endif
     daemon_started = 0;
     daemon_ready = 0;
@@ -558,18 +561,14 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
                   std::is_same<decltype(session_initiator_pid), uint64_t>::value &&
                   offsetof(SharedInfo, number_of_versions) == 32 &&
                   std::is_same<decltype(number_of_versions), uint64_t>::value &&
-                  offsetof(SharedInfo, writemutex) == 40 &&
-                  std::is_same<decltype(writemutex), RobustMutex>::value,
+                  offsetof(SharedInfo, shared_writemutex) == 40 &&
+                  std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
                   "Caught layout change requiring SharedInfo file format bumping");
 }
 
 
 namespace {
 
-void recover_from_dead_write_transact()
-{
-    // Nothing needs to be done
-}
 
 #ifdef REALM_ASYNC_DAEMON
 
@@ -702,8 +701,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 #endif
 
     m_db_path = path;
+    m_coordination_dir = path + ".management";
+    try {
+        make_dir(m_coordination_dir);
+    } catch (File::Exists&) {
+    }
     m_key = encryption_key;
-    m_lockfile_path = path + ".lock";
+    m_lockfile_path = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_group.m_alloc;
 
     Replication::HistoryType history_type = Replication::hist_None;
@@ -815,7 +819,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // sizes match, the entire struct matches. The offsets of
         // `size_of_mutex` and `size_of_condvar` are known to be as expected due
         // to the preceeding check in `shared_info_version`.
-        if (info->size_of_mutex != sizeof info->controlmutex)
+        if (info->size_of_mutex != sizeof info->shared_controlmutex)
             throw IncompatibleLockFile();
 #ifndef _WIN32
         if (info->size_of_condvar != sizeof info->room_to_write)
@@ -835,7 +839,16 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // attempt to lock. This cannot be fixed by also unlocking on failure
         // with EOWNERDEAD, because that would mark the mutex as consistent
         // again and prevent us from being notified below.
-        if (!info->controlmutex.is_valid())
+
+        m_writemutex.set_shared_part(info->shared_writemutex,m_lockfile_path,"write");
+#ifdef REALM_ASYNC_DAEMON
+        m_balancemutex.set_shared_part(info->shared_balancemutex,m_lockfile_path,"balance");
+#endif
+        m_controlmutex.set_shared_part(info->shared_controlmutex,m_lockfile_path,"control");
+
+        // even though fields match wrt alignment and size, there may still be incompatibilities
+        // between implementations, so lets ask one of the mutexes if it thinks it'll work.
+        if (!m_controlmutex.is_valid())
             throw IncompatibleLockFile();
 
         // OK! lock file appears valid. We can now continue operations under the protection
@@ -846,7 +859,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // - SharedGroup beginning/ending a session
         // - Waiting for and signalling database changes
         {
-            RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+            std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to later detect concurrent expansion of the ringbuffer.
             m_local_max_entry = info->readers.get_num_entries();
@@ -977,12 +990,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             }
 
 #ifndef _WIN32
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_db_path,0);
-            m_work_to_do.set_shared_part(info->work_to_do,m_db_path,1);
-            m_room_to_write.set_shared_part(info->room_to_write,m_db_path,2);
-            m_new_commit_available.set_shared_part(info->new_commit_available,m_db_path,3);
-
+            m_new_commit_available.set_shared_part(info->new_commit_available,m_lockfile_path,"new_commit");
 #ifdef REALM_ASYNC_DAEMON
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_lockfile_path,"daemon_ready");
+            m_work_to_do.set_shared_part(info->work_to_do,m_lockfile_path,"work_ready");
+            m_room_to_write.set_shared_part(info->room_to_write,m_lockfile_path,"allow_write");
             // In async mode, we need to make sure the daemon is running and ready:
             if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == 0) {
@@ -992,7 +1004,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                     }
                     // FIXME: It might be more robust to sleep a little, then restart the loop
                     // std::cerr << "Waiting for daemon" << std::endl;
-                    m_daemon_becomes_ready.wait(info->controlmutex, &recover_from_dead_write_transact, 0);
+                    m_daemon_becomes_ready.wait(m_controlmutex, 0);
                     // std::cerr << " - notified" << std::endl;
                 }
             }
@@ -1071,7 +1083,7 @@ bool SharedGroup::compact()
     }
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
     SharedInfo* info = m_file_map.get_addr();
-    RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
     if (info->num_participants > 1)
         return false;
 
@@ -1133,7 +1145,7 @@ bool SharedGroup::compact()
 uint_fast64_t SharedGroup::get_number_of_versions()
 {
     SharedInfo* info = m_file_map.get_addr();
-    RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact); // Throws
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
 }
 
@@ -1161,7 +1173,7 @@ void SharedGroup::close() noexcept
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
-        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
 
         if (m_group.m_alloc.is_attached())
             m_group.m_alloc.detach();
@@ -1204,13 +1216,12 @@ bool SharedGroup::has_changed()
 }
 
 #ifndef _WIN32
-#if !REALM_PLATFORM_APPLE
 bool SharedGroup::wait_for_change()
 {
     SharedInfo* info = m_file_map.get_addr();
-    RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     while (m_read_lock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
-        m_new_commit_available.wait(info->controlmutex, &recover_from_dead_write_transact, 0);
+        m_new_commit_available.wait(m_controlmutex, 0);
     }
     return m_read_lock.m_version != info->latest_version_number;
 }
@@ -1218,8 +1229,7 @@ bool SharedGroup::wait_for_change()
 
 void SharedGroup::wait_for_change_release()
 {
-    SharedInfo* info = m_file_map.get_addr();
-    RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = false;
     m_new_commit_available.notify_all();
 }
@@ -1227,12 +1237,11 @@ void SharedGroup::wait_for_change_release()
 
 void SharedGroup::enable_wait_for_change()
 {
-    SharedInfo* info = m_file_map.get_addr();
-    RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+    std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
 }
-#endif // !REALM_PLATFORM_APPLE
 
+#ifdef REALM_ASYNC_DAEMON
 void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
@@ -1247,7 +1256,7 @@ void SharedGroup::do_async_commits()
     }
     // we must treat version and version_index the same way:
     {
-        RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
+        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
         info->free_write_slots = max_write_slots;
         info->daemon_ready = 1;
         m_daemon_becomes_ready.notify_all();
@@ -1268,8 +1277,8 @@ void SharedGroup::do_async_commits()
         ReadLockInfo next_read_lock = m_read_lock;
         {
             // detect if we're the last "client", and if so, shutdown (must be under lock):
-            RobustLockGuard lock2(info->writemutex, &recover_from_dead_write_transact);
-            RobustLockGuard lock(info->controlmutex, &recover_from_dead_write_transact);
+            std::lock_guard<InterprocessMutex> lock2(m_writemutex);
+            std::lock_guard<InterprocessMutex> lock(m_controlmutex);
             version_type old_version = next_read_lock.m_version;
             VersionID version_id = VersionID(); // Latest available snapshot
             grab_read_lock(next_read_lock, version_id);
@@ -1305,7 +1314,7 @@ void SharedGroup::do_async_commits()
         release_read_lock(m_read_lock);
         m_read_lock = next_read_lock;
 
-        info->balancemutex.lock(&recover_from_dead_write_transact);
+        m_balancemutex.lock();
 
         // We have caught up with the writers, let them know that there are
         // now free write slots, wakeup any that has been suspended.
@@ -1330,12 +1339,13 @@ void SharedGroup::do_async_commits()
             }
 
             // no timeout support if the condvars are only emulated, so this will assert
-            m_work_to_do.wait(info->balancemutex, &recover_from_dead_write_transact, &ts);
+            m_work_to_do.wait(m_balancemutex, &ts);
         }
-        info->balancemutex.unlock();
+        m_balancemutex.unlock();
 
     }
 }
+#endif // REALM_ASYNC_DAEMON
 #endif // _WIN32
 
 
@@ -1594,23 +1604,23 @@ void SharedGroup::do_begin_write()
     // Get write lock
     // Note that this will not get released until we call
     // commit() or rollback()
-    info->writemutex.lock(&recover_from_dead_write_transact); // Throws
+    m_writemutex.lock(); // Throws
 
 #ifdef REALM_ASYNC_DAEMON
     if (info->durability == durability_Async) {
 
-        info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
+        m_balancemutex.lock(); // Throws
 
         // if we are running low on write slots, kick the sync daemon
         if (info->free_write_slots < relaxed_sync_threshold)
             m_work_to_do.notify();
         // if we are out of write slots, wait for the sync daemon to catch up
         while (info->free_write_slots <= 0) {
-            m_room_to_write.wait(info->balancemutex, recover_from_dead_write_transact);
+            m_room_to_write.wait(m_balancemutex, 0);
         }
 
         info->free_write_slots--;
-        info->balancemutex.unlock();
+        m_balancemutex.unlock();
     }
 #endif // _WIN32
 }
@@ -1618,8 +1628,7 @@ void SharedGroup::do_begin_write()
 
 void SharedGroup::do_end_write() noexcept
 {
-    SharedInfo* info = m_file_map.get_addr();
-    info->writemutex.unlock();
+    m_writemutex.unlock();
 }
 
 
@@ -1808,7 +1817,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r_info->readers.use_next();
     }
     {
-        RobustLockGuard lock(info->controlmutex, recover_from_dead_write_transact);
+        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
         info->number_of_versions = new_version - oldest_version + 1;
         info->latest_version_number = new_version;
 #ifndef _WIN32

@@ -27,7 +27,10 @@
 #include <limits>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#include <realm/util/platform_specific_condvar.hpp>
+#ifndef _WIN32
+#include <realm/util/interprocess_condvar.hpp>
+#endif
+#include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
@@ -246,7 +249,8 @@ public:
     /// NOTE:
     /// "changed" means that one or more commits has been made to the database
     /// since the SharedGroup (on which wait_for_change() is called) last
-    /// started, committed, promoted or advanced a transaction.
+    /// started, committed, promoted or advanced a transaction. If the SharedGroup
+    /// has not yet begun a transaction, "changed" is undefined.
     ///
     /// No distinction is made between changes done by another process
     /// and changes done by another thread in the same process as the caller.
@@ -254,7 +258,6 @@ public:
     /// Has db been changed ?
     bool has_changed();
 
-#if !REALM_PLATFORM_APPLE
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to wait_for_change_release()
     /// further calls to wait_for_change() will return immediately. To restore
@@ -267,7 +270,6 @@ public:
 
     /// re-enable waiting for change
     void enable_wait_for_change();
-#endif // !REALM_PLATFORM_APPLE
     // Transactions:
 
     using version_type = _impl::History::version_type;
@@ -530,14 +532,18 @@ private:
     bool m_wait_for_change_enabled;
     std::string m_lockfile_path;
     std::string m_db_path;
+    std::string m_coordination_dir;
     const char* m_key;
     TransactStage m_transact_stage;
     util::Mutex m_handover_lock;
+    util::InterprocessMutex m_writemutex;
+    util::InterprocessMutex m_balancemutex;
+    util::InterprocessMutex m_controlmutex;
 #ifndef _WIN32
-    util::PlatformSpecificCondVar m_room_to_write;
-    util::PlatformSpecificCondVar m_work_to_do;
-    util::PlatformSpecificCondVar m_daemon_becomes_ready;
-    util::PlatformSpecificCondVar m_new_commit_available;
+    util::InterprocessCondVar m_room_to_write;
+    util::InterprocessCondVar m_work_to_do;
+    util::InterprocessCondVar m_daemon_becomes_ready;
+    util::InterprocessCondVar m_new_commit_available;
 #endif
 
     void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,

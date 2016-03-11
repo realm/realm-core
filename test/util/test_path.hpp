@@ -125,7 +125,7 @@ public:
     SharedGroupTestPathGuard(const std::string& path);
     std::string get_lock_path() const
     {
-        return m_path + ".lock";
+        return m_path + ".management/access_control";
     }
     ~SharedGroupTestPathGuard() noexcept;
 };
