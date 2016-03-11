@@ -41,6 +41,7 @@ set(CMAKE_CXX_FLAGS "-Wextra -Wpedantic -DREALM_HAVE_CONFIG" CACHE INTERNAL "")
 
 if(APPLE)
     set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
+    set(CMAKE_EXE_LINKER_FLAGS "-framework Foundation" CACHE INTERNAL "" FORCE)
 endif(APPLE)
 
 include(FindOpenSSL)
