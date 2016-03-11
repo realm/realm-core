@@ -215,8 +215,8 @@ inline size_t ChangesetInputStream::next_block(const char*& begin, const char*& 
         if (REALM_UNLIKELY(m_changesets_begin == m_changesets_end)) {
             if (m_begin_version == m_end_version)
                 return 0; // End of input
-            size_t n = sizeof m_changesets / sizeof m_changesets[0];
-            size_t avail = m_end_version - m_begin_version;
+            uint_fast64_t n = sizeof m_changesets / sizeof m_changesets[0];
+            uint_fast64_t avail = m_end_version - m_begin_version;
             if (n > avail)
                 n = avail;
             version_type end_version = m_begin_version + n;
