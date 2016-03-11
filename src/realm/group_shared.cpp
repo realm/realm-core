@@ -66,7 +66,8 @@ const uint16_t relaxed_sync_threshold = 50;
 // 4       Unknown
 // 5       Introduction of SharedInfo::file_format_version and
 //         SharedInfo::history_type.
-const uint_fast16_t g_shared_info_version = 5;
+// 6       Using new robust mutex emulation where applicable
+const uint_fast16_t g_shared_info_version = 6;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
