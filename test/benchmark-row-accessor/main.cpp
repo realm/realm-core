@@ -18,7 +18,8 @@ namespace {
 
 enum DetachOrder { AttachOrder, RevAttOrder, RandomOrder };
 
-void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, const char* lead_text)
+void heap(Timer& timer, BenchmarkResults& results, int n,
+          const char* ident, const char* lead_text)
 {
     Table table;
     table.add_empty_row();
