@@ -216,9 +216,9 @@ inline size_t ChangesetInputStream::next_block(const char*& begin, const char*& 
             if (m_begin_version == m_end_version)
                 return 0; // End of input
             size_t n = sizeof m_changesets / sizeof m_changesets[0];
-            size_t avail = m_end_version - m_begin_version;
+            version_type avail = m_end_version - m_begin_version;
             if (n > avail)
-                n = avail;
+                n = size_t(avail);
             version_type end_version = m_begin_version + n;
             m_history.get_changesets(m_begin_version, end_version, m_changesets);
             m_begin_version = end_version;
