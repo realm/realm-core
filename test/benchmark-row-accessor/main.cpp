@@ -60,6 +60,20 @@ void heap(Timer& timer, BenchmarkResults& results, int n,
     results.submit_single(ident, lead_text, timer);
 }
 
+/// Benchmark the (=) operator on row, while detaching (the same row?).
+///
+/// Here it is in pseduocode:
+///
+///     table = new table
+///     table.add_empty_row
+///     detach_indexes = sort(detach_order, range(balloon_size))
+///     time {
+///       rows = replicate(table[0], ballon_size)
+///       for i in range(ballon_size) {
+///         rows[detach_indexes[i]].detach()
+///       }
+///     }
+///
 void balloon(Timer& timer, BenchmarkResults& results,
              int balloon_size, DetachOrder detach_order,
              const char* ident, const char* lead_text)
