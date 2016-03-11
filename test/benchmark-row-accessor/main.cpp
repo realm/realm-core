@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <stdexcept>
 #include <algorithm>
 #include <iostream>
 
@@ -59,8 +58,6 @@ void balloon(Timer& timer, BenchmarkResults& results,
         case RandomOrder:
             random.shuffle(detach_indexes.get(), detach_indexes.get() + balloon_size);
             break;
-        default:
-            throw std::runtime_error("Bad order specification");
     }
     int n = (100000000L + balloon_size - 1) / balloon_size;
     timer.reset();
