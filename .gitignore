@@ -53,8 +53,6 @@ Static library*/
 *.opensdf
 *.sdf
 
-/realm.xcodeproj/project.xcworkspace
-/realm.xcodeproj/xcuserdata
 *.dSYM
 
 # Ignore KDevelop4 user files
@@ -63,20 +61,9 @@ Static library*/
 # ref doc
 /doc/ref_cpp/html/*
 
-# sh build.sh config
-/src/config.mk
-
-# sh build.sh build-cocoa
-/core-*.zip
-/macosx-lib/
-/ios-lib/
-/watchos-lib/
-/tvos-lib/
-
-# sh build.sh build-android
-/android-lib/
-/openssl/
-core-android-*.tar.gz
+# Rakefile default build dirs
+build.make.*
+build.apple
 
 # debian/ubuntu builds
 /debian/realm/*
