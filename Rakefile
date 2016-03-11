@@ -4,48 +4,62 @@ require 'tmpdir'
 require 'fileutils'
 
 REALM_PROJECT_ROOT            = File.absolute_path(File.dirname(__FILE__))
-REALM_DEFAULT_APPLE_BUILD_DIR = "build.apple"
-REALM_DEFAULT_BUILD_DIR       = "build.make"
+REALM_DEFAULT_BUILD_DIR_APPLE = "build.apple"
+REALM_DEFAULT_BUILD_DIR_STEM  = "build.make"
+REALM_DEFAULT_BUILD_DIR_DEBUG = "#{REALM_DEFAULT_BUILD_DIR_STEM}.debug"
+REALM_DEFAULT_BUILD_DIR_OPTIM = "#{REALM_DEFAULT_BUILD_DIR_STEM}.release"
+REALM_DEFAULT_BUILD_DIR_COVER = "#{REALM_DEFAULT_BUILD_DIR_STEM}.cover"
 
-REALM_APPLE_BUILD_DIR = ENV['build_dir'] || REALM_DEFAULT_APPLE_BUILD_DIR
-REALM_BUILD_DIR       = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR
+REALM_BUILD_DIR_APPLE = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR_APPLE
+REALM_BUILD_DIR_DEBUG = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR_DEBUG
+REALM_BUILD_DIR_OPTIM = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR_OPTIM
+REALM_BUILD_DIR_COVER = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR_COVER
 
-directory REALM_BUILD_DIR
-directory REALM_APPLE_BUILD_DIR unless REALM_APPLE_BUILD_DIR == REALM_BUILD_DIR
+directory REALM_BUILD_DIR_APPLE
 
-desc 'Generate UNIX Makefiles (default dir: \'build.make\')'
-task :generate_makefiles => REALM_BUILD_DIR do
-    options = ENV.select {|k,v| k.start_with?("REALM_")}.map{|k,v| "-D#{k}=#{v}"}.join
+def generate_makefiles(build_dir)
+    options = ENV.select {|k,_| k.start_with?("REALM_") || k.start_with?("CMAKE_") }.map{|k,v| "-D#{k}=#{v}"}.join(' ')
 
-    Dir.chdir(REALM_BUILD_DIR) do
+    Dir.chdir(build_dir) do
         sh "cmake -G\"Unix Makefiles\" #{REALM_PROJECT_ROOT} #{options}"
     end
 end
 
-desc 'Build with default options'
-task :build => :generate_makefiles do
-    Dir.chdir(REALM_BUILD_DIR) do
-        sh "cmake --build ."
+REALM_CONFIGURATIONS = {
+    debug:   ['Debug',   REALM_BUILD_DIR_DEBUG],
+    release: ['Release', REALM_BUILD_DIR_OPTIM],
+    cover:   ['Debug',   REALM_BUILD_DIR_COVER],
+}
+
+REALM_CONFIGURATIONS.each do |configuration, (build_type, dir)|
+    directory dir
+
+    task "config-#{configuration}" => dir do
+        ENV['CMAKE_BUILD_TYPE'] = build_type
+        ENV['REALM_COVERAGE'] = '1' if configuration == :cover
+        generate_makefiles(dir)
+    end
+
+    desc "Build in #{configuration} mode"
+    task "build-#{configuration}" => "config-#{configuration}" do
+        Dir.chdir(dir) do
+            sh "cmake --build ."
+        end
+    end
+
+    desc "Run tests in #{configuration} mode"
+    task "check-#{configuration}" => "build-#{configuration}" do
+        Dir.chdir("#{dir}/test") do
+            sh "./realm-tests"
+        end
     end
 end
 
-desc 'Build in debug mode'
-task 'build-debug' do
-    ENV['REALM_DEBUG'] = '1'
-    Rake::Task[:build].invoke
-end
+desc 'Build debug and release modes'
+task :build => ['build-debug', 'build-release']
 
-desc 'Run tests in current configuration'
-task :check => :build do
-    Dir.chdir("#{REALM_BUILD_DIR}/test") do
-        sh "./realm-tests"
-    end
-end
-
-desc 'Run tests in debug mode'
-task 'check-debug' => 'build-debug' do
-    Rake::Task[:check].execute
-end
+desc 'Run tests in release mode'
+task :check => 'check-release'
 
 desc 'Run tests in debug mode under GDB'
 task 'gdb-debug' => 'build-debug' do
@@ -63,8 +77,10 @@ end
 
 desc 'Forcibly remove all build state'
 task :clean do
-    FileUtils.rm_rf(REALM_BUILD_DIR)
-    FileUtils.rm_rf(REALM_APPLE_BUILD_DIR) unless REALM_APPLE_BUILD_DIR == REALM_BUILD_DIR
+    REALM_CONFIGURATIONS.each do |name, (build_type, dir)|
+        FileUtils.rm_rf(dir)
+    end
+    FileUtils.rm_rf(REALM_BUILD_DIR_APPLE)
 end
 
 task :tmpdir do
@@ -88,14 +104,14 @@ task :check_xcpretty do
 end
 
 desc 'Generate Xcode project (default dir: \'build.apple\')'
-task :xcode_project => [REALM_APPLE_BUILD_DIR, :check_xcpretty] do
-    Dir.chdir(REALM_APPLE_BUILD_DIR) do
+task :xcode_project => [REALM_BUILD_DIR_APPLE, :check_xcpretty] do
+    Dir.chdir(REALM_BUILD_DIR_APPLE) do
         sh "cmake -GXcode #{REALM_PROJECT_ROOT}"
     end
 end
 
 def build_apple(sdk, configuration, enable_bitcode = false)
-    Dir.chdir(REALM_APPLE_BUILD_DIR) do
+    Dir.chdir(REALM_BUILD_DIR_APPLE) do
         bitcode_option = "ENABLE_BITCODE=#{enable_bitcode ? 'YES' : 'NO'}"
         sh "xcodebuild -sdk #{sdk} -target realm -configuration #{configuration} #{bitcode_option} #{@xcpretty_suffix}"
     end
@@ -121,7 +137,7 @@ REALM_COCOA_SUPPORTED_PLATFORMS.each do |platform|
                 bitcode_suffix    = platform == 'macosx' ? '' : (enable_bitcode ? '-bitcode' : '-no-bitcode')
                 dst_target_suffix = configuration == 'Debug'  ? "-dbg" : ''
                 tag = "#{platform}#{bitcode_suffix}"
-                src = "#{REALM_APPLE_BUILD_DIR}/src/realm/#{configuration}#{platform_suffix}/librealm.a"
+                src = "#{REALM_BUILD_DIR_APPLE}/src/realm/#{configuration}#{platform_suffix}/librealm.a"
                 FileUtils.mkdir_p("#{@tmpdir}/core")
                 dst = "#{@tmpdir}/core/librealm#{platform_suffix}#{bitcode_suffix}#{dst_target_suffix}.a"
                 cp(src, dst)
@@ -158,5 +174,7 @@ task :apple_zip => [:apple_static_libraries, :apple_copy_headers, :apple_copy_re
 end
 
 desc 'Build zipped Core library suitable for Cocoa binding'
-task 'build-cocoa' => :apple_zip
+task 'build-cocoa' => :apple_zip do
+    puts "TODO: Unzip in ../realm-cocoa"
+end
 
