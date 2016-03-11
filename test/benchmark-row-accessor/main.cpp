@@ -18,7 +18,7 @@ namespace {
 
 enum DetachOrder { AttachOrder, RevAttOrder, RandomOrder };
 
-/// Benchmark the (=) operator on rows.
+/// Benchmark the (=) operator on row accessors.
 ///
 /// Here it is in pseduocode:
 ///
@@ -60,7 +60,8 @@ void heap(Timer& timer, BenchmarkResults& results, int n,
     results.submit_single(ident, lead_text, timer);
 }
 
-/// Benchmark the (=) operator on row, while detaching (the same row?).
+/// Benchmark the (=) operator on row accessors, while detaching them in
+/// various orders.
 ///
 /// Here it is in pseduocode:
 ///
