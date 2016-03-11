@@ -3,13 +3,6 @@
 require 'tmpdir'
 require 'fileutils'
 
-REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator)
-if ENV['REALM_COCOA_PLATFORMS']
-    REALM_COCOA_PLATFORMS = ENV['REALM_COCOA_PLATFORMS'].split.select {|p| REALM_COCOA_SUPPORTED_PLATFORMS.include?(p) }
-else
-    REALM_COCOA_PLATFORMS = REALM_COCOA_SUPPORTED_PLATFORMS
-end
-
 REALM_PROJECT_ROOT            = File.absolute_path(File.dirname(__FILE__))
 REALM_DEFAULT_APPLE_BUILD_DIR = "build.apple"
 REALM_DEFAULT_BUILD_DIR       = "build.make"
@@ -20,6 +13,7 @@ REALM_BUILD_DIR       = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR
 directory REALM_BUILD_DIR
 directory REALM_APPLE_BUILD_DIR unless REALM_APPLE_BUILD_DIR == REALM_BUILD_DIR
 
+desc 'Generate UNIX Makefiles (default dir: \'build.make\')'
 task :generate_makefiles => REALM_BUILD_DIR do
     options = ENV.select {|k,v| k.start_with?("REALM_")}.map{|k,v| "-D#{k}=#{v}"}.join
 
@@ -28,37 +22,49 @@ task :generate_makefiles => REALM_BUILD_DIR do
     end
 end
 
+desc 'Build with default options'
 task :build => :generate_makefiles do
     Dir.chdir(REALM_BUILD_DIR) do
         sh "cmake --build ."
     end
 end
 
+desc 'Build in debug mode'
 task 'build-debug' do
     ENV['REALM_DEBUG'] = '1'
     Rake::Task[:build].invoke
 end
 
+desc 'Run tests in current configuration'
 task :check => :build do
     Dir.chdir("#{REALM_BUILD_DIR}/test") do
         sh "./realm-tests"
     end
 end
 
+desc 'Run tests in debug mode'
 task 'check-debug' => 'build-debug' do
     Rake::Task[:check].execute
 end
 
+desc 'Run tests in debug mode under GDB'
 task 'gdb-debug' => 'build-debug' do
     Dir.chdir("#{REALM_BUILD_DIR}/test") do
         sh "gdb ./realm-tests"
     end
 end
 
+desc 'Run tests in debug mode under LLDB'
 task 'lldb-debug' => 'build-debug' do
     Dir.chdir("#{REALM_BUILD_DIR}/test") do
         sh "lldb ./realm-tests"
     end
+end
+
+desc 'Forcibly remove all build state'
+task :clean do
+    FileUtils.rm_rf(REALM_BUILD_DIR)
+    FileUtils.rm_rf(REALM_APPLE_BUILD_DIR) unless REALM_APPLE_BUILD_DIR == REALM_BUILD_DIR
 end
 
 task :tmpdir do
@@ -66,11 +72,22 @@ task :tmpdir do
     puts "Using temporary directory: #{@tmpdir}"
 end
 
+
+### Apple-specific tasks
+
+REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator)
+if ENV['REALM_COCOA_PLATFORMS']
+    REALM_COCOA_PLATFORMS = ENV['REALM_COCOA_PLATFORMS'].split.select {|p| REALM_COCOA_SUPPORTED_PLATFORMS.include?(p) }
+else
+    REALM_COCOA_PLATFORMS = REALM_COCOA_SUPPORTED_PLATFORMS
+end
+
 task :check_xcpretty do
     @xcpretty_suffix = `which xcpretty`
     @xcpretty_suffix = "| #{@xcpretty_suffix}" unless @xcpretty_suffix.empty?
 end
 
+desc 'Generate Xcode project (default dir: \'build.apple\')'
 task :xcode_project => [REALM_APPLE_BUILD_DIR, :check_xcpretty] do
     Dir.chdir(REALM_APPLE_BUILD_DIR) do
         sh "cmake -GXcode #{REALM_PROJECT_ROOT}"
@@ -140,5 +157,6 @@ task :apple_zip => [:apple_static_libraries, :apple_copy_headers, :apple_copy_re
     end
 end
 
+desc 'Build zipped Core library suitable for Cocoa binding'
 task 'build-cocoa' => :apple_zip
 
