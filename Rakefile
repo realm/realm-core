@@ -53,6 +53,13 @@ REALM_CONFIGURATIONS.each do |configuration, (build_type, dir)|
             sh "./realm-tests"
         end
     end
+
+    desc "Run Valgrind for tests in #{configuration} mode"
+    task "memcheck-#{configuration}" => "build-#{configuration}" do
+        Dir.chdir("#{dir}/test") do
+            sh "valgrind ./realm-tests"
+        end
+    end
 end
 
 desc 'Build debug and release modes'
