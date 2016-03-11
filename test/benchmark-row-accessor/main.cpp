@@ -17,6 +17,8 @@ using namespace realm::test_util;
 
 namespace {
 
+enum DetachOrder { AttachOrder, RevAttOrder, RandomOrder };
+
 void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, const char* lead_text)
 {
     Table table;
@@ -38,7 +40,7 @@ void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, con
 }
 
 void balloon(Timer& timer, BenchmarkResults& results,
-             int balloon_size, int detach_order,
+             int balloon_size, DetachOrder detach_order,
              const char* ident, const char* lead_text)
 {
     Table table;
@@ -49,12 +51,12 @@ void balloon(Timer& timer, BenchmarkResults& results,
         detach_indexes[i] = i;
     Random random;
     switch (detach_order) {
-        case 0: // Same as attach order
+        case AttachOrder:
             break;
-        case 1: // Opposite of attach order
+        case RevAttOrder:
             std::reverse(detach_indexes.get(), detach_indexes.get() + balloon_size);
             break;
-        case 2: // Randomized
+        case RandomOrder:
             random.shuffle(detach_indexes.get(), detach_indexes.get() + balloon_size);
             break;
         default:
@@ -87,17 +89,17 @@ int main()
     heap(timer, results,  100, "heap_100",  "Heap 100");
     heap(timer, results, 1000, "heap_1000", "Heap 1000");
 
-    balloon(timer, results, 10, 0, "balloon_10",         "Balloon 10");
-    balloon(timer, results, 10, 1, "balloon_10_reverse", "Balloon 10 (reverse)");
-    balloon(timer, results, 10, 2, "balloon_10_random",  "Balloon 10 (random)");
+    balloon(timer, results, 10, AttachOrder, "balloon_10",         "Balloon 10");
+    balloon(timer, results, 10, RevAttOrder, "balloon_10_reverse", "Balloon 10 (reverse)");
+    balloon(timer, results, 10, RandomOrder, "balloon_10_random",  "Balloon 10 (random)");
 
-    balloon(timer, results, 100, 0, "balloon_100",         "Balloon 100");
-    balloon(timer, results, 100, 1, "balloon_100_reverse", "Balloon 100 (reverse)");
-    balloon(timer, results, 100, 2, "balloon_100_random",  "Balloon 100 (random)");
+    balloon(timer, results, 100, AttachOrder, "balloon_100",         "Balloon 100");
+    balloon(timer, results, 100, RevAttOrder, "balloon_100_reverse", "Balloon 100 (reverse)");
+    balloon(timer, results, 100, RandomOrder, "balloon_100_random",  "Balloon 100 (random)");
 
-    balloon(timer, results, 1000, 0, "balloon_1000",         "Balloon 1000");
-    balloon(timer, results, 1000, 1, "balloon_1000_reverse", "Balloon 1000 (reverse)");
-    balloon(timer, results, 1000, 2, "balloon_1000_random",  "Balloon 1000 (random)");
+    balloon(timer, results, 1000, AttachOrder, "balloon_1000",         "Balloon 1000");
+    balloon(timer, results, 1000, RevAttOrder, "balloon_1000_reverse", "Balloon 1000 (reverse)");
+    balloon(timer, results, 1000, RandomOrder, "balloon_1000_random",  "Balloon 1000 (random)");
 
     results.submit_single("total_time", "Total time", timer_total);
 }
