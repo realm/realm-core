@@ -37,7 +37,9 @@ void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, con
     results.submit_single(ident, lead_text, timer);
 }
 
-void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, int detach_order, const char* ident, const char* lead_text)
+void balloon(Timer& timer, BenchmarkResults& results,
+             int balloon_size, int detach_order,
+             const char* ident, const char* lead_text)
 {
     Table table;
     table.add_empty_row();
