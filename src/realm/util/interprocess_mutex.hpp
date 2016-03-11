@@ -23,9 +23,9 @@
 
 // Enable this only on platforms where it might be needed
 // currently APPLE.
-#if REALM_PLATFORM_APPLE
+//#if REALM_PLATFORM_APPLE
 #define REALM_ROBUST_MUTEX_EMULATION
-#endif
+//#endif
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -142,7 +142,7 @@ inline void InterprocessMutex::release_shared_part()
 inline void InterprocessMutex::lock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    std::unique_lock lock(m_local_mutex);
+    std::unique_lock<Mutex> lock(m_local_mutex);
     m_file.lock_exclusive();
     lock.release();
 #else
