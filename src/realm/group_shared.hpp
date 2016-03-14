@@ -1136,6 +1136,11 @@ public:
         return sg.get_file_format_version();
     }
 
+    static SharedGroup::version_type get_version_of_latest_snapshot(SharedGroup& sg)
+    {
+        return sg.get_version_of_latest_snapshot();
+    }
+
     static SharedGroup::version_type get_version_of_bound_snapshot(const SharedGroup& sg) noexcept
     {
         return sg.get_version_of_bound_snapshot();
