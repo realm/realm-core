@@ -195,6 +195,8 @@ public:
     ///
     /// </pre>
     static const char* get_data_type_name(DataType) noexcept;
+
+    static SharedGroup::version_type get_version_of_latest_snapshot(SharedGroup&);
 };
 
 
@@ -384,6 +386,12 @@ inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, O&& o
 {
     using sgf = _impl::SharedGroupFriend;
     sgf::rollback_and_continue_as_read(sg, &observer); // Throws
+}
+
+inline SharedGroup::version_type LangBindHelper::get_version_of_latest_snapshot(SharedGroup& sg)
+{
+    using sgf = _impl::SharedGroupFriend;
+    return sgf::get_version_of_latest_snapshot(sg); // Throws
 }
 
 } // namespace realm
