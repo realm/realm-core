@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fix an alignment problem which could cause crash when opening a Realm file
+  on 32-bit IOS devices. (issue 1558)
 
 ### API breaking changes:
 
