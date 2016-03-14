@@ -400,7 +400,12 @@ private:
 /// on the file, and may be read only while holding a shared (or exclusive) lock
 /// on the file. All other members (except for the Ringbuffer) may be accessed
 /// only while holding a lock on `controlmutex`.
-struct alignas(uint64_t) SharedGroup::SharedInfo {
+
+/// SharedInfo must be 8-byte aligned. On 32-bit Apple platforms, mutexes store their
+/// alignment as part of the mutex state. We're copying the SharedInfo (including
+/// embedded but alway unlocked mutexes) and it must retain the same alignment
+/// throughout.
+struct alignas(8) SharedGroup::SharedInfo {
     // Indicates that initialization of the lock file was completed sucessfully.
     uint8_t init_complete = 0; // Offset 0
 
