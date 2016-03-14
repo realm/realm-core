@@ -2,9 +2,6 @@
 
 ### Bugfixes:
 
-* Fix an alignment problem which could cause crash when opening a Realm file
-  on 32-bit IOS devices. (issue 1558)
-
 ### API breaking changes:
 
 * Lorem ipsum.
@@ -18,6 +15,18 @@
 ### Internals:
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.97.1 Release notes
+
+### Bugfixes:
+
+* Fix an alignment problem which could cause crash when opening a Realm file
+  on 32-bit IOS devices. (issue 1558)
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.97.0].**
 
 ----------------------------------------------
 
