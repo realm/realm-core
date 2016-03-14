@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.97.1 Release notes
 
 ### Bugfixes:
 
