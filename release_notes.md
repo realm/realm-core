@@ -14,7 +14,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Disabled unittest Shared_RobustAgainstDeathDuringWrite on Linux, as 
+  it could run forever.
 
 ----------------------------------------------
 
