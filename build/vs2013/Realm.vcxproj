@@ -260,7 +260,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -283,7 +283,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -305,7 +305,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -334,7 +334,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -364,7 +364,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -395,7 +395,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\win32;..\..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -420,7 +420,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
     </ClCompile>
@@ -449,7 +449,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
     </ClCompile>
@@ -477,6 +477,7 @@
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\win32;..\..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>
@@ -508,7 +509,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /D__STDC_LIMIT_MACROS</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
@@ -539,7 +540,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions) /D__STDC_LIMIT_MACROS</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
@@ -572,6 +573,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\win32;..\..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -607,6 +609,7 @@
     <ClCompile Include="..\..\src\realm\column_string.cpp" />
     <ClCompile Include="..\..\src\realm\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\realm\column_table.cpp" />
+    <ClCompile Include="..\..\src\realm\history.cpp" />
     <ClCompile Include="..\..\src\realm\commit_log.cpp" />
     <ClCompile Include="..\..\src\realm\descriptor.cpp" />
     <ClCompile Include="..\..\src\realm\disable_sync_to_disk.cpp" />
@@ -641,6 +644,7 @@
     <ClCompile Include="..\..\src\realm\group.cpp" />
     <ClCompile Include="..\..\src\realm\group_shared.cpp" />
     <ClCompile Include="..\..\src\realm\group_writer.cpp" />
+    <ClCompile Include="..\..\src\realm\impl\continuous_transactions_history.cpp" />
     <ClCompile Include="..\..\src\realm\index_string.cpp" />
     <ClCompile Include="..\..\src\realm\query.cpp" />
     <ClCompile Include="..\..\src\realm\spec.cpp" />
@@ -1090,6 +1094,7 @@
     <ClCompile Include="..\..\test\util\resource_limits.cpp" />
     <ClCompile Include="..\..\test\util\test_only.cpp" />
     <ClCompile Include="..\..\test\util\test_path.cpp" />
+    <ClCompile Include="..\..\test\util\crypt_key.cpp" />
     <ClCompile Include="..\..\test\util\timer.cpp" />
     <ClCompile Include="..\..\test\util\unit_test.cpp" />
     <ClCompile Include="..\..\test\util\wildcard.cpp" />
@@ -1131,6 +1136,7 @@
     <ClInclude Include="..\..\src\realm\importer.hpp" />
     <ClInclude Include="..\..\src\realm\link_view.hpp" />
     <ClInclude Include="..\..\src\realm\link_view_fwd.hpp" />
+    <ClInclude Include="..\..\src\realm\null.hpp" />
     <ClInclude Include="..\..\src\realm\query_expression.hpp" />
     <ClInclude Include="..\..\src\realm\string_data.hpp" />
     <ClInclude Include="..\..\src\realm\table_basic_fwd.hpp" />
@@ -1168,6 +1174,7 @@
     <ClInclude Include="..\..\src\realm\datetime.hpp" />
     <ClInclude Include="..\..\src\realm\group.hpp" />
     <ClInclude Include="..\..\src\realm\group_shared.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\continuous_transactions_history.hpp" />
     <ClInclude Include="..\..\src\realm\group_writer.hpp" />
     <ClInclude Include="..\..\src\realm\index_string.hpp" />
     <ClInclude Include="..\..\src\realm\lang_bind_helper.hpp" />

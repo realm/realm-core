@@ -36,6 +36,9 @@
 /realm-config
 /realm-config-dbg
 
+/realm-config-macosx
+/realm-config-macosx-dbg
+
 # iPhone
 /realm-config-ios
 /realm-config-ios-dbg

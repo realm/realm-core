@@ -27,7 +27,7 @@
 #include "unit_test.hpp"
 
 #define TEST_PATH_HELPER(class_name, var_name, suffix) \
-    class_name var_name(realm::test_util::get_test_path(test_details, "." #var_name "." suffix))
+    class_name var_name(realm::test_util::get_test_path(test_context, "." #var_name "." suffix))
 
 #define TEST_PATH(var_name) \
     TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
@@ -44,19 +44,40 @@
 namespace realm {
 namespace test_util {
 
-/// Disable removal of test files. If called, the call must complete
-/// before any TestPathGuard object is created.
+/// Disable automatic removal of test files.
+///
+/// This function is **not** thread-safe. If you call it, be sure to call it
+/// prior to any execution of the TEST_PATH or TEST_DIR family of macros.
 void keep_test_files();
+
+
+/// This function is thread-safe as long as there are no concurrent invocations
+/// of set_test_path_prefix().
+std::string get_test_path_prefix();
+
+/// This function is thread-safe as long as there are no concurrent invocations
+/// of set_test_path_prefix().
+std::string get_test_path(const unit_test::TestContext&, const std::string& suffix);
 
 /// By default, test files are placed in the current working
 /// directory. Use this function to set a path prefix. The specified
 /// prefix must contain a final `/`.
+///
+/// This function is **not** thread-safe. If you call it, be sure to call it
+/// prior to any invocation of get_test_path_prefix() or get_test_path(), and
+/// prior to any execution of the TEST_PATH or TEST_DIR family of macros.
 void set_test_path_prefix(const std::string&);
-std::string get_test_path_prefix();
 
-std::string get_test_path(const unit_test::TestDetails&, const std::string& suffix);
 
+/// This function is thread-safe as long as tehre are no concurrent invocations
+/// of set_test_resource_path().
 std::string get_test_resource_path();
+
+
+/// Set the path to be returned by get_test_resource_path().
+///
+/// This function is **not** thread-safe. If you call it, be sure to call it
+/// prior to any invocation of get_test_resource_path().
 void set_test_resource_path(const std::string&);
 
 
@@ -104,7 +125,7 @@ public:
     SharedGroupTestPathGuard(const std::string& path);
     std::string get_lock_path() const
     {
-        return m_path + ".lock";
+        return m_path + ".management/access_control";
     }
     ~SharedGroupTestPathGuard() noexcept;
 };

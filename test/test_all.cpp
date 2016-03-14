@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 #include <locale>
 #include <sstream>
@@ -22,11 +23,11 @@
 #include <realm/version.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
-#include "test_all.hpp"
 #include "util/timer.hpp"
 #include "util/resource_limits.hpp"
 
 #include "test.hpp"
+#include "test_all.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -160,10 +161,26 @@ void set_random_seed()
     }
 }
 
+void set_always_encrypt()
+{
+    const char* str = getenv("UNITTEST_ENCRYPT_ALL");
+    if (str && strlen(str) != 0)
+        enable_always_encrypt();
+}
+
 void display_build_config()
 {
     const char* with_debug =
         Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
+
+#if REALM_ENABLE_ENCRYPTION
+    bool always_encrypt = is_always_encrypt_enabled();
+    const char* encryption = always_encrypt ?
+        "Enabled at compile-time (always encrypt = yes)" :
+        "Enabled at compile-time (always encrypt = no)";
+#else
+    const char* encryption = "Disabled at compile-time";
+#endif
 
 #ifdef REALM_COMPILER_SSE
     const char* compiler_sse = "Yes";
@@ -184,10 +201,10 @@ void display_build_config()
 
     std::cout <<
         "\n"
-        "Realm version: " << Version::get_version() << "\n"
-        "  with Debug " << with_debug << "\n"
+        "Realm version: "<<Version::get_version()<<" with Debug "<<with_debug<<"\n"
+        "Encryption: "<<encryption<<"\n"
         "\n"
-        "REALM_MAX_BPNODE_SIZE = " << REALM_MAX_BPNODE_SIZE << "\n"
+        "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
@@ -215,18 +232,19 @@ public:
     {
     }
 
-    void end(const TestDetails& details, double elapsed_seconds) override
+    void end(const TestContext& context, double elapsed_seconds) override
     {
         result r;
-        r.m_test_name = details.test_name;
-        r.m_elapsed_seconds = elapsed_seconds;
+        r.test_index       = context.test_index;
+        r.recurrence_index = context.recurrence_index;
+        r.elapsed_seconds  = elapsed_seconds;
         m_results.push_back(r);
-        SimpleReporter::end(details, elapsed_seconds);
+        SimpleReporter::end(context, elapsed_seconds);
     }
 
-    void summary(const Summary& summary) override
+    void summary(const ExecContext& context, const Summary& summary) override
     {
-        SimpleReporter::summary(summary);
+        SimpleReporter::summary(context, summary);
 
         size_t max_n = 5;
         size_t n = std::min<size_t>(max_n, m_results.size());
@@ -234,36 +252,45 @@ public:
             return;
 
         partial_sort(m_results.begin(), m_results.begin() + n, m_results.end());
+        std::vector<std::tuple<std::string, std::string>> rows;
         size_t name_col_width = 0, time_col_width = 0;
-        for(size_t i = 0; i != n; ++i) {
+        for (size_t i = 0; i < n; ++i) {
             const result& r = m_results[i];
-            size_t size = r.m_test_name.size();
-            if (size > name_col_width)
-                name_col_width = size;
-            size = Timer::format(r.m_elapsed_seconds).size();
-            if (size > time_col_width)
-                time_col_width = size;
+            const TestDetails& details = context.test_list.get_test_details(r.test_index);
+            std::ostringstream out;
+            out.imbue(std::locale::classic());
+            out << details.test_name;
+            if (context.num_recurrences > 1)
+                out << '#' << (r.recurrence_index+1);
+            std::string name = out.str();
+            std::string time = Timer::format(r.elapsed_seconds);
+            rows.emplace_back(name, time);
+            if (name.size() > name_col_width)
+                name_col_width = name.size();
+            if (time.size() > time_col_width)
+                time_col_width = time.size();
         }
+
         name_col_width += 2;
         size_t full_width = name_col_width + time_col_width;
         std::cout.fill('-');
         std::cout << "\nTop " << n << " time usage:\n" << std::setw(int(full_width)) << "" << "\n";
         std::cout.fill(' ');
-        for(size_t i = 0; i != n; ++i) {
-            const result& r = m_results[i];
+        for (const auto& row: rows) {
             std::cout <<
-                std::left  << std::setw(int(name_col_width)) << r.m_test_name <<
-                std::right << std::setw(int(time_col_width)) << Timer::format(r.m_elapsed_seconds) << "\n";
+                std::left  << std::setw(int(name_col_width)) << std::get<0>(row) <<
+                std::right << std::setw(int(time_col_width)) << std::get<1>(row) << "\n";
         }
     }
 
 private:
     struct result {
-        std::string m_test_name;
-        double m_elapsed_seconds;
+        size_t test_index;
+        int recurrence_index;
+        double elapsed_seconds;
         bool operator<(const result& r) const
         {
-            return m_elapsed_seconds > r.m_elapsed_seconds; // Descending order
+            return elapsed_seconds > r.elapsed_seconds; // Descending order
         }
     };
 
@@ -315,6 +342,20 @@ bool run_tests()
     if (filter_str && strlen(filter_str) != 0)
         filter.reset(create_wildcard_filter(filter_str));
 
+    int num_repetitions = 1;
+    {
+        const char* str = getenv("UNITTEST_REPEAT");
+        if (str && strlen(str) != 0) {
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+            in >> num_repetitions;
+            bool bad = !in || in.get() != std::char_traits<char>::eof() || num_repetitions < 0;
+            if (bad)
+                throw std::runtime_error("Bad number of repetitions");
+        }
+    }
+
     int num_threads = 1;
     {
         const char* str = getenv("UNITTEST_THREADS");
@@ -323,8 +364,7 @@ bool run_tests()
             in.imbue(std::locale::classic());
             in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
             in >> num_threads;
-            bool bad = !in || in.get() != std::char_traits<char>::eof() ||
-                num_threads < 1 || num_threads > 1024;
+            bool bad = !in || in.get() != std::char_traits<char>::eof() || num_threads < 1;
             if (bad)
                 throw std::runtime_error("Bad number of threads");
             if (num_threads > 1)
@@ -342,7 +382,7 @@ bool run_tests()
     // Run
     TestList& list = get_default_test_list();
     list.sort(PatternBasedFileOrder(file_order));
-    bool success = list.run(reporter.get(), filter.get(), num_threads, shuffle);
+    bool success = list.run(reporter.get(), filter.get(), num_repetitions, num_threads, shuffle);
 
     if (test_only)
         std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
@@ -376,6 +416,7 @@ int test_all(int argc, char* argv[])
 #endif
 
     set_random_seed();
+    set_always_encrypt();
 
     fix_max_open_files();
     fix_async_daemon_path();

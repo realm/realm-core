@@ -55,6 +55,7 @@ template<class>
 class Columns;
 template<class>
 class SubQuery;
+struct LinkTargetInfo;
 
 struct Link {};
 typedef Link LinkList;
@@ -392,7 +393,7 @@ public:
     /// \sa Table::set_string_unique()
     void change_link_targets(size_t row_ndx, size_t new_row_ndx);
 
-    // Get cell values
+    // Get cell values. Will assert if the requested type does not match the column type
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
     DateTime    get_datetime(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -402,6 +403,9 @@ public:
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
+
+    template<class T> T get(size_t c, size_t r) const noexcept;
+
     size_t get_link(size_t column_ndx, size_t row_ndx) const noexcept;
     bool is_null_link(size_t column_ndx, size_t row_ndx) const noexcept;
     LinkViewRef get_linklist(size_t column_ndx, size_t row_ndx);
@@ -447,7 +451,7 @@ public:
     /// remove_substring() removes the specified byte range from the currently
     /// stored string. The beginning of the range (\a pos) must be less than or
     /// equal to the size of the currently stored string. If the specified range
-    /// cextends beyond the end of the currently stored string, it will be
+    /// extends beyond the end of the currently stored string, it will be
     /// silently clamped.
     ///
     /// String level modifications performed via insert_substring() and
@@ -940,9 +944,9 @@ private:
               size_t parent_row_ndx);
 
     static void do_insert_column(Descriptor&, size_t col_ndx, DataType type,
-                                 StringData name, Table* link_target_table, bool nullable = false);
+                                 StringData name, LinkTargetInfo& link_target_info, bool nullable = false);
     static void do_insert_column_unless_exists(Descriptor&, size_t col_ndx, DataType type,
-                                               StringData name, Table* link_target_table, bool nullable = false,
+                                               StringData name, LinkTargetInfo& link, bool nullable = false,
                                                bool* was_inserted = nullptr);
     static void do_erase_column(Descriptor&, size_t col_ndx);
     static void do_rename_column(Descriptor&, size_t col_ndx, StringData name);
@@ -954,14 +958,14 @@ private:
     struct MoveSubtableColumns;
 
     void insert_root_column(size_t col_ndx, DataType type, StringData name,
-                            Table* link_target_table, bool nullable = false);
+                            LinkTargetInfo& link, bool nullable = false);
     void erase_root_column(size_t col_ndx);
     void move_root_column(size_t from, size_t to);
     void do_insert_root_column(size_t col_ndx, ColumnType, StringData name, bool nullable = false);
     void do_erase_root_column(size_t col_ndx);
     void do_move_root_column(size_t from, size_t to);
     void do_set_link_type(size_t col_ndx, LinkType);
-    void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
+    void insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx);
     void erase_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx);
     void update_link_target_tables(size_t old_col_ndx_begin, size_t new_col_ndx_begin);
     void update_link_target_tables_after_column_move(size_t moved_from, size_t moved_to);
@@ -1342,6 +1346,11 @@ private:
 
     void refresh_column_accessors(size_t col_ndx_begin = 0);
 
+    // Look for link columns starting from col_ndx_begin.
+    // If a link column is found, follow the link and update it's
+    // backlink column accessor if it is in different table.
+    void refresh_link_target_accessors(size_t col_ndx_begin = 0);
+
     bool is_cross_table_link_target() const noexcept;
 
 #ifdef REALM_DEBUG
@@ -1402,12 +1411,10 @@ protected:
 };
 
 
-
-
-
 // Implementation:
-inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
+
+inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
 inline void Table::bump_version(bool bump_global) const noexcept
 {
@@ -1899,6 +1906,15 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
     }
 }
 
+// This class groups together information about the target of a link column
+// This is not a valid link if the target table == nullptr
+struct LinkTargetInfo {
+    LinkTargetInfo(Table* target = nullptr, size_t backlink_ndx = realm::npos)
+        : m_target_table(target), m_backlink_col_ndx(backlink_ndx) {}
+    bool is_valid() const { return (m_target_table != nullptr); }
+    Table* m_target_table;
+    size_t m_backlink_col_ndx; // a value of npos indicates the backlink should be appended
+};
 
 // The purpose of this class is to give internal access to some, but
 // not all of the non-public parts of the Table class.
@@ -2084,16 +2100,16 @@ public:
     }
 
     static void insert_column(Descriptor& desc, size_t column_ndx, DataType type,
-                              StringData name, Table* link_target_table, bool nullable = false)
+                              StringData name, LinkTargetInfo& link, bool nullable = false)
     {
-        Table::do_insert_column(desc, column_ndx, type, name, link_target_table, nullable); // Throws
+        Table::do_insert_column(desc, column_ndx, type, name, link, nullable); // Throws
     }
 
     static void insert_column_unless_exists(Descriptor& desc, size_t column_ndx, DataType type,
-                                            StringData name, Table* link_target_table, bool nullable = false,
+                                            StringData name, LinkTargetInfo& link, bool nullable = false,
                                             bool* was_inserted = nullptr)
     {
-        Table::do_insert_column_unless_exists(desc, column_ndx, type, name, link_target_table, nullable, was_inserted); // Throws
+        Table::do_insert_column_unless_exists(desc, column_ndx, type, name, link, nullable, was_inserted); // Throws
     }
 
     static void erase_column(Descriptor& desc, size_t column_ndx)

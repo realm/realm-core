@@ -7,7 +7,7 @@
 #include "test.hpp"
 
 using namespace realm;
-using test_util::unit_test::TestResults;
+using test_util::unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -75,7 +75,7 @@ const size_t num_double_values = size_of_array(double_values);
 // TODO: Add test of full range of floats.
 
 template<class A, typename T>
-void BasicArray_AddGet(TestResults& test_results, T values[], size_t num_values)
+void BasicArray_AddGet(TestContext& test_context, T values[], size_t num_values)
 {
     A f(Allocator::get_default());
     f.create();
@@ -95,16 +95,16 @@ void BasicArray_AddGet(TestResults& test_results, T values[], size_t num_values)
 }
 TEST(ArrayFloat_AddGet)
 {
-    BasicArray_AddGet<ArrayFloat, float>(test_results, float_values, num_float_values);
+    BasicArray_AddGet<ArrayFloat, float>(test_context, float_values, num_float_values);
 }
 TEST(ArrayDouble_AddGet)
 {
-    BasicArray_AddGet<ArrayDouble, double>(test_results, double_values, num_double_values);
+    BasicArray_AddGet<ArrayDouble, double>(test_context, double_values, num_double_values);
 }
 
 
 template<class A, typename T>
-void BasicArray_AddManyValues(TestResults& test_results)
+void BasicArray_AddManyValues(TestContext& test_context)
 {
     A f(Allocator::get_default());
     f.create();
@@ -127,15 +127,15 @@ void BasicArray_AddManyValues(TestResults& test_results)
 }
 TEST(ArrayFloat_AddManyValues)
 {
-    BasicArray_AddManyValues<ArrayFloat, float>(test_results);
+    BasicArray_AddManyValues<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_AddManyValues)
 {
-    BasicArray_AddManyValues<ArrayDouble, double>(test_results);
+    BasicArray_AddManyValues<ArrayDouble, double>(test_context);
 }
 
 template<class A, typename T>
-void BasicArray_Delete(TestResults& test_results)
+void BasicArray_Delete(TestContext& test_context)
 {
     A f(Allocator::get_default());
     f.create();
@@ -175,16 +175,16 @@ void BasicArray_Delete(TestResults& test_results)
 }
 TEST(ArrayFloat_Delete)
 {
-    BasicArray_Delete<ArrayFloat, float>(test_results);
+    BasicArray_Delete<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_Delete)
 {
-    BasicArray_Delete<ArrayDouble, double>(test_results);
+    BasicArray_Delete<ArrayDouble, double>(test_context);
 }
 
 
 template<class A, typename T>
-void BasicArray_Set(TestResults& test_results, T values[], size_t num_values)
+void BasicArray_Set(TestContext& test_context, T values[], size_t num_values)
 {
     A f(Allocator::get_default());
     f.create();
@@ -208,16 +208,16 @@ void BasicArray_Set(TestResults& test_results, T values[], size_t num_values)
 }
 TEST(ArrayFloat_Set)
 {
-    BasicArray_Set<ArrayFloat, float>(test_results, float_values, num_float_values);
+    BasicArray_Set<ArrayFloat, float>(test_context, float_values, num_float_values);
 }
 TEST(ArrayDouble_Set)
 {
-    BasicArray_Set<ArrayDouble, double>(test_results, double_values, num_double_values);
+    BasicArray_Set<ArrayDouble, double>(test_context, double_values, num_double_values);
 }
 
 
 template<class A, typename T>
-void BasicArray_Insert(TestResults& test_results)
+void BasicArray_Insert(TestContext& test_context)
 {
     A f(Allocator::get_default());
     f.create();
@@ -257,17 +257,17 @@ void BasicArray_Insert(TestResults& test_results)
 }
 TEST(ArrayFloat_Insert)
 {
-    BasicArray_Insert<ArrayFloat, float>(test_results);
+    BasicArray_Insert<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_Insert)
 {
-    BasicArray_Insert<ArrayDouble, double>(test_results);
+    BasicArray_Insert<ArrayDouble, double>(test_context);
 }
 
 #if 0
 // sum() is unused by other classes
 template<class A, typename T>
-void BasicArray_Sum(TestResults& test_results)
+void BasicArray_Sum(TestContext& test_context)
 {
     A f(Allocator::get_default());
     f.create();
@@ -294,16 +294,16 @@ void BasicArray_Sum(TestResults& test_results)
 }
 TEST(ArrayFloat_Sum)
 {
-    BasicArray_Sum<ArrayFloat, float>(test_results);
+    BasicArray_Sum<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_Sum)
 {
-    BasicArray_Sum<ArrayDouble, double>(test_results);
+    BasicArray_Sum<ArrayDouble, double>(test_context);
 }
 #endif
 
 template<class A, typename T>
-void BasicArray_Minimum(TestResults& test_results)
+void BasicArray_Minimum(TestContext& test_context)
 {
     A f(Allocator::get_default());
     f.create();
@@ -337,16 +337,16 @@ void BasicArray_Minimum(TestResults& test_results)
 }
 TEST(ArrayFloat_Minimum)
 {
-    BasicArray_Minimum<ArrayFloat, float>(test_results);
+    BasicArray_Minimum<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_Minimum)
 {
-    BasicArray_Minimum<ArrayDouble, double>(test_results);
+    BasicArray_Minimum<ArrayDouble, double>(test_context);
 }
 
 
 template<class A, typename T>
-void BasicArray_Maximum(TestResults& test_results)
+void BasicArray_Maximum(TestContext& test_context)
 {
     A f(Allocator::get_default());
     f.create();
@@ -380,16 +380,16 @@ void BasicArray_Maximum(TestResults& test_results)
 }
 TEST(ArrayFloat_Maximum)
 {
-    BasicArray_Maximum<ArrayFloat, float>(test_results);
+    BasicArray_Maximum<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_Maximum)
 {
-    BasicArray_Maximum<ArrayDouble, double>(test_results);
+    BasicArray_Maximum<ArrayDouble, double>(test_context);
 }
 
 
 template<class A, typename T>
-void BasicArray_Find(TestResults& test_results)
+void BasicArray_Find(TestContext& test_context)
 {
     A f(Allocator::get_default());
     f.create();
@@ -435,16 +435,16 @@ void BasicArray_Find(TestResults& test_results)
 }
 TEST(ArrayFloat_Find)
 {
-    BasicArray_Find<ArrayFloat, float>(test_results);
+    BasicArray_Find<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_Find)
 {
-    BasicArray_Find<ArrayDouble, double>(test_results);
+    BasicArray_Find<ArrayDouble, double>(test_context);
 }
 
 
 template<class A, typename T>
-void BasicArray_Count(TestResults& test_results)
+void BasicArray_Count(TestContext& test_context)
 {
     A f(Allocator::get_default());
     f.create();
@@ -478,16 +478,16 @@ void BasicArray_Count(TestResults& test_results)
 }
 TEST(ArrayFloat_Count)
 {
-    BasicArray_Count<ArrayFloat, float>(test_results);
+    BasicArray_Count<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_Count)
 {
-    BasicArray_Count<ArrayDouble, double>(test_results);
+    BasicArray_Count<ArrayDouble, double>(test_context);
 }
 
 
 template<class A, typename T>
-void BasicArray_Compare(TestResults& test_results)
+void BasicArray_Compare(TestContext& test_context)
 {
     A f1(Allocator::get_default()), f2(Allocator::get_default());
     f1.create();
@@ -516,11 +516,11 @@ void BasicArray_Compare(TestResults& test_results)
 }
 TEST(ArrayFloat_Compare)
 {
-    BasicArray_Compare<ArrayFloat, float>(test_results);
+    BasicArray_Compare<ArrayFloat, float>(test_context);
 }
 TEST(ArrayDouble_Compare)
 {
-    BasicArray_Compare<ArrayDouble, double>(test_results);
+    BasicArray_Compare<ArrayDouble, double>(test_context);
 }
 
 #endif // TEST_ARRAY_FLOAT
