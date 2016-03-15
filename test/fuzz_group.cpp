@@ -84,12 +84,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
     SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
-
-    ReadTransaction rt(sg_r);
-    WriteTransaction wt(sg_w);
-
-    const Group& g_r = rt.get_group();
-    Group& g = wt.get_group();
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
 
     try {
         State s;
@@ -113,11 +110,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << pritable_key << ");\n";
             *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << pritable_key << ");\n";
 
-            *log << "ReadTransaction rt(sg_r);\n";
-            *log << "WriteTransaction wt(sg_w);\n";
-
-            *log << "const Group& g_r = rt.get_group();\n";
-            *log << "Group& g = wt.get_group();\n";
+            *log << "Group& g = const_cast<Group&>(sg_w.begin_read());\n";
+            *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
+            *log << "LangBindHelper::promote_to_write(sg_w);\n";
 
             *log << "\n\n";
         }
