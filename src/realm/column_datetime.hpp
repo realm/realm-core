@@ -41,10 +41,20 @@ struct NewDate {
     bool operator >= (const NewDate& rhs) const { return *this > rhs || *this == rhs; }
     NewDate& operator = (const NewDate& rhs) = default;
 
+    template<class Ch, class Tr>
+    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
+
     int64_t m_seconds;
     int32_t m_nanoseconds;
     bool m_is_null;
 };
+
+template<class C, class T>
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const NewDate& d)
+{
+    out << "NewDate(" << d.m_seconds << ", " << d.m_nanoseconds << ")";
+    return out;
+}
 
 class DateTimeColumn : public ColumnBase, public ColumnTemplate<NewDate> {
 public:

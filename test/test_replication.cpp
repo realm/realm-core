@@ -222,6 +222,70 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
     CHECK(rt_1.get_group() == rt_2.get_group());
 }
 
+/*
+TEST(Replication_NewDate)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.add_table("t");
+
+        // Add nullable NewDate column
+        table->add_column(type_NewDate, "nd", true);
+        
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("t");
+
+        // First row is to have a row that we can test move_last_over() on later
+        table->add_empty_row();
+
+        table->add_empty_row();
+        table->set_newdate(0, 1, NewDate(5, 6));
+        table->add_empty_row();
+        table->set_newdate(0, 2, NewDate(1, 2));
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("t");
+        
+        // Overwrite non-null with null to test that 
+        // TransactLogParser::parse_one(InstructionHandler& handler) correctly will see a set_null instruction
+        // and not a set_new_date instruction
+        table->set_newdate(0, 1, NewDate(null()));
+
+        // Overwrite non-null with other non-null
+        table->set_newdate(0, 2, NewDate(3, 4));
+        wt.commit();
+    }
+    {
+        // move_last_over
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("t");
+        table->move_last_over(0);
+        wt.commit();
+    }
+
+    std::unique_ptr<util::Logger> replay_logger;
+    SharedGroup sg_2(path_2);
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt_1(sg_1);
+        rt_1.get_group().verify();
+        ConstTableRef table = rt_1.get_table("t");
+        CHECK_EQUAL(1, table->size());
+        CHECK(table->get_newdate(0, 0) == NewDate(null()));;
+        CHECK(table->get_newdate(0, 1) == NewDate(3, 4));;
+    }
+}
+*/
 
 TEST(Replication_Links)
 {

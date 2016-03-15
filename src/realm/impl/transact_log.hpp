@@ -57,6 +57,7 @@ enum Instruction {
     instr_SetStringUnique       = 32,
     instr_SetBinary             = 10,
     instr_SetDateTime           = 11,
+    instr_SetNewDate            = 48,
     instr_SetTable              = 12,
     instr_SetMixed              = 13,
     instr_SetLink               = 14,
@@ -157,6 +158,7 @@ public:
     bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
     bool set_binary(size_t, size_t, BinaryData) { return true; }
     bool set_date_time(size_t, size_t, DateTime) { return true; }
+    bool set_newdate(size_t, size_t, NewDate) { return true; }
     bool set_table(size_t, size_t) { return true; }
     bool set_mixed(size_t, size_t, const Mixed&) { return true; }
     bool set_link(size_t, size_t, size_t, size_t) { return true; }
@@ -225,6 +227,7 @@ public:
     bool set_string_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, StringData);
     bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData);
     bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime);
+    bool set_newdate(size_t col_ndx, size_t row_ndx, NewDate);
     bool set_table(size_t col_ndx, size_t row_ndx);
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&);
     bool set_link(size_t col_ndx, size_t row_ndx, size_t, size_t target_group_level_ndx);
@@ -324,6 +327,7 @@ public:
     void set_string_unique(const Table*, size_t col_ndx, size_t ndx, StringData value);
     void set_binary(const Table*, size_t col_ndx, size_t ndx, BinaryData value);
     void set_date_time(const Table*, size_t col_ndx, size_t ndx, DateTime value);
+    void set_newdate(const Table*, size_t col_ndx, size_t ndx, NewDate value);
     void set_table(const Table*, size_t col_ndx, size_t ndx);
     void set_mixed(const Table*, size_t col_ndx, size_t ndx, const Mixed& value);
     void set_link(const Table*, size_t col_ndx, size_t ndx, size_t value);
@@ -1074,17 +1078,30 @@ inline void TransactLogConvenientEncoder::set_binary(const Table* t, size_t col_
 
 inline bool TransactLogEncoder::set_date_time(size_t col_ndx, size_t ndx, DateTime value)
 {
-    append_simple_instr(instr_SetDateTime, util::tuple(col_ndx, ndx,
-                                                       value.get_datetime())); // Throws
+    append_simple_instr(instr_SetDateTime, util::tuple(col_ndx, ndx, value.get_datetime())); // Throws
     return true;
 }
 
 inline void TransactLogConvenientEncoder::set_date_time(const Table* t, size_t col_ndx,
-                                       size_t ndx, DateTime value)
+    size_t ndx, DateTime value)
 {
     select_table(t); // Throws
     m_encoder.set_date_time(col_ndx, ndx, value); // Throws
 }
+
+
+inline bool TransactLogEncoder::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
+{
+    append_simple_instr(instr_SetNewDate, util::tuple(col_ndx, ndx, value.m_seconds, value.m_nanoseconds)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_newdate(const Table* t, size_t col_ndx, size_t ndx, NewDate value)
+{
+    select_table(t); // Throws
+    m_encoder.set_newdate(col_ndx, ndx, value); // Throws
+}
+
 
 inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx)
 {
@@ -1566,6 +1583,16 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             int_fast64_t value = read_int<int_fast64_t>(); // Throws
             if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
                 parser_error();
+            return;
+        }
+        case instr_SetNewDate: {
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            int64_t seconds = read_int<int64_t>(); // Throws
+            uint32_t nanoseconds = read_int<uint32_t>(); // Throws
+            NewDate value = NewDate(seconds, nanoseconds);
+//            if (!handler.set_newdate(col_ndx, row_ndx, value)) // Throws
+//                parser_error();
             return;
         }
         case instr_SetTable: {
@@ -2257,6 +2284,13 @@ public:
     bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
     {
         m_encoder.set_date_time(col_ndx, row_ndx, value);
+        append_instruction();
+        return true;
+    }
+
+    bool set_newdate(size_t col_ndx, size_t row_ndx, NewDate value)
+    {
+        m_encoder.set_newdate(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }
