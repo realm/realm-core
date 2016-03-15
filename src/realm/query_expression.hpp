@@ -697,8 +697,8 @@ struct NullableVector
         m_first[index] = m_null;
     }
 
-    template <typename Type = t_storage> typename std::enable_if<
-        std::is_same<Type, int64_t>::value, void>::type
+    template <typename Type = t_storage>
+    typename std::enable_if<std::is_same<Type, int64_t>::value, void>::type
     set(size_t index, t_storage value)
     {
         REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
@@ -714,8 +714,9 @@ struct NullableVector
         m_first[index] = value;
     }
 
-    template <typename Type = T> typename std::enable_if
-        <realm::is_any<Type, float, double, DateTime, BinaryData, StringData, null>::value, void>::type
+    template <typename Type = T>
+    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, null>::value,
+                            void>::type
     set(size_t index, t_storage value) {
         m_first[index] = value;
     }
@@ -1555,7 +1556,7 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination) override
+    void evaluate(size_t index, ValueBase& destination) override
     {
         Value<T>& d = static_cast<Value<T>&>(destination);
 
