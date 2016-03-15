@@ -1,3 +1,15 @@
+
+# 0.97.2 Release notes
+
+### Enhancements:
+
+* Add more information to IncompatibleLockFile.
+
+**NOTE: This is a hotfix release. The above changes are not present in
+versions [0.97.1].**
+
+----------------------------------------------
+
 # 0.97.1 Release notes
 
 ### Bugfixes:
