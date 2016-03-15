@@ -45,7 +45,7 @@ struct NewDate {
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
 
     int64_t m_seconds;
-    int32_t m_nanoseconds;
+    uint32_t m_nanoseconds;
     bool m_is_null;
 };
 
