@@ -806,20 +806,35 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // layout expected by this session participant. We could find that it is
         // initializaed with a different memory layout if other concurrent
         // session participants use different versions of the core library.
-        if (info_size < sizeof (SharedInfo))
-            throw IncompatibleLockFile();
-        if (info->shared_info_version != g_shared_info_version)
-            throw IncompatibleLockFile();
+        if (info_size < sizeof (SharedInfo)) {
+            std::stringstream ss;
+            ss << "Info size doesn't match, " << info_size << " " << sizeof(SharedInfo) <<  ".";
+            throw IncompatibleLockFile(ss.str());
+        }
+        if (info->shared_info_version != g_shared_info_version) {
+            std::stringstream ss;
+            ss << "Shared info version doesn't match, " << info->shared_info_version <<
+                " " << g_shared_info_version << ".";
+            throw IncompatibleLockFile(ss.str());
+        }
         // Validate compatible sizes of mutex and condvar types. Sizes of all
         // other fields are architecture independent, so if condvar and mutex
         // sizes match, the entire struct matches. The offsets of
         // `size_of_mutex` and `size_of_condvar` are known to be as expected due
         // to the preceeding check in `shared_info_version`.
-        if (info->size_of_mutex != sizeof info->controlmutex)
-            throw IncompatibleLockFile();
+        if (info->size_of_mutex != sizeof info->controlmutex) {
+            std::stringstream ss;
+            ss << "Mutex size doesn't match: " << info->size_of_mutex << " "  <<
+                sizeof(info->shared_controlmutex) << ".";
+            throw IncompatibleLockFile(ss.str());
+        }
 #ifndef _WIN32
-        if (info->size_of_condvar != sizeof info->room_to_write)
-            throw IncompatibleLockFile();
+        if (info->size_of_condvar != sizeof info->room_to_write) {
+            std::stringstream ss;
+            ss << "Condtion var size doesn't match: " << info->size_of_condvar << " " <<
+                    sizeof(info->room_to_write) << ".";
+            throw IncompatibleLockFile(ss.str());
+        }
 #endif
         // Even though fields match wrt alignment and size, there may still be
         // incompatibilities between implementations, so lets ask one of the
@@ -836,7 +851,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // with EOWNERDEAD, because that would mark the mutex as consistent
         // again and prevent us from being notified below.
         if (!info->controlmutex.is_valid())
-            throw IncompatibleLockFile();
+            throw IncompatibleLockFile("Control mutex is invalid.");
 
         // OK! lock file appears valid. We can now continue operations under the protection
         // of the controlmutex. The controlmutex protects the following activities:
@@ -972,8 +987,12 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                 // we shall instead simply check that there is agreement, and
                 // throw the same kind of exception, as would have been thrown
                 // with a bumped SharedInfo file format version, if there isn't.
-                if (info->file_format_version != target_file_format_version)
-                    throw IncompatibleLockFile();
+                if (info->file_format_version != target_file_format_version) {
+                    std::stringstream ss;
+                    ss << "File format version deosn't match: " << info->file_format_version << " " <<
+                        target_file_format_version << ".";
+                    throw IncompatibleLockFile(ss.str());
+                }
             }
 
 #ifndef _WIN32
@@ -1455,8 +1474,8 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
             // has been cleaned up.
             if (& r_info->readers.get_oldest() != &r)
 	        throw BadVersion();
-	}
-	// we managed to lock an entry in the ringbuffer, but it may be so old that
+        }
+        // we managed to lock an entry in the ringbuffer, but it may be so old that
         // the version doesn't match the specific request. In that case we must release and fail
         if (r.version != version_id.version) {
             atomic_double_dec(r.count); // <-- release
