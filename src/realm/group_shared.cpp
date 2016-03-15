@@ -825,7 +825,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         if (info->size_of_mutex != sizeof info->controlmutex) {
             std::stringstream ss;
             ss << "Mutex size doesn't match: " << info->size_of_mutex << " "  <<
-                sizeof(info->shared_controlmutex) << ".";
+                sizeof(info->controlmutex) << ".";
             throw IncompatibleLockFile(ss.str());
         }
 #ifndef _WIN32
