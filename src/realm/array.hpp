@@ -1149,6 +1149,9 @@ private:
     template<size_t w>
     size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
 
+    template<size_t w>
+    size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
+
 protected:
     /// The total size in bytes (including the header) of a new empty
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
@@ -1827,12 +1830,36 @@ inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
 
 inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
-    size_t n = size();
-    for (size_t i = 0; i != n; ++i) {
-        int_fast64_t v = get(i);
-        if (v >= limit)
-            set(i, int64_t(v + diff)); // Throws
+    for (size_t i = 0, n = size(); i != n; ) {
+        REALM_TEMPEX(i = adjust_ge, m_width, (i, n, limit, diff))
     }
+}
+
+template<size_t w>
+size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff)
+{
+    // Check if we need to copy before modifying
+    copy_on_write(); // Throws
+
+    for (size_t i = start; i != end; ++i) {
+        int_fast64_t v = get<w>(i);
+        if (v >= limit) {
+            int64_t shifted = v + diff;
+
+            // The new value may not fit within the current width. If so, call
+            // non-template set() to let it perform the expansion, and return
+            // our current position so that the caller can switch to the
+            // appropriate specialization for the new width.
+            bool do_expand = shifted < m_lbound || shifted > m_ubound;
+            if (do_expand) {
+                set(i, shifted); // Throws
+                return i + 1;
+            }
+
+            set<w>(i, shifted);
+        }
+    }
+    return end;
 }
 
 

@@ -28,6 +28,8 @@
   separate ".management" subdirectory.
 * Adding `util::network::buffered_input_stream::reset()`.
 * Added support for queries that traverse backlinks. Fixes #776.
+* Improve the performance of advance_read() over transations that inserted rows
+  when there are live TableViews.
 
 -----------
 
