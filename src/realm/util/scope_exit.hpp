@@ -44,6 +44,7 @@ public:
     ScopeExit(ScopeExit&& se) noexcept(std::is_nothrow_move_constructible<H>::value):
         m_handler(std::move(se.m_handler))
     {
+        se.m_handler = none;
     }
 
     ~ScopeExit() noexcept
