@@ -8,7 +8,12 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added emulation of robust mutexes on platforms which do not
+  provide the full posix API for it. This prevents a situation
+  where a crash in one process holding the lock, would leave
+  the database locked. Fixes issue #1429
+* Moved all supporting files (all files except the .realm file) into a
+  separate ".management" subdirectory.
 
 -----------
 
@@ -16,6 +21,17 @@
 
 * Disabled unittest Shared_RobustAgainstDeathDuringWrite on Linux, as 
   it could run forever.
+
+----------------------------------------------
+
+# 0.97.2 Release notes
+
+### Enhancements:
+
+* Add more information to IncompatibleLockFile.
+
+**NOTE: This is a hotfix release. The above changes are not present in
+versions [0.97.1].**
 
 ----------------------------------------------
 
@@ -67,12 +83,6 @@ versions [0.97.0].**
 
 ### Enhancements:
 
-* Added emulation of robust mutexes on platforms which do not
-  provide the full posix API for it. This prevents a situation
-  where a crash in one process holding the lock, would leave
-  the database locked. Fixes issue #1429
-* Moved all supporting files (all files except the .realm file) into a
-  separate ".management" subdirectory.
 * Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
   keeps the current history implementation as the default for now
   (`<realm/commit_log.hpp>`).
