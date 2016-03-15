@@ -72,7 +72,7 @@ struct IncompatibleLockFile: std::runtime_error {
 /// stopped (end_read(), commit(), rollback()).
 ///
 /// If a transaction is active when the SharedGroup is destroyed, that
-/// transaction is implicitely terminated, either by a call to
+/// transaction is implicitly terminated, either by a call to
 /// end_read() or rollback().
 ///
 /// Two processes that want to share a database file must reside on
@@ -82,30 +82,30 @@ struct IncompatibleLockFile: std::runtime_error {
 /// Desired exception behavior (not yet fully implemented)
 /// ------------------------------------------------------
 ///
-///  - If any data access API function throws an unexpcted exception during a
+///  - If any data access API function throws an unexpected exception during a
 ///    read transaction, the shared group accessor is left in state "error
 ///    during read".
 ///
-///  - If any data access API function throws an unexpcted exception during a
+///  - If any data access API function throws an unexpected exception during a
 ///    write transaction, the shared group accessor is left in state "error
 ///    during write".
 ///
 ///  - If SharedGroup::begin_write() or SharedGroup::begin_read() throws an
-///    unexpcted exception, the shared group accessor is left in state "no
+///    unexpected exception, the shared group accessor is left in state "no
 ///    transaction in progress".
 ///
 ///  - SharedGroup::end_read() and SharedGroup::rollback() do not throw.
 ///
-///  - If SharedGroup::commit() throws an unexpcted exception, the shared group
+///  - If SharedGroup::commit() throws an unexpected exception, the shared group
 ///    accessor is left in state "error during write" and the transaction was
-///    not comitted.
+///    not committed.
 ///
 ///  - If SharedGroup::advance_read() or SharedGroup::promote_to_write() throws
-///    an unexpcted exception, the shared group accessor is left in state "error
+///    an unexpected exception, the shared group accessor is left in state "error
 ///    during read".
 ///
 ///  - If SharedGroup::commit_and_continue_as_read() or
-///    SharedGroup::rollback_and_continue_as_read() throws an unexpcted
+///    SharedGroup::rollback_and_continue_as_read() throws an unexpected
 ///    exception, the shared group accessor is left in state "error during
 ///    write".
 ///
@@ -139,14 +139,14 @@ public:
         durability_Async    ///< Not yet supported on windows.
     };
 
-    /// \brief Same as calling the corrsponding version of open() on a instance
+    /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,
                          bool allow_file_format_upgrade = true);
 
-    /// \brief Same as calling the corrsponding version of open() on a instance
+    /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
@@ -180,7 +180,7 @@ public:
     /// specify the same durability level, otherwise an exception will be
     /// thrown.
     ///
-    /// If \a allow_file_format_ugrade is set to `true`, this function will
+    /// If \a allow_file_format_upgrade is set to `true`, this function will
     /// automatically upgrade the file format used in the specified Realm file
     /// if necessary (and if it is possible). In order to prevent this, set \a
     /// allow_upgrade to `false`.
@@ -210,7 +210,7 @@ public:
               const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication instance
-    /// must remain in exixtence for as long as the SharedGroup.
+    /// must remain in existence for as long as the SharedGroup.
     void open(Replication&, DurabilityLevel = durability_Full,
               const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
@@ -353,7 +353,7 @@ public:
     /// transaction, which means that they can no longer be used to access the
     /// underlying objects.
     ///
-    /// Subordinate accessors that were detatched at the end of the previous
+    /// Subordinate accessors that were detached at the end of the previous
     /// read or write transaction will not be automatically reattached when a
     /// new transaction is initiated. The application must reobtain new
     /// accessors during a new transaction to regain access to the underlying
@@ -401,14 +401,14 @@ public:
     /// - The method will throw if called in unattached state.
     /// - The method will return false if other SharedGroups are accessing the database
     ///   in which case compaction is not done. This is not necessarily an error.
-    /// It will return true following succesful compaction.
+    /// It will return true following successful compaction.
     /// While compaction is in progress, attempts by other
     /// threads or processes to open the database will wait.
     /// Be warned that resource requirements for compaction is proportional to the amount
     /// of live data in the database.
-    /// Compaction works by writing the database contents to a temporary databasefile and
+    /// Compaction works by writing the database contents to a temporary database file and
     /// then replacing the database with the temporary one. The name of the temporary
-    /// file is formed by appending ".tmp_compaction_space" to the name of the databse
+    /// file is formed by appending ".tmp_compaction_space" to the name of the database
     ///
     /// FIXME: This function is not yet implemented in an exception-safe manner,
     /// therefore, if it throws, the application should not attempt to
@@ -448,7 +448,7 @@ public:
     ///   ConstSourcePayload::Stay.
     ///
     /// For all other (non-TableView) accessors, handover is done with payload copy,
-    /// since the payload is trival.
+    /// since the payload is trivial.
     ///
     /// Handover *without* payload is useful when you want to ship a tableview with its query for
     /// execution in a background thread. Handover with *payload move* is useful when you want to
@@ -475,7 +475,7 @@ public:
     /// a tableview dependent upon another tableview and using MutableSourcePayload::Move,
     /// you are on thin ice!
     ///
-    /// On the importing side, the toplevel accessor being created during import takes ownership
+    /// On the importing side, the top-level accessor being created during import takes ownership
     /// of all other accessors (if any) being created as part of the import.
 
     /// Type used to support handover of accessors between shared groups.
@@ -549,7 +549,7 @@ private:
     void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
                  const char* encryption_key, bool allow_file_format_upgrade);
 
-    // Ring buffer managment
+    // Ring buffer management
     bool        ringbuf_is_empty() const noexcept;
     size_t ringbuf_size() const noexcept;
     size_t ringbuf_capacity() const noexcept;
@@ -562,7 +562,7 @@ private:
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
-    /// Grab a read lock on the spapshot associated with the specified
+    /// Grab a read lock on the snapshot associated with the specified
     /// version. If `version_id == VersionID()`, a read lock will be grabbed on
     /// the latest available snapshot. Fails if the snapshot is no longer
     /// available.
@@ -870,7 +870,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
     std::unique_ptr<Handover<T>> result(new Handover<T>());
     // Implementation note:
     // often, the return value from clone will be T*, BUT it may be ptr to some base of T
-    // instead, so we must cast it to T*. This is alway safe, because no matter the type,
+    // instead, so we must cast it to T*. This is always safe, because no matter the type,
     // clone() will clone the actual accessor instance, and hence return an instance of the
     // same type.
     result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
@@ -1047,7 +1047,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         observer->parse_complete(); // Throws
     }
 
-    // The old read lock must be retaind for as long as the change history is
+    // The old read lock must be retained for as long as the change history is
     // accessed (until Group::advance_transact() returns). This ensures that the
     // oldest needed changeset remains in the history, even when the history is
     // implemented as a separate unversioned entity outside the Realm (i.e., the
