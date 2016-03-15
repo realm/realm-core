@@ -42,7 +42,7 @@ struct NewDate {
     NewDate& operator = (const NewDate& rhs) = default;
 
     template<class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
+    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const NewDate&);
 
     int64_t m_seconds;
     uint32_t m_nanoseconds;
