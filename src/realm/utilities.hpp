@@ -61,7 +61,7 @@
 
 namespace realm {
 
-typedef std::function< bool(const char* string1, const char* string2) > StringCompareCallback;
+using StringCompareCallback = std::function<bool(const char* string1, const char* string2)>;
 
 extern signed char sse_support;
 extern signed char avx_support;
@@ -202,7 +202,7 @@ struct is_any<T, T, Ts...> : std::true_type { };
 
 template<typename T, typename U, typename... Ts>
 struct is_any<T, U, Ts...> : is_any<T, Ts...> { };
-
+    
     
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
 template<class InputIterator1, class InputIterator2>

@@ -1599,7 +1599,7 @@ public:
         m_link_map.set_base_table(table);
     }
 
-    virtual void evaluate(size_t index, ValueBase& destination) override
+    void evaluate(size_t index, ValueBase& destination) override
     {
         Value<T>& d = static_cast<Value<T>&>(destination);
 
