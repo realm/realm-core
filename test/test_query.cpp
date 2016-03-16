@@ -8644,9 +8644,11 @@ TEST(Query_NewDate_Null)
 
     table.add_column(type_NewDate, "first", false);
     table.add_column(type_NewDate, "second", true);
-    Columns<NewDate> first = table.column<NewDate>(0);
-    Columns<NewDate> second = table.column<NewDate>(0);
+    table.add_empty_row();
 
+    Columns<NewDate> first = table.column<NewDate>(0);
+    Columns<NewDate> second = table.column<NewDate>(1);
+    
     match = (first == NewDate(null())).find();
     CHECK_EQUAL(match, npos);
 
