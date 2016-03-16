@@ -25,12 +25,10 @@ namespace realm {
 ref_type DateTimeColumn::create(Allocator& alloc, size_t size)
 {
     Array top(alloc);
-    top.create(Array::type_HasRefs);
-    top.add(0);
-    top.add(0);
+    top.create(Array::type_HasRefs, false /* context_flag */, 2);
 
-    ref_type seconds = IntNullColumn::create(alloc, Array::type_Normal, 0);
-    ref_type nano = IntegerColumn::create(alloc, Array::type_Normal, 0);
+    ref_type seconds = IntNullColumn::create(alloc, Array::type_Normal, size);
+    ref_type nano = IntegerColumn::create(alloc, Array::type_Normal, size);
 
     top.set_as_ref(0, seconds);
     top.set_as_ref(1, nano);
