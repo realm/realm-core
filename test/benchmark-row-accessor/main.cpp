@@ -14,11 +14,20 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 
+/// Row Accessor Benchmarks
+///
+/// To measure the performance of the row accessor only, the table tested on is
+/// minimal, one empty row nothing else. Bigger tables might be necessary, but
+/// beware of skewed results.
+
 namespace {
 
 enum DetachOrder { AttachOrder, RevAttOrder, RandomOrder };
 
 /// Benchmark the (=) operator on row accessors.
+///
+/// The (=) operator causes a reattachment a row expression to the table.
+/// `heap` signfies that this reattachment will happen many times over.
 ///
 /// Here it is in pseduocode:
 ///
@@ -60,8 +69,10 @@ void heap(Timer& timer, BenchmarkResults& results, int n,
     results.submit_single(ident, lead_text, timer);
 }
 
-/// Benchmark the (=) operator on row accessors, while detaching them in
-/// various orders.
+/// Benchmark the (=) operator on row accessors, while detaching them in /
+/// various orders. `balloon` signifies that the row accessors are first
+/// attached (inflating a balloon) and then detached in some order
+/// (deflating the balloon).
 ///
 /// Here it is in pseduocode:
 ///
