@@ -2,21 +2,48 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
-
 ### API breaking changes:
 
 * Lorem ipsum.
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added emulation of robust mutexes on platforms which do not
+  provide the full posix API for it. This prevents a situation
+  where a crash in one process holding the lock, would leave
+  the database locked. Fixes issue #1429
+* Moved all supporting files (all files except the .realm file) into a
+  separate ".management" subdirectory.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Disabled unittest Shared_RobustAgainstDeathDuringWrite on Linux, as 
+  it could run forever.
+
+----------------------------------------------
+
+# 0.97.2 Release notes
+
+### Enhancements:
+
+* Add more information to IncompatibleLockFile.
+
+**NOTE: This is a hotfix release. The above changes are not present in
+versions [0.97.1].**
+
+----------------------------------------------
+
+# 0.97.1 Release notes
+
+### Bugfixes:
+
+* Fix an alignment problem which could cause crash when opening a Realm file
+  on 32-bit IOS devices. (issue 1558)
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.97.0].**
 
 ----------------------------------------------
 

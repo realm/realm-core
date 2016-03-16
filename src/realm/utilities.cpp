@@ -299,7 +299,9 @@ void millisleep(size_t milliseconds)
 #else
     // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
     timespec ts;
-    ts.tv_sec = 0;
+    size_t secs = milliseconds / 1000;
+    milliseconds = milliseconds % 1000;
+    ts.tv_sec = secs;
     ts.tv_nsec = milliseconds * 1000 * 1000;
     nanosleep(&ts, 0);
 #endif

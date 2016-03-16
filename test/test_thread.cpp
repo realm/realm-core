@@ -5,8 +5,19 @@
 #include <algorithm>
 #include <queue>
 #include <functional>
+#include <mutex>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
+#include <realm/utilities.hpp>
+#include <realm/util/features.h>
 #include <realm/util/thread.hpp>
+#ifndef _WIN32
+#include <realm/util/interprocess_condvar.hpp>
+#endif
+#include <realm/util/interprocess_mutex.hpp>
 
 #include "test.hpp"
 
@@ -78,6 +89,36 @@ struct Shared {
 
 };
 
+struct SharedWithEmulated {
+    InterprocessMutex m_mutex;
+    InterprocessMutex::SharedPart m_shared_part;
+    int m_value;
+
+    SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
+    ~SharedWithEmulated() { }
+
+    // 10000 takes less than 0.1 sec
+    void increment_10000_times()
+    {
+        for (int i=0; i<10000; ++i) {
+            std::lock_guard<InterprocessMutex> lock(m_mutex);
+            ++m_value;
+        }
+    }
+
+    void increment_10000_times2()
+    {
+        for (int i=0; i<10000; ++i) {
+            std::lock_guard<InterprocessMutex> lock(m_mutex);
+            // Create a time window where thread interference can take place. Problem with ++m_value is that it
+            // could assemble into 'inc [addr]' which has very tiny gap
+            double f = m_value;
+            f += 1.;
+            m_value = int(f);
+        }
+    }
+
+};
 
 struct Robust {
     RobustMutex m_mutex;
@@ -238,6 +279,19 @@ TEST(Thread_CriticalSection)
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
         threads[i].start(std::bind(&Shared::increment_10000_times, &shared));
+    for (int i = 0; i < 10; ++i)
+        threads[i].join();
+    CHECK_EQUAL(100000, shared.m_value);
+}
+
+
+TEST(Thread_EmulatedMutex_CriticalSection)
+{
+    SharedWithEmulated shared("EmulatedMutex_CriticalSection");
+    shared.m_value = 0;
+    Thread threads[10];
+    for (int i = 0; i < 10; ++i)
+        threads[i].start(std::bind(&SharedWithEmulated::increment_10000_times, &shared));
     for (int i = 0; i < 10; ++i)
         threads[i].join();
     CHECK_EQUAL(100000, shared.m_value);
@@ -423,5 +477,210 @@ TEST(Thread_CondVar)
         CHECK_EQUAL(1000, n);
     }
 }
+
+#ifndef _WIN32 // interprocess condvars not suported in Windows yet
+
+// Detect and flag trivial implementations of condvars.
+namespace {
+
+static int signals;
+
+void signaller(InterprocessMutex* mutex, InterprocessCondVar* cv)
+{
+    millisleep(1000);
+    signals = 1;
+    {
+        std::lock_guard<InterprocessMutex> l(*mutex);
+        // wakeup any waiters
+        cv->notify_all();
+    }
+    // exit scope to allow waiters to get lock
+    millisleep(1000);
+    signals = 2;
+    {
+        std::lock_guard<InterprocessMutex> l(*mutex);
+        // wakeup any waiters, 2nd time
+        cv->notify_all();
+    }
+    millisleep(1000);
+    signals = 3;
+    {
+        std::lock_guard<InterprocessMutex> l(*mutex);
+        // wakeup any waiters, 2nd time
+        cv->notify_all();
+    }
+    millisleep(1000);
+    signals = 4;
+}
+
+static int signal_state;
+void wakeup_signaller(InterprocessMutex* mutex, InterprocessCondVar* cv)
+{
+    millisleep(1000);
+    signal_state = 2;
+    std::lock_guard<InterprocessMutex> l(*mutex);
+    cv->notify_all();
+}
+
+static int wait_counter;
+
+void waiter_with_count(InterprocessMutex* mutex, InterprocessCondVar* cv)
+{
+    std::lock_guard<InterprocessMutex> l(*mutex);
+    ++wait_counter;
+    cv->wait(*mutex, nullptr);
+    --wait_counter;
+}
+
+void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
+{
+    std::lock_guard<InterprocessMutex> l(*mutex);
+    cv->wait(*mutex, nullptr);
+}
+
+}
+
+// Verify, that a wait on a condition variable actually waits
+// - this test relies on assumptions about scheduling, which
+//   may not hold on a heavily loaded system.
+TEST(Thread_CondvarWaits)
+{
+    InterprocessMutex mutex;
+    InterprocessMutex::SharedPart mutex_part;
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    mutex.set_shared_part(mutex_part, "Thread_CondvarWaits", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarWaits", "");
+    changed.init_shared_part(condvar_part);
+    Thread signal_thread;
+    signals = 0;
+    signal_thread.start(std::bind(signaller, &mutex, &changed));
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        changed.wait(mutex, nullptr);
+        CHECK_EQUAL(signals, 1);
+        changed.wait(mutex, nullptr);
+        CHECK_EQUAL(signals, 2);
+        changed.wait(mutex, nullptr);
+        CHECK_EQUAL(signals, 3);
+    }
+    signal_thread.join();
+    mutex.release_shared_part();
+}
+
+// Verify that a condition variable looses its signal if no one
+// is waiting on it
+TEST(Thread_CondvarIsStateless)
+{
+    InterprocessMutex mutex;
+    InterprocessMutex::SharedPart mutex_part;
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
+    mutex.set_shared_part(mutex_part, "Thread_CondvarIsStateless", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarIsStateless", "");
+    Thread signal_thread;
+    signal_state = 1;
+    // send some signals:
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        for (int i=0; i<10; ++i)
+            changed.notify_all();
+    }
+    // spawn a thread which will later do one more signal in order
+    // to wake us up.
+    signal_thread.start(std::bind(wakeup_signaller, &mutex, &changed));
+    // Wait for a signal - the signals sent above should be lost, so
+    // that this wait will actually wait for the thread to signal.
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        changed.wait(mutex,0);
+        CHECK_EQUAL(signal_state, 2);
+    }
+    signal_thread.join();
+    mutex.release_shared_part();
+}
+
+
+// this test hangs, if timeout doesn't work.
+TEST(Thread_CondvarTimeout)
+{
+    InterprocessMutex mutex;
+    InterprocessMutex::SharedPart mutex_part;
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
+    mutex.set_shared_part(mutex_part, "Thread_CondvarTimeout", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarTimeout", "");
+    struct timespec time;
+    time.tv_sec = 0;
+    time.tv_nsec = 100000000; // 0.1 sec
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        for (int i=0; i<5; ++i)
+            changed.wait(mutex, &time);
+    }
+    mutex.release_shared_part();
+}
+
+
+// test that notify_all will wake up all waiting threads, if there
+// are many waiters:
+TEST(Thread_CondvarNotifyAllWakeup)
+{
+    InterprocessMutex mutex;
+    InterprocessMutex::SharedPart mutex_part;
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
+    mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyAllWakeup", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyAllWakeup", "");
+    const int num_waiters = 10;
+    Thread waiters[num_waiters];
+    for (int i=0; i<num_waiters; ++i) {
+        waiters[i].start(std::bind(waiter, &mutex, &changed));
+    }
+    millisleep(1000); // allow time for all waiters to wait
+    changed.notify_all();
+    for (int i=0; i<num_waiters; ++i) {
+        waiters[i].join();
+    }
+    mutex.release_shared_part();
+}
+
+
+// test that notify will wake up only a single thread, even if there
+// are many waiters:
+TEST(Thread_CondvarNotifyWakeup)
+{
+    wait_counter = 0;
+    InterprocessMutex mutex;
+    InterprocessMutex::SharedPart mutex_part;
+    InterprocessCondVar changed;
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
+    mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyWakeup", "");
+    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyWakeup", "");
+    const int num_waiters = 10;
+    Thread waiters[num_waiters];
+    for (int i=0; i<num_waiters; ++i) {
+        waiters[i].start(std::bind(waiter_with_count, &mutex, &changed));
+    }
+    millisleep(1000); // allow time for all waiters to wait
+    CHECK(wait_counter == 10);
+    changed.notify();
+    millisleep(1000);
+    CHECK(wait_counter == 9);
+    changed.notify();
+    millisleep(1000);
+    CHECK(wait_counter == 8);
+    changed.notify_all();
+    for (int i=0; i<num_waiters; ++i) {
+        waiters[i].join();
+    }
+    mutex.release_shared_part();
+}
+
+#endif // _WIN32
 
 #endif // TEST_THREAD

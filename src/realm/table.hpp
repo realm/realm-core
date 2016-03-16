@@ -2107,7 +2107,7 @@ public:
     }
 
     static void insert_column_unless_exists(Descriptor& desc, size_t column_ndx, DataType type,
-                                            StringData name, LinkTargetInfo& link, bool nullable = false,
+                                            StringData name, LinkTargetInfo link, bool nullable = false,
                                             bool* was_inserted = nullptr)
     {
         Table::do_insert_column_unless_exists(desc, column_ndx, type, name, link, nullable, was_inserted); // Throws
