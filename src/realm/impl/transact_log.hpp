@@ -1078,17 +1078,17 @@ inline void TransactLogConvenientEncoder::set_binary(const Table* t, size_t col_
 
 inline bool TransactLogEncoder::set_date_time(size_t col_ndx, size_t ndx, DateTime value)
 {
-    append_simple_instr(instr_SetDateTime, util::tuple(col_ndx, ndx, value.get_datetime())); // Throws
+    append_simple_instr(instr_SetDateTime, util::tuple(col_ndx, ndx,
+                                                       value.get_datetime())); // Throws
     return true;
 }
 
 inline void TransactLogConvenientEncoder::set_date_time(const Table* t, size_t col_ndx,
-    size_t ndx, DateTime value)
+                                       size_t ndx, DateTime value)
 {
     select_table(t); // Throws
     m_encoder.set_date_time(col_ndx, ndx, value); // Throws
 }
-
 
 inline bool TransactLogEncoder::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
 {
@@ -1101,7 +1101,6 @@ inline void TransactLogConvenientEncoder::set_newdate(const Table* t, size_t col
     select_table(t); // Throws
     m_encoder.set_newdate(col_ndx, ndx, value); // Throws
 }
-
 
 inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx)
 {

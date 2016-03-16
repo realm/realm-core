@@ -2862,6 +2862,7 @@ void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
         repl->set_date_time(this, col_ndx, ndx, value); // Throws
 }
 
+
 float Table::get_float(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<float>(col_ndx, ndx);

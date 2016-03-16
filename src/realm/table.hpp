@@ -1364,14 +1364,18 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
-    template<class> friend class util::bind_ptr;
-    template<class> friend class SimpleColumn;
+    template<class>
+    friend class util::bind_ptr;
+    template<class>
+    friend class SimpleColumn;
     friend class LangBindHelper;
     friend class TableViewBase;
-    template<class T> friend class Columns;
+    template<class T>
+    friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
-    template<class> friend class SequentialGetter;
+    template<class>
+    friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
     friend class LinkMap;
@@ -1414,6 +1418,7 @@ protected:
 
 
 // Implementation:
+
 
 inline uint_fast64_t Table::get_version_counter() const noexcept { return m_version; }
 
@@ -1656,18 +1661,18 @@ inline TableRef Table::copy(Allocator& alloc) const
 
 // For use by queries
 template<class T>
-inline Columns<T> Table::column(size_t col_ndx)
+inline Columns<T> Table::column(size_t column)
 {
     std::vector<size_t> tmp = m_link_chain;
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
-        tmp.push_back(col_ndx);
+        tmp.push_back(column);
     }
 
     // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
     const Table* table = get_link_chain_target(m_link_chain);
 
-    realm::DataType ct = table->get_column_type(col_ndx);
+    realm::DataType ct = table->get_column_type(column);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
@@ -1681,7 +1686,7 @@ inline Columns<T> Table::column(size_t col_ndx)
 
 
     m_link_chain.clear();
-    return Columns<T>(col_ndx, this, tmp);
+    return Columns<T>(column, this, tmp);
 }
 
 template<class T>
