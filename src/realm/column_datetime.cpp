@@ -147,9 +147,10 @@ inline ref_type DateTimeColumn::write(size_t /*slice_offset*/, size_t /*slice_si
     return 0;
 }
 
-inline void DateTimeColumn::update_from_parent(size_t /*old_baseline*/) noexcept
+inline void DateTimeColumn::update_from_parent(size_t old_baseline) noexcept
 {
-    // FIXME: Dummy implementation
+    m_seconds.update_from_parent(old_baseline);
+    m_nanoseconds.update_from_parent(old_baseline);
 }
 
 inline void DateTimeColumn::refresh_accessor_tree(size_t /*new_col_ndx*/, const Spec&)

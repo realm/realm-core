@@ -64,8 +64,7 @@ TEST(DateTimeColumn_Basic_Nulls)
 
 TEST(DateTimeColumn_Relocate)
 {
-    // Fill so much data in a column that it relocates, to check if update_from_parent() etc
-    // works.
+    // Fill so much data in a column that it relocates, to check if relocation propagates up correctly
     Table t;
     t.add_column(type_NewDate, "date", true  /*nullable*/);
 
