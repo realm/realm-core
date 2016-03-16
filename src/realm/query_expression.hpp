@@ -736,7 +736,7 @@ struct NullableVector
     }
 
     template <typename Type = T>
-    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, null>::value,
+    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, NewDate, null>::value,
                             void>::type
     set(size_t index, t_storage value) {
         m_first[index] = value;
@@ -753,10 +753,13 @@ struct NullableVector
 
     inline void set(size_t index, util::Optional<Underlying> value)
     {
-        if (value)
-            set(index, *value);
-        else
+        if (value) {
+            Underlying v = *value;
+            set(index, v);
+        }
+        else {
             set_null(index);
+        }
     }
 
     void fill(T value)
