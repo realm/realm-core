@@ -1311,8 +1311,8 @@ TEST(Group_Persist)
     table->add_column(type_DateTime, "date");
     table->add_column(type_String,   "string");
     table->add_column(type_Binary,   "binary");
-    table->add_column(type_Mixed, "mixed");
-    table->add_column(type_NewDate, "newdate");
+    table->add_column(type_Mixed,    "mixed");
+    table->add_column(type_NewDate,  "newdate");
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
