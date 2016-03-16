@@ -54,6 +54,9 @@ DateTimeColumn::DateTimeColumn(Allocator& alloc, ref_type ref)
 
     m_seconds.init_from_ref(alloc, seconds);
     m_nanoseconds.init_from_ref(alloc, nano);
+
+    m_seconds.set_parent(root, 0);
+    m_nanoseconds.set_parent(root, 1);
 }
 
 

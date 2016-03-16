@@ -62,4 +62,16 @@ TEST(DateTimeColumn_Basic_Nulls)
     t.set_null(1, 0);
 }
 
+TEST(DateTimeColumn_Relocate)
+{
+    // Fill so much data in a column that it relocates, to check if update_from_parent() etc
+    // works.
+    Table t;
+    t.add_column(type_NewDate, "date", true  /*nullable*/);
+
+    for (size_t i = 0; i < 10000; i++) {
+        t.add_empty_row();
+        t.set_newdate(0, i, NewDate(i, i));
+    }
+}
 #endif // TEST_COLUMN_DATETIME
