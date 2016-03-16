@@ -19,7 +19,7 @@ function bench {
     echo "# Duration: ${duration}" >> $out
     echo "# Readers Writers TPS(Reader) TPS(Writer) TPS(total)" >> $out
     for i in $(seq 0 $Nmax)
-    do 
+    do
         for j in $(seq 0 $Nmax)
         do
             echo -n "$j $i " >> $out

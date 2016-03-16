@@ -192,7 +192,7 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_utf8_invalid)
     // Test that invalid utf8 won't make decisions on data beyond Realm payload. Do that by placing an utf8 header that
     // indicate 5 octets will follow, and put spurious1 and spurious2 after them to see if Realm will access these too
     // and make sorting decisions on them. Todo: This does not guarantee that spurious data access does not happen;
-    // todo: make unit test that attempts to trigger segfault near a page limit instead. 
+    // todo: make unit test that attempts to trigger segfault near a page limit instead.
     char invalid1[] = "\xfc";
     char spurious1[] = "aaaaaaaaaaaaaaaa";
     char invalid2[] = "\xfc";

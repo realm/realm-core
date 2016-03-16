@@ -240,7 +240,7 @@ TEST(StringData_LexicographicCompare)
 TEST(StringData_Substrings)
 {
     // Reasoning behind behaviour is that if you append strings A + B then B is a suffix of a, and hence A
-    // "ends with" B, and B "begins with" A. This is true even though appending a null or empty string keeps the 
+    // "ends with" B, and B "begins with" A. This is true even though appending a null or empty string keeps the
     // original unchanged
 
     StringData empty("");
