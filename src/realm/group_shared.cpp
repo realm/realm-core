@@ -400,7 +400,12 @@ private:
 /// on the file, and may be read only while holding a shared (or exclusive) lock
 /// on the file. All other members (except for the Ringbuffer) may be accessed
 /// only while holding a lock on `controlmutex`.
-struct SharedGroup::SharedInfo {
+
+/// SharedInfo must be 8-byte aligned. On 32-bit Apple platforms, mutexes store their
+/// alignment as part of the mutex state. We're copying the SharedInfo (including
+/// embedded but alway unlocked mutexes) and it must retain the same alignment
+/// throughout.
+struct alignas(8) SharedGroup::SharedInfo {
     // Indicates that initialization of the lock file was completed sucessfully.
     uint8_t init_complete = 0; // Offset 0
 
@@ -736,7 +741,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             // init_complete = 0. Need to fill with zeros before constructing
             // due to the bit field members. Otherwise we would write
             // uninitialized bits to the file.
-            char buffer[sizeof (SharedInfo)] = {0};
+            alignas(SharedInfo) char buffer[sizeof (SharedInfo)] = {0};
             new (buffer) SharedInfo(durability, history_type); // Throws
             m_file.write(buffer, sizeof buffer); // Throws
 
@@ -810,20 +815,35 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // layout expected by this session participant. We could find that it is
         // initializaed with a different memory layout if other concurrent
         // session participants use different versions of the core library.
-        if (info_size < sizeof (SharedInfo))
-            throw IncompatibleLockFile();
-        if (info->shared_info_version != g_shared_info_version)
-            throw IncompatibleLockFile();
+        if (info_size < sizeof (SharedInfo)) {
+            std::stringstream ss;
+            ss << "Info size doesn't match, " << info_size << " " << sizeof(SharedInfo) <<  ".";
+            throw IncompatibleLockFile(ss.str());
+        }
+        if (info->shared_info_version != g_shared_info_version) {
+            std::stringstream ss;
+            ss << "Shared info version doesn't match, " << info->shared_info_version <<
+                " " << g_shared_info_version << ".";
+            throw IncompatibleLockFile(ss.str());
+        }
         // Validate compatible sizes of mutex and condvar types. Sizes of all
         // other fields are architecture independent, so if condvar and mutex
         // sizes match, the entire struct matches. The offsets of
         // `size_of_mutex` and `size_of_condvar` are known to be as expected due
         // to the preceeding check in `shared_info_version`.
-        if (info->size_of_mutex != sizeof info->shared_controlmutex)
-            throw IncompatibleLockFile();
+        if (info->size_of_mutex != sizeof info->shared_controlmutex) {
+            std::stringstream ss;
+            ss << "Mutex size doesn't match: " << info->size_of_mutex << " "  <<
+                sizeof(info->shared_controlmutex) << ".";
+            throw IncompatibleLockFile(ss.str());
+        }
 #ifndef _WIN32
-        if (info->size_of_condvar != sizeof info->room_to_write)
-            throw IncompatibleLockFile();
+        if (info->size_of_condvar != sizeof info->room_to_write) {
+            std::stringstream ss;
+            ss << "Condtion var size doesn't match: " << info->size_of_condvar << " " <<
+                    sizeof(info->room_to_write) << ".";
+            throw IncompatibleLockFile(ss.str());
+        }
 #endif
         // Even though fields match wrt alignment and size, there may still be
         // incompatibilities between implementations, so lets ask one of the
@@ -848,8 +868,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
-        if (!m_controlmutex.is_valid())
-            throw IncompatibleLockFile();
+        if (!m_controlmutex.is_valid()) {
+            throw IncompatibleLockFile("Control mutex is invalid.");
+        }
 
         // OK! lock file appears valid. We can now continue operations under the protection
         // of the controlmutex. The controlmutex protects the following activities:
@@ -985,8 +1006,12 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                 // we shall instead simply check that there is agreement, and
                 // throw the same kind of exception, as would have been thrown
                 // with a bumped SharedInfo file format version, if there isn't.
-                if (info->file_format_version != target_file_format_version)
-                    throw IncompatibleLockFile();
+                if (info->file_format_version != target_file_format_version) {
+                    std::stringstream ss;
+                    ss << "File format version deosn't match: " << info->file_format_version << " " <<
+                        target_file_format_version << ".";
+                    throw IncompatibleLockFile(ss.str());
+                }
             }
 
 #ifndef _WIN32
@@ -1465,8 +1490,8 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
             // has been cleaned up.
             if (& r_info->readers.get_oldest() != &r)
 	        throw BadVersion();
-	}
-	// we managed to lock an entry in the ringbuffer, but it may be so old that
+        }
+        // we managed to lock an entry in the ringbuffer, but it may be so old that
         // the version doesn't match the specific request. In that case we must release and fail
         if (r.version != version_id.version) {
             atomic_double_dec(r.count); // <-- release

@@ -506,7 +506,7 @@ public:
 
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=},
         // but only if both columns are non-nullable, and aren't in linked tables.
-        if (left_col && right_col && std::is_same<L, R>::value && !left_col->m_nullable && !right_col->m_nullable
+        if (left_col && right_col && std::is_same<L, R>::value && !left_col->is_nullable() && !right_col->is_nullable()
             && !left_col->links_exist() && !right_col->links_exist()) {
             const Table* t = left_col->get_base_table();
             Query q = Query(*t);
@@ -697,7 +697,9 @@ struct NullableVector
         m_first[index] = m_null;
     }
 
-    inline void set(size_t index, t_storage value)
+    template <typename Type = t_storage>
+    typename std::enable_if<std::is_same<Type, int64_t>::value, void>::type
+    set(size_t index, t_storage value)
     {
         REALM_ASSERT((std::is_same<t_storage, int64_t>::value));
 
@@ -711,6 +713,14 @@ struct NullableVector
         }
         m_first[index] = value;
     }
+
+    template <typename Type = T>
+    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, null>::value,
+                            void>::type
+    set(size_t index, t_storage value) {
+        m_first[index] = value;
+    }
+
 
     inline util::Optional<T> get(size_t index) const
     {
@@ -778,12 +788,6 @@ struct NullableVector
 // Double
 // NOTE: fails in gcc 4.8 without `inline`. Do not remove. Same applies for all methods below.
 template<>
-inline void NullableVector<double>::set(size_t index, double value)
-{
-    m_first[index] = value;
-}
-
-template<>
 inline bool NullableVector<double>::is_null(size_t index) const
 {
     return null::is_null_float(m_first[index]);
@@ -808,11 +812,6 @@ inline void NullableVector<float>::set_null(size_t index)
     m_first[index] = null::get_null_float<float>();
 }
 
-template<>
-inline void NullableVector<float>::set(size_t index, float value)
-{
-    m_first[index] = value;
-}
 
 // Null
 template<>
@@ -825,10 +824,7 @@ inline bool NullableVector<null>::is_null(size_t) const
 {
     return true;
 }
-template<>
-inline void NullableVector<null>::set(size_t, null)
-{
-}
+
 
 // DateTime
 template<>
@@ -837,11 +833,6 @@ inline bool NullableVector<DateTime>::is_null(size_t index) const
     return m_first[index].get_datetime() == m_null;
 }
 
-template<>
-inline void NullableVector<DateTime>::set(size_t index, DateTime value)
-{
-    m_first[index] = value;
-}
 
 template<>
 inline void NullableVector<DateTime>::set_null(size_t index)
@@ -850,11 +841,7 @@ inline void NullableVector<DateTime>::set_null(size_t index)
 }
 
 // StringData
-template<>
-inline void NullableVector<StringData>::set(size_t index, StringData value)
-{
-    m_first[index] = value;
-}
+
 template<>
 inline bool NullableVector<StringData>::is_null(size_t index) const
 {
@@ -868,11 +855,7 @@ inline void NullableVector<StringData>::set_null(size_t index)
 }
 
 // BinaryData
-template<>
-inline void NullableVector<BinaryData>::set(size_t index, BinaryData value)
-{
-    m_first[index] = value;
-}
+
 template<>
 inline bool NullableVector<BinaryData>::is_null(size_t index) const
 {
@@ -884,6 +867,7 @@ inline void NullableVector<BinaryData>::set_null(size_t index)
 {
     m_first[index] = BinaryData();
 }
+
 
 template<typename Operator>
 struct OperatorOptionalAdapter {
@@ -1541,24 +1525,25 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
     return value;
 }
 
-// Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
-template <> class Columns<StringData> : public Subexpr2<StringData>
-{
+
+// If we add a new Realm type T and quickly want Query support for it, then simply inherit from it like
+// `template <> class Columns<T> : public SimpleColumn<T>` and you're done. Any operators of the set
+// { ==, >=, <=, !=, >, < } that are supported by T will be supported by the "query expression syntax"
+// automatically. NOTE: This method of Query support will be slow because it goes through Table::get<T>.
+// To get faster Query support, either add SequentialGetter support (faster) or create a query_engine.hpp
+// node for it (super fast).
+
+template <class T>
+class SimpleColumn : public Subexpr2<T> {
 public:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}):
-        m_link_map(table, links), m_column(column)
+    SimpleColumn(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
+        m_column(column), m_link_map(table, links)
     {
-        REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), ==, type_String);
     }
 
-    void set_base_table(const Table* table) override
+    bool is_nullable() const noexcept
     {
-        m_link_map.set_base_table(table);
-    }
-
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
-    {
-        return make_subexpr<Columns<StringData>>(*this);
+        return m_link_map.base_table()->is_nullable(m_column);
     }
 
     const Table* get_base_table() const override
@@ -1566,17 +1551,22 @@ public:
         return m_link_map.base_table();
     }
 
+    void set_base_table(const Table* table) override
+    {
+        m_link_map.set_base_table(table);
+    }
+
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Value<StringData>& d = static_cast<Value<StringData>&>(destination);
+        Value<T>& d = static_cast<Value<T>&>(destination);
 
         if (links_exist()) {
             std::vector<size_t> links = m_link_map.get_links(index);
-            Value<StringData> v = make_value_for_link<StringData>(m_link_map.only_unary_links(), links.size());
+            Value<T> v = make_value_for_link<T>(m_link_map.only_unary_links(), links.size());
 
             for (size_t t = 0; t < links.size(); t++) {
                 size_t link_to = links[t];
-                v.m_storage.set(t, m_link_map.target_table()->get_string(m_column, link_to));
+                v.m_storage.set(t, m_link_map.target_table()->template get<T>(m_column, link_to));
             }
             destination.import(v);
         }
@@ -1584,9 +1574,39 @@ public:
             // Not a link column
             const Table* target_table = m_link_map.target_table();
             for (size_t t = 0; t < destination.m_values && index + t < target_table->size(); t++) {
-                d.m_storage.set(t, target_table->get_string(m_column, index + t));
+                d.m_storage.set(t, target_table->get<T>(m_column, index + t));
             }
         }
+    }
+
+    bool links_exist() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
+    }
+
+    // Column index of payload column of m_table
+    size_t m_column;
+    LinkMap m_link_map;
+};
+
+
+template <>
+class Columns<BinaryData> : public SimpleColumn<BinaryData> {
+    using SimpleColumn::SimpleColumn;
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return make_subexpr<Columns<BinaryData>>(*this);
+    }
+};
+
+
+template <>
+class Columns<StringData> : public SimpleColumn<StringData> {
+public:
+    using SimpleColumn::SimpleColumn;
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
+    {
+        return make_subexpr<Columns<StringData>>(*this);
     }
 
     Query equal(StringData sd, bool case_sensitive = true)
@@ -1638,16 +1658,6 @@ public:
     {
         return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
     }
-
-    bool links_exist() const
-    {
-        return m_link_map.m_link_columns.size() > 0;
-    }
-
-    LinkMap m_link_map;
-
-    // Column index of payload column of m_table
-    size_t m_column;
 };
 
 
@@ -1705,66 +1715,6 @@ Query operator != (const Columns<StringData>& left, T right) {
 }
 
 
-// Handling of BinaryData columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
-//
-// FIXME: See if we can merge it with Columns<StringData> because they are very similiar
-template <> class Columns<BinaryData> : public Subexpr2<BinaryData>
-{
-public:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}) :
-        m_column(column), m_link_map(table, links)
-    {
-        REALM_ASSERT_3(m_link_map.target_table()->get_column_type(column), == , type_Binary);
-    }
-
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
-    {
-        return make_subexpr<Columns<BinaryData>>(*this);
-    }
-
-    const Table* get_base_table() const override
-    {
-        return m_link_map.base_table();
-    }
-
-    void set_base_table(const Table* table) override
-    {
-        m_link_map.set_base_table(table);
-    }
-
-    virtual void evaluate(size_t index, ValueBase& destination) override
-    {
-        Value<BinaryData>& d = static_cast<Value<BinaryData>&>(destination);
-
-        if (links_exist()) {
-            std::vector<size_t> links = m_link_map.get_links(index);
-            Value<BinaryData> v = make_value_for_link<BinaryData>(m_link_map.only_unary_links(), links.size());
-
-            for (size_t t = 0; t < links.size(); t++) {
-                size_t link_to = links[t];
-                v.m_storage.set(t, m_link_map.target_table()->get_binary(m_column, link_to));
-            }
-            destination.import(v);
-        }
-        else {
-            // Not a link column
-            const Table* target_table = m_link_map.target_table();
-            for (size_t t = 0; t < destination.m_values && index + t < target_table->size(); t++) {
-                d.m_storage.set(t, target_table->get_binary(m_column, index + t));
-            }
-        }
-    }
-
-    bool links_exist() const
-    {
-        return m_link_map.m_link_columns.size() > 0;
-    }
-
-    // Column index of payload column of m_table
-    size_t m_column;
-
-    LinkMap m_link_map;
-};
 
 inline Query operator==(const Columns<BinaryData>& left, BinaryData right) {
     return create<BinaryData, Equal, BinaryData>(right, left);
@@ -2071,6 +2021,11 @@ public:
         return m_link_map.m_link_columns.size() > 0;
     }
 
+    bool is_nullable() const
+    {
+        return m_nullable;
+    }
+
     LinkMap m_link_map;
 
     // Fast (leaf caching) value getter for payload column (column in table on which query condition is executed)
@@ -2079,6 +2034,7 @@ public:
     // Column index of payload column of m_table
     size_t m_column;
 
+private:
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
     // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
     bool m_nullable = false;
