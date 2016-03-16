@@ -518,7 +518,7 @@ TEST(ArrayString_Null)
 
         a.add("foo");
         a.add("");
-        a.add(realm::null()); 
+        a.add(realm::null());
 
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
@@ -540,7 +540,7 @@ TEST(ArrayString_Null)
         ArrayString a(Allocator::get_default(), true);
         a.create();
 
-        a.add(realm::null());  
+        a.add(realm::null());
         a.add("");
         a.add("foo");
 
@@ -550,9 +550,9 @@ TEST(ArrayString_Null)
         CHECK(a.get(2) == "foo");
 
         // Test insert
-        a.insert(0, realm::null()); 
-        a.insert(2, realm::null()); 
-        a.insert(4, realm::null()); 
+        a.insert(0, realm::null());
+        a.insert(2, realm::null());
+        a.insert(4, realm::null());
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);
@@ -653,7 +653,7 @@ TEST(ArrayString_Null)
         }
         a.destroy();
     }
-   
+
 }
 
 
@@ -686,7 +686,7 @@ TEST(ArrayString_Null2)
         // Keeps width = 0
         a.add("");
 
-        // Now add an "a" which will relocate the array and initialize the trailing width-byte of the empty string 
+        // Now add an "a" which will relocate the array and initialize the trailing width-byte of the empty string
         // (see array_string.hpp header) to the same value as m_width (which is 2). For a nullable column, that would
         // indicate that a[0] == null. But we're not nullable, so the following get(0) should not return null.
         a.add("a");
@@ -694,7 +694,7 @@ TEST(ArrayString_Null2)
         StringData sd = a.get(0);
         CHECK(!sd.is_null());
         CHECK_EQUAL(a.find_first(""), 0);
-        
+
         a.destroy();
         b.destroy();
     }

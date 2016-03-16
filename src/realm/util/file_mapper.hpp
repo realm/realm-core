@@ -44,16 +44,16 @@ class EncryptedFileMapping;
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
-void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key, 
+void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key,
            EncryptedFileMapping*& mapping);
 
-void do_encryption_read_barrier(const void* addr, size_t size, 
+void do_encryption_read_barrier(const void* addr, size_t size,
                                 HeaderToSize header_to_size,
                                 EncryptedFileMapping* mapping);
 
 void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping);
 
-void inline encryption_read_barrier(const void* addr, size_t size, 
+void inline encryption_read_barrier(const void* addr, size_t size,
                                     EncryptedFileMapping* mapping,
                                     HeaderToSize header_to_size = nullptr)
 {
@@ -70,7 +70,7 @@ void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFil
 
 extern util::Mutex mapping_mutex;
 
-inline void do_encryption_read_barrier(const void* addr, size_t size, 
+inline void do_encryption_read_barrier(const void* addr, size_t size,
                                        HeaderToSize header_to_size,
                                        EncryptedFileMapping* mapping)
 {
@@ -78,7 +78,7 @@ inline void do_encryption_read_barrier(const void* addr, size_t size,
     mapping->read_barrier(addr, size, lock, header_to_size);
 }
 
-inline void do_encryption_write_barrier(const void* addr, size_t size, 
+inline void do_encryption_write_barrier(const void* addr, size_t size,
                                         EncryptedFileMapping* mapping)
 {
     LockGuard lock(mapping_mutex);
@@ -88,9 +88,9 @@ inline void do_encryption_write_barrier(const void* addr, size_t size,
 
 
 #else
-void inline encryption_read_barrier(const void*, size_t, 
+void inline encryption_read_barrier(const void*, size_t,
                                     EncryptedFileMapping*,
-                                    HeaderToSize header_to_size = nullptr) 
+                                    HeaderToSize header_to_size = nullptr)
 {
     static_cast<void>(header_to_size);
 }

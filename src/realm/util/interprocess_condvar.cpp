@@ -84,7 +84,7 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
 
 
 
-void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, 
+void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path,
                                           std::string condvar_name)
 {
     close();

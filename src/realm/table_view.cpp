@@ -640,7 +640,7 @@ void TableViewBase::distinct(size_t column)
     distinct(std::vector<size_t> { column });
 }
 
-/// Remove rows that are duplicated with respect to the column set passed as argument. 
+/// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
 void TableViewBase::distinct(std::vector<size_t> columns)
 {
@@ -664,7 +664,7 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     Sorter s(columns, ascending);
     sort(s);
 
-    // Step 3: Create column accessors for all columns in the column set. 
+    // Step 3: Create column accessors for all columns in the column set.
     std::vector<const ColumnTemplateBase*> m_columns;
     std::vector<const StringEnumColumn*> m_columns_enum;
     m_columns.resize(columns.size());
@@ -672,8 +672,8 @@ void TableViewBase::distinct(std::vector<size_t> columns)
 
     for (size_t i = 0; i < columns.size(); i++) {
         const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
-        // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting 
-        // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used 
+        // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting
+        // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used
         // in a couple of other places in Core too.
         const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
         REALM_ASSERT(ctb);

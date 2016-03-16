@@ -1783,7 +1783,7 @@ TEST(TableView_Distinct)
     // Now test sync_if_needed()
     tv = t.where().find_all();
     // "", null, "", null, "foo", "foo", "bar"
-    
+
     tv.sort(0, false);
     // "foo", "foo", "bar", "", "", null, null
 
