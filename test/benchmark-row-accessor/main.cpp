@@ -31,14 +31,11 @@ enum DetachOrder { AttachOrder, RevAttOrder, RandomOrder };
 ///
 /// Here it is in pseduocode:
 ///
-///     table = new table
-///     table.add_empty_row
+///     table = add_empty_row(table())
 ///     rows = replicate(table[0], n)
 ///     time {
-///       repeat 10000 times {
-///         repeat 10000 times {
-///           rows[random(n)] = table[0]
-///         }
+///       repeat 10000 * 10000 times {
+///         rows[random(n)] = table[0]
 ///       }
 ///     }
 ///
@@ -76,8 +73,7 @@ void heap(Timer& timer, BenchmarkResults& results, int n,
 ///
 /// Here it is in pseduocode:
 ///
-///     table = new table
-///     table.add_empty_row
+///     table = add_empty_row(table())
 ///     detach_indexes = sort(detach_order, range(balloon_size))
 ///     time {
 ///       rows = replicate(table[0], ballon_size)
