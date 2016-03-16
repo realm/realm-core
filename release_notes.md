@@ -21,6 +21,7 @@
 
 * Disabled unittest Shared_RobustAgainstDeathDuringWrite on Linux, as
   it could run forever.
+* Fixed a few compiler warnings
 * Disabled unittest Shared_WaitForChange again, as it can still run forever
 
 ----------------------------------------------
