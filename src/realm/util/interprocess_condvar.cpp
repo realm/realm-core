@@ -217,8 +217,10 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         int r;
         {
             if (tp) {
-                int time = tp->tv_sec*1000 + tp->tv_nsec/1000000;
-                r = poll(&poll_d, 1, time);
+                long miliseconds = tp->tv_sec*1000 + tp->tv_nsec/1000000;
+                REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<int>(miliseconds));
+                int timeout = int(miliseconds);
+                r = poll(&poll_d, 1, timeout);
             }
             else
                 r = poll(&poll_d, 1, -1);
@@ -264,7 +266,7 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         // potentially loop on it), but it will consume excess CPU/battery
         // and may also cause priority inversion
         char c;
-        int ret = read(m_fd_read,&c,1);
+        ssize_t ret = read(m_fd_read,&c,1);
         if (ret == -1)
             continue; // FIXME: If the invariants hold, this is unreachable
         return;
