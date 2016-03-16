@@ -1591,8 +1591,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             int64_t seconds = read_int<int64_t>(); // Throws
             uint32_t nanoseconds = read_int<uint32_t>(); // Throws
             NewDate value = NewDate(seconds, nanoseconds);
-//            if (!handler.set_newdate(col_ndx, row_ndx, value)) // Throws
-//                parser_error();
+            if (!handler.set_newdate(col_ndx, row_ndx, value)) // Throws
+                parser_error();
             return;
         }
         case instr_SetTable: {

@@ -149,7 +149,7 @@ public:
     bool set_newdate(size_t col_ndx, size_t row_ndx, NewDate value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
-            //log("table->set_newdate(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            log("table->set_newdate(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
             m_table->set_newdate(col_ndx, row_ndx, value); // Throws
             return true;
         }
