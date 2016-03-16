@@ -58,8 +58,10 @@ using namespace realm::util;
 namespace {
 
 // Constants controlling the amount of uncommited writes in flight:
+#ifdef REALM_ASYNC_DAEMON
 const uint16_t max_write_slots = 100;
 const uint16_t relaxed_sync_threshold = 50;
+#endif
 
 // value   change
 // --------------------
@@ -1624,14 +1626,13 @@ void SharedGroup::do_end_read() noexcept
 
 void SharedGroup::do_begin_write()
 {
-    SharedInfo* info = m_file_map.get_addr();
-
     // Get write lock
     // Note that this will not get released until we call
     // commit() or rollback()
     m_writemutex.lock(); // Throws
 
 #ifdef REALM_ASYNC_DAEMON
+    SharedInfo* info = m_file_map.get_addr();
     if (info->durability == durability_Async) {
 
         m_balancemutex.lock(); // Throws
