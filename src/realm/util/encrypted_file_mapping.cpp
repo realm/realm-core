@@ -319,7 +319,7 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 #endif
 }
 
-EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, 
+EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size,
                                            File::AccessMode access)
 : m_file(file)
 , m_page_shift(log2(realm::util::page_size()))

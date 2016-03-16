@@ -13,7 +13,7 @@ print "Filling db"
 with db.write() as group:
     table = group.create_table("test", ["key",   "int",
                                         "value", "string"])
-    
+
     for i in range(1000000):
         table += [i, str(i)]
 

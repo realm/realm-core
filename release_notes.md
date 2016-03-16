@@ -19,7 +19,7 @@
 
 ### Internals:
 
-* Disabled unittest Shared_RobustAgainstDeathDuringWrite on Linux, as 
+* Disabled unittest Shared_RobustAgainstDeathDuringWrite on Linux, as
   it could run forever.
 
 ----------------------------------------------
@@ -70,7 +70,7 @@ versions [0.97.0].**
 
 * Language bindings can now test if a TableView depends on a deleted LinkList
   (detached LinkView) using `bool TableViewBase::depends_deleted_linklist()`.
-  See https://github.com/realm/realm-core/issues/1509 and also 
+  See https://github.com/realm/realm-core/issues/1509 and also
   TEST(Query_ReferDeletedLinkView) in test_query.cpp for details.
 * `LangBindHelper::advance_read()` and friends no longer take a history
   argument. Access to the history is now gained automatically via
@@ -233,8 +233,8 @@ versions [0.97.0].**
 
 * Any attempt to execute a query that depends on a LinkList that has been
   deleted from its table will now throw `DeletedLinkView` instead of
-  segfaulting. No other changes has been made; you must still verify 
-  LinkViewRef::is_attached() before calling any methods on a LinkViewRef, as 
+  segfaulting. No other changes has been made; you must still verify
+  LinkViewRef::is_attached() before calling any methods on a LinkViewRef, as
   usual.
 
 ### Enhancements:
@@ -369,7 +369,7 @@ versions [0.97.0].**
 
 ### Bugfixes:
 
-* Fixed bug where Query::average() would include the number of nulls in the 
+* Fixed bug where Query::average() would include the number of nulls in the
   result.
 * Presumably fixed a race between commit and opening the database.
 

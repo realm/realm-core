@@ -300,8 +300,8 @@ public:
     // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
     // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
     // then Query::m_table is set to this table, and set_base_table() is called on all Columns and LinkMaps in
-    // the query expression tree so that they can set/update their internals as required. 
-    // 
+    // the query expression tree so that they can set/update their internals as required.
+    //
     // During thread-handover of a Query, set_base_table() is also called to make objects point at the new table
     // instead of the old one from the old thread.
     virtual void set_base_table(const Table*) {}

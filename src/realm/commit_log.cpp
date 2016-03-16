@@ -238,7 +238,7 @@ protected:
     //
     //     [ preamble->begin_newest_commit_range .. preamble->end_commit_range [
     void get_maps_in_order(const CommitLogPreamble* preamble,
-                           const util::File::Map<CommitLogHeader>*& first, 
+                           const util::File::Map<CommitLogHeader>*& first,
                            const util::File::Map<CommitLogHeader>*& second) const;
 
     // Ensure the file is open so that it can be resized or mapped

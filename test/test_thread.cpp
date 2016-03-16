@@ -153,7 +153,7 @@ struct Robust {
 
 class QueueMonitor {
 public:
-    QueueMonitor(): m_closed(false) 
+    QueueMonitor(): m_closed(false)
     {
     }
 
