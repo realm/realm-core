@@ -1446,8 +1446,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             break;
         case col_type_NewDate:
             // Origin table will be set by group after entire table has been created
-            // FIXME: Not correctly implemented
-            col = new DateTimeColumn(); // Throws
+            col = new DateTimeColumn(alloc, ref); // Throws
             break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
@@ -1948,7 +1947,7 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
         case col_type_NewDate:
-            return DateTimeColumn().get_ref(); // Throws
+            return DateTimeColumn::create(alloc, size); // Throws
         case col_type_Float:
             return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Double:
