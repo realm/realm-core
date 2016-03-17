@@ -61,7 +61,7 @@ public:
     DateTimeColumn(Allocator& alloc, ref_type ref);
     ~DateTimeColumn() noexcept override;
 
-    static ref_type create(Allocator& alloc, size_t size);
+    static ref_type create(Allocator& alloc, size_t size = 0);
 
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
