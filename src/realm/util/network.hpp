@@ -278,6 +278,9 @@ private:
     using LendersOperPtr     = std::unique_ptr<async_oper, LendersOperDeleter>;
     using LendersWaitOperPtr = std::unique_ptr<wait_oper_base, LendersOperDeleter>;
 
+    class impl;
+    const std::unique_ptr<impl> m_impl;
+
     template<class Oper, class... Args>
     static std::unique_ptr<Oper, LendersOperDeleter> alloc(OwnersOperPtr&, Args&&...);
 
@@ -288,15 +291,13 @@ private:
     void add_wait_oper(LendersWaitOperPtr);
     void add_completed_oper(LendersOperPtr) noexcept;
 
-    using PostOperConstr = async_oper*(void* addr, size_t size, const void* cookie);
+    using PostOperConstr = post_oper_base*(void* addr, size_t size, impl&, const void* cookie);
     void do_post(PostOperConstr, size_t size, const void* cookie);
     template<class H>
-    static async_oper* post_oper_constr(void* addr, size_t size, const void* cookie);
+    static post_oper_base* post_oper_constr(void* addr, size_t size, impl&, const void* cookie);
+    static void recycle_post_oper(impl&, post_oper_base*) noexcept;
 
     using clock = std::chrono::steady_clock;
-
-    class impl;
-    const std::unique_ptr<impl> m_impl;
 
     friend class socket_base;
     friend class socket;
@@ -992,8 +993,9 @@ protected:
 class io_service::post_oper_base:
         public async_oper {
 public:
-    post_oper_base(size_t size):
-        async_oper(size, true) // Second argument is `in_use`
+    post_oper_base(size_t size, impl& serv):
+        async_oper(size, true), // Second argument is `in_use`
+        m_service(serv)
     {
     }
     void proceed() noexcept override
@@ -1002,32 +1004,46 @@ public:
     }
     void recycle() noexcept override
     {
-        bool orphaned = m_orphaned;
-        // Note: do_recycle() commits suicide.
-        do_recycle(orphaned);
+        // io_service::recycle_post_oper() destroys this operation object
+        io_service::recycle_post_oper(m_service, this);
     }
     void orphan() noexcept override
     {
-        m_orphaned = true;
+        REALM_ASSERT(false); // Never called
     }
 protected:
-    bool m_orphaned = false;
+    impl& m_service;
 };
 
 template<class H>
 class io_service::post_oper:
         public post_oper_base {
 public:
-    post_oper(size_t size, const H& handler):
-        post_oper_base(size),
+    post_oper(size_t size, impl& serv, const H& handler):
+        post_oper_base(size, serv),
         m_handler(handler)
     {
     }
     void recycle_and_execute() override
     {
-        bool orphaned = m_orphaned;
-        // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute(orphaned, m_handler); // Throws
+        // Recycle the operation object before the handler is exceuted, such
+        // that the memory is available for a new post operation that might be
+        // initiated during the execution of the handler.
+        bool was_recycled = false;
+        try {
+            H handler = std::move(m_handler); // Throws
+            // io_service::recycle_post_oper() destroys this operation object
+            io_service::recycle_post_oper(m_service, this);
+            was_recycled = true;
+            handler(); // Throws
+        }
+        catch (...) {
+            if (!was_recycled) {
+                // io_service::recycle_post_oper() destroys this operation object
+                io_service::recycle_post_oper(m_service, this);
+            }
+            throw;
+        }
     }
 private:
     const H m_handler;
@@ -1124,16 +1140,16 @@ inline void io_service::execute(std::unique_ptr<Oper, LendersOperDeleter>& lende
     lenders_ptr.release()->recycle_and_execute(); // Throws
 }
 
-template<class H> inline io_service::async_oper*
-io_service::post_oper_constr(void* addr, size_t size, const void* cookie)
+template<class H> inline io_service::post_oper_base*
+io_service::post_oper_constr(void* addr, size_t size, impl& serv, const void* cookie)
 {
     const H& handler = *static_cast<const H*>(cookie);
-    return new (addr) post_oper<H>(size, handler); // Throws
+    return new (addr) post_oper<H>(size, serv, handler); // Throws
 }
 
 inline bool io_service::async_oper::in_use() const noexcept
 {
-    return m_in_use != 0;
+    return m_in_use;
 }
 
 inline bool io_service::async_oper::is_complete() const noexcept
@@ -1176,8 +1192,9 @@ template<class H, class... Args>
 inline void io_service::async_oper::do_recycle_and_execute(bool orphaned, H& handler,
                                                            Args&&... args)
 {
-    // Recycle the operation object before the handler is exceuted, such that it
-    // is available for reuse during the execution of the handler.
+    // Recycle the operation object before the handler is exceuted, such that
+    // the memory is available for a new post operation that might be initiated
+    // during the execution of the handler.
     bool was_recycled = false;
     try {
         H handler_2 = std::move(handler); // Throws
@@ -1189,7 +1206,7 @@ inline void io_service::async_oper::do_recycle_and_execute(bool orphaned, H& han
         // `std::decay`, the following tuple will introduce a copy of all
         // nonconst lvalue reference arguments, preventing such references from
         // being passed through.
-        std::tuple<typename std::decay<Args>::type...> copy_of_args(args...);
+        std::tuple<typename std::decay<Args>::type...> copy_of_args(args...); // Throws
         do_recycle(orphaned);
         was_recycled = true;
         util::call_with_tuple(handler_2, std::move(copy_of_args)); // Throws
