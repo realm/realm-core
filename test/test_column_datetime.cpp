@@ -38,15 +38,16 @@ using namespace realm;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-/*
+
 TEST(DateTimeColumn_Basic)
 {
-    DateTimeColumn c;
+    ref_type ref = DateTimeColumn::create(Allocator::get_default());
+    DateTimeColumn c(Allocator::get_default(), ref);
     c.add(NewDate(123,123));
     NewDate ndt = c.get(0);
     CHECK(ndt == NewDate(123, 123));
 }
-*/
+
 TEST(DateTimeColumn_Basic_Nulls)
 {
     // Test that default value is null() for nullable column and non-null for non-nullable column
