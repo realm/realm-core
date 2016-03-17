@@ -59,11 +59,11 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 class DateTimeColumn : public ColumnBaseSimple {
 public:
     DateTimeColumn(Allocator& alloc, ref_type ref);
-    /// Get the number of entries in this column. This operation is relatively
-    /// slow.
 
     static ref_type create(Allocator& alloc, size_t size);
 
+    /// Get the number of entries in this column. This operation is relatively
+    /// slow.
     size_t size() const noexcept override;
     /// Whether or not this column is nullable.
     bool is_nullable() const noexcept override;
