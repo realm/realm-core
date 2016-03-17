@@ -610,7 +610,7 @@ private:
     /// See LangBindHelper.
     template<class O> void advance_read(O* observer, VersionID);
     template<class O> void promote_to_write(O* observer);
-    void commit_and_continue_as_read();
+    version_type commit_and_continue_as_read();
     template<class O> void rollback_and_continue_as_read(O* observer);
     //@}
 
@@ -1109,9 +1109,9 @@ public:
         sg.promote_to_write(obs); // Throws
     }
 
-    static void commit_and_continue_as_read(SharedGroup& sg)
+    static SharedGroup::version_type commit_and_continue_as_read(SharedGroup& sg)
     {
-        sg.commit_and_continue_as_read(); // Throws
+        return sg.commit_and_continue_as_read(); // Throws
     }
 
     template<class O>
