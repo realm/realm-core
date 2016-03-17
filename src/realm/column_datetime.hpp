@@ -59,6 +59,7 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 class DateTimeColumn : public ColumnBaseSimple {
 public:
     DateTimeColumn(Allocator& alloc, ref_type ref);
+    ~DateTimeColumn() noexcept override;
 
     static ref_type create(Allocator& alloc, size_t size);
 

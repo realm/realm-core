@@ -42,6 +42,12 @@ DateTimeColumn::DateTimeColumn(Allocator& alloc, ref_type ref)
 }
 
 
+DateTimeColumn::~DateTimeColumn() noexcept
+{
+
+}
+
+
 ref_type DateTimeColumn::create(Allocator& alloc, size_t size)
 {
     Array top(alloc);
