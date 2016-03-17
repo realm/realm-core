@@ -69,7 +69,7 @@ TEST(DateTimeColumn_Relocate)
     Table t;
     t.add_column(type_NewDate, "date", true  /*nullable*/);
 
-    for (size_t i = 0; i < 10000; i++) {
+    for (unsigned int i = 0; i < 10000; i++) {
         t.add_empty_row();
         t.set_newdate(0, i, NewDate(i, i));
     }
