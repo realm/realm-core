@@ -429,6 +429,13 @@ struct alignas(8) SharedGroup::SharedInfo {
     /// Cleared by the daemon when it decides to exit.
     uint8_t daemon_ready : 1; // Offset 3
 
+    /// Set during the critical phase of a commit, when the logs, the ringbuffer
+    /// and the database may be out of sync with respect to each other. If a
+    /// writer crashes during this phase, there is no safe way of continuing
+    /// with further write transactions. When beginning a write transaction, 
+    /// this must be checked and an exception thrown if set.
+    uint8_t commit_in_critical_phase : 1; // Offset 3
+
     /// The target Realm file format version for the current session. This
     /// allows all session participants to be in agreement. It can only differ
     /// from what is returned by Group::get_file_format_version() temporarily,
@@ -525,6 +532,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
 #endif
     daemon_started = 0;
     daemon_ready = 0;
+    commit_in_critical_phase = 0;
 
     // IMPORTANT: The offsets, types (, and meanings) of these members must
     // never change, not even when the SharedInfo layout version is bumped. The
@@ -1625,11 +1633,13 @@ void SharedGroup::do_end_read() noexcept
 void SharedGroup::do_begin_write()
 {
     SharedInfo* info = m_file_map.get_addr();
-
     // Get write lock
     // Note that this will not get released until we call
     // commit() or rollback()
     m_writemutex.lock(); // Throws
+
+    if (info->commit_in_critical_phase)
+        throw std::runtime_error("need to restart everything");
 
 #ifdef REALM_ASYNC_DAEMON
     if (info->durability == durability_Async) {
@@ -1665,6 +1675,7 @@ Replication::version_type SharedGroup::do_commit()
 
     version_type current_version = r_info->get_current_version_unchecked();
     version_type new_version = current_version + 1;
+    r_info->commit_in_critical_phase = 1;
     if (Replication* repl = m_group.get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
@@ -1676,6 +1687,8 @@ Replication::version_type SharedGroup::do_commit()
         }
         catch (...) {
             repl->abort_transact();
+            r_info = m_reader_map.get_addr();
+            r_info->commit_in_critical_phase = 0;
             throw;
         }
         repl->finalize_commit();
@@ -1683,7 +1696,8 @@ Replication::version_type SharedGroup::do_commit()
     else {
         low_level_commit(new_version); // Throws
     }
-
+    r_info = m_reader_map.get_addr();
+    r_info->commit_in_critical_phase = 0;
     return new_version;
 }
 
