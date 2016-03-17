@@ -22,22 +22,6 @@
 
 namespace realm {
 
-ref_type DateTimeColumn::create(Allocator& alloc, size_t size)
-{
-    Array top(alloc);
-    top.create(Array::type_HasRefs, false /* context_flag */, 2);
-
-    ref_type seconds = IntNullColumn::create(alloc, Array::type_Normal, size);
-    ref_type nano = IntegerColumn::create(alloc, Array::type_Normal, size);
-
-    top.set_as_ref(0, seconds);
-    top.set_as_ref(1, nano);
-
-    ref_type top_ref = top.get_ref();
-    return top_ref;
-}
-
-
 DateTimeColumn::DateTimeColumn(Allocator& alloc, ref_type ref)
 {
     char* header = alloc.translate(ref);
@@ -55,6 +39,22 @@ DateTimeColumn::DateTimeColumn(Allocator& alloc, ref_type ref)
 
     m_seconds.set_parent(root, 0);
     m_nanoseconds.set_parent(root, 1);
+}
+
+
+ref_type DateTimeColumn::create(Allocator& alloc, size_t size)
+{
+    Array top(alloc);
+    top.create(Array::type_HasRefs, false /* context_flag */, 2);
+
+    ref_type seconds = IntNullColumn::create(alloc, Array::type_Normal, size);
+    ref_type nano = IntegerColumn::create(alloc, Array::type_Normal, size);
+
+    top.set_as_ref(0, seconds);
+    top.set_as_ref(1, nano);
+
+    ref_type top_ref = top.get_ref();
+    return top_ref;
 }
 
 
