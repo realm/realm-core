@@ -145,6 +145,7 @@ SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
     try {
         do_clean_dir(path+ ".management", ".management");
         remove_dir(path+ ".management");
+        File::try_remove(get_lock_path());
     } catch (...) {
         // exception ignored
     }
@@ -158,6 +159,7 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
     try {
         do_clean_dir(m_path+ ".management", ".management");
         remove_dir(m_path+ ".management");
+        File::try_remove(get_lock_path());
     }
     catch (...) {
         // Exception deliberately ignored
