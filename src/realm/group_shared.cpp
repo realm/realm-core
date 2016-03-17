@@ -1689,13 +1689,13 @@ Replication::version_type SharedGroup::do_commit()
 }
 
 
-void SharedGroup::commit_and_continue_as_read()
+SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
 {
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
     util::LockGuard lg(m_handover_lock);
-    do_commit(); // Throws
+    version_type version = do_commit(); // Throws
 
     // advance read lock but dont update accessors:
     // As this is done under lock, along with the addition above of the newest commit,
@@ -1716,6 +1716,8 @@ void SharedGroup::commit_and_continue_as_read()
     gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size); // Throws
 
     m_transact_stage = transact_Reading;
+
+    return version;
 }
 
 
