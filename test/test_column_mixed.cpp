@@ -219,7 +219,7 @@ TEST(MixedColumn_Date)
 }
 
 
-TEST(MixedColumn_Date)
+TEST(MixedColumn_NewDate)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
