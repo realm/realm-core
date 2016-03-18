@@ -4,8 +4,8 @@ echo Realm core c++ binding Windows Release.
 Echo beta 0.11
 echo ----------------------------------------------------------
 echo This cmd file will collect the result of a visual studio
-echo Version %1 build of Realm and create a release archive 
-echo with all the files that should be distributed 
+echo Version %1 build of Realm and create a release archive
+echo with all the files that should be distributed
 echo to c++ binding users.
 echo The release will be located in Windows\Release\vs%1
 echo ----------------------------------------------------------
@@ -59,7 +59,7 @@ cd %location%release\vs%vsversion%\files
 echo %location%7z.exe a -tzip -r %location%release\vs%vsversion%\release\%releasefilename% *.*
 %location%7z.exe a -tzip -r %releasefilename% *.*
 :revision history
-:0.01 
+:0.01
 :First version. still needs to set up date time and developer environment variables correctly
 :Only support for vs2012
 :still need to be able to call the compiler to get things built

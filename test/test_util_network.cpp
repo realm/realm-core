@@ -1250,4 +1250,52 @@ TEST(Network_Async)
     server_thread.join();
 }
 
+
+TEST(Network_HeavyAsyncPost)
+{
+    network::io_service service;
+    network::deadline_timer dummy_timer(service);
+    dummy_timer.async_wait(std::chrono::hours(10000), [](std::error_code) {});
+
+    ThreadWrapper looper_thread;
+    looper_thread.start([&] { service.run(); });
+
+    std::vector<std::pair<int, long>> entries;
+    const long num_iterations = 10000L;
+    auto func = [&](int thread_index) {
+        for (long i = 0; i < num_iterations; ++i)
+            service.post([&entries, thread_index, i] { entries.emplace_back(thread_index, i); });
+    };
+
+    const int num_threads = 8;
+    std::unique_ptr<ThreadWrapper[]> threads(new ThreadWrapper[num_threads]);
+    for (int i = 0; i < num_threads; ++i)
+        threads[i].start([&func, i] { func(i); });
+    for (int i = 0; i < num_threads; ++i)
+        CHECK_NOT(threads[i].join());
+
+    service.post([&] { dummy_timer.cancel(); });
+    CHECK_NOT(looper_thread.join());
+
+    // Check that every post operation ran exactly once
+    using longlong = long long;
+    if (CHECK_EQUAL(num_threads * longlong(num_iterations), entries.size())) {
+        bool every_post_operation_ran_exactly_once = true;
+        std::sort(entries.begin(), entries.end());
+        auto i = entries.begin();
+        for (int i_1 = 0; i_1 < num_threads; ++i_1) {
+            for (long i_2 = 0; i_2 < num_iterations; ++i_2) {
+                int thread_index     = i->first;
+                long iteration_index = i->second;
+                if (i_1 != thread_index || i_2 != iteration_index) {
+                    every_post_operation_ran_exactly_once = false;
+                    break;
+                }
+                ++i;
+            }
+        }
+        CHECK(every_post_operation_ran_exactly_once);
+    }
+}
+
 #endif // TEST_UTIL_NETWORK

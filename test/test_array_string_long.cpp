@@ -49,7 +49,7 @@ struct nullable {
 struct non_nullable {
     static constexpr bool value = false;
 };
-    
+
 } // anonymous namespace
 
 
@@ -280,7 +280,7 @@ TEST(ArrayStringLong_Null)
 
         a.add("foo");
         a.add("");
-        a.add(realm::null()); 
+        a.add(realm::null());
 
         CHECK_EQUAL(a.is_null(0), false);
         CHECK_EQUAL(a.is_null(1), false);
@@ -302,7 +302,7 @@ TEST(ArrayStringLong_Null)
         ArrayStringLong a(Allocator::get_default(), true);
         a.create();
 
-        a.add(realm::null());  
+        a.add(realm::null());
         a.add("");
         a.add("foo");
 
@@ -312,9 +312,9 @@ TEST(ArrayStringLong_Null)
         CHECK(a.get(2) == "foo");
 
         // Test insert
-        a.insert(0, realm::null()); 
-        a.insert(2, realm::null()); 
-        a.insert(4, realm::null()); 
+        a.insert(0, realm::null());
+        a.insert(2, realm::null());
+        a.insert(4, realm::null());
 
         CHECK_EQUAL(a.is_null(0), true);
         CHECK_EQUAL(a.is_null(1), true);

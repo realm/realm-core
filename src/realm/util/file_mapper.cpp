@@ -326,7 +326,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
             return new_addr;
         int err = errno; // Eliminate any risk of clobbering
         // Do not throw here if mremap is declared as "not supported" by the
-        // platform Eg. When compiling with GNU libc on OSX, iOS. 
+        // platform Eg. When compiling with GNU libc on OSX, iOS.
         // In this case fall through to no-mremap case below.
         if (err != ENOTSUP && err != ENOSYS) {
             if (is_mmap_memory_error(err)) {

@@ -490,9 +490,9 @@ TEST(Query_NextGenSyntax)
 /*
 This tests the new string conditions now available for the expression syntax.
 
-Null behaviour (+ means concatenation): 
+Null behaviour (+ means concatenation):
 
-If A + B == B, then A is a prefix of B, and B is a suffix of A. This is valid for any A and B, including null and 
+If A + B == B, then A is a prefix of B, and B is a suffix of A. This is valid for any A and B, including null and
 empty strings. Some examples:
 
 1)    "" both begins with null and ends with null and contains null.
@@ -5791,7 +5791,7 @@ TEST(Query_DeepCopyLeak1)
 
 TEST(Query_DeepCopyTest)
 {
-    // If Query::first vector was relocated because of push_back, then Query would crash, because referenced 
+    // If Query::first vector was relocated because of push_back, then Query would crash, because referenced
     // pointers were pointing into it.
     Table table;
     table.add_column(type_Int, "first");
@@ -5916,8 +5916,8 @@ TEST(Query_Nulls_Fuzzy)
                 unsigned char action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
 
                 if (action > 48 && table.size() < 10) {
-                    // Generate string with equal probability of being empty, null, short, medium and long, and with 
-                    // their contents having equal proability of being either random or a duplicate of a previous 
+                    // Generate string with equal probability of being empty, null, short, medium and long, and with
+                    // their contents having equal proability of being either random or a duplicate of a previous
                     // string. When it's random, each char must have equal probability of being 0 or non-0
                     char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
                     char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
@@ -5957,7 +5957,7 @@ TEST(Query_Nulls_Fuzzy)
                                 else
                                     buf2[t] = static_cast<char>(fastrand(255));  // random byte
                             }
-                            // no generated string can equal "null" (our vector magic value for null) because 
+                            // no generated string can equal "null" (our vector magic value for null) because
                             // len == 4 is not possible
                             sd = StringData(buf2, len);
                             st = std::string(buf2, len);
@@ -6005,7 +6005,7 @@ TEST(Query_BinaryNull)
     table.set_binary(0, 0, BinaryData());
     table.set_binary(0, 1, BinaryData("", 0)); // NOTE: Specify size = 0, else size turns into 1!
     table.set_binary(0, 2, BinaryData("foo"));
-    
+
     TableView t;
 
     // Next gen syntax
@@ -6479,7 +6479,7 @@ TEST(Query_NullShowcase)
     int64_t i;
     double d;
     DateTime dt;
-    tv = table->where().find_all();    
+    tv = table->where().find_all();
 
     // Integer column
     i = tv.maximum_int(0);
@@ -6536,19 +6536,19 @@ TEST(Query_NullShowcase)
 
     table->set_float(1, 0, std::numeric_limits<float>::signaling_NaN());
     table->set_float(1, 1, std::numeric_limits<float>::quiet_NaN());
-    
-    // Realm may return a signalling/quiet NaN that is different from the signalling/quiet NaN you stored 
-    // (the IEEE standard defines a sequence of bits in the NaN that can have custom contents). Realm does 
+
+    // Realm may return a signalling/quiet NaN that is different from the signalling/quiet NaN you stored
+    // (the IEEE standard defines a sequence of bits in the NaN that can have custom contents). Realm does
     // not preserve these bits.
     CHECK(std::isnan(table->get_float(1, 0)));
     CHECK(std::isnan(table->get_float(1, 1)));
 
- 
+
     // FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
-    // signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel 
-    // Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that 
+    // signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel
+    // Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that
     // has bit 22 clear (indicates it's signaling), and pop it back (fst instruction), the FPU will toggle
-    // that bit into being set. All this needs further investigation, so a P2 has been created. Note that 
+    // that bit into being set. All this needs further investigation, so a P2 has been created. Note that
     // IEEE just began specifying signaling vs. non-signaling NaNs in 2008. Also note that all this seems
     // to work fine on ARM in both 32 and 64 bit mode.
 
@@ -6957,7 +6957,7 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     CHECK_EQUAL(count, 1);
     count = 123;
     CHECK_EQUAL(tv.average_double(3, &count), 10.);
-    CHECK_EQUAL(count, 1); 
+    CHECK_EQUAL(count, 1);
 }
 
 
@@ -7964,7 +7964,7 @@ TEST(Query_FuzzyFind)
         const size_t rows = 18;
         for (size_t i = 0; i < rows; ++i) {
             table->add_empty_row();
-            
+
             // Produce numbers -3 ... 17. Just to test edge cases around 4-bit values also
             int64_t t = (fastrand() % 21) - 3;
             table->set_int(col, i, t);
@@ -8087,7 +8087,7 @@ TEST(Query_MaximumSumAverage)
         table1->add_column(type_Int, "int2", /* nullable */ n);
         table1->add_column(type_Double, "d", /* nullable */ n);
 
-        // Create three identical columns with values: For the nullable case: 
+        // Create three identical columns with values: For the nullable case:
         //      3, 4, null
         // For non-nullable iteration:
         //      3, 4
@@ -8401,7 +8401,7 @@ TEST(Query_ReferDeletedLinkView)
     LinkViewRef links = table->get_linklist(0, 0);
     Query q = table->where(links);
     TableView tv = q.find_all();
-    
+
     // TableView that depends on LinkView soon to be deleted
     TableView tv_sorted = links->get_sorted_view(1);
 
@@ -8436,7 +8436,7 @@ TEST(Query_ReferDeletedLinkView)
 
     CHECK(!links->is_attached());
     tv.sync_if_needed();
-    
+
     // PLEASE NOTE that 'tv' will still return true in this case! Even though it indirectly depends on
     // the LinkView through multiple levels!
     CHECK(tv.is_attached());

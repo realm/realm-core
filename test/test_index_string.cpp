@@ -1031,8 +1031,8 @@ TEST(StringIndex_Zero_Crash2)
                 table.add_search_index(0);
             }
             else if (action > 48 && table.size() < 10) {
-                // Generate string with equal probability of being empty, null, short, medium and long, and with 
-                // their contents having equal proability of being either random or a duplicate of a previous 
+                // Generate string with equal probability of being empty, null, short, medium and long, and with
+                // their contents having equal proability of being either random or a duplicate of a previous
                 // string. When it's random, each char must have equal probability of being 0 or non-0e
                 char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
                 char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
@@ -1062,7 +1062,7 @@ TEST(StringIndex_Zero_Crash2)
                         else
                             buf2[t] = static_cast<char>(random.draw_int<int>());  // random byte
                     }
-                    // no generated string can equal "null" (our vector magic value for null) because 
+                    // no generated string can equal "null" (our vector magic value for null) because
                     // len == 4 is not possible
                     sd = StringData(buf2, len);
                 }
@@ -1115,7 +1115,7 @@ TEST(StringIndex_Integer_Increasing)
     for (size_t row = 0; row < rows; row++) {
         int64_t v = table.get_int(0, row);
         size_t c = table.count_int(0, v);
-        
+
         size_t start = std::lower_bound(reference.begin(), reference.end(), v) - reference.begin();
         size_t ref_count = 0;
         for (size_t t = start; t < reference.size(); t++) {

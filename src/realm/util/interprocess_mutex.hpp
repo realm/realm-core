@@ -76,8 +76,8 @@ public:
     /// Attempt to check if the mutex is valid (only relevant if not emulating)
     bool is_valid() noexcept;
 
-    static bool is_robust_on_this_platform() 
-    { 
+    static bool is_robust_on_this_platform()
+    {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
         return true;  // we're faking it!
 #else
@@ -134,7 +134,6 @@ inline void InterprocessMutex::release_shared_part()
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     File::try_remove(m_filename);
 #else
-    m_shared_part->~RobustMutex();
     m_shared_part = nullptr;
 #endif
 }
