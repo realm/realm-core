@@ -1647,7 +1647,6 @@ void SharedGroup::do_begin_write()
     }
 
 #ifdef REALM_ASYNC_DAEMON
-    SharedInfo* info = m_file_map.get_addr();
     if (info->durability == durability_Async) {
 
         m_balancemutex.lock(); // Throws
