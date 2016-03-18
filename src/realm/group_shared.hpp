@@ -531,6 +531,7 @@ private:
     util::File::Map<SharedInfo> m_reader_map;
     bool m_wait_for_change_enabled;
     std::string m_lockfile_path;
+    std::string m_lockfile_prefix;
     std::string m_db_path;
     std::string m_coordination_dir;
     const char* m_key;

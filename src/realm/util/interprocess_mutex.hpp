@@ -134,7 +134,6 @@ inline void InterprocessMutex::release_shared_part()
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     File::try_remove(m_filename);
 #else
-    m_shared_part->~RobustMutex();
     m_shared_part = nullptr;
 #endif
 }

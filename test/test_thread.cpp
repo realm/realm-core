@@ -95,7 +95,7 @@ struct SharedWithEmulated {
     int m_value;
 
     SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
-    ~SharedWithEmulated() { }
+    ~SharedWithEmulated() { m_mutex.release_shared_part(); }
 
     // 10000 takes less than 0.1 sec
     void increment_10000_times()

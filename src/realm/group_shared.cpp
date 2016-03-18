@@ -709,12 +709,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
     m_db_path = path;
     m_coordination_dir = path + ".management";
+    m_lockfile_path = path + ".lock";
     try {
         make_dir(m_coordination_dir);
     } catch (File::Exists&) {
     }
     m_key = encryption_key;
-    m_lockfile_path = m_coordination_dir + "/access_control";
+    m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_group.m_alloc;
 
     Replication::HistoryType history_type = Replication::hist_None;
@@ -862,11 +863,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // with EOWNERDEAD, because that would mark the mutex as consistent
         // again and prevent us from being notified below.
 
-        m_writemutex.set_shared_part(info->shared_writemutex,m_lockfile_path,"write");
+        m_writemutex.set_shared_part(info->shared_writemutex,m_lockfile_prefix,"write");
 #ifdef REALM_ASYNC_DAEMON
-        m_balancemutex.set_shared_part(info->shared_balancemutex,m_lockfile_path,"balance");
+        m_balancemutex.set_shared_part(info->shared_balancemutex,m_lockfile_prefix,"balance");
 #endif
-        m_controlmutex.set_shared_part(info->shared_controlmutex,m_lockfile_path,"control");
+        m_controlmutex.set_shared_part(info->shared_controlmutex,m_lockfile_prefix,"control");
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
@@ -1017,11 +1018,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             }
 
 #ifndef _WIN32
-            m_new_commit_available.set_shared_part(info->new_commit_available,m_lockfile_path,"new_commit");
+            m_new_commit_available.set_shared_part(info->new_commit_available,m_lockfile_prefix,"new_commit");
 #ifdef REALM_ASYNC_DAEMON
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_lockfile_path,"daemon_ready");
-            m_work_to_do.set_shared_part(info->work_to_do,m_lockfile_path,"work_ready");
-            m_room_to_write.set_shared_part(info->room_to_write,m_lockfile_path,"allow_write");
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_lockfile_prefix,"daemon_ready");
+            m_work_to_do.set_shared_part(info->work_to_do,m_lockfile_prefix,"work_ready");
+            m_room_to_write.set_shared_part(info->room_to_write,m_lockfile_prefix,"allow_write");
             // In async mode, we need to make sure the daemon is running and ready:
             if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == 0) {
