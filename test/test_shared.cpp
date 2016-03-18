@@ -1338,9 +1338,8 @@ TEST(Shared_WriterThreads)
 #if !REALM_ENABLE_ENCRYPTION &&  defined(ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE)
 // this unittest has issues that has not been fully understood, but could be
 // related to interaction between posix robust mutexes and the fork() system call.
-// it has so far only been seen failing on Linux, so we enable it on platforms where
-// the emulation is in use.
-#ifdef REALM_ROBUST_MUTEX_EMULATION
+// it has so far only been seen failing on Linux, so we enable it on ios.
+#if REALM_PLATFORM_APPLE
 
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
@@ -1407,7 +1406,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     }
 }
 
-#endif // emulation enabled
+#endif // on apple
 #endif // encryption enabled
 
 // not ios or android
