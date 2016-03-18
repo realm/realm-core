@@ -201,7 +201,7 @@ or `sh build.sh bin-dist`, as in the following example:
 Testing
 -------
 
-The core library comes with a suite of unite tests. You can run it in one of the
+The core library comes with a suite of unit tests. You can run it in one of the
 following ways:
 
     sh build.sh check
