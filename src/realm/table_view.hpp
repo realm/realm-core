@@ -178,7 +178,10 @@ public:
 //    void set_operating_mode(mode);
 //    mode get_operating_mode();
     bool is_empty() const noexcept;
+
+    // Tells if the table that this TableView points at still exists or has been deleted.
     bool is_attached() const noexcept;
+
     bool is_row_attached(size_t row_ndx) const noexcept;
     size_t size() const noexcept;
     size_t num_attached_rows() const noexcept;
@@ -280,6 +283,9 @@ public:
     // it, it too will become outdated.
     bool is_in_sync() const;
 
+    // Tells if this TableView depends on a LinkList that has been deleted.
+    bool depends_on_deleted_linklist() const;
+
     // Synchronize a view to match a table or tableview from which it
     // has been derived. Synchronization is achieved by rerunning the
     // query used to generate the view. If derived from another view, that
@@ -289,16 +295,12 @@ public:
     // before any of the other access-methods whenever the view may have become
     // outdated.
     //
-    // This method will throw a DeletedLinkView exception if the TableView 
+    // This method will throw a DeletedLinkView exception if the TableView
     // depends on a LinkList that was deleted from its table.
     uint_fast64_t sync_if_needed() const;
 
     // Set this undetached TableView to be a distinct view, and sync immediately.
     void sync_distinct_view(size_t column_ndx);
-
-    // This TableView can be "born" from 4 different sources : LinkView, Table::get_distinct_view(),
-    // Table::find_all() or Query. Return the version of the source it was created from.
-    uint64_t outside_version() const;
 
     // Re-sort view according to last used criterias
     void re_sort();
@@ -309,7 +311,7 @@ public:
     // Sort m_row_indexes according to multiple columns
     void sort(std::vector<size_t> columns, std::vector<bool> ascending);
 
-    // Remove rows that are duplicated with respect to the column set passed as argument. 
+    // Remove rows that are duplicated with respect to the column set passed as argument.
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
     // If two rows are indentical (for the given set of distinct-columns), then the last row is removed.
     // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
@@ -324,6 +326,10 @@ public:
     virtual ~TableViewBase() noexcept;
 
 protected:
+    // This TableView can be "born" from 4 different sources : LinkView, Table::get_distinct_view(),
+    // Table::find_all() or Query. Return the version of the source it was created from.
+    uint64_t outside_version() const;
+
     void do_sync();
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;

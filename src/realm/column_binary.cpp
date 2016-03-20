@@ -496,14 +496,20 @@ ref_type BinaryColumn::write(size_t slice_offset, size_t slice_size,
 
 void BinaryColumn::refresh_accessor_tree(size_t, const Spec&)
 {
+    ref_type ref = m_array->get_ref_from_parent();
+    update_from_ref(ref); // Throws
+}
+
+
+void BinaryColumn::update_from_ref(ref_type ref)
+{
     // The type of the cached root array accessor may no longer match the
     // underlying root node. In that case we need to replace it. Note that when
     // the root node is an inner B+-tree node, then only the top array accessor
     // of that node is cached. The top array accessor of an inner B+-tree node
     // is of type Array.
 
-    ref_type root_ref = m_array->get_ref_from_parent();
-    MemRef root_mem(root_ref, m_array->get_alloc());
+    MemRef root_mem(ref, m_array->get_alloc());
     bool new_root_is_leaf  = !Array::get_is_inner_bptree_node_from_header(root_mem.m_addr);
     bool new_root_is_small = !Array::get_context_flag_from_header(root_mem.m_addr);
     bool old_root_is_leaf  = !m_array->is_inner_bptree_node();
@@ -517,17 +523,17 @@ void BinaryColumn::refresh_accessor_tree(size_t, const Spec&)
             if (old_root_is_small) {
                 // Root is 'small blobs' leaf
                 ArrayBinary* root = static_cast<ArrayBinary*>(m_array.get());
-                root->init_from_parent();
+                root->init_from_mem(root_mem);
                 return;
             }
             // Root is 'big blobs' leaf
             ArrayBigBlobs* root = static_cast<ArrayBigBlobs*>(m_array.get());
-            root->init_from_parent();
+            root->init_from_mem(root_mem);
             return;
         }
         // Root is inner node
         Array* root = m_array.get();
-        root->init_from_parent();
+        root->init_from_mem(root_mem);
         return;
     }
 

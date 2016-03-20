@@ -20,6 +20,7 @@
 #include <realm/util/to_string.hpp>
 #include <realm/replication.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/history.hpp>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -33,12 +34,11 @@
 
 
 #include "test.hpp"
-#include "crypt_key.hpp"
 
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -130,28 +130,37 @@ REALM_TABLE_1(TestTableInts,
                 first,  Int)
 
 
-class ShortCircuitHistory: public TrivialReplication, public History {
+class ShortCircuitHistory: public TrivialReplication, public _impl::History {
 public:
-    using version_type = History::version_type;
+    using version_type = _impl::History::version_type;
 
     ShortCircuitHistory(const std::string& database_file):
         TrivialReplication(database_file)
     {
     }
 
-    ~ShortCircuitHistory() noexcept
+    void initiate_session(version_type) override
     {
+        // No-op
     }
 
-    void prepare_changeset(const char* data, size_t size, Replication::version_type new_version) override
+    void terminate_session() noexcept override
+    {
+        // No-op
+    }
+
+    version_type prepare_changeset(const char* data, size_t size,
+                                   version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data+size, m_incoming_changeset.data());
+        version_type new_version = orig_version + 1;
         m_incoming_version = new_version;
         // Allocate space for the new changeset in m_changesets such that we can
         // be sure no exception will be thrown whan adding the changeset in
         // finalize_changeset().
         m_changesets[new_version]; // Throws
+        return new_version;
     }
 
     void finalize_changeset() noexcept override
@@ -161,11 +170,31 @@ public:
         m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
     }
 
+    HistoryType get_history_type() const noexcept override
+    {
+        return hist_OutOfRealm;
+    }
+
+    _impl::History* get_history() override
+    {
+        return this;
+    }
+
+    void update_early_from_top_ref(version_type, size_t, ref_type) override
+    {
+        // No-op
+    }
+
+    void update_from_parent(version_type) override
+    {
+        // No-op
+    }
+
     void get_changesets(version_type begin_version, version_type end_version,
                         BinaryData* buffer) const noexcept override
     {
         size_t n = size_t(end_version - begin_version);
-        for (size_t i = 0; i != n; ++i) {
+        for (size_t i = 0; i < n; ++i) {
             uint_fast64_t version = begin_version + i + 1;
             auto j = m_changesets.find(version);
             REALM_ASSERT(j != m_changesets.end());
@@ -175,11 +204,23 @@ public:
         }
     }
 
+    void set_oldest_bound_version(version_type) override
+    {
+        // No-op
+    }
+
     BinaryData get_uncommitted_changes() noexcept override
     {
         REALM_ASSERT(false);
         return BinaryData(); // FIXME: Not yet implemented
     }
+
+#ifdef REALM_DEBUG
+    void verify() const override
+    {
+        // No-op
+    }
+#endif
 
 private:
     Buffer<char> m_incoming_changeset;
@@ -203,7 +244,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(0, group.size());
 
     // Try to advance without anything having happened
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, group.size());
 
@@ -212,7 +253,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         WriteTransaction wt(sg_w);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, group.size());
 
@@ -221,7 +262,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         WriteTransaction wt(sg_w);
         // Implicit rollback
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, group.size());
 
@@ -231,7 +272,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         TableRef foo_w = wt.add_table("bad");
         // Implicit rollback
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, group.size());
 
@@ -244,7 +285,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, group.size());
     ConstTableRef foo = group.get_table("foo");
@@ -266,7 +307,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         foo_w->set_string(1, 1, "b");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     CHECK(version != foo->get_version_counter());
     group.verify();
     CHECK_EQUAL(2, foo->get_column_count());
@@ -280,7 +321,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(foo, group.get_table("foo"));
 
     // Again, with no change
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(0));
@@ -320,7 +361,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, group.size());
     CHECK_EQUAL(2, foo->get_column_count());
@@ -347,7 +388,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         bar_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, group.size());
     CHECK(foo->is_attached());
@@ -380,7 +421,7 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 
     // Add the first table
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table_1");
@@ -388,20 +429,20 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
     }
 
     // Create a SharedGroup to which we can apply a foreign transaction
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     // Add the second table in a "foreign" transaction
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table_2");
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 }
 
 
@@ -417,7 +458,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 
     // Add the table
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table");
@@ -425,20 +466,20 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
     }
 
     // Create a SharedGroup to which we can apply a foreign transaction
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     // remove the table in a "foreign" transaction
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.get_group().remove_table("table");
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 }
 
 
@@ -447,19 +488,19 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
         WriteTransaction wt(sg_w);
@@ -471,7 +512,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 }
 
 
@@ -480,7 +521,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
 
@@ -494,7 +535,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
         wt.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
@@ -502,7 +543,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
     ConstTableRef table2 = rt.get_table("table2");
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
         WriteTransaction wt(sg_w);
@@ -514,7 +555,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 
     CHECK_EQUAL(table1->size(), 1);
     CHECK_EQUAL(table2->size(), 2);
@@ -527,7 +568,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTableOrdered)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
 
@@ -538,12 +579,12 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTableOrdered)
         wt.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         CHECK_EQUAL(wt.get_group().size(), 2);
@@ -555,7 +596,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTableOrdered)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 
     CHECK_EQUAL(rt.get_table(0), rt.get_table("table0"));
     CHECK_EQUAL(rt.get_table(1), rt.get_table("table1"));
@@ -569,7 +610,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
 
@@ -582,12 +623,12 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
         wt.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist(realm::make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     ReadTransaction rt(sg);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(realm::make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         CHECK_EQUAL(wt.get_group().size(), 3);
@@ -598,7 +639,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 
     CHECK_EQUAL(rt.get_table(0), rt.get_table("table1"));
     CHECK_EQUAL(rt.get_table(1), rt.get_table("table2"));
@@ -637,7 +678,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
         b->add_column_link(type_Link, "foo", *a);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 }
 
@@ -684,7 +725,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
 
     // Verify sorted LinkList (see above)
     ConstTableRef linktable = group.get_table("links");
@@ -724,7 +765,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         other_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, group.size());
     ConstTableRef strings = group.get_table("strings");
@@ -806,7 +847,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
             strings_w->set_mixed  (3, 0, bin_mix);
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK_EQUAL(2, group.size());
         CHECK(strings->is_attached());
@@ -845,7 +886,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         other_w->set_subtable (2, (leaf_x4p16-16)/3+3, 0); // FIXME: Set something
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, group.size());
     CHECK(other->is_attached());
@@ -875,7 +916,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         other_w->set_subtable (2, 0, 0); // FIXME: Set something
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, group.size());
     CHECK(other->is_attached());
@@ -912,7 +953,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->add_empty_row(3);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // Every cell must have integer type and be zero by default
     ConstTableRef table = group.get_table("t");
@@ -957,7 +998,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         set_subtab(table_w, 2, 1, 6);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
         CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
@@ -993,7 +1034,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->set_mixed(2, 2, Mixed(DateTime(60)));
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
         CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
@@ -1021,7 +1062,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->insert_empty_row(0, 8);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8+0)) &&
         CHECK_EQUAL(2, table->get_mixed(0, 8+0).get_int());
@@ -1050,7 +1091,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->remove(2);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6+0)) &&
         CHECK_EQUAL(2, table->get_mixed(0, 6+0).get_int());
@@ -1080,7 +1121,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->move_last_over(0); // 6 -> 0
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
         CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
@@ -1109,7 +1150,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->swap_rows(2, 5);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4)) &&
         CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
@@ -1144,7 +1185,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->insert_column(2, type_Mixed,    "x8");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(0+8, 4)) &&
         CHECK_EQUAL(2, table->get_mixed(0+8, 4).get_int());
@@ -1173,7 +1214,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->remove_column(2);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(0+6, 4)) &&
         CHECK_EQUAL(2, table->get_mixed(0+6, 4).get_int());
@@ -1205,7 +1246,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         tf::move_column(*desc_w, 2, 7);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4)) &&
         CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
@@ -1259,7 +1300,7 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
         }
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef table = group.get_table("t");
     ConstDescriptorRef desc = table->get_descriptor();
@@ -1274,7 +1315,7 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
         table_w->optimize();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, desc->get_num_unique_values(0));
     CHECK_NOT_EQUAL(0, desc->get_num_unique_values(1)); // Must be "optimized" now
@@ -1309,7 +1350,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         table_w->add_empty_row(8);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef table = group.get_table("t");
     CHECK(table->has_search_index(0));
@@ -1330,7 +1371,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         table_w->remove_search_index(4);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_NOT(table->has_search_index(0));
     CHECK(table->has_search_index(1));
@@ -1354,7 +1395,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         }
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     // Move the indexed columns by insertion
@@ -1367,7 +1408,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         table_w->insert_column(0, type_Int, "x4");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_NOT(table->has_search_index(2));
     CHECK(table->has_search_index(3));
@@ -1385,7 +1426,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         table_w->remove_column(4);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_NOT(table->has_search_index(1));
     CHECK(table->has_search_index(2));
@@ -1405,7 +1446,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         tf::move_column(*desc_w, 1, 6);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_NOT(table->has_search_index(6));
     CHECK(table->has_search_index(4));
@@ -1439,7 +1480,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, group.size());
     ConstTableRef parent = group.get_table("parent");
@@ -1463,7 +1504,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1497,7 +1538,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subdesc->add_column(type_Double, "d");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, subtab_0_0->get_column_count());
     CHECK_EQUAL(type_Int,   subtab_0_0->get_column_type(0));
@@ -1534,7 +1575,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(3, parent->size());
     CHECK(subtab_0_0->is_attached());
@@ -1564,7 +1605,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11111.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(3, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1602,7 +1643,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11112.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1640,7 +1681,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11113.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(5, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1680,7 +1721,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11114.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1715,7 +1756,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11115.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(3, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1745,7 +1786,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_double (1, 0, 11116.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1770,7 +1811,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->set_float (1, 0, 10017.0f);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1791,7 +1832,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->set_float (1, 0, 10018.0f);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1810,7 +1851,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->clear_subtable(0,0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1826,7 +1867,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1848,7 +1889,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(2, parent->size());
@@ -1872,7 +1913,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -1897,7 +1938,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_1_1_w->set_string(0, 0, "supercalifragilisticexpialidocious");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     subtab_0_0 = parent->get_subtable(0,0);
     subtab_0_1 = parent->get_subtable(0,1);
@@ -1909,7 +1950,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1929,7 +1970,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->set_string(0, 0, "brahmaputra");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1948,7 +1989,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1964,7 +2005,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         subtab_0_0_w->set_string(0, 0, "baikonur");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -1983,7 +2024,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -1995,7 +2036,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist,SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
     SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
 
     // Start a read transaction (to be repeatedly advanced)
@@ -2014,7 +2055,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->add_column(type_Int, "x");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, group.size());
     ConstTableRef parent = group.get_table("parent");
@@ -2045,7 +2086,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->add_column(type_Int, "x");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -2082,7 +2123,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->add_column(type_Double, "d");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, subtab_0_0->get_column_count());
     CHECK_EQUAL(type_Int,   subtab_0_0->get_column_type(0));
@@ -2119,7 +2160,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(3, parent->size());
     CHECK(subtab_0_0->is_attached());
@@ -2149,7 +2190,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11111.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(3, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -2190,7 +2231,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11112.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -2228,7 +2269,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11113.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(5, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -2268,7 +2309,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11114.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
@@ -2303,7 +2344,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11115.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(3, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -2333,7 +2374,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_double (1, 0, 11116.0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -2358,7 +2399,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->set_float (1, 0, 10017.0f);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -2379,7 +2420,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->set_float (1, 0, 10018.0f);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -2398,7 +2439,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->clear_subtable(0,0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -2411,7 +2452,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -2433,7 +2474,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(2, parent->size());
@@ -2457,7 +2498,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
@@ -2485,7 +2526,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_1_1_w->set_string(0, 0, "supercalifragilisticexpialidocious");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     subtab_0_0 = parent->get_subtable(0,0);
     subtab_0_1 = parent->get_subtable(0,1);
@@ -2497,7 +2538,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -2519,7 +2560,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->set_string(0, 0, "brahmaputra");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -2538,7 +2579,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -2556,7 +2597,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         subtab_0_0_w->set_string(0, 0, "baikonur");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -2575,7 +2616,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -2619,7 +2660,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->set_int_unique(0, 1, 227);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef parent = rt.get_table("parent");
     CHECK_EQUAL(2, parent->size());
@@ -2642,7 +2683,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->insert_empty_row(0); // Before
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(5, parent->size());
     CHECK(row_1.is_attached());
@@ -2662,7 +2703,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->insert_empty_row(5); // Immediately before row_2
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(9, parent->size());
     CHECK(row_1.is_attached());
@@ -2685,7 +2726,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove(4); // Immediately after  row_2
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(5, parent->size());
     CHECK(row_1.is_attached());
@@ -2704,7 +2745,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove(1); // Between
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
@@ -2723,7 +2764,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->size());
     CHECK(!row_1.is_attached());
@@ -2739,7 +2780,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->set_int(0, 0, 27);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->size());
     row_1 = (*parent)[0];
@@ -2759,7 +2800,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove(1);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->size());
     CHECK(row_1.is_attached());
@@ -2775,7 +2816,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->set_int(0, 1, 227);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->size());
     row_2 = (*parent)[1];
@@ -2797,7 +2838,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->insert_column(0, type_Float, "y");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
@@ -2815,7 +2856,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove_column(1);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->size());
     CHECK(row_1.is_attached());
@@ -2834,7 +2875,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -2850,7 +2891,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->set_int(0, 1, 227);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->size());
     row_1 = (*parent)[0];
@@ -2869,7 +2910,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, parent->size());
     CHECK(!row_1.is_attached());
@@ -2908,7 +2949,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
         regular_w->set_int(0, 0, 29);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef parent = rt.get_table("parent");
     ConstTableRef mixed   = parent->get_subtable(0,0);
@@ -2928,7 +2969,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
         parent_w->set_mixed(0, 0, Mixed("foo"));
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(!mixed->is_attached());
     CHECK(regular->is_attached());
@@ -2945,7 +2986,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
         mixed_w->set_int(0, 0, 19);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     mixed = parent->get_subtable(0,0);
     CHECK(mixed);
@@ -2965,7 +3006,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
         parent_w->set_subtable(1, 0, 0); // Clear
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(mixed->is_attached());
     CHECK(regular->is_attached());
@@ -3011,7 +3052,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         }
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     // Use first table to check with accessors on row indexes 0, 1, and 4, but
@@ -3055,7 +3096,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 3 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK(!row_0.is_attached());
         CHECK(row_1.is_attached());
@@ -3086,7 +3127,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 1 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK(!row_0.is_attached());
         CHECK(!row_1.is_attached());
@@ -3145,7 +3186,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 3 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK(!row_0.is_attached());
         CHECK(!row_2.is_attached());
@@ -3170,7 +3211,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(1); // Move row at index 2 to index 1
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK(!row_0.is_attached());
         CHECK(!row_2.is_attached());
@@ -3195,7 +3236,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 1 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK(!row_0.is_attached());
         CHECK(!row_2.is_attached());
@@ -3240,7 +3281,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 3 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK(row_1.is_attached());
         CHECK(row_3.is_attached());
@@ -3267,7 +3308,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(1); // Move row at index 2 to index 1
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK(!row_1.is_attached());
         CHECK(row_3.is_attached());
@@ -3289,7 +3330,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
             parent_w->move_last_over(0); // Move row at index 1 to index 0
             wt.commit();
         }
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         CHECK(!row_1.is_attached());
         CHECK(!row_3.is_attached());
@@ -3344,7 +3385,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
         // self-destruct.  We only get accessors to row indices 0, 1 and 4;
         // rows 2 and 3 will be tested later on.
 
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         ConstTableRef table = rt.get_table("parent_1");
 
@@ -3392,7 +3433,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
             wt.commit();
         }
 
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
 
         // No rows were deleted, so everything should still be attached
@@ -3455,7 +3496,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     ConstRow row_int_0_replaced_by_row_2  = group.get_table(0)->get(0);
@@ -3472,7 +3513,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     CHECK(row_int_0_replaced_by_row_2.is_attached());
@@ -3532,7 +3573,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         target_2_w->add_empty_row(2);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef origin_1 = rt.get_table("origin_1");
     ConstTableRef origin_2 = rt.get_table("origin_2");
@@ -3548,7 +3589,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->add_empty_row(2);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1: LL_1->T_1
     // O_2: F_1
@@ -3562,7 +3603,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(0, 0, 1); // O_2_L_2[0] -> T_1[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1: F_2   LL_1->T_1
     // O_2: L_2->T_1   F_1
@@ -3579,7 +3620,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->get_linklist(2, 1)->add(1); // O_2_LL_3[1] -> T_2[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1: L_3->T_1   F_2   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2
@@ -3594,7 +3635,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(3, 1, 0); // O_2_L_4[1] -> T_2[0]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1: L_3->T_1   F_2   L_4->T_2   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2   L_4->T_2
@@ -3608,7 +3649,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->insert_column(3, type_Int, "o_2_f_5");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1: L_3->T_1   F_2   L_4->T_2   F_5   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2   F_5   L_4->T_2
@@ -3622,7 +3663,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_1_w->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -3694,7 +3735,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_1_w->set_int(1, 2, 13);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -3743,7 +3784,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         target_1_w->set_int(0, 2, 17);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -3799,7 +3840,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(4, 2, 0);  // O_2_L_4[2] -> T_2[0]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -3858,7 +3899,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         // Adds    O_1_L_3[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -3916,7 +3957,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         link_list_2_2_w->add(0); // O_2_LL_3[2] -> T_2[0]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -3981,7 +4022,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         link_list_2_2_w->add(1);    // Add     O_2_LL_3[2] -> T_2[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4050,7 +4091,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         link_list_2_2_w->move(0,1); // [ 0, 1 ] -> [ 1, 0 ]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4109,7 +4150,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         link_list_2_2_w->swap(0,1); // [ 1, 0 ] -> [ 0, 1 ]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4168,7 +4209,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         link_list_2_2_w->swap(1,1); // [ 0, 1 ] -> [ 0, 1 ]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4246,7 +4287,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         // Adds     O_1_L_3[0]  -> T_1[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4314,7 +4355,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         // Adds     O_1_L_4[2]  -> T_2[0]  and  O_2_LL_3[0] -> T_2[0]  and  O_2_L_4[0] -> T_2[0]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4379,7 +4420,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         // Adds     O_1_L_4[1]  -> T_2[0]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4436,7 +4477,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(4,2,0);           // O_2_L_4[2]  -> T_2[0]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4500,7 +4541,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_1_w->get_linklist(4,2)->add(1); // O_1_LL_1[2] -> T_1[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4582,7 +4623,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         // Adds     O_1_LL_1[1] -> T_1[2]  and  O_2_LL_3[2] -> T_2[2]  and  O_2_L_4[0] -> T_2[2]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4663,7 +4704,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         //          O_2_L_2[0] -> T_1[0]  and  O_2_LL_3[2] -> T_2[2]  and  O_2_L_4[0] -> T_2[2]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4744,7 +4785,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         //          O_2_LL_3[2] -> T_2[0]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4822,7 +4863,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         //          O_2_L_2[0]  -> T_1[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4893,7 +4934,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(4,1,1);           // O_2_L_4[1]  -> T_2[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -4968,7 +5009,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(0,2,1); // O_2_L_2[2] -> T_1[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -5045,7 +5086,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -5112,7 +5153,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(4,1,1);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -5186,7 +5227,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         target_2_w->clear();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -5260,7 +5301,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(4,1,1);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
@@ -5353,7 +5394,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->insert_column(6, type_String, "foo_3");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(6, origin_1->get_column_count());
     CHECK_EQUAL(7, origin_2->get_column_count());
@@ -5440,7 +5481,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(7, origin_1->get_column_count());
     CHECK_EQUAL(6, origin_2->get_column_count());
@@ -5526,7 +5567,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->remove_column(5);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(5, origin_1->get_column_count());
     CHECK_EQUAL(5, origin_2->get_column_count());
@@ -5616,7 +5657,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->set_link(0,1,0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(6, origin_1->get_column_count());
     CHECK_EQUAL(7, origin_2->get_column_count());
@@ -5734,7 +5775,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->get_linklist(5,2)->add(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(7, origin_1->get_column_count());
     CHECK_EQUAL(6, origin_2->get_column_count());
@@ -5862,7 +5903,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_2_w->remove_column(5);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(5, origin_1->get_column_count());
     CHECK_EQUAL(5, origin_2->get_column_count());
@@ -5954,7 +5995,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         target_2_w->insert_column_link(1, type_Link, "t_4", *target_1_w);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, target_1->get_column_count());
     CHECK_EQUAL(2, target_2->get_column_count());
@@ -5990,7 +6031,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         target_2_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, target_1->get_column_count());
     CHECK_EQUAL(1, target_2->get_column_count());
@@ -6026,7 +6067,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         target_1_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(0, target_1->get_column_count());
     CHECK_EQUAL(1, target_2->get_column_count());
@@ -6111,7 +6152,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         TableRef table_w = wt.add_table("table");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef table = group.get_table("table");
     {
@@ -6121,7 +6162,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_w->add_column_link(type_LinkList, "bar", *table_w);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(2, table->get_column_count());
@@ -6137,7 +6178,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_w->set_link(0,0,0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(table, table->get_link_target(0));
@@ -6156,7 +6197,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_w->get_linklist(1,0)->add(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(table, table->get_link_target(0));
@@ -6183,7 +6224,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_2_w->get_linklist(1,0)->add(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef table_2 = group.get_table("table_2");
     CHECK_EQUAL(2, table_2->get_column_count());
@@ -6215,7 +6256,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_2_w->add_column_link(type_LinkList, "barfoo", *table_w);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK(table_2->is_attached());
@@ -6272,7 +6313,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_2_w->get_linklist(2,0)->add(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK(table_2->is_attached());
@@ -6323,7 +6364,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_4_w->set_link(0,0,0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef table_3 = group.get_table("table_3");
     ConstTableRef table_4 = group.get_table("table_4");
@@ -6359,7 +6400,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_3_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK(table_2->is_attached());
@@ -6414,7 +6455,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_4_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK(table_2->is_attached());
@@ -6446,7 +6487,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_w->remove_column(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK(table_2->is_attached());
@@ -6473,7 +6514,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_w->get_linklist(1,0)->add(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(2, table->get_column_count());
@@ -6502,7 +6543,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_w->get_linklist(1,1)->add(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(2, table->get_column_count());
@@ -6529,7 +6570,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_w->move_last_over(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(2, table->get_column_count());
@@ -6561,7 +6602,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_3_w->get_linklist(0,0)->add(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table_2->is_attached());
     CHECK(table_3->is_attached());
@@ -6589,7 +6630,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         table_2_w->move_last_over(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK(table_2->is_attached());
     CHECK(table_3->is_attached());
@@ -6634,7 +6675,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
         target_w->add_empty_row();
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef origin = group.get_table("origin");
     ConstTableRef target = group.get_table("target");
@@ -6645,7 +6686,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
         origin_w->set_link(0,0,0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 }
 
@@ -6684,7 +6725,7 @@ TEST(LangBindHelper_AdvanceReadTransact_NonEndRowInsertWithLinks)
         bar_w->get_linklist(0,2)->add(0);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     ConstTableRef foo = rt.get_table("foo");
@@ -6713,7 +6754,7 @@ TEST(LangBindHelper_AdvanceReadTransact_NonEndRowInsertWithLinks)
         bar_w->insert_empty_row(1,3);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     // Check that row and link list accessors are also properly adjusted.
@@ -6773,7 +6814,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
         epsilon_w->add_column_link(type_Link, "epsilon-1", *delta_w);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     CHECK_EQUAL(5, group.size());
@@ -6790,7 +6831,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
         wt.get_group().remove_table("alpha");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     CHECK_EQUAL(4, group.size());
@@ -6806,7 +6847,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
         wt.get_group().remove_table("beta");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     CHECK_EQUAL(3, group.size());
@@ -6822,7 +6863,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
         wt.get_group().remove_table("gamma");
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     CHECK_EQUAL(2, group.size());
@@ -6837,7 +6878,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
         CHECK_THROW(wt.get_group().remove_table("delta"), CrossTableLinkTarget);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     CHECK_EQUAL(2, group.size());
@@ -6896,7 +6937,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
         fourth_w->set_link(1,1,1); // fourth[1].five = third[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     ConstTableRef first  = group.get_table(names[0]);
@@ -6909,7 +6950,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
         wt.get_group().remove_table(1); // Second
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     CHECK_EQUAL(3, group.size());
@@ -6941,7 +6982,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
         first_w->set_link(0,0,1);  // first[0].one   = third[1]
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
 
     CHECK_EQUAL(2, first->size());
@@ -7011,7 +7052,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
         }
 
         // Grab the row accessors before applying the modification being tested
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         target_row_0 = target.get(0);
         target_row_1 = target.get(1);
@@ -7023,7 +7064,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
             wt.commit();
         }
 
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         // Leave `group` and the target accessors in a state which can be tested
         // with the changes applied
@@ -7112,7 +7153,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
         }
 
         // Grab the row accessors before applying the modification being tested
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         target_row_0 = target.get(0);
         target_row_1 = target.get(1);
@@ -7124,7 +7165,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
             wt.commit();
         }
 
-        LangBindHelper::advance_read(sg, hist);
+        LangBindHelper::advance_read(sg);
         group.verify();
         // Leave `group` and the target accessors in a state which can be tested
         // with the changes applied
@@ -7179,11 +7220,11 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
 
     TableRef target = g.add_table("target");
     target->add_column(type_Int, "pk");
@@ -7194,19 +7235,19 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     LangBindHelper::commit_and_continue_as_read(sg);
 
     // open a second copy that'll be advanced over the write
-    std::unique_ptr<ClientHistory> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
     SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
     TableRef t_r = g_r.get_table("target");
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     // Ensure that the index has a different bptree layout so that failing to
     // refresh it will do bad things
     for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
         target->set_int(0, i, i);
     LangBindHelper::commit_and_continue_as_read(sg);
 
-    LangBindHelper::promote_to_write(sg_r, *hist_r);
+    LangBindHelper::promote_to_write(sg_r);
     // Crashes if index has an invalid parent ref
     t_r->clear();
 }
@@ -7215,7 +7256,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
 
     {
@@ -7232,7 +7273,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     CHECK(row.is_attached());
 
     {
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
         WriteTransaction wt(sg_w);
@@ -7240,7 +7281,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 
     CHECK(!row.is_attached());
 
@@ -7256,7 +7297,7 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
 
     {
@@ -7275,7 +7316,7 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
     CHECK_EQUAL(row.get_int(0), 2);
 
     {
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
         // Remove the first row via unordered removal, resulting in the '2' row
@@ -7285,7 +7326,7 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
         wt.commit();
     }
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 
     CHECK(row.is_attached());
     CHECK_EQUAL(row.get_int(0), 2);
@@ -7297,7 +7338,7 @@ namespace {
 // the entire interface
 class NoOpTransactionLogParser {
 public:
-    NoOpTransactionLogParser(TestResults& test_results) : test_results(test_results) { }
+    NoOpTransactionLogParser(TestContext& test_context) : test_context(test_context) { }
 
     size_t get_current_table() const
     {
@@ -7310,7 +7351,7 @@ public:
     }
 
 protected:
-    TestResults& test_results;
+    TestContext& test_context;
 
 private:
     size_t m_current_table = realm::npos;
@@ -7385,27 +7426,28 @@ public:
 
 struct AdvanceReadTransact {
     template<typename Func>
-    static void call(SharedGroup& sg, History& history, Func&& func)
+    static void call(SharedGroup& sg, Func&& func)
     {
-        LangBindHelper::advance_read(sg, history, std::forward<Func&&>(func));
+        LangBindHelper::advance_read(sg, std::forward<Func&&>(func));
     }
 };
 
 struct PromoteThenRollback {
     template<typename Func>
-    static void call(SharedGroup& sg, History& history, Func&& func)
+    static void call(SharedGroup& sg, Func&& func)
     {
-        LangBindHelper::promote_to_write(sg, history, std::forward<Func&&>(func));
-        LangBindHelper::rollback_and_continue_as_read(sg, history);
+        LangBindHelper::promote_to_write(sg, std::forward<Func&&>(func));
+        LangBindHelper::rollback_and_continue_as_read(sg);
     }
 };
-}
+
+} // unnamed namespace
 
 
 TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, PromoteThenRollback)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
 
     {
@@ -7424,11 +7466,11 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
             {
                 CHECK(false);
             }
-        } parser(test_results);
-        TEST_TYPE::call(sg, *hist, parser);
+        } parser(test_context);
+        TEST_TYPE::call(sg, parser);
     }
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
     { // With an empty change, parse_complete() and nothing else should be called
@@ -7443,8 +7485,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
             {
                 called = true;
             }
-        } parser(test_results);
-        TEST_TYPE::call(sg, *hist, parser);
+        } parser(test_context);
+        TEST_TYPE::call(sg, parser);
         CHECK(parser.called);
     }
 
@@ -7472,8 +7514,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
                 return true;
             }
-        } parser(test_results);
-        TEST_TYPE::call(sg, *hist, parser);
+        } parser(test_context);
+        TEST_TYPE::call(sg, parser);
         CHECK_EQUAL(2, parser.expected_table);
     }
 
@@ -7487,7 +7529,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         table->get_linklist(1, 0)->add(0);
         wt.commit();
 
-        LangBindHelper::advance_read(sg, *hist);
+        LangBindHelper::advance_read(sg);
     }
 
     { // Verify that deleting the targets of the links logs link nullifications
@@ -7526,8 +7568,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK_EQUAL(0, row_ndx);
                 return true;
             }
-        } parser(test_results);
-        TEST_TYPE::call(sg, *hist, parser);
+        } parser(test_context);
+        TEST_TYPE::call(sg, parser);
     }
 
     { // Verify that clear() logs the correct rows
@@ -7540,7 +7582,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         lv->add(5);
 
         wt.commit();
-        LangBindHelper::advance_read(sg, *hist);
+        LangBindHelper::advance_read(sg);
     }
 
     {
@@ -7560,8 +7602,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 CHECK_EQUAL(3, old_list_size);
                 return true;
             }
-        } parser(test_results);
-        TEST_TYPE::call(sg, *hist, parser);
+        } parser(test_context);
+        TEST_TYPE::call(sg, parser);
     }
 }
 
@@ -7569,7 +7611,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
 
     // Add some initial data and then begin a read transaction at that version
@@ -7586,7 +7628,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
     // Modify the data with a different SG so that we can determine which version
     // the read transaction is using
     {
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg_w);
         wt.get_table("Table")->set_int(0, 0, 20);
@@ -7602,9 +7644,9 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
             {
                 throw ObserverError();
             }
-        } parser(test_results);
+        } parser(test_context);
 
-        LangBindHelper::advance_read(sg, *hist, parser);
+        LangBindHelper::advance_read(sg, parser);
         CHECK(false); // Should not be reached
     }
     catch (ObserverError) {
@@ -7614,7 +7656,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
     CHECK_EQUAL(10, g.get_table("Table")->get_int(0, 0));
 
     // Should be able to advance to the new version still
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
 
     // And see that version's data
     CHECK_EQUAL(20, g.get_table("Table")->get_int(0, 0));
@@ -7624,14 +7666,14 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
 TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
         wt.add_table<TestTableShared>("table")->add_empty_row();
         wt.commit();
     }
-    std::unique_ptr<ClientHistory> hist2(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist2(make_client_history(path, crypt_key()));
     SharedGroup sg2(*hist2, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TestTableShared::Ref table = g.get_table<TestTableShared>("table");
@@ -7644,7 +7686,7 @@ TEST(LangBindHelper_ImplicitTransactions)
         }
         // verify we can't see the update
         CHECK_EQUAL(i, table[0].first);
-        LangBindHelper::advance_read(sg, *hist);
+        LangBindHelper::advance_read(sg);
         // now we CAN see it, and through the same accessor
         CHECK(table->is_attached());
         CHECK_EQUAL(i + 100, table[0].first);
@@ -7656,7 +7698,7 @@ TEST(LangBindHelper_ImplicitTransactions)
         }
         // can't see it:
         CHECK_EQUAL(i + 100, table[0].first);
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         // CAN see it:
         CHECK(table->is_attached());
         CHECK_EQUAL(i + 10100, table[0].first);
@@ -7673,12 +7715,12 @@ TEST(LangBindHelper_ImplicitTransactions)
 TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
        {
-            LangBindHelper::promote_to_write(sg, *hist);
+            LangBindHelper::promote_to_write(sg);
             TableRef origin = group->get_or_add_table("origin");
             origin->add_column(type_Int, "");
             origin->add_empty_row();
@@ -7688,11 +7730,11 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         group->verify();
         {
             // rollback of group level table insertion
-            LangBindHelper::promote_to_write(sg, *hist);
+            LangBindHelper::promote_to_write(sg);
             TableRef o = group->get_or_add_table("nullermand");
             TableRef o2 = group->get_table("nullermand");
             REALM_ASSERT(o2);
-            LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+            LangBindHelper::rollback_and_continue_as_read(sg);
             TableRef o3 = group->get_table("nullermand");
             REALM_ASSERT(!o3);
             REALM_ASSERT(o2->is_attached() == false);
@@ -7703,7 +7745,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         CHECK_EQUAL(42, origin->get_int(0,0));
 
         {
-            LangBindHelper::promote_to_write(sg, *hist);
+            LangBindHelper::promote_to_write(sg);
             origin->insert_empty_row(0);
             origin->set_int(0,0,5746);
             CHECK_EQUAL(42, origin->get_int(0,1));
@@ -7711,7 +7753,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
             CHECK_EQUAL(42, row.get_int(0));
             CHECK_EQUAL(2, origin->size());
             group->verify();
-            LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+            LangBindHelper::rollback_and_continue_as_read(sg);
         }
         CHECK_EQUAL(1, origin->size());
         group->verify();
@@ -7719,7 +7761,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         CHECK_EQUAL(42, row.get_int(0));
 
         {
-            LangBindHelper::promote_to_write(sg, *hist);
+            LangBindHelper::promote_to_write(sg);
             origin->add_empty_row();
             origin->set_int(0,1,42);
             LangBindHelper::commit_and_continue_as_read(sg);
@@ -7728,13 +7770,13 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         CHECK_EQUAL(2, origin->size());
 
         {
-            LangBindHelper::promote_to_write(sg, *hist);
+            LangBindHelper::promote_to_write(sg);
             origin->move_last_over(0);
             CHECK_EQUAL(1, origin->size());
             CHECK_EQUAL(42, row2.get_int(0));
             CHECK_EQUAL(42, origin->get_int(0,0));
             group->verify();
-            LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+            LangBindHelper::rollback_and_continue_as_read(sg);
         }
         CHECK_EQUAL(2, origin->size());
         group->verify();
@@ -7748,24 +7790,24 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
 TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         TableRef origin = group->get_or_add_table("a_table");
         LangBindHelper::commit_and_continue_as_read(sg);
     }
     group->verify();
     {
         // rollback of group level table delete
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         TableRef o2 = group->get_table("a_table");
         REALM_ASSERT(o2);
         group->remove_table("a_table");
         TableRef o3 = group->get_table("a_table");
         REALM_ASSERT(!o3);
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg);
         TableRef o4 = group->get_table("a_table");
         REALM_ASSERT(o4);
     }
@@ -7776,11 +7818,11 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 TEST(LangBindHelper_RollbackCircularReferenceRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         TableRef alpha = group->get_or_add_table("alpha");
         TableRef beta = group->get_or_add_table("beta");
         alpha->add_column_link(type_Link, "beta-1", *beta);
@@ -7789,7 +7831,7 @@ TEST(LangBindHelper_RollbackCircularReferenceRemoval)
     }
     group->verify();
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         CHECK_EQUAL(2, group->size());
         TableRef alpha = group->get_table("alpha");
         TableRef beta = group->get_table("beta");
@@ -7801,7 +7843,7 @@ TEST(LangBindHelper_RollbackCircularReferenceRemoval)
         CHECK_NOT(group->has_table("beta"));
 
         // Version 1: This crashes
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg);
         CHECK_EQUAL(2, group->size());
 
 //        // Version 2: This works
@@ -7816,12 +7858,12 @@ TEST(LangBindHelper_RollbackCircularReferenceRemoval)
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         t = group->get_or_add_table("a_table");
         t->add_column(type_Int, "lorelei");
         t->insert_empty_row(0);
@@ -7832,12 +7874,12 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
     group->verify();
     {
         // add a column and regret it again
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         t->add_column(type_Int, "riget");
         t->set_int(1,0,44);
         CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
         group->verify();
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg);
         group->verify();
         CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
     }
@@ -7849,11 +7891,11 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 TEST(LangBindHelper_TableLinkingRemovalIssue)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         TableRef t1 = group->get_or_add_table("t1");
         TableRef t2 = group->get_or_add_table("t2");
         TableRef t3 = group->get_or_add_table("t3");
@@ -7865,7 +7907,7 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
     }
     group->verify();
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         CHECK_EQUAL(4, group->size());
 
         group->remove_table("t1");
@@ -7873,7 +7915,7 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
         group->remove_table("t3"); // CRASHES HERE
         group->remove_table("t4");
 
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg);
         CHECK_EQUAL(4, group->size());
     }
     group->verify();
@@ -7884,11 +7926,11 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
 TEST(LangBindHelper_RollbackTableRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         TableRef alpha = group->get_or_add_table("alpha");
         TableRef beta = group->get_or_add_table("beta");
         beta->add_column_link(type_Link, "alpha-1", *alpha);
@@ -7896,14 +7938,14 @@ TEST(LangBindHelper_RollbackTableRemove)
     }
     group->verify();
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         CHECK_EQUAL(2, group->size());
         TableRef alpha = group->get_table("alpha");
         TableRef beta = group->get_table("beta");
         group->remove_table("beta");
         CHECK_NOT(group->has_table("beta"));
 
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg);
         CHECK_EQUAL(2, group->size());
 
     }
@@ -7914,11 +7956,11 @@ TEST(LangBindHelper_RollbackTableRemove)
 TEST(LangBindHelper_RollbackTableRemove2)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         TableRef a = group->get_or_add_table("a");
         TableRef b = group->get_or_add_table("b");
         TableRef c = group->get_or_add_table("c");
@@ -7929,12 +7971,12 @@ TEST(LangBindHelper_RollbackTableRemove2)
     }
     group->verify();
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         CHECK_EQUAL(4, group->size());
         group->remove_table("c");
         CHECK_NOT(group->has_table("c"));
         group->verify();
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg);
         CHECK_EQUAL(4, group->size());
     }
     group->verify();
@@ -7955,19 +7997,19 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     // reason for the missing table accessor entry.
 
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     TableRef filler = group->get_or_add_table("filler");
     TableRef table = group->get_or_add_table("table");
     table->add_column(type_Int, "i");
     table->add_empty_row();
     LangBindHelper::commit_and_continue_as_read(sg);
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     table->set_int(0, 0, 0);
     group->remove_table("table");
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
 }
 
 TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
@@ -8005,7 +8047,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
         table_2_w->set_int(0,0,2);
         wt.commit();
     }
-    LangBindHelper::advance_read(sg, hist);
+    LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, table_2->get_int(0,0));
     CHECK_EQUAL(0, table_2->get_index_in_group());
@@ -8016,13 +8058,13 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t, t2;
     {
         // add a column
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         t  = group->get_or_add_table("a_table");
         t2 = group->get_or_add_table("b_table");
         t->add_column_link(type_Link, "bruno", *t2);
@@ -8032,10 +8074,10 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
     group->verify();
     {
         // ... but then regret it
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         t->remove_column(0);
         CHECK_EQUAL(0, t->get_descriptor()->get_column_count());
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg);
     }
 }
 
@@ -8043,12 +8085,12 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
 TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         t = group->get_or_add_table("a_table");
         t->add_column(type_Int, "lorelei");
         t->add_column(type_Int, "riget");
@@ -8061,11 +8103,11 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
     group->verify();
     {
         // remove a column but regret it
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
         t->remove_column(0);
         group->verify();
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+        LangBindHelper::rollback_and_continue_as_read(sg);
         group->verify();
         CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
     }
@@ -8076,10 +8118,10 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
     origin->add_column_link(type_LinkList, "", *target);
@@ -8094,38 +8136,38 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
     CHECK_EQUAL(1, link_list->size());
     group->verify();
     // now change a link in link list and roll back the change
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     link_list->add(1);
     link_list->add(2);
     CHECK_EQUAL(3, link_list->size());
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(1, link_list->size());
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     link_list->remove(0);
     CHECK_EQUAL(0, link_list->size());
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(1, link_list->size());
     // verify that we can do move last over - first set link to last entry in target:
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     link_list->set(0,2); // link list holds single link to end of target
     LangBindHelper::commit_and_continue_as_read(sg);
     // then we test move last over:
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     CHECK_EQUAL(2, link_list->get(0).get_index()); // link restored
     target->move_last_over(0);
     CHECK_EQUAL(0, link_list->get(0).get_index()); // link was changed to 0 due to move last over
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, link_list->get(0).get_index()); // link restored
 }
 
 
-TEST(LangBindHelper_RollbackAndContinueAsReadLink)
+TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
     origin->add_column_link(type_Link, "", *target);
@@ -8139,36 +8181,84 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLink)
     LangBindHelper::commit_and_continue_as_read(sg);
     // verify that we can reverse a move last over:
     CHECK_EQUAL(2, origin->get_link(0,0));
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     target->move_last_over(1);
     CHECK_EQUAL(1, origin->get_link(0,0));
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, origin->get_link(0,0));
     // verify that we can revert a link change:
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     origin->set_link(0, 0, 1);
     CHECK_EQUAL(1, origin->get_link(0,0));
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, origin->get_link(0,0));
     // verify that we can revert addition of a row in target table
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     target->add_empty_row();
     CHECK_EQUAL(2, origin->get_link(0,0));
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, origin->get_link(0,0));
     // Verify that we can revert a non-end insertion of a row in target table
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     target->insert_empty_row(0);
     CHECK_EQUAL(3, origin->get_link(0,0));
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(2, origin->get_link(0,0));
 }
+
+
+TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    Group* group = const_cast<Group*>(&sg.begin_read());
+    LangBindHelper::promote_to_write(sg);
+    TableRef origin = group->add_table("origin");
+    TableRef target = group->add_table("target");
+    origin->add_column_link(type_LinkList, "", *target);
+    target->add_column(type_Int, "");
+    origin->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    target->add_empty_row();
+    LinkViewRef link_list = origin->get_linklist(0,0);
+    link_list->add(0);
+    link_list->add(1);
+    link_list->add(2);
+    link_list->add(0);
+    link_list->add(2);
+    LangBindHelper::commit_and_continue_as_read(sg);
+    // verify that we can reverse a LinkView::move()
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(1, link_list->get(1).get_index());
+    CHECK_EQUAL(2, link_list->get(2).get_index());
+    CHECK_EQUAL(0, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+    LangBindHelper::promote_to_write(sg);
+    link_list->move(1,3);
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(2, link_list->get(1).get_index());
+    CHECK_EQUAL(0, link_list->get(2).get_index());
+    CHECK_EQUAL(1, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    CHECK_EQUAL(5, link_list->size());
+    CHECK_EQUAL(0, link_list->get(0).get_index());
+    CHECK_EQUAL(1, link_list->get(1).get_index());
+    CHECK_EQUAL(2, link_list->get(2).get_index());
+    CHECK_EQUAL(0, link_list->get(3).get_index());
+    CHECK_EQUAL(2, link_list->get(4).get_index());
+}
+
 
 TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
 {
     // adapted from earlier move last over test
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
 
@@ -8177,7 +8267,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
     // Create three parent tables, each with with 5 rows, and each row
     // containing one regular and one mixed subtable
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         for (int i = 0; i < 3; ++i) {
             const char* table_name = i == 0 ? "parent_1" : i == 1 ? "parent_2" : "parent_3";
             TableRef parent_w = group->add_table(table_name);
@@ -8235,7 +8325,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
     // Perform two 'move last over' operations which brings the number of
     // rows down from 5 to 3
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         TableRef parent_w = group->get_table("parent_1");
         parent_w->move_last_over(2); // Move row at index 4 to index 2 --> [0,1,4,3]
         parent_w->move_last_over(0); // Move row at index 3 to index 0 --> [3,1,4]
@@ -8258,7 +8348,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
 
     // ... then rollback to earlier state and verify
     {
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist); // --> [_,1,_,3,4]
+        LangBindHelper::rollback_and_continue_as_read(sg); // --> [_,1,_,3,4]
     }
     // even though we rollback, accessors to row_0 should have become
     // detached as part of the changes done before reverting, and once
@@ -8283,11 +8373,11 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
 TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     TableRef origin = g.add_table("origin");
     TableRef target = g.add_table("target");
 
@@ -8302,23 +8392,23 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     linklist->add(0);
     LangBindHelper::commit_and_continue_as_read(sg);
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     CHECK_EQUAL(1, linklist->size());
     target->clear();
     CHECK_EQUAL(0, linklist->size());
 
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
     CHECK_EQUAL(1, linklist->size());
 }
 
 TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
 
     TableRef target = g.add_table("target");
     target->add_column(type_Int, "pk");
@@ -8327,15 +8417,15 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
     target->add_empty_row(REALM_MAX_BPNODE_SIZE+1);
 
     LangBindHelper::commit_and_continue_as_read(sg);
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
 
     // Ensure that the index has a different bptree layout so that failing to
     // refresh it will do bad things
     for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
         target->set_int(0, i, i);
 
-    LangBindHelper::rollback_and_continue_as_read(sg, *hist);
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::rollback_and_continue_as_read(sg);
+    LangBindHelper::promote_to_write(sg);
 
     // Crashes if index has an invalid parent ref
     target->clear();
@@ -8345,7 +8435,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
 TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
 
     {
@@ -8366,13 +8456,13 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
             {
                 CHECK(false);
             }
-        } parser(test_results);
-        LangBindHelper::promote_to_write(sg, *hist);
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
+        } parser(test_context);
+        LangBindHelper::promote_to_write(sg);
+        LangBindHelper::rollback_and_continue_as_read(sg, parser);
     }
 
     // Make a simple modification and verify that the appropriate handler is called
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     table1->add_empty_row();
     table2->add_empty_row();
 
@@ -8395,13 +8485,13 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
                 return true;
             }
-        } parser(test_results);
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
+        } parser(test_context);
+        LangBindHelper::rollback_and_continue_as_read(sg, parser);
         CHECK_EQUAL(0, parser.expected_table + 1);
     }
 
     // Add a table with some links
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     table1->add_empty_row();
     table2->add_empty_row();
 
@@ -8415,7 +8505,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     LangBindHelper::commit_and_continue_as_read(sg);
 
     // Verify that link nullification is rolled back appropriately
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     table1->move_last_over(0);
     table2->move_last_over(0);
 
@@ -8463,15 +8553,15 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 set_link_called = true;
                 return true;
             }
-        } parser(test_results);
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
+        } parser(test_context);
+        LangBindHelper::rollback_and_continue_as_read(sg, parser);
         CHECK_EQUAL(0, parser.expected_table + 1);
         CHECK(parser.link_list_insert_called);
         CHECK(parser.set_link_called);
     }
 
     // Verify that clear() is rolled back appropriately
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     table2->add_empty_row(10);
 
     LinkViewRef lv = link_table->get_linklist(1, 0);
@@ -8483,7 +8573,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     LangBindHelper::commit_and_continue_as_read(sg);
 
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     link_table->get_linklist(1, 0)->clear();
 
     {
@@ -8502,8 +8592,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 ++list_ndx;
                 return true;
             }
-        } parser(test_results);
-        LangBindHelper::rollback_and_continue_as_read(sg, *hist, parser);
+        } parser(test_context);
+        LangBindHelper::rollback_and_continue_as_read(sg, parser);
         CHECK_EQUAL(parser.list_ndx, 3);
     }
 }
@@ -8515,7 +8605,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     SHARED_GROUP_TEST_PATH(path);
     // we hold on to write log collector and registry across a complete
     // shutdown/initialization of shared group.
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     {
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         {
@@ -8529,7 +8619,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
         // no valid shared group anymore
     }
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         {
             WriteTransaction wt(sg);
@@ -8546,10 +8636,10 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
     origin->add_column_link(type_LinkList, "", *target);
@@ -8566,10 +8656,10 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
 TEST(LangBindHelper_ImplicitTransactions_StringIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group* group = const_cast<Group*>(&sg.begin_read());
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     TableRef table = group->add_table("a");
     table->add_column(type_String, "b");
     table->add_search_index(0);
@@ -8583,8 +8673,10 @@ namespace {
 
 void multiple_trackers_writer_thread(std::string path)
 {
+    // Insert up to 10 rows at random positions through 10 separate
+    // transactions, then quit. No waiting.
     Random random(random_int<unsigned long>());
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
@@ -8602,12 +8694,11 @@ void multiple_trackers_writer_thread(std::string path)
     }
 }
 
-void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string path)
+void multiple_trackers_reader_thread(TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
     Random random(random_int<unsigned long>());
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
@@ -8615,7 +8706,7 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string 
     size_t row_ndx = q.find();
     Row row = tr->get(row_ndx);
     TableView tv = q.find_all();
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     tr->set_int(0, 0, 1 + tr->get_int(0, 0));
     LangBindHelper::commit_and_continue_as_read(sg);
     for (;;) {
@@ -8628,7 +8719,7 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string 
         CHECK_EQUAL(42, tv.get_int(0,0));
         while (!sg.has_changed())
             sched_yield();
-        LangBindHelper::advance_read(sg, *hist);
+        LangBindHelper::advance_read(sg);
     }
     CHECK_EQUAL(0, tv.size());
     sg.end_read();
@@ -8640,39 +8731,40 @@ void multiple_trackers_reader_thread(TestResults* test_results_ptr, std::string 
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
-    const int read_thread_count = 3; // must be less than 42 for correct operation
+    const int read_thread_count = 3; // must be less than 42 for correct operation (really?)
 
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("table");
         tr->add_column(type_Int, "first");
-        for (int i = 0; i < 200; ++i) // use first entry in table to count readers which have locked on
-            tr->add_empty_row();
+        tr->add_empty_row(200); // use first entry in table to count readers which have locked on
         tr->set_int(0, 100, 42);
         wt.commit();
     }
+    // FIXME: Use separate arrays for reader and writer threads for safety and readability.
     Thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
-        threads[i].start(std::bind(multiple_trackers_writer_thread, std::string(path)));
+        threads[i].start([&] { multiple_trackers_writer_thread(path); });
     sched_yield();
     for (int i = 0; i < read_thread_count; ++i) {
-        threads[write_thread_count + i].start(std::bind(multiple_trackers_reader_thread,
-                                                   &test_results, std::string(path)));
+        threads[write_thread_count + i].
+            start([&] { multiple_trackers_reader_thread(test_context, path); });
     }
 
     // Wait for all writer threads to complete
     for (int i = 0; i < write_thread_count; ++i)
         threads[i].join();
 
-    // Wait for all reader threads to find and lock onto value '42'
+    // Busy-wait for all reader threads to find and lock onto value '42'
     for (;;) {
         ReadTransaction rt(sg);
         ConstTableRef tr = rt.get_table("table");
-        if (tr->get_int(0,0) == read_thread_count) break;
+        if (tr->get_int(0,0) == read_thread_count)
+            break;
         sched_yield();
     }
     // signal to all readers to complete
@@ -8689,7 +8781,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         threads[write_thread_count + i].join();
 
     // cleanup
-    sg.end_read();
+    sg.end_read(); // FIXME: What cleanup? This seems out of place!?
 }
 
 #ifndef _WIN32
@@ -8717,7 +8809,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     int pid = fork();
     if (pid == 0) {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist);
         {
             WriteTransaction wt(sg);
@@ -8747,7 +8839,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < read_process_count; ++i) {
         readpids[i] = fork();
         if (readpids[i] == 0) {
-            multiple_trackers_reader_thread(&test_results, std::string(path));
+            multiple_trackers_reader_thread(test_context, path);
             exit(0);
         }
     }
@@ -8760,7 +8852,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     // Wait for all reader threads to find and lock onto value '42'
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist);
         for (;;) {
             ReadTransaction rt(sg);
@@ -8772,7 +8864,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     // signal to all readers to complete
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist);
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("table");
@@ -8801,10 +8893,10 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
     SHARED_GROUP_TEST_PATH(path);
 
     for (int i = 0; i < 100; ++i) {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         LangBindHelper::commit_and_continue_as_read(sg);
         sg.end_read();
     }
@@ -8829,11 +8921,11 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
 
     Row rows[10];
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& group = const_cast<Group&>(sg.begin_read());
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     TableRef table = group.add_table("table");
     table->add_column(type_Int, "");
     table->add_empty_row(10);
@@ -8846,7 +8938,7 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
 
     Random random(random_int<unsigned long>());
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     for (int i = 0; i < 10; ++i) {
         size_t row_ndx = random.draw_int_mod(table->size());
         int_fast64_t value = table->get_int(0, row_ndx);
@@ -8867,31 +8959,31 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     TableRef table_w = group_w.add_table("table");
     table_w->add_column(type_Int, "");
     table_w->add_empty_row();
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     ConstTableRef table = group.get_table("table");
     CHECK_EQUAL(0, table->get_int(0,0));
     group.verify();
 
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     table_w->set_int(0,0,1);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     CHECK_EQUAL(1, table->get_int(0,0));
     group.verify();
 
@@ -8900,36 +8992,37 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
 }
 
 
+
 TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     TableRef table_w = group_w.add_table("table");
     DescriptorRef desc_w = table_w->get_descriptor();
     desc_w->add_column(type_Int, "1");
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     ConstTableRef table = group.get_table("table");
     CHECK_EQUAL(1, table->get_column_count());
     group.verify();
 
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     desc_w->add_column(type_Int, "2");
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     CHECK_EQUAL(2, table->get_column_count());
     group.verify();
 
@@ -8942,15 +9035,15 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     TableRef table_w = group_w.add_table("table");
     table_w->add_column_link(type_LinkList, "", *table_w);
     table_w->add_empty_row();
@@ -8959,18 +9052,18 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     ConstTableRef table = group.get_table("table");
     ConstLinkViewRef link_list = table->get_linklist(0,0);
     CHECK_EQUAL(1, link_list->size());
     group.verify();
 
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     link_list_w->add(0);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     CHECK_EQUAL(2, link_list->size());
     group.verify();
 
@@ -8983,12 +9076,12 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist{make_client_history(path, crypt_key())};
+    std::unique_ptr<Replication> hist{make_client_history(path, crypt_key())};
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
     // Create some tables and rows.
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     Group& group_w = const_cast<Group&>(group);
     TableRef t0 = group_w.add_table("t0");
     TableRef t1 = group_w.add_table("t1");
@@ -9012,7 +9105,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
     CHECK_EQUAL(r.get_int(0), 0);
 
     // Check that row accessors are detached.
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     t0->change_link_targets(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
@@ -9024,7 +9117,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
     TableRef st0 = t1->get_subtable(2, 0);
     TableRef mt0 = t1->get_subtable(3, 0);
     CHECK_EQUAL(l0->get_origin_row_index(), 0);
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     t1->change_link_targets(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
@@ -9067,7 +9160,7 @@ TEST(LangBindHelper_MemOnly)
     }
 
     CHECK(rt.get_group().is_empty());
-    LangBindHelper::advance_read(sg_r, hist);
+    LangBindHelper::advance_read(sg_r);
     CHECK(!rt.get_group().is_empty());
 }
 
@@ -9075,16 +9168,16 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     const Group& group = sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // Add initial data
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     TableRef table_w = group_w.add_table("table");
     table_w->add_column(type_Int, "int1");
     table_w->add_column(type_String, "str");
@@ -9096,7 +9189,7 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     ConstTableRef table = group.get_table("table");
     CHECK_EQUAL(1, table->get_int(0, 0));
     CHECK_EQUAL("2", table->get_string(1, 0));
@@ -9104,12 +9197,12 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     group.verify();
 
     // Add search index and re-verify
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     table_w->add_search_index(1);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     CHECK_EQUAL(1, table->get_int(0, 0));
     CHECK_EQUAL("2", table->get_string(1, 0));
     CHECK_EQUAL(3, table->get_int(2, 0));
@@ -9117,12 +9210,12 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     group.verify();
 
     // Remove search index and re-verify
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     table_w->remove_search_index(1);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     group_w.verify();
 
-    LangBindHelper::advance_read(sg, *hist);
+    LangBindHelper::advance_read(sg);
     CHECK_EQUAL(1, table->get_int(0, 0));
     CHECK_EQUAL("2", table->get_string(1, 0));
     CHECK_EQUAL(3, table->get_int(2, 0));
@@ -9134,11 +9227,11 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
 TEST(LangBindHelper_HandoverQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -9147,7 +9240,7 @@ TEST(LangBindHelper_HandoverQuery)
         // Typed interface
         std::unique_ptr<SharedGroup::Handover<TestTableInts::Query> > handover;
         {
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
             for (int i = 0; i <100; ++i)
                 table->add(i);
@@ -9160,7 +9253,7 @@ TEST(LangBindHelper_HandoverQuery)
             handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             // importing query
             std::unique_ptr<TestTableInts::Query> q(sg.import_from_handover(move(handover)));
@@ -9177,7 +9270,7 @@ TEST(LangBindHelper_HandoverQuery)
         {
             sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
             sg_w.begin_read();
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             for (int i = 0; i <100; ++i) {
@@ -9193,7 +9286,7 @@ TEST(LangBindHelper_HandoverQuery)
             handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             // importing query
             std::unique_ptr<Query> q(sg.import_from_handover(move(handover)));
@@ -9210,14 +9303,14 @@ TEST(LangBindHelper_HandoverQuery)
 TEST(LangBindHelper_SubqueryHandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
-    
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    
+
     SharedGroup::VersionID vid;
     {
         // Untyped interface
@@ -9225,7 +9318,7 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
         std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery;
         {
             TableView tv1;
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             table->add_column(type_Bool, "even");
@@ -9244,12 +9337,12 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
             CHECK_EQUAL(51, tv1.size());
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             sg_w.close();
-            
+
             std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
             realm::TableView tv = q->equal(1, true).find_all();
-            
+
             CHECK(tv.is_in_sync());
             CHECK(tv.is_attached());
             CHECK_EQUAL(26, tv.size());//BOOM! fail with 50
@@ -9261,11 +9354,11 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
 TEST(LangBindHelper_HandoverPartialQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -9274,7 +9367,7 @@ TEST(LangBindHelper_HandoverPartialQuery)
         // Untyped interface
         std::unique_ptr<SharedGroup::Handover<Query> > handover;
         {
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             for (int i = 0; i <100; ++i) {
@@ -9290,7 +9383,7 @@ TEST(LangBindHelper_HandoverPartialQuery)
             handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             // importing query
             std::unique_ptr<Query> q(sg.import_from_handover(move(handover)));
@@ -9306,11 +9399,11 @@ TEST(LangBindHelper_HandoverPartialQuery)
 TEST(LangBindHelper_HandoverAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -9320,7 +9413,7 @@ TEST(LangBindHelper_HandoverAccessors)
         std::unique_ptr<SharedGroup::Handover<TestTableInts::View> > handover;
         {
             TestTableInts::View tv;
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
             for (int i = 0; i <100; ++i)
                 table->add(i);
@@ -9338,7 +9431,7 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK(tv.is_attached());
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             //sg_w.end_read();
             sg_w.close();
             // importing tv
@@ -9364,7 +9457,7 @@ TEST(LangBindHelper_HandoverAccessors)
             Row row;
             sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
             sg_w.begin_read();
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             for (int i = 0; i <100; ++i) {
@@ -9415,7 +9508,7 @@ TEST(LangBindHelper_HandoverAccessors)
 
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             // importing tv:
             std::unique_ptr<TableView> tv( sg.import_from_handover(move(handover2)) );
@@ -9531,14 +9624,14 @@ struct HandoverControl {
 
 void handover_writer(std::string path)
 {
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg.begin_read());
     TheTable::Ref table = g.get_table<TheTable>("table");
     Random random(random_int<unsigned long>());
     for (int i = 1; i < 5000; ++i)
     {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         // table holds random numbers >= 1, until the writing process
         // finishes, after which table[0] is set to 0 to signal termination
         table->add(1 + random.draw_int_mod(100));
@@ -9548,7 +9641,7 @@ void handover_writer(std::string path)
         for (int n=0; n<10; ++n)
             sched_yield();
     }
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     table[0].first = 0; // <---- signals other threads to stop
     LangBindHelper::commit_and_continue_as_read(sg);
     sg.end_read();
@@ -9556,17 +9649,16 @@ void handover_writer(std::string path)
 
 
 void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control,
-                      TestResults* test_results_ptr, std::string path)
+                      TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     // We need to ensure that the initial version observed is *before* the final
     // one written by the writer thread. We do this (simplisticly) by locking on
     // to the initial version before even starting the writer.
     Group& g = const_cast<Group&>(sg.begin_read());
     Thread writer;
-    writer.start(bind(&handover_writer, path));
+    writer.start([&] { handover_writer(path); });
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
@@ -9576,7 +9668,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
             sched_yield();
             continue;
         }
-        LangBindHelper::advance_read(sg, *hist);
+        LangBindHelper::advance_read(sg);
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
@@ -9596,10 +9688,9 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
 }
 
 void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control,
-                       TestResults* test_results_ptr, std::string path)
+                       TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (;;) {
         std::unique_ptr<SharedGroup::Handover<TableView>> handover;
@@ -9634,12 +9725,12 @@ namespace {
 void attacher(std::string path)
 {
     for (int i=0; i<1000; ++i) {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         Group& g = const_cast<Group&>(sg.begin_read());
         g.verify();
         TheTable::Ref table = g.get_table<TheTable>("table");
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         table[i].first = 1 + table[i*10].first;
         LangBindHelper::commit_and_continue_as_read(sg);
         g.verify();
@@ -9651,10 +9742,9 @@ void attacher(std::string path)
 TEST(LangBindHelper_RacingAttachers)
 {
     const int num_attachers = 10;
-    SHARED_GROUP_TEST_PATH(p);
-    std::string path(p);
+    SHARED_GROUP_TEST_PATH(path);
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         Group& g = sg.begin_write();
         TheTable::Ref table = g.add_table<TheTable>("table");
@@ -9663,7 +9753,7 @@ TEST(LangBindHelper_RacingAttachers)
     }
     Thread attachers[num_attachers];
     for (int i=0; i<num_attachers; ++i) {
-        attachers[i].start(bind(&attacher, path));
+        attachers[i].start([&] { attacher(path); });
     }
     for (int i=0; i<num_attachers; ++i) {
         attachers[i].join();
@@ -9671,12 +9761,10 @@ TEST(LangBindHelper_RacingAttachers)
 }
 
 
-
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
-    SHARED_GROUP_TEST_PATH(p);
-    std::string path(p);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = sg.begin_write();
     TheTable::Ref table = g.add_table<TheTable>("table");
@@ -9688,8 +9776,8 @@ TEST(LangBindHelper_HandoverBetweenThreads)
 
     HandoverControl<SharedGroup::Handover<TableView>> control;
     Thread querier, verifier;
-    querier.start(bind(&handover_querier, &control, &test_results, path));
-    verifier.start(bind(&handover_verifier, &control, &test_results, path));
+    querier.start([&] { handover_querier(&control, test_context, path); });
+    verifier.start([&] { handover_verifier(&control, test_context, path); });
     querier.join();
     verifier.join();
 
@@ -9707,17 +9795,16 @@ struct StealingInfo {
 
 
 void stealing_querier(HandoverControl<StealingInfo>* control,
-                      TestResults* test_results_ptr, std::string path)
+                      TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     // We need to ensure that the initial version observed is *before* the final
     // one written by the writer thread. We do this (simplisticly) by locking on
     // to the initial version before even starting the writer.
     Group& g = const_cast<Group&>(sg.begin_read());
     Thread writer;
-    writer.start(bind(&handover_writer, path));
+    writer.start([&] { handover_writer(path); });
     TableRef table = g.get_table("table");
     TableView tv = table->where().greater(0,50).find_all();
     for (;;) {
@@ -9727,7 +9814,7 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
             sched_yield();
             continue;
         }
-        LangBindHelper::advance_read(sg, *hist);
+        LangBindHelper::advance_read(sg);
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
@@ -9739,7 +9826,7 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
         if (table->size() > 0 && table->get_int(0,0) <= 0) {
             // we need to wait for the verifier to steal our latest payload.
             // if we go out of scope too early, the payload will become invalid
-            LangBindHelper::advance_read(sg, *hist);
+            LangBindHelper::advance_read(sg);
             if (table->get_int(0,0) == -1)
                 break;
         }
@@ -9749,10 +9836,9 @@ void stealing_querier(HandoverControl<StealingInfo>* control,
 }
 
 void stealing_verifier(HandoverControl<StealingInfo>* control,
-                       TestResults* test_results_ptr, std::string path)
+                       TestContext& test_context, std::string path)
 {
-    TestResults& test_results = *test_results_ptr;
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     for (;;) {
         std::unique_ptr<StealingInfo> info;
@@ -9781,7 +9867,7 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
             CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
         // this looks wrong!
         if (table->size() > 0 && table->get_int(0,0) == 0) {
-            LangBindHelper::promote_to_write(sg, *hist);
+            LangBindHelper::promote_to_write(sg);
             table->set_int(0,0,-1);
             sg.commit();
             control->signal_feedback();
@@ -9796,9 +9882,8 @@ void stealing_verifier(HandoverControl<StealingInfo>* control,
 
 TEST(LangBindHelper_HandoverStealing)
 {
-    SHARED_GROUP_TEST_PATH(p);
-    std::string path(p);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g = sg.begin_write();
     TheTable::Ref table = g.add_table<TheTable>("table");
@@ -9810,8 +9895,8 @@ TEST(LangBindHelper_HandoverStealing)
     HandoverControl<StealingInfo> control;
 
     Thread querier, verifier;
-    querier.start(bind(&stealing_querier, &control, &test_results, path));
-    verifier.start(bind(&stealing_verifier, &control, &test_results, path));
+    querier.start([&] { stealing_querier(&control, test_context, path); });
+    verifier.start([&] { stealing_verifier(&control, test_context, path); });
     querier.join();
     verifier.join();
 
@@ -9821,11 +9906,11 @@ TEST(LangBindHelper_HandoverStealing)
 TEST(LangBindHelper_HandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -9837,7 +9922,7 @@ TEST(LangBindHelper_HandoverDependentViews)
         {
             TableView tv1;
             TableView tv2;
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             for (int i = 0; i <100; ++i) {
@@ -9861,7 +9946,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             CHECK(tv2.is_attached());
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             // importing tv:
             std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover2)) );
@@ -9884,11 +9969,11 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
     for (int detached = 0; detached < 2; detached++)
     {
         SHARED_GROUP_TEST_PATH(path);
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
 
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
         std::unique_ptr<SharedGroup::Handover<TableView> > handover;
@@ -9896,7 +9981,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
 
         {
             TableView tv;
-            LangBindHelper::promote_to_write(sg_w, *hist);
+            LangBindHelper::promote_to_write(sg_w);
 
             TableRef table1 = group_w.add_table("table1");
             TableRef table2 = group_w.add_table("table2");
@@ -9937,7 +10022,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
             // q.m_view = lvr
             Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
 
-            // Remove the LinkList that the query depends on, to see if a detached LinkView can be handed over 
+            // Remove the LinkList that the query depends on, to see if a detached LinkView can be handed over
             // correctly
             if (detached == 1)
                 table2->remove(0);
@@ -9952,7 +10037,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
             handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             std::unique_ptr<TableView> tv(sg.import_from_handover(move(handover))); // <-- import tv
 
@@ -9965,7 +10050,6 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
                 CHECK_EQUAL(0, tv->get_source_ndx(0));
                 CHECK_EQUAL(2, tv->get_source_ndx(1));
             }
-
         }
     }
 }
@@ -9974,25 +10058,25 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
 TEST(LangBindHelper_HandoverTableRef)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<Table> > handover;
     SharedGroup::VersionID vid;
     {
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
         TableRef table1 = group_w.add_table("table1");
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
         handover = sg_w.export_table_for_handover(table1);
     }
     {
-        LangBindHelper::advance_read(sg, *hist, vid);
+        LangBindHelper::advance_read(sg, vid);
         TableRef table2 = sg.import_table_from_handover(move(handover));
         CHECK(table2->is_attached());
         CHECK(table2->size() == 0);
@@ -10003,11 +10087,11 @@ TEST(LangBindHelper_HandoverTableRef)
 TEST(LangBindHelper_HandoverLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& group = const_cast<Group&>(sg.begin_read());
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -10016,7 +10100,7 @@ TEST(LangBindHelper_HandoverLinkView)
     SharedGroup::VersionID vid;
     {
 
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
 
         TableRef table1 = group_w.add_table("table1");
         TableRef table2 = group_w.add_table("table2");
@@ -10058,7 +10142,7 @@ TEST(LangBindHelper_HandoverLinkView)
         handover2 = sg_w.export_linkview_for_handover(lvr);
     }
     {
-        LangBindHelper::advance_read(sg, *hist, vid);
+        LangBindHelper::advance_read(sg, vid);
         LinkViewRef lvr = sg.import_linkview_from_handover(move(handover)); // <-- import lvr
         // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
@@ -10077,7 +10161,7 @@ TEST(LangBindHelper_HandoverLinkView)
         CHECK_EQUAL(2, tv.get_source_ndx(1));
     }
     {
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
         // Change table1 and verify that the change does not propagate through the handed-over linkview
         TableRef table1 = group_w.get_table("table1");
         table1->set_int(0, 0, 50);
@@ -10106,11 +10190,11 @@ TEST(LangBindHelper_HandoverLinkView)
 TEST(LangBindHelper_HandoverDistinctView)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -10122,7 +10206,7 @@ TEST(LangBindHelper_HandoverDistinctView)
         {
             TableView tv1;
             TableView tv2;
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             table->add_empty_row(2);
@@ -10141,7 +10225,7 @@ TEST(LangBindHelper_HandoverDistinctView)
             CHECK(tv1.is_attached());
         }
         {
-            LangBindHelper::advance_read(sg, *hist, vid);
+            LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             // importing tv1:
             std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover2)));
@@ -10168,12 +10252,13 @@ TEST(LangBindHelper_HandoverDistinctView)
 
 TEST(LangBindHelper_HandoverWithReverseDependency)
 {
+    // FIXME: This testcase is wrong!
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -10185,7 +10270,7 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
         TableView tv1;
         TableView tv2;
         {
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
             table->add_column(type_Int, "first");
             for (int i = 0; i <100; ++i) {
@@ -10214,10 +10299,10 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
 TEST(LangBindHelper_HandoverTableViewFromBacklink)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -10226,7 +10311,7 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
         // Untyped interface
         std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
         {
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
 
             TableRef source = group_w.add_table("source");
             source->add_column(type_Int, "int");
@@ -10269,16 +10354,16 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
 TEST(LangBindHelper_HandoverWithLinkQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // First setup data so that we can do a query on links
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     TableRef table1 = group_w.add_table("table1");
     TableRef table2 = group_w.add_table("table2");
     // add some more columns to table1 and table2
@@ -10343,7 +10428,7 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction();// vid == 2
     {
-        LangBindHelper::advance_read(sg, *hist, vid);
+        LangBindHelper::advance_read(sg, vid);
         std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
         realm::TableView tv = q->find_all();
         match = tv.size();
@@ -10352,7 +10437,7 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
     // On the exporting side, change the data such that the query will now have
     // non-zero results if evaluated in that context.
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     table2->add_empty_row();
     table2->set_int(0, 3, 700);
     table2->set_string(1, 3, "nabil");
@@ -10374,20 +10459,23 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 TEST(LangBindHelper_HandoverQueryLinksTo)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryOr;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAnd;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryNot;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAndAndOr;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryWithExpression;
 
     {
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
 
         TableRef source = group_w.add_table("source");
         TableRef target = group_w.add_table("target");
@@ -10407,32 +10495,47 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 
         LangBindHelper::commit_and_continue_as_read(sg_w);
 
-        realm::Query query = source->where().links_to(col_link, target->get(0));
+        Query query = source->where().links_to(col_link, target->get(0));
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
 
-        realm::Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
+        Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
         handoverQueryOr = sg_w.export_for_handover(queryOr, ConstSourcePayload::Copy);
 
-        realm::Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
+        Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
         handoverQueryAnd = sg_w.export_for_handover(queryAnd, ConstSourcePayload::Copy);
+
+        Query queryNot = source->where().Not().links_to(col_link, target->get(0)).links_to(col_link, target->get(1));
+        handoverQueryNot = sg_w.export_for_handover(queryNot, ConstSourcePayload::Copy);
+
+        Query queryAndAndOr = source->where().group().and_query(queryOr).end_group().and_query(queryAnd);
+        handoverQueryAndAndOr = sg_w.export_for_handover(queryAndAndOr, ConstSourcePayload::Copy);
+
+        Query queryWithExpression = source->column<LinkList>(col_link).is_not_null() && query;
+        handoverQueryWithExpression = sg_w.export_for_handover(queryWithExpression, ConstSourcePayload::Copy);
     }
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
     {
         // Import the queries into the read-only shared group.
-        LangBindHelper::advance_read(sg, *hist, vid);
+        LangBindHelper::advance_read(sg, vid);
         std::unique_ptr<Query> query(sg.import_from_handover(move(handoverQuery)));
         std::unique_ptr<Query> queryOr(sg.import_from_handover(move(handoverQueryOr)));
         std::unique_ptr<Query> queryAnd(sg.import_from_handover(move(handoverQueryAnd)));
+        std::unique_ptr<Query> queryNot(sg.import_from_handover(move(handoverQueryNot)));
+        std::unique_ptr<Query> queryAndAndOr(sg.import_from_handover(move(handoverQueryAndAndOr)));
+        std::unique_ptr<Query> queryWithExpression(sg.import_from_handover(move(handoverQueryWithExpression)));
 
         CHECK_EQUAL(1, query->count());
         CHECK_EQUAL(2, queryOr->count());
         CHECK_EQUAL(1, queryAnd->count());
+        CHECK_EQUAL(1, queryNot->count());
+        CHECK_EQUAL(1, queryAndAndOr->count());
+        CHECK_EQUAL(1, queryWithExpression->count());
 
 
         // Remove the linked-to row.
         {
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
 
             TableRef target = group_w.get_table("target");
             target->move_last_over(0);
@@ -10444,6 +10547,9 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         CHECK_EQUAL(1, query->count());
         CHECK_EQUAL(2, queryOr->count());
         CHECK_EQUAL(1, queryAnd->count());
+        CHECK_EQUAL(1, queryNot->count());
+        CHECK_EQUAL(1, queryAndAndOr->count());
+        CHECK_EQUAL(1, queryWithExpression->count());
     }
 }
 
@@ -10451,18 +10557,18 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 TEST(LangBindHelper_HandoverQuerySubQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     sg.begin_read();
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
 
     {
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
 
         TableRef source = group_w.add_table("source");
         TableRef target = group_w.add_table("target");
@@ -10489,14 +10595,14 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
     {
         // Import the queries into the read-only shared group.
-        LangBindHelper::advance_read(sg, *hist, vid);
+        LangBindHelper::advance_read(sg, vid);
         std::unique_ptr<Query> query(sg.import_from_handover(move(handoverQuery)));
 
         CHECK_EQUAL(1, query->count());
 
         // Remove the linked-to row.
         {
-            LangBindHelper::promote_to_write(sg_w, *hist_w);
+            LangBindHelper::promote_to_write(sg_w);
 
             TableRef target = group_w.get_table("target");
             target->move_last_over(2);
@@ -10523,9 +10629,9 @@ TEST(LangBindHelper_VersionControl)
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         // first create 'num_version' versions
         sg.begin_read();
@@ -10560,7 +10666,7 @@ TEST(LangBindHelper_VersionControl)
                 // FIXME: Oops, illegal attempt to access a specific version
                 // that is not currently tethered via another transaction.
 
-                LangBindHelper::advance_read(sg_w, *hist_w, versions[k]);
+                LangBindHelper::advance_read(sg_w, versions[k]);
                 g.verify();
                 CHECK_EQUAL(k, t[k].first);
                 sg_w.end_read();
@@ -10593,7 +10699,7 @@ TEST(LangBindHelper_VersionControl)
                 // FIXME: Oops, illegal attempt to access a specific version
                 // that is not currently tethered via another transaction.
 
-                LangBindHelper::advance_read(sg_w, *hist_w, versions[k]);
+                LangBindHelper::advance_read(sg_w, versions[k]);
                 g.verify();
                 CHECK_EQUAL(k, t[k].first);
             }
@@ -10628,7 +10734,7 @@ TEST(LangBindHelper_VersionControl)
                 // FIXME: Oops, illegal attempt to access a specific version
                 // that is not currently tethered via another transaction.
 
-                LangBindHelper::advance_read(sg_w, *hist_w, versions[new_version]);
+                LangBindHelper::advance_read(sg_w, versions[new_version]);
                 g.verify();
                 CHECK_EQUAL(new_version, t[new_version].first);
             }
@@ -10657,7 +10763,7 @@ TEST(LangBindHelper_VersionControl)
 TEST(LangBindHelper_LinkListCrash)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction wt(sg);
@@ -10666,7 +10772,7 @@ TEST(LangBindHelper_LinkListCrash)
         wt.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist2(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist2(make_client_history(path, crypt_key()));
     SharedGroup sg2(*hist, SharedGroup::durability_Full, crypt_key());
     Group& g2 = const_cast<Group&>(sg2.begin_read());
     for (int i = 0; i < 2; ++i) {
@@ -10679,8 +10785,12 @@ TEST(LangBindHelper_LinkListCrash)
         wt.get_table("Point")->add_empty_row();
         wt.commit();
     }
+    {
+        ReadTransaction rt(sg);
+        rt.get_group().verify();
+    }
     g2.verify();
-    LangBindHelper::advance_read(sg2, *hist2);
+    LangBindHelper::advance_read(sg2);
     g2.verify();
 }
 
@@ -10688,16 +10798,16 @@ TEST(LangBindHelper_LinkListCrash)
 TEST(LangBindHelper_OpenCloseOpen)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     group_w.add_table("bar");
     LangBindHelper::commit_and_continue_as_read(sg_w);
     sg_w.close();
     sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
     sg_w.begin_read();
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
     group_w.add_table("foo");
     LangBindHelper::commit_and_continue_as_read(sg_w);
     sg_w.close();
@@ -10707,12 +10817,12 @@ TEST(LangBindHelper_OpenCloseOpen)
 TEST(LangBindHelper_MixedCommitSizes)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
 
     Group& g = const_cast<Group&>(sg.begin_read());
 
-    LangBindHelper::promote_to_write(sg, *hist);
+    LangBindHelper::promote_to_write(sg);
     TableRef table = g.add_table("table");
     table->add_column(type_Binary, "value");
     LangBindHelper::commit_and_continue_as_read(sg);
@@ -10725,7 +10835,7 @@ TEST(LangBindHelper_MixedCommitSizes)
     // enabled), two small commits to shrink both of the log files, then two
     // large commits to re-expand them
     for (int i = 0; i < 4; ++i) {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         table->insert_empty_row(0);
         table->set_binary(0, 0, BinaryData(buffer.get(), 65536));
         LangBindHelper::commit_and_continue_as_read(sg);
@@ -10733,7 +10843,7 @@ TEST(LangBindHelper_MixedCommitSizes)
     }
 
     for (int i = 0; i < 2; ++i) {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         table->insert_empty_row(0);
         table->set_binary(0, 0, BinaryData(buffer.get(), 1024));
         LangBindHelper::commit_and_continue_as_read(sg);
@@ -10741,7 +10851,7 @@ TEST(LangBindHelper_MixedCommitSizes)
     }
 
     for (int i = 0; i < 2; ++i) {
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         table->insert_empty_row(0);
         table->set_binary(0, 0, BinaryData(buffer.get(), 65536));
         LangBindHelper::commit_and_continue_as_read(sg);
@@ -10752,22 +10862,23 @@ TEST(LangBindHelper_MixedCommitSizes)
 TEST(LangBindHelper_RollbackToInitialState1)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     sg_w.begin_read();
-    LangBindHelper::promote_to_write(sg_w, *hist_w);
-    LangBindHelper::rollback_and_continue_as_read(sg_w, *hist_w);
+    LangBindHelper::promote_to_write(sg_w);
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
 }
 
 
 TEST(LangBindHelper_RollbackToInitialState2)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     sg_w.begin_write();
     sg_w.rollback();
 }
+
 
 TEST(LangBindHelper_Compact)
 {
@@ -10775,7 +10886,7 @@ TEST(LangBindHelper_Compact)
     size_t N = 100;
 
     {
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         WriteTransaction w(sg_w);
         TableRef table = w.get_or_add_table("test");
@@ -10788,7 +10899,7 @@ TEST(LangBindHelper_Compact)
         sg_w.close();
     }
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
@@ -10797,14 +10908,14 @@ TEST(LangBindHelper_Compact)
     }
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         CHECK_EQUAL(true, sg.compact());
         sg.close();
     }
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
@@ -10812,6 +10923,7 @@ TEST(LangBindHelper_Compact)
         sg.close();
     }
 }
+
 
 TEST(LangBindHelper_CompactLargeEncryptedFile)
 {
@@ -10826,7 +10938,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
     const size_t N = 32;
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key(true)));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("test");
@@ -10843,7 +10955,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
     }
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key(true)));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key(true)));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
@@ -10852,11 +10964,12 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
     }
 }
 
+
 TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     {
         WriteTransaction w(sg_w);
@@ -10869,7 +10982,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
         w.commit();
     }
 
-    std::unique_ptr<ClientHistory> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
     SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
     ReadTransaction r(sg_r);
     ConstTableRef table_r = r.get_table("test");
@@ -10881,7 +10994,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
         w.get_table("test")->clear();
         w.commit();
     }
-    LangBindHelper::advance_read(sg_r, *hist_r);
+    LangBindHelper::advance_read(sg_r);
 
     // Verify that an aggregate on the view with detached refs gives the expected result.
     CHECK_EQUAL(false, view.is_in_sync());
@@ -10899,6 +11012,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     CHECK_EQUAL(0, min);
     CHECK_EQUAL(not_found, ndx);
 }
+
 
 // Tests handover of a Query. Especially it tests if next-gen-syntax nodes are deep copied correctly by
 // executing an imported query multiple times in parallel
@@ -10918,16 +11032,16 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     std::atomic<bool> end_signal(false);
 
     {
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
 
-        std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
         // First setup data so that we can do a query on links
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
 
         TableRef owner = group_w.add_table("Owner");
         TableRef dog = group_w.add_table("Dog");
@@ -10958,7 +11072,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     auto async = [&]() {
         // Async thread
         //************************************************************************************************
-        std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         sg.begin_read();
 
@@ -10976,7 +11090,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
 
                 // We cannot advance backwards compared to our initial begin_read() outside the while loop
                 if (v >= sg.get_version_of_current_transaction()) {
-                    LangBindHelper::advance_read(sg, *hist, v);
+                    LangBindHelper::advance_read(sg, v);
                     std::unique_ptr<Query> q(sg.import_from_handover(move(qptr)));
                     realm::TableView tv = q->find_all();
                 }
@@ -10988,7 +11102,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         //************************************************************************************************
     };
 
-    std::unique_ptr<ClientHistory> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     Group& group = const_cast<Group&>(sg.begin_read());
 
@@ -11007,7 +11121,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     //************************************************************************************************
     for (size_t iter = 0; iter < 20 + TEST_DURATION * TEST_DURATION * 500; iter++) {
         vector_mutex.lock();
-        LangBindHelper::promote_to_write(sg, *hist);
+        LangBindHelper::promote_to_write(sg);
         LangBindHelper::commit_and_continue_as_read(sg);
         if (qs.size() < 100) {
             for (size_t t = 0; t < 5; t++) {
@@ -11036,7 +11150,7 @@ TEST(LangBindHelper_TableViewClear)
     size_t number_of_history = 1000;
     size_t number_of_line = 18;
 
-    std::unique_ptr<ClientHistory> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
@@ -11044,7 +11158,7 @@ TEST(LangBindHelper_TableViewClear)
     // history : ["id" (int), "parent" (int), "lines" (list(line))]
     // line    : ["id" (int), "parent" (int)]
     {
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
         TableRef history = group_w.add_table("history");
         TableRef line = group_w.add_table("line");
 
@@ -11061,7 +11175,7 @@ TEST(LangBindHelper_TableViewClear)
     }
 
     {
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
 
         TableRef history = group_w.get_table("history");
         TableRef line = group_w.get_table("line");
@@ -11094,7 +11208,7 @@ TEST(LangBindHelper_TableViewClear)
 
     // query and delete
     {
-        LangBindHelper::promote_to_write(sg_w, *hist_w);
+        LangBindHelper::promote_to_write(sg_w);
 
         TableRef history = group_w.get_table("history");
         TableRef line = group_w.get_table("line");
@@ -11114,6 +11228,446 @@ TEST(LangBindHelper_TableViewClear)
         CHECK_EQUAL(number_of_history, history->size());
         CHECK_EQUAL(number_of_line, line->size());
     }
+}
+
+
+TEST(LangBindHelper_SessionHistoryConsistency)
+{
+    // Check that we can reliably detect inconsist history
+    // types across concurrent session participants.
+
+    // Errors of this kind are considered as incorrect API usage, and will lead
+    // to throwing of LogicError exceptions.
+
+    SHARED_GROUP_TEST_PATH(path);
+
+    // When starting with an empty Realm, all history types are allowed, but all
+    // session participants must still agree
+    {
+        // No history
+        SharedGroup sg(path);
+
+        // Out-of-Realm history
+        std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+                          LogicError::mixed_history_type);
+    }
+}
+
+
+TEST(LangBindHelper_InRealmHistory_Basics)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist = make_in_realm_history(path);
+    std::unique_ptr<Replication> hist_w = make_in_realm_history(path);
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    // Try to advance without anything having happened
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(0, group.size());
+
+    // Try to advance after an empty write transaction
+    {
+        WriteTransaction wt(sg_w);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(0, group.size());
+
+    // Try to advance after a superfluous rollback
+    {
+        WriteTransaction wt(sg_w);
+        // Implicit rollback
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(0, group.size());
+
+    // Try to advance after a propper rollback
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("bad");
+        // Implicit rollback
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(0, group.size());
+
+    // Create a table via the other SharedGroup
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("foo");
+        foo_w->add_column(type_Int, "i");
+        foo_w->add_empty_row();
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(1, group.size());
+    ConstTableRef foo = group.get_table("foo");
+    CHECK_EQUAL(1, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(1, foo->size());
+    CHECK_EQUAL(0, foo->get_int(0,0));
+    uint_fast64_t version = foo->get_version_counter();
+
+    // Modify the table via the other SharedGroup
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.get_table("foo");
+        foo_w->add_column(type_String, "s");
+        foo_w->add_empty_row();
+        foo_w->set_int(0, 0, 1);
+        foo_w->set_int(0, 1, 2);
+        foo_w->set_string(1, 0, "a");
+        foo_w->set_string(1, 1, "b");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    CHECK(version != foo->get_version_counter());
+    group.verify();
+    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(2, foo->size());
+    CHECK_EQUAL(1, foo->get_int(0,0));
+    CHECK_EQUAL(2, foo->get_int(0,1));
+    CHECK_EQUAL("a", foo->get_string(1,0));
+    CHECK_EQUAL("b", foo->get_string(1,1));
+    CHECK_EQUAL(foo, group.get_table("foo"));
+
+    // Again, with no change
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(2, foo->size());
+    CHECK_EQUAL(1, foo->get_int(0,0));
+    CHECK_EQUAL(2, foo->get_int(0,1));
+    CHECK_EQUAL("a", foo->get_string(1,0));
+    CHECK_EQUAL("b", foo->get_string(1,1));
+    CHECK_EQUAL(foo, group.get_table("foo"));
+
+    // Perform several write transactions before advancing the read transaction
+    {
+        WriteTransaction wt(sg_w);
+        TableRef bar_w = wt.add_table("bar");
+        bar_w->add_column(type_Int, "a");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_w);
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_w);
+        TableRef bar_w = wt.get_table("bar");
+        bar_w->add_column(type_Float, "b");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_w);
+        // Implicit rollback
+    }
+    {
+        WriteTransaction wt(sg_w);
+        TableRef bar_w = wt.get_table("bar");
+        bar_w->add_column(type_Double, "c");
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(2, group.size());
+    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(2, foo->size());
+    CHECK_EQUAL(1, foo->get_int(0,0));
+    CHECK_EQUAL(2, foo->get_int(0,1));
+    CHECK_EQUAL("a", foo->get_string(1,0));
+    CHECK_EQUAL("b", foo->get_string(1,1));
+    CHECK_EQUAL(foo, group.get_table("foo"));
+    ConstTableRef bar = group.get_table("bar");
+    CHECK_EQUAL(3, bar->get_column_count());
+    CHECK_EQUAL(type_Int,    bar->get_column_type(0));
+    CHECK_EQUAL(type_Float,  bar->get_column_type(1));
+    CHECK_EQUAL(type_Double, bar->get_column_type(2));
+
+    // Clear tables
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.get_table("foo");
+        foo_w->clear();
+        TableRef bar_w = wt.get_table("bar");
+        bar_w->clear();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(2, group.size());
+    CHECK(foo->is_attached());
+    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(type_Int, foo->get_column_type(0));
+    CHECK_EQUAL(type_String, foo->get_column_type(1));
+    CHECK_EQUAL(0, foo->size());
+    CHECK(bar->is_attached());
+    CHECK_EQUAL(3, bar->get_column_count());
+    CHECK_EQUAL(type_Int,    bar->get_column_type(0));
+    CHECK_EQUAL(type_Float,  bar->get_column_type(1));
+    CHECK_EQUAL(type_Double, bar->get_column_type(2));
+    CHECK_EQUAL(0, bar->size());
+    CHECK_EQUAL(foo, group.get_table("foo"));
+    CHECK_EQUAL(bar, group.get_table("bar"));
+}
+
+
+TEST(LangBindHelper_InRealmHistory_RollbackAndContinueAsRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    {
+        Group* group = const_cast<Group*>(&sg.begin_read());
+       {
+            LangBindHelper::promote_to_write(sg);
+            TableRef origin = group->get_or_add_table("origin");
+            origin->add_column(type_Int, "");
+            origin->add_empty_row();
+            origin->set_int(0,0,42);
+            LangBindHelper::commit_and_continue_as_read(sg);
+        }
+        group->verify();
+        {
+            // rollback of group level table insertion
+            LangBindHelper::promote_to_write(sg);
+            TableRef o = group->get_or_add_table("nullermand");
+            TableRef o2 = group->get_table("nullermand");
+            REALM_ASSERT(o2);
+            LangBindHelper::rollback_and_continue_as_read(sg);
+            TableRef o3 = group->get_table("nullermand");
+            REALM_ASSERT(!o3);
+            REALM_ASSERT(o2->is_attached() == false);
+        }
+
+        TableRef origin = group->get_table("origin");
+        Row row = origin->get(0);
+        CHECK_EQUAL(42, origin->get_int(0,0));
+
+        {
+            LangBindHelper::promote_to_write(sg);
+            origin->insert_empty_row(0);
+            origin->set_int(0,0,5746);
+            CHECK_EQUAL(42, origin->get_int(0,1));
+            CHECK_EQUAL(5746, origin->get_int(0,0));
+            CHECK_EQUAL(42, row.get_int(0));
+            CHECK_EQUAL(2, origin->size());
+            group->verify();
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        CHECK_EQUAL(1, origin->size());
+        group->verify();
+        CHECK_EQUAL(42, origin->get_int(0,0));
+        CHECK_EQUAL(42, row.get_int(0));
+
+        {
+            LangBindHelper::promote_to_write(sg);
+            origin->add_empty_row();
+            origin->set_int(0,1,42);
+            LangBindHelper::commit_and_continue_as_read(sg);
+        }
+        Row row2 = origin->get(1);
+        CHECK_EQUAL(2, origin->size());
+
+        {
+            LangBindHelper::promote_to_write(sg);
+            origin->move_last_over(0);
+            CHECK_EQUAL(1, origin->size());
+            CHECK_EQUAL(42, row2.get_int(0));
+            CHECK_EQUAL(42, origin->get_int(0,0));
+            group->verify();
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+        CHECK_EQUAL(2, origin->size());
+        group->verify();
+        CHECK_EQUAL(42, row2.get_int(0));
+        CHECK_EQUAL(42, origin->get_int(0,1));
+        sg.end_read();
+    }
+}
+
+
+TEST(LangBindHelper_InRealmHistory_Upgrade)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    {
+        // Out-of-Realm history
+        std::unique_ptr<Replication> hist = make_client_history(path_1, crypt_key());
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    {
+        // In-Realm history
+        std::unique_ptr<Replication> hist = make_in_realm_history(path_1);
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    SHARED_GROUP_TEST_PATH(path_2);
+    {
+        // No history
+        SharedGroup sg(path_2);
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    {
+        // In-Realm history
+        std::unique_ptr<Replication> hist = make_in_realm_history(path_2);
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+}
+
+
+TEST(LangBindHelper_InRealmHistory_Downgrade)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        // In-Realm history
+        std::unique_ptr<Replication> hist = make_in_realm_history(path);
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        WriteTransaction wt(sg);
+        wt.commit();
+    }
+    {
+        // No history
+        CHECK_THROW(SharedGroup(path), InvalidDatabase);
+    }
+    {
+        // Out-of-Realm history
+        std::unique_ptr<Replication> hist = make_client_history(path, crypt_key());
+        CHECK_THROW(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+                    InvalidDatabase);
+    }
+}
+
+
+TEST(LangBindHelper_InRealmHistory_SessionConsistency)
+{
+    // Check that we can reliably detect inconsist history
+    // types across concurrent session participants.
+
+    // Errors of this kind are considered as incorrect API usage, and will lead
+    // to throwing of LogicError exceptions.
+
+    SHARED_GROUP_TEST_PATH(path);
+
+    // When starting with an empty Realm, all history types are allowed, but all
+    // session participants must still agree
+    {
+        // No history
+        SharedGroup sg(path);
+
+        // In-Realm history
+        std::unique_ptr<Replication> hist = make_in_realm_history(path);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+                          LogicError::mixed_history_type);
+    }
+    // The Realm is still at its initial empty state
+    {
+        // Out-of-Realm history
+        std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
+        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+        // In-Realm history
+        std::unique_ptr<Replication> hist_2 = make_in_realm_history(path);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroup::durability_Full, crypt_key()),
+                          LogicError::mixed_history_type);
+    }
+}
+
+// Check that stored column indices are correct after a
+// column removal. Not updating the stored index was
+// causing an assertion failure when a table was cleared.
+TEST(LangBindHelper_StaleLinkIndexOnTableClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+    TableRef t = group_w.add_table("table1");
+    t->add_column(type_Int, "int1");
+    t->add_search_index(0);
+    t->add_empty_row(2);
+
+    TableRef t2 = group_w.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->add_empty_row();
+    t2->set_link(1, 0, 1);
+    t2->remove_column(0); // after this call LinkColumnBase::m_column_ndx was incorrect
+
+    // which would cause an index out of bounds assertion failure triggered
+    // from a table clear() (assert in Spec::get_opposite_link_table_ndx)
+    t->clear();
+
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_EQUAL(t2->get_link(0, 0), realm::npos); // no link
+}
+
+// Check that rollback of a transaction which deletes a table
+// containing a link will insert the associated backlink into
+// the correct index in the associated (linked) table. In this
+// case, backlink columns should not be appended (rather they
+// should be inserted into the previously used index).
+TEST(LangBindHelper_RollBackAfterRemovalOfTable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+
+    TableRef source_a = group_w.add_table("source_a");
+    TableRef source_b = group_w.add_table("source_b");
+    TableRef target_b = group_w.add_table("target_b");
+
+    source_a->add_column_link(type_LinkList, "b", *target_b);
+    source_b->add_column_link(type_LinkList, "b", *target_b);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    {
+        LangBindHelper::promote_to_write(sg_w);
+
+        group_w.remove_table("source_a");
+        LangBindHelper::rollback_and_continue_as_read(sg_w);
+    }
+    using tf = _impl::TableFriend;
+    CHECK_EQUAL(group_w.size(), 3);
+    CHECK_EQUAL(group_w.get_table_name(0), StringData("source_a"));
+    CHECK_EQUAL(group_w.get_table(0)->get_column_count(), 1);
+    CHECK_EQUAL(group_w.get_table(0)->get_link_target(0), target_b);
+    CHECK_EQUAL(group_w.get_table(1)->get_link_target(0), target_b);
+    // backlink column index in target_b from source_a should be index 0
+    CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(0, 0), 0);
+    // backlink column index in target_b from source_b should be index 1
+    CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(1, 0), 1);
 }
 
 #endif

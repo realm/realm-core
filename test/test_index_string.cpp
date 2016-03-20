@@ -16,7 +16,7 @@ using namespace util;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -1031,8 +1031,8 @@ TEST(StringIndex_Zero_Crash2)
                 table.add_search_index(0);
             }
             else if (action > 48 && table.size() < 10) {
-                // Generate string with equal probability of being empty, null, short, medium and long, and with 
-                // their contents having equal proability of being either random or a duplicate of a previous 
+                // Generate string with equal probability of being empty, null, short, medium and long, and with
+                // their contents having equal proability of being either random or a duplicate of a previous
                 // string. When it's random, each char must have equal probability of being 0 or non-0e
                 char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
                 char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
@@ -1062,7 +1062,7 @@ TEST(StringIndex_Zero_Crash2)
                         else
                             buf2[t] = static_cast<char>(random.draw_int<int>());  // random byte
                     }
-                    // no generated string can equal "null" (our vector magic value for null) because 
+                    // no generated string can equal "null" (our vector magic value for null) because
                     // len == 4 is not possible
                     sd = StringData(buf2, len);
                 }
@@ -1115,7 +1115,7 @@ TEST(StringIndex_Integer_Increasing)
     for (size_t row = 0; row < rows; row++) {
         int64_t v = table.get_int(0, row);
         size_t c = table.count_int(0, v);
-        
+
         size_t start = std::lower_bound(reference.begin(), reference.end(), v) - reference.begin();
         size_t ref_count = 0;
         for (size_t t = start; t < reference.size(); t++) {
@@ -1200,7 +1200,7 @@ TEST(StringIndex_Duplicate_Values)
 
 namespace {
 
-void verify_single_move_last_over(TestResults& test_results, StringColumn& col, size_t index) {
+void verify_single_move_last_over(TestContext& test_context, StringColumn& col, size_t index) {
     std::string value = col.get(col.size() - 1);
     size_t orig_size = col.size();
     col.move_last_over(index);
@@ -1251,12 +1251,12 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     col.create_search_index();
 
     // switch out entire first leaf on a tree where MAX_BPNODE_SIZE == 4
-    ::verify_single_move_last_over(test_results, col, 0);
-    ::verify_single_move_last_over(test_results, col, 1);
-    ::verify_single_move_last_over(test_results, col, 2);
-    ::verify_single_move_last_over(test_results, col, 3);
-    ::verify_single_move_last_over(test_results, col, 4);
-    ::verify_single_move_last_over(test_results, col, 5);
+    verify_single_move_last_over(test_context, col, 0);
+    verify_single_move_last_over(test_context, col, 1);
+    verify_single_move_last_over(test_context, col, 2);
+    verify_single_move_last_over(test_context, col, 3);
+    verify_single_move_last_over(test_context, col, 4);
+    verify_single_move_last_over(test_context, col, 5);
 
     // move_last_over for last index should remove the last item
     size_t last_size = col.size();
@@ -1266,7 +1266,7 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     // randomly remove remaining elements until col.size() == 1
     while (col.size() > 1) {
         size_t random_index = random.draw_int<size_t>(0, col.size() - 2);
-        ::verify_single_move_last_over(test_results, col, random_index);
+        verify_single_move_last_over(test_context, col, random_index);
     }
 
     // remove final element

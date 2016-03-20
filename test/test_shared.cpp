@@ -28,12 +28,11 @@
 #include "util/thread_wrapper.hpp"
 
 #include "test.hpp"
-#include "crypt_key.hpp"
 
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -112,16 +111,17 @@ void writer(std::string path, int id)
             wt.commit();
         }
         // std::cerr << "Ended pid " << getpid() << std::endl;
-    } catch (...) {
+    }
+    catch (...) {
         // std::cerr << "Exception from " << getpid() << std::endl;
         REALM_ASSERT(false);
     }
 }
 
 
-#if !REALM_PLATFORM_APPLE && !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
+#if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 
-void killer(TestResults& test_results, int pid, std::string path, int id)
+void killer(TestContext& test_context, int pid, std::string path, int id)
 {
     {
         SharedGroup sg(path, true, SharedGroup::durability_Full, crypt_key());
@@ -168,7 +168,7 @@ void killer(TestResults& test_results, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !REALM_PLATFORM_APPLE && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -202,7 +202,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     if (pid == 0) {
         // first writer!
         writer(path, 0);
-        _exit(0);
+        _Exit(0);
     }
     else {
         for (int k=1; k < num_processes; ++k) {
@@ -212,16 +212,18 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
                 REALM_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
-                _exit(0);
+                _Exit(0);
             }
             else {
                 // std::cerr << "New process " << pid << " killing old " << pid2 << std::endl;
-                killer(test_results, pid2, path, k-1);
+                killer(test_context, pid2, path, k-1);
             }
         }
         // std::cerr << "Killing last one: " << pid << std::endl;
-        killer(test_results, pid, path, num_processes-1);
+        killer(test_context, pid, path, num_processes-1);
     }
+    // We need to wait cleaning up til the killed processes have exited.
+    sleep(1);
 }
 #endif
 
@@ -1248,10 +1250,8 @@ TEST(Shared_WritesSpecialOrder)
 
 namespace  {
 
-void writer_threads_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
+void writer_threads_thread(TestContext& test_context, std::string path, size_t row_ndx)
 {
-    TestResults& test_results = *test_results_ptr;
-
     // Open shared db
     SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
 
@@ -1309,7 +1309,7 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i)
-            threads[i].start(std::bind(&writer_threads_thread, &test_results, std::string(path), i));
+            threads[i].start([this, &path, i] { writer_threads_thread(test_context, path, i); });
 
         // Wait for all threads to complete
         for (size_t i = 0; i < thread_count; ++i)
@@ -1335,8 +1335,11 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
-#if !defined REALM_ANDROID && !defined REALM_IOS
+#if !REALM_ENABLE_ENCRYPTION &&  defined(ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE)
+// this unittest has issues that has not been fully understood, but could be
+// related to interaction between posix robust mutexes and the fork() system call.
+// it has so far only been seen failing on Linux, so we enable it on ios.
+#if REALM_PLATFORM_APPLE
 
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
@@ -1348,10 +1351,10 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
     // This test can only be conducted by spawning independent
     // processes which can then be terminated individually.
-
+    const int process_count = 100;
     SHARED_GROUP_TEST_PATH(path);
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < process_count; ++i) {
         pid_t pid = fork();
         if (pid == pid_t(-1))
             REALM_TERMINATE("fork() failed");
@@ -1360,8 +1363,8 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TableRef table = wt.add_table("alpha");
-            _exit(0); // Die with an active write transaction
+            TableRef table = wt.get_or_add_table("alpha");
+            _Exit(42); // Die hard with an active write transaction
         }
         else {
             // Parent
@@ -1373,7 +1376,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             bool child_exited_normaly = WIFEXITED(stat_loc);
             CHECK(child_exited_normaly);
             int child_exit_status = WEXITSTATUS(stat_loc);
-            CHECK_EQUAL(0, child_exit_status);
+            CHECK_EQUAL(42, child_exit_status);
         }
 
         // Check that we can continue without dead-locking
@@ -1381,7 +1384,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TableRef table = wt.add_table("beta");
+            TableRef table = wt.get_or_add_table("beta");
             if (table->is_empty()) {
                 table->add_column(type_Int, "i");
                 table->insert_empty_row(0);
@@ -1399,12 +1402,15 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         CHECK(!rt.has_table("alpha"));
         CHECK(rt.has_table("beta"));
         ConstTableRef table = rt.get_table("beta");
-        CHECK_EQUAL(10, table->get_int(0,0));
+        CHECK_EQUAL(process_count, table->get_int(0,0));
     }
 }
 
-#endif // not ios or android
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+#endif // on apple
+#endif // encryption enabled
+
+// not ios or android
+//#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
@@ -1877,10 +1883,8 @@ namespace  {
 
 #define multiprocess_increments 100
 
-void multiprocess_thread(TestResults* test_results_ptr, std::string path, size_t row_ndx)
+void multiprocess_thread(TestContext& test_context, std::string path, size_t row_ndx)
 {
-    TestResults& test_results = *test_results_ptr;
-
     // Open shared db
     bool no_create = false;
     SharedGroup sg(path, no_create, SharedGroup::durability_Async);
@@ -1986,7 +1990,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
 #endif
 }
 
-void multiprocess_threaded(TestResults& test_results, std::string path, size_t num_threads, size_t base)
+void multiprocess_threaded(TestContext& test_context, std::string path, size_t num_threads, size_t base)
 {
     // Do some changes in a async db
     std::unique_ptr<test_util::ThreadWrapper[]> threads;
@@ -1994,7 +1998,8 @@ void multiprocess_threaded(TestResults& test_results, std::string path, size_t n
 
     // Start threads
     for (size_t i = 0; i != num_threads; ++i)
-        threads[i].start(std::bind(&multiprocess_thread, &test_results, path, base+i));
+        threads[i].start([&test_context, &path, base, i]
+                         { multiprocess_thread(test_context, path, base+i); });
 
     // Wait for threads to finish
     for (size_t i = 0; i != num_threads; ++i) {
@@ -2022,7 +2027,7 @@ void multiprocess_threaded(TestResults& test_results, std::string path, size_t n
     }
 }
 
-void multiprocess_validate_and_clear(TestResults& test_results, std::string path, std::string lock_path,
+void multiprocess_validate_and_clear(TestContext& test_context, std::string path, std::string lock_path,
                                      size_t rows, int result)
 {
     // Wait for async_commit process to shutdown
@@ -2046,12 +2051,12 @@ void multiprocess_validate_and_clear(TestResults& test_results, std::string path
     }
 }
 
-void multiprocess(TestResults& test_results, std::string path, int num_procs, size_t num_threads)
+void multiprocess(TestContext& test_context, std::string path, int num_procs, size_t num_threads)
 {
     int* pids = new int[num_procs];
     for (int i = 0; i != num_procs; ++i) {
         if (0 == (pids[i] = fork())) {
-            multiprocess_threaded(test_results, path, num_threads, i*num_threads);
+            multiprocess_threaded(test_context, path, num_threads, i*num_threads);
             _exit(0);
         }
     }
@@ -2075,25 +2080,25 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 #if TEST_DURATION < 1
     multiprocess_make_table(path, path.get_lock_path(), alone_path, 4);
 
-    multiprocess_threaded(test_results, path, 2, 0);
-    multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+    multiprocess_threaded(test_context, path, 2, 0);
+    multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
                                     2, multiprocess_increments);
 
     for (int k = 1; k < 3; ++k) {
-        multiprocess(test_results, path, 2, 2);
-        multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+        multiprocess(test_context, path, 2, 2);
+        multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
                                         4, multiprocess_increments);
     }
 #else
     multiprocess_make_table(path, path.get_lock_path(), alone_path, 100);
 
-    multiprocess_threaded(test_results, path, 10, 0);
-    multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+    multiprocess_threaded(test_context, path, 10, 0);
+    multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
                                     10, multiprocess_increments);
 
     for (int k = 1; k < 10; ++k) {
-        multiprocess(test_results, path, 10, 10);
-        multiprocess_validate_and_clear(test_results, path, path.get_lock_path(),
+        multiprocess(test_context, path, 10, 10);
+        multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
                                         100, multiprocess_increments);
     }
 #endif
@@ -2101,91 +2106,91 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
-#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
-
-
-// Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
-/*
-
-namespace {
-
-const int num_threads = 3;
-int shared_state[num_threads];
-SharedGroup* sgs[num_threads];
-Mutex* muu;
-
-void waiter(std::string path, int i)
-{
-    SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 1;
-        sgs[i] = sg;
-    }
-    sg->wait_for_change();
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 2; // this state should not be observed by the writer
-    }
-    sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 3;
-    }
-    sg->begin_read();
-    sg->end_read();
-    sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 4;
-    }
-    // works within a read transaction as well
-    sg->begin_read();
-    sg->wait_for_change();
-    sg->end_read();
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 5;
-    }
-    sg->begin_read();
-    sg->end_read();
-    sg->wait_for_change(); // wait until wait_for_change is released
-    {
-        LockGuard l(*muu);
-        shared_state[i] = 6;
-    }
-}
-
-} // anonymous namespace
+#if !defined(_WIN32)
+// this test does not work with valgrind:
+#if 0
 
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
-    muu = new Mutex;
+    const int num_threads = 3;
+    Mutex mutex;
+    int shared_state[num_threads];
+    SharedGroup* sgs[num_threads];
+
+    auto waiter = [&](std::string path, int i) {
+        SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 1;
+            sgs[i] = sg;
+        }
+        sg->begin_read(); // open a transaction at least once to make "changed" well defined
+        sg->end_read();
+        sg->wait_for_change();
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 2; // this state should not be observed by the writer
+        }
+        sg->wait_for_change(); // we'll fall right through here, because we haven't advanced our readlock
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 3;
+        }
+        sg->begin_read();
+        sg->end_read();
+        sg->wait_for_change(); // this time we'll wait because state hasn't advanced since we did.
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 4;
+        }
+        // works within a read transaction as well
+        sg->begin_read();
+        sg->wait_for_change();
+        sg->end_read();
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 5;
+        }
+        sg->begin_read();
+        sg->end_read();
+        sg->wait_for_change(); // wait until wait_for_change is released
+        {
+            LockGuard l(mutex);
+            shared_state[i] = 6;
+        }
+    };
+
     SHARED_GROUP_TEST_PATH(path);
     for (int j=0; j < num_threads; j++)
         shared_state[j] = 0;
     SharedGroup sg(path, false, SharedGroup::durability_Full);
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
-        threads[j].start(std::bind(&waiter, std::string(path), j));
+        threads[j].start([waiter, &path, j] { waiter(path, j); });
     bool try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
-            if (shared_state[j] != 1) try_again = true;
+            LockGuard l(mutex);
+            if (shared_state[j] < 1) try_again = true;
+            CHECK(shared_state[j] < 2);
         }
     }
 
+    // This write transaction should allow all readers to run again
     sg.begin_write();
     sg.commit();
+
+    // All readers should pass through state 2 to state 3, so wait
+    // for all to reach state 3:
     try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(mutex);
             if (3 != shared_state[j]) try_again = true;
+            CHECK(shared_state[j] < 4);
         }
     }
 
@@ -2195,7 +2200,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(mutex);
             if (4 != shared_state[j]) try_again = true;
         }
     }
@@ -2205,7 +2210,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(mutex);
             if (5 != shared_state[j]) try_again = true;
         }
     }
@@ -2213,7 +2218,7 @@ TEST(Shared_WaitForChange)
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
-            LockGuard l(*muu);
+            LockGuard l(mutex);
             if (sgs[j]) {
                 sgs[j]->wait_for_change_release();
             }
@@ -2228,12 +2233,11 @@ TEST(Shared_WaitForChange)
         delete sgs[j];
         sgs[j] = 0;
     }
-    delete muu;
 }
 
-*/
 
-#endif // endif not on windows (or apple)
+#endif // test is disabled
+#endif // endif not on windows
 
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
@@ -2849,5 +2853,87 @@ TEST(Shared_BeginReadFailure)
     CHECK_THROW(sg.begin_read(), SimulatedFailure);
 }
 #endif // REALM_DEBUG
+
+
+TEST(Shared_SessionDurabilityConsistency)
+{
+    // Check that we can reliably detect inconsist durability choices across
+    // concurrent session participants.
+
+    // Errors of this kind are considered as incorrect API usage, and will lead
+    // to throwing of LogicError exceptions.
+
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        bool no_create = false;
+        SharedGroup::DurabilityLevel durability_1 = SharedGroup::durability_Full;
+        SharedGroup sg(path, no_create, durability_1);
+
+        SharedGroup::DurabilityLevel durability_2 = SharedGroup::durability_MemOnly;
+        CHECK_LOGIC_ERROR(SharedGroup(path, no_create, durability_2),
+                          LogicError::mixed_durability);
+    }
+}
+
+
+TEST(Shared_WriteEmpty)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
+    {
+        SharedGroup sg(path_1);
+        ReadTransaction rt(sg);
+        rt.get_group().write(path_2);
+    }
+}
+
+
+TEST(Shared_CompactEmpty)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        SharedGroup sg(path);
+        CHECK(sg.compact());
+    }
+}
+
+
+TEST(Shared_VersionOfBoundSnapshot)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup::version_type version;
+    SharedGroup sg(path);
+    {
+        ReadTransaction rt(sg);
+        version = rt.get_version();
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_EQUAL(version, rt.get_version());
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+        wt.commit(); // Increment version
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_LESS(version, rt.get_version());
+        version = rt.get_version();
+    }
+    {
+        WriteTransaction wt(sg);
+        CHECK_EQUAL(version, wt.get_version());
+        wt.commit(); // Increment version
+    }
+    {
+        ReadTransaction rt(sg);
+        CHECK_LESS(version, rt.get_version());
+    }
+}
 
 #endif // TEST_SHARED

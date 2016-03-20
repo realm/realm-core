@@ -201,8 +201,8 @@ or `sh build.sh bin-dist`, as in the following example:
 Testing
 -------
 
-The core library comes with a suite of unite tests. You can run it in
-one of the following ways:
+The core library comes with a suite of unit tests. You can run it in one of the
+following ways:
 
     sh build.sh check
     sh build.sh check-debug
@@ -211,58 +211,57 @@ one of the following ways:
 
 The `mem` versions will run the suite inside Valgrind.
 
-There are a number of environment variable that can be use the
-customize the execution. For example, here is how to run only the
-`Foo` test and those whose names start with `Bar`, then how run all
-tests whose names start with `Foo`, except `Foo2` and those whose
-names end with an `X`:
+There are a number of environment variable that can be use the customize the
+execution. For example, here is how to run only the `Foo` test and those whose
+names start with `Bar`, then how run all tests whose names start with `Foo`,
+except `Foo2` and those whose names end with an `X`:
 
     UNITTEST_FILTER="Foo Bar*" sh build.sh check-debug
     UNITTEST_FILTER="Foo* - Foo2 *X" sh build.sh check-debug
 
 These are the available variables:
 
- - `UNITTEST_FILTER` can be used to exclude one or more tests from a
-   particular run. For more information about the syntax, see the
-   documentation of
+ - `UNITTEST_FILTER` can be used to exclude one or more tests from a particular
+   run. For more information about the syntax, see the documentation of
    `realm::test_util::unit_test::create_wildcard_filter()` in
    `test/util/unit_test.hpp`.
 
- - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of
-   progress (write the name of each test as it is executed).
+ - Set `UNITTEST_PROGRESS` to a non-empty value to enable reporting of progress
+   (write the name of each test as it is executed).
 
- - If you set `UNITTEST_SHUFFLE` to a non-empty value, the tests will
-   be executed in a random order. This requires, of course, that all
-   executed tests are independant of each other. Note that unless you
-   also set `UNITTEST_RANDOM_SEED=random`, you will get the same
-   random order in each sucessive run.
+ - If you set `UNITTEST_SHUFFLE` to a non-empty value, the tests will be
+   executed in a random order. This requires, of course, that all executed tests
+   are independant of each other. Note that unless you also set
+   `UNITTEST_RANDOM_SEED=random`, you will get the same random order in each
+   sucessive run.
 
- - You may set `UNITTEST_RANDOM_SEED` to `random` or to some unsigned
-   integer (at least 32 bits will be accepted). If you specify
-   `random`, the global pseudorandom number generator will be seeded
-   with a nondeterministic value (one that generally will be different
-   in each sucessive run). If you specify an integer, it will be
-   seeded with that integer.
+ - You may set `UNITTEST_RANDOM_SEED` to `random` or to some unsigned integer
+   (at least 32 bits will be accepted). If you specify `random`, the global
+   pseudorandom number generator will be seeded with a nondeterministic value
+   (one that generally will be different in each sucessive run). If you specify
+   an integer, it will be seeded with that integer.
 
- - Set `UNITTEST_THREADS` to the number of test threads to use. The
-   default is 1. Using more than one thread requires that all executed
-   tests are thread-safe and independant of each other.
+ - Set `UNITTEST_REPEAT` to the number of times you want to execute the tests
+   selected by the filter. It defaults to 1.
 
- - Set `UNITTEST_KEEP_FILES` to a non-empty value to disable automatic
-   removal of test files.
+ - Set `UNITTEST_THREADS` to the number of test threads to use. The default
+   is 1. Using more than one thread requires that all executed tests are
+   thread-safe and independant of each other.
 
- - Set `UNITTEST_XML` to a non-empty value to dump the test results to
-   an XML file. For details, see
-   `realm::test_util::unit_test::create_xml_reporter()` in
-   `test/util/unit_test.hpp`.
+ - Set `UNITTEST_KEEP_FILES` to a non-empty value to disable automatic removal
+   of test files.
+
+ - Set `UNITTEST_XML` to a non-empty value to dump the test results to an XML
+   file. For details, see `realm::test_util::unit_test::create_xml_reporter()`
+   in `test/util/unit_test.hpp`.
 
 Memory debugging:
 
-Realm currently allows for uninitialized data to be written to a
-database file. This is not an error (technically), but it does cause
-Valgrind to report errors. To avoid these 'false positives' during
-testing and debugging, set `REALM_ENABLE_ALLOC_SET_ZERO` to a
-nonempty value during configuration as in the following example:
+Realm currently allows for uninitialized data to be written to a database
+file. This is not an error (technically), but it does cause Valgrind to report
+errors. To avoid these 'false positives' during testing and debugging, set
+`REALM_ENABLE_ALLOC_SET_ZERO` to a nonempty value during configuration as in the
+following example:
 
     REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 

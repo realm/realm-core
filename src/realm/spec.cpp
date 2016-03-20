@@ -122,9 +122,6 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
 {
     REALM_ASSERT(column_ndx <= m_types.size());
 
-    // Backlinks should always be appended to end
-    REALM_ASSERT(column_ndx == m_types.size() || type != col_type_BackLink);
-
     if (type != col_type_BackLink) // backlinks do not have names
         m_names.insert(column_ndx, name); // Throws
     m_types.insert(column_ndx, type); // Throws

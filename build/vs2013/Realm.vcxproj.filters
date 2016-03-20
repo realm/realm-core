@@ -19,6 +19,7 @@
     <ClCompile Include="..\..\src\realm\column_string.cpp" />
     <ClCompile Include="..\..\src\realm\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\realm\column_table.cpp" />
+    <ClCompile Include="..\..\src\realm\history.cpp" />
     <ClCompile Include="..\..\src\realm\commit_log.cpp" />
     <ClCompile Include="..\..\src\realm\descriptor.cpp" />
     <ClCompile Include="..\..\src\realm\link_view.cpp" />
@@ -30,6 +31,7 @@
     <ClCompile Include="..\..\src\realm\util\thread.cpp" />
     <ClCompile Include="..\..\src\realm\group.cpp" />
     <ClCompile Include="..\..\src\realm\group_shared.cpp" />
+    <ClCompile Include="..\..\src\realm\impl\continuous_transactions_history.cpp" />
     <ClCompile Include="..\..\src\realm\group_writer.cpp" />
     <ClCompile Include="..\..\src\realm\index_string.cpp" />
     <ClCompile Include="..\..\src\realm\query.cpp" />
@@ -96,6 +98,7 @@
     <ClCompile Include="..\..\test\util\resource_limits.cpp" />
     <ClCompile Include="..\..\test\util\test_only.cpp" />
     <ClCompile Include="..\..\test\util\test_path.cpp" />
+    <ClCompile Include="..\..\test\util\crypt_key.cpp" />
     <ClCompile Include="..\..\test\util\timer.cpp" />
     <ClCompile Include="..\..\test\util\unit_test.cpp" />
     <ClCompile Include="..\..\test\util\wildcard.cpp" />
@@ -165,6 +168,7 @@
     <ClInclude Include="..\..\src\realm\datetime.hpp" />
     <ClInclude Include="..\..\src\realm\group.hpp" />
     <ClInclude Include="..\..\src\realm\group_shared.hpp" />
+    <ClInclude Include="..\..\src\realm\impl\continuous_transactions_history.hpp" />
     <ClInclude Include="..\..\src\realm\group_writer.hpp" />
     <ClInclude Include="..\..\src\realm\index_string.hpp" />
     <ClInclude Include="..\..\src\realm\lang_bind_helper.hpp" />
@@ -230,6 +234,7 @@
     <ClInclude Include="..\..\src\realm\impl\sequential_getter.hpp" />
     <ClInclude Include="..\..\test\test.hpp" />
     <ClInclude Include="..\..\test\fuzz_group.hpp" />
+    <ClInclude Include="..\..\src\realm\null.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

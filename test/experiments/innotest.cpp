@@ -35,25 +35,25 @@ int main(int argc, char* argv [])
         SharedGroup db("parallel_benchmark.realm", true, SharedGroup::durability_Async);
 
         for (size_t round = 0; round < 20; ++round) {
-    
+
             for (size_t i = 0; i < 1000000; ++i) {
                 if (reads_per_write != 0 && (i % reads_per_write) == 0)
                 {
                     WriteTransaction trx(db);
-                    
+
                     TableRef t = trx.get_table("test");
-                    
+
                     size_t ndx = rand() % 1000000;
-                    
+
                     int v = t->get_int(0, ndx);
                     t->set_int(0, ndx, v + 1);
                     trx.commit();
                 }
                 else {
                     ReadTransaction trx(db);
-                    
+
                     ConstTableRef t = trx.get_table("test");
-                    
+
                     size_t ndx = rand() % 1000000;
                     volatile int v;
                     v = t->get_int(0, ndx);
@@ -70,6 +70,6 @@ int main(int argc, char* argv [])
         wait(&status); // wait for child to complete
         spawns--;
     }
-    
+
     return 0;
 }

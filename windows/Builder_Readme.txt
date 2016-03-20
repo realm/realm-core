@@ -18,7 +18,7 @@ consisting of LIB files, and header files.
 
 You will need both Visual Studio 2010 and Visual Studio 2012 to build the release.
 
-Warning : Following the instructions below, vs2012 will have changed the project files. 
+Warning : Following the instructions below, vs2012 will have changed the project files.
 Do not check these changed files back into github as VS2010 cannot read them correctly.
 
 If You have access to many cores, or two computers you can do vs2010 on one computer in one repository
@@ -26,7 +26,7 @@ If You have access to many cores, or two computers you can do vs2010 on one comp
 
 1. open Realm.sln in VS2010
 
-2. select Build->Batch Build. Unmark *all* , mark the 4 called 
+2. select Build->Batch Build. Unmark *all* , mark the 4 called
 project:  configuration: Platform
 Realm   Debug      Win32
 Realm   Debug      x64
@@ -40,7 +40,7 @@ click clean
 
 5. Look through Output, look for warnings.
 
-6. For each warning, click on it to view the source. The source should have a note about the specific warning, 
+6. For each warning, click on it to view the source. The source should have a note about the specific warning,
 otherwise a c++ developer will have to evaluate the warning and fix the problem or write a note
 
 7. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
@@ -68,17 +68,17 @@ Select Release in Solution Configurations drop down
 Select x64 in solution platform drops down
 Click the green run arrow. after a while,
 top5 timings will be shown. No unit tests should be listed as failed.
-Press ENTER. 
+Press ENTER.
 
 11.
 Select Release in Solution Configurations drop down
 Select win32 in solution platform drops down
 Click the green run arrow. after a while,
 top5 timings will be shown. No unit tests should be listed as failed.
-Press ENTER. 
+Press ENTER.
 
 
-12. select Build->Batch Build. Unmark *all* , mark the 4 called 
+12. select Build->Batch Build. Unmark *all* , mark the 4 called
 project:  configuration: Platform
 Realm   Static library, debug    Win32
 Realm   Static library, debug    x64
@@ -92,7 +92,7 @@ click clean
 
 15. Look through Output, look for warnings.
 
-16. For each warning, click on it to view the source. The source should have a note about the specific warning, 
+16. For each warning, click on it to view the source. The source should have a note about the specific warning,
 otherwise a c++ developer will have to evaluate the warning and fix the problem or write a note
 6. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
 
@@ -105,7 +105,7 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 20. in the windows folder, double click on winrelease2010.cmd
 
 
-***Visual studio 2012 build 
+***Visual studio 2012 build
 
 21. Open Realm.sln with visual studio 2012 . right click "Solution 'Realm' (8 projects) in Solution Explorer
 
@@ -115,7 +115,7 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 
 24. wait while VS2012 updates the projects.
 
-25. select Build->Batch Build. Unmark *all* , mark the 4 called 
+25. select Build->Batch Build. Unmark *all* , mark the 4 called
 project:  configuration: Platform
 Realm   Debug      Win32
 Realm   Debug      x64
@@ -129,7 +129,7 @@ click clean
 
 28. Look through Output, look for warnings.
 
-29. For each warning, click on it to view the source. The source should have a note about the specific warning, 
+29. For each warning, click on it to view the source. The source should have a note about the specific warning,
 otherwise a c++ developer will have to evaluate the warning and fix the problem or write a note
 
 30. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
@@ -157,17 +157,17 @@ Select Release in Solution Configurations drop down
 Select x64 in solution platform drops down
 Click the green run arrow. after a while,
 top5 timings will be shown. No unit tests should be listed as failed.
-Press ENTER. 
+Press ENTER.
 
 34.
 Select Release in Solution Configurations drop down
 Select win32 in solution platform drops down
 Click the green run arrow. after a while,
 top5 timings will be shown. No unit tests should be listed as failed.
-Press ENTER. 
+Press ENTER.
 
 
-35. select Build->Batch Build. Unmark *all* , mark the 4 called 
+35. select Build->Batch Build. Unmark *all* , mark the 4 called
 project:  configuration: Platform
 Realm   Static library, debug    Win32
 Realm   Static library, debug    x64
@@ -181,7 +181,7 @@ click clean
 
 38. Look through Output, look for warnings.
 
-39. For each warning, click on it to view the source. The source should have a note about the specific warning, 
+39. For each warning, click on it to view the source. The source should have a note about the specific warning,
 otherwise a c++ developer will have to evaluate the warning and fix the problem or write a note
 
 40. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
@@ -199,10 +199,10 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 
 The release files can now be found in the directories Windows\release\vs2010 and Windows\release\vs2012
 the VS20NN directories contains two sub directories:
-files\ 
-release\  
+files\
+release\
 
 files\
- is an unpacked version, 
+ is an unpacked version,
 release\
 contains a timestamped zip file with the same files as are found in the files\ directory

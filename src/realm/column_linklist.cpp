@@ -417,7 +417,6 @@ void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
     prune_list_accessor_tombstones();
 
     LinkColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
-    m_column_ndx = col_ndx;
     for (auto& entry : m_list_accessors)
         entry.m_list->refresh_accessor_tree(entry.m_row_ndx);
 }

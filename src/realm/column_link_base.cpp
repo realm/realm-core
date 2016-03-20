@@ -12,6 +12,7 @@ void LinkColumnBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
     IntegerColumn::refresh_accessor_tree(col_ndx, spec); // Throws
     ColumnAttr attr = spec.get_column_attr(col_ndx);
     m_weak_links = (attr & col_attr_StrongLinks) == 0;
+    m_column_ndx = col_ndx;
 }
 
 

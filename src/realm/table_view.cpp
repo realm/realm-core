@@ -442,6 +442,16 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     m_table->to_string_row(real_ndx, out, widths);
 }
 
+
+bool TableViewBase::depends_on_deleted_linklist() const
+{
+    uint64_t max = std::numeric_limits<uint64_t>::max();
+    // outside_version() will call itself recursively for each TableView in the dependency chain
+    // and terminate with `max` if the deepest depends on a deleted LinkList
+    return outside_version() == max;
+}
+
+// Return version of whatever this TableView depends on
 uint64_t TableViewBase::outside_version() const
 {
     check_cookie();
@@ -451,16 +461,22 @@ uint64_t TableViewBase::outside_version() const
     // later
     uint64_t max = std::numeric_limits<uint64_t>::max();
 
-    // Return version of whatever this TableView depends on
     LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
     if (lvp) {
-        // Depends on Query that depends on LinkList. 
+        // This LinkView depends on Query that is restricted by LinkList (with where(&linklist))
         if (lvp->is_attached()) {
             return lvp->get_origin_table().m_version;
         }
         else {
+            // LinkList was deleted
             return max;
         }
+    }
+
+    TableView* tvp = dynamic_cast<TableView*>(m_query.m_view);
+    if (tvp) {
+        // This LinkView depends on a Query that is restricted by a LinkView (with where(&linkview))
+        return tvp->outside_version();
     }
 
     if (m_linkview_source) {
@@ -624,7 +640,7 @@ void TableViewBase::distinct(size_t column)
     distinct(std::vector<size_t> { column });
 }
 
-/// Remove rows that are duplicated with respect to the column set passed as argument. 
+/// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
 void TableViewBase::distinct(std::vector<size_t> columns)
 {
@@ -648,7 +664,7 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     Sorter s(columns, ascending);
     sort(s);
 
-    // Step 3: Create column accessors for all columns in the column set. 
+    // Step 3: Create column accessors for all columns in the column set.
     std::vector<const ColumnTemplateBase*> m_columns;
     std::vector<const StringEnumColumn*> m_columns_enum;
     m_columns.resize(columns.size());
@@ -656,8 +672,8 @@ void TableViewBase::distinct(std::vector<size_t> columns)
 
     for (size_t i = 0; i < columns.size(); i++) {
         const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
-        // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting 
-        // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used 
+        // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting
+        // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used
         // in a couple of other places in Core too.
         const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
         REALM_ASSERT(ctb);
