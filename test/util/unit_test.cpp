@@ -1,9 +1,12 @@
+#include <stdlib.h>
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <map>
 #include <string>
+#include <locale>
 #include <iostream>
+#include <iomanip>
 
 #include <realm/util/thread.hpp>
 
@@ -20,7 +23,6 @@ using namespace realm::test_util::unit_test;
 
 
 
-// FIXME: Think about order of tests during execution.
 // FIXME: Write quoted strings with escaped nonprintables
 
 
@@ -82,7 +84,7 @@ public:
         i->second.elapsed_seconds = elapsed_seconds;
     }
 
-    void summary(const ExecContext& context, const Summary& summary) override
+    void summary(const SharedContext& context, const Summary& summary) override
     {
         m_out <<
             "<?xml version=\"1.0\"?>\n"
@@ -228,7 +230,6 @@ private:
     patterns m_include, m_exclude;
 };
 
-
 } // anonymous namespace
 
 
@@ -238,9 +239,10 @@ namespace test_util {
 namespace unit_test {
 
 
-class TestList::SharedContext: public ExecContext {
+class TestList::SharedContextImpl: public SharedContext {
 public:
     Reporter& reporter;
+    const bool abort_on_failure;
     Mutex mutex;
     struct Entry {
         const Test* test;
@@ -254,48 +256,35 @@ public:
     long long num_failed_checks = 0;
     int num_ended_threads = 0;
 
-    SharedContext(const TestList& test_list, int num_recurrences, int num_threads, Reporter& r):
-        ExecContext(test_list, num_recurrences, num_threads),
-        reporter(r)
+    SharedContextImpl(const TestList& test_list, int num_recurrences, int num_threads,
+                      util::Logger& logger, Reporter& r, bool aof):
+        SharedContext(test_list, num_recurrences, num_threads, logger),
+        reporter(r),
+        abort_on_failure(aof)
     {
-    }
-
-    void add(Entry entry)
-    {
-        const Test& test = *entry.test;
-        auto& tests = (test.allow_concur && num_threads > 1 ? concur_tests : no_concur_tests);
-        tests.push_back(entry);
-    }
-
-    void shuffle()
-    {
-        Random random(random_int<unsigned long>()); // Seed from slow global generator
-        random.shuffle(concur_tests.begin(), concur_tests.end());
-        random.shuffle(no_concur_tests.begin(), no_concur_tests.end());
     }
 };
 
 
 
-class TestList::ThreadContext {
+class TestList::ThreadContextImpl: public ThreadContext {
 public:
-    const int thread_index;
-    SharedContext& shared_context;
+    SharedContextImpl& shared_context;
     Mutex mutex;
     std::atomic<long long> num_checks{0};
     long long num_failed_checks = 0;
     long num_failed_tests = 0;
     bool errors_seen;
 
-    ThreadContext(int ti, SharedContext& sc):
-        thread_index(ti),
+    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* logger):
+        ThreadContext(sc, ti, logger ? *logger : sc.logger),
         shared_context(sc)
     {
     }
 
     void run();
 
-    void run(SharedContext::Entry, UniqueLock&);
+    void run(SharedContextImpl::Entry, UniqueLock&);
 };
 
 
@@ -316,16 +305,18 @@ void TestList::add(RunFunc run_func, IsEnabledFunc is_enabled_func, bool allow_c
 }
 
 
-bool TestList::run(Reporter* reporter, Filter* filter, int num_repetitions, int num_threads,
-                   bool shuffle)
+bool TestList::run(Config config)
 {
-    Timer timer;
-    Reporter fallback_reporter;
-    Reporter& reporter_2 = reporter ? *reporter : fallback_reporter;
-    if (num_repetitions < 0)
+    if (config.num_repetitions < 0)
         throw std::runtime_error("Bad number of repetitions");
-    if (num_threads < 1)
+    if (config.num_threads < 1)
         throw std::runtime_error("Bad number of threads");
+
+    util::StderrLogger base_logger;
+    util::ThreadSafeLogger shared_logger(base_logger);
+
+    Reporter fallback_reporter;
+    Reporter& reporter = config.reporter ? *config.reporter : fallback_reporter;
 
     // Filter
     std::vector<std::pair<const Test*, size_t>> included_tests; // Second component is test index
@@ -337,37 +328,90 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_repetitions, int 
             continue;
         }
         ++num_enabled;
-        if (filter && !filter->include(test->details))
+        if (config.filter && !config.filter->include(test->details))
             continue;
         included_tests.emplace_back(test, i);
     }
 
     // Repeat
-    SharedContext shared_context(*this, num_repetitions, num_threads, reporter_2);
+    int num_threads = config.num_threads;
+    std::vector<SharedContextImpl::Entry> concur_tests, no_concur_tests;
     size_t num_executed_tests = 0;
-    for (int i = 0; i < num_repetitions; ++i) {
+    for (int i = 0; i < config.num_repetitions; ++i) {
         for (auto p: included_tests) {
-            SharedContext::Entry entry;
+            SharedContextImpl::Entry entry;
             entry.test = p.first;
             entry.test_index = p.second;
             entry.recurrence_index = i;
-            shared_context.add(entry);
+            const Test& test = *entry.test;
+            auto& tests = (test.allow_concur && num_threads > 1 ? concur_tests : no_concur_tests);
+            tests.push_back(entry);
+            if (num_executed_tests == std::numeric_limits<size_t>::max())
+                throw std::runtime_error("Too many tests");
             ++num_executed_tests;
         }
     }
 
+    // Don't start more threads than are needed
+    {
+        size_t max_threads = concur_tests.size();
+        if (max_threads == 0 && !no_concur_tests.empty())
+            max_threads = 1;
+        if (max_threads < unsigned(num_threads))
+            num_threads = int(max_threads);
+    }
+
     // Shuffle
-    if (shuffle)
-        shared_context.shuffle();
+    if (config.shuffle) {
+        Random random(random_int<unsigned long>()); // Seed from slow global generator
+        random.shuffle(concur_tests.begin(), concur_tests.end());
+        random.shuffle(no_concur_tests.begin(), no_concur_tests.end());
+    }
 
     // Execute
+    SharedContextImpl shared_context(*this, config.num_repetitions, num_threads, shared_logger,
+                                     reporter, config.abort_on_failure);
+    shared_context.concur_tests    = std::move(concur_tests);
+    shared_context.no_concur_tests = std::move(no_concur_tests);
+    std::unique_ptr<std::unique_ptr<util::Logger>[]> loggers;
+    loggers.reset(new std::unique_ptr<util::Logger>[num_threads]);
+    if (num_threads != 1 || !config.per_thread_log_path.empty()) {
+        std::unique_ptr<util::Logger> logger;
+        std::ostringstream formatter;
+        formatter.imbue(std::locale::classic());
+        formatter << num_threads;
+        int thread_digits = formatter.str().size();
+        formatter.fill('0');
+        if (config.per_thread_log_path.empty()) {
+            for (int i = 0; i != num_threads; ++i) {
+                formatter.str(std::string());
+                formatter << "Thread["<<std::setw(thread_digits)<<(i+1)<<"]: ";
+                loggers[i].reset(new util::PrefixLogger(formatter.str(), shared_logger));
+            }
+        }
+        else {
+            const std::string& format = config.per_thread_log_path;
+            auto j = format.rfind('%');
+            if (j == std::string::npos)
+                throw std::runtime_error("No '%' in per-thread log path");
+            std::string a = format.substr(0,j), b = format.substr(j+1);
+            for (int i = 0; i != num_threads; ++i) {
+                formatter.str(std::string());
+                formatter << a<<std::setw(thread_digits)<<(i+1)<<b;
+                std::string path = formatter.str();
+                shared_logger.log("Logging to %1", path);
+                loggers[i].reset(new util::FileLogger(path));
+            }
+        }
+    }
+    Timer timer;
     if (num_threads == 1) {
-        ThreadContext thread_context(0, shared_context);
+        ThreadContextImpl thread_context(shared_context, 0, loggers[0].get());
         thread_context.run();
     }
     else {
         auto thread = [&](int i) {
-            ThreadContext thread_context(i, shared_context);
+            ThreadContextImpl thread_context(shared_context, i, loggers[i].get());
             thread_context.run();
         };
         std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
@@ -387,15 +431,16 @@ bool TestList::run(Reporter* reporter, Filter* filter, int num_repetitions, int 
     summary.num_executed_checks = shared_context.num_checks;
     summary.num_failed_checks   = shared_context.num_failed_checks;
     summary.elapsed_seconds     = timer.get_elapsed_time();
-    reporter_2.summary(shared_context, summary);
+    reporter.summary(shared_context, summary);
 
     return shared_context.num_failed_tests == 0;
 }
 
 
-void TestList::ThreadContext::run()
+void TestList::ThreadContextImpl::run()
 {
     UniqueLock lock(shared_context.mutex);
+    shared_context.reporter.thread_begin(*this);
 
     // First run the tests that can safely run concurrently with other threads
     // and with itself.
@@ -417,11 +462,11 @@ void TestList::ThreadContext::run()
     shared_context.num_failed_checks += num_failed_checks;
 
     ++shared_context.num_ended_threads;
-    shared_context.reporter.end_of_thread(shared_context, thread_index);
+    shared_context.reporter.thread_end(*this);
 }
 
 
-void TestList::ThreadContext::run(SharedContext::Entry entry, UniqueLock& lock)
+void TestList::ThreadContextImpl::run(SharedContextImpl::Entry entry, UniqueLock& lock)
 {
     const Test& test = *entry.test;
     TestContext test_context(*this, test.details, entry.test_index, entry.recurrence_index);
@@ -457,12 +502,11 @@ TestList& get_default_test_list()
 }
 
 
-TestContext::TestContext(TestList::ThreadContext& tc, const TestDetails& td, size_t ti, int ri):
-    exec_context(tc.shared_context),
+TestContext::TestContext(TestList::ThreadContextImpl& tc, const TestDetails& td, size_t ti, int ri):
+    thread_context(tc),
     test_details(td),
     test_index(ti),
     recurrence_index(ri),
-    thread_index(tc.thread_index),
     m_thread_context(tc)
 {
 }
@@ -471,6 +515,17 @@ TestContext::TestContext(TestList::ThreadContext& tc, const TestDetails& td, siz
 void TestContext::check_succeeded()
 {
     ++m_thread_context.num_checks;
+}
+
+
+REALM_NORETURN void TestContext::abort()
+{
+    const SharedContext& context = thread_context.shared_context;
+    const char* format = context.num_threads == 1 ?
+        "Aborting due to failure" :
+        "Aborting due to failure in test thread %1";
+    context.logger.log(format, m_thread_context.thread_index+1);
+    ::abort();
 }
 
 
@@ -483,9 +538,11 @@ void TestContext::check_failed(const char* file, long line, const std::string& m
         m_thread_context.errors_seen = true;
     }
     {
-        TestList::SharedContext& shared = m_thread_context.shared_context;
+        TestList::SharedContextImpl& shared = m_thread_context.shared_context;
         LockGuard lock(shared.mutex);
         shared.reporter.fail(*this, file, line, message);
+        if (shared.abort_on_failure)
+            abort();
     }
 }
 
@@ -497,9 +554,11 @@ void TestContext::test_failed(const std::string& message)
         m_thread_context.errors_seen = true;
     }
     {
-        TestList::SharedContext& shared = m_thread_context.shared_context;
+        TestList::SharedContextImpl& shared = m_thread_context.shared_context;
         LockGuard lock(shared.mutex);
         shared.reporter.fail(*this, test_details.file_name, test_details.line_number, message);
+        if (shared.abort_on_failure)
+            abort();
     }
 }
 
@@ -571,6 +630,10 @@ void TestContext::throw_any_failed(const char* file, long line, const char* expr
 }
 
 
+void Reporter::thread_begin(const ThreadContext&)
+{
+}
+
 void Reporter::begin(const TestContext&)
 {
 }
@@ -583,11 +646,11 @@ void Reporter::end(const TestContext&, double)
 {
 }
 
-void Reporter::summary(const ExecContext&, const Summary&)
+void Reporter::thread_end(const ThreadContext&)
 {
 }
 
-void Reporter::end_of_thread(const ExecContext&, int)
+void Reporter::summary(const SharedContext&, const Summary&)
 {
 }
 
@@ -668,55 +731,56 @@ void SimpleReporter::begin(const TestContext& context)
         return;
 
     const TestDetails& details = context.test_details;
-    std::cout << details.file_name << ":" << details.line_number << ": ";
-    std::cout << "Begin " << details.test_name;
-    if (context.exec_context.num_recurrences > 1)
-        std::cout << '#' << (context.recurrence_index+1);
-    if (context.exec_context.num_threads > 1)
-        std::cout << " [test thread "<<(context.thread_index+1)<<"] ";
-    std::cout << "\n";
+    util::Logger& logger = context.thread_context.logger;
+    auto format = context.thread_context.shared_context.num_recurrences == 1 ?
+        "%1:%2: Begin %3" :
+        "%1:%2: Begin %3#%4";
+    logger.log(format, details.file_name, details.line_number, details.test_name,
+               context.recurrence_index+1);
 }
 
 void SimpleReporter::fail(const TestContext& context, const char* file_name, long line_number,
                           const std::string& message)
 {
     const TestDetails& details = context.test_details;
-    std::cerr << file_name << ":" << line_number << ": ";
-    std::cerr << "ERROR in " << details.test_name;
-    if (context.exec_context.num_recurrences > 1)
-        std::cout << '#' << (context.recurrence_index+1);
-    std::cerr << ": " << message << "\n";
+    util::Logger& logger = context.thread_context.logger;
+    auto format = context.thread_context.shared_context.num_recurrences == 1 ?
+        "%1:%2: ERROR in %3: %5" :
+        "%1:%2: ERROR in %3#%4: %5";
+    logger.log(format, file_name, line_number, details.test_name, context.recurrence_index+1,
+               message);
 }
 
-void SimpleReporter::summary(const ExecContext&, const Summary& summary)
-{
-    std::cout << "\n";
-    if (summary.num_failed_tests == 0) {
-        std::cout << "Success: All "<<summary.num_executed_tests<<" tests passed "
-            "("<<summary.num_executed_checks<<" checks).\n";
-    }
-    else {
-        std::cerr << "FAILURE: "<<summary.num_failed_tests<<" "
-            "out of "<<summary.num_executed_tests<<" tests failed "
-            "("<<summary.num_failed_checks<<" "
-            "out of "<<summary.num_executed_checks<<" checks failed).\n";
-    }
-    std::cout << "Test time: "<<Timer::format(summary.elapsed_seconds)<<"\n";
-    if (summary.num_excluded_tests == 1) {
-        std::cout << "\nNote: One test was excluded!\n";
-    }
-    else if (summary.num_excluded_tests > 1) {
-        std::cout << "\nNote: "<<summary.num_excluded_tests<<" tests were excluded!\n";
-    }
-}
-
-void SimpleReporter::end_of_thread(const ExecContext& context, int thread_index)
+void SimpleReporter::thread_end(const ThreadContext& context)
 {
     if (!m_report_progress)
         return;
 
-    if (context.num_threads > 1)
-        std::cout << "End of test thread "<<(thread_index+1)<<"\n";
+    if (context.shared_context.num_threads > 1) {
+        util::Logger& logger = context.logger;
+        logger.log("End of thread");
+    }
+}
+
+void SimpleReporter::summary(const SharedContext& context, const Summary& summary)
+{
+    util::Logger& logger = context.logger;
+    if (summary.num_failed_tests == 0) {
+        logger.log("Success: All %1 tests passed (%2 checks).", summary.num_executed_tests,
+                   summary.num_executed_checks);
+    }
+    else {
+        logger.log("FAILURE: %1 out of %2 tests failed (%3 out of %4 checks failed).",
+                   summary.num_failed_tests,  summary.num_executed_tests,
+                   summary.num_failed_checks, summary.num_executed_checks);
+    }
+    logger.log("Test time: %1", Timer::format(summary.elapsed_seconds));
+    if (summary.num_excluded_tests >= 1) {
+        auto format = summary.num_excluded_tests == 1 ?
+            "Note: One test was excluded!" :
+            "Note: %1 tests were excluded!";
+        logger.log(format, summary.num_excluded_tests);
+    }
 }
 
 

@@ -23,6 +23,10 @@
   it could run forever.
 * Fixed a few compiler warnings
 * Disabled unittest Shared_WaitForChange again, as it can still run forever
+* New features in the unit test framework: Ability to log to a file (one for
+  each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
+  failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
+  (`util::Logger`) is now directly available to each unit test.
 
 ----------------------------------------------
 
