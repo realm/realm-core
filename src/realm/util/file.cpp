@@ -373,7 +373,9 @@ error:
 #else // POSIX version
 
     if (m_encryption_key) {
-        off_t pos = lseek(m_fd, 0, SEEK_CUR);
+        off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
+        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
+        size_t pos = size_t(pos_original);
         Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
         realm::util::encryption_read_barrier(map, pos, size);
         memcpy(data, map.get_addr() + pos, size);
@@ -432,9 +434,11 @@ void File::write(const char* data, size_t size)
 #else // POSIX version
 
     if (m_encryption_key) {
-        off_t pos = lseek(m_fd, 0, SEEK_CUR);
+        off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
+        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
+        size_t pos = size_t(pos_original);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        // FIXME: Expect this to fail du to assert asking for a read first!
+        // FIXME: Expect this to fail due to assert asking for a read first! Possibly an old fixme. Is not related to the current REALM_ASSERT.
         realm::util::encryption_read_barrier(map, pos, size);
         memcpy(map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(map, pos, size);
