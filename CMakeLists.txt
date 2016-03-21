@@ -11,10 +11,10 @@ set(REALM_VERSION_MINOR 96)
 set(REALM_VERSION_PATCH 2)
 set(REALM_VERSION "${REALM_VERSION_MAJOR}.${REALM_VERSION_MINOR}.${REALM_VERSION_PATCH}")
 
-set(REALM_ENABLE_ASSERTIONS "0" CACHE STRING "Enable assertions in release mode.")
+option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode.")
+option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations.")
+option(REALM_ENABLE_ENCRYPTION "Enable encryption.")
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node side.")
-set(REALM_ENABLE_ALLOC_SET_ZERO "0" CACHE STRING "Zero all allocations.")
-set(REALM_ENABLE_ENCRYPTION "0" CACHE STRING "Enable encryption.")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic -DREALM_HAVE_CONFIG $ENV{EXTRA_CFLAGS}")
 if(REALM_COVERAGE)
