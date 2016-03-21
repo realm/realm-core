@@ -47,10 +47,7 @@ if(CMAKE_BUILD_TYPE STREQUAL Debug)
     set(REALM_DEBUG 1)
 endif()
 
-configure_file(
-    ${CMAKE_SOURCE_DIR}/src/realm/util/config.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/src/realm/util/config.h
-)
+configure_file(src/realm/util/config.h.in src/realm/util/config.h)
 
 include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
