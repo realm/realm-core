@@ -170,28 +170,31 @@ set_target_properties(
     SOVERSION ${REALM_SOVERSION}
 )
 
-target_link_libraries(realm ${REALM_EXTRA_LIBS})
-target_link_libraries(realm Threads::Threads)
-install(TARGETS realm
-        DESTINATION lib)
-install(FILES ${REALM_INSTALL_HEADERS}
-        DESTINATION include)
+target_link_libraries(
+    realm
+    ${REALM_EXTRA_LIBS}
+    Threads::Threads
+)
 
 if(REALM_ENABLE_ENCRYPTION)
     target_link_libraries(realm ${OPENSSL_LIBRARIES})
 endif(REALM_ENABLE_ENCRYPTION)
 
+install(TARGETS realm
+        DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${REALM_INSTALL_HEADERS}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
 add_executable(realm-config config_tool.cpp)
 install(TARGETS realm-config
-        DESTINATION bin)
+        DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(realm-importer importer_tool.cpp)
-target_link_libraries(realm-importer realm ${REALM_EXTRA_LIBS})
+target_link_libraries(realm-importer realm)
 install(TARGETS realm-importer
-        DESTINATION bin)
+        DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(realmd realmd.cpp)
-target_link_libraries(realmd realm ${REALM_EXTRA_LIBS})
+target_link_libraries(realmd realm)
 install(TARGETS realmd
-        DESTINATION bin)
-
+        DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
