@@ -41,14 +41,15 @@ REALM_CONFIGURATIONS.each do |configuration, (build_type, dir)|
     end
 
     desc "Build in #{configuration} mode"
-    task "build-#{configuration}" => "config-#{configuration}" do
+    task "build-#{configuration}" => ["config-#{configuration}", :guess_num_processors] do
         Dir.chdir(dir) do
-            sh "cmake --build ."
+            sh "cmake --build . -- -j#{@num_processors}"
         end
     end
 
     desc "Run tests in #{configuration} mode"
     task "check-#{configuration}" => "build-#{configuration}" do
+        ENV['UNITTEST_THREADS'] ||= @num_processors
         Dir.chdir("#{dir}/test") do
             sh "./realm-tests"
         end
@@ -56,6 +57,7 @@ REALM_CONFIGURATIONS.each do |configuration, (build_type, dir)|
 
     desc "Run Valgrind for tests in #{configuration} mode"
     task "memcheck-#{configuration}" => "build-#{configuration}" do
+        ENV['UNITTEST_THREADS'] ||= @num_processors
         Dir.chdir("#{dir}/test") do
             sh "valgrind ./realm-tests"
         end
@@ -103,6 +105,18 @@ end
 task :tmpdir do
     @tmpdir = Dir.mktmpdir("realm-build")
     puts "Using temporary directory: #{@tmpdir}"
+end
+
+task :guess_operating_system do
+    @operating_system = `uname`
+end
+
+task :guess_num_processors => :guess_operating_system do
+    if @operating_system == 'Darwin'
+        @num_processors = `sysctl -n hw.ncpu`.chomp
+    else # assume Linux
+        @num_processors = `cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l`.chomp
+    end
 end
 
 
