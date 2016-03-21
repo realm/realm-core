@@ -108,7 +108,7 @@ task :tmpdir do
 end
 
 task :guess_operating_system do
-    @operating_system = `uname`
+    @operating_system = `uname`.chomp
 end
 
 task :guess_num_processors => :guess_operating_system do
