@@ -12,7 +12,7 @@ cd /tmp/build
 # Configure the build
 sh build.sh config /usr
 # Build and install
-sh build.sh build
+sh build.sh build-release
 DESTDIR=/usr/local/core sh build.sh install-prod
 DESTDIR=/usr/local/core sh build.sh install-devel
 
