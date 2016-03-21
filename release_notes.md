@@ -2,6 +2,10 @@
 
 ### Bugfixes:
 
+* Update table accessors after table move rollback, issue #1551. This
+  issue could have caused corruption or crashes when tables are moved
+  and then the transaction is rolled back.
+
 ### API breaking changes:
 
 * Lorem ipsum.
