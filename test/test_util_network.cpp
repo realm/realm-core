@@ -10,7 +10,6 @@
 #include <realm/util/network.hpp>
 
 #include "test.hpp"
-#include "../test/util/thread_wrapper.hpp"
 
 using namespace realm::util;
 using namespace realm::test_util;

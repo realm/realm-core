@@ -493,7 +493,7 @@ struct SummaryRecorder: Reporter {
         m_summary(summary)
     {
     }
-    void summary(const ExecContext&, const Summary& summary) override
+    void summary(const SharedContext&, const Summary& summary) override
     {
         m_summary = summary;
     }

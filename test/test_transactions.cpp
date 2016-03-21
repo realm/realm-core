@@ -12,8 +12,6 @@
 #include <realm/group_shared.hpp>
 #include <realm/table_macros.hpp>
 
-#include "util/thread_wrapper.hpp"
-
 #include "test.hpp"
 
 using namespace realm;

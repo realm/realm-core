@@ -34,6 +34,7 @@
 #include <realm/util/type_traits.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/bind_ptr.hpp>
+#include <realm/util/logger.hpp>
 
 
 #define TEST(name) \
@@ -188,7 +189,8 @@ namespace test_util {
 namespace unit_test {
 
 class TestContext;
-class ExecContext;
+class ThreadContext;
+class SharedContext;
 
 
 struct TestDetails {
@@ -213,12 +215,13 @@ struct Summary {
 
 class Reporter {
 public:
+    virtual void thread_begin(const ThreadContext&);
     virtual void begin(const TestContext&);
     virtual void fail(const TestContext&, const char* file_name, long line_number,
                       const std::string& message);
     virtual void end(const TestContext&, double elapsed_seconds);
-    virtual void summary(const ExecContext&, const Summary&);
-    virtual void end_of_thread(const ExecContext&, int thread_index);
+    virtual void thread_end(const ThreadContext&);
+    virtual void summary(const SharedContext&, const Summary&);
     virtual ~Reporter() noexcept {}
 };
 
@@ -256,9 +259,42 @@ public:
     ///  The sorting operation is stable.
     template<class Compare> void sort(Compare);
 
+    struct Config {
+        Config() {}
+
+        int num_threads = 1;
+        int num_repetitions = 1;
+        bool shuffle = false;
+
+        /// No filtering by default.
+        Filter* filter = nullptr;
+
+        /// No reporting by default.
+        Reporter* reporter = nullptr;
+
+        /// Logging to \ref std::cerr by default.
+        util::Logger* logger = nullptr;
+
+        /// By default, all test threads send log messages through a single
+        /// shared logger (\ref logger), but if \ref per_thread_log_path is set
+        /// to a nonempty string, then that string is used as a template for log
+        /// file paths, and one log file is created for each test thread.
+        ///
+        /// When specified, it must be a valid path, and contain at least one
+        /// `%`, for example `test_thread_%.log`. The test thread number will be
+        /// substituted for the last occurrence of `%`.
+        std::string per_thread_log_path;
+
+        /// Abort testing process as soon as a check fails or an unexpected
+        /// exception is thrown in a test.
+        bool abort_on_failure = false;
+    };
+
     /// Run all the tests in this list (or a filtered subset of them).
-    bool run(Reporter* = nullptr, Filter* = nullptr, int num_repetitions = 1, int num_threads = 1,
-             bool shuffle = false);
+    bool run(Config = Config());
+
+    /// Short-hand version of run(Config).
+    bool run(Reporter* reporter, Filter* filter = nullptr);
 
     using RunFunc = void (*)(TestContext&);
     using IsEnabledFunc = bool (*)();
@@ -272,8 +308,8 @@ public:
     const TestDetails& get_test_details(size_t i) const noexcept;
 
 private:
-    class SharedContext;
-    class ThreadContext;
+    class SharedContextImpl;
+    class ThreadContextImpl;
 
     struct Test {
         RunFunc run_func;
@@ -285,7 +321,6 @@ private:
     std::vector<const Test*> m_tests;
 
     friend class TestContext;
-    friend class ExecContext;
 };
 
 TestList& get_default_test_list();
@@ -319,8 +354,8 @@ public:
 
     void begin(const TestContext&) override;
     void fail(const TestContext&, const char*, long, const std::string&) override;
-    void summary(const ExecContext&, const Summary&) override;
-    void end_of_thread(const ExecContext&, int) override;
+    void thread_end(const ThreadContext&) override;
+    void summary(const SharedContext&, const Summary&) override;
 
 protected:
     bool m_report_progress;
@@ -363,23 +398,18 @@ Filter* create_wildcard_filter(const std::string&);
 
 class TestContext {
 public:
-    const ExecContext& exec_context;
+    const ThreadContext& thread_context;
     const TestDetails& test_details;
 
     /// Index of executing test with respect to the order of the tests in
-    /// `exec_context.test_list`. `exec_context.test_list.size()` specifies the
-    /// number of distinct tests.
+    /// `test_list` (`thread_context.shared_context.test_list`).
+    /// `test_list.size()` specifies the number of distinct tests.
     const size_t test_index;
 
     /// An index into the sequence of repeated executions of this
-    /// test. `exec_context.num_recurrences` specifies the number of requested
-    /// repetitions.
+    /// test. `thread_context.shared_context.num_recurrences` specifies the
+    /// number of requested repetitions.
     const int recurrence_index;
-
-    /// The index of the test thread that is executing the test this
-    /// time. `exec_context.num_threads` specifies the number of requested test
-    /// threads.
-    const int thread_index;
 
     bool check_cond(bool cond, const char* file, long line, const char* macro_name,
                     const char* cond_text);
@@ -449,13 +479,15 @@ public:
     void throw_any_failed(const char* file, long line, const char* expr_text);
 
     TestContext(const TestContext&) = delete;
-    void operator=(const TestContext&) = delete;
+    TestContext& operator=(const TestContext&) = delete;
 
 private:
-    TestList::ThreadContext& m_thread_context;
+    TestList::ThreadContextImpl& m_thread_context;
 
-    TestContext(TestList::ThreadContext&, const TestDetails&, size_t test_index, int recurrence_index);
+    TestContext(TestList::ThreadContextImpl&, const TestDetails&, size_t test_index,
+                int recurrence_index);
 
+    REALM_NORETURN void abort();
     void test_failed(const std::string& message);
     void check_failed(const char* file, long line, const std::string& message);
     void cond_failed(const char* file, long line, const char* macro_name, const char* cond_text);
@@ -466,30 +498,51 @@ private:
                                 const char* a_text, const char* b_text, const char* eps_text,
                                 long double a, long double b, long double eps);
 
-    friend class TestList::ThreadContext;
+    friend class TestList::ThreadContextImpl;
 };
 
 
-class ExecContext {
+class ThreadContext {
+public:
+    const SharedContext& shared_context;
+
+    /// The index of the test thread associated with this
+    /// context. `shared_context.num_threads` specifies the total number of test
+    /// threads.
+    const int thread_index;
+
+    util::Logger& logger;
+
+    ThreadContext(const ThreadContext&) = delete;
+    ThreadContext& operator=(const ThreadContext&) = delete;
+
+protected:
+    ThreadContext(SharedContext&, int thread_index, util::Logger&);
+};
+
+
+class SharedContext {
 public:
     const TestList& test_list;
     const int num_recurrences;
     const int num_threads;
+    util::Logger& logger;
 
-    ExecContext(const ExecContext&) = delete;
-    void operator=(const ExecContext&) = delete;
+    SharedContext(const SharedContext&) = delete;
+    SharedContext& operator=(const SharedContext&) = delete;
 
-private:
-    ExecContext(const TestList&, int num_recurrences, int num_threads);
-
-    friend class TestList::SharedContext;
+protected:
+    SharedContext(const TestList&, int num_recurrences, int num_threads, util::Logger&);
 };
 
 
-class TestBase {
+class TestBase: public util::Logger {
 protected:
     TestContext& test_context;
+
     TestBase(TestContext&);
+
+    void do_log(std::string) override;
 };
 
 
@@ -518,6 +571,14 @@ template<class Compare> inline void TestList::sort(Compare compare)
         return compare(a->details, b->details);
     };
     std::stable_sort(m_tests.begin(), m_tests.end(), compare_2);
+}
+
+inline bool TestList::run(Reporter* reporter, Filter* filter)
+{
+    Config config;
+    config.reporter = reporter;
+    config.filter = filter;
+    return run(config); // Throws
 }
 
 inline size_t TestList::size() const noexcept
@@ -787,16 +848,29 @@ inline bool TestContext::check_definitely_greater(long double a, long double b,
                                  a_text, b_text, eps_text);
 }
 
-inline ExecContext::ExecContext(const TestList& tl, int nr, int nt):
+inline ThreadContext::ThreadContext(SharedContext& sc, int ti, util::Logger& l):
+    shared_context(sc),
+    thread_index(ti),
+    logger(l)
+{
+}
+
+inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, util::Logger& l):
     test_list(tl),
     num_recurrences(nr),
-    num_threads(nt)
+    num_threads(nt),
+    logger(l)
 {
 }
 
 inline TestBase::TestBase(TestContext& context):
     test_context(context)
 {
+}
+
+inline void TestBase::do_log(std::string message)
+{
+    Logger::do_log(test_context.thread_context.logger, message);
 }
 
 } // namespace unit_test
