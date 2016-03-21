@@ -23,9 +23,6 @@
 
 #include "../test.hpp"
 #include "../util/demangle.hpp"
-#include "../util/random.hpp"
-#include "../util/thread_wrapper.hpp"
-#include "../util/random.hpp"
 
 using namespace realm;
 using namespace realm::util;

@@ -9761,7 +9761,6 @@ TEST(LangBindHelper_RacingAttachers)
 }
 
 
-
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -10253,6 +10252,7 @@ TEST(LangBindHelper_HandoverDistinctView)
 
 TEST(LangBindHelper_HandoverWithReverseDependency)
 {
+    // FIXME: This testcase is wrong!
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());

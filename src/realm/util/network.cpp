@@ -174,13 +174,18 @@ public:
         }
         return LendersOperPtr(op);
     }
-    ~oper_queue() noexcept
+    void clear() noexcept
     {
         if (m_back) {
             LendersOperPtr op(m_back);
             while (op->m_next != m_back)
                 op.reset(op->m_next);
+            m_back = nullptr;
         }
+    }
+    ~oper_queue() noexcept
+    {
+        clear();
     }
 private:
     async_oper* m_back = nullptr;
@@ -216,8 +221,12 @@ public:
 
     ~impl()
     {
+        // Avoid calls to recycle_post_oper() after destruction has begun.
+        m_completed_operations.clear();
+
         ::close(m_wakeup_pipe_read_fd);
         ::close(m_wakeup_pipe_write_fd);
+
 #if REALM_ASSERTIONS_ENABLED
         size_t n = 0;
         for (size_t i = 0; i < m_io_operations.size(); ++i) {
@@ -378,57 +387,39 @@ public:
     {
         {
             LockGuard l(m_mutex);
-            LendersOperPtr op = alloc_post(m_post_oper, constr, size, cookie); // Throws
+            std::unique_ptr<char[]> mem;
+            if (m_post_oper && m_post_oper->m_size >= size) {
+                // Reuse old memory
+                async_oper* op = m_post_oper.release();
+                REALM_ASSERT(dynamic_cast<UnusedOper*>(op));
+                static_cast<UnusedOper*>(op)->UnusedOper::~UnusedOper(); // Static dispatch
+                mem.reset(static_cast<char*>(static_cast<void*>(op)));
+            }
+            else {
+                // Allocate new memory
+                mem.reset(new char[size]); // Throws
+            }
+
+            LendersOperPtr op;
+            op.reset((*constr)(mem.get(), size, *this, cookie)); // Throws
+            mem.release();
             m_post_operations.push_back(std::move(op));
         }
         wake_up_poll_thread();
     }
 
-    static LendersOperPtr alloc_post(OwnersOperPtr& owners_ptr, PostOperConstr constr, size_t size,
-                                     const void* cookie)
+    void recycle_post_oper(post_oper_base* op) noexcept
     {
-        // Special version of io_service::alloc() for post operations. See
-        // io_service::alloc() for more information.
+        size_t size = op->m_size;
+        op->~post_oper_base(); // Dynamic dispatch
+        OwnersOperPtr op_2(new (op) UnusedOper(size)); // Does not throw
 
-        OwnersOperPtr temp_owners_ptr;
-        OwnersOperPtr* owners_ptr_ptr = &owners_ptr;
-        void* addr = owners_ptr.get();
-        size_t size_2; // The number of allocated bytes
-        if (REALM_LIKELY(addr)) {
-            // Two operations of a single type are generally not allowed to
-            // overlap in time, but in the case of post operations, they
-            // are. This is handled by creating additional operations in the
-            // orphaned (unowned) state if the owned instance is already in use.
-            if (owners_ptr->in_use()) {
-                owners_ptr_ptr = &temp_owners_ptr;
-                goto no_object;
-            }
-            size_2 = owners_ptr->m_size;
-            // We can use static dispatch in the destructor call here, since an
-            // object, that is not in use, is always an instance of UnusedOper.
-            REALM_ASSERT(dynamic_cast<UnusedOper*>(owners_ptr.get()));
-            static_cast<UnusedOper*>(owners_ptr.get())->UnusedOper::~UnusedOper();
-            if (REALM_UNLIKELY(size_2 < size)) {
-                owners_ptr.release();
-                delete[] static_cast<char*>(addr);
-                goto no_object;
-            }
+        // Keep the larger memory chunk (`op_2` or m_post_oper)
+        {
+            LockGuard l(m_mutex);
+            if (!m_post_oper || m_post_oper->m_size < size)
+                swap(op_2, m_post_oper);
         }
-        else {
-          no_object:
-            addr = new char[size]; // Throws
-            size_2 = size;
-            owners_ptr_ptr->reset(static_cast<async_oper*>(addr));
-        }
-        LendersOperPtr lenders_ptr;
-        try {
-            lenders_ptr.reset((*constr)(addr, size_2, cookie)); // Throws
-        }
-        catch (...) {
-            new (addr) UnusedOper(size); // Does not throw
-            throw;
-        }
-        return lenders_ptr;
     }
 
     void cancel_incomplete_io_ops(int fd) noexcept
@@ -482,7 +473,7 @@ private:
 
     Mutex m_mutex;
     OwnersOperPtr m_post_oper; // Protected by `m_mutex`
-    oper_queue m_post_operations; // Protected by `m_mutex` (including the enqueued operations).
+    oper_queue m_post_operations; // Protected by `m_mutex`
     bool m_stopped = false; // Protected by `m_mutex`
 
     bool process_timers(clock::time_point now)
@@ -709,6 +700,11 @@ void io_service::add_completed_oper(LendersOperPtr op) noexcept
 void io_service::do_post(PostOperConstr constr, size_t size, const void* cookie)
 {
     m_impl->post(constr, size, cookie); // Throws
+}
+
+void io_service::recycle_post_oper(impl& impl, post_oper_base* op) noexcept
+{
+    impl.recycle_post_oper(op);
 }
 
 

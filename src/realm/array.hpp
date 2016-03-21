@@ -667,9 +667,9 @@ public:
     /// destroy_deep() for every contained 'ref' element.
     static void destroy_deep(MemRef, Allocator&) noexcept;
 
-    Allocator& get_alloc() const noexcept 
-    { 
-        return m_alloc;     
+    Allocator& get_alloc() const noexcept
+    {
+        return m_alloc;
     }
 
     // Serialization
@@ -2642,7 +2642,7 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
         // Huge speed optimizations are possible here! This is a very simple generic method.
         for (; start2 < end; start2++) {
             int64_t v = get<bitwidth>(start2 + 1);
-            if (c(v, value, v == get(0), find_null)) {                
+            if (c(v, value, v == get(0), find_null)) {
                 util::Optional<int64_t> v2(v == get(0) ? util::none : util::make_optional(v));
                 if (!find_action<action, Callback>(start2 + baseindex, v2, state, callback))
                     return false; // tell caller to stop aggregating/search

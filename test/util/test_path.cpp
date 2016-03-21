@@ -44,7 +44,8 @@ std::string get_test_path(const TestContext& context, const std::string& suffix)
     int recurrence_index = context.recurrence_index;
     std::ostringstream out;
     out.imbue(std::locale::classic());
-    out << path_prefix << sanitize_for_file_name(test_name) << '.' << recurrence_index << suffix;
+    out << path_prefix << sanitize_for_file_name(test_name) << '.' << (recurrence_index+1) <<
+        suffix;
     return out.str();
 }
 
@@ -111,33 +112,44 @@ TestDirGuard::~TestDirGuard() noexcept
     }
 }
 
-void TestDirGuard::clean_dir(const std::string& path)
+namespace {
+void do_clean_dir(const std::string& path, const std::string& guard_string)
 {
     DirScanner ds(path);
     std::string name;
     while (ds.next(name)) {
         std::string subpath = File::resolve(name, path);
         if (File::is_dir(subpath)) {
-            clean_dir(subpath);
+            do_clean_dir(subpath, guard_string);
             remove_dir(subpath);
         }
         else {
             // Try to avoid accidental removal of precious files due to bugs in
             // TestDirGuard or TEST_DIR macro.
-            if (subpath.find(".test-dir") == std::string::npos)
+            if (subpath.find(guard_string) == std::string::npos)
                 throw std::runtime_error("Bad test dir path");
             File::remove(subpath);
         }
     }
+}
+}
+
+void TestDirGuard::clean_dir(const std::string& path)
+{
+    do_clean_dir(path, ".test-dir");
 }
 
 
 SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
     TestPathGuard(path)
 {
-    File::try_remove(get_lock_path());
-    File::try_remove(m_path + ".log_a");
-    File::try_remove(m_path + ".log_b");
+    try {
+        do_clean_dir(path+ ".management", ".management");
+        remove_dir(path+ ".management");
+        File::try_remove(get_lock_path());
+    } catch (...) {
+        // exception ignored
+    }
 }
 
 
@@ -146,9 +158,9 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
     if (keep_files)
         return;
     try {
+        do_clean_dir(m_path+ ".management", ".management");
+        remove_dir(m_path+ ".management");
         File::try_remove(get_lock_path());
-        File::try_remove(m_path + ".log_a");
-        File::try_remove(m_path + ".log_b");
     }
     catch (...) {
         // Exception deliberately ignored

@@ -343,7 +343,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                         }
                     }
                 }
-            }               
+            }
             else if (instr == REMOVE_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);

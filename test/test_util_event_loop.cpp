@@ -1,5 +1,4 @@
 #include "test.hpp"
-#include "../test/util/thread_wrapper.hpp"
 
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/event_loop.hpp>

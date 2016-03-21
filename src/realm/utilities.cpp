@@ -275,13 +275,13 @@ int fast_popcount64(int64_t x)
 }
 
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
-uint64_t fastrand(uint64_t max, bool is_seed) 
+uint64_t fastrand(uint64_t max, bool is_seed)
 {
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
     static std::atomic<uint64_t> state(is_seed ? max : 1);
-    
+
     // Thread safe increment to prevent two threads from producing the same value if called at the exact same time
-    state.fetch_add(1, std::memory_order_release); 
+    state.fetch_add(1, std::memory_order_release);
     uint64_t x = state.load(std::memory_order_acquire);
     // The result of this arithmetic may be overwritten by another thread, but that's fine in a rand generator
     x ^= x >> 12; // a
@@ -299,7 +299,9 @@ void millisleep(size_t milliseconds)
 #else
     // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
     timespec ts;
-    ts.tv_sec = 0;
+    size_t secs = milliseconds / 1000;
+    milliseconds = milliseconds % 1000;
+    ts.tv_sec = secs;
     ts.tv_nsec = milliseconds * 1000 * 1000;
     nanosleep(&ts, 0);
 #endif

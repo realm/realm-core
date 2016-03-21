@@ -2,6 +2,7 @@
 #define REALM_TEST_HPP
 
 #include "util/random.hpp"
+#include "util/thread_wrapper.hpp"
 #include "util/unit_test.hpp"
 #include "util/test_types.hpp"
 #include "util/test_path.hpp"
