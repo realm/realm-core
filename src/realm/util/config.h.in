@@ -1,5 +1,5 @@
 // Version information
-#cmakedefine REALM_VERSION "@REALM_VERSION@"
+#define REALM_VERSION "@PROJECT_VERSION@"
 
 // Specific headers
 #cmakedefine01 HAVE_MALLOC_H

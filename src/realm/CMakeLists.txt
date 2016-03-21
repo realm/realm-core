@@ -163,7 +163,13 @@ set(REALM_INSTALL_HEADERS
 ) # REALM_INSTALL_HEADERS
 
 add_library(realm ${REALM_SOURCES})
-set_target_properties(realm PROPERTIES SOVERSION "9.0.0")
+
+set_target_properties(
+    realm PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${REALM_SOVERSION}
+)
+
 target_link_libraries(realm ${REALM_EXTRA_LIBS})
 target_link_libraries(realm Threads::Threads)
 install(TARGETS realm

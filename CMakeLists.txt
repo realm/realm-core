@@ -8,6 +8,7 @@ cmake_policy(SET CMP0048 NEW)
 set(REALM_VERSION_MAJOR 0)
 set(REALM_VERSION_MINOR 96)
 set(REALM_VERSION_PATCH 2)
+set(REALM_SOVERSION "9.0.0")
 
 project(
     realm
