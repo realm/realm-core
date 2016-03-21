@@ -27,7 +27,7 @@ using namespace realm::util;
 // when in core version > 89 / file version 3, it will read / upgrade the
 // previously written files version 2 files.
 
-#if REALM_VER_MINOR > 89
+#if REALM_VERSION_MINOR > 89
 #  define TEST_READ_UPGRADE_MODE 1
 #else
 #  define TEST_READ_UPGRADE_MODE 0
@@ -37,7 +37,7 @@ using namespace realm::util;
 // FIXME: This will not work when we hit 1.0, but we should also consider
 // testing the half matrix of all possible upgrade paths. E.g.:
 // 0.88.5->0.88.6->0.89.0->0.89.1->0.90.0->... and 0.88.5->0.90.0 directly etc.
-#if REALM_VER_MAJOR != 0
+#if REALM_VERSION_MAJOR != 0
 #  error FIXME
 #endif
 

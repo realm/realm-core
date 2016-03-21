@@ -68,6 +68,8 @@ endif()
 
 # Store configuration in header file
 configure_file(src/realm/util/config.h.in src/realm/util/config.h)
+# Configure source code to use right version number
+configure_file(src/realm/version.hpp.in src/realm/version.hpp)
 
 # Tell the build system where to find the sources (and generated sources)
 include_directories(src)
