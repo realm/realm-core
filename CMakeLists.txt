@@ -25,7 +25,18 @@ set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 if(APPLE)
     set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
     set(CMAKE_EXE_LINKER_FLAGS "-framework Foundation")
-endif(APPLE)
+    if(CMAKE_GENERATOR STREQUAL Xcode)
+        set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS
+            "macosx iphoneos iphonesimulator appletvos appletvsimulator watchos watchsimulator"
+        )
+        set(CMAKE_XCODE_EFFECTIVE_PLATFORMS
+            "-macosx;-iphoneos;-iphonesimulator;-appletvos;-appletvsimulator;-watchos;-watchsimulator"
+        )
+        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
+        set(CMAKE_OSX_SYSROOT $(PLATFORM_NAME))
+        set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "7.0")
+    endif()
+endif()
 
 check_include_files(malloc.h HAVE_MALLOC_H)
 
@@ -48,9 +59,3 @@ add_subdirectory(src/realm)
 add_subdirectory(test)
 
 include(FindOpenSSL)
-
-set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "macosx iphoneos iphonesimulator appletvos appletvsimulator watchos watchsimulator")
-set(CMAKE_XCODE_EFFECTIVE_PLATFORMS "-macosx;-iphoneos;-iphonesimulator;-appletvos;-appletvsimulator;-watchos;-watchsimulator")
-set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
-set(CMAKE_OSX_SYSROOT $(PLATFORM_NAME))
-set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "7.0")
