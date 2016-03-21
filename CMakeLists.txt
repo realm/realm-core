@@ -19,6 +19,10 @@ project(
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
 include(FindOpenSSL)
+include(GetGitRevisionDescription)
+
+# Get accurate git-describe version
+git_describe(REALM_VERSION)
 
 # Project-wide build flags
 set(CMAKE_CXX_STANDARD 11)
