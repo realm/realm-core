@@ -62,7 +62,7 @@ find_package(Threads REQUIRED)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode.")
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations.")
 option(REALM_ENABLE_ENCRYPTION "Enable encryption.")
-set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node side.")
+set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
 
