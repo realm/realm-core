@@ -29,7 +29,12 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic $ENV{EXTRA_CFLAGS}")
 set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
-# Target-specific build flags
+# Add REALM_DEBUG=1 to compile definitions for Debug targets
+set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
+    $<$<CONFIG:Debug>:REALM_DEBUG=1>
+)
+
+# Coverage-specific build flags
 if(REALM_COVERAGE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -fno-inline -fno-elide-constructors")
 endif()
@@ -65,10 +70,6 @@ option(REALM_ENABLE_ENCRYPTION "Enable encryption.")
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
-
-if(CMAKE_BUILD_TYPE STREQUAL Debug)
-    set(REALM_DEBUG 1)
-endif()
 
 # Store configuration in header file
 configure_file(src/realm/util/config.h.in src/realm/util/config.h)
