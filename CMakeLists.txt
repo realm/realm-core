@@ -16,10 +16,11 @@ set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node side.")
 set(REALM_ENABLE_ALLOC_SET_ZERO "0" CACHE STRING "Zero all allocations.")
 set(REALM_ENABLE_ENCRYPTION "0" CACHE STRING "Enable encryption.")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic -DREALM_HAVE_CONFIG")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic -DREALM_HAVE_CONFIG $ENV{EXTRA_CFLAGS}")
 if(REALM_COVERAGE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -fno-inline -fno-elide-constructors")
 endif()
+set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
 if(APPLE)
     set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")

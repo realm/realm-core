@@ -3,19 +3,9 @@
 require 'tmpdir'
 require 'fileutils'
 
-REALM_PROJECT_ROOT            = File.absolute_path(File.dirname(__FILE__))
-REALM_DEFAULT_BUILD_DIR_APPLE = "build.apple"
-REALM_DEFAULT_BUILD_DIR_STEM  = "build.make"
-REALM_DEFAULT_BUILD_DIR_DEBUG = "#{REALM_DEFAULT_BUILD_DIR_STEM}.debug"
-REALM_DEFAULT_BUILD_DIR_OPTIM = "#{REALM_DEFAULT_BUILD_DIR_STEM}.release"
-REALM_DEFAULT_BUILD_DIR_COVER = "#{REALM_DEFAULT_BUILD_DIR_STEM}.cover"
-
-REALM_BUILD_DIR_APPLE = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR_APPLE
-REALM_BUILD_DIR_DEBUG = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR_DEBUG
-REALM_BUILD_DIR_OPTIM = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR_OPTIM
-REALM_BUILD_DIR_COVER = ENV['build_dir'] || REALM_DEFAULT_BUILD_DIR_COVER
-
-directory REALM_BUILD_DIR_APPLE
+REALM_PROJECT_ROOT    = File.absolute_path(File.dirname(__FILE__))
+REALM_BUILD_DIR_APPLE = "build.apple"
+REALM_BUILD_DIR_STEM  = "build.make"
 
 def generate_makefiles(build_dir)
     options = ENV.select {|k,_| k.start_with?("REALM_") || k.start_with?("CMAKE_") }.map{|k,v| "-D#{k}=#{v}"}.join(' ')
@@ -26,15 +16,21 @@ def generate_makefiles(build_dir)
 end
 
 REALM_CONFIGURATIONS = {
-    debug:   ['Debug',   REALM_BUILD_DIR_DEBUG],
-    release: ['Release', REALM_BUILD_DIR_OPTIM],
-    cover:   ['Debug',   REALM_BUILD_DIR_COVER],
+    debug:   'Debug',
+    release: 'Release',
+    cover:   'Debug',
 }
 
-REALM_CONFIGURATIONS.each do |configuration, (build_type, dir)|
+REALM_CONFIGURATIONS.each do |configuration, build_type|
+    dir = ENV['build_dir'] || "#{REALM_BUILD_DIR_STEM}.#{configuration}"
+
     directory dir
 
-    task "config-#{configuration}" => dir do
+    task "#{configuration}-build-dir" => dir do
+        @build_dir ||= dir
+    end
+
+    task "config-#{configuration}" => "#{configuration}-build-dir" do
         ENV['CMAKE_BUILD_TYPE'] = build_type
         ENV['REALM_COVERAGE'] = '1' if configuration == :cover
         generate_makefiles(dir)
@@ -59,7 +55,7 @@ REALM_CONFIGURATIONS.each do |configuration, (build_type, dir)|
     task "memcheck-#{configuration}" => "build-#{configuration}" do
         ENV['UNITTEST_THREADS'] ||= @num_processors
         Dir.chdir("#{dir}/test") do
-            sh "valgrind ./realm-tests"
+            sh "valgrind #{@valgrind_flags} ./realm-tests"
         end
     end
 end
@@ -72,21 +68,21 @@ task :check => 'check-release'
 
 desc 'Run tests in debug mode under GDB'
 task 'gdb-debug' => 'build-debug' do
-    Dir.chdir("#{REALM_BUILD_DIR_DEBUG}/test") do
+    Dir.chdir("#{@build_dir}/test") do
         sh "gdb ./realm-tests"
     end
 end
 
 desc 'Run tests in debug mode under LLDB'
 task 'lldb-debug' => 'build-debug' do
-    Dir.chdir("#{REALM_BUILD_DIR_DEBUG}/test") do
+    Dir.chdir("#{@build_dir}/test") do
         sh "lldb ./realm-tests"
     end
 end
 
 desc 'Run coverage test and process output with LCOV'
 task 'lcov' => ['check-cover', :tmpdir] do
-    Dir.chdir("#{REALM_BUILD_DIR_COVER}") do
+    Dir.chdir("#{@build_dir}") do
         sh "lcov --capture --directory . --output-file #{@tmpdir}/realm.lcov"
         sh "lcov --extract #{@tmpdir}/realm.lcov '#{REALM_PROJECT_ROOT}/src/*' --output-file #{@tmpdir}/realm-clean.lcov"
         FileUtils.rm_rf "cover_html"
@@ -94,10 +90,73 @@ task 'lcov' => ['check-cover', :tmpdir] do
     end
 end
 
+desc 'Run coverage test and process output with Gcovr'
+task 'gcovr' => 'check-cover' do
+    Dir.chdir(@build_dir) do
+        sh "gcovr --filter='*src/realm.*' -x > gcovr.xml"
+    end
+end
+
+task :asan_flags do
+    ENV['ASAN_OPTIONS'] = "detect_odr_violation=2"
+    ENV['EXTRA_CFLAGS'] = "-fsanitize=address"
+    ENV['EXTRA_LDFLAGS'] = "-fsanitize=address"
+end
+
+desc 'Run address sanitizer in release mode.'
+task 'asan' => [:asan_flags, 'check-release']
+
+desc 'Run address sanitizer in debug mode.'
+task 'asan-debug' => [:asan_flags, 'check-debug']
+
+task :tsan_flags do
+    ENV['EXTRA_CFLAGS'] = "-fsanitize=thread"
+    ENV['EXTRA_LDFLAGS'] = "-fsanitize=thread"
+end
+
+desc 'Run thread sanitizer in release mode.'
+task 'tsan' => [:tsan_flags, 'check-release']
+
+desc 'Run thread sanitizer in debug mode.'
+task 'tsan-debug' => [:tsan_flags, 'check-debug']
+
+task :jenkins_workspace do
+    raise 'No WORKSPACE set.' unless ENV['WORKSPACE']
+    @jenkins_workspace = File.absolute_path(ENV['WORKSPACE'])
+    @build_dir = @jenkins_workspace or raise 'No WORKSPACE set.'
+end
+
+task :jenkins_flags => :jenkins_workspace do
+    ENV['REALM_MAX_BPNODE_SIZE'] = '4'
+end
+
+desc 'Run by Jenkins as part of the core pipeline whenever master changes'
+task 'jenkins-pipeline-unit-tests' => :jenkins_flags do
+    ENV['UNITTEST_SHUFFLE'] = '1'
+    ENV['UNITTEST_RANDOM_SEED'] = 'random'
+    ENV['UNITTEST_XML'] = '1'
+end
+
+desc 'Run by Jenkins as part of the core pipeline whenever master changes'
+task 'jenkins-pipeline-coverage' => [:jenkins_flags, :gcovr]
+
+desc 'Run by Jenkins as part of the core pipeline whenever master changes'
+task 'jenkins-pipeline-address-sanitizer' => [:jenkins_flags, 'asan-debug']
+
+desc 'Run by Jenkins as part of the core pipeline whenever master changes'
+task 'jenkins-pipeline-thread-sanitizer' => [:jenkins_flags, 'tsan-debug']
+
+task :jenkins_valgrind_flags => :jenkins_flags do
+    ENV['REALM_ENABLE_ALLOC_SET_ZERO'] = '1'
+    @valgrind_flags = "--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=#{@jenkins_workspace}/realm-tests-dbg.%p.memreport"
+end
+
+task 'jenkins-valgrind' => [:jenkins_valgrind_flags, 'memcheck-release']
+
 desc 'Forcibly remove all build state'
 task :clean do
-    REALM_CONFIGURATIONS.each do |name, (build_type, dir)|
-        FileUtils.rm_rf(dir)
+    REALM_CONFIGURATIONS.each do |configuration, _|
+        FileUtils.rm_rf("#{REALM_BUILD_DIR_STEM}.#{configuration}")
     end
     FileUtils.rm_rf(REALM_BUILD_DIR_APPLE)
 end
@@ -129,20 +188,28 @@ else
     REALM_COCOA_PLATFORMS = REALM_COCOA_SUPPORTED_PLATFORMS
 end
 
+apple_build_dir = ENV['build_dir'] || REALM_BUILD_DIR_APPLE
+
+directory apple_build_dir
+
+task :build_dir_apple => apple_build_dir do
+    @build_dir = apple_build_dir
+end
+
 task :check_xcpretty do
     @xcpretty_suffix = `which xcpretty`
     @xcpretty_suffix = "| #{@xcpretty_suffix}" unless @xcpretty_suffix.empty?
 end
 
 desc 'Generate Xcode project (default dir: \'build.apple\')'
-task :xcode_project => [REALM_BUILD_DIR_APPLE, :check_xcpretty] do
-    Dir.chdir(REALM_BUILD_DIR_APPLE) do
+task :xcode_project => [:build_dir_apple, :check_xcpretty] do
+    Dir.chdir(@build_dir) do
         sh "cmake -GXcode #{REALM_PROJECT_ROOT}"
     end
 end
 
 def build_apple(sdk, configuration, enable_bitcode = false)
-    Dir.chdir(REALM_BUILD_DIR_APPLE) do
+    Dir.chdir(@build_dir) do
         bitcode_option = "ENABLE_BITCODE=#{enable_bitcode ? 'YES' : 'NO'}"
         sh "xcodebuild -sdk #{sdk} -target realm -configuration #{configuration} #{bitcode_option} #{@xcpretty_suffix}"
     end
@@ -168,7 +235,7 @@ REALM_COCOA_SUPPORTED_PLATFORMS.each do |platform|
                 bitcode_suffix    = platform == 'macosx' ? '' : (enable_bitcode ? '-bitcode' : '-no-bitcode')
                 dst_target_suffix = configuration == 'Debug'  ? "-dbg" : ''
                 tag = "#{platform}#{bitcode_suffix}"
-                src = "#{REALM_BUILD_DIR_APPLE}/src/realm/#{configuration}#{platform_suffix}/librealm.a"
+                src = "#{@build_dir}/src/realm/#{configuration}#{platform_suffix}/librealm.a"
                 FileUtils.mkdir_p("#{@tmpdir}/core")
                 dst = "#{@tmpdir}/core/librealm#{platform_suffix}#{bitcode_suffix}#{dst_target_suffix}.a"
                 cp(src, dst)
