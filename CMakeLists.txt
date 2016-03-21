@@ -16,7 +16,7 @@ option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations.")
 option(REALM_ENABLE_ENCRYPTION "Enable encryption.")
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node side.")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic -DREALM_HAVE_CONFIG $ENV{EXTRA_CFLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic $ENV{EXTRA_CFLAGS}")
 if(REALM_COVERAGE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage -fno-inline -fno-elide-constructors")
 endif()
