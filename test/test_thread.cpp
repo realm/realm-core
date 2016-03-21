@@ -221,6 +221,34 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
     }
 }
 
+
+class bowl_of_stones_semaphore {
+public:
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
+        m_num_stones(initial_number_of_stones)
+    {
+    }
+    void get_stone(int num_to_get)
+    {
+        LockGuard lock(m_mutex);
+        while (m_num_stones < num_to_get)
+            m_cond_var.wait(lock);
+        m_num_stones -= num_to_get;
+    }
+    void add_stone()
+    {
+        LockGuard lock(m_mutex);
+        ++m_num_stones;
+        m_cond_var.notify();
+    }
+private:
+    Mutex m_mutex;
+    int m_num_stones;
+    CondVar m_cond_var;
+};
+
+
+
 } // anonymous namespace
 
 
@@ -520,13 +548,16 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
     cv->notify_all();
 }
 
-void waiter_with_count(int* wait_counter, InterprocessMutex* mutex, InterprocessCondVar* cv)
+void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, 
+                       InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
     //std::cerr << "waiter entry: " << *wait_counter << std::endl;
     ++ *wait_counter;
+    feedback->add_stone();
     cv->wait(*mutex, nullptr);
     -- *wait_counter;
+    feedback->add_stone();
     //std::cerr << "waiter exit: " << *wait_counter << std::endl;
 }
 
@@ -667,22 +698,23 @@ TEST(Thread_CondvarNotifyWakeup)
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
+    bowl_of_stones_semaphore feedback(0);
     SHARED_GROUP_TEST_PATH(path);
     mutex.set_shared_part(mutex_part, path, "");
     changed.set_shared_part(condvar_part, path, "");
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i=0; i<num_waiters; ++i) {
-        waiters[i].start(std::bind(waiter_with_count, &wait_counter, &mutex, &changed));
+        waiters[i].start(std::bind(waiter_with_count, &feedback, &wait_counter, &mutex, &changed));
     }
-    millisleep(1000); // allow time for all waiters to wait
-    CHECK_EQUAL(wait_counter, 10);
+    feedback.get_stone(num_waiters);
+    CHECK_EQUAL(wait_counter, num_waiters);
     changed.notify();
-    millisleep(1000);
-    CHECK_EQUAL(wait_counter, 9);
+    feedback.get_stone(1);
+    CHECK_EQUAL(wait_counter, num_waiters-1);
     changed.notify();
-    millisleep(1000);
-    CHECK_EQUAL(wait_counter, 8);
+    feedback.get_stone(1);
+    CHECK_EQUAL(wait_counter, num_waiters-2);
     changed.notify_all();
     for (int i=0; i<num_waiters; ++i) {
         waiters[i].join();
