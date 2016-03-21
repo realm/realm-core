@@ -698,7 +698,15 @@ EOF
         echo "Done building"
         exit 0
         ;;
-    
+
+    "build-release")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        $MAKE release || exit 1
+        echo "Done building"
+        exit 0
+        ;;
+
     "build-config-progs")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
