@@ -391,13 +391,25 @@ struct BenchmarkGetLinkList : Benchmark {
     }
 };
 
-const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
+const char* to_lead_cstr(SharedGroup::DurabilityLevel level)
 {
     switch (level) {
         case SharedGroup::durability_Full:    return "Full   ";
         case SharedGroup::durability_MemOnly: return "MemOnly";
 #ifndef _WIN32
         case SharedGroup::durability_Async:   return "Async  ";
+#endif
+    }
+    return nullptr;
+}
+
+const char* to_ident_cstr(SharedGroup::DurabilityLevel level)
+{
+    switch (level) {
+        case SharedGroup::durability_Full:    return "Full";
+        case SharedGroup::durability_MemOnly: return "MemOnly";
+#ifndef _WIN32
+        case SharedGroup::durability_Async:   return "Async";
 #endif
     }
     return nullptr;
@@ -445,9 +457,9 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
-        lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) <<
+        lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level) <<
             ", " << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
-        ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level) <<
+        ident_ss << benchmark.name() << "_" << to_ident_cstr(level) <<
             (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
 
