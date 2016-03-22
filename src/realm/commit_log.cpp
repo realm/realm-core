@@ -369,11 +369,13 @@ void WriteLogCollector::remap_if_needed(const CommitLogMetadata& log) const
     if (log.map.is_attached() == false) {
         open_if_needed(log);
         log.last_seen_size = log.file.get_size();
-        log.map.map(log.file, File::access_ReadWrite, log.last_seen_size);
+        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(log.last_seen_size));
+        log.map.map(log.file, File::access_ReadWrite, size_t(log.last_seen_size));
         return;
     }
     if (log.last_seen_size != log.file.get_size()) {
-        log.map.remap(log.file, File::access_ReadWrite, log.file.get_size());
+        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(log.last_seen_size));
+        log.map.remap(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
         log.last_seen_size = log.file.get_size();
     }
 }
@@ -555,13 +557,13 @@ void WriteLogCollector::terminate_session() noexcept
 void WriteLogCollector::set_log_entry_internal(HistoryEntry* entry,
                                                const EntryHeader* hdr, const char* log)
 {
-    entry->changeset = BinaryData(log, hdr->size);
+    entry->changeset = BinaryData(log, size_t(hdr->size));
 }
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
                                                const EntryHeader* hdr, const char* log)
 {
-    *entry = BinaryData(log, hdr->size);
+    *entry = BinaryData(log, size_t(hdr->size));
 }
 
 
@@ -630,7 +632,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
         uint_fast64_t tmp_offset = m_read_offset + sizeof(EntryHeader);
         if (m_read_version >= from_version) {
             // std::cerr << "  --at: " << m_read_offset << ", " << size << "\n";
-            realm::util::encryption_read_barrier(hdr, size + sizeof(EntryHeader),
+            realm::util::encryption_read_barrier(hdr, size_t(size + sizeof(EntryHeader)),
                                                  first_map->get_encrypted_mapping());
             set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
             ++logs_buffer;
