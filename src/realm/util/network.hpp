@@ -500,30 +500,102 @@ public:
     void write(const char* data, size_t size);
     std::error_code write(const char* data, size_t size, std::error_code&) noexcept;
 
+    /// \brief Perform an asynchronous write operation.
+    ///
+    /// Initiate an asynchronous write operation. The completion handler is
+    /// called when the operation completes. The operation completes when all
+    /// the specified bytes have been written to the socket, or an error occurs.
+    ///
+    /// The specified handler object will be copied as necessary, and will be
+    /// executed by an expression on the form `handler(ec, n)` where `ec` is the
+    /// error code, and `n` is the number of bytes written (of type `size_t`).
+    ///
+    /// It is an error to start an asynchronous write operation before the
+    /// socket is connected.
+    ///
+    /// It is an error to start a new write operation (synchronous or
+    /// asynchronous) while an asynchronous write operation is in progress. An
+    /// asynchronous write operation is considered complete as soon as the
+    /// completion handler starts executing. This means that a new write
+    /// operation can be started from the completion handler of another
+    /// asynchronous write operation.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the socket is closed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The completion
+    /// handler will always be called, as long as the event loop is running.
     template<class H>
     void async_write(const char* data, size_t size, const H& handler);
 
     /// @{ \brief Read at least one byte from this socket.
     ///
-    /// If \a size is greater than zero, block the calling thread until at least
-    /// one byte becomes available, or an error occurs. In this context, end of
-    /// input counts as an error (see `network::end_of_input`). If an error
-    /// occurs, the two-argument version will throw `std::system_error`, while
-    /// the three-argument version will set `ec` appropriately, and return
-    /// zero. If no error occurs, or if \a size is zero, both versions will read
-    /// as many available bytes as will fit into the specified buffer, and then
-    /// return the number of bytes placed in the buffer. The three-argument
-    /// version will also set `ec` to indicate success in this case.
+    /// If \a size is zero, both versions of read_some() will return zero
+    /// without blocking. Read errors may or may not be detected in this case.
     ///
-    /// The two argument version always return a value greater than zero, and
-    /// the three argument version returns a value greather than zero if, and
-    /// only if `ec` is set to indicate success (no error, and no end of input).
+    /// Otherwise, if \a size is greater than zero, and at least one byte is
+    /// immediately available, that is, without blocking, then both versions
+    /// will read at least one byte (but generally as many immediately available
+    /// bytes as will fit into the specified buffer), and return without
+    /// blocking.
+    ///
+    /// Otherwise, both versions will block the calling thread until at least one
+    /// byte becomes available, or an error occurs.
+    ///
+    /// In this context, it counts as an error, if the end of input is reached
+    /// before at least one byte becomes available (see
+    /// `network::end_of_input`).
+    ///
+    /// If no error occurs, both versions will return the number of bytes placed
+    /// in the specified buffer, which is generally as many as are immediately
+    /// available at the time when the first byte becomes available, although
+    /// never more than \a size.
+    ///
+    /// If no error occurs, the three-argument version will set \a ec to
+    /// indicate success.
+    ///
+    /// If an error occurs, the two-argument version will throw
+    /// `std::system_error`, while the three-argument version will set \a ec to
+    /// indicate the error, and return zero.
+    ///
+    /// As long as \a size is greater than zero, the two argument version will
+    /// always return a value that is greater than zero, while the three
+    /// argument version will return a value greater than zero when, and only
+    /// when \a ec is set to indicate success (no error, and no end of input).
     size_t read_some(char* buffer, size_t size);
     size_t read_some(char* buffer, size_t size, std::error_code& ec) noexcept;
     /// @}
 
+    /// @{ \brief Write at least one byte to this socket.
+    ///
+    /// If \a size is zero, both versions of write_some() will return zero
+    /// without blocking. Write errors may or may not be detected in this case.
+    ///
+    /// Otherwise, if \a size is greater than zero, and at least one byte can be
+    /// written immediately, that is, without blocking, then both versions will
+    /// write at least one byte (but generally as many as can be written
+    /// immediately), and return without blocking.
+    ///
+    /// Otherwise, both versions will block the calling thread until at least one
+    /// byte can be written, or an error occurs.
+    ///
+    /// If no error occurs, both versions will return the number of bytes
+    /// written, which is generally as many as can be written immediately at the
+    /// time when the first byte can be written.
+    ///
+    /// If no error occurs, the three-argument version will set \a ec to
+    /// indicate success.
+    ///
+    /// If an error occurs, the two-argument version will throw
+    /// `std::system_error`, while the three-argument version will set \a ec to
+    /// indicate the error, and return zero.
+    ///
+    /// As long as \a size is greater than zero, the two argument version will
+    /// always return a value that is greater than zero, while the three
+    /// argument version will return a value greater than zero when, and only
+    /// when \a ec is set to indicate success.
     size_t write_some(const char* data, size_t size);
     size_t write_some(const char* data, size_t size, std::error_code&) noexcept;
+    /// @}
 
 private:
     class connect_oper_base;
@@ -632,7 +704,7 @@ public:
     ///
     /// Initiate an asynchronous buffered read operation on the associated
     /// socket. The completion handler will be called when the operation
-    /// completes.
+    /// completes, or an error occurs.
     ///
     /// async_read() will continue reading until the specified buffer is full,
     /// or an error occurs. If the end of input is reached before the buffer is
@@ -655,7 +727,8 @@ public:
     /// asynchronous) while an asynchronous read operation is in progress. An
     /// asynchronous read operation is considered complete as soon as the
     /// completion handler starts executing. This means that a new read
-    /// operation can be started from the completion handler.
+    /// operation can be started from the completion handler of another
+    /// asynchronous buffered read operation.
     ///
     /// The operation can be canceled by calling socket::cancel(), and will be
     /// automatically canceled if the associated socket is closed. If the
@@ -1525,8 +1598,13 @@ public:
     void initiate() noexcept
     {
         REALM_ASSERT(!is_complete());
-        if (m_socket->ensure_nonblocking_mode(m_error_code))
+        REALM_ASSERT(m_curr <= m_end);
+        if (m_curr == m_end) {
+            set_is_complete(true); // Success
+        }
+        else if (m_socket->ensure_nonblocking_mode(m_error_code)) {
             set_is_complete(true); // Failure
+        }
     }
     void proceed() noexcept override
     {
@@ -1715,8 +1793,8 @@ public:
     }
 protected:
     acceptor* m_acceptor;
-    socket& m_socket;
-    endpoint* const m_endpoint;
+    socket& m_socket; // Invalid after cancelation
+    endpoint* const m_endpoint; // Invalid after cancelation
     std::error_code m_error_code;
 };
 
@@ -1732,7 +1810,7 @@ public:
     void recycle_and_execute() override
     {
         REALM_ASSERT(is_complete() || is_canceled());
-        REALM_ASSERT(is_complete() == (m_socket.is_open() || m_error_code));
+        REALM_ASSERT(is_canceled() || m_socket.is_open() || m_error_code);
         bool orphaned = !m_acceptor;
         std::error_code ec = m_error_code;
         if (is_canceled())

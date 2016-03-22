@@ -2,6 +2,10 @@
 
 ### Bugfixes:
 
+* Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
+* Bug fix: Access dangling pointer while handling canceled asynchronous accept
+  in POSIX networking API.
+
 ### API breaking changes:
 
 * Lorem ipsum.
@@ -27,6 +31,7 @@
   each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
   failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
   (`util::Logger`) is now directly available to each unit test.
+* New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 
 ----------------------------------------------
 
