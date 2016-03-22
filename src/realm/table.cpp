@@ -4406,7 +4406,7 @@ namespace {
 
 inline void out_datetime(std::ostream& out, DateTime value)
 {
-    time_t rawtime = value.get_datetime();
+    time_t rawtime = time_t(value.get_datetime());
     struct tm* t = gmtime(&rawtime);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
