@@ -2352,7 +2352,6 @@ TEST(Group_Fuzzy)
     //std::string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
     //std::string filename = "d:/crash3";
 
-    SHARED_GROUP_TEST_PATH(path);
 
     std::string instr;
     if (filename != "") {
@@ -2364,7 +2363,8 @@ TEST(Group_Fuzzy)
         const size_t iterations = 100;
 
         // Number of instructions in each test
-        const size_t instructions = 1000;
+        // Changing this strongly affects the test suite run time
+        const size_t instructions = 200;
 
         for (size_t counter = 0; counter < iterations; counter++)
         {
@@ -2392,10 +2392,11 @@ TEST(Group_Fuzzy)
                     fastlog += "}; instr = string(instr2);";
                 }
             }
+            // Scope guard of "path" is inside the loop to clean up files per iteration
+            SHARED_GROUP_TEST_PATH(path);
             // If using std::cerr, you can copy/paste the console output into a unit test
             // to get a reproduction test case
-
-            //parse_and_apply_instructions(instr, g, std::cerr);
+            //parse_and_apply_instructions(instr, path, std::cerr);
             parse_and_apply_instructions(instr, path, util::none);
         }
     }
