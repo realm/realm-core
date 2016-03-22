@@ -86,7 +86,13 @@
 #  define REALM_HAVE_CLANG_WARNING(warning) 0
 #endif
 
-#define REALM_PRAGMA(v) _Pragma(REALM_QUOTE2(v))
+#if defined(__GNUC__) // clang or GCC
+#  define REALM_PRAGMA(v) _Pragma(REALM_QUOTE2(v))
+#elif defined(_MSC_VER) // VS
+#  define REALM_PRAGMA(v) __pragma(v)
+#else
+#  define REALM_PRAGMA(v)
+#endif
 
 #if __clang__
 #  define  REALM_DIAG(v) REALM_PRAGMA(clang diagnostic v)
