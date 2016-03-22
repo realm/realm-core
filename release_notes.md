@@ -2,6 +2,11 @@
 
 ### Bugfixes:
 
+* Detach subspec and enumkey accessors when they are removed
+  via a transaction (ex rollback). This could cause crashes
+  when removing the last column in a table of type link,
+  linklist, backlink, subtable, or enumkey. See #1585.
+
 ### API breaking changes:
 
 * Lorem ipsum.
