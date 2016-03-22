@@ -15,6 +15,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+using namespace realm::test_util::unit_test;
 
 namespace {
 #define BASE_SIZE 3600
@@ -415,11 +416,10 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
     timer.unpause();
 }
 
-
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
 template<typename B>
-void run_benchmark(BenchmarkResults& results)
+void run_benchmark(TestContext& test_context, BenchmarkResults& results)
 {
     typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
     std::vector<config_pair> configs;
@@ -435,7 +435,6 @@ void run_benchmark(BenchmarkResults& results)
     configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
 #endif
 
-    static long test_counter = 0;
     Timer timer(Timer::type_UserTime);
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
@@ -451,13 +450,6 @@ void run_benchmark(BenchmarkResults& results)
         ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level) <<
             (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
-
-        realm::test_util::unit_test::TestDetails test_details;
-        test_details.test_index = test_counter++;
-        test_details.suite_name = "BenchmarkCommonTasks";
-        test_details.test_name = ident.c_str();
-        test_details.file_name = __FILE__;
-        test_details.line_number = __LINE__;
 
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
@@ -505,35 +497,40 @@ void run_benchmark(BenchmarkResults& results)
 
 extern "C" int benchmark_common_tasks_main();
 
-int benchmark_common_tasks_main()
+TEST(benchmark_common_tasks_main)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
-    run_benchmark<BenchmarkUnorderedTableViewClear>(results);
-    run_benchmark<BenchmarkEmptyCommit>(results);
-    run_benchmark<AddTable>(results);
-    run_benchmark<BenchmarkQuery>(results);
-    run_benchmark<BenchmarkQueryNot>(results);
-    run_benchmark<BenchmarkSize>(results);
-    run_benchmark<BenchmarkSort>(results);
-    run_benchmark<BenchmarkSortInt>(results);
-    run_benchmark<BenchmarkInsert>(results);
-    run_benchmark<BenchmarkGetString>(results);
+#define __BENCH(B) \
+    run_benchmark<B>(test_context, results)
 
-    run_benchmark<BenchmarkSetString>(results);
+    __BENCH(BenchmarkUnorderedTableViewClear);
+    __BENCH(BenchmarkEmptyCommit);
+    __BENCH(AddTable);
+    __BENCH(BenchmarkQuery);
+    __BENCH(BenchmarkQueryNot);
+    __BENCH(BenchmarkSize);
+    __BENCH(BenchmarkSort);
+    __BENCH(BenchmarkSortInt);
+    __BENCH(BenchmarkInsert);
+    __BENCH(BenchmarkGetString);
+    __BENCH(BenchmarkSetString);
+    __BENCH(BenchmarkCreateIndex);
+    __BENCH(BenchmarkGetLongString);
+    __BENCH(BenchmarkSetLongString);
+    __BENCH(BenchmarkGetLinkList);
 
-    run_benchmark<BenchmarkCreateIndex>(results);
-    run_benchmark<BenchmarkGetLongString>(results);
-    run_benchmark<BenchmarkSetLongString>(results);
-    run_benchmark<BenchmarkGetLinkList>(results);
-
-    return 0;
+#undef __BENCH
 }
 
 #if !defined(REALM_IOS)
 int main(int, const char**)
 {
-    return benchmark_common_tasks_main();
+    bool success;
+
+    success = get_default_test_list().run();
+
+    return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 #endif
