@@ -78,7 +78,7 @@
 #define REALM_HAVE_AT_LEAST_GCC(maj, min) \
     (__GNUC__ > (maj) || __GNUC__ == (maj) && __GNUC_MINOR__ >= (min))
 
-#if __clang__
+#if defined(__clang__)
 #  define REALM_HAVE_CLANG_FEATURE(feature) __has_feature(feature)
 #  define REALM_HAVE_CLANG_WARNING(warning) __has_warning(warning)
 #else
@@ -94,9 +94,9 @@
 #  define REALM_PRAGMA(v)
 #endif
 
-#if __clang__
+#if defined(__clang__)
 #  define  REALM_DIAG(v) REALM_PRAGMA(clang diagnostic v)
-#elif __GNUC__
+#elif defined(__GNUC__)
 #  define REALM_DIAG(v) REALM_PRAGMA(GCC diagnostic v)
 #else
 #  define REALM_DIAG(v)
