@@ -369,7 +369,9 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     uint64_t table_ref = uint64_t(tagged_value) >> 1;
-    return table_ref;
+
+    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(table_ref));
+    return size_t(table_ref);
 }
 
 
