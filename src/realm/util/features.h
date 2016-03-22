@@ -92,6 +92,8 @@
 #  define  REALM_DIAG(v) REALM_PRAGMA(clang diagnostic v)
 #elif __GNUC__
 #  define REALM_DIAG(v) REALM_PRAGMA(GCC diagnostic v)
+#else
+#  define REALM_DIAG(v)
 #endif
 
 #define REALM_DIAG_PUSH() REALM_DIAG(push)
