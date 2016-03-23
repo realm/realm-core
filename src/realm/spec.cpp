@@ -137,7 +137,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
     if (is_subspec_type) {
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
-        REALM_ASSERT(m_subspecs.is_attached() == has_subspec());
+        REALM_ASSERT_EX(m_subspecs.is_attached() == has_subspec(), m_subspecs.is_attached(), m_top.size());
         if (!m_subspecs.is_attached()) {
             bool context_flag = false;
             MemRef subspecs_mem =
@@ -305,7 +305,7 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
 {
     REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
 
-    REALM_ASSERT(m_enumkeys.is_attached() == (m_top.size() > 4));
+    REALM_ASSERT_EX(m_enumkeys.is_attached() == (m_top.size() > 4), m_enumkeys.is_attached(), m_top.size());
     // Create the enumkeys list if needed
     if (!m_enumkeys.is_attached()) {
         m_enumkeys.create(Array::type_HasRefs);
