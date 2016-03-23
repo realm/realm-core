@@ -45,6 +45,7 @@ spec.hpp \
 impl/array_writer.hpp \
 impl/destroy_guard.hpp \
 impl/output_stream.hpp \
+impl/debug_trace.hpp \
 impl/simulated_failure.hpp \
 null.hpp \
 datetime.hpp \
@@ -162,6 +163,7 @@ group_writer.cpp \
 impl/continuous_transactions_history.cpp \
 impl/output_stream.cpp \
 impl/transact_log.cpp \
+impl/debug_trace.cpp \
 impl/simulated_failure.cpp \
 importer.cpp \
 index_string.cpp \

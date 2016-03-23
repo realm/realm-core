@@ -36,7 +36,7 @@
 #include <realm/group_writer.hpp>
 #include <realm/link_view.hpp>
 #include <realm/replication.hpp>
-#include <realm/impl/simulated_failure.hpp>
+#include <realm/impl/debug_trace.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
 #ifndef _WIN32
@@ -1724,8 +1724,8 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
 
 bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 {
-    using _impl::SimulatedFailure;
-    SimulatedFailure::check(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
+    using _impl::DebugTrace;
+    DebugTrace::trace(DebugTrace::Event::shared_group__grow_reader_mapping); // Throws
 
     if (index >= m_local_max_entry) {
         // handle mapping expansion if required

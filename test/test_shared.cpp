@@ -2847,7 +2847,7 @@ TEST(Shared_BeginReadFailure)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
     using SimulatedFailure = _impl::SimulatedFailure;
-    SimulatedFailure::PrimeGuard pg(SimulatedFailure::shared_group__grow_reader_mapping);
+    SimulatedFailure::PrimeGuard pg(_impl::DebugTrace::Event::shared_group__grow_reader_mapping);
     CHECK_THROW(sg.begin_read(), SimulatedFailure);
 }
 #endif // REALM_DEBUG
