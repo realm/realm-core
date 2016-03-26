@@ -46,7 +46,7 @@ public:
     static void unprime(type) noexcept;
 
     // If the specified failure type was primed on the calling thread and
-    // REALM_DEBUG was defined during compilation, then this throw
+    // REALM_DEBUG was defined during compilation, then this throws
     // SimulatedFailure after unpriming the failure type. If REALM_DEBUG was not
     // defined, this function does nothing.
     static void check(type);
