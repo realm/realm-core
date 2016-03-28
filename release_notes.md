@@ -1,4 +1,3 @@
-
 # 0.97.3 Release notes
 
 ### Bugfixes:

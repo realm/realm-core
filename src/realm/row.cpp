@@ -70,7 +70,8 @@ void RowBase::generate_patch(const RowBase& source, HandoverPatch& patch)
 void RowBase::apply_patch(HandoverPatch& patch, Group& group)
 {
     m_table = Table::create_from_and_consume_patch(patch.m_table, group);
-    m_table->register_row_accessor(this);
+    if (m_table)
+        m_table->register_row_accessor(this);
     m_row_ndx = patch.row_ndx;
 }
 
