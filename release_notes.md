@@ -5,6 +5,7 @@
 * Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
 * Bug fix: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
+* Handing over a detached row accessor no longer crashes.
 
 ### API breaking changes:
 
