@@ -557,8 +557,10 @@ void WriteLogCollector::terminate_session() noexcept
 void WriteLogCollector::set_log_entry_internal(HistoryEntry* entry,
                                                const EntryHeader* hdr, const char* log)
 {
+    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(hdr->size));
     entry->changeset = BinaryData(log, size_t(hdr->size));
 }
+
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
                                                const EntryHeader* hdr, const char* log)

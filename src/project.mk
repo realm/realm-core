@@ -10,7 +10,7 @@ endif
 
 CFLAGS_DEBUG += -fno-elide-constructors
 CFLAGS_PTHREADS += -pthread
-CFLAGS_GENERAL += -Wextra -pedantic -Wshorten-64-to-32
+CFLAGS_GENERAL += -Wextra -pedantic
 CFLAGS_CXX = -std=c++11
 
 # Avoid a warning from Clang when linking on OS X. By default,
@@ -26,6 +26,11 @@ endif
 # in the future.
 ifeq ($(COMPILER_IS),clang)
   CFLAGS_GENERAL += -Wunreachable-code
+endif
+
+# The shorten-64-to-32 flag is only defined for clang.
+ifeq ($(COMPILER_IS),clang)
+  CFLAGS_GENERAL += -Wshorten-64-to-32
 endif
 
 # CoreFoundation is required for logging
