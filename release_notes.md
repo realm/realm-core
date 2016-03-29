@@ -18,6 +18,7 @@
   the database locked. Fixes issue #1429
 * Moved all supporting files (all files except the .realm file) into a
   separate ".management" subdirectory.
+* Adding `util::network::buffered_input_stream::reset()`.
 
 -----------
 
