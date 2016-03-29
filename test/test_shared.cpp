@@ -2802,52 +2802,6 @@ TEST(Shared_MovingSearchIndex)
     }
 }
 
-TEST(Shared_FuzzTestFail1)
-{
-    std::unique_ptr<Replication> hist_r(make_client_history("fuzz.realm.findings.crashes.id:000000,sig:06,src:000000,op:havoc,rep:64", 0));
-    std::unique_ptr<Replication> hist_w(make_client_history("fuzz.realm.findings.crashes.id:000000,sig:06,src:000000,op:havoc,rep:64", 0));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, 0);
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
-    ReadTransaction rt(sg_r);
-    WriteTransaction wt(sg_w);
-    Group& g = wt.get_group();
-
-    g.insert_table(0, "t0");
-    g.get_table(0)->insert_column_link(0, type_Link, "t0_link0_to_t0", *g.get_table(0));
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
-    g.add_table("t1");
-    g.get_table(1)->add_column_link(type_LinkList, "t1_link0_to_t0", *g.get_table(0));
-    { TableRef t = g.get_table(1); t->remove_column(0); }
-    g.move_table(1, 0);
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-    g.verify();
-    //table.cpp:5249: [realm-core-0.97.0] Assertion failed: col_ndx <= m_cols.size() [2, 0]
-}
-
-TEST(Shared_FuzzTestFail2)
-{
-    std::unique_ptr<Replication> hist_r(make_client_history("fuzz.realm.findings.crashes.id:000000,sig:06,src:000000,op:havoc,rep:64_", 0));
-    std::unique_ptr<Replication> hist_w(make_client_history("fuzz.realm.findings.crashes.id:000000,sig:06,src:000000,op:havoc,rep:64_", 0));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, 0);
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
-    ReadTransaction rt(sg_r);
-    WriteTransaction wt(sg_w);
-    Group& g = wt.get_group();
-
-    g.insert_table(0, "t0");
-    g.get_table(0)->insert_column(0, type_Int, "t0_int0");
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
-    g.add_table("t1");
-    g.move_table(1, 0);
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-    g.verify();
-    //array.cpp:2111: [realm-core-0.97.0] Assertion failed: ref_in_parent == m_ref [112, 4864]
-}
-
 TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 {
     // This test only makes sense when we can insert a number of rows
