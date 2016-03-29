@@ -750,6 +750,9 @@ public:
     void async_read_until(char* buffer, size_t size, char delim, const H& handler);
     /// @}
 
+    /// Discard any buffered input.
+    void reset() noexcept;
+
 private:
     class read_oper_base;
     template<class H> class read_oper;
@@ -1985,10 +1988,9 @@ private:
 
 inline buffered_input_stream::buffered_input_stream(socket& sock):
     m_socket(sock),
-    m_buffer(new char[s_buffer_size]), // Throws
-    m_begin(m_buffer.get()),
-    m_end(m_buffer.get())
+    m_buffer(new char[s_buffer_size]) // Throws
 {
+    reset();
 }
 
 inline buffered_input_stream::~buffered_input_stream() noexcept
@@ -2035,6 +2037,12 @@ inline void buffered_input_stream::async_read_until(char* buffer, size_t size, c
                                                     const H& handler)
 {
     async_read(buffer, size, std::char_traits<char>::to_int_type(delim), handler);
+}
+
+inline void buffered_input_stream::reset() noexcept
+{
+    m_begin = m_buffer.get();
+    m_end   = m_buffer.get();
 }
 
 template<class H>
