@@ -32,6 +32,7 @@
   failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
   (`util::Logger`) is now directly available to each unit test.
 * New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+* Headers and source files are now compiled as C++14.
 
 ----------------------------------------------
 
