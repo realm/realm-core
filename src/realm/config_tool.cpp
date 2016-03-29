@@ -50,9 +50,6 @@ void flush()
 void emit_flags()
 {
     if (emit_cflags) {
-#ifdef REALM_HAVE_CONFIG
-        emit_flags("-DREALM_HAVE_CONFIG");
-#endif
 #ifdef REALM_DEBUG
         emit_flags("-DREALM_DEBUG");
 #endif
