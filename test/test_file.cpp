@@ -373,4 +373,18 @@ TEST(File_Exists)
                    File::Exists, e.get_path() == std::string(path));
 }
 
+
+TEST(File_Move)
+{
+    TEST_PATH(path);
+    File file_1(path, File::mode_Write);
+    CHECK(file_1.is_attached());
+    File file_2(std::move(file_1));
+    CHECK_NOT(file_1.is_attached());
+    CHECK(file_2.is_attached());
+    file_1 = std::move(file_2);
+    CHECK(file_1.is_attached());
+    CHECK_NOT(file_2.is_attached());
+}
+
 #endif // TEST_FILE

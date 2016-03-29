@@ -40,7 +40,7 @@ class EncryptedFileMapping;
 class EncryptedFileMapping {
 public:
     // Adds the newly-created object to file.mappings iff it's successfully constructed
-    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, 
+    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset,
                          void* addr, size_t size, File::AccessMode access);
     ~EncryptedFileMapping();
 
@@ -53,7 +53,7 @@ public:
 
     // Make sure that memory in the specified range is synchronized with any
     // changes made globally visible through call to write_barrier
-    void read_barrier(const void* addr, size_t size, 
+    void read_barrier(const void* addr, size_t size,
                       UniqueLock& lock,
                       Header_to_size header_to_size);
 
@@ -102,7 +102,7 @@ private:
 
 
 
-inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, 
+inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size,
                                                UniqueLock& lock,
                                                Header_to_size header_to_size)
 {
@@ -113,7 +113,7 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size,
     if (!m_up_to_date_pages[first_idx]) {
         if (!lock.holds_lock())
             lock.lock();
-            refresh_page(first_idx);
+        refresh_page(first_idx);
     }
 
     if (header_to_size) {

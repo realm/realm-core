@@ -43,19 +43,19 @@ namespace {
 
 TestList zero_tests_list, zero_checks_list;
 
-TEST_EX(ZeroChecks, zero_checks_list, true)
+TEST_EX(ZeroChecks, zero_checks_list, true, true)
 {
 }
 
 
 TestList one_check_success_list, one_check_failure_list;
 
-TEST_EX(OneCheckSuccess, one_check_success_list, true)
+TEST_EX(OneCheckSuccess, one_check_success_list, true, true)
 {
     CHECK(true);
 }
 
-TEST_EX(OneCheckFailure, one_check_failure_list, true)
+TEST_EX(OneCheckFailure, one_check_failure_list, true, true)
 {
     CHECK(false);
 }
@@ -63,7 +63,7 @@ TEST_EX(OneCheckFailure, one_check_failure_list, true)
 
 TestList one_test_success_list, one_test_failure_list;
 
-TEST_EX(OneTestSuccess, one_test_success_list, true)
+TEST_EX(OneTestSuccess, one_test_success_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -72,7 +72,7 @@ TEST_EX(OneTestSuccess, one_test_success_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(OneTestFailure, one_test_failure_list, true)
+TEST_EX(OneTestFailure, one_test_failure_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -84,7 +84,7 @@ TEST_EX(OneTestFailure, one_test_failure_list, true)
 
 TestList few_tests_success_list, few_tests_failure_list;
 
-TEST_EX(FewTestsSuccess_1, few_tests_success_list, true)
+TEST_EX(FewTestsSuccess_1, few_tests_success_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -92,7 +92,7 @@ TEST_EX(FewTestsSuccess_1, few_tests_success_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsSuccess_2, few_tests_success_list, true)
+TEST_EX(FewTestsSuccess_2, few_tests_success_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -101,7 +101,7 @@ TEST_EX(FewTestsSuccess_2, few_tests_success_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsSuccess_3, few_tests_success_list, true)
+TEST_EX(FewTestsSuccess_3, few_tests_success_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -109,7 +109,7 @@ TEST_EX(FewTestsSuccess_3, few_tests_success_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsFailure_1, few_tests_failure_list, true)
+TEST_EX(FewTestsFailure_1, few_tests_failure_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -117,7 +117,7 @@ TEST_EX(FewTestsFailure_1, few_tests_failure_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsFailure_2, few_tests_failure_list, true)
+TEST_EX(FewTestsFailure_2, few_tests_failure_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -126,7 +126,7 @@ TEST_EX(FewTestsFailure_2, few_tests_failure_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(FewTestsFailure_3, few_tests_failure_list, true)
+TEST_EX(FewTestsFailure_3, few_tests_failure_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -137,7 +137,7 @@ TEST_EX(FewTestsFailure_3, few_tests_failure_list, true)
 
 TestList mixed_list;
 
-TEST_EX(Mixed_1_X, mixed_list, true)
+TEST_EX(Mixed_1_X, mixed_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -145,7 +145,7 @@ TEST_EX(Mixed_1_X, mixed_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(Mixed_2_Y, mixed_list, true)
+TEST_EX(Mixed_2_Y, mixed_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_EQUAL(0,1);         // <--- Failure
@@ -153,18 +153,18 @@ TEST_EX(Mixed_2_Y, mixed_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(Mixed_3_X, mixed_list, true)
+TEST_EX(Mixed_3_X, mixed_list, true, true)
 {
 }
 
-TEST_EX(Mixed_4_Y, mixed_list, true)
+TEST_EX(Mixed_4_Y, mixed_list, true, true)
 {
     CHECK_NOT_EQUAL(0,0);     // <--- Failure
     CHECK_EQUAL(0,1);         // <--- Failure
     CHECK_GREATER_EQUAL(0,1); // <--- Failure
 }
 
-TEST_EX(Mixed_5_X, mixed_list, true)
+TEST_EX(Mixed_5_X, mixed_list, true, true)
 {
     CHECK_NOT_EQUAL(0,0);     // <--- Failure
     CHECK_NOT_EQUAL(0,1);
@@ -172,11 +172,11 @@ TEST_EX(Mixed_5_X, mixed_list, true)
     CHECK_GREATER(1,0);
 }
 
-TEST_EX(Mixed_6_Y, mixed_list, true)
+TEST_EX(Mixed_6_Y, mixed_list, true, true)
 {
 }
 
-TEST_EX(Mixed_7_Y, mixed_list, true)
+TEST_EX(Mixed_7_Y, mixed_list, true, true)
 {
     CHECK_EQUAL(0,0);
     CHECK_NOT_EQUAL(0,1);
@@ -187,7 +187,7 @@ TEST_EX(Mixed_7_Y, mixed_list, true)
 
 TestList success_list, failure_list;
 
-TEST_EX(Success_Bool, success_list, true) // Test #1, accum checks = 0 + 13 = 13
+TEST_EX(Success_Bool, success_list, true, true) // Test #1, accum checks = 0 + 13 = 13
 {
     CHECK(true);
     CHECK_EQUAL(false, false);
@@ -204,7 +204,7 @@ TEST_EX(Success_Bool, success_list, true) // Test #1, accum checks = 0 + 13 = 13
     CHECK_GREATER_EQUAL(true, true);
 }
 
-TEST_EX(Failure_Bool, failure_list, true) // Test #1, accum checks = 0 + 13 = 13
+TEST_EX(Failure_Bool, failure_list, true, true) // Test #1, accum checks = 0 + 13 = 13
 {
     CHECK(false);
     CHECK_EQUAL(false, true);
@@ -221,7 +221,7 @@ TEST_EX(Failure_Bool, failure_list, true) // Test #1, accum checks = 0 + 13 = 13
     CHECK_GREATER_EQUAL(false, true);
 }
 
-TEST_EX(Success_Int, success_list, true) // Test #2, accum checks = 13 + 12 = 25
+TEST_EX(Success_Int, success_list, true, true) // Test #2, accum checks = 13 + 12 = 25
 {
     CHECK_EQUAL(1,1);
     CHECK_EQUAL(2,2);
@@ -237,7 +237,7 @@ TEST_EX(Success_Int, success_list, true) // Test #2, accum checks = 13 + 12 = 25
     CHECK_GREATER_EQUAL(2,2);
 }
 
-TEST_EX(Failure_Int, failure_list, true) // Test #2, accum checks = 13 + 12 = 25
+TEST_EX(Failure_Int, failure_list, true, true) // Test #2, accum checks = 13 + 12 = 25
 {
     CHECK_EQUAL(1,2);
     CHECK_EQUAL(2,1);
@@ -253,7 +253,7 @@ TEST_EX(Failure_Int, failure_list, true) // Test #2, accum checks = 13 + 12 = 25
     CHECK_GREATER_EQUAL(1,2);
 }
 
-TEST_EX(Success_Float, success_list, true) // Test #3, accum checks = 25 + 32 = 57
+TEST_EX(Success_Float, success_list, true, true) // Test #3, accum checks = 25 + 32 = 57
 {
     CHECK_EQUAL(3.1, 3.1);
     CHECK_EQUAL(3.2, 3.2);
@@ -294,7 +294,7 @@ TEST_EX(Success_Float, success_list, true) // Test #3, accum checks = 25 + 32 = 
     CHECK_DEFINITELY_GREATER(-0.49, -1.00, eps);  // Min error = 0.5
 }
 
-TEST_EX(Failure_Float, failure_list, true) // Test #3, accum checks = 25 + 52 = 77
+TEST_EX(Failure_Float, failure_list, true, true) // Test #3, accum checks = 25 + 52 = 77
 {
     CHECK_EQUAL(3.1, 3.2);
     CHECK_EQUAL(3.2, 3.1);
@@ -355,7 +355,7 @@ TEST_EX(Failure_Float, failure_list, true) // Test #3, accum checks = 25 + 52 = 
     CHECK_DEFINITELY_GREATER(-1.00, -0.49, eps);  // Min error = 0.5
 }
 
-TEST_EX(Success_String, success_list, true) // Test #4, accum checks = 57 + 16 = 73
+TEST_EX(Success_String, success_list, true, true) // Test #4, accum checks = 57 + 16 = 73
 {
     const char* s_1 = "";
     const char* s_2 = "x";
@@ -384,7 +384,7 @@ TEST_EX(Success_String, success_list, true) // Test #4, accum checks = 57 + 16 =
     CHECK_GREATER_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_2.get()));
 }
 
-TEST_EX(Failure_String, failure_list, true) // Test #4, accum checks = 77 + 16 = 93
+TEST_EX(Failure_String, failure_list, true, true) // Test #4, accum checks = 77 + 16 = 93
 {
     const char* s_1 = "";
     const char* s_2 = "x";
@@ -413,7 +413,7 @@ TEST_EX(Failure_String, failure_list, true) // Test #4, accum checks = 77 + 16 =
     CHECK_GREATER(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_2.get()));
 }
 
-TEST_EX(Success_Pointer, success_list, true) // Test #5, accum checks = 73 + 12 = 85
+TEST_EX(Success_Pointer, success_list, true, true) // Test #5, accum checks = 73 + 12 = 85
 {
     int i;
     int* p_1 = nullptr;
@@ -432,7 +432,7 @@ TEST_EX(Success_Pointer, success_list, true) // Test #5, accum checks = 73 + 12 
     CHECK_GREATER_EQUAL(p_2, p_2);
 }
 
-TEST_EX(Failure_Pointer, failure_list, true) // Test #5, accum checks = 93 + 12 = 105
+TEST_EX(Failure_Pointer, failure_list, true, true) // Test #5, accum checks = 93 + 12 = 105
 {
     int i;
     int* p_1 = nullptr;
@@ -474,13 +474,13 @@ void throw_nothing()
 {
 }
 
-TEST_EX(Success_Exception, success_list, true) // Test #6, accum checks = 85 + 2 = 87
+TEST_EX(Success_Exception, success_list, true, true) // Test #6, accum checks = 85 + 2 = 87
 {
     CHECK_THROW(throw_foo(), FooException);
     CHECK_THROW(throw_bar(), BarException);
 }
 
-TEST_EX(Failure_Exception, failure_list, true) // Test #6, accum checks = 105 + 2 = 107
+TEST_EX(Failure_Exception, failure_list, true, true) // Test #6, accum checks = 105 + 2 = 107
 {
     CHECK_THROW(throw_nothing(), FooException);
     CHECK_THROW(throw_nothing(), BarException);
@@ -493,13 +493,13 @@ struct SummaryRecorder: Reporter {
         m_summary(summary)
     {
     }
-    void summary(const Summary& summary) override
+    void summary(const SharedContext&, const Summary& summary) override
     {
         m_summary = summary;
     }
 };
 
-void check_summary(TestResults& test_results, TestList& list,
+void check_summary(TestContext& test_context, TestList& list,
                    int num_included_tests, int num_failed_tests, int num_excluded_tests,
                    int num_checks, int num_failed_checks)
 {
@@ -509,12 +509,12 @@ void check_summary(TestResults& test_results, TestList& list,
     CHECK_EQUAL(num_included_tests, summary.num_included_tests);
     CHECK_EQUAL(num_failed_tests,   summary.num_failed_tests);
     CHECK_EQUAL(num_excluded_tests, summary.num_excluded_tests);
-    CHECK_EQUAL(num_checks,         summary.num_checks);
+    CHECK_EQUAL(num_checks,         summary.num_executed_checks);
     CHECK_EQUAL(num_failed_checks,  summary.num_failed_checks);
 }
 
 
-void check_filtered_summary(TestResults& test_results, TestList& list, const char* filter_str,
+void check_filtered_summary(TestContext& test_context, TestList& list, const char* filter_str,
                             int num_included_tests, int num_failed_tests, int num_excluded_tests,
                             int num_checks, int num_failed_checks)
 {
@@ -525,7 +525,7 @@ void check_filtered_summary(TestResults& test_results, TestList& list, const cha
     CHECK_EQUAL(num_included_tests, summary.num_included_tests);
     CHECK_EQUAL(num_failed_tests,   summary.num_failed_tests);
     CHECK_EQUAL(num_excluded_tests, summary.num_excluded_tests);
-    CHECK_EQUAL(num_checks,         summary.num_checks);
+    CHECK_EQUAL(num_checks,         summary.num_executed_checks);
     CHECK_EQUAL(num_failed_checks,  summary.num_failed_checks);
 }
 
@@ -544,40 +544,40 @@ TEST(Self_Basic)
     CHECK(success_list.run());
     CHECK(!failure_list.run());
 
-    check_summary(test_results, zero_tests_list,        0, 0, 0,   0,   0);
-    check_summary(test_results, zero_checks_list,       1, 0, 0,   0,   0);
-    check_summary(test_results, one_check_success_list, 1, 0, 0,   1,   0);
-    check_summary(test_results, one_check_failure_list, 1, 1, 0,   1,   1);
-    check_summary(test_results, one_test_success_list,  1, 0, 0,   5,   0);
-    check_summary(test_results, one_test_failure_list,  1, 1, 0,   5,   1);
-    check_summary(test_results, few_tests_success_list, 3, 0, 0,  13,   0);
-    check_summary(test_results, few_tests_failure_list, 3, 1, 0,  13,   1);
-    check_summary(test_results, mixed_list,             7, 3, 0,  19,   6);
-    check_summary(test_results, success_list,           6, 0, 0,  87,   0);
-    check_summary(test_results, failure_list,           6, 6, 0, 107, 107);
+    check_summary(test_context, zero_tests_list,        0, 0, 0,   0,   0);
+    check_summary(test_context, zero_checks_list,       1, 0, 0,   0,   0);
+    check_summary(test_context, one_check_success_list, 1, 0, 0,   1,   0);
+    check_summary(test_context, one_check_failure_list, 1, 1, 0,   1,   1);
+    check_summary(test_context, one_test_success_list,  1, 0, 0,   5,   0);
+    check_summary(test_context, one_test_failure_list,  1, 1, 0,   5,   1);
+    check_summary(test_context, few_tests_success_list, 3, 0, 0,  13,   0);
+    check_summary(test_context, few_tests_failure_list, 3, 1, 0,  13,   1);
+    check_summary(test_context, mixed_list,             7, 3, 0,  19,   6);
+    check_summary(test_context, success_list,           6, 0, 0,  87,   0);
+    check_summary(test_context, failure_list,           6, 6, 0, 107, 107);
 
-    check_filtered_summary(test_results, mixed_list, "- *",           0, 0, 7,  0, 0);
-    check_filtered_summary(test_results, mixed_list, "* - *",         0, 0, 7,  0, 0);
-    check_filtered_summary(test_results, mixed_list, "",              7, 3, 0, 19, 6);
-    check_filtered_summary(test_results, mixed_list, "*",             7, 3, 0, 19, 6);
-    check_filtered_summary(test_results, mixed_list, "* -",           7, 3, 0, 19, 6);
-    check_filtered_summary(test_results, mixed_list, "-",             7, 3, 0, 19, 6);
-    check_filtered_summary(test_results, mixed_list, "Mixed_*",       7, 3, 0, 19, 6);
-    check_filtered_summary(test_results, mixed_list, "Mixed_* -",     7, 3, 0, 19, 6);
-    check_filtered_summary(test_results, mixed_list, "Mixed_1_X",     1, 0, 6,  4, 0);
-    check_filtered_summary(test_results, mixed_list, "Mixed_2_Y",     1, 1, 6,  4, 1);
-    check_filtered_summary(test_results, mixed_list, "Mixed_3_X",     1, 0, 6,  0, 0);
-    check_filtered_summary(test_results, mixed_list, "Mixed_4_Y",     1, 1, 6,  3, 3);
-    check_filtered_summary(test_results, mixed_list, "Mixed_5_X",     1, 1, 6,  4, 2);
-    check_filtered_summary(test_results, mixed_list, "Mixed_6_Y",     1, 0, 6,  0, 0);
-    check_filtered_summary(test_results, mixed_list, "Mixed_7_Y",     1, 0, 6,  4, 0);
-    check_filtered_summary(test_results, mixed_list, "Mixed_*_X",     3, 1, 4,  8, 2);
-    check_filtered_summary(test_results, mixed_list, "Mixed_*_Y",     4, 2, 3, 11, 4);
-    check_filtered_summary(test_results, mixed_list, "* - Mixed_*_X", 4, 2, 3, 11, 4);
-    check_filtered_summary(test_results, mixed_list, "* - Mixed_*_Y", 3, 1, 4,  8, 2);
-    check_filtered_summary(test_results, mixed_list,
+    check_filtered_summary(test_context, mixed_list, "- *",           0, 0, 7,  0, 0);
+    check_filtered_summary(test_context, mixed_list, "* - *",         0, 0, 7,  0, 0);
+    check_filtered_summary(test_context, mixed_list, "",              7, 3, 0, 19, 6);
+    check_filtered_summary(test_context, mixed_list, "*",             7, 3, 0, 19, 6);
+    check_filtered_summary(test_context, mixed_list, "* -",           7, 3, 0, 19, 6);
+    check_filtered_summary(test_context, mixed_list, "-",             7, 3, 0, 19, 6);
+    check_filtered_summary(test_context, mixed_list, "Mixed_*",       7, 3, 0, 19, 6);
+    check_filtered_summary(test_context, mixed_list, "Mixed_* -",     7, 3, 0, 19, 6);
+    check_filtered_summary(test_context, mixed_list, "Mixed_1_X",     1, 0, 6,  4, 0);
+    check_filtered_summary(test_context, mixed_list, "Mixed_2_Y",     1, 1, 6,  4, 1);
+    check_filtered_summary(test_context, mixed_list, "Mixed_3_X",     1, 0, 6,  0, 0);
+    check_filtered_summary(test_context, mixed_list, "Mixed_4_Y",     1, 1, 6,  3, 3);
+    check_filtered_summary(test_context, mixed_list, "Mixed_5_X",     1, 1, 6,  4, 2);
+    check_filtered_summary(test_context, mixed_list, "Mixed_6_Y",     1, 0, 6,  0, 0);
+    check_filtered_summary(test_context, mixed_list, "Mixed_7_Y",     1, 0, 6,  4, 0);
+    check_filtered_summary(test_context, mixed_list, "Mixed_*_X",     3, 1, 4,  8, 2);
+    check_filtered_summary(test_context, mixed_list, "Mixed_*_Y",     4, 2, 3, 11, 4);
+    check_filtered_summary(test_context, mixed_list, "* - Mixed_*_X", 4, 2, 3, 11, 4);
+    check_filtered_summary(test_context, mixed_list, "* - Mixed_*_Y", 3, 1, 4,  8, 2);
+    check_filtered_summary(test_context, mixed_list,
                            "Mixed_1_X Mixed_3_X Mixed_5_X",           3, 1, 4,  8, 2);
-    check_filtered_summary(test_results, mixed_list,
+    check_filtered_summary(test_context, mixed_list,
                            "* - Mixed_1_X Mixed_3_X Mixed_5_X",       4, 2, 3, 11, 4);
 }
 

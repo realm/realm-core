@@ -23,7 +23,7 @@ using namespace realm::test_util;
     // Override point for customization after application launch.
     self.window.backgroundColor = [UIColor whiteColor];
     [self.window makeKeyAndVisible];
-    
+
     // Set the path prefix.
     string path_prefix = [NSTemporaryDirectory() UTF8String];
     set_test_path_prefix(path_prefix);
@@ -34,7 +34,7 @@ using namespace realm::test_util;
 
     // Run the tests.
     test_all(0, NULL);
-    
+
     // Report to stdout.
     std::cout << "====================" << std::endl;
     std::ifstream if_xml(path_prefix + "unit-test-report.xml", std::ios_base::binary);
@@ -54,7 +54,7 @@ using namespace realm::test_util;
 
 - (void)applicationDidEnterBackground:(UIApplication *)application
 {
-    // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later. 
+    // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
     // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
 }
 

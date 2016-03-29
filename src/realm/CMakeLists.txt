@@ -11,7 +11,7 @@ set(REALM_SOURCES
     util/network.cpp
     util/event_loop.cpp
     util/uri.cpp
-    util/platform_specific_condvar.cpp
+    util/interprocess_condvar.cpp
     alloc.cpp
     alloc_slab.cpp
     array.cpp
@@ -40,6 +40,7 @@ set(REALM_SOURCES
     impl/output_stream.cpp
     impl/transact_log.cpp
     impl/simulated_failure.cpp
+    impl/continuous_transactions_history.cpp
     importer.cpp
     index_string.cpp
     lang_bind_helper.cpp
@@ -55,6 +56,7 @@ set(REALM_SOURCES
     version.cpp
     views.cpp
     replication.cpp
+    history.cpp
     commit_log.cpp
     disable_sync_to_disk.cpp
 ) # REALM_SOURCES
@@ -85,7 +87,8 @@ set(REALM_INSTALL_HEADERS
     util/uri.hpp
     util/utf8.hpp
     util/priority_queue.hpp
-    util/platform_specific_condvar.hpp
+    util/interprocess_condvar.hpp
+    util/interprocess_mutex.hpp
     util/file_mapper.hpp
     util/encrypted_file_mapping.hpp
     util/miscellaneous.hpp
@@ -106,6 +109,8 @@ set(REALM_INSTALL_HEADERS
     string_data.hpp
     impl/input_stream.hpp
     impl/transact_log.hpp
+    impl/continuous_transactions_history.hpp
+    null.hpp
     binary_data.hpp
     mixed.hpp
     owned_data.hpp
@@ -125,6 +130,7 @@ set(REALM_INSTALL_HEADERS
     history.hpp
     handover_defs.hpp
     replication.hpp
+    history.hpp
     query.hpp
     query_conditions.hpp
     lang_bind_helper.hpp

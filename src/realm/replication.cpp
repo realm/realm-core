@@ -2,7 +2,6 @@
 #include <utility>
 #include <iomanip>
 
-
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/descriptor.hpp>
@@ -18,11 +17,6 @@ void Replication::set_replication(Group& group, Replication* repl) noexcept
 {
     typedef _impl::GroupFriend gf;
     gf::set_replication(group, repl);
-}
-
-Replication::version_type Replication::get_current_version(SharedGroup& sg)
-{
-    return sg.get_current_version();
 }
 
 
@@ -384,9 +378,9 @@ public:
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
                 log("desc->insert_column(%1, %2, \"%3\", %4);", col_ndx, data_type_to_str(type),
                     name, nullable); // Throws
-                Table* link_target_table = nullptr;
+                LinkTargetInfo invalid_link;
                 using tf = _impl::TableFriend;
-                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, link_target_table, nullable); // Throws
+                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, invalid_link, nullable); // Throws
                 return true;
             }
         }
@@ -394,16 +388,17 @@ public:
     }
 
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
-                       size_t link_target_table_ndx, size_t)
+                       size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
         if (REALM_LIKELY(m_desc)) {
             if (REALM_LIKELY(col_ndx <= m_desc->get_column_count())) {
-                log("desc->insert_column_link(%1, %2, \"%3\", group->get_table(%4));", col_ndx,
-                    data_type_to_str(type), name, link_target_table_ndx); // Throws
+                log("desc->insert_column_link(%1, %2, \"%3\", LinkTargetInfo(group->get_table(%4), %5));",
+                    col_ndx, data_type_to_str(type), name, link_target_table_ndx, backlink_col_ndx); // Throws
                 using gf = _impl::GroupFriend;
                 using tf = _impl::TableFriend;
                 Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
-                tf::insert_column(*m_desc, col_ndx, type, name, link_target_table); // Throws
+                LinkTargetInfo link(link_target_table, backlink_col_ndx);
+                tf::insert_column(*m_desc, col_ndx, type, name, link); // Throws
                 return true;
             }
         }
@@ -769,34 +764,38 @@ void TrivialReplication::apply_changeset(const char* data, size_t size, SharedGr
     wt.commit(); // Throws
 }
 
-std::string TrivialReplication::do_get_database_path()
+std::string TrivialReplication::get_database_path()
 {
     return m_database_file;
 }
 
-void TrivialReplication::do_initiate_transact(SharedGroup&, version_type)
+void TrivialReplication::initialize(SharedGroup&)
+{
+    // Nothing needs to be done here
+}
+
+void TrivialReplication::do_initiate_transact(version_type, bool history_updated)
 {
     char* data = m_transact_log_buffer.data();
     size_t size = m_transact_log_buffer.size();
     set_buffer(data, data + size);
+    m_history_updated = history_updated;
 }
 
-Replication::version_type
-TrivialReplication::do_prepare_commit(SharedGroup&, version_type orig_version)
+Replication::version_type TrivialReplication::do_prepare_commit(version_type orig_version)
 {
     char* data = m_transact_log_buffer.data();
     size_t size = write_position() - data;
-    version_type new_version = orig_version + 1;
-    prepare_changeset(data, size, new_version); // Throws
+    version_type new_version = prepare_changeset(data, size, orig_version); // Throws
     return new_version;
 }
 
-void TrivialReplication::do_finalize_commit(SharedGroup&) noexcept
+void TrivialReplication::do_finalize_commit() noexcept
 {
     finalize_changeset();
 }
 
-void TrivialReplication::do_abort_transact(SharedGroup&) noexcept
+void TrivialReplication::do_abort_transact() noexcept
 {
 }
 

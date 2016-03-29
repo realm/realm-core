@@ -27,10 +27,12 @@
 #include <limits>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#include <realm/util/platform_specific_condvar.hpp>
+#ifndef _WIN32
+#include <realm/util/interprocess_condvar.hpp>
+#endif
+#include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
-#include <realm/history.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/replication.hpp>
 
@@ -44,8 +46,8 @@ class WriteLogCollector;
 /// Thrown by SharedGroup::open() if the lock file is already open in another
 /// process which can't share mutexes with this process
 struct IncompatibleLockFile: std::runtime_error {
-    IncompatibleLockFile():
-        std::runtime_error("Incompatible lock file")
+    IncompatibleLockFile(const std::string& msg):
+        std::runtime_error("Incompatible lock file. " + msg)
     {
     }
 };
@@ -70,7 +72,7 @@ struct IncompatibleLockFile: std::runtime_error {
 /// stopped (end_read(), commit(), rollback()).
 ///
 /// If a transaction is active when the SharedGroup is destroyed, that
-/// transaction is implicitely terminated, either by a call to
+/// transaction is implicitly terminated, either by a call to
 /// end_read() or rollback().
 ///
 /// Two processes that want to share a database file must reside on
@@ -80,30 +82,30 @@ struct IncompatibleLockFile: std::runtime_error {
 /// Desired exception behavior (not yet fully implemented)
 /// ------------------------------------------------------
 ///
-///  - If any data access API function throws an unexpcted exception during a
+///  - If any data access API function throws an unexpected exception during a
 ///    read transaction, the shared group accessor is left in state "error
 ///    during read".
 ///
-///  - If any data access API function throws an unexpcted exception during a
+///  - If any data access API function throws an unexpected exception during a
 ///    write transaction, the shared group accessor is left in state "error
 ///    during write".
 ///
-///  - If GroupShared::begin_write() or GroupShared::begin_read() throws an
-///    unexpcted exception, the shared group accessor is left in state "no
+///  - If SharedGroup::begin_write() or SharedGroup::begin_read() throws an
+///    unexpected exception, the shared group accessor is left in state "no
 ///    transaction in progress".
 ///
-///  - GroupShared::end_read() and GroupShared::rollback() do not throw.
+///  - SharedGroup::end_read() and SharedGroup::rollback() do not throw.
 ///
-///  - If GroupShared::commit() throws an unexpcted exception, the shared group
+///  - If SharedGroup::commit() throws an unexpected exception, the shared group
 ///    accessor is left in state "error during write" and the transaction was
-///    not comitted.
+///    not committed.
 ///
-///  - If GroupShared::advance_read() or GroupShared::promote_to_write() throws
-///    an unexpcted exception, the shared group accessor is left in state "error
+///  - If SharedGroup::advance_read() or SharedGroup::promote_to_write() throws
+///    an unexpected exception, the shared group accessor is left in state "error
 ///    during read".
 ///
-///  - If GroupShared::commit_and_continue_as_read() or
-///    GroupShared::rollback_and_continue_as_read() throws an unexpcted
+///  - If SharedGroup::commit_and_continue_as_read() or
+///    SharedGroup::rollback_and_continue_as_read() throws an unexpected
 ///    exception, the shared group accessor is left in state "error during
 ///    write".
 ///
@@ -120,14 +122,14 @@ struct IncompatibleLockFile: std::runtime_error {
 ///
 ///  - In state "error during read", almost all Realm API functions are
 ///    illegal on the connected group of accessors. The only valid operations
-///    are destruction of the shared group, and GroupShared::end_read(). If
-///    GroupShared::end_read() is called, the new state becomes "no transaction
+///    are destruction of the shared group, and SharedGroup::end_read(). If
+///    SharedGroup::end_read() is called, the new state becomes "no transaction
 ///    in progress".
 ///
 ///  - In state "error during write", almost all Realm API functions are
 ///    illegal on the connected group of accessors. The only valid operations
-///    are destruction of the shared group, and GroupShared::rollback(). If
-///    GroupShared::end_write() is called, the new state becomes "no transaction
+///    are destruction of the shared group, and SharedGroup::rollback(). If
+///    SharedGroup::end_write() is called, the new state becomes "no transaction
 ///    in progress"
 class SharedGroup {
 public:
@@ -137,17 +139,19 @@ public:
         durability_Async    ///< Not yet supported on windows.
     };
 
-    /// \brief Same as calling the corrsponding version of open() on a instance
+    /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr,
+                         bool allow_file_format_upgrade = true);
 
-    /// \brief Same as calling the corrsponding version of open() on a instance
+    /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
+                         const char* encryption_key = nullptr,
+                         bool allow_file_format_upgrade = true);
 
     struct unattached_tag {};
 
@@ -176,7 +180,7 @@ public:
     /// specify the same durability level, otherwise an exception will be
     /// thrown.
     ///
-    /// If \a allow_file_format_ugrade is set to `true`, this function will
+    /// If \a allow_file_format_upgrade is set to `true`, this function will
     /// automatically upgrade the file format used in the specified Realm file
     /// if necessary (and if it is possible). In order to prevent this, set \a
     /// allow_upgrade to `false`.
@@ -206,7 +210,7 @@ public:
               const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication instance
-    /// must remain in exixtence for as long as the SharedGroup.
+    /// must remain in existence for as long as the SharedGroup.
     void open(Replication&, DurabilityLevel = durability_Full,
               const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
@@ -245,7 +249,8 @@ public:
     /// NOTE:
     /// "changed" means that one or more commits has been made to the database
     /// since the SharedGroup (on which wait_for_change() is called) last
-    /// started, committed, promoted or advanced a transaction.
+    /// started, committed, promoted or advanced a transaction. If the SharedGroup
+    /// has not yet begun a transaction, "changed" is undefined.
     ///
     /// No distinction is made between changes done by another process
     /// and changes done by another thread in the same process as the caller.
@@ -253,7 +258,6 @@ public:
     /// Has db been changed ?
     bool has_changed();
 
-#if !REALM_PLATFORM_APPLE
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to wait_for_change_release()
     /// further calls to wait_for_change() will return immediately. To restore
@@ -266,14 +270,16 @@ public:
 
     /// re-enable waiting for change
     void enable_wait_for_change();
-#endif // !REALM_PLATFORM_APPLE
     // Transactions:
 
-    struct VersionID {
-        uint_fast64_t version;
-        uint_fast32_t index;
+    using version_type = _impl::History::version_type;
 
-        explicit VersionID(uint_fast64_t version = 0, uint_fast32_t index = 0)
+    struct VersionID {
+        version_type version = std::numeric_limits<version_type>::max();
+        uint_fast32_t index   = 0;
+
+        VersionID() {}
+        VersionID(version_type version, uint_fast32_t index)
         {
             this->version = version;
             this->index = index;
@@ -286,8 +292,6 @@ public:
         bool operator>(const VersionID& other) { return version > other.version; }
         bool operator>=(const VersionID& other) { return version >= other.version; }
     };
-
-    using version_type = History::version_type;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
@@ -319,7 +323,7 @@ public:
     ///
     /// end_read() terminates the active read transaction. If no read
     /// transaction is active, end_read() does nothing. It is an error to call
-    /// this function on a SharedGRoup object with an active write
+    /// this function on a SharedGroup object with an active write
     /// transaction. end_read() does not throw.
     ///
     /// commit() commits all changes performed in the context of the active
@@ -349,7 +353,7 @@ public:
     /// transaction, which means that they can no longer be used to access the
     /// underlying objects.
     ///
-    /// Subordinate accessors that were detatched at the end of the previous
+    /// Subordinate accessors that were detached at the end of the previous
     /// read or write transaction will not be automatically reattached when a
     /// new transaction is initiated. The application must reobtain new
     /// accessors during a new transaction to regain access to the underlying
@@ -397,14 +401,14 @@ public:
     /// - The method will throw if called in unattached state.
     /// - The method will return false if other SharedGroups are accessing the database
     ///   in which case compaction is not done. This is not necessarily an error.
-    /// It will return true following succesful compaction.
+    /// It will return true following successful compaction.
     /// While compaction is in progress, attempts by other
     /// threads or processes to open the database will wait.
     /// Be warned that resource requirements for compaction is proportional to the amount
     /// of live data in the database.
-    /// Compaction works by writing the database contents to a temporary databasefile and
+    /// Compaction works by writing the database contents to a temporary database file and
     /// then replacing the database with the temporary one. The name of the temporary
-    /// file is formed by appending ".tmp_compaction_space" to the name of the databse
+    /// file is formed by appending ".tmp_compaction_space" to the name of the database
     ///
     /// FIXME: This function is not yet implemented in an exception-safe manner,
     /// therefore, if it throws, the application should not attempt to
@@ -444,7 +448,7 @@ public:
     ///   ConstSourcePayload::Stay.
     ///
     /// For all other (non-TableView) accessors, handover is done with payload copy,
-    /// since the payload is trival.
+    /// since the payload is trivial.
     ///
     /// Handover *without* payload is useful when you want to ship a tableview with its query for
     /// execution in a background thread. Handover with *payload move* is useful when you want to
@@ -471,7 +475,7 @@ public:
     /// a tableview dependent upon another tableview and using MutableSourcePayload::Move,
     /// you are on thin ice!
     ///
-    /// On the importing side, the toplevel accessor being created during import takes ownership
+    /// On the importing side, the top-level accessor being created during import takes ownership
     /// of all other accessors (if any) being created as part of the import.
 
     /// Type used to support handover of accessors between shared groups.
@@ -511,42 +515,42 @@ private:
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
-        uint_fast64_t   m_version;
-        uint_fast32_t   m_reader_idx;
-        ref_type        m_top_ref;
-        size_t          m_file_size;
-        // FIXME: Bad initialization as size_t is not necessarily equal to uint_fast64_t.
-        ReadLockInfo() : m_version(std::numeric_limits<size_t>::max()),
-                         m_reader_idx(0), m_top_ref(0), m_file_size(0) {};
+        uint_fast64_t   m_version    = std::numeric_limits<version_type>::max();
+        uint_fast32_t   m_reader_idx = 0;
+        ref_type        m_top_ref    = 0;
+        size_t          m_file_size  = 0;
     };
     class ReadLockUnlockGuard;
 
     // Member variables
-    Group      m_group;
-    ReadLockInfo m_readlock;
-    uint_fast32_t   m_local_max_entry;
+    Group m_group;
+    ReadLockInfo m_read_lock;
+    uint_fast32_t m_local_max_entry;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
     bool m_wait_for_change_enabled;
     std::string m_lockfile_path;
+    std::string m_lockfile_prefix;
     std::string m_db_path;
+    std::string m_coordination_dir;
     const char* m_key;
     TransactStage m_transact_stage;
     util::Mutex m_handover_lock;
+    util::InterprocessMutex m_writemutex;
+    util::InterprocessMutex m_balancemutex;
+    util::InterprocessMutex m_controlmutex;
 #ifndef _WIN32
-    util::PlatformSpecificCondVar m_room_to_write;
-    util::PlatformSpecificCondVar m_work_to_do;
-    util::PlatformSpecificCondVar m_daemon_becomes_ready;
-    util::PlatformSpecificCondVar m_new_commit_available;
+    util::InterprocessCondVar m_room_to_write;
+    util::InterprocessCondVar m_work_to_do;
+    util::InterprocessCondVar m_daemon_becomes_ready;
+    util::InterprocessCondVar m_new_commit_available;
 #endif
 
-    void do_open_1(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
-                   const char* encryption_key, bool allow_file_format_upgrade);
-    void do_open_2(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
-                   const char* encryption_key);
+    void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
+                 const char* encryption_key, bool allow_file_format_upgrade);
 
-    // Ring buffer managment
+    // Ring buffer management
     bool        ringbuf_is_empty() const noexcept;
     size_t ringbuf_size() const noexcept;
     size_t ringbuf_capacity() const noexcept;
@@ -559,34 +563,37 @@ private:
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
-    // Grab the latest readlock and update readlock info. Compare latest against
-    // current (before updating) and determine if the version is the same as before.
-    // As a side effect update memory mapping to ensure that the ringbuffer entries
-    // referenced in the readlock info is accessible.
-    // The caller may provide an uninitialized readlock in which case same_as_before
-    // is given an undefined value.
-    void grab_latest_readlock(ReadLockInfo& readlock, bool& same_as_before);
+    /// Grab a read lock on the snapshot associated with the specified
+    /// version. If `version_id == VersionID()`, a read lock will be grabbed on
+    /// the latest available snapshot. Fails if the snapshot is no longer
+    /// available.
+    ///
+    /// As a side effect update memory mapping to ensure that the ringbuffer entries
+    /// referenced in the readlock info is accessible.
+    ///
+    /// FIXME: It needs to be made more clear exactly under which conditions
+    /// this function fails. Also, why is it useful to promise anything about
+    /// detection of bad versions? Can we really promise enough to make such a
+    /// promise useful to the caller?
+    void grab_read_lock(ReadLockInfo&, VersionID);
 
-    // Try to grab a readlock for a specific version. Fails if the version is no longer
-    // accessible.
-    bool grab_specific_readlock(ReadLockInfo& readlock, bool& same_as_before,
-                                VersionID specific_version);
+    // Release a specific read lock. The read lock MUST have been obtained by a
+    // call to grab_read_lock().
+    void release_read_lock(ReadLockInfo&) noexcept;
 
-    // Release a specific readlock. The readlock info MUST have been obtained by a
-    // call to grab_latest_readlock() or grab_specific_readlock().
-    void release_readlock(ReadLockInfo& readlock) noexcept;
-
-    void do_begin_read(VersionID);
+    void do_begin_read(VersionID, bool writable);
     void do_end_read() noexcept;
     void do_begin_write();
     version_type do_commit();
     void do_end_write() noexcept;
 
-public:
-    // return the current version of the database - note, this is not necessarily
-    // the version seen by any currently open transactions.
-    uint_fast64_t get_current_version();
-private:
+    /// Returns the version of the latest snapshot.
+    version_type get_version_of_latest_snapshot();
+
+    /// Returns the version of the snapshot bound in the current read or write
+    /// transaction. It is an error to call this function when no transaction is
+    /// in progress.
+    version_type get_version_of_bound_snapshot() const noexcept;
 
     // make sure the given index is within the currently mapped area.
     // if not, expand the mapped area. Returns true if the area is expanded.
@@ -598,25 +605,26 @@ private:
 
     void do_async_commits();
 
-    void upgrade_file_format(bool allow_file_format_upgrade);
+    void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version);
 
     //@{
     /// See LangBindHelper.
-    template<class O>
-    void advance_read(History&, O* observer, VersionID);
-
-    template<class O>
-    void promote_to_write(History&, O* observer);
-    void commit_and_continue_as_read();
-    template<class O>
-    void rollback_and_continue_as_read(History&, O* observer);
+    template<class O> void advance_read(O* observer, VersionID);
+    template<class O> void promote_to_write(O* observer);
+    version_type commit_and_continue_as_read();
+    template<class O> void rollback_and_continue_as_read(O* observer);
     //@}
 
-    // Advance the readlock to the given version and return the transaction logs
-    // between the old version and the given version, or nullptr if none.
-    std::unique_ptr<BinaryData[]> advance_readlock(History&, VersionID specific_version);
+    /// Returns true if, and only if _impl::History::update_early_from_top_ref()
+    /// was called during the execution of this function.
+    template<class O> bool do_advance_read(O* observer, VersionID, _impl::History&);
 
-    int get_file_format() const noexcept;
+    /// If there is an associated \ref Replication object, then this function
+    /// returns `repl->get_history()` where `repl` is that Replication object,
+    /// otherwise this function returns null.
+    _impl::History* get_history();
+
+    int get_file_format_version() const noexcept;
 
     friend class _impl::SharedGroupFriend;
 };
@@ -658,6 +666,9 @@ public:
     }
 
     const Group& get_group() const noexcept;
+
+    /// Get the version of the snapshot to which this read transaction is bound.
+    SharedGroup::version_type get_version() const noexcept;
 
 private:
     SharedGroup& m_shared_group;
@@ -723,6 +734,10 @@ public:
 
     Group& get_group() const noexcept;
 
+    /// Get the version of the snapshot on which this write transaction is
+    /// based.
+    SharedGroup::version_type get_version() const noexcept;
+
     SharedGroup::version_type commit()
     {
         REALM_ASSERT(m_shared_group);
@@ -779,8 +794,8 @@ inline void SharedGroup::open(const std::string& path, bool no_create_file,
     // it must leave the file closed.
 
     bool is_backend = false;
-    do_open_1(path, no_create_file, durability, is_backend, encryption_key,
-              allow_file_format_upgrade); // Throws
+    do_open(path, no_create_file, durability, is_backend, encryption_key,
+            allow_file_format_upgrade); // Throws
 }
 
 inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
@@ -790,13 +805,17 @@ inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
     // it must leave the file closed.
 
     REALM_ASSERT(!is_attached());
+
+    repl.initialize(*this); // Throws
+
+    typedef _impl::GroupFriend gf;
+    gf::set_replication(m_group, &repl);
+
     std::string file = repl.get_database_path();
     bool no_create   = false;
     bool is_backend  = false;
-    typedef _impl::GroupFriend gf;
-    gf::set_replication(m_group, &repl);
-    do_open_1(file, no_create, durability, is_backend, encryption_key,
-              allow_file_format_upgrade); // Throws
+    do_open(file, no_create, durability, is_backend, encryption_key,
+            allow_file_format_upgrade); // Throws
 }
 
 inline bool SharedGroup::is_attached() const noexcept
@@ -809,6 +828,11 @@ inline SharedGroup::TransactStage SharedGroup::get_transact_stage() const noexce
     return m_transact_stage;
 }
 
+inline SharedGroup::version_type SharedGroup::get_version_of_bound_snapshot() const noexcept
+{
+    return m_read_lock.m_version;
+}
+
 class SharedGroup::ReadLockUnlockGuard {
 public:
     ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept:
@@ -819,7 +843,7 @@ public:
     ~ReadLockUnlockGuard() noexcept
     {
         if (m_read_lock)
-            m_shared_group.release_readlock(*m_read_lock);
+            m_shared_group.release_read_lock(*m_read_lock);
     }
     void release() noexcept
     {
@@ -847,7 +871,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
     std::unique_ptr<Handover<T>> result(new Handover<T>());
     // Implementation note:
     // often, the return value from clone will be T*, BUT it may be ptr to some base of T
-    // instead, so we must cast it to T*. This is alway safe, because no matter the type,
+    // instead, so we must cast it to T*. This is always safe, because no matter the type,
     // clone() will clone the actual accessor instance, and hence return an instance of the
     // same type.
     result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
@@ -896,58 +920,48 @@ std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup
     return result;
 }
 
-
 template<class O>
-inline void SharedGroup::advance_read(History& history, O* observer, VersionID version)
+inline void SharedGroup::advance_read(O* observer, VersionID version_id)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    util::LockGuard lg(m_handover_lock);
-    ReadLockInfo old_readlock = m_readlock;
-    std::unique_ptr<BinaryData[]> changesets = advance_readlock(history, version); // Throws
-    ReadLockUnlockGuard rlug(*this, old_readlock);
-    if (!changesets)
-        return;
-    size_t num_changesets = size_t(m_readlock.m_version - old_readlock.m_version);
-    const BinaryData* changesets_begin = changesets.get();
-    const BinaryData* changesets_end = changesets_begin + num_changesets;
+    // It is an error if the new version precedes the currently bound one.
+    if (version_id.version < m_read_lock.m_version)
+        throw LogicError(LogicError::bad_version);
 
-    if (observer) {
-        try {
-            _impl::TransactLogParser parser;
-            _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-            parser.parse(in, *observer); // Throws
-            observer->parse_complete(); // Throws
-        }
-        catch (...) {
-            release_readlock(m_readlock);
-            m_readlock = old_readlock;
-            rlug.release();
-            throw;
-        }
-    }
+    _impl::History* hist = get_history(); // Throws
+    if (!hist)
+        throw LogicError(LogicError::no_history);
 
-    _impl::MultiLogNoCopyInputStream in(changesets_begin, changesets_end);
-    using gf = _impl::GroupFriend;
-    gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size, in); // Throws
+    do_advance_read(observer, version_id, *hist); // Throws
 }
 
 template<class O>
-inline void SharedGroup::promote_to_write(History& history, O* observer)
+inline void SharedGroup::promote_to_write(O* observer)
 {
     if (m_transact_stage != transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
+
+    _impl::History* hist = get_history(); // Throws
+    if (!hist)
+        throw LogicError(LogicError::no_history);
 
     do_begin_write(); // Throws
     try {
         VersionID version = VersionID(); // Latest
-        advance_read(history, observer, version); // Throws
+        bool history_updated = do_advance_read(observer, version, *hist); // Throws
 
         Replication* repl = m_group.get_replication();
-        REALM_ASSERT(repl);
-        version_type current_version = m_readlock.m_version;
-        repl->initiate_transact(*this, current_version); // Throws
+        REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
+        version_type current_version = m_read_lock.m_version;
+        repl->initiate_transact(current_version, history_updated); // Throws
+
+        // If the group has no top array (top_ref == 0), create a new node
+        // structure for an empty group now, to be ready for modifications. See
+        // also Group::attach_shared().
+        using gf = _impl::GroupFriend;
+        gf::create_empty_group_when_missing(m_group); // Throws
     }
     catch (...) {
         do_end_write();
@@ -957,40 +971,15 @@ inline void SharedGroup::promote_to_write(History& history, O* observer)
     m_transact_stage = transact_Writing;
 }
 
-inline void SharedGroup::commit_and_continue_as_read()
-{
-    if (m_transact_stage != transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
-
-    util::LockGuard lg(m_handover_lock);
-    do_commit(); // Throws
-
-    // advance readlock but dont update accessors:
-    // As this is done under lock, along with the addition above of the newest commit,
-    // we know for certain that the readlock we will grab WILL refer to our own newly
-    // completed commit.
-    release_readlock(m_readlock);
-
-    bool dummy;
-    grab_latest_readlock(m_readlock, dummy); // Throws
-
-    do_end_write();
-
-    // Free memory that was allocated during the write transaction.
-    using gf = _impl::GroupFriend;
-    gf::reset_free_space_tracking(m_group); // Throws
-
-    // Remap file if it has grown, and update refs in underlying node structure
-    gf::remap_and_update_refs(m_group, m_readlock.m_top_ref, m_readlock.m_file_size); // Throws
-
-    m_transact_stage = transact_Reading;
-}
-
 template<class O>
-inline void SharedGroup::rollback_and_continue_as_read(History& history, O* observer)
+inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
+
+    _impl::History* hist = get_history(); // Throws
+    if (!hist)
+        throw LogicError(LogicError::no_history);
 
     util::LockGuard lg(m_handover_lock);
 
@@ -998,7 +987,7 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
     using gf = _impl::GroupFriend;
     gf::reset_free_space_tracking(m_group); // Throws
 
-    BinaryData uncommitted_changes = history.get_uncommitted_changes();
+    BinaryData uncommitted_changes = hist->get_uncommitted_changes();
 
     // FIXME: We are currently creating two transaction log parsers, one here,
     // and one in advance_transact(). That is wasteful as the parser creation is
@@ -1014,67 +1003,89 @@ inline void SharedGroup::rollback_and_continue_as_read(History& history, O* obse
         observer->parse_complete(); // Throws
     }
 
+    ref_type top_ref = m_read_lock.m_top_ref;
+    size_t file_size = m_read_lock.m_file_size;
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
-    gf::advance_transact(m_group, m_readlock.m_top_ref, m_readlock.m_file_size,
-                         reversed_in); // Throws
+    gf::advance_transact(m_group, top_ref, file_size, reversed_in); // Throws
 
     do_end_write();
 
     Replication* repl = gf::get_replication(m_group);
-    REALM_ASSERT(repl);
-    repl->abort_transact(*this);
+    REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
+    repl->abort_transact();
 
     m_transact_stage = transact_Reading;
 }
 
-inline void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade)
+template<class O>
+inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist)
 {
-    // In a multithreaded scenario multiple threads may set upgrade = true, but
-    // that is ok, because the condition is later rechecked in a fully reliable
-    // way inside a transaction.
-
-    // Please revisit upgrade logic when library_file_format is bumped beyond 3
-    REALM_ASSERT(SlabAlloc::library_file_format == 3);
-
-    // First a non-threadsafe but fast check
-    int file_format = m_group.get_file_format();
-    REALM_ASSERT(file_format <= SlabAlloc::library_file_format);
-    bool upgrade = (file_format < SlabAlloc::library_file_format);
-    if (upgrade) {
-
-#ifdef REALM_DEBUG
-        // Sleep 0.2 seconds to create a simple thread-barrier for the two threads in the
-        // TEST(Upgrade_Database_2_3_Writes_New_File_Format_new) unit test. See the unit test for details.
-#ifdef _WIN32
-        _sleep(200);
-#else
-        // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
-        timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 200000000;
-        nanosleep(&ts, 0);
-#endif
-#endif
-
-        // Exception safety: It is important that m_group.set_file_format() is
-        // called only when the upgrade operation has completed successfully,
-        // otherwise then next call to SharedGroup::open() will see the wrong
-        // value.
-
-        WriteTransaction wt(*this);
-        if (m_group.get_committed_file_format() != SlabAlloc::library_file_format) {
-            if (!allow_file_format_upgrade)
-                throw FileFormatUpgradeRequired();
-            m_group.upgrade_file_format(); // Throws
-            commit(); // Throws
-            m_group.set_file_format(SlabAlloc::library_file_format);
-        }
+    util::LockGuard lg(m_handover_lock);
+    ReadLockInfo new_read_lock;
+    grab_read_lock(new_read_lock, version_id); // Throws
+    REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
+    if (new_read_lock.m_version == m_read_lock.m_version) {
+        release_read_lock(new_read_lock);
+        return false; // _impl::History::update_early_from_top_ref() was not called
     }
+
+    ReadLockUnlockGuard g(*this, new_read_lock);
+    {
+        version_type new_version = new_read_lock.m_version;
+        size_t new_file_size = new_read_lock.m_file_size;
+        ref_type new_top_ref = new_read_lock.m_top_ref;
+        hist.update_early_from_top_ref(new_version, new_file_size, new_top_ref); // Throws
+    }
+
+    if (observer) {
+        // This has to happen in the context of the originally bound snapshot
+        // and while the read transaction is still in a fully functional state.
+        _impl::TransactLogParser parser;
+        version_type old_version = m_read_lock.m_version;
+        version_type new_version = new_read_lock.m_version;
+        _impl::ChangesetInputStream in(hist, old_version, new_version);
+        parser.parse(in, *observer); // Throws
+        observer->parse_complete(); // Throws
+    }
+
+    // The old read lock must be retained for as long as the change history is
+    // accessed (until Group::advance_transact() returns). This ensures that the
+    // oldest needed changeset remains in the history, even when the history is
+    // implemented as a separate unversioned entity outside the Realm (i.e., the
+    // old implementation and ShortCircuitHistory in
+    // test_lang_Bind_helper.cpp). On the other hand, if it had been the case,
+    // that the history was always implemented as a versioned entity, that was
+    // part of the Realm state, then it would not have been necessary to retain
+    // the old read lock beyond this point.
+
+    {
+        version_type old_version = m_read_lock.m_version;
+        version_type new_version = new_read_lock.m_version;
+        ref_type new_top_ref = new_read_lock.m_top_ref;
+        size_t new_file_size = new_read_lock.m_file_size;
+        _impl::ChangesetInputStream in(hist, old_version, new_version);
+        m_group.advance_transact(new_top_ref, new_file_size, in); // Throws
+    }
+
+    g.release();
+    release_read_lock(m_read_lock);
+    m_read_lock = new_read_lock;
+
+    return true; // _impl::History::update_early_from_top_ref() was called
 }
 
-inline int SharedGroup::get_file_format() const noexcept
+inline _impl::History* SharedGroup::get_history()
 {
-    return m_group.get_file_format();
+    using gf = _impl::GroupFriend;
+    if (Replication* repl = gf::get_replication(m_group))
+        return repl->get_history();
+    return 0;
+}
+
+inline int SharedGroup::get_file_format_version() const noexcept
+{
+    using gf = _impl::GroupFriend;
+    return gf::get_file_format_version(m_group);
 }
 
 
@@ -1088,26 +1099,26 @@ public:
     }
 
     template<class O>
-    static void advance_read(SharedGroup& sg, History& hist, O* obs, SharedGroup::VersionID ver)
+    static void advance_read(SharedGroup& sg, O* obs, SharedGroup::VersionID ver)
     {
-        sg.advance_read(hist, obs, ver); // Throws
+        sg.advance_read(obs, ver); // Throws
     }
 
     template<class O>
-    static void promote_to_write(SharedGroup& sg, History& hist, O* obs)
+    static void promote_to_write(SharedGroup& sg, O* obs)
     {
-        sg.promote_to_write(hist, obs); // Throws
+        sg.promote_to_write(obs); // Throws
     }
 
-    static void commit_and_continue_as_read(SharedGroup& sg)
+    static SharedGroup::version_type commit_and_continue_as_read(SharedGroup& sg)
     {
-        sg.commit_and_continue_as_read(); // Throws
+        return sg.commit_and_continue_as_read(); // Throws
     }
 
     template<class O>
-    static void rollback_and_continue_as_read(SharedGroup& sg, History& hist, O* obs)
+    static void rollback_and_continue_as_read(SharedGroup& sg, O* obs)
     {
-        sg.rollback_and_continue_as_read(hist, obs); // Throws
+        sg.rollback_and_continue_as_read(obs); // Throws
     }
 
     static void async_daemon_open(SharedGroup& sg, const std::string& file)
@@ -1117,13 +1128,23 @@ public:
         bool is_backend = true;
         const char* encryption_key = nullptr;
         bool allow_file_format_upgrade = false;
-        sg.do_open_1(file, no_create, durability, is_backend, encryption_key,
-                     allow_file_format_upgrade); // Throws
+        sg.do_open(file, no_create, durability, is_backend, encryption_key,
+                   allow_file_format_upgrade); // Throws
     }
 
-    static int get_file_format(const SharedGroup& sg) noexcept
+    static int get_file_format_version(const SharedGroup& sg) noexcept
     {
-        return sg.get_file_format();
+        return sg.get_file_format_version();
+    }
+
+    static SharedGroup::version_type get_version_of_latest_snapshot(SharedGroup& sg)
+    {
+        return sg.get_version_of_latest_snapshot();
+    }
+
+    static SharedGroup::version_type get_version_of_bound_snapshot(const SharedGroup& sg) noexcept
+    {
+        return sg.get_version_of_bound_snapshot();
     }
 };
 
@@ -1133,11 +1154,23 @@ inline const Group& ReadTransaction::get_group() const noexcept
     return sgf::get_group(m_shared_group);
 }
 
+inline SharedGroup::version_type ReadTransaction::get_version() const noexcept
+{
+    using sgf = _impl::SharedGroupFriend;
+    return sgf::get_version_of_bound_snapshot(m_shared_group);
+}
+
 inline Group& WriteTransaction::get_group() const noexcept
 {
     REALM_ASSERT(m_shared_group);
     using sgf = _impl::SharedGroupFriend;
     return sgf::get_group(*m_shared_group);
+}
+
+inline SharedGroup::version_type WriteTransaction::get_version() const noexcept
+{
+    using sgf = _impl::SharedGroupFriend;
+    return sgf::get_version_of_bound_snapshot(*m_shared_group);
 }
 
 } // namespace realm

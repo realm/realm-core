@@ -343,7 +343,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                         }
                     }
                 }
-            }               
+            }
             else if (instr == REMOVE_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
@@ -393,13 +393,6 @@ int run_fuzzy(int argc, const char* argv[])
         fprintf(stderr, "Could not open file for reading: %s\n", argv[1]);
         exit(1);
     }
-
-    test_util::unit_test::TestDetails test_details;
-    test_details.test_index = 0;
-    test_details.suite_name = "FuzzyTest";
-    test_details.test_name = "Group";
-    test_details.file_name = __FILE__;
-    test_details.line_number = __LINE__;
 
     Group group;
 

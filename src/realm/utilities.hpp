@@ -23,8 +23,9 @@
 #include <stdint.h>
 #include <cstdlib>
 #include <cstdlib> // size_t
-#include <algorithm>
 #include <cstdio>
+#include <algorithm>
+#include <functional>
 
 #ifdef _MSC_VER
 #  include <win32/types.h>
@@ -60,7 +61,7 @@
 
 namespace realm {
 
-typedef bool(*StringCompareCallback)(const char* string1, const char* string2);
+using StringCompareCallback = std::function<bool(const char* string1, const char* string2)>;
 
 extern signed char sse_support;
 extern signed char avx_support;
@@ -189,6 +190,18 @@ enum IndexMethod {
     index_FindAll_nocopy,
     index_Count
 };
+
+
+// realm::is_any<T, U1, U2, U3, ...> ==
+// std::is_same<T, U1>::value || std::is_same<T, U2>::value || std::is_same<T, U3>::value ...
+template<typename... T>
+struct is_any : std::false_type { };
+
+template<typename T, typename... Ts>
+struct is_any<T, T, Ts...> : std::true_type { };
+
+template<typename T, typename U, typename... Ts>
+struct is_any<T, U, Ts...> : is_any<T, Ts...> { };
 
 
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.

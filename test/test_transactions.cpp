@@ -12,13 +12,11 @@
 #include <realm/group_shared.hpp>
 #include <realm/table_macros.hpp>
 
-#include "util/thread_wrapper.hpp"
-
 #include "test.hpp"
 
 using namespace realm;
 using namespace realm::util;
-using test_util::unit_test::TestResults;
+using test_util::unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -82,7 +80,7 @@ const size_t max_blob_size   = 32*1024; // 32 KiB
 
 const BinaryData EmptyNonNul = BinaryData("", 0);
 
-void round(TestResults& test_results, SharedGroup& db, int index)
+void round(TestContext& test_context, SharedGroup& db, int index)
 {
     // Testing all value types
     {
@@ -393,11 +391,11 @@ void round(TestResults& test_results, SharedGroup& db, int index)
 }
 
 
-void thread(TestResults* test_results, int index, std::string path)
+void thread(TestContext& test_context, int index, std::string path)
 {
     for (int i=0; i<num_rounds; ++i) {
         SharedGroup db(path);
-        round(*test_results, db, index);
+        round(test_context, db, index);
     }
 }
 
@@ -414,7 +412,7 @@ TEST(Transactions_General)
 
         // Start threads
         for (int i = 0; i != num_threads; ++i)
-            threads[i].start(std::bind(&thread, &test_results, i, std::string(path)));
+            threads[i].start([this, i, &path] { thread(test_context, i, path); });
 
         // Wait for threads to finish
         for (int i = 0; i != num_threads; ++i) {

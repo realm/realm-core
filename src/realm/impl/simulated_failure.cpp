@@ -93,7 +93,7 @@ void SimulatedFailure::do_unprime(type failure_type) noexcept
 void SimulatedFailure::do_check(type failure_type)
 {
     bool* primed_failure_types = get();
-    if (primed_failure_types[failure_type]) {
+    if (REALM_UNLIKELY(primed_failure_types[failure_type])) {
         primed_failure_types[failure_type] = false;
         throw SimulatedFailure();
     }

@@ -8,6 +8,7 @@
 #include <ostream>
 
 #include <realm.hpp>
+#include <realm/commit_log.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/buffer.hpp>
 
@@ -18,7 +19,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using unit_test::TestResults;
+using unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -3715,7 +3716,7 @@ TEST(Table_Pivot)
 
 namespace {
 
-void compare_table_with_slice(TestResults& test_results, const Table& table,
+void compare_table_with_slice(TestContext& test_context, const Table& table,
                               const Table& slice, size_t offset, size_t size)
 {
     ConstDescriptorRef table_desc = table.get_descriptor();
@@ -3834,7 +3835,7 @@ void compare_table_with_slice(TestResults& test_results, const Table& table,
 }
 
 
-void test_write_slice_name(TestResults& test_results, const Table& table,
+void test_write_slice_name(TestContext& test_context, const Table& table,
                            StringData expect_name, bool override_name)
 {
     size_t offset = 0, size = 0;
@@ -3853,7 +3854,7 @@ void test_write_slice_name(TestResults& test_results, const Table& table,
     CHECK(slice);
 }
 
-void test_write_slice_contents(TestResults& test_results, const Table& table,
+void test_write_slice_contents(TestContext& test_context, const Table& table,
                                size_t offset, size_t size)
 {
     std::ostringstream out;
@@ -3871,7 +3872,7 @@ void test_write_slice_contents(TestResults& test_results, const Table& table,
             size_2 = remaining_size;
         CHECK_EQUAL(size_2, slice->size());
         if (size_2 == slice->size())
-            compare_table_with_slice(test_results, table, *slice, offset, size_2);
+            compare_table_with_slice(test_context, table, *slice, offset, size_2);
     }
 }
 
@@ -3883,16 +3884,16 @@ TEST(Table_WriteSlice)
     // check that the name of the written table is as expected
     {
         Table table;
-        test_write_slice_name(test_results, table, "",    false);
-        test_write_slice_name(test_results, table, "foo", true); // Override
-        test_write_slice_name(test_results, table, "",    true); // Override
+        test_write_slice_name(test_context, table, "",    false);
+        test_write_slice_name(test_context, table, "foo", true); // Override
+        test_write_slice_name(test_context, table, "",    true); // Override
     }
     {
         Group group;
         TableRef table = group.add_table("test");
-        test_write_slice_name(test_results, *table, "test", false);
-        test_write_slice_name(test_results, *table, "foo",  true); // Override
-        test_write_slice_name(test_results, *table, "",     true); // Override
+        test_write_slice_name(test_context, *table, "test", false);
+        test_write_slice_name(test_context, *table, "foo",  true); // Override
+        test_write_slice_name(test_context, *table, "",     true); // Override
     }
 
     // Run through a 3-D matrix of table sizes, slice offsets, and
@@ -3914,7 +3915,7 @@ TEST(Table_WriteSlice)
                 int size = table_sizes[size_i];
                 // This also checks that the range can extend beyond
                 // end of table
-                test_write_slice_contents(test_results, *table, offset, size);
+                test_write_slice_contents(test_context, *table, offset, size);
                 if (offset + size > table_size)
                     break;
             }
@@ -6566,6 +6567,139 @@ TEST(Table_ChangeLinkTargets_LinkLists)
     CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
 }
 
+// Minimal test case causing an assertion error because
+// backlink columns are storing stale values referencing
+// their respective link column index. If a link column
+// index changes, the backlink column accessors must also
+// be updated.
+TEST(Table_MinimalStaleLinkColumnIndex)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    t->add_column(type_Int, "int1");
+    t->add_search_index(0);
+    t->add_empty_row(2);
+    t->set_int(0, 1, 4444);
+
+    TableRef t2 = g.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->remove_column(0);
+
+    t->set_int_unique(0, 0, 4444); // crashed here
+
+    CHECK_EQUAL(t->get_int(0, 0), 4444);
+    CHECK_EQUAL(t->size(), 1);
+}
+
+// This test case is a simplified version of a bug revealed by fuzz testing
+// set_int_unique triggers backlinks to update if the element to insert is
+// not unique. The expected behaviour is that the old row containing the
+// unique int will be removed and the new row will remain; this ensures
+// uniques without throwing errors. This test was crashing (assert failed)
+// when inserting a unique duplicate because backlink indices hadn't been
+// updated after a column had been removed from the table containing the link.
+TEST(Table_FuzzTestRevealed_SetUniqueAssert)
+{
+    Group g;
+    g.add_table("string_index_test_table");
+    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "aa",true));
+    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "bb",true));
+    g.get_table(0)->insert_column(0, DataType(0), "cc",true);
+    g.get_table(0)->add_search_index(0);
+    g.get_table(0)->insert_column_link(3, type_Link, "dd", *g.get_table(0));
+    g.get_table(0)->add_empty_row(225);
+    { TableRef t = g.get_table(0); t->remove_column(1); }
+    { TableRef t = g.get_table(0); t->remove_column(0); }
+    g.get_table(0)->add_empty_row(186);
+    g.get_table(0)->find_first_int(0, 0);
+    g.get_table(0)->set_int_unique(0, 255, 1);
+    g.get_table(0)->find_first_int(0, 0);
+    g.get_table(0)->set_null(0, 53);
+    g.get_table(0)->set_int_unique(0, 97, 'l');
+    g.get_table(0)->add_empty_row(85);
+    g.get_table(0)->set_int_unique(0, 100, 'l');    // duplicate
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 100), 'l');
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 97), 0);
+}
+
+TEST(Table_InsertUniqueDuplicate_LinkedColumns)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    t->add_column(type_Int, "int1");
+    t->add_search_index(0);
+    t->add_empty_row(2);
+    t->set_int_unique(0, 0, 42);
+    t->set_int_unique(0, 1, 42);
+    CHECK_EQUAL(t->size(), 1);
+    CHECK_EQUAL(t->get_int(0, 0), 42);
+
+    t->insert_column(0, type_String, "string1");
+    t->add_search_index(0);
+    t->add_empty_row(1);
+    t->set_string_unique(0, 0, "fourty-two");
+    t->set_string_unique(0, 1, "fourty-two");
+    CHECK_EQUAL(t->size(), 1);
+    CHECK_EQUAL(t->get_string(0, 0), "fourty-two");
+    CHECK_EQUAL(t->get_int(1, 0), 0);
+
+    TableRef t2 = g.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column(type_String, "string_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->add_search_index(0);
+    t2->add_search_index(1);
+    t2->add_empty_row(2);
+    t2->set_int_unique(0, 0, 43);
+    t2->set_string_unique(1, 0, "fourty-three");
+    t2->set_string_unique(1, 1, "FOURTY_THREE");
+    t2->set_link(2, 1, 0);
+    t2->set_int_unique(0, 1, 43);
+
+    CHECK_EQUAL(t2->size(), 1);
+    CHECK_EQUAL(t2->get_int(0, 0), 43);
+    CHECK_EQUAL(t2->get_string(1, 0), "FOURTY_THREE");
+    CHECK_EQUAL(t2->get_link(2, 0), 0);
+
+    t2->remove_column(0);
+    t->insert_empty_row(0);     // update t2 link through backlinks
+    t->set_int(1, 0, 333);
+    CHECK_EQUAL(t->get_int(1, 0), 333);
+    CHECK_EQUAL(t->get_int(1, 1), 0);
+    CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped forward by insert at t(0), updated through backlinks
+
+    using df = _impl::DescriptorFriend;
+    DescriptorRef t2_descriptor = t2->get_descriptor();
+    df::move_column(*t2_descriptor, 0, 1);
+    CHECK_EQUAL(t2->get_link(0, 0), 1); // unchanged
+    t->insert_empty_row(0);
+    t->set_int(1, 0, 4444);
+    CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped forward via backlinks
+    t2->remove_column(1);
+    CHECK_EQUAL(t2->get_link(0, 0), 2); // unchanged
+    t->insert_empty_row(0);     // update through backlinks
+    t->set_int(1, 0, 55555);
+    CHECK_EQUAL(t2->get_link(0, 0), 3);
+
+    t->set_int_unique(1, 0, 4444);  // duplicate
+    CHECK_EQUAL(t2->get_link(0, 0), 1); // changed by duplicate overwrite in linked table via backlinks
+
+    t2->insert_column(0, type_Int, "type_Int col");
+    CHECK_EQUAL(t2->get_link(1, 0), 1); // no change after insert col
+    t->insert_empty_row(0);
+    t->set_int(1, 0, 666666);
+    CHECK_EQUAL(t2->get_link(1, 0), 2); // bumped forward via backlinks
+
+    df::move_column(*t2_descriptor, 1, 0);  // move backwards
+    CHECK_EQUAL(t2->get_link(0, 0), 2);     // no change
+    t->insert_empty_row(0);
+    t->set_int(1, 0, 7777777);
+    CHECK_EQUAL(t2->get_link(0, 0), 3); // bumped forward via backlinks
+    t->remove(0);
+    CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped back via backlinks
+}
+
 
 TEST(Table_DetachedAccessor)
 {
@@ -6589,6 +6723,82 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->remove_substring(1, 0, 0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_binary(2, 0, BinaryData()), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_link(3, 0, 0), LogicError::detached_accessor);
+}
+
+// This test reproduces a user reported assertion failure. The problem was
+// due to BacklinkColumn::m_origin_column_ndx not being updated when the
+// linked table removed/inserted columns (this happened on a migration)
+TEST(Table_StaleLinkIndexOnTableRemove)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+    TableRef t = group_w.add_table("table1");
+    t->add_column(type_Int, "int1");
+    t->add_empty_row(2);
+
+    TableRef t2 = group_w.add_table("table2");
+    t2->add_column(type_Int, "int_col");
+    t2->add_column_link(type_Link, "link", *t);
+    t2->add_empty_row();
+    t2->set_link(1, 0, 1);
+    t2->remove_column(0); // after this call LinkColumnBase::m_column_ndx was incorrect
+    t2->add_column(type_Int, "int_col2");
+
+    // The stale backlink index would still be "1" which is now an integer column in t2
+    // so the assertion in Spec::get_opposite_link_table() would fail when removing a link
+    t->remove(1);
+
+    CHECK_EQUAL(t->size(), 1);
+    CHECK_EQUAL(t2->get_link(0, 0), realm::npos); // no link
+}
+
+TEST(Table_getVersionCounterAfterRowAccessor) {
+    Table t;
+    size_t col_bool   = t.add_column(type_Bool,     "bool",   true);
+    size_t col_int    = t.add_column(type_Int,      "int",    true);
+    size_t col_string = t.add_column(type_String,   "string", true);
+    size_t col_float  = t.add_column(type_Float,    "float",  true);
+    size_t col_double = t.add_column(type_Double,   "double", true);
+    size_t col_date   = t.add_column(type_DateTime, "date",   true);
+    size_t col_binary = t.add_column(type_Binary,   "binary", true);
+
+    t.add_empty_row(1);
+
+    int_fast64_t ver = t.get_version_counter();
+    int_fast64_t newVer;
+
+#define _CHECK_VER_BUMP() \
+    newVer = t.get_version_counter();\
+    CHECK_GREATER(newVer, ver); \
+    ver = newVer;
+
+    t.set_bool(col_bool, 0, true);
+    _CHECK_VER_BUMP();
+
+    t.set_int(col_int, 0, 42);
+    _CHECK_VER_BUMP();
+
+    t.set_string(col_string, 0, "foo");
+    _CHECK_VER_BUMP();
+
+    t.set_float(col_float, 0, 0.42f);
+    _CHECK_VER_BUMP();
+
+    t.set_double(col_double, 0, 0.42);
+    _CHECK_VER_BUMP();
+
+    t.set_datetime(col_date, 0, 1234);
+    _CHECK_VER_BUMP();
+
+    t.set_binary(col_binary, 0, BinaryData("binary", 7));
+    _CHECK_VER_BUMP();
+
+    t.set_null(0, 0);
+    _CHECK_VER_BUMP();
 }
 
 #endif // TEST_TABLE

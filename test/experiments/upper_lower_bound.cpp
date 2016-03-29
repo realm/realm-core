@@ -13,8 +13,6 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string_long.hpp>
 
-#include "../util/thread_wrapper.hpp"
-
 #include "../util/timer.hpp"
 #include "unit_test.hpp"
 

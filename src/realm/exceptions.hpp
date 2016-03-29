@@ -176,7 +176,20 @@ public:
         /// object is of the wrong type (read/write), or an attampt was made to
         /// initiate a new transaction while one is already in progress on the
         /// same SharedGroup object.
-        wrong_transact_state
+        wrong_transact_state,
+
+        /// Attempted use of a continuous transaction through a SharedGroup
+        /// object with no history. See Replication::get_history().
+        no_history,
+
+        /// Durability setting (as passed to the SharedGroup constructor) was
+        /// not consistent across the session.
+        mixed_durability,
+
+        /// History type (as specified by the Replication implementation passed
+        /// to the SharedGroup constructor) was not consistent across the
+        /// session.
+        mixed_history_type
     };
 
     LogicError(ErrorKind message);

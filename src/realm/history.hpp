@@ -17,44 +17,20 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
-
 #ifndef REALM_HISTORY_HPP
 #define REALM_HISTORY_HPP
 
-#include <stdint.h>
+#include <memory>
+#include <string>
 
-#include <realm/binary_data.hpp>
+#include <realm/replication.hpp>
+
 
 namespace realm {
 
-
-class History {
-public:
-    using version_type = uint_fast64_t;
-
-    /// Get all changesets between the specified versions. References to those
-    /// changesets will be made availble in successive entries of `buffer`. The
-    /// number of retreived changesets is exactly `end_version -
-    /// begin_version`. If this number is greater than zero, the changeset made
-    /// avaialable in `buffer[0]` is the one that brought the database from
-    /// `begin_version` to `begin_version + 1`.
-    ///
-    /// The calee retains ownership of the memory referenced by those entries,
-    /// i.e., the memory referenced by `buffer[i].changeset` is **not** handed
-    /// over to the caller.
-    ///
-    /// The caller must **not** assume that this memory remains valid
-    /// indefinitely. It is the responsibility of the implementing subclass to
-    /// specify the rules that govern the period of validity of this memory.
-    virtual void get_changesets(version_type begin_version, version_type end_version,
-                                BinaryData* buffer) const noexcept = 0;
-
-    virtual BinaryData get_uncommitted_changes() noexcept = 0;
-
-    virtual ~History() noexcept {}
-};
-
+std::unique_ptr<Replication> make_in_realm_history(const std::string& realm_path);
 
 } // namespace realm
+
 
 #endif // REALM_HISTORY_HPP

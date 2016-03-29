@@ -104,6 +104,9 @@ public:
     friend class LockGuard;
     friend class UniqueLock;
 
+    void lock() noexcept;
+    void unlock() noexcept;
+
 protected:
     pthread_mutex_t m_impl;
 
@@ -113,16 +116,12 @@ protected:
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);
 
-    void lock() noexcept;
-    void unlock() noexcept;
-
     REALM_NORETURN static void init_failed(int);
     REALM_NORETURN static void attr_init_failed(int);
     REALM_NORETURN static void destroy_failed(int) noexcept;
     REALM_NORETURN static void lock_failed(int) noexcept;
 
     friend class CondVar;
-    friend class PlatformSpecificCondVar;
 };
 
 
@@ -135,7 +134,6 @@ public:
 private:
     Mutex& m_mutex;
     friend class CondVar;
-    friend class PlatformSpecificCondVar;
 };
 
 

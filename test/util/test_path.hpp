@@ -27,7 +27,7 @@
 #include "unit_test.hpp"
 
 #define TEST_PATH_HELPER(class_name, var_name, suffix) \
-    class_name var_name(realm::test_util::get_test_path(test_details, "." #var_name "." suffix))
+    class_name var_name(realm::test_util::get_test_path(test_context, "." #var_name "." suffix))
 
 #define TEST_PATH(var_name) \
     TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
@@ -57,7 +57,7 @@ std::string get_test_path_prefix();
 
 /// This function is thread-safe as long as there are no concurrent invocations
 /// of set_test_path_prefix().
-std::string get_test_path(const unit_test::TestDetails&, const std::string& suffix);
+std::string get_test_path(const unit_test::TestContext&, const std::string& suffix);
 
 /// By default, test files are placed in the current working
 /// directory. Use this function to set a path prefix. The specified
@@ -69,7 +69,7 @@ std::string get_test_path(const unit_test::TestDetails&, const std::string& suff
 void set_test_path_prefix(const std::string&);
 
 
-/// This function is thread-safe as long as tehre are no concurrent invocations
+/// This function is thread-safe as long as there are no concurrent invocations
 /// of set_test_resource_path().
 std::string get_test_resource_path();
 
@@ -125,7 +125,7 @@ public:
     SharedGroupTestPathGuard(const std::string& path);
     std::string get_lock_path() const
     {
-        return m_path + ".lock";
+        return m_path + ".lock"; // ".management/access_control";
     }
     ~SharedGroupTestPathGuard() noexcept;
 };

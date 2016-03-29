@@ -2365,7 +2365,7 @@ TEST(Group_Fuzzy)
 
         for (size_t counter = 0; counter < iterations; counter++)
         {
-            // You can use your own seed if you have observed a crashing unit test that 
+            // You can use your own seed if you have observed a crashing unit test that
             // printed out some specific seed (the "Unit test random seed:" part that appears).
             //fastrand(534653645, true);
             fastrand(unit_test_random_seed + counter, true);
@@ -2450,6 +2450,22 @@ TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
 
     // Triggers "alloc.hpp:213: Assertion failed: v % 8 == 0"
     g.verify();
+}
+
+
+TEST(Group_WriteEmpty)
+{
+    GROUP_TEST_PATH(path_1);
+    GROUP_TEST_PATH(path_2);
+    {
+        Group group;
+        group.write(path_2);
+    }
+    File::remove(path_2);
+    {
+        Group group(path_1, 0, Group::mode_ReadWrite);
+        group.write(path_2);
+    }
 }
 
 
