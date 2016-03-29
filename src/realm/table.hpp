@@ -854,7 +854,7 @@ private:
     typedef std::vector<ColumnBase*> column_accessors;
     column_accessors m_cols;
 
-    mutable size_t m_ref_count;
+    mutable std::atomic<size_t> m_ref_count;
 
     // If this table is a root table (has independent descriptor),
     // then Table::m_descriptor refers to the accessor of its
@@ -1042,8 +1042,8 @@ private:
     // Detach the type descriptor accessor if it exists.
     void discard_desc_accessor() noexcept;
 
-    void bind_ptr() const noexcept { ++m_ref_count; }
-    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept;
+    void unbind_ptr() const noexcept;
 
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) noexcept;
@@ -1457,6 +1457,20 @@ inline void Table::remove_last()
 {
     if (!is_empty())
         remove(size()-1);
+}
+
+inline void Table::bind_ptr() const noexcept
+{
+    m_ref_count.fetch_add(1, std::memory_order_relaxed);
+}
+
+inline void Table::unbind_ptr() const noexcept
+{
+    if (m_ref_count.fetch_sub(1, std::memory_order_release) != 1)
+        return;
+
+    std::atomic_thread_fence(std::memory_order_acquire);
+    delete this;
 }
 
 inline void Table::register_view(const TableViewBase* view)
