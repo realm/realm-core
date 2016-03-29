@@ -915,30 +915,36 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
 
 #define REALM_ASSERT_COLUMN(column_ndx)                                   \
     REALM_ASSERT(m_table);                                                \
-    REALM_ASSERT(column_ndx < m_table->get_column_count());
+    REALM_ASSERT(column_ndx < m_table->get_column_count())
 
 #define REALM_ASSERT_ROW(row_ndx)                                         \
     REALM_ASSERT(m_table);                                                \
-    REALM_ASSERT(row_ndx < m_row_indexes.size());
+    REALM_ASSERT(row_ndx < m_row_indexes.size())
 
 #define REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)             \
-    REALM_ASSERT_COLUMN(column_ndx)                                       \
+    REALM_ASSERT_COLUMN(column_ndx);                                      \
+    REALM_DIAG_PUSH();                                                    \
+    REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE();                             \
     REALM_ASSERT(m_table->get_column_type(column_ndx) == column_type ||   \
-                  (m_table->get_column_type(column_ndx) == type_DateTime && column_type == type_Int));
+                  (m_table->get_column_type(column_ndx) == type_DateTime && column_type == type_Int)); \
+    REALM_DIAG_POP()
 
 #define REALM_ASSERT_INDEX(column_ndx, row_ndx)                           \
-    REALM_ASSERT_COLUMN(column_ndx)                                       \
-    REALM_ASSERT(row_ndx < m_row_indexes.size());
+    REALM_ASSERT_COLUMN(column_ndx);                                       \
+    REALM_ASSERT(row_ndx < m_row_indexes.size())
 
 #define REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, column_type)     \
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)                 \
-    REALM_ASSERT(row_ndx < m_row_indexes.size());
+    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type);                 \
+    REALM_ASSERT(row_ndx < m_row_indexes.size())
 
 #define REALM_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx)   \
-    REALM_ASSERT_COLUMN(column_ndx)                                       \
+    REALM_ASSERT_COLUMN(column_ndx);                                      \
+    REALM_DIAG_PUSH();                                                    \
+    REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE();                             \
     REALM_ASSERT(m_table->get_column_type(column_ndx) == type_Table ||    \
-                   (m_table->get_column_type(column_ndx) == type_Mixed));   \
-    REALM_ASSERT(row_ndx < m_row_indexes.size());
+                   (m_table->get_column_type(column_ndx) == type_Mixed)); \
+    REALM_DIAG_POP();                                                     \
+    REALM_ASSERT(row_ndx < m_row_indexes.size())
 
 // Column information
 
