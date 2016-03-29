@@ -126,7 +126,7 @@ TEST(LinkList_MissingDeepCopy)
     table2->set_link(col_link2, 0, 1);
     table2->set_link(col_link2, 1, 2);
 
-    char* c = new char[10000000]; 
+    char* c = new char[10000000];
     c[10000000 - 1] = '!';
     Query q = table2->link(col_link2).column<String>(1) == StringData(&c[10000000 - 1], 1);
 
@@ -1322,15 +1322,15 @@ TEST(LinkList_QueryOnLinkList)
 
     // Should of course work even if nothing has changed
     tv.sync_if_needed();
-  
+
     // Modify the LinkList and see if sync_if_needed takes it in count
     lvr->remove(2); // bumps version of table2 and only table2
     tv.sync_if_needed();
-    
+
     CHECK_EQUAL(1, tv.size()); // fail
     CHECK_EQUAL(0, tv.get_source_ndx(0));
-    
-    // Now test if changes in linked-to table bumps the version of the linked-from table and that 
+
+    // Now test if changes in linked-to table bumps the version of the linked-from table and that
     // the query of 'tv' is re-run
     table1->set_int(0, 2, 50); // exclude row 2 from tv because of the '> 100' condition in Query
     tv.sync_if_needed();
@@ -1400,7 +1400,7 @@ TEST(LinkList_QueryLinkNull)
     // +-+--------+------+------+--------+------+
     // | | string | link | int  | double | date |
     // +-+--------+------+------+--------+------+
-    // |0| Fish   |    0 |   1  |   1.0  |  1   | 
+    // |0| Fish   |    0 |   1  |   1.0  |  1   |
     // |1| null   | null | null |  null  | null |
     // |2| Horse  |    1 |   2  |   2.0  |  2   |
     // +-+--------+------+------+--------+------+
@@ -1569,10 +1569,10 @@ TEST(LinkList_QueryDateTime)
     table1->add_column_link(type_LinkList, "link", *table2);
 
     table2->add_column(type_DateTime, "date");
-    
+
     table2->add_empty_row();
     table2->set_datetime(0, 0, DateTime(1));
-    
+
     table1->add_empty_row();
     LinkViewRef lvr = table1->get_linklist(0, 0);
     lvr->add(0);

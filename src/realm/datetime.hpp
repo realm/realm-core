@@ -69,7 +69,7 @@ public:
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
 
-    // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed 
+    // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed
     // because DateTime is internally stored in an int64_t column.
     operator int_fast64_t() noexcept;
 

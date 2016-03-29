@@ -1,5 +1,4 @@
 #include <cstdlib>
-#include <stdexcept>
 #include <algorithm>
 #include <iostream>
 
@@ -15,20 +14,50 @@ using namespace realm::util;
 using namespace realm::test_util;
 
 
+/// Row Accessor Benchmarks
+///
+/// To measure the performance of the row accessor only, the table tested on is
+/// minimal, one empty row nothing else. Bigger tables might be necessary, but
+/// beware of skewed results.
+
 namespace {
 
-void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, const char* lead_text)
+enum DetachOrder { AttachOrder, RevAttOrder, RandomOrder };
+
+/// Benchmark the (=) operator on row accessors.
+///
+/// The (=) operator causes a reattachment a row expression to the table.
+/// `heap` signfies that this reattachment will happen many times over.
+///
+/// Here it is in pseduocode:
+///
+///     table = add_empty_row(table())
+///     rows = replicate(table[0], n)
+///     time {
+///       repeat 10000 * 10000 times {
+///         rows[random(n)] = table[0]
+///       }
+///     }
+///
+void heap(Timer& timer, BenchmarkResults& results, int n,
+          const char* ident, const char* lead_text)
 {
     Table table;
     table.add_empty_row();
     std::unique_ptr<Row[]> rows(new Row[n]);
     for (int i = 0; i < n; ++i)
         rows[i] = table[0];
+
+    // Generate random numbers before timing because Random is slooow
+    // (thread-safe):
     int m = 10000;
     std::unique_ptr<int[]> indexes(new int[m]);
     Random random;
     for (int i = 0; i < m; ++i)
         indexes[i] = random.draw_int_mod(n);
+    // indexes is not guaranteed to contain all indexes from 0 to n..
+
+    // Now get to business:
     timer.reset();
     for (int j = 0; j < 10000; ++j) {
         for (int i = 0; i < m; ++i)
@@ -37,7 +66,25 @@ void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, con
     results.submit_single(ident, lead_text, timer);
 }
 
-void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, int detach_order, const char* ident, const char* lead_text)
+/// Benchmark the (=) operator on row accessors, while detaching them in /
+/// various orders. `balloon` signifies that the row accessors are first
+/// attached (inflating a balloon) and then detached in some order
+/// (deflating the balloon).
+///
+/// Here it is in pseduocode:
+///
+///     table = add_empty_row(table())
+///     detach_indexes = sort(detach_order, range(balloon_size))
+///     time {
+///       rows = replicate(table[0], ballon_size)
+///       for i in range(ballon_size) {
+///         rows[detach_indexes[i]].detach()
+///       }
+///     }
+///
+void balloon(Timer& timer, BenchmarkResults& results,
+             int balloon_size, DetachOrder detach_order,
+             const char* ident, const char* lead_text)
 {
     Table table;
     table.add_empty_row();
@@ -47,16 +94,14 @@ void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, int deta
         detach_indexes[i] = i;
     Random random;
     switch (detach_order) {
-        case 0: // Same as attach order
+        case AttachOrder:
             break;
-        case 1: // Opposite of attach order
+        case RevAttOrder:
             std::reverse(detach_indexes.get(), detach_indexes.get() + balloon_size);
             break;
-        case 2: // Randomized
+        case RandomOrder:
             random.shuffle(detach_indexes.get(), detach_indexes.get() + balloon_size);
             break;
-        default:
-            throw std::runtime_error("Bad order specification");
     }
     int n = (100000000L + balloon_size - 1) / balloon_size;
     timer.reset();
@@ -85,17 +130,17 @@ int main()
     heap(timer, results,  100, "heap_100",  "Heap 100");
     heap(timer, results, 1000, "heap_1000", "Heap 1000");
 
-    balloon(timer, results, 10, 0, "balloon_10",         "Balloon 10");
-    balloon(timer, results, 10, 1, "balloon_10_reverse", "Balloon 10 (reverse)");
-    balloon(timer, results, 10, 2, "balloon_10_random",  "Balloon 10 (random)");
+    balloon(timer, results, 10, AttachOrder, "balloon_10",         "Balloon 10");
+    balloon(timer, results, 10, RevAttOrder, "balloon_10_reverse", "Balloon 10 (reverse)");
+    balloon(timer, results, 10, RandomOrder, "balloon_10_random",  "Balloon 10 (random)");
 
-    balloon(timer, results, 100, 0, "balloon_100",         "Balloon 100");
-    balloon(timer, results, 100, 1, "balloon_100_reverse", "Balloon 100 (reverse)");
-    balloon(timer, results, 100, 2, "balloon_100_random",  "Balloon 100 (random)");
+    balloon(timer, results, 100, AttachOrder, "balloon_100",         "Balloon 100");
+    balloon(timer, results, 100, RevAttOrder, "balloon_100_reverse", "Balloon 100 (reverse)");
+    balloon(timer, results, 100, RandomOrder, "balloon_100_random",  "Balloon 100 (random)");
 
-    balloon(timer, results, 1000, 0, "balloon_1000",         "Balloon 1000");
-    balloon(timer, results, 1000, 1, "balloon_1000_reverse", "Balloon 1000 (reverse)");
-    balloon(timer, results, 1000, 2, "balloon_1000_random",  "Balloon 1000 (random)");
+    balloon(timer, results, 1000, AttachOrder, "balloon_1000",         "Balloon 1000");
+    balloon(timer, results, 1000, RevAttOrder, "balloon_1000_reverse", "Balloon 1000 (reverse)");
+    balloon(timer, results, 1000, RandomOrder, "balloon_1000_random",  "Balloon 1000 (random)");
 
     results.submit_single("total_time", "Total time", timer_total);
 }

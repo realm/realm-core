@@ -49,7 +49,7 @@ namespace {
 // Converts unicodes 0...0x6ff (up to Arabic) to their respective lower case characters using a popular UnicodeData.txt
 // file (http://www.opensource.apple.com/source/Heimdal/Heimdal-247.9/lib/wind/UnicodeData.txt) that contains case
 // conversion information. The conversion does not take your current locale in count; it can be slightly wrong in some
-// countries! If the input is already lower case, or outside range 0...0x6ff, then input value is returned untouched. 
+// countries! If the input is already lower case, or outside range 0...0x6ff, then input value is returned untouched.
 uint32_t to_lower(uint32_t character)
 {
     static const int16_t lowers[] = {
@@ -143,7 +143,7 @@ namespace realm {
             while (begin + i != end) {
                 if ((static_cast<int>(std::char_traits<char>::to_int_type(begin[i])) & (0x80 + 0x40)) != 0x80)
                     break;
-                if (begin[i] != begin2[i]) 
+                if (begin[i] != begin2[i])
                     return false;
                 ++i;
             }
@@ -188,8 +188,8 @@ namespace realm {
             , 268, 293, 535, 367, 366, 172, 171, 180, 179, 411, 410, 176, 175, 178, 177, 253, 252, 255, 254, 318, 317, 320, 319, 417, 416, 419, 418, 450, 449, 452, 451, 520, 519, 522, 521, 464, 463, 483, 482, 261, 260, 289, 288, 377, 227, 427, 426, 567, 566, 155, 154, 249, 248, 409, 408, 413, 412, 392, 391, 407, 406, 547, 546, 358, 381, 485, 326, 219, 437, 168, 203, 202, 351, 484, 465, 568, 591, 590, 184, 510, 529, 251, 250, 331, 330, 436, 435, 448, 447, 551, 550 };
 
         if (string_compare_method == STRING_COMPARE_CORE) {
-            // Core-only method. Compares in us_EN locale (sorting may be slightly inaccurate in some countries). Will 
-            // return arbitrary return value for invalid utf8 (silent error treatment). If one or both strings have 
+            // Core-only method. Compares in us_EN locale (sorting may be slightly inaccurate in some countries). Will
+            // return arbitrary return value for invalid utf8 (silent error treatment). If one or both strings have
             // unicodes beyond 'Latin Extended 2' (0...591), then the strings are compared by unicode value.
             uint32_t char1;
             uint32_t char2;
@@ -426,7 +426,7 @@ namespace realm {
     {
         for (size_t i = 0; i != haystack.size(); ++i) {
             char c = haystack[i];
-            if (needle_lower[i] != c && needle_upper[i] != c) 
+            if (needle_lower[i] != c && needle_upper[i] != c)
                 return false;
         }
 
@@ -435,7 +435,7 @@ namespace realm {
         const char* i = begin;
         while (i != end) {
             if (!equal_sequence(i, end, needle_lower + (i - begin)) &&
-                !equal_sequence(i, end, needle_upper + (i - begin))) 
+                !equal_sequence(i, end, needle_upper + (i - begin)))
                 return false;
         }
         return true;

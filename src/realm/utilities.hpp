@@ -192,6 +192,18 @@ enum IndexMethod {
 };
 
 
+// realm::is_any<T, U1, U2, U3, ...> ==
+// std::is_same<T, U1>::value || std::is_same<T, U2>::value || std::is_same<T, U3>::value ...
+template<typename... T>
+struct is_any : std::false_type { };
+
+template<typename T, typename... Ts>
+struct is_any<T, T, Ts...> : std::true_type { };
+
+template<typename T, typename U, typename... Ts>
+struct is_any<T, U, Ts...> : is_any<T, Ts...> { };
+
+
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
 template<class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)

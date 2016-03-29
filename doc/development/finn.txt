@@ -23,9 +23,9 @@ m_child -----------           m_child ---------          m_child = ----------   
 The population of m_children happens through a gather_children() method call from init().
 
 All these m_children vectors could maybe be gathered into a single vector stored somewhere else. However, note that sub node chains of ORNodes would need their own. So a single global is not enough. More analyzing is needed.
-														 
+														
 Idea
-********************************************************************************************************												 
+********************************************************************************************************												
 The methods of QueryState (which consumes matches) are templated by Action (find, findall, count, etc):
 
     template<Action action, bool pattern>
@@ -41,17 +41,17 @@ Also, many methods of Node classes are templated. It *could* be a simplification
 This would be a bit more complex task than QueryState. So begin with QueryState.	
 
 Idea
-********************************************************************************************************												 
+********************************************************************************************************												
 query_expression: Sqrt operator in query_expression.hpp
 
 
 Idea
-********************************************************************************************************												 
+********************************************************************************************************												
 query_engine: Optimize cost() method and/or m_dD and m_dT constants for the different node classes. Do not trust that any existing values or formulas are near optimal at all, because I have only done very little measurements, and
 mostly just guessing.
 
 
 Idea
-********************************************************************************************************												 
+********************************************************************************************************												
 query_engine: Implement NOT node
 

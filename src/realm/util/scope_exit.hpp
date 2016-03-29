@@ -20,30 +20,51 @@
 #ifndef REALM_UTIL_SCOPE_EXIT_HPP
 #define REALM_UTIL_SCOPE_EXIT_HPP
 
+#include <type_traits>
+#include <utility>
+
+#include <realm/util/optional.hpp>
+
 namespace realm {
 namespace util {
 
 template<class H>
 class ScopeExit {
 public:
-    ScopeExit(const H& handler) noexcept(noexcept(H(handler))):
+    explicit ScopeExit(const H& handler) noexcept(std::is_nothrow_copy_constructible<H>::value):
         m_handler(handler)
     {
     }
-    ScopeExit(ScopeExit&&) noexcept = default;
-    ~ScopeExit()
+
+    explicit ScopeExit(H&& handler) noexcept(std::is_nothrow_move_constructible<H>::value):
+        m_handler(std::move(handler))
     {
-        m_handler();
     }
+
+    ScopeExit(ScopeExit&& se) noexcept(std::is_nothrow_move_constructible<H>::value):
+        m_handler(std::move(se.m_handler))
+    {
+        se.m_handler = none;
+    }
+
+    ~ScopeExit() noexcept
+    {
+        if (m_handler)
+            (*m_handler)();
+    }
+
+    static_assert(noexcept(std::declval<H>()()), "Handler must be nothrow executable");
+    static_assert(std::is_nothrow_destructible<H>::value, "Handler must be nothrow destructible");
+
 private:
-    H m_handler;
-    static_assert(noexcept(m_handler()), "Handler must not throw");
+    util::Optional<H> m_handler;
 };
 
 template<class H>
-ScopeExit<H> make_scope_exit(const H& handler)
+ScopeExit<typename std::remove_reference<H>::type> make_scope_exit(H&& handler)
+    noexcept(noexcept(ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler))))
 {
-    return ScopeExit<H>(handler);
+    return ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler));
 }
 
 } // namespace util

@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
+* Bug fix: Access dangling pointer while handling canceled asynchronous accept
+  in POSIX networking API.
 
 ### API breaking changes:
 
@@ -10,13 +12,49 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* Added emulation of robust mutexes on platforms which do not
+  provide the full posix API for it. This prevents a situation
+  where a crash in one process holding the lock, would leave
+  the database locked. Fixes issue #1429
+* Moved all supporting files (all files except the .realm file) into a
+  separate ".management" subdirectory.
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Disabled unittest Shared_RobustAgainstDeathDuringWrite on Linux, as
+  it could run forever.
+* Fixed a few compiler warnings
+* Disabled unittest Shared_WaitForChange again, as it can still run forever
+* New features in the unit test framework: Ability to log to a file (one for
+  each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
+  failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
+  (`util::Logger`) is now directly available to each unit test.
+* New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+
+----------------------------------------------
+
+# 0.97.2 Release notes
+
+### Enhancements:
+
+* Add more information to IncompatibleLockFile.
+
+**NOTE: This is a hotfix release. The above changes are not present in
+versions [0.97.1].**
+
+----------------------------------------------
+
+# 0.97.1 Release notes
+
+### Bugfixes:
+
+* Fix an alignment problem which could cause crash when opening a Realm file
+  on 32-bit IOS devices. (issue 1558)
+
+**NOTE: This is a hotfix release. The above bugfixes are not present in
+versions [0.97.0].**
 
 ----------------------------------------------
 
@@ -43,7 +81,7 @@
 
 * Language bindings can now test if a TableView depends on a deleted LinkList
   (detached LinkView) using `bool TableViewBase::depends_deleted_linklist()`.
-  See https://github.com/realm/realm-core/issues/1509 and also 
+  See https://github.com/realm/realm-core/issues/1509 and also
   TEST(Query_ReferDeletedLinkView) in test_query.cpp for details.
 * `LangBindHelper::advance_read()` and friends no longer take a history
   argument. Access to the history is now gained automatically via
@@ -206,8 +244,8 @@
 
 * Any attempt to execute a query that depends on a LinkList that has been
   deleted from its table will now throw `DeletedLinkView` instead of
-  segfaulting. No other changes has been made; you must still verify 
-  LinkViewRef::is_attached() before calling any methods on a LinkViewRef, as 
+  segfaulting. No other changes has been made; you must still verify
+  LinkViewRef::is_attached() before calling any methods on a LinkViewRef, as
   usual.
 
 ### Enhancements:
@@ -342,7 +380,7 @@
 
 ### Bugfixes:
 
-* Fixed bug where Query::average() would include the number of nulls in the 
+* Fixed bug where Query::average() would include the number of nulls in the
   result.
 * Presumably fixed a race between commit and opening the database.
 

@@ -27,8 +27,6 @@
 #include <realm/util/thread.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
-#include "util/thread_wrapper.hpp"
-
 #include "test.hpp"
 
 using namespace realm;
@@ -121,7 +119,7 @@ void writer(std::string path, int id)
 }
 
 
-#if !REALM_PLATFORM_APPLE && !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
+#if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION
 
 void killer(TestContext& test_context, int pid, std::string path, int id)
 {
@@ -170,7 +168,7 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !REALM_PLATFORM_APPLE && !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -204,7 +202,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     if (pid == 0) {
         // first writer!
         writer(path, 0);
-        _exit(0);
+        _Exit(0);
     }
     else {
         for (int k=1; k < num_processes; ++k) {
@@ -214,7 +212,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
                 REALM_TERMINATE("fork() failed");
             if (pid == 0) {
                 writer(path, k);
-                _exit(0);
+                _Exit(0);
             }
             else {
                 // std::cerr << "New process " << pid << " killing old " << pid2 << std::endl;
@@ -224,6 +222,8 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
         // std::cerr << "Killing last one: " << pid << std::endl;
         killer(test_context, pid, path, num_processes-1);
     }
+    // We need to wait cleaning up til the killed processes have exited.
+    sleep(1);
 }
 #endif
 
@@ -1335,8 +1335,11 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
-#if !defined REALM_ANDROID && !defined REALM_IOS
+#if !REALM_ENABLE_ENCRYPTION &&  defined(ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE)
+// this unittest has issues that has not been fully understood, but could be
+// related to interaction between posix robust mutexes and the fork() system call.
+// it has so far only been seen failing on Linux, so we enable it on ios.
+#if REALM_PLATFORM_APPLE
 
 // Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
@@ -1348,10 +1351,10 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
     // This test can only be conducted by spawning independent
     // processes which can then be terminated individually.
-
+    const int process_count = 100;
     SHARED_GROUP_TEST_PATH(path);
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < process_count; ++i) {
         pid_t pid = fork();
         if (pid == pid_t(-1))
             REALM_TERMINATE("fork() failed");
@@ -1360,8 +1363,8 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TableRef table = wt.add_table("alpha");
-            _exit(0); // Die with an active write transaction
+            TableRef table = wt.get_or_add_table("alpha");
+            _Exit(42); // Die hard with an active write transaction
         }
         else {
             // Parent
@@ -1373,7 +1376,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             bool child_exited_normaly = WIFEXITED(stat_loc);
             CHECK(child_exited_normaly);
             int child_exit_status = WEXITSTATUS(stat_loc);
-            CHECK_EQUAL(0, child_exit_status);
+            CHECK_EQUAL(42, child_exit_status);
         }
 
         // Check that we can continue without dead-locking
@@ -1381,7 +1384,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TableRef table = wt.add_table("beta");
+            TableRef table = wt.get_or_add_table("beta");
             if (table->is_empty()) {
                 table->add_column(type_Int, "i");
                 table->insert_empty_row(0);
@@ -1399,12 +1402,15 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         CHECK(!rt.has_table("alpha"));
         CHECK(rt.has_table("beta"));
         ConstTableRef table = rt.get_table("beta");
-        CHECK_EQUAL(10, table->get_int(0,0));
+        CHECK_EQUAL(process_count, table->get_int(0,0));
     }
 }
 
-#endif // not ios or android
-#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
+#endif // on apple
+#endif // encryption enabled
+
+// not ios or android
+//#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE && !REALM_ENABLE_ENCRYPTION
 
 
 TEST(Shared_FormerErrorCase1)
@@ -2100,11 +2106,9 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
-#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
-
-
-// Commented out by KS because it hangs CI too frequently. See https://github.com/realm/realm-core/issues/887.
-/*
+#if !defined(_WIN32)
+// this test does not work with valgrind:
+#if 0
 
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
@@ -2121,6 +2125,8 @@ TEST(Shared_WaitForChange)
             shared_state[i] = 1;
             sgs[i] = sg;
         }
+        sg->begin_read(); // open a transaction at least once to make "changed" well defined
+        sg->end_read();
         sg->wait_for_change();
         {
             LockGuard l(mutex);
@@ -2167,19 +2173,24 @@ TEST(Shared_WaitForChange)
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(mutex);
-            if (shared_state[j] != 1)
-                try_again = true;
+            if (shared_state[j] < 1) try_again = true;
+            CHECK(shared_state[j] < 2);
         }
     }
 
+    // This write transaction should allow all readers to run again
     sg.begin_write();
     sg.commit();
+
+    // All readers should pass through state 2 to state 3, so wait
+    // for all to reach state 3:
     try_again = true;
     while (try_again) {
         try_again = false;
         for (int j=0; j < num_threads; j++) {
             LockGuard l(mutex);
             if (3 != shared_state[j]) try_again = true;
+            CHECK(shared_state[j] < 4);
         }
     }
 
@@ -2224,9 +2235,9 @@ TEST(Shared_WaitForChange)
     }
 }
 
-*/
 
-#endif // endif not on windows (or apple)
+#endif // test is disabled
+#endif // endif not on windows
 
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
