@@ -102,11 +102,16 @@ public:
     NewDate get_val(size_t row_ndx) const noexcept override { return get(row_ndx); }
     void set(size_t row_ndx, const NewDate& ndt);
     bool compare(const DateTimeColumn& c) const noexcept;
+
+    NewDate maximum(size_t, size_t, size_t, size_t*) const { return NewDate(); }
+    size_t count(NewDate) const;
+
     void erase(size_t ndx, bool is_last) {
         m_seconds.erase(ndx, is_last);
         m_nanoseconds.erase(ndx, is_last);
     }
 
+    typedef NewDate value_type;
 
 private:
 

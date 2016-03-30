@@ -1651,6 +1651,7 @@ TEST(Query_LimitUntyped2)
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "second1");
+    table.add_column(type_NewDate, "date");
 
     table.add_empty_row(3);
     table.set_int(0, 0, 10000);
@@ -1665,11 +1666,15 @@ TEST(Query_LimitUntyped2)
     table.set_double(2, 1, 30000.);
     table.set_double(2, 2, 40000.);
 
+    table.set_newdate(3, 0, NewDate(10000, 10000));
+    table.set_newdate(3, 1, NewDate(30000, 30000));
+    table.set_newdate(3, 2, NewDate(40000, 40000));
 
     Query q = table.where();
     int64_t sum;
     float sumf;
     double sumd;
+    NewDate nd;
 
     // sum, limited by 'limit'
     sum = q.sum_int(0, nullptr, 0, -1, 1);
@@ -1712,6 +1717,8 @@ TEST(Query_LimitUntyped2)
     size_t ndx = not_found;
 
     // max, limited by 'limit'
+
+    // int
     sum = q.maximum_int(0, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
     q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
@@ -1727,6 +1734,24 @@ TEST(Query_LimitUntyped2)
     q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
 
+    // NewDate
+/*
+    nd = q.maximum_newdate(3, nullptr, 0, -1, 1);
+    CHECK_EQUAL(NewDate(10000, 10000), nd);
+    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
+    CHECK_EQUAL(0, ndx);
+
+    nd = q.maximum_newdate(3, nullptr, 0, -1, 2);
+    CHECK_EQUAL(NewDate(30000, 30000), nd);
+    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
+    CHECK_EQUAL(1, ndx);
+
+    nd = q.maximum_newdate(3, nullptr, 0, -1);
+    CHECK_EQUAL(NewDate(40000, 40000), nd);
+    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
+    CHECK_EQUAL(2, ndx);
+*/
+    // float
     sumf = q.maximum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
     q.maximum_float(1, nullptr, 0, -1, 1, &ndx);
