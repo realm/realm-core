@@ -438,7 +438,7 @@ void File::write(const char* data, size_t size)
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        // FIXME: Expect this to fail due to assert asking for a read first! Possibly an old fixme. Is not related to the current REALM_ASSERT.
+        // FIXME: Expect this to fail due to assert asking for a read first! This FIXME seems to be made by Finn who does not remember it. 
         realm::util::encryption_read_barrier(map, pos, size);
         memcpy(map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(map, pos, size);
