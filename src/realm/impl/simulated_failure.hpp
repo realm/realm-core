@@ -21,6 +21,7 @@
 #ifndef REALM_IMPL_SIMULATED_FAILURE_HPP
 #define REALM_IMPL_SIMULATED_FAILURE_HPP
 
+#include <stdint.h>
 #include <exception>
 
 #include <realm/util/features.h>
@@ -48,15 +49,16 @@ public:
 
     /// Prime the specified failure type on the calling thread for triggering
     /// randomly \a n out of \a m times.
-    static void prime_random(FailureType, int n, int m);
+    static void prime_random(FailureType, int n, int m, uint_fast64_t seed = 0);
 
     /// Unprime the specified failure type on the calling thread.
     static void unprime(FailureType) noexcept;
 
     /// Returns true according to the mode of priming of the specified failure
-    /// type, but only if REALM_DEBUG was defined during compilation. If
-    /// REALM_DEBUG was not defined, this function always return false.
-    static bool check_trigger(FailureType);
+    /// type on the calling thread, but only if REALM_DEBUG was defined during
+    /// compilation. If REALM_DEBUG was not defined, this function always return
+    /// false.
+    static bool check_trigger(FailureType) noexcept;
 
     /// Throws SimulatedFailure if check_trigger() returns true.
     static void trigger(FailureType);
@@ -68,9 +70,9 @@ public:
 private:
 #ifdef REALM_DEBUG
     static void do_prime_one_shot(FailureType);
-    static void do_prime_random(FailureType, int n, int m);
+    static void do_prime_random(FailureType, int n, int m, uint_fast64_t seed);
     static void do_unprime(FailureType) noexcept;
-    static bool do_check_trigger(FailureType);
+    static bool do_check_trigger(FailureType) noexcept;
 #endif
 };
 
@@ -86,7 +88,7 @@ private:
 
 class SimulatedFailure::RandomPrimeGuard {
 public:
-    RandomPrimeGuard(FailureType, int n, int m);
+    RandomPrimeGuard(FailureType, int n, int m, uint_fast64_t seed = 0);
     ~RandomPrimeGuard() noexcept;
 private:
     const FailureType m_type;
@@ -107,14 +109,16 @@ inline void SimulatedFailure::prime_one_shot(FailureType failure_type)
 #endif
 }
 
-inline void SimulatedFailure::prime_random(FailureType failure_type, int n, int m)
+inline void SimulatedFailure::prime_random(FailureType failure_type, int n, int m,
+                                           uint_fast64_t seed)
 {
 #ifdef REALM_DEBUG
-    do_prime_random(failure_type, n, m);
+    do_prime_random(failure_type, n, m, seed);
 #else
     static_cast<void>(failure_type);
     static_cast<void>(n);
     static_cast<void>(m);
+    static_cast<void>(seed);
 #endif
 }
 
@@ -127,7 +131,7 @@ inline void SimulatedFailure::unprime(FailureType failure_type) noexcept
 #endif
 }
 
-inline bool SimulatedFailure::check_trigger(FailureType failure_type)
+inline bool SimulatedFailure::check_trigger(FailureType failure_type) noexcept
 {
 #ifdef REALM_DEBUG
     return do_check_trigger(failure_type);
@@ -163,10 +167,11 @@ inline SimulatedFailure::OneShotPrimeGuard::~OneShotPrimeGuard() noexcept
     unprime(m_type);
 }
 
-inline SimulatedFailure::RandomPrimeGuard::RandomPrimeGuard(FailureType failure_type, int n, int m):
+inline SimulatedFailure::RandomPrimeGuard::RandomPrimeGuard(FailureType failure_type, int n, int m,
+                                                            uint_fast64_t seed):
     m_type(failure_type)
 {
-    prime_random(m_type, n, m);
+    prime_random(m_type, n, m, seed);
 }
 
 inline SimulatedFailure::RandomPrimeGuard::~RandomPrimeGuard() noexcept

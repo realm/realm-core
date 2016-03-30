@@ -1,3 +1,4 @@
+#include <memory>
 #include <algorithm>
 #include <stdexcept>
 #include <system_error>
@@ -27,20 +28,40 @@ namespace {
 
 const int num_failure_types = SimulatedFailure::_num_failure_types;
 
-enum class PrimeMode { none, one_shot, random };
-
-struct PrimeSlot {
-    PrimeMode mode = PrimeMode::none;
-    std::uniform_int_distribution<int> dist;
-    int n;
+struct PrimeMode {
+    virtual bool check_trigger() noexcept = 0;
 };
 
 struct PrimeState {
-    PrimeSlot slots[num_failure_types];
-    std::mt19937_64 random;
-    PrimeState()
+    std::unique_ptr<PrimeMode> slots[num_failure_types];
+};
+
+struct OneShotPrimeMode: PrimeMode {
+    bool triggered = false;
+    bool check_trigger() noexcept override
     {
-        random.seed(std::random_device()());
+        if (triggered)
+            return false;
+        triggered = true;
+        return true;
+    }
+};
+
+struct RandomPrimeMode: PrimeMode {
+    std::mt19937_64 random;
+    std::uniform_int_distribution<int> dist;
+    int n;
+    RandomPrimeMode(int n, int m, uint_fast64_t seed):
+        random(seed),
+        dist(0, m-1),
+        n(n)
+    {
+        REALM_ASSERT(n >= 0 && m > 0);
+    }
+    bool check_trigger() noexcept override
+    {
+        int i = dist(random);
+        return i < n;
     }
 };
 
@@ -101,45 +122,31 @@ PrimeState& get() noexcept
 void SimulatedFailure::do_prime_one_shot(FailureType failure_type)
 {
     PrimeState& state = get();
-    if (state.slots[failure_type].mode != PrimeMode::none)
-        throw std::runtime_error("Overlapping priming");
-    state.slots[failure_type].mode = PrimeMode::one_shot;
+    if (state.slots[failure_type])
+        throw std::runtime_error("Already primed");
+    state.slots[failure_type].reset(new OneShotPrimeMode); // Throws
 }
 
-void SimulatedFailure::do_prime_random(FailureType failure_type, int n, int m)
+void SimulatedFailure::do_prime_random(FailureType failure_type, int n, int m, uint_fast64_t seed)
 {
-    REALM_ASSERT(n >= 0 && m > 0);
     PrimeState& state = get();
-    if (state.slots[failure_type].mode != PrimeMode::none)
-        throw std::runtime_error("Overlapping priming");
-    state.slots[failure_type].mode = PrimeMode::random;
-    using param_type = std::uniform_int_distribution<int>::param_type;
-    state.slots[failure_type].dist.param(param_type(0,m-1));
-    state.slots[failure_type].dist.reset();
-    state.slots[failure_type].n = n;
+    if (state.slots[failure_type])
+        throw std::runtime_error("Already primed");
+    state.slots[failure_type].reset(new RandomPrimeMode(n, m, seed)); // Throws
 }
 
 void SimulatedFailure::do_unprime(FailureType failure_type) noexcept
 {
     PrimeState& state = get();
-    state.slots[failure_type].mode = PrimeMode::none;
+    state.slots[failure_type].reset();
 }
 
-bool SimulatedFailure::do_check_trigger(FailureType failure_type)
+bool SimulatedFailure::do_check_trigger(FailureType failure_type) noexcept
 {
     PrimeState& state = get();
-    switch (state.slots[failure_type].mode) {
-        case PrimeMode::none:
-            return false;
-        case PrimeMode::one_shot:
-            state.slots[failure_type].mode = PrimeMode::none;
-            return true;
-        case PrimeMode::random: {
-            int i = state.slots[failure_type].dist(state.random);
-            return i < state.slots[failure_type].n;
-        }
-    }
-    REALM_ASSERT(false);
+    if (PrimeMode* p = state.slots[failure_type].get())
+        return p->check_trigger();
+    return false;
 }
 
 #endif // REALM_DEBUG
