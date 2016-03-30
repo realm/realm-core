@@ -9,7 +9,7 @@
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
-#if REALM_IOS
+#if REALM_PLATFORM_APPLE
 #  define USE_PTHREADS_IMPL 1
 #else
 #  define USE_PTHREADS_IMPL 0
