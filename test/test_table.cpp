@@ -6408,6 +6408,7 @@ TEST(Table_RowAccessor_Null)
     size_t col_double = table.add_column(type_Double,   "double", true);
     size_t col_date   = table.add_column(type_DateTime, "date",   true);
     size_t col_binary = table.add_column(type_Binary,   "binary", true);
+    size_t col_newdate = table.add_column(type_NewDate, "newdate", true);
 
     {
         table.add_empty_row();
@@ -6419,6 +6420,7 @@ TEST(Table_RowAccessor_Null)
         row.set_null(col_double);
         row.set_null(col_date);
         row.set_binary(col_binary, BinaryData());
+        row.set_null(col_newdate);
     }
     {
         table.add_empty_row();
@@ -6430,6 +6432,7 @@ TEST(Table_RowAccessor_Null)
         row.set_double(col_double, 1.0);
         row.set_datetime(col_date, DateTime(1));
         row.set_binary(col_binary, BinaryData("a"));
+        row.set_newdate(col_newdate, NewDate(1, 2));
     }
 
     {
@@ -6441,6 +6444,7 @@ TEST(Table_RowAccessor_Null)
         CHECK(row.is_null(col_double));
         CHECK(row.is_null(col_date));
         CHECK(row.is_null(col_binary));
+        CHECK(row.is_null(col_newdate));
     }
 
     {
@@ -6452,6 +6456,7 @@ TEST(Table_RowAccessor_Null)
         CHECK_EQUAL(1.0,             row.get_double(col_double));
         CHECK_EQUAL(DateTime(1),     row.get_datetime(col_date));
         CHECK_EQUAL(BinaryData("a"), row.get_binary(col_binary));
+        CHECK_EQUAL(NewDate(1, 2),   row.get_newdate(col_newdate));
     }
 }
 
@@ -6768,13 +6773,14 @@ TEST(Table_StaleLinkIndexOnTableRemove)
 
 TEST(Table_getVersionCounterAfterRowAccessor) {
     Table t;
-    size_t col_bool   = t.add_column(type_Bool,     "bool",   true);
-    size_t col_int    = t.add_column(type_Int,      "int",    true);
-    size_t col_string = t.add_column(type_String,   "string", true);
-    size_t col_float  = t.add_column(type_Float,    "float",  true);
-    size_t col_double = t.add_column(type_Double,   "double", true);
-    size_t col_date   = t.add_column(type_DateTime, "date",   true);
-    size_t col_binary = t.add_column(type_Binary,   "binary", true);
+    size_t col_bool    = t.add_column(type_Bool,     "bool",    true);
+    size_t col_int     = t.add_column(type_Int,      "int",     true);
+    size_t col_string  = t.add_column(type_String,   "string",  true);
+    size_t col_float   = t.add_column(type_Float,    "float",   true);
+    size_t col_double  = t.add_column(type_Double,   "double",  true);
+    size_t col_date    = t.add_column(type_DateTime, "date",    true);
+    size_t col_binary  = t.add_column(type_Binary,   "binary",  true);
+    size_t col_newdate = t.add_column(type_NewDate,  "newdate", true);
 
     t.add_empty_row(1);
 
@@ -6805,6 +6811,9 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     _CHECK_VER_BUMP();
 
     t.set_binary(col_binary, 0, BinaryData("binary", 7));
+    _CHECK_VER_BUMP();
+
+    t.set_newdate(col_newdate, 0, NewDate(777, 888));
     _CHECK_VER_BUMP();
 
     t.set_null(0, 0);
