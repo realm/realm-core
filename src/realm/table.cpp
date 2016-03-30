@@ -4917,7 +4917,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                 out_datetime(out, get_datetime(col, row_ndx));
                 break;
             case type_NewDate:
-                out << get_newdate(col, row_ndx);
+                out_newdate(out, get_newdate(col, row_ndx));
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
@@ -4954,7 +4954,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                             out_datetime(out, m.get_datetime());
                             break;
                         case type_NewDate:
-                            out << m.get_newdate();
+                            out_newdate(out, m.get_newdate());
                             break;
                         case type_Binary:
                             out.width(widths[col+1]-6); // adjust for " bytes" text
