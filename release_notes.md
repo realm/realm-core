@@ -6,6 +6,10 @@
   which could not later be read. The symptom would be a realm file with zeroes
   in the end but on streaming form (which requires a footer at the end of the
   file instead).
+* Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
+* Bug fix: Access dangling pointer while handling canceled asynchronous accept
+  in POSIX networking API.
+* Handing over a detached row accessor no longer crashes.
 
 ### API breaking changes:
 
@@ -19,6 +23,7 @@
   the database locked. Fixes issue #1429
 * Moved all supporting files (all files except the .realm file) into a
   separate ".management" subdirectory.
+* Adding `util::network::buffered_input_stream::reset()`.
 
 -----------
 
@@ -32,6 +37,7 @@
   each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
   failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
   (`util::Logger`) is now directly available to each unit test.
+* New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 
 ----------------------------------------------
 
