@@ -59,6 +59,7 @@ struct LinkTargetInfo;
 
 struct Link {};
 typedef Link LinkList;
+typedef Link BackLink;
 
 namespace _impl { class TableFriend; }
 
@@ -329,9 +330,13 @@ public:
 
     template<class T>
     Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
+    template<class T>
+    Columns<T> column(const Table& origin, size_t origin_column_ndx);
 
-    template <class T>
+    template<class T>
     SubQuery<T> column(size_t column, Query subquery);
+    template<class T>
+    SubQuery<T> column(const Table& origin, size_t origin_column_ndx, Query subquery);
 
     // Table size and deletion
     bool is_empty() const noexcept;
@@ -692,6 +697,7 @@ public:
     Query where(const LinkViewRef& lv) { return Query(*this, lv); }
 
     Table& link(size_t link_column);
+    Table& backlink(const Table& origin, size_t origin_col_ndx);
 
     // Optimizing. enforce == true will enforce enumeration of all string columns;
     // enforce == false will auto-evaluate if they should be enumerated or not
@@ -1657,14 +1663,12 @@ inline TableRef Table::copy(Allocator& alloc) const
 template<class T>
 inline Columns<T> Table::column(size_t column)
 {
-    std::vector<size_t> tmp = m_link_chain;
-    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
-        tmp.push_back(column);
-    }
+    std::vector<size_t> link_chain = std::move(m_link_chain);
+    m_link_chain.clear();
 
     // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
-    const Table* table = get_link_chain_target(m_link_chain);
+    const Table* table = get_link_chain_target(link_chain);
 
     realm::DataType ct = table->get_column_type(column);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
@@ -1678,16 +1682,40 @@ inline Columns<T> Table::column(size_t column)
     else if (std::is_same<T, double>::value && ct != type_Double)
         throw(LogicError::type_mismatch);
 
+    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value || std::is_same<T, BackLink>::value) {
+        link_chain.push_back(column);
+    }
 
+    return Columns<T>(column, this, std::move(link_chain));
+}
+
+template<class T>
+inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
+{
+    static_assert(std::is_same<T, BackLink>::value, "");
+
+    size_t origin_table_ndx = origin.get_index_in_group();
+    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+
+    std::vector<size_t> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
-    return Columns<T>(column, this, tmp);
+    link_chain.push_back(backlink_col_ndx);
+
+    return Columns<T>(backlink_col_ndx, this, std::move(link_chain));
 }
 
 template<class T>
 SubQuery<T> Table::column(size_t column_ndx, Query subquery)
 {
-    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list column");
+    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(column_ndx), std::move(subquery));
+}
+
+template<class T>
+SubQuery<T> Table::column(const Table& origin, size_t origin_col_ndx, Query subquery)
+{
+    static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
+    return SubQuery<T>(column<T>(origin, origin_col_ndx), std::move(subquery));
 }
 
 // For use by queries
@@ -1695,6 +1723,13 @@ inline Table& Table::link(size_t link_column)
 {
     m_link_chain.push_back(link_column);
     return *this;
+}
+
+inline Table& Table::backlink(const Table& origin, size_t origin_col_ndx)
+{
+    size_t origin_table_ndx = origin.get_index_in_group();
+    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+    return link(backlink_col_ndx);
 }
 
 inline bool Table::is_empty() const noexcept
