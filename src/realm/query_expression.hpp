@@ -202,15 +202,16 @@ StringData only_string(StringData in)
     return in;
 }
 
-// FIXME: Horrible. Use C++11 features instead
-template<class T>
-T no_newdate(T in)
+template<class T, class U>
+T no_newdate(U in)
 {
-    return in;
+    return static_cast<T>(util::unwrap(in));
 }
 
-int no_newdate(NewDate)
+template<class T>
+int no_newdate(const NewDate&)
 {
+    REALM_ASSERT(false);
     return 0;
 }
 
@@ -390,9 +391,9 @@ Query create(L left, const Subexpr2<R>& right)
         else if (std::is_same<Cond, Greater>::value)
             q.less(column->m_column, only_numeric<R>(left));
         else if (std::is_same<Cond, Equal>::value)
-            q.equal(column->m_column, no_newdate(left));
+            q.equal(column->m_column, no_newdate<R>(left));
         else if (std::is_same<Cond, NotEqual>::value)
-            q.not_equal(column->m_column, no_newdate(left));
+            q.not_equal(column->m_column, no_newdate<R>(left));
         else if (std::is_same<Cond, LessEqual>::value)
             q.greater_equal(column->m_column, only_numeric<R>(left));
         else if (std::is_same<Cond, GreaterEqual>::value)
