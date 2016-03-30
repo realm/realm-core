@@ -1459,6 +1459,8 @@ inline void Table::remove_last()
         remove(size()-1);
 }
 
+// A good place to start if you want to understand the memory ordering
+// chosen for the operations below is http://preshing.com/20130922/acquire-and-release-fences/
 inline void Table::bind_ptr() const noexcept
 {
     m_ref_count.fetch_add(1, std::memory_order_relaxed);
@@ -1466,6 +1468,12 @@ inline void Table::bind_ptr() const noexcept
 
 inline void Table::unbind_ptr() const noexcept
 {
+    // The delete operation runs the destructor, and the destructor
+    // must always see all changes to the object being deleted.
+    // Within each thread, we know that unbind_ptr will always happen after
+    // any changes, so it is a convenient place to do a release.
+    // The release will then be observed by the acquire fence in
+    // the case where delete is actually called (the count reaches 0)
     if (m_ref_count.fetch_sub(1, std::memory_order_release) != 1)
         return;
 
