@@ -58,7 +58,9 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
     return out;
 }
 
-class DateTimeColumn : public ColumnBaseSimple {
+// Inherits from ColumnTemplate to get a compare_values() that can be called without knowing the
+// column type
+class DateTimeColumn : public ColumnBaseSimple, public ColumnTemplate<NewDate> {
 public:
     DateTimeColumn(Allocator& alloc, ref_type ref);
     ~DateTimeColumn() noexcept override;
@@ -97,6 +99,7 @@ public:
 #endif
     void add(const NewDate& ndt = NewDate{});
     NewDate get(size_t row_ndx) const noexcept;
+    NewDate get_val(size_t row_ndx) const noexcept { return get(row_ndx); }
     void set(size_t row_ndx, const NewDate& ndt);
     bool compare(const DateTimeColumn& c) const noexcept;
     void erase(size_t ndx, bool is_last) {
