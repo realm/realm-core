@@ -83,6 +83,10 @@ public:
     /// all sharing a common SharedPart instance, which must be in shared memory.
     static void init_shared_part(SharedPart& shared_part);
 
+    /// Release any system resources allocated for the shared part. This should
+    /// be used *only* when you are certain, that nobody is using it.
+    void release_shared_part();
+
     /// Wait for someone to call notify() or notify_all() on this condition
     /// variable. The call to wait() may return spuriously, so the caller should
     /// always re-evaluate the condition on which to wait and loop on wait()
@@ -105,7 +109,10 @@ public:
 private:
     // non-zero if a shared part has been registered (always 0 on process local instances)
     SharedPart* m_shared_part = nullptr;
-
+#ifdef REALM_CONDVAR_EMULATION
+    // keep the path to allocated system resource so we can remove them again
+    std::string m_resource_path;
+#endif
     bool uses_emulation = false;
     // pipe used for emulation
     int m_fd_read = -1;
