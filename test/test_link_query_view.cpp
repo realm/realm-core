@@ -1755,20 +1755,20 @@ TEST(BackLink_Query_MultipleLevels)
         return row;
     };
 
-    auto hannah   = add_person("Hannah", 0, {});
-    auto elijah   = add_person("Elijah", 3, {});
+    auto hannah   = add_person("Hannah",    0, {});
+    auto elijah   = add_person("Elijah",    3, {});
 
-    auto mark     = add_person("Mark",  30, {hannah});
-    auto jason    = add_person("Jason", 31, {elijah});
+    auto mark     = add_person("Mark",     30, {hannah});
+    auto jason    = add_person("Jason",    31, {elijah});
 
-    auto diane    = add_person("Diane", 29, {hannah});
-    auto carol    = add_person("Carol", 32, {});
+    auto diane    = add_person("Diane",    29, {hannah});
+    auto carol    = add_person("Carol",    31, {});
 
-    auto don      = add_person("Don",   64, {diane, carol});
-    auto diane_sr = add_person("Diane", 60, {diane, carol});
+    auto don      = add_person("Don",      64, {diane, carol});
+    auto diane_sr = add_person("Diane",    60, {diane, carol});
 
-    add_person("Michael",  57, {jason, mark});
-    add_person("Raewynne", 56, {jason, mark});
+    auto michael  = add_person("Michael",  57, {jason, mark});
+    auto raewynne = add_person("Raewynne", 56, {jason, mark});
 
     // People that have a parent with a name that starts with 'M'.
     Query q1 = people->backlink(*people, col_children).column<String>(col_name).begins_with("M");
@@ -1793,6 +1793,26 @@ TEST(BackLink_Query_MultipleLevels)
     // People that have at least one sibling.
     Query q6 = people->column<BackLink>(*people, col_children, people->column<Link>(col_children).count() > 1).count() > 0;
     CHECK_TABLE_VIEW(q6.find_all(), {mark, jason, diane, carol});
+
+    // People that have Raewynne as a parent.
+    Query q7 = people->column<BackLink>(*people, col_children) == people->get(raewynne);
+    CHECK_TABLE_VIEW(q7.find_all(), {mark, jason});
+
+    // People that have Mark as a child.
+    Query q8 = people->column<Link>(col_children) == people->get(mark);
+    CHECK_TABLE_VIEW(q8.find_all(), {michael, raewynne});
+
+    // People that have Michael as a grandparent.
+    Query q9 = people->backlink(*people, col_children).column<BackLink>(*people, col_children) == people->get(michael);
+    CHECK_TABLE_VIEW(q9.find_all(), {hannah, elijah});
+
+    // People that have Hannah as a grandchild.
+    Query q10 = people->link(col_children).column<Link>(col_children) == people->get(hannah);
+    CHECK_TABLE_VIEW(q10.find_all(), {don, diane_sr, michael, raewynne});
+
+    // People that have no listed parents.
+    Query q11 = people->column<BackLink>(*people, col_children).is_null();
+    CHECK_TABLE_VIEW(q11.find_all(), {don, diane_sr, michael, raewynne});
 }
 
 #endif

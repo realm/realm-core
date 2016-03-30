@@ -246,6 +246,29 @@ struct Common<T1, T2, true, false, b> {
 };
 
 
+struct RowIndex {
+    enum DetachedTag {
+        Detached
+    };
+
+    explicit RowIndex() : m_row_index(npos) { }
+    explicit RowIndex(size_t row_index) : m_row_index(row_index) { }
+    RowIndex(DetachedTag) : m_row_index() { }
+
+    bool is_attached() const { return bool(m_row_index); }
+    bool is_null() const { return is_attached() && *m_row_index == npos; }
+
+    bool operator == (const RowIndex& other) const {
+        // Row indexes that are detached are never equal to any other row index.
+        if (!is_attached() || !other.is_attached())
+            return false;
+        return m_row_index == other.m_row_index;
+    }
+    bool operator != (const RowIndex& other) const { return !(*this == other); }
+
+private:
+    util::Optional<size_t> m_row_index;
+};
 
 
 struct ValueBase
@@ -258,6 +281,7 @@ struct ValueBase
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void export_StringData(ValueBase& destination) const = 0;
     virtual void export_BinaryData(ValueBase& destination) const = 0;
+    virtual void export_RowIndex(ValueBase& destination) const = 0;
     virtual void export_null(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
@@ -715,7 +739,7 @@ struct NullableVector
     }
 
     template <typename Type = T>
-    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, null>::value,
+    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, RowIndex, null>::value,
                             void>::type
     set(size_t index, t_storage value) {
         m_first[index] = value;
@@ -866,6 +890,18 @@ template<>
 inline void NullableVector<BinaryData>::set_null(size_t index)
 {
     m_first[index] = BinaryData();
+}
+
+// RowIndex
+template<>
+inline bool NullableVector<RowIndex>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+template<>
+inline void NullableVector<RowIndex>::set_null(size_t index)
+{
+    m_first[index] = RowIndex();
 }
 
 
@@ -1042,6 +1078,10 @@ public:
     {
         export2<BinaryData>(destination);
     }
+    REALM_FORCEINLINE void export_RowIndex(ValueBase& destination) const override
+    {
+        export2<RowIndex>(destination);
+    }
     REALM_FORCEINLINE void export_null(ValueBase& destination) const override
     {
         Value<null>& d = static_cast<Value<null>&>(destination);
@@ -1064,6 +1104,8 @@ public:
             source.export_StringData(*this);
         else if (std::is_same<T, BinaryData>::value)
             source.export_BinaryData(*this);
+        else if (std::is_same<T, RowIndex>::value)
+            source.export_RowIndex(*this);
         else if (std::is_same<T, null>::value)
             source.export_null(*this);
         else
@@ -1527,6 +1569,9 @@ private:
     const Table* m_base_table = nullptr;
     const Table* m_target_table = nullptr;
     bool m_only_unary_links = true;
+
+    template <class>
+    friend Query compare(const Subexpr2<Link>&, const ConstRow&);
 };
 
 template<class T, class S, class I>
@@ -1839,6 +1884,60 @@ private:
     LinkMap m_link_map;
 };
 
+struct ConstantRowValueHandoverPatch : public QueryNodeHandoverPatch {
+    std::unique_ptr<RowBaseHandoverPatch> row_patch;
+};
+
+class ConstantRowValue : public Subexpr2<Link> {
+public:
+    ConstantRowValue(const ConstRow& row) : m_row(row) { }
+
+    void set_base_table(const Table*) override { }
+    const Table* get_base_table() const override { return nullptr; }
+
+    void evaluate(size_t, ValueBase& destination) override
+    {
+        if (m_row.is_attached()) {
+            Value<RowIndex> v(RowIndex(m_row.get_index()));
+            destination.import(v);
+        } else {
+            Value<RowIndex> v(RowIndex::Detached);
+            destination.import(v);
+        }
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantRowValue(*this, patches));
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        REALM_ASSERT(patches.size());
+        std::unique_ptr<QueryNodeHandoverPatch> abstract_patch = std::move(patches.back());
+        patches.pop_back();
+
+        auto patch = dynamic_cast<ConstantRowValueHandoverPatch*>(abstract_patch.get());
+        REALM_ASSERT(patch);
+
+        m_row.apply_and_consume_patch(patch->row_patch, group);
+    }
+
+private:
+    ConstantRowValue(const ConstantRowValue& source, QueryNodeHandoverPatches* patches)
+    : m_row(patches ? ConstRow() : source.m_row)
+    {
+        if (!patches)
+            return;
+
+        std::unique_ptr<ConstantRowValueHandoverPatch> patch(new ConstantRowValueHandoverPatch);
+        ConstRow::generate_patch(source.m_row, patch->row_patch);
+        patches->emplace_back(patch.release());
+    }
+
+    ConstRow m_row;
+};
+
 template<typename T>
 class SubColumns;
 
@@ -1873,6 +1972,25 @@ public:
 
     LinkMap link_map() const { return m_link_map; }
 
+    const Table* get_base_table() const override { return m_link_map.base_table(); }
+    void set_base_table(const Table* table) override { m_link_map.set_base_table(table); }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return make_subexpr<Columns<Link>>(*this);
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        std::vector<size_t> links = m_link_map.get_links(index);
+        Value<RowIndex> v = make_value_for_link<RowIndex>(m_link_map.only_unary_links(), links.size());
+
+        for (size_t t = 0; t < links.size(); t++) {
+            v.m_storage.set(t, RowIndex(links[t]));
+        }
+        destination.import(v);
+    }
+
 private:
     Columns(size_t column, const Table* table, const std::vector<size_t>& links={}) :
         m_link_map(table, links)
@@ -1880,31 +1998,28 @@ private:
         static_cast<void>(column);
     }
 
-    void set_base_table(const Table* table) override
-    {
-        m_link_map.set_base_table(table);
-    }
-
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
-    {
-        return make_subexpr<Columns<Link>>(*this);
-    }
-
-    const Table* get_base_table() const override
-    {
-        return m_link_map.base_table();
-    }
-
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        static_cast<void>(index);
-        static_cast<void>(destination);
-        REALM_ASSERT(false);
-    }
-
     LinkMap m_link_map;
     friend class Table;
 };
+
+
+template <class Operator>
+Query compare(const Subexpr2<Link>& left, const ConstRow& row)
+{
+    static_assert(std::is_same<Operator, Equal>::value || std::is_same<Operator, NotEqual>::value,
+                  "Links can only be compared for equality.");
+    const Columns<Link>* column = dynamic_cast<const Columns<Link>*>(&left);
+    if (column) {
+        LinkMap link_map = column->link_map();
+        REALM_ASSERT(link_map.target_table() == row.get_table() || !row.is_attached());
+    }
+    return make_expression<Compare<Operator, RowIndex>>(left.clone(), make_subexpr<ConstantRowValue>(row));
+}
+
+inline Query operator == (const Subexpr2<Link>& left, const ConstRow& row) { return compare<Equal>(left, row); }
+inline Query operator != (const Subexpr2<Link>& left, const ConstRow& row) { return compare<NotEqual>(left, row); }
+inline Query operator == (const ConstRow& row, const Subexpr2<Link>& right) { return compare<Equal>(right, row); }
+inline Query operator != (const ConstRow& row, const Subexpr2<Link>& right) { return compare<NotEqual>(right, row); }
 
 
 template<class T>
