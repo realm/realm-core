@@ -233,7 +233,8 @@ TEST(MixedColumn_NewDate)
         CHECK_EQUAL(type_NewDate, c.get_type(i));
 
     CHECK_EQUAL(4, c.size());
-    CHECK(c.get_newdate(0) == NewDate(null()));
+//    CHECK(c.get_newdate(0) == NewDate(null()));
+//    operator== should not be called for null according to column_datetime.hpp:38
     CHECK(c.get_newdate(1) == NewDate(100, 200));
     CHECK(c.get_newdate(2) == NewDate(0, 0)); // Should *not* equal null
     CHECK(c.get_newdate(3) == NewDate(-1000, 0));
