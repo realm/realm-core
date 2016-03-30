@@ -2069,6 +2069,17 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
     if (column) {
         LinkMap link_map = column->link_map();
         REALM_ASSERT(link_map.target_table() == row.get_table() || !row.is_attached());
+#ifdef REALM_OLDQUERY_FALLBACK
+        if (link_map.m_link_columns.size() == 1 &&
+            (link_map.m_link_types[0] == col_type_Link || link_map.m_link_types[0] == col_type_LinkList)) {
+            const Table* t = column->get_base_table();
+            Query query(*t);
+            if (std::is_same<Operator, NotEqual>::value)
+                query.Not();
+            query.links_to(link_map.m_link_column_indexes[0], row);
+            return query;
+        }
+#endif
     }
     return make_expression<Compare<Operator, RowIndex>>(left.clone(), make_subexpr<ConstantRowValue>(row));
 }

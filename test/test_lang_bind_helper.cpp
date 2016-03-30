@@ -10500,22 +10500,22 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 
         LangBindHelper::commit_and_continue_as_read(sg_w);
 
-        Query query = source->where().links_to(col_link, target->get(0));
+        Query query = source->column<Link>(col_link) == target->get(0);
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
 
-        Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
+        Query queryOr = source->column<Link>(col_link) == target->get(0) || source->column<Link>(col_link) == target->get(1);
         handoverQueryOr = sg_w.export_for_handover(queryOr, ConstSourcePayload::Copy);
 
-        Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
+        Query queryAnd = source->column<Link>(col_link) == target->get(0) && source->column<Link>(col_link) == target->get(0);
         handoverQueryAnd = sg_w.export_for_handover(queryAnd, ConstSourcePayload::Copy);
 
-        Query queryNot = source->where().Not().links_to(col_link, target->get(0)).links_to(col_link, target->get(1));
+        Query queryNot = !(source->column<Link>(col_link) == target->get(0)) && source->column<Link>(col_link) == target->get(1);
         handoverQueryNot = sg_w.export_for_handover(queryNot, ConstSourcePayload::Copy);
 
         Query queryAndAndOr = source->where().group().and_query(queryOr).end_group().and_query(queryAnd);
         handoverQueryAndAndOr = sg_w.export_for_handover(queryAndAndOr, ConstSourcePayload::Copy);
 
-        Query queryWithExpression = source->column<LinkList>(col_link).is_not_null() && query;
+        Query queryWithExpression = source->column<Link>(col_link).is_not_null() && query;
         handoverQueryWithExpression = sg_w.export_for_handover(queryWithExpression, ConstSourcePayload::Copy);
 
         Query queryLinksToDetached = source->where().links_to(col_link, detached_row);
