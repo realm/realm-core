@@ -68,7 +68,7 @@ struct RandomPrimeMode: PrimeMode {
 #  if !USE_PTHREADS_IMPL
 
 
-REALM_THREAD_LOCAL PrimeState t_prime_state;
+thread_local PrimeState t_prime_state;
 
 PrimeState& get() noexcept
 {
