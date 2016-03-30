@@ -4478,6 +4478,21 @@ inline void out_datetime(std::ostream& out, DateTime value)
     }
 }
 
+inline void out_newdate(std::ostream& out, NewDate value)
+{
+    // FIXME: Do we want to output the full precision to json?
+    time_t rawtime = value.m_seconds;
+    struct tm* t = gmtime(&rawtime);
+    if (t) {
+        // We need a buffer for formatting dates (and binary to hex). Max
+        // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
+        char buffer[30];
+        size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
+        if (res)
+            out << buffer;
+    }
+}
+
 inline void out_binary(std::ostream& out, const BinaryData bin)
 {
     const char* p = bin.data();
@@ -4551,6 +4566,9 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
         case type_Binary:
             out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
             break;
+        case type_NewDate:
+            out << "\""; out_newdate(out, get_newdate(i, row_ndx)); out << "\"";
+            break;
         case type_Table:
             get_subtable(i, row_ndx)->to_json(out);
             break;
@@ -4583,6 +4601,9 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                     break;
                 case type_Binary:
                     out << "\""; out_binary(out, m.get_binary()); out << "\"";
+                    break;
+                case type_NewDate:
+                    out << "\""; out_newdate(out, m.get_newdate()); out << "\"";
                     break;
                 case type_Table:
                 case type_Mixed:
@@ -4729,6 +4750,8 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 width = 5;
                 break;
             case type_DateTime:
+            case type_NewDate:
+                // FIXME: Probably not correct if we output the full precision
                 width = 19;
                 break;
             case type_Int:
@@ -4781,6 +4804,8 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                             width = std::max(width, size_t(5));
                             break;
                         case type_DateTime:
+                        case type_NewDate:
+                            // FIXME: Probably not correct if we output the full precision
                             width = std::max(width, size_t(19));
                             break;
                         case type_Int:

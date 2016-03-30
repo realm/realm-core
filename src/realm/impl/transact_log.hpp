@@ -720,6 +720,14 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
             append_string_instr(instr, numbers_2, value_3); // Throws
             return;
         }
+        case type_NewDate: {
+            NewDate nd = value.get_newdate();
+            auto seconds = nd.m_seconds;
+            auto nano_seconds = nd.m_nanoseconds;
+            auto numbers_3 = append(numbers_2, seconds);
+            append_simple_instr(instr, append(numbers_3, nano_seconds)); // Throws
+            return;
+        }
         case type_Table:
             append_simple_instr(instr, numbers_2); // Throws
             return;
