@@ -642,6 +642,12 @@ public:
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/ ) RLM_U(> ) RLM_U(< ) RLM_U(== ) RLM_U(!= ) RLM_U(>= ) RLM_U(<= )
 };
 
+// Subexpr2<Link> only provides equality comparisons. Their implementations can be found later in this file.
+template<>
+class Subexpr2<Link> : public Subexpr
+{
+};
+
 
 /*
 This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
@@ -2088,6 +2094,19 @@ inline Query operator == (const Subexpr2<Link>& left, const ConstRow& row) { ret
 inline Query operator != (const Subexpr2<Link>& left, const ConstRow& row) { return compare<NotEqual>(left, row); }
 inline Query operator == (const ConstRow& row, const Subexpr2<Link>& right) { return compare<Equal>(right, row); }
 inline Query operator != (const ConstRow& row, const Subexpr2<Link>& right) { return compare<NotEqual>(right, row); }
+
+template <class Operator>
+Query compare(const Subexpr2<Link>& left, null)
+{
+    static_assert(std::is_same<Operator, Equal>::value || std::is_same<Operator, NotEqual>::value,
+                  "Links can only be compared for equality.");
+    return make_expression<Compare<Operator, RowIndex>>(left.clone(), make_subexpr<Value<RowIndex>>());
+}
+
+inline Query operator == (const Subexpr2<Link>& left, null) { return compare<Equal>(left, null()); }
+inline Query operator != (const Subexpr2<Link>& left, null) { return compare<NotEqual>(left, null()); }
+inline Query operator == (null, const Subexpr2<Link>& right) { return compare<Equal>(right, null()); }
+inline Query operator != (null, const Subexpr2<Link>& right) { return compare<NotEqual>(right, null()); }
 
 
 template<class T>

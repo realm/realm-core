@@ -1456,6 +1456,12 @@ TEST(LinkList_QueryLinkNull)
 
     CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
     CHECK_EQUAL(0, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(0));
+
+    CHECK_EQUAL(1, (data_table->column<Link>(1) == realm::null()).count());
+    CHECK_EQUAL(2, (data_table->column<Link>(1) != realm::null()).count());
+
+    CHECK_EQUAL(0, (data_table->column<Link>(1) == Row()).count());
+    CHECK_EQUAL(3, (data_table->column<Link>(1) != Row()).count());
 }
 
 
@@ -1813,6 +1819,22 @@ TEST(BackLink_Query_MultipleLevels)
     // People that have no listed parents.
     Query q11 = people->column<BackLink>(*people, col_children).is_null();
     CHECK_TABLE_VIEW(q11.find_all(), {don, diane_sr, michael, raewynne});
+
+    // Backlinks can never contain null so this will match no rows.
+    Query q12 = people->column<BackLink>(*people, col_children) == null();
+    CHECK_TABLE_VIEW(q12.find_all(), {});
+
+    // Backlinks can never contain null so this will match all rows with backlinks.
+    Query q13 = people->column<BackLink>(*people, col_children) != null();
+    CHECK_TABLE_VIEW(q13.find_all(), {hannah, elijah, mark, jason, diane, carol});
+
+    // No links are equal to a detached row accessor.
+    Query q14 = people->column<BackLink>(*people, col_children) == Row();
+    CHECK_TABLE_VIEW(q14.find_all(), {});
+
+    // All links are not equal to a detached row accessor so this will match all rows with backlinks.
+    Query q15 = people->column<BackLink>(*people, col_children) != Row();
+    CHECK_TABLE_VIEW(q15.find_all(), {hannah, elijah, mark, jason, diane, carol});
 }
 
 #endif
