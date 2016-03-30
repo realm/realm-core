@@ -239,7 +239,7 @@ public:
     {
         LockGuard lock(m_mutex);
         ++m_num_stones;
-        m_cond_var.notify();
+        m_cond_var.notify_all();
     }
 private:
     Mutex m_mutex;
@@ -552,13 +552,11 @@ void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter,
                        InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
-    //std::cerr << "waiter entry: " << *wait_counter << std::endl;
     ++ *wait_counter;
     feedback->add_stone();
     cv->wait(*mutex, nullptr);
     -- *wait_counter;
     feedback->add_stone();
-    //std::cerr << "waiter exit: " << *wait_counter << std::endl;
 }
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
