@@ -30,6 +30,7 @@ const int num_failure_types = SimulatedFailure::_num_failure_types;
 
 struct PrimeMode {
     virtual bool check_trigger() noexcept = 0;
+    virtual ~PrimeMode() noexcept {}
 };
 
 struct PrimeState {
