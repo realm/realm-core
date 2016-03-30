@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <stdexcept>
 #include <system_error>
+#include <random>
 
 #include <realm/util/features.h>
+#include <realm/util/assert.hpp>
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
@@ -25,14 +27,31 @@ namespace {
 
 const int num_failure_types = SimulatedFailure::_num_failure_types;
 
+enum class PrimeMode { none, one_shot, random };
+
+struct PrimeSlot {
+    PrimeMode mode = PrimeMode::none;
+    std::uniform_int_distribution<int> dist;
+    int n;
+};
+
+struct PrimeState {
+    PrimeSlot slots[num_failure_types];
+    std::mt19937_64 random;
+    PrimeState()
+    {
+        random.seed(std::random_device()());
+    }
+};
+
 #  if !USE_PTHREADS_IMPL
 
 
-REALM_THREAD_LOCAL bool primed_failure_types[num_failure_types];
+REALM_THREAD_LOCAL PrimeState t_prime_state;
 
-bool* get() noexcept
+PrimeState& get() noexcept
 {
-    return primed_failure_types;
+    return t_prime_state;
 }
 
 
@@ -44,8 +63,8 @@ pthread_once_t key_once = PTHREAD_ONCE_INIT;
 
 void destroy(void* ptr) noexcept
 {
-    bool* primed_failure_types = static_cast<bool*>(ptr);
-    delete[] primed_failure_types;
+    PrimeState* prime_state = static_cast<PrimeState*>(ptr);
+    delete prime_state;
 }
 
 void create() noexcept
@@ -57,21 +76,20 @@ void create() noexcept
     }
 }
 
-bool* get() noexcept
+PrimeState& get() noexcept
 {
     pthread_once(&key_once, &create);
     void* ptr = pthread_getspecific(key);
-    bool* primed_failure_types = static_cast<bool*>(ptr);
-    if (!primed_failure_types) {
-        primed_failure_types = new bool[num_failure_types]; // Throws with intended termination
-        std::fill(primed_failure_types, primed_failure_types+num_failure_types, false);
-        int ret = pthread_setspecific(key, primed_failure_types);
+    PrimeState* prime_state = static_cast<PrimeState*>(ptr);
+    if (!prime_state) {
+        prime_state = new PrimeState; // Throws with intended termination
+        int ret = pthread_setspecific(key, prime_state);
         if (REALM_UNLIKELY(ret != 0)) {
             std::error_code ec = util::make_basic_system_error_code(errno);
             throw std::system_error(ec); // Termination intended
         }
     }
-    return primed_failure_types;
+    return *prime_state;
 }
 
 
@@ -80,23 +98,48 @@ bool* get() noexcept
 } // unnamed namespace
 
 
-void SimulatedFailure::do_prime(type failure_type)
+void SimulatedFailure::do_prime_one_shot(FailureType failure_type)
 {
-    get()[failure_type] = true;
+    PrimeState& state = get();
+    if (state.slots[failure_type].mode != PrimeMode::none)
+        throw std::runtime_error("Overlapping priming");
+    state.slots[failure_type].mode = PrimeMode::one_shot;
 }
 
-void SimulatedFailure::do_unprime(type failure_type) noexcept
+void SimulatedFailure::do_prime_random(FailureType failure_type, int n, int m)
 {
-    get()[failure_type] = false;
+    REALM_ASSERT(n >= 0 && m > 0);
+    PrimeState& state = get();
+    if (state.slots[failure_type].mode != PrimeMode::none)
+        throw std::runtime_error("Overlapping priming");
+    state.slots[failure_type].mode = PrimeMode::random;
+    using param_type = std::uniform_int_distribution<int>::param_type;
+    state.slots[failure_type].dist.param(param_type(0,m-1));
+    state.slots[failure_type].dist.reset();
+    state.slots[failure_type].n = n;
 }
 
-void SimulatedFailure::do_check(type failure_type)
+void SimulatedFailure::do_unprime(FailureType failure_type) noexcept
 {
-    bool* primed_failure_types = get();
-    if (REALM_UNLIKELY(primed_failure_types[failure_type])) {
-        primed_failure_types[failure_type] = false;
-        throw SimulatedFailure();
+    PrimeState& state = get();
+    state.slots[failure_type].mode = PrimeMode::none;
+}
+
+bool SimulatedFailure::do_check_trigger(FailureType failure_type)
+{
+    PrimeState& state = get();
+    switch (state.slots[failure_type].mode) {
+        case PrimeMode::none:
+            return false;
+        case PrimeMode::one_shot:
+            state.slots[failure_type].mode = PrimeMode::none;
+            return true;
+        case PrimeMode::random: {
+            int i = state.slots[failure_type].dist(state.random);
+            return i < state.slots[failure_type].n;
+        }
     }
+    REALM_ASSERT(false);
 }
 
 #endif // REALM_DEBUG

@@ -30,51 +30,66 @@ namespace _impl {
 
 class SimulatedFailure: public std::exception {
 public:
-    enum type {
+    enum FailureType {
+        generic,
         slab_alloc__reset_free_space_tracking,
         slab_alloc__remap,
         shared_group__grow_reader_mapping,
+        sync_client__read_head,
         _num_failure_types
     };
 
-    class PrimeGuard;
+    class OneShotPrimeGuard;
+    class RandomPrimeGuard;
 
-    // Prime the specified failure type on the calling thread.
-    static void prime(type);
+    /// Prime the specified failure type on the calling thread for triggering
+    /// once.
+    static void prime_one_shot(FailureType);
 
-    // Unprime the specified failure type on the calling thread.
-    static void unprime(type) noexcept;
+    /// Prime the specified failure type on the calling thread for triggering
+    /// randomly \a n out of \a m times.
+    static void prime_random(FailureType, int n, int m);
 
-    // If the specified failure type was primed on the calling thread and
-    // REALM_DEBUG was defined during compilation, then this throws
-    // SimulatedFailure after unpriming the failure type. If REALM_DEBUG was not
-    // defined, this function does nothing.
-    static void check(type);
+    /// Unprime the specified failure type on the calling thread.
+    static void unprime(FailureType) noexcept;
+
+    /// Returns true according to the mode of priming of the specified failure
+    /// type, but only if REALM_DEBUG was defined during compilation. If
+    /// REALM_DEBUG was not defined, this function always return false.
+    static bool check_trigger(FailureType);
+
+    /// Throws SimulatedFailure if check_trigger() returns true.
+    static void trigger(FailureType);
+
+    /// Returns true when, and only when REALM_DEBUG was defined during
+    /// compilation.
+    static constexpr bool is_enabled();
 
 private:
 #ifdef REALM_DEBUG
-    static void do_prime(type);
-    static void do_unprime(type) noexcept;
-    static void do_check(type);
+    static void do_prime_one_shot(FailureType);
+    static void do_prime_random(FailureType, int n, int m);
+    static void do_unprime(FailureType) noexcept;
+    static bool do_check_trigger(FailureType);
 #endif
 };
 
 
-class SimulatedFailure::PrimeGuard {
+class SimulatedFailure::OneShotPrimeGuard {
 public:
-    PrimeGuard(type failure_type):
-        m_type(failure_type)
-    {
-        prime(m_type);
-    }
-
-    ~PrimeGuard() noexcept
-    {
-        unprime(m_type);
-    }
-
+    OneShotPrimeGuard(FailureType);
+    ~OneShotPrimeGuard() noexcept;
 private:
-    const type m_type;
+    const FailureType m_type;
+};
+
+
+class SimulatedFailure::RandomPrimeGuard {
+public:
+    RandomPrimeGuard(FailureType, int n, int m);
+    ~RandomPrimeGuard() noexcept;
+private:
+    const FailureType m_type;
 };
 
 
@@ -83,16 +98,27 @@ private:
 
 // Implementation
 
-inline void SimulatedFailure::prime(type failure_type)
+inline void SimulatedFailure::prime_one_shot(FailureType failure_type)
 {
 #ifdef REALM_DEBUG
-    do_prime(failure_type);
+    do_prime_one_shot(failure_type);
 #else
     static_cast<void>(failure_type);
 #endif
 }
 
-inline void SimulatedFailure::unprime(type failure_type) noexcept
+inline void SimulatedFailure::prime_random(FailureType failure_type, int n, int m)
+{
+#ifdef REALM_DEBUG
+    do_prime_random(failure_type, n, m);
+#else
+    static_cast<void>(failure_type);
+    static_cast<void>(n);
+    static_cast<void>(m);
+#endif
+}
+
+inline void SimulatedFailure::unprime(FailureType failure_type) noexcept
 {
 #ifdef REALM_DEBUG
     do_unprime(failure_type);
@@ -101,13 +127,51 @@ inline void SimulatedFailure::unprime(type failure_type) noexcept
 #endif
 }
 
-inline void SimulatedFailure::check(type failure_type)
+inline bool SimulatedFailure::check_trigger(FailureType failure_type)
 {
 #ifdef REALM_DEBUG
-    do_check(failure_type);
+    return do_check_trigger(failure_type);
 #else
     static_cast<void>(failure_type);
+    return false;
 #endif
+}
+
+inline void SimulatedFailure::trigger(FailureType failure_type)
+{
+    if (check_trigger(failure_type))
+        throw SimulatedFailure();
+}
+
+inline constexpr bool SimulatedFailure::is_enabled()
+{
+#ifdef REALM_DEBUG
+    return true;
+#else
+    return false;
+#endif
+}
+
+inline SimulatedFailure::OneShotPrimeGuard::OneShotPrimeGuard(FailureType failure_type):
+    m_type(failure_type)
+{
+    prime_one_shot(m_type);
+}
+
+inline SimulatedFailure::OneShotPrimeGuard::~OneShotPrimeGuard() noexcept
+{
+    unprime(m_type);
+}
+
+inline SimulatedFailure::RandomPrimeGuard::RandomPrimeGuard(FailureType failure_type, int n, int m):
+    m_type(failure_type)
+{
+    prime_random(m_type, n, m);
+}
+
+inline SimulatedFailure::RandomPrimeGuard::~RandomPrimeGuard() noexcept
+{
+    unprime(m_type);
 }
 
 } // namespace _impl
