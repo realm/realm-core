@@ -1643,7 +1643,7 @@ void SharedGroup::do_begin_write()
 
     if (info->commit_in_critical_phase) {
         m_writemutex.unlock();
-        throw std::runtime_error("need to restart everything");
+        throw std::runtime_error("Crash of other process detected, restart required");
     }
 
 #ifdef REALM_ASYNC_DAEMON
