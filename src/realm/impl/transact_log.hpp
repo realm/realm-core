@@ -460,6 +460,7 @@ private:
 
     StringData read_string(util::StringBuffer&);
     BinaryData read_binary(util::StringBuffer&);
+    NewDate read_newdate();
     void read_mixed(Mixed*);
 
     // Advance m_input_begin and m_input_end to reflect the next block of instructions
@@ -2017,6 +2018,12 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
     return StringData{buffer.data(), size};
 }
 
+inline NewDate TransactLogParser::read_newdate()
+{
+    REALM_ASSERT(false);
+    return NewDate();
+}
+
 
 inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
 {
@@ -2059,6 +2066,11 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
         case type_DateTime: {
             int_fast64_t value = read_int<int_fast64_t>(); // Throws
             mixed->set_datetime(value);
+            return;
+        }
+        case type_NewDate: {
+            NewDate value = read_newdate(); // Throws
+            mixed->set_newdate(value);
             return;
         }
         case type_String: {

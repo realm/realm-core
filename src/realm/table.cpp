@@ -3075,6 +3075,8 @@ Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const noexcept
             return Mixed(column.get_bool(ndx));
         case type_DateTime:
             return Mixed(DateTime(column.get_datetime(ndx)));
+        case type_NewDate:
+            return Mixed(column.get_newdate(ndx));
         case type_Float:
             return Mixed(column.get_float(ndx));
         case type_Double:
@@ -3123,6 +3125,9 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
             break;
         case type_DateTime:
             column.set_datetime(ndx, value.get_datetime()); // Throws
+            break;
+        case type_NewDate:
+            column.set_newdate(ndx, value.get_newdate()); // Throws
             break;
         case type_Float:
             column.set_float(ndx, value.get_float()); // Throws
@@ -4905,6 +4910,9 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                             break;
                         case type_DateTime:
                             out_datetime(out, m.get_datetime());
+                            break;
+                        case type_NewDate:
+                            out << m.get_newdate();
                             break;
                         case type_Binary:
                             out.width(widths[col+1]-6); // adjust for " bytes" text

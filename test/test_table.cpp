@@ -3814,6 +3814,9 @@ void compare_table_with_slice(TestContext& test_context, const Table& table,
                             case type_DateTime:
                                 CHECK_EQUAL(v_1.get_datetime(), v_2.get_datetime());
                                 break;
+                            case type_NewDate:
+                                CHECK_EQUAL(v_1.get_newdate(), v_2.get_newdate());
+                                break;
                             case type_Table: {
                                 ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
                                 ConstTableRef t_2 = slice.get_subtable(col_i, i);
