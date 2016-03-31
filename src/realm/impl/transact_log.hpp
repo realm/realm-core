@@ -2127,6 +2127,7 @@ inline bool TransactLogParser::is_valid_data_type(int type)
         case type_String:
         case type_Binary:
         case type_DateTime:
+        case type_NewDate:
         case type_Table:
         case type_Mixed:
         case type_Link:

@@ -692,6 +692,8 @@ private:
                 return "type_Binary";
             case type_DateTime:
                 return "type_DataTime"; // FIXME? Can we fix this spelling mistake?
+            case type_NewDate:
+                return "type_NewDate";
             case type_Table:
                 return "type_Table";
             case type_Mixed:

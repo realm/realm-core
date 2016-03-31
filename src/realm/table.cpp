@@ -1562,6 +1562,7 @@ void Table::upgrade_file_format()
             case col_type_Bool:
             case col_type_Int:
             case col_type_DateTime: {
+                // FIXME: Do upgrade of col_type_DateTime
                 IntegerColumn& col = get_column(col_ndx);
                 col.get_search_index()->clear();
                 col.populate_search_index();
@@ -1583,6 +1584,9 @@ void Table::upgrade_file_format()
             case col_type_LinkList:
             case col_type_BackLink:
                 // Indices are not support on these column types
+                break;
+            case col_type_NewDate:
+                // Introduced after latest file format upgrade
                 break;
         }
         REALM_ASSERT(false);
@@ -1825,6 +1829,16 @@ const MixedColumn& Table::get_column_mixed(size_t ndx) const noexcept
 MixedColumn& Table::get_column_mixed(size_t ndx)
 {
     return get_column<MixedColumn, col_type_Mixed>(ndx);
+}
+
+const DateTimeColumn& Table::get_column_datetime(size_t ndx) const noexcept
+{
+    return get_column<DateTimeColumn, col_type_NewDate>(ndx);
+}
+
+DateTimeColumn& Table::get_column_datetime(size_t ndx)
+{
+    return get_column<DateTimeColumn, col_type_NewDate>(ndx);
 }
 
 const LinkColumnBase& Table::get_column_link_base(size_t ndx) const noexcept
@@ -4877,6 +4891,9 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
             case type_DateTime:
                 out_datetime(out, get_datetime(col, row_ndx));
                 break;
+            case type_NewDate:
+                out << get_newdate(col, row_ndx);
+                break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
                 break;
@@ -4980,6 +4997,13 @@ bool Table::compare_rows(const Table& t) const
                     if (!c1.compare(c2))
                         return false;
                 }
+                continue;
+            }
+            case col_type_NewDate: {
+                const DateTimeColumn& c1 = get_column_datetime(i);
+                const DateTimeColumn& c2 = t.get_column_datetime(i);
+                if (!c1.compare(c2))
+                    return false;
                 continue;
             }
             case col_type_Float: {
