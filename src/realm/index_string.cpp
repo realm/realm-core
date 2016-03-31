@@ -260,9 +260,6 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
 
         return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
     }
-
-    REALM_ASSERT(false); // never reach here
-    return NodeChange::none;
 }
 
 
