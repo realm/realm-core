@@ -108,6 +108,9 @@ public:
 
     ~File() noexcept;
 
+    File(File&&) noexcept;
+    File& operator=(File&&) noexcept;
+
     /// Calling this function on an instance that is already attached
     /// to an open file has undefined behavior.
     ///
@@ -673,7 +676,7 @@ private:
 class File::Streambuf: public std::streambuf {
 public:
     explicit Streambuf(File*);
-    ~Streambuf();
+    ~Streambuf() noexcept;
 
 private:
     static const size_t buffer_size = 4096;
@@ -773,6 +776,34 @@ inline File::File() noexcept
 inline File::~File() noexcept
 {
     close();
+}
+
+inline File::File(File&& f) noexcept
+{
+#ifdef _WIN32
+    m_handle = f.m_handle;
+    m_have_lock = f.m_have_lock;
+    f.m_handle = nullptr;
+#else
+    m_fd = f.m_fd;
+    f.m_fd = -1;
+#endif
+    m_encryption_key = std::move(f.m_encryption_key);
+}
+
+inline File& File::operator=(File&& f) noexcept
+{
+    close();
+#ifdef _WIN32
+    m_handle = f.m_handle;
+    m_have_lock = f.m_have_lock;
+    f.m_handle = nullptr;
+#else
+    m_fd = f.m_fd;
+    f.m_fd = -1;
+#endif
+    m_encryption_key = std::move(f.m_encryption_key);
+    return *this;
 }
 
 inline void File::open(const std::string& path, Mode m)
@@ -964,7 +995,7 @@ inline File::Streambuf::Streambuf(File* f): m_file(*f), m_buffer(new char[buffer
     setp(b, b + buffer_size);
 }
 
-inline File::Streambuf::~Streambuf()
+inline File::Streambuf::~Streambuf() noexcept
 {
     try {
         if (m_file.is_attached()) flush();

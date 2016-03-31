@@ -3,11 +3,14 @@
 #  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
-#include <cstring>
-#include <cstdlib>
+#include <time.h>
+#include <string.h>
+#include <stdlib.h>
 #include <algorithm>
 #include <stdexcept>
 #include <tuple>
+#include <memory>
+#include <iterator>
 #include <vector>
 #include <locale>
 #include <sstream>
@@ -15,8 +18,6 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/util/features.h>
-#include <memory>
 #include <realm/util/features.h>
 #include <realm.hpp>
 #include <realm/utilities.hpp>
@@ -30,7 +31,6 @@
 #include "test_all.hpp"
 
 using namespace realm;
-using namespace realm::util;
 using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
@@ -242,7 +242,7 @@ public:
         SimpleReporter::end(context, elapsed_seconds);
     }
 
-    void summary(const ExecContext& context, const Summary& summary) override
+    void summary(const SharedContext& context, const Summary& summary) override
     {
         SimpleReporter::summary(context, summary);
 
@@ -298,7 +298,14 @@ private:
 };
 
 
-bool run_tests()
+void put_time(std::ostream& out, const std::tm& tm, const char* format)
+{
+    const std::time_put<char>& facet = std::use_facet<std::time_put<char>>(out.getloc());
+    facet.put(std::ostreambuf_iterator<char>(out), out, ' ', &tm, format, format + strlen(format));
+}
+
+
+bool run_tests(util::Logger* logger)
 {
     {
         const char* str = getenv("UNITTEST_KEEP_FILES");
@@ -306,8 +313,46 @@ bool run_tests()
             keep_test_files();
     }
 
-    std::unique_ptr<Reporter> reporter;
-    std::unique_ptr<Filter> filter;
+    TestList::Config config;
+    config.logger = logger;
+
+    // Set number of threads
+    {
+        const char* str = getenv("UNITTEST_THREADS");
+        if (str && strlen(str) != 0) {
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+            in >> config.num_threads;
+            bool bad = !in || in.get() != std::char_traits<char>::eof() || config.num_threads < 1;
+            if (bad)
+                throw std::runtime_error("Bad number of threads");
+            if (config.num_threads > 1)
+                std::cout << "Number of test threads: "<<config.num_threads<<"\n\n";
+        }
+    }
+
+    // Set number of repetitions
+    {
+        const char* str = getenv("UNITTEST_REPEAT");
+        if (str && strlen(str) != 0) {
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+            in >> config.num_repetitions;
+            bool bad = !in || in.get() != std::char_traits<char>::eof() ||
+                config.num_repetitions < 0;
+            if (bad)
+                throw std::runtime_error("Bad number of repetitions");
+        }
+    }
+
+    // Shuffle
+    {
+        const char* str = getenv("UNITTEST_SHUFFLE");
+        if (str && strlen(str) != 0)
+            config.shuffle = true;
+    }
 
     // Set up reporter
     std::ofstream xml_file;
@@ -318,6 +363,7 @@ bool run_tests()
     const char* xml_str = getenv("UNITTEST_XML");
     xml = (xml_str && strlen(xml_str) != 0);
 #endif
+    std::unique_ptr<Reporter> reporter;
     if (xml) {
         std::string path = get_test_path_prefix();
         std::string xml_path = path + "unit-test-report.xml";
@@ -333,56 +379,46 @@ bool run_tests()
 #endif
         reporter.reset(new CustomReporter(report_progress));
     }
+    config.reporter = reporter.get();
 
     // Set up filter
     const char* filter_str = getenv("UNITTEST_FILTER");
     const char* test_only = get_test_only();
     if (test_only)
         filter_str = test_only;
+    std::unique_ptr<Filter> filter;
     if (filter_str && strlen(filter_str) != 0)
         filter.reset(create_wildcard_filter(filter_str));
+    config.filter = filter.get();
 
-    int num_repetitions = 1;
+    // Set up per-thread file logging
     {
-        const char* str = getenv("UNITTEST_REPEAT");
+        const char* str = getenv("UNITTEST_LOG_TO_FILES");
         if (str && strlen(str) != 0) {
-            std::istringstream in(str);
-            in.imbue(std::locale::classic());
-            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-            in >> num_repetitions;
-            bool bad = !in || in.get() != std::char_traits<char>::eof() || num_repetitions < 0;
-            if (bad)
-                throw std::runtime_error("Bad number of repetitions");
+            std::ostringstream out;
+            out.imbue(std::locale::classic());
+            time_t now = time(nullptr);
+            tm tm = *localtime(&now);
+            out << "test_logs_";
+            put_time(out, tm, "%Y%m%d_%H%M%S");
+            std::string dir_path = get_test_path_prefix() + out.str();
+            util::make_dir(dir_path);
+            config.per_thread_log_path = util::File::resolve("thread_%.log", dir_path);
         }
     }
 
-    int num_threads = 1;
+    // Enable abort on failure
     {
-        const char* str = getenv("UNITTEST_THREADS");
+        const char* str = getenv("UNITTEST_ABORT_ON_FAILURE");
         if (str && strlen(str) != 0) {
-            std::istringstream in(str);
-            in.imbue(std::locale::classic());
-            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-            in >> num_threads;
-            bool bad = !in || in.get() != std::char_traits<char>::eof() || num_threads < 1;
-            if (bad)
-                throw std::runtime_error("Bad number of threads");
-            if (num_threads > 1)
-                std::cout << "Number of test threads: "<<num_threads<<"\n\n";
+            config.abort_on_failure = true;
         }
-    }
-
-    bool shuffle = false;
-    {
-        const char* str = getenv("UNITTEST_SHUFFLE");
-        if (str && strlen(str) != 0)
-            shuffle = true;
     }
 
     // Run
     TestList& list = get_default_test_list();
     list.sort(PatternBasedFileOrder(file_order));
-    bool success = list.run(reporter.get(), filter.get(), num_repetitions, num_threads, shuffle);
+    bool success = list.run(config);
 
     if (test_only)
         std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
@@ -393,10 +429,10 @@ bool run_tests()
     return success;
 }
 
-
 } // anonymous namespace
 
-int test_all(int argc, char* argv[])
+
+int test_all(int argc, char* argv[], util::Logger* logger)
 {
     // Disable buffering on std::cout so that progress messages can be related to
     // error messages.
@@ -423,7 +459,7 @@ int test_all(int argc, char* argv[])
 
     display_build_config();
 
-    bool success = run_tests();
+    bool success = run_tests(logger);
 
 #ifdef _MSC_VER
     getchar(); // wait for key

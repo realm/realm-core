@@ -72,7 +72,7 @@ void InterprocessCondVar::close() noexcept
         ::close(m_fd_write);
         return; // we don't need to clean up the SharedPart
     }
-    // we don't do anything to the shared part, other CondVars may shared it
+    // we don't do anything to the shared part, other CondVars may share it
     m_shared_part = nullptr;
 }
 
@@ -94,10 +94,10 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     static_cast<void>(condvar_name);
 #ifdef REALM_CONDVAR_EMULATION
 #if !TARGET_OS_TV
-    auto path = base_path + "." + condvar_name + ".cv";
+    m_resource_path = base_path + "." + condvar_name + ".cv";
 
     // Create and open the named pipe
-    int ret = mkfifo(path.c_str(), 0600);
+    int ret = mkfifo(m_resource_path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
         if (err == ENOTSUP) {
@@ -109,9 +109,9 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
             // leaving it as is for now.
             // FIXME: Let's create our own thread-safe version in util.
             ss << getenv("TMPDIR");
-            ss << "realm_" << std::hash<std::string>()(path) << ".cv";
-            path = ss.str();
-            ret = mkfifo(path.c_str(), 0600);
+            ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
+            m_resource_path = ss.str();
+            ret = mkfifo(m_resource_path.c_str(), 0600);
             err = errno;
         }
         // the fifo already existing isn't an error
@@ -120,12 +120,12 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         }
     }
 
-    m_fd_write = open(path.c_str(), O_RDWR);
+    m_fd_write = open(m_resource_path.c_str(), O_RDWR);
     if (m_fd_write == -1) {
         throw std::system_error(errno, std::system_category());
     }
 
-    m_fd_read = open(path.c_str(), O_RDONLY);
+    m_fd_read = open(m_resource_path.c_str(), O_RDONLY);
     if (m_fd_read == -1) {
         throw std::system_error(errno, std::system_category());
     }
@@ -169,6 +169,14 @@ void InterprocessCondVar::init_shared_part(SharedPart& shared_part) {
 #else
     new (&shared_part) CondVar(CondVar::process_shared_tag());
 #endif // REALM_CONDVAR_EMULATION
+}
+
+
+void InterprocessCondVar::release_shared_part() {
+#ifdef REALM_CONDVAR_EMULATION
+    File::try_remove(m_resource_path);
+#else
+#endif
 }
 
 // Wait/notify combined invariant:

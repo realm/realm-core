@@ -25,8 +25,6 @@
 #include <realm/util/thread.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
-#include "util/thread_wrapper.hpp"
-
 #include "test.hpp"
 
 using namespace realm;
