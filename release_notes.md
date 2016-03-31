@@ -2,6 +2,9 @@
 
 ### Bugfixes:
 
+* Update table accessors after table move rollback, issue #1551. This
+  issue could have caused corruption or crashes when tables are moved
+  and then the transaction is rolled back.
 * Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
 * Bug fix: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.

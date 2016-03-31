@@ -11681,4 +11681,5 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
     CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(1, 0), 1);
 }
 
+
 #endif
