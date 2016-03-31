@@ -11756,9 +11756,9 @@ TEST(LangBindHelper_RollbackLinkInsert)
     LangBindHelper::promote_to_write(sg_w);
 
     g.add_table("t2");
-    //g.get_table(0)->add_column_link(type_Link, "link", *g.get_table(1));
-    //or
     g.get_table(1)->add_column_link(type_Link, "link", *g.get_table(0));
+    // or
+    //g.get_table(0)->add_column_link(type_Link, "link", *g.get_table(1));
 
     g.add_table("t3");
 
