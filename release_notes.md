@@ -20,6 +20,7 @@
 * Moved all supporting files (all files except the .realm file) into a
   separate ".management" subdirectory.
 * Adding `util::network::buffered_input_stream::reset()`.
+* Added support for queries that traverse backlinks. Fixes #776.
 
 -----------
 
