@@ -74,4 +74,23 @@ TEST(DateTimeColumn_Relocate)
         t.set_newdate(0, i, NewDate(i, i));
     }
 }
+
+TEST(DateTimeColumn_Compare)
+{
+    ref_type ref = DateTimeColumn::create(Allocator::get_default());
+    DateTimeColumn c(Allocator::get_default(), ref);
+
+    for (unsigned int i = 0; i < 10000; i++) {
+        c.add(NewDate(i, i));
+    }
+
+    CHECK(c.compare(c));
+
+    {
+        ref_type ref = DateTimeColumn::create(Allocator::get_default());
+        DateTimeColumn c2(Allocator::get_default(), ref);
+        CHECK_NOT(c.compare(c2));
+    }
+}
+
 #endif // TEST_COLUMN_DATETIME

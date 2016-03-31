@@ -98,6 +98,13 @@ public:
     void add(const NewDate& ndt = NewDate{});
     NewDate get(size_t row_ndx) const noexcept;
     void set(size_t row_ndx, const NewDate& ndt);
+    bool compare(const DateTimeColumn& c) const noexcept;
+    void erase(size_t ndx, bool is_last) {
+        m_seconds.erase(ndx, is_last);
+        m_nanoseconds.erase(ndx, is_last);
+    }
+
+
 private:
 
     IntNullColumn m_seconds;
