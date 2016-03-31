@@ -209,7 +209,7 @@ T no_newdate(T in)
     return in;
 }
 
-int no_newdate(NewDate in)
+int no_newdate(NewDate)
 {
     return 0;
 }
