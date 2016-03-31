@@ -145,6 +145,28 @@ TEST(TableView_NewDateMaxMinCount)
     CHECK_EQUAL(cnt, 1);
 }
 
+TEST(TableView_NewDateGetSet)
+{
+    Table t;
+    t.add_column(type_NewDate, "nd", true);
+    t.add_empty_row(3);
+    t.set_newdate(0, 0, NewDate(000, 010));
+    t.set_newdate(0, 1, NewDate(100, 110));
+    t.set_newdate(0, 2, NewDate(200, 210));
+
+    TableView tv = t.where().find_all();
+    CHECK_EQUAL(tv.get_newdate(0, 0), NewDate(000,010));
+    CHECK_EQUAL(tv.get_newdate(0, 1), NewDate(100,110));
+    CHECK_EQUAL(tv.get_newdate(0, 2), NewDate(200,210));
+
+    tv.set_newdate(0, 0, NewDate(1000, 1010));
+    tv.set_newdate(0, 1, NewDate(1100, 1110));
+    tv.set_newdate(0, 2, NewDate(1200, 1210));
+    CHECK_EQUAL(tv.get_newdate(0, 0), NewDate(1000,1010));
+    CHECK_EQUAL(tv.get_newdate(0, 1), NewDate(1100,1110));
+    CHECK_EQUAL(tv.get_newdate(0, 2), NewDate(1200,1210));
+}
+
 TEST(TableView_GetSetInteger)
 {
     TestTableInt table;
