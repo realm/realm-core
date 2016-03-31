@@ -1,3 +1,13 @@
+# 0.98.0 Release notes
+
+### Enhancements:
+
+* Added support for queries that traverse backlinks. Fixes #776.
+
+**NOTE: This is a hotfix release which is built on top of [0.97.4].**
+
+----------------------------------------------
+
 # 0.97.4 Release notes
 
 ### Bugfixes:
