@@ -2,6 +2,14 @@
 
 ### Bugfixes:
 
+* Update table accessors after table move rollback, issue #1551. This
+  issue could have caused corruption or crashes when tables are moved
+  and then the transaction is rolled back.
+* Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
+* Bug fix: Access dangling pointer while handling canceled asynchronous accept
+  in POSIX networking API.
+* Handing over a detached row accessor no longer crashes.
+
 ### API breaking changes:
 
 * Lorem ipsum.
@@ -14,6 +22,8 @@
   the database locked. Fixes issue #1429
 * Moved all supporting files (all files except the .realm file) into a
   separate ".management" subdirectory.
+* Adding `util::network::buffered_input_stream::reset()`.
+* Added support for queries that traverse backlinks. Fixes #776.
 
 -----------
 
@@ -23,6 +33,11 @@
   it could run forever.
 * Fixed a few compiler warnings
 * Disabled unittest Shared_WaitForChange again, as it can still run forever
+* New features in the unit test framework: Ability to log to a file (one for
+  each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
+  failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
+  (`util::Logger`) is now directly available to each unit test.
+* New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 
 ----------------------------------------------
 

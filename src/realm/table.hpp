@@ -61,6 +61,7 @@ struct LinkTargetInfo;
 
 struct Link {};
 typedef Link LinkList;
+typedef Link BackLink;
 
 namespace _impl { class TableFriend; }
 
@@ -331,9 +332,13 @@ public:
 
     template<class T>
     Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
+    template<class T>
+    Columns<T> column(const Table& origin, size_t origin_column_ndx);
 
-    template <class T>
+    template<class T>
     SubQuery<T> column(size_t column, Query subquery);
+    template<class T>
+    SubQuery<T> column(const Table& origin, size_t origin_column_ndx, Query subquery);
 
     // Table size and deletion
     bool is_empty() const noexcept;
@@ -696,6 +701,7 @@ public:
     Query where(const LinkViewRef& lv) { return Query(*this, lv); }
 
     Table& link(size_t link_column);
+    Table& backlink(const Table& origin, size_t origin_col_ndx);
 
     // Optimizing. enforce == true will enforce enumeration of all string columns;
     // enforce == false will auto-evaluate if they should be enumerated or not
@@ -858,7 +864,7 @@ private:
     typedef std::vector<ColumnBase*> column_accessors;
     column_accessors m_cols;
 
-    mutable size_t m_ref_count;
+    mutable std::atomic<size_t> m_ref_count;
 
     // If this table is a root table (has independent descriptor),
     // then Table::m_descriptor refers to the accessor of its
@@ -1046,8 +1052,8 @@ private:
     // Detach the type descriptor accessor if it exists.
     void discard_desc_accessor() noexcept;
 
-    void bind_ptr() const noexcept { ++m_ref_count; }
-    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept;
+    void unbind_ptr() const noexcept;
 
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) noexcept;
@@ -1467,6 +1473,28 @@ inline void Table::remove_last()
         remove(size()-1);
 }
 
+// A good place to start if you want to understand the memory ordering
+// chosen for the operations below is http://preshing.com/20130922/acquire-and-release-fences/
+inline void Table::bind_ptr() const noexcept
+{
+    m_ref_count.fetch_add(1, std::memory_order_relaxed);
+}
+
+inline void Table::unbind_ptr() const noexcept
+{
+    // The delete operation runs the destructor, and the destructor
+    // must always see all changes to the object being deleted.
+    // Within each thread, we know that unbind_ptr will always happen after
+    // any changes, so it is a convenient place to do a release.
+    // The release will then be observed by the acquire fence in
+    // the case where delete is actually called (the count reaches 0)
+    if (m_ref_count.fetch_sub(1, std::memory_order_release) != 1)
+        return;
+
+    std::atomic_thread_fence(std::memory_order_acquire);
+    delete this;
+}
+
 inline void Table::register_view(const TableViewBase* view)
 {
     // Casting away constness here - operations done on tableviews
@@ -1665,14 +1693,12 @@ inline TableRef Table::copy(Allocator& alloc) const
 template<class T>
 inline Columns<T> Table::column(size_t column)
 {
-    std::vector<size_t> tmp = m_link_chain;
-    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
-        tmp.push_back(column);
-    }
+    std::vector<size_t> link_chain = std::move(m_link_chain);
+    m_link_chain.clear();
 
     // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
-    const Table* table = get_link_chain_target(m_link_chain);
+    const Table* table = get_link_chain_target(link_chain);
 
     realm::DataType ct = table->get_column_type(column);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
@@ -1686,16 +1712,40 @@ inline Columns<T> Table::column(size_t column)
     else if (std::is_same<T, double>::value && ct != type_Double)
         throw(LogicError::type_mismatch);
 
+    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value || std::is_same<T, BackLink>::value) {
+        link_chain.push_back(column);
+    }
 
+    return Columns<T>(column, this, std::move(link_chain));
+}
+
+template<class T>
+inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
+{
+    static_assert(std::is_same<T, BackLink>::value, "");
+
+    size_t origin_table_ndx = origin.get_index_in_group();
+    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+
+    std::vector<size_t> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
-    return Columns<T>(column, this, tmp);
+    link_chain.push_back(backlink_col_ndx);
+
+    return Columns<T>(backlink_col_ndx, this, std::move(link_chain));
 }
 
 template<class T>
 SubQuery<T> Table::column(size_t column_ndx, Query subquery)
 {
-    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list column");
+    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(column_ndx), std::move(subquery));
+}
+
+template<class T>
+SubQuery<T> Table::column(const Table& origin, size_t origin_col_ndx, Query subquery)
+{
+    static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
+    return SubQuery<T>(column<T>(origin, origin_col_ndx), std::move(subquery));
 }
 
 // For use by queries
@@ -1703,6 +1753,13 @@ inline Table& Table::link(size_t link_column)
 {
     m_link_chain.push_back(link_column);
     return *this;
+}
+
+inline Table& Table::backlink(const Table& origin, size_t origin_col_ndx)
+{
+    size_t origin_table_ndx = origin.get_index_in_group();
+    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+    return link(backlink_col_ndx);
 }
 
 inline bool Table::is_empty() const noexcept

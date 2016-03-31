@@ -10474,6 +10474,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryNot;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAndAndOr;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryWithExpression;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryLinksToDetached;
 
     {
         LangBindHelper::promote_to_write(sg_w);
@@ -10484,15 +10485,19 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         size_t col_link = source->add_column_link(type_Link, "link", *target);
         size_t col_name = target->add_column(type_String, "name");
 
-        target->add_empty_row(3);
+        target->add_empty_row(4);
         target->set_string(col_name, 0, "A");
         target->set_string(col_name, 1, "B");
         target->set_string(col_name, 2, "C");
+        target->set_string(col_name, 3, "D");
 
         source->add_empty_row(3);
         source->set_link(col_link, 0, 0);
         source->set_link(col_link, 1, 1);
         source->set_link(col_link, 2, 2);
+
+        Row detached_row = target->get(3);
+        target->move_last_over(3);
 
         LangBindHelper::commit_and_continue_as_read(sg_w);
 
@@ -10513,6 +10518,9 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 
         Query queryWithExpression = source->column<LinkList>(col_link).is_not_null() && query;
         handoverQueryWithExpression = sg_w.export_for_handover(queryWithExpression, ConstSourcePayload::Copy);
+
+        Query queryLinksToDetached = source->where().links_to(col_link, detached_row);
+        handoverQueryLinksToDetached = sg_w.export_for_handover(queryLinksToDetached, ConstSourcePayload::Copy);
     }
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
@@ -10525,6 +10533,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         std::unique_ptr<Query> queryNot(sg.import_from_handover(move(handoverQueryNot)));
         std::unique_ptr<Query> queryAndAndOr(sg.import_from_handover(move(handoverQueryAndAndOr)));
         std::unique_ptr<Query> queryWithExpression(sg.import_from_handover(move(handoverQueryWithExpression)));
+        std::unique_ptr<Query> queryLinksToDetached(sg.import_from_handover(move(handoverQueryLinksToDetached)));
 
         CHECK_EQUAL(1, query->count());
         CHECK_EQUAL(2, queryOr->count());
@@ -10532,6 +10541,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         CHECK_EQUAL(1, queryNot->count());
         CHECK_EQUAL(1, queryAndAndOr->count());
         CHECK_EQUAL(1, queryWithExpression->count());
+        CHECK_EQUAL(0, queryLinksToDetached->count());
 
 
         // Remove the linked-to row.
@@ -10551,6 +10561,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         CHECK_EQUAL(1, queryNot->count());
         CHECK_EQUAL(1, queryAndAndOr->count());
         CHECK_EQUAL(1, queryWithExpression->count());
+        CHECK_EQUAL(0, queryLinksToDetached->count());
     }
 }
 
@@ -11670,5 +11681,6 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
     // backlink column index in target_b from source_b should be index 1
     CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(1, 0), 1);
 }
+
 
 #endif

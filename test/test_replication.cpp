@@ -2,10 +2,10 @@
 #ifdef TEST_REPLICATION
 
 #include <algorithm>
+#include <memory>
 
 #include <realm.hpp>
 #include <realm/util/features.h>
-#include <memory>
 #include <realm/util/file.hpp>
 #include <realm/replication.hpp>
 
@@ -189,10 +189,10 @@ TEST(Replication_General)
         wt.commit();
     }
 
-    std::unique_ptr<util::Logger> replay_logger;
-//    replay_logger.reset(new util::Logger);
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
     SharedGroup sg_2(path_2);
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
 
     {
         ReadTransaction rt_1(sg_1);
@@ -317,8 +317,8 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
-//    replay_logger.reset(new util::Logger);
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -337,7 +337,7 @@ TEST(Replication_Links)
         target_2->add_empty_row(2);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -352,7 +352,7 @@ TEST(Replication_Links)
         origin_2->add_empty_row(2);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1: LL_1->T_1
     // O_2: F_1
     {
@@ -369,7 +369,7 @@ TEST(Replication_Links)
         origin_2->set_link(0, 0, 1); // O_2_L_2[0] -> T_1[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1: F_2   LL_1->T_1
     // O_2: L_2->T_1   F_1
     {
@@ -389,7 +389,7 @@ TEST(Replication_Links)
         origin_2->get_linklist(2, 1)->add(1); // O_2_LL_3[1] -> T_2[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1: L_3->T_1   F_2   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2
     {
@@ -407,7 +407,7 @@ TEST(Replication_Links)
         origin_2->set_link(3, 1, 0); // O_2_L_4[1] -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1: L_3->T_1   F_2   L_4->T_2   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2   L_4->T_2
     {
@@ -424,7 +424,7 @@ TEST(Replication_Links)
         origin_2->insert_column(3, type_Int, "o_2_f_5");
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1: L_3->T_1   F_2   L_4->T_2   F_5   LL_1->T_1
     // O_2: L_2->T_1   F_1   LL_3->T_2   F_5   L_4->T_2
     {
@@ -441,7 +441,7 @@ TEST(Replication_Links)
         origin_1->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -520,7 +520,7 @@ TEST(Replication_Links)
         origin_1_w->set_int(1, 2, 13);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -577,7 +577,7 @@ TEST(Replication_Links)
         target_1_w->set_int(0, 2, 17);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -641,7 +641,7 @@ TEST(Replication_Links)
         origin_2_w->set_link(4, 2, 0);  // O_2_L_4[2] -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -708,7 +708,7 @@ TEST(Replication_Links)
         // Adds    O_1_L_3[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -773,7 +773,7 @@ TEST(Replication_Links)
         link_list_2_2_w->add(0); // O_2_LL_3[2] -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -847,7 +847,7 @@ TEST(Replication_Links)
         link_list_2_2_w->add(1);    // Add     O_2_LL_3[2] -> T_2[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -921,7 +921,7 @@ TEST(Replication_Links)
         link_list_2_2_w->move(0,1); // [ 0, 1 ] -> [ 1, 0 ]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -990,7 +990,7 @@ TEST(Replication_Links)
         link_list_2_2_w->swap(0,1); // [ 1, 0 ] -> [ 0, 1 ]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -1059,7 +1059,7 @@ TEST(Replication_Links)
         link_list_2_2_w->swap(1,1); // [ 0, 1 ] -> [ 0, 1 ]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[0]     []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -1147,7 +1147,7 @@ TEST(Replication_Links)
         // Adds     O_1_L_3[0]  -> T_1[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     null       []                     T_1[1]     [ T_2[1] ]             T_2[1]
@@ -1214,7 +1214,7 @@ TEST(Replication_Links)
         // Adds     O_1_L_4[2]  -> T_2[0]  and  O_2_LL_3[0] -> T_2[0]  and  O_2_L_4[0] -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     null       []                     null       [ T_2[0], T_2[1] ]     T_2[0]
@@ -1281,7 +1281,7 @@ TEST(Replication_Links)
         // Adds     O_1_L_4[1]  -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     null       []
@@ -1340,7 +1340,7 @@ TEST(Replication_Links)
         origin_2_w->set_link(4,2,0);           // O_2_L_4[2]  -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     null       []                     T_1[0]     [ T_2[1] ]             T_2[1]
@@ -1409,7 +1409,7 @@ TEST(Replication_Links)
         origin_1_w->get_linklist(4,2)->add(1); // O_1_LL_1[2] -> T_1[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     []                     T_1[0]     [ T_2[1] ]             T_2[1]
@@ -1495,7 +1495,7 @@ TEST(Replication_Links)
         // Adds     O_1_LL_1[1] -> T_1[2]  and  O_2_LL_3[2] -> T_2[2]  and  O_2_L_4[0] -> T_2[2]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     []                     T_1[0]     [ T_2[1] ]             T_2[2]
@@ -1578,7 +1578,7 @@ TEST(Replication_Links)
         //          O_2_L_2[0] -> T_1[0]  and  O_2_LL_3[2] -> T_2[2]  and  O_2_L_4[0] -> T_2[2]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     []                     null       [ T_2[1] ]             null
@@ -1675,7 +1675,7 @@ TEST(Replication_Links)
         //          O_2_LL_3[2] -> T_2[0]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[0]     []                     T_1[2]     [ T_2[0] ]             null
@@ -1769,7 +1769,7 @@ TEST(Replication_Links)
         //          O_2_L_2[0]  -> T_1[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       null       []                     T_1[1]     []                     null
@@ -1856,7 +1856,7 @@ TEST(Replication_Links)
         origin_2_w->set_link(4,1,1);           // O_2_L_4[1]  -> T_2[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // null       T_2[1]     []                     null       [ T_2[1], T_2[1] ]     T_2[0]
@@ -1947,7 +1947,7 @@ TEST(Replication_Links)
         origin_2_w->set_link(0,2,1); // O_2_L_2[2] -> T_1[1]
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
@@ -2040,7 +2040,7 @@ TEST(Replication_Links)
         origin_2_w->clear();
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]
@@ -2106,7 +2106,7 @@ TEST(Replication_Links)
         origin_2_w->set_link(4,1,1);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
@@ -2185,7 +2185,7 @@ TEST(Replication_Links)
         target_2_w->clear();
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     null       [ T_1[1], T_1[0] ]     T_1[0]     []                     null
@@ -2261,7 +2261,7 @@ TEST(Replication_Links)
         origin_2_w->set_link(4,1,1);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     // O_1_L_3    O_1_L_4    O_1_LL_1               O_2_L_2    O_2_LL_3               O_2_L_4
     // ----------------------------------------------------------------------------------------
     // T_1[1]     T_2[1]     [ T_1[1], T_1[0] ]     T_1[0]     [ T_2[1], T_2[1] ]     T_2[0]
@@ -2364,7 +2364,7 @@ TEST(Replication_Links)
         origin_2_w->insert_column(6, type_String, "foo_3");
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -2453,7 +2453,7 @@ TEST(Replication_Links)
         origin_2_w->remove_column(0);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -2541,7 +2541,7 @@ TEST(Replication_Links)
         origin_2_w->remove_column(5);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -2633,7 +2633,7 @@ TEST(Replication_Links)
         origin_2_w->set_link(0,1,0);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -2753,7 +2753,7 @@ TEST(Replication_Links)
         origin_2_w->get_linklist(5,2)->add(0);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -2877,7 +2877,7 @@ TEST(Replication_Links)
         origin_2_w->remove_column(5);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -2965,7 +2965,7 @@ TEST(Replication_Links)
         target_2_w->insert_column_link(1, type_Link, "t_4", *target_1_w);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -3009,7 +3009,7 @@ TEST(Replication_Links)
         target_2_w->remove_column(0);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -3053,7 +3053,7 @@ TEST(Replication_Links)
         target_1_w->remove_column(0);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         check(test_context, sg_1, rt);
@@ -3120,8 +3120,8 @@ TEST(Replication_CascadeRemove_ColumnLink)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
-//    replay_logger.reset(new util::Logger);
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     SharedGroup sg(path_1);
     MyTrivialReplication repl(path_2);
@@ -3169,7 +3169,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
 
         // Apply the changes to sg via replication
         sg.end_read();
-        repl.replay_transacts(sg, replay_logger.get());
+        repl.replay_transacts(sg, replay_logger);
         const Group& group = sg.begin_read();
         group.verify();
 
@@ -3225,8 +3225,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
-//    replay_logger.reset(new util::Logger);
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     SharedGroup sg(path_1);
     MyTrivialReplication repl(path_2);
@@ -3275,7 +3275,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 
         // Apply the changes to sg via replication
         sg.end_read();
-        repl.replay_transacts(sg, replay_logger.get());
+        repl.replay_transacts(sg, replay_logger);
         const Group& group = sg.begin_read();
         group.verify();
 
@@ -3338,8 +3338,8 @@ TEST(Replication_NullStrings)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
-//    replay_logger.reset(new util::Logger);
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3368,7 +3368,7 @@ TEST(Replication_NullStrings)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
@@ -3388,8 +3388,8 @@ TEST(Replication_NullInteger)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
-//    replay_logger.reset(new util::Logger);
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3410,7 +3410,7 @@ TEST(Replication_NullInteger)
 
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
@@ -3427,7 +3427,8 @@ TEST(Replication_SetUnique)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3451,7 +3452,7 @@ TEST(Replication_SetUnique)
         table1->set_string_unique(3, 0, "Hello, World!");
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
@@ -3469,7 +3470,8 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3492,7 +3494,7 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
         wt.get_group().move_table(1, 0);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         ConstTableRef foo = rt.get_table("foo");
@@ -3513,7 +3515,9 @@ TEST(Replication_ChangeLinkTargets)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
+
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
     SharedGroup sg_2(path_2);
@@ -3530,7 +3534,7 @@ TEST(Replication_ChangeLinkTargets)
         t0->change_link_targets(0, 1);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt1(sg_1);
         ReadTransaction rt2(sg_2);
@@ -3551,7 +3555,8 @@ TEST(Replication_Substrings)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3572,7 +3577,7 @@ TEST(Replication_Substrings)
         table->insert_substring(0, 0, 0, "Goodbye, Cruel");
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         auto table = rt.get_table("table");
@@ -3592,8 +3597,8 @@ TEST(Replication_MoveSelectedLinkView)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    std::unique_ptr<util::Logger> replay_logger;
-//    replay_logger.reset(new util::Logger);
+    util::Logger* replay_logger = nullptr;
+//    replay_logger = &test_context.thread_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3609,7 +3614,7 @@ TEST(Replication_MoveSelectedLinkView)
         target->add_empty_row(2);
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         rt.get_group().verify();
@@ -3624,7 +3629,7 @@ TEST(Replication_MoveSelectedLinkView)
         link_list->add(1); // Now modify it again
         wt.commit();
     }
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt(sg_2);
         rt.get_group().verify();
