@@ -462,9 +462,7 @@ int run_fuzzy(int argc, const char* argv[])
     }
 
     disable_sync_to_disk();
-    std::string unique_path = std::string("fuzz.realm.") + argv[file_arg];
-    std::replace(unique_path.begin(), unique_path.end(), '/', '.');
-    realm::test_util::SharedGroupTestPathGuard path(unique_path);
+    realm::test_util::SharedGroupTestPathGuard path("fuzz.realm.test");
 
     try {
         if (log) {
