@@ -22,14 +22,14 @@
 #define REALM_IMPL_SIMULATED_FAILURE_HPP
 
 #include <stdint.h>
-#include <exception>
+#include <system_error>
 
 #include <realm/util/features.h>
 
 namespace realm {
 namespace _impl {
 
-class SimulatedFailure: public std::exception {
+class SimulatedFailure: public std::system_error {
 public:
     enum FailureType {
         generic,
@@ -37,6 +37,7 @@ public:
         slab_alloc__remap,
         shared_group__grow_reader_mapping,
         sync_client__read_head,
+        sync_server__read_head,
         _num_failure_types
     };
 
@@ -60,12 +61,21 @@ public:
     /// false.
     static bool check_trigger(FailureType) noexcept;
 
-    /// Throws SimulatedFailure if check_trigger() returns true.
-    static void trigger(FailureType);
+    /// The specified error code is set to `make_error_code(failure_type)` if
+    /// check_trigger() returns true. Otherwise it is set to
+    /// `std::error_code()`. Returns a copy of the updated error code.
+    static std::error_code trigger(FailureType failure_type, std::error_code&) noexcept;
+
+    /// Throws SimulatedFailure if check_trigger() returns true. The exception
+    /// will be constructed with an error code equal to
+    /// `make_error_code(failure_type)`.
+    static void trigger(FailureType failure_type);
 
     /// Returns true when, and only when REALM_DEBUG was defined during
     /// compilation.
     static constexpr bool is_enabled();
+
+    SimulatedFailure(std::error_code);
 
 private:
 #ifdef REALM_DEBUG
@@ -75,6 +85,8 @@ private:
     static bool do_check_trigger(FailureType) noexcept;
 #endif
 };
+
+std::error_code make_error_code(SimulatedFailure::FailureType) noexcept;
 
 
 class SimulatedFailure::OneShotPrimeGuard {
@@ -141,10 +153,22 @@ inline bool SimulatedFailure::check_trigger(FailureType failure_type) noexcept
 #endif
 }
 
+inline std::error_code SimulatedFailure::trigger(FailureType failure_type,
+                                                 std::error_code& ec) noexcept
+{
+    if (check_trigger(failure_type)) {
+        ec = make_error_code(failure_type);
+    }
+    else {
+        ec = std::error_code();
+    }
+    return ec;
+}
+
 inline void SimulatedFailure::trigger(FailureType failure_type)
 {
     if (check_trigger(failure_type))
-        throw SimulatedFailure();
+        throw SimulatedFailure(make_error_code(failure_type));
 }
 
 inline constexpr bool SimulatedFailure::is_enabled()
@@ -154,6 +178,11 @@ inline constexpr bool SimulatedFailure::is_enabled()
 #else
     return false;
 #endif
+}
+
+inline SimulatedFailure::SimulatedFailure(std::error_code ec):
+    std::system_error(ec)
+{
 }
 
 inline SimulatedFailure::OneShotPrimeGuard::OneShotPrimeGuard(FailureType failure_type):

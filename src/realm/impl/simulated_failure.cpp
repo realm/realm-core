@@ -151,3 +151,55 @@ bool SimulatedFailure::do_check_trigger(FailureType failure_type) noexcept
 }
 
 #endif // REALM_DEBUG
+
+
+namespace {
+
+class ErrorCategory: public std::error_category {
+public:
+    const char* name() const noexcept override;
+    std::string message(int) const override;
+};
+
+ErrorCategory g_error_category;
+
+const char* ErrorCategory::name() const noexcept
+{
+    return "realm.simulated_failure";
+}
+
+std::string ErrorCategory::message(int value) const
+{
+    switch (SimulatedFailure::FailureType(value)) {
+        case SimulatedFailure::generic:
+            return "Simulated failure (generic)";
+        case SimulatedFailure::slab_alloc__reset_free_space_tracking:
+            return "Simulated failure (slab_alloc__reset_free_space_tracking)";
+        case SimulatedFailure::slab_alloc__remap:
+            return "Simulated failure (slab_alloc__remap)";
+        case SimulatedFailure::shared_group__grow_reader_mapping:
+            return "Simulated failure (shared_group__grow_reader_mapping)";
+        case SimulatedFailure::sync_client__read_head:
+            return "Simulated failure (sync_client__read_head)";
+        case SimulatedFailure::sync_server__read_head:
+            return "Simulated failure (sync_server__read_head)";
+        case SimulatedFailure::_num_failure_types:
+            break;
+    }
+    REALM_ASSERT(false);
+    return std::string();
+}
+
+} // unnamed namespace
+
+
+namespace realm {
+namespace _impl {
+
+std::error_code make_error_code(SimulatedFailure::FailureType failure_type) noexcept
+{
+    return std::error_code(failure_type, g_error_category);
+}
+
+} // namespace _impl
+} // namespace realm

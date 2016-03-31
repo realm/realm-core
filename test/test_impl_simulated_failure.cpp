@@ -45,7 +45,7 @@ TEST_IF(Impl_SimulatedFailure_OneShot, _impl::SimulatedFailure::is_enabled())
 TEST_IF(Impl_SimulatedFailure_Random, _impl::SimulatedFailure::is_enabled())
 {
     using sf = _impl::SimulatedFailure;
-    sf::RandomPrimeGuard pg(sf::generic, 1, 2, // 50% of the times
+    sf::RandomPrimeGuard pg(sf::generic, 1, 2, // 50% chance of failure
                             test_util::random_int<uint_fast64_t>()); // Seed from global generator
 
     // Must be possible to find a case where it triggers
