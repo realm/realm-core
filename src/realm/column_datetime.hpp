@@ -33,13 +33,13 @@ struct NewDate {
     NewDate() : NewDate(null()) { }
 
     bool is_null() const { return m_is_null; }
-    bool operator == (const NewDate& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
-    bool operator != (const NewDate& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
-    bool operator > (const NewDate& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
-    bool operator < (const NewDate& rhs) const { return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds); }
-    bool operator <= (const NewDate& rhs) const { return *this < rhs || *this == rhs; }
-    bool operator >= (const NewDate& rhs) const { return *this > rhs || *this == rhs; }
-    NewDate& operator = (const NewDate& rhs) = default;
+    bool operator==(const NewDate& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
+    bool operator!=(const NewDate& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
+    bool operator>(const NewDate& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
+    bool operator<(const NewDate& rhs) const { return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds); }
+    bool operator<=(const NewDate& rhs) const { return *this < rhs || *this == rhs; }
+    bool operator>=(const NewDate& rhs) const { return *this > rhs || *this == rhs; }
+    NewDate& operator=(const NewDate& rhs) = default;
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const NewDate&);
