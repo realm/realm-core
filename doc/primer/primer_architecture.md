@@ -229,14 +229,16 @@ this shouldn't be taken as a "security", only convenience):
     
     update_user(my_row);
 
-For a quick reference on the details of how to get a realm up and running to
-play around with, it would be a good idea to look at the unit tests. For examples
-see test/test_shared.cpp or test/test_table.cpp. Writing unit tests may also be
-a good way to start contributing, because improving the test coverage of the code
-base is very beneficial to the team and also requires you to learn the expected
-behaviour of the code you are testing. To know what files need more test coverage,
-you can run 'sh build.sh lcov' which generates a html coverage report for the
-project.
+For a high level overview on what is required to get a realm up and running to
+play around with, it would be a good idea to look at the unit tests. For
+good examples of unit tests see [test/test_shared.cpp][test-shared] or [test/test_table.cpp][test-table].
+When contributing code to the project, remember to add tests to cover
+what you have changed. When submitting a pull request, Jenkins will
+automatically report the code coverage of your changes, but to generate
+this report locally (or to see what files need more test coverage) you can
+run 'sh build.sh lcov' which generates a html coverage report for the project.
 
 [realm-cocoa]: https://github.com/realm/realm-cocoa
 [realm-java]: https://github.com/realm/realm-java
+[test-shared]: https://github.com/realm/realm-core/blob/master/test/test_shared.cpp
+[test-table]: https://github.com/realm/realm-core/blob/master/test/test_table.cpp
