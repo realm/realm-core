@@ -1476,7 +1476,7 @@ Table::~Table() noexcept
 
     if (!is_attached()) {
         // This table has been detached.
-        REALM_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT_3(m_ref_count.load(), ==, 0);
         return;
     }
 
@@ -1490,7 +1490,7 @@ Table::~Table() noexcept
         // of this subtable.
         ArrayParent* parent = m_columns.get_parent();
         REALM_ASSERT(parent);
-        REALM_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT_3(m_ref_count.load(), ==, 0);
         REALM_ASSERT(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
@@ -1502,7 +1502,7 @@ Table::~Table() noexcept
     if (ArrayParent* parent = m_top.get_parent()) {
         // This is a table whose lifetime is managed by reference
         // counting, so we must let our parent know about our demise.
-        REALM_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT_3(m_ref_count.load(), ==, 0);
         REALM_ASSERT(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();

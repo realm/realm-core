@@ -2150,9 +2150,11 @@ public:
         return true;
     }
 
-    bool move_group_level_table(size_t, size_t)
+    bool move_group_level_table(size_t from_table_ndx, size_t to_table_ndx)
     {
         sync_table();
+        m_encoder.move_group_level_table(to_table_ndx, from_table_ndx);
+        append_instruction();
         return true;
     }
 
