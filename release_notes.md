@@ -2,6 +2,10 @@
 
 ### Bugfixes:
 
+* Detach subspec and enumkey accessors when they are removed
+  via a transaction (ex rollback). This could cause crashes
+  when removing the last column in a table of type link,
+  linklist, backlink, subtable, or enumkey. See #1585.
 * Update table accessors after table move rollback, issue #1551. This
   issue could have caused corruption or crashes when tables are moved
   and then the transaction is rolled back.
