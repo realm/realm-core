@@ -33,6 +33,8 @@ struct NewDate {
     NewDate() : NewDate(null()) { }
 
     bool is_null() const { return m_is_null; }
+    
+    // Note that nullability is handeled by query system. These operators are only invoked for non-null dates.
     bool operator==(const NewDate& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
     bool operator!=(const NewDate& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
     bool operator>(const NewDate& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
