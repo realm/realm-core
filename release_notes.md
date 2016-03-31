@@ -3,6 +3,10 @@
 ### Enhancements:
 
 * Added support for queries that traverse backlinks. Fixes #776.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links.
 
 **NOTE: This is a hotfix release which is built on top of [0.97.4].**
 
