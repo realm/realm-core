@@ -142,7 +142,7 @@ based on another column. We can use column *X* as the look-up table to look
 iterate through column *Y*.
 
 If you tried your hand at the coding challenge, trying to squeeze ints in
-fractional bits is probably still fresh in your mind. This is where it all
+fractional bits is probably still fresh in your mind. This is what it all
 comes down to. By having each column live in its own space, we can apply
 specific compression algorithms to it, and save precious space when the
 column is saved to disk.
@@ -229,5 +229,16 @@ this shouldn't be taken as a "security", only convenience):
     
     update_user(my_row);
 
+For a high level overview on what is required to get a realm up and running to
+play around with, it would be a good idea to look at the unit tests. For
+good examples of unit tests see [test/test_shared.cpp][test-shared] or [test/test_table.cpp][test-table].
+When contributing code to the project, remember to add tests to cover
+what you have changed. When submitting a pull request, Jenkins will
+automatically report the code coverage of your changes, but to generate
+this report locally (or to see what files need more test coverage) you can
+run 'sh build.sh lcov' which generates a html coverage report for the project.
+
 [realm-cocoa]: https://github.com/realm/realm-cocoa
 [realm-java]: https://github.com/realm/realm-java
+[test-shared]: https://github.com/realm/realm-core/blob/master/test/test_shared.cpp
+[test-table]: https://github.com/realm/realm-core/blob/master/test/test_table.cpp

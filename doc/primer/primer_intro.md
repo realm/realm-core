@@ -84,7 +84,7 @@ How can you start contributing? Well, head over to [Waffle][waffle], and look
 at the currently open issues. Get someone to explain how Waffle is organised.
 Very roughly: the left hand side is more urgent, the right side is less urgent.
 Read through some P2 or P3 issues, preferably, look through issues that aren't
-assigned to anyone (to avatar stuck to it), and if there's anything you feel
+assigned to anyone (having an avatar stuck to it), and if there's anything you feel
 capable of tackling; just go ahead and assign the issue to yourself and get
 going!
 
@@ -92,6 +92,22 @@ If you have trouble understanding what the issues are about, ask the person who
 created it, or maybe just give a shout in `#core` to see if anyone is familiar
 with it. If you get interesting information, add it to the issue, so that the
 information isn't lost.
+
+You can keep track of what other team members are working on by monitoring
+active pull requests and reviewing the code they are submitting. This is a
+good process to keep up to speed with how the project is evolving and what
+the other team members are working on. The feedback on PRs will also be
+educational for things you should keep in mind for consistency in style and
+design. It can be difficult to know how much you don't yet understand so to
+guide you on your quest to understanding the code, try to make sure that you
+understand everything on the list of [realm terminology][realm-terms].
+The list can be used as a guide when asking team members about the code, and if
+you understand all the terms, you are definitely in a good place of understanding
+how everything works. Please update the list as you discover terms that are
+otherwise unfamiliar to you. When you get a chance, be sure to check out the
+documentation on the [core wiki][core-wiki]. Especially informative is
+Alexander's [core fundamentals video][alex-core].
+
 
 Hopefully, by the time you've finished reading through this primer, most issues
 and tasks will make sense. This covers the very basics, and the intro to this
@@ -103,3 +119,7 @@ primer. Let's head on to the next part: \ref primer_architecture
 [wiki]: https://github.com/realm/realm-wiki/wiki
 [scudcloud]: https://github.com/raelgc/scudcloud
 [git-cheat-sheet]: http://www.git-tower.com/blog/git-cheat-sheet/
+[realm-terms]: https://github.com/realm/realm-wiki/wiki/Concepts%20for%20New%20Core%20Members
+[core-wiki]: https://github.com/realm/realm-wiki/wiki/Core
+[alex-core]: https://realm.wistia.com/medias/uwl2gog8b8
+
