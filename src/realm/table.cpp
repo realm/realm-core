@@ -2810,6 +2810,8 @@ void Table::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
 
     DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
     column.set(ndx, value);
