@@ -53,7 +53,7 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     // TimestampColumn is only there if needed
     if (top->size() >= 4) {
         ref_type timestamp_ref = top->get_as_ref(3);
-        m_timestamp.reset(new TimestampColumn(alloc, timestamp_ref)); // Throws
+        m_timestamp.reset(new TimestampColumn(alloc, timestamp_ref, false)); // Throws
         m_timestamp->set_parent(&*top, 3);
     }
 
@@ -86,8 +86,8 @@ void MixedColumn::ensure_timestamp_column()
     if (m_timestamp)
         return;
 
-    ref_type ref = TimestampColumn::create(m_array->get_alloc()); // Throws
-    m_timestamp.reset(new TimestampColumn(m_array->get_alloc(), ref)); // Throws
+    ref_type ref = TimestampColumn::create(m_array->get_alloc(), 0, false); // Throws
+    m_timestamp.reset(new TimestampColumn(m_array->get_alloc(), ref, false)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 3);
     m_array->add(ref); // Throws
     m_timestamp->set_parent(m_array.get(), 3);
@@ -298,6 +298,7 @@ void MixedColumn::set_binary(size_t ndx, BinaryData value)
 void MixedColumn::set_timestamp(size_t ndx, Timestamp value)
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT(!value.is_null());
     ensure_timestamp_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
