@@ -398,7 +398,10 @@ void LinkView::do_swap_link(size_t target_row_ndx_1, size_t target_row_ndx_2)
     // FIXME: Optimize this.
     size_t len = m_row_indexes.size();
     for (size_t i = 0; i < len; ++i) {
-        size_t value = m_row_indexes.get(i);
+        int64_t value_64 = m_row_indexes.get(i);
+        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(value_64));
+        size_t value = size_t(value_64);
+
         if (value == target_row_ndx_1) {
             m_row_indexes.set(i, target_row_ndx_2);
         }
