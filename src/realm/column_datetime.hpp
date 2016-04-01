@@ -66,6 +66,7 @@ public:
     ~DateTimeColumn() noexcept override;
 
     static ref_type create(Allocator& alloc, size_t size = 0, bool nullable = false);
+    static ref_type upgrade_from_datetime(Allocator& alloc, size_t datetime_ref, bool nullable);
 
     /// Get the number of entries in this column. This operation is relatively
     /// slow.

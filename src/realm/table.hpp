@@ -796,6 +796,26 @@ public:
     static void generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch);
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
+    // FIXME: Temporary, not finished at all.
+    void Table::upgrade_datetime()
+    {
+        for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
+            ColumnType col_type = get_real_column_type(col_ndx);
+            switch (col_type) {
+                case col_type_DateTime: {
+                   // remove_search_index(col_ndx); // temporary
+                    const ColumnBase& old_datetime = get_column_base(col_ndx);                    
+                    ref_type newdates = DateTimeColumn::upgrade_from_datetime(get_alloc(), old_datetime.get_ref(), is_nullable(col_ndx));
+                    m_spec.set_column_type(col_ndx, col_type_NewDate);      
+                    // FIXME: Make sure it takes index slots in count, etc, etc...
+                    m_columns.set_as_ref(col_ndx, newdates);
+                    m_cols[col_ndx] = nullptr;
+                }
+            }
+        }
+        refresh_column_accessors();
+    }
+
 protected:
     /// Get a pointer to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
@@ -813,6 +833,7 @@ protected:
     bool compare_rows(const Table&) const;
 
     void set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const;
+
 
 private:
     class SliceWriter;

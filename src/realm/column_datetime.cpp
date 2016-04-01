@@ -97,6 +97,27 @@ ref_type DateTimeColumn::create(Allocator& alloc, size_t size, bool nullable)
     return top_ref;
 }
 
+ref_type DateTimeColumn::upgrade_from_datetime(Allocator& alloc, size_t old_datetime_ref, bool nullable)
+{
+    Array top(alloc);
+    top.create(Array::type_HasRefs, false /* context_flag */, 2);
+
+    size_t size;
+    // Important to call on correct class, because nullable version has 1 extra hidden element
+    if (nullable)
+        size = IntNullColumn::get_size_from_ref(old_datetime_ref, alloc);
+    else
+        size = IntegerColumn::get_size_from_ref(old_datetime_ref, alloc);
+
+    CreateHandler<BpTree<int64_t>> nano_create_handler{ 0, alloc };
+    ref_type nano = ColumnBase::create(alloc, size, nano_create_handler);
+
+    top.set_as_ref(0, old_datetime_ref);
+    top.set_as_ref(1, nano);
+
+    ref_type top_ref = top.get_ref();
+    return top_ref;
+}
 
 /// Get the number of entries in this column. This operation is relatively
 /// slow.
