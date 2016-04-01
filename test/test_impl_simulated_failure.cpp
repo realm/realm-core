@@ -33,6 +33,8 @@ using namespace realm;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
+namespace {
+
 TEST_IF(Impl_SimulatedFailure_OneShot, _impl::SimulatedFailure::is_enabled())
 {
     using sf = _impl::SimulatedFailure;
@@ -72,3 +74,5 @@ TEST_IF(Impl_SimulatedFailure_Random, _impl::SimulatedFailure::is_enabled())
             break;
     }
 }
+
+} // unnamed namespace

@@ -26,6 +26,10 @@
 
 #include <realm/util/features.h>
 
+#ifdef REALM_DEBUG
+#  define REALM_ENABLE_SIMULATED_FAILURE
+#endif
+
 namespace realm {
 namespace _impl {
 
@@ -56,9 +60,9 @@ public:
     static void unprime(FailureType) noexcept;
 
     /// Returns true according to the mode of priming of the specified failure
-    /// type on the calling thread, but only if REALM_DEBUG was defined during
-    /// compilation. If REALM_DEBUG was not defined, this function always return
-    /// false.
+    /// type on the calling thread, but only if REALM_ENABLE_SIMULATED_FAILURE
+    /// was defined during compilation. If REALM_ENABLE_SIMULATED_FAILURE was
+    /// not defined, this function always return false.
     static bool check_trigger(FailureType) noexcept;
 
     /// The specified error code is set to `make_error_code(failure_type)` if
@@ -71,14 +75,14 @@ public:
     /// `make_error_code(failure_type)`.
     static void trigger(FailureType failure_type);
 
-    /// Returns true when, and only when REALM_DEBUG was defined during
-    /// compilation.
+    /// Returns true when, and only when REALM_ENABLE_SIMULATED_FAILURE was
+    /// defined during compilation.
     static constexpr bool is_enabled();
 
     SimulatedFailure(std::error_code);
 
 private:
-#ifdef REALM_DEBUG
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
     static void do_prime_one_shot(FailureType);
     static void do_prime_random(FailureType, int n, int m, uint_fast64_t seed);
     static void do_unprime(FailureType) noexcept;
@@ -114,7 +118,7 @@ private:
 
 inline void SimulatedFailure::prime_one_shot(FailureType failure_type)
 {
-#ifdef REALM_DEBUG
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
     do_prime_one_shot(failure_type);
 #else
     static_cast<void>(failure_type);
@@ -124,7 +128,7 @@ inline void SimulatedFailure::prime_one_shot(FailureType failure_type)
 inline void SimulatedFailure::prime_random(FailureType failure_type, int n, int m,
                                            uint_fast64_t seed)
 {
-#ifdef REALM_DEBUG
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
     do_prime_random(failure_type, n, m, seed);
 #else
     static_cast<void>(failure_type);
@@ -136,7 +140,7 @@ inline void SimulatedFailure::prime_random(FailureType failure_type, int n, int 
 
 inline void SimulatedFailure::unprime(FailureType failure_type) noexcept
 {
-#ifdef REALM_DEBUG
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
     do_unprime(failure_type);
 #else
     static_cast<void>(failure_type);
@@ -145,7 +149,7 @@ inline void SimulatedFailure::unprime(FailureType failure_type) noexcept
 
 inline bool SimulatedFailure::check_trigger(FailureType failure_type) noexcept
 {
-#ifdef REALM_DEBUG
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
     return do_check_trigger(failure_type);
 #else
     static_cast<void>(failure_type);
@@ -173,7 +177,7 @@ inline void SimulatedFailure::trigger(FailureType failure_type)
 
 inline constexpr bool SimulatedFailure::is_enabled()
 {
-#ifdef REALM_DEBUG
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
     return true;
 #else
     return false;

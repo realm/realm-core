@@ -22,7 +22,7 @@
 using namespace realm;
 using namespace realm::_impl;
 
-#ifdef REALM_DEBUG
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
 
 namespace {
 
@@ -150,7 +150,7 @@ bool SimulatedFailure::do_check_trigger(FailureType failure_type) noexcept
     return false;
 }
 
-#endif // REALM_DEBUG
+#endif // REALM_ENABLE_SIMULATED_FAILURE
 
 
 namespace {
