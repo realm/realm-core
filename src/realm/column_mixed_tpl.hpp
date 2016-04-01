@@ -343,6 +343,7 @@ inline void MixedColumn::insert_datetime(size_t ndx, DateTime value)
 
 inline void MixedColumn::insert_newdate(size_t ndx, NewDate value)
 {
+    REALM_ASSERT(!value.is_null());
     ensure_newdate_column();
     size_t datetime_row_ndx = m_datetime->size();
     m_datetime->add(value); // Throws

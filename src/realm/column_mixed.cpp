@@ -53,7 +53,7 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     // DateTimeColumn is only there if needed
     if (top->size() >= 4) {
         ref_type newdate_ref = top->get_as_ref(3);
-        m_datetime.reset(new DateTimeColumn(alloc, newdate_ref)); // Throws
+        m_datetime.reset(new DateTimeColumn(alloc, newdate_ref, false)); // Throws
         m_datetime->set_parent(&*top, 3);
     }
 
@@ -87,7 +87,7 @@ void MixedColumn::ensure_newdate_column()
         return;
 
     ref_type ref = DateTimeColumn::create(m_array->get_alloc()); // Throws
-    m_datetime.reset(new DateTimeColumn(m_array->get_alloc(), ref)); // Throws
+    m_datetime.reset(new DateTimeColumn(m_array->get_alloc(), ref, false)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 3);
     m_array->add(ref); // Throws
     m_datetime->set_parent(m_array.get(), 3);
@@ -298,6 +298,7 @@ void MixedColumn::set_binary(size_t ndx, BinaryData value)
 void MixedColumn::set_newdate(size_t ndx, NewDate value)
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT(!value.is_null());
     ensure_newdate_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
