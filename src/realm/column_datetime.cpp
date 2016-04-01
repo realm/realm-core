@@ -123,7 +123,7 @@ void DateTimeColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
     }
 }
 
-void DateTimeColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+void DateTimeColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t /*prior_num_rows*/,
     bool broken_reciprocal_backlinks)
 {
     static_cast<void>(broken_reciprocal_backlinks);

@@ -99,7 +99,7 @@ public:
     MemRef clone_deep(Allocator& alloc) const override;
     ref_type write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream&) const override;
     void update_from_parent(size_t old_baseline) noexcept override;
-    void set_ndx_in_parent(size_t ndx) noexcept;
+    void set_ndx_in_parent(size_t ndx) noexcept override;
     void refresh_accessor_tree(size_t new_col_ndx, const Spec&) override;
 #ifdef REALM_DEBUG
     void verify() const override;
