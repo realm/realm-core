@@ -436,6 +436,10 @@ struct alignas(8) SharedGroup::SharedInfo {
     /// writer crashes during this phase, there is no safe way of continuing
     /// with further write transactions. When beginning a write transaction, 
     /// this must be checked and an exception thrown if set.
+    /// FIXME: This is a temporary approach until we get the commitlog data
+    /// moved into the realm file. After that it should be feasible to either
+    /// handle the error condition properly or preclude it by using a non-robust
+    /// mutex for the remaining and much smaller critical section.
     uint8_t commit_in_critical_phase : 1; // Offset 3
 
     /// The target Realm file format version for the current session. This
