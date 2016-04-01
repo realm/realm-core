@@ -65,14 +65,6 @@ TEST(DateTimeColumn_Basic_Nulls)
     CHECK_THROW_ANY(t.set_newdate(0, 0, NewDate(null())));
 }
 
-// FIXME: Add index support
-TEST(DateTimeColumn_Index)
-{
-    Table t;
-    t.add_column(type_NewDate, "date", false /*nullable*/);
-    CHECK_THROW_ANY(t.add_search_index(0));
-}
-
 TEST(DateTimeColumn_Relocate)
 {
     // Fill so much data in a column that it relocates, to check if relocation propagates up correctly
