@@ -45,6 +45,24 @@
 
 ----------------------------------------------
 
+# 0.97.3 Release notes
+
+### Bugfixes:
+
+* Update table accessors after table move rollback, issue #1551. This
+  issue could have caused corruption or crashes when tables are moved
+  and then the transaction is rolled back.
+* Detach subspec and enumkey accessors when they are removed
+  via a transaction (ex rollback). This could cause crashes
+  when removing the last column in a table of type link,
+  linklist, backlink, subtable, or enumkey. See #1585.
+* Handing over a detached row accessor no longer crashes.
+
+**NOTE: This is a hotfix release. The above changes are not present in
+versions [0.97.2].**
+
+----------------------------------------------
+
 # 0.97.2 Release notes
 
 ### Enhancements:
