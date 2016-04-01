@@ -44,8 +44,6 @@ class StringIndex;
 /// it is, then the root ref of the index is stored in
 /// Table::m_columns immediately after the root ref of the string
 /// column.
-///
-/// FIXME: Rename StringColumn to StringColumn
 class StringColumn: public ColumnBaseSimple, public ColumnTemplate<StringData> {
 public:
     typedef StringData value_type;
