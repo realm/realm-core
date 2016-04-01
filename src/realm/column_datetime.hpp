@@ -62,10 +62,10 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 // column type
 class DateTimeColumn : public ColumnBaseSimple, public ColumnTemplate<NewDate> {
 public:
-    DateTimeColumn(Allocator& alloc, ref_type ref);
+    DateTimeColumn(Allocator& alloc, ref_type ref, bool nullable);
     ~DateTimeColumn() noexcept override;
 
-    static ref_type create(Allocator& alloc, size_t size = 0);
+    static ref_type create(Allocator& alloc, size_t size = 0, bool nullable = false);
 
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
@@ -117,17 +117,24 @@ public:
     size_t count(NewDate) const;
 
     void erase(size_t ndx, bool is_last) {
-        m_seconds.erase(ndx, is_last);
+        if (m_nullable)
+            m_nullable_seconds.erase(ndx, is_last);
+        else
+            m_nonnullable_seconds.erase(ndx, is_last);
         m_nanoseconds.erase(ndx, is_last);
     }
 
     typedef NewDate value_type;
 
 private:
-    BpTree<util::Optional<int64_t>> m_seconds;
+    BpTree<int64_t> m_nonnullable_seconds;
+    BpTree<util::Optional<int64_t>> m_nullable_seconds;
     BpTree<int64_t> m_nanoseconds;
+    bool m_nullable;
 
     std::unique_ptr<StringIndex> m_search_index;
+
+    template<class BT> class CreateHandler;
 };
 
 } // namespace realm

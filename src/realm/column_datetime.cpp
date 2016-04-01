@@ -24,7 +24,8 @@
 namespace realm {
 
 
-DateTimeColumn::DateTimeColumn(Allocator& alloc, ref_type ref)
+DateTimeColumn::DateTimeColumn(Allocator& alloc, ref_type ref, bool nullable):
+    m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -36,10 +37,15 @@ DateTimeColumn::DateTimeColumn(Allocator& alloc, ref_type ref)
     ref_type seconds = m_array->get_as_ref(0);
     ref_type nano = m_array->get_as_ref(1);
 
-    m_seconds.init_from_ref(alloc, seconds);
+    if (m_nullable) {
+        m_nullable_seconds.init_from_ref(alloc, seconds);
+        m_nullable_seconds.set_parent(root, 0);
+    }
+    else {
+        m_nonnullable_seconds.init_from_ref(alloc, seconds);
+        m_nonnullable_seconds.set_parent(root, 0);
+    }
     m_nanoseconds.init_from_ref(alloc, nano);
-
-    m_seconds.set_parent(root, 0);
     m_nanoseconds.set_parent(root, 1);
 }
 
@@ -50,16 +56,42 @@ DateTimeColumn::~DateTimeColumn() noexcept
 }
 
 
-ref_type DateTimeColumn::create(Allocator& alloc, size_t size)
+template<class BT> class DateTimeColumn::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(typename BT::value_type value, Allocator& alloc):
+        m_value(value), m_alloc(alloc) {}
+
+    ref_type create_leaf(size_t size) override
+    {
+        MemRef mem = BT::create_leaf(Array::type_Normal, size, m_value, m_alloc); // Throws
+        return mem.m_ref;
+    }
+private:
+    const typename BT::value_type m_value;
+    Allocator& m_alloc;
+};
+
+ref_type DateTimeColumn::create(Allocator& alloc, size_t size, bool nullable)
 {
     Array top(alloc);
     top.create(Array::type_HasRefs, false /* context_flag */, 2);
 
-    MemRef seconds = BpTree<util::Optional<int64_t>>::create_leaf(Array::type_Normal, size, null{}, alloc);
-    MemRef nano = BpTree<int64_t>::create_leaf(Array::type_Normal, size, 0, alloc);
+    ref_type seconds;
 
-    top.set_as_ref(0, seconds.m_ref);
-    top.set_as_ref(1, nano.m_ref);
+    if (nullable) {
+        CreateHandler<BpTree<util::Optional<int64_t>>> create_handler{null{}, alloc};
+        seconds = ColumnBase::create(alloc, size, create_handler);
+    }
+    else {
+        CreateHandler<BpTree<int64_t>> create_handler{0, alloc};
+        seconds = ColumnBase::create(alloc, size, create_handler);
+    }
+
+    CreateHandler<BpTree<int64_t>> nano_create_handler{0, alloc};
+    ref_type nano = ColumnBase::create(alloc, size, nano_create_handler);
+
+    top.set_as_ref(0, seconds);
+    top.set_as_ref(1, nano);
 
     ref_type top_ref = top.get_ref();
     return top_ref;
@@ -71,27 +103,32 @@ ref_type DateTimeColumn::create(Allocator& alloc, size_t size)
 size_t DateTimeColumn::size() const noexcept
 {
     // FIXME: Consider debug asserts on the columns having the same size
-    return m_seconds.size();
+    if (m_nullable)
+        return m_nullable_seconds.size();
+    return m_nonnullable_seconds.size();
 }
 
 /// Whether or not this column is nullable.
 bool DateTimeColumn::is_nullable() const noexcept
 {
-    return true;
+    return m_nullable;
 }
 
 /// Whether or not the value at \a row_ndx is NULL. If the column is not
 /// nullable, always returns false.
 bool DateTimeColumn::is_null(size_t row_ndx) const noexcept
 {
-    return m_seconds.is_null(row_ndx);
+    if (!m_nullable)
+        return false;
+    return m_nullable_seconds.is_null(row_ndx);
 }
 
 /// Sets the value at \a row_ndx to be NULL.
 /// \throw LogicError Thrown if this column is not nullable.
 void DateTimeColumn::set_null(size_t row_ndx)
 {
-    m_seconds.set_null(row_ndx);
+    REALM_ASSERT(m_nullable);
+    m_nullable_seconds.set_null(row_ndx);
     if (has_search_index()) {
         m_search_index->set(row_ndx, null{});
     }
@@ -104,9 +141,9 @@ void DateTimeColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size
     if (row_ndx == size())
         row_ndx = npos;
     if (nullable)
-        m_seconds.insert(row_ndx, null{}, num_rows_to_insert);
+        m_nullable_seconds.insert(row_ndx, null{}, num_rows_to_insert);
     else
-        m_seconds.insert(row_ndx, 0, num_rows_to_insert);
+        m_nonnullable_seconds.insert(row_ndx, 0, num_rows_to_insert);
     m_nanoseconds.insert(row_ndx, 0, num_rows_to_insert);
 
     if (has_search_index()) {
@@ -129,11 +166,15 @@ void DateTimeColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     static_cast<void>(broken_reciprocal_backlinks);
     bool is_last = (row_ndx + num_rows_to_erase) == size();
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
-        m_seconds.erase(row_ndx + num_rows_to_erase - i - 1, is_last);
-        m_nanoseconds.erase(row_ndx + num_rows_to_erase - i - 1, is_last);
+        size_t ndx = row_ndx + num_rows_to_erase - i - 1;
+        if (m_nullable)
+            m_nullable_seconds.erase(ndx, is_last);
+        else
+            m_nonnullable_seconds.erase(ndx, is_last);
+        m_nanoseconds.erase(ndx, is_last);
         
         if (has_search_index()) {
-            m_search_index->erase<StringData>(row_ndx + num_rows_to_erase - i - 1, is_last);
+            m_search_index->erase<StringData>(ndx, is_last);
         }
     }
 }
@@ -157,15 +198,21 @@ void DateTimeColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
         }
     }
 
-    m_seconds.move_last_over(row_ndx, prior_num_rows);
+    if (m_nullable)
+        m_nullable_seconds.move_last_over(row_ndx, prior_num_rows);
+    else
+        m_nonnullable_seconds.move_last_over(row_ndx, prior_num_rows);
     m_nanoseconds.move_last_over(row_ndx, prior_num_rows);
 }
 
 void DateTimeColumn::clear(size_t num_rows, bool broken_reciprocal_backlinks)
 {
-    REALM_ASSERT_EX(num_rows == m_seconds.size(), num_rows, m_seconds.size());
+    REALM_ASSERT_EX(num_rows == size(), num_rows, size());
     static_cast<void>(broken_reciprocal_backlinks);
-    m_seconds.clear();
+    if (m_nullable)
+        m_nullable_seconds.clear();
+    else
+        m_nonnullable_seconds.clear();
     m_nanoseconds.clear();
     if (has_search_index()) {
         m_search_index->clear();
@@ -186,9 +233,15 @@ void DateTimeColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         m_search_index->insert(row_ndx_2, value_1, 1, row_ndx_2_is_last);
     }
 
-    auto tmp1 = m_seconds.get(row_ndx_1);
-    m_seconds.set(row_ndx_1, m_seconds.get(row_ndx_2));
-    m_seconds.set(row_ndx_2, tmp1);
+    auto tmp1 = get(row_ndx_1).m_seconds;
+    if (m_nullable) {
+        m_nullable_seconds.set(row_ndx_1, m_nullable_seconds.get(row_ndx_2));
+        m_nullable_seconds.set(row_ndx_2, tmp1);
+    }
+    else {
+        m_nonnullable_seconds.set(row_ndx_1, m_nonnullable_seconds.get(row_ndx_2));
+        m_nonnullable_seconds.set(row_ndx_2, tmp1);
+    }
     auto tmp2 = m_nanoseconds.get(row_ndx_1);
     m_nanoseconds.set(row_ndx_1, m_nanoseconds.get(row_ndx_2));
     m_nanoseconds.set(row_ndx_2, tmp2);
@@ -196,7 +249,10 @@ void DateTimeColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
 void DateTimeColumn::destroy() noexcept
 {
-    m_seconds.destroy();
+    if (m_nullable)
+        m_nullable_seconds.destroy();
+    else
+        m_nonnullable_seconds.destroy();
     m_nanoseconds.destroy();
     if (m_array)
         m_array->destroy();
@@ -307,10 +363,15 @@ void DateTimeColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/,
 
 void DateTimeColumn::add(const NewDate& ndt)
 {
-    bool is_null = ndt.is_null();
-    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ndt.m_seconds);
-    int32_t nanoseconds = is_null ? 0 : ndt.m_nanoseconds;
-    m_seconds.insert(npos, seconds);
+    uint32_t nanoseconds = ndt.is_null() ? 0 : ndt.m_nanoseconds;
+    if (m_nullable) {
+        util::Optional<int64_t> seconds = ndt.is_null() ? util::none : util::some<int64_t>(ndt.m_seconds);
+        m_nullable_seconds.insert(npos, seconds);
+    }
+    else {
+        REALM_ASSERT(!ndt.is_null());
+        m_nonnullable_seconds.insert(npos, ndt.m_seconds);
+    }
     m_nanoseconds.insert(npos, nanoseconds);
 
     if (has_search_index()) {
@@ -321,8 +382,19 @@ void DateTimeColumn::add(const NewDate& ndt)
 
 NewDate DateTimeColumn::get(size_t row_ndx) const noexcept
 {
-    util::Optional<int64_t> seconds = m_seconds.get(row_ndx);
-    return seconds ? NewDate(*seconds, int32_t(m_nanoseconds.get(row_ndx))) : NewDate(null());
+    int64_t seconds;
+    if (m_nullable) {
+        util::Optional<int64_t> maybe_seconds = m_nullable_seconds.get(row_ndx);
+        if (maybe_seconds)
+            seconds = *maybe_seconds;
+        else
+            return null{};
+    }
+    else {
+        seconds = m_nonnullable_seconds.get(row_ndx);
+    }
+    uint32_t ns = static_cast<uint32_t>(m_nanoseconds.get(row_ndx));
+    return NewDate{seconds, ns};
 }
 
 void DateTimeColumn::set(size_t row_ndx, const NewDate& ndt)
@@ -330,7 +402,13 @@ void DateTimeColumn::set(size_t row_ndx, const NewDate& ndt)
     bool is_null = ndt.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ndt.m_seconds);
     int32_t nanoseconds = is_null ? 0 : ndt.m_nanoseconds;
-    m_seconds.set(row_ndx, seconds);
+    if (m_nullable) {
+        m_nullable_seconds.set(row_ndx, seconds);
+    }
+    else {
+        REALM_ASSERT(!is_null);
+        m_nonnullable_seconds.set(row_ndx, *seconds);
+    }
     m_nanoseconds.set(row_ndx, nanoseconds);
 
     if (has_search_index()) {

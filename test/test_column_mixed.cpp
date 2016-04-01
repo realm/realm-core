@@ -224,7 +224,7 @@ TEST(MixedColumn_NewDate)
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
-    c.insert_newdate(0, NewDate(null()));
+    c.insert_newdate(0, NewDate(0, 0));
     c.insert_newdate(1, NewDate(100, 200));
     c.insert_newdate(2, NewDate(0, 0)); // Should *not* equal null
     c.insert_newdate(3, NewDate(-1000, 0));
@@ -388,10 +388,8 @@ TEST(MixedColumn_Mixed)
     c.set_subtable(5, 0);
     c.set_float(6, 1.124f);
     c.set_double(7, 1234.124);
-    c.set_newdate(8, NewDate());
     CHECK_EQUAL(9, c.size());
 
-    CHECK_EQUAL(type_NewDate, c.get_type(8));
     CHECK_EQUAL(type_Double, c.get_type(7));
     CHECK_EQUAL(type_Float,  c.get_type(6));
     CHECK_EQUAL(type_Table,  c.get_type(5));

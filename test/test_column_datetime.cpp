@@ -39,13 +39,14 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(DateTimeColumn_Basic)
+TEST_TYPES(DateTimeColumn_Basic, std::true_type, std::false_type)
 {
-    ref_type ref = DateTimeColumn::create(Allocator::get_default());
-    DateTimeColumn c(Allocator::get_default(), ref);
+    bool nullable = TEST_TYPE::value;
+    ref_type ref = DateTimeColumn::create(Allocator::get_default(), 0, nullable);
+    DateTimeColumn c(Allocator::get_default(), ref, nullable);
     c.add(NewDate(123,123));
     NewDate ndt = c.get(0);
-    CHECK(ndt == NewDate(123, 123));
+    CHECK_EQUAL(ndt, NewDate(123, 123));
 }
 
 TEST(DateTimeColumn_Basic_Nulls)
@@ -77,10 +78,10 @@ TEST(DateTimeColumn_Relocate)
     }
 }
 
-TEST(DateTimeColumn_Compare)
+TEST_TYPES(DateTimeColumn_Compare, std::true_type, std::false_type)
 {
-    ref_type ref = DateTimeColumn::create(Allocator::get_default());
-    DateTimeColumn c(Allocator::get_default(), ref);
+    ref_type ref = DateTimeColumn::create(Allocator::get_default(), 0, TEST_TYPE::value);
+    DateTimeColumn c(Allocator::get_default(), ref, TEST_TYPE::value);
 
     for (unsigned int i = 0; i < 10000; i++) {
         c.add(NewDate(i, i));
@@ -89,16 +90,16 @@ TEST(DateTimeColumn_Compare)
     CHECK(c.compare(c));
 
     {
-        ref_type ref = DateTimeColumn::create(Allocator::get_default());
-        DateTimeColumn c2(Allocator::get_default(), ref);
+        ref_type ref = DateTimeColumn::create(Allocator::get_default(), 0, TEST_TYPE::value);
+        DateTimeColumn c2(Allocator::get_default(), ref, TEST_TYPE::value);
         CHECK_NOT(c.compare(c2));
     }
 }
 
-TEST(DateTimeColumn_Index)
+TEST_TYPES(DateTimeColumn_Index, std::true_type, std::false_type)
 {
-    ref_type ref = DateTimeColumn::create(Allocator::get_default());
-    DateTimeColumn c(Allocator::get_default(), ref);
+    ref_type ref = DateTimeColumn::create(Allocator::get_default(), 0, TEST_TYPE::value);
+    DateTimeColumn c(Allocator::get_default(), ref, TEST_TYPE::value);
     StringIndex* index = c.create_search_index();
     CHECK(index);
 
