@@ -103,4 +103,23 @@ TEST(DateTimeColumn_Compare)
     }
 }
 
+TEST(DateTimeColumn_Index)
+{
+    ref_type ref = DateTimeColumn::create(Allocator::get_default());
+    DateTimeColumn c(Allocator::get_default(), ref);
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+
+    for (uint32_t i = 0; i < 100; ++i) {
+        c.add(NewDate{i + 10000, i});
+    }
+
+    NewDate last_value{10099, 99};
+
+    CHECK_EQUAL(index->find_first(last_value), 99);
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
 #endif // TEST_COLUMN_DATETIME
