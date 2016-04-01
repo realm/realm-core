@@ -2814,11 +2814,8 @@ void Table::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
     DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
     column.set(ndx, value);
 
-    // FIXME: Add replication
-    /*
     if (Replication* repl = get_repl())
-        repl->set_bool(this, col_ndx, ndx, value); // Throws
-        */
+        repl->set_newdate(this, col_ndx, ndx, value); // Throws
 }
 
 
