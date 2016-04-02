@@ -16,7 +16,7 @@
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Lock file (`foo.realm.lock`) format bumped.
 
 ### Enhancements:
 
