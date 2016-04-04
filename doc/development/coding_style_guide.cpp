@@ -147,13 +147,6 @@ private:
     // Friends
 };
 
-// Use of 'auto' keyword:
-//
-// 'auto' should *not* be used for trivial cases where the type declaration 
-// is short, non-templated, and non-derived (type_t, int64_t, std::string,
-// etc.
-
-
 
 // About FIXMEs:
 //
