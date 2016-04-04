@@ -380,7 +380,7 @@ bool TestList::run(Config config)
         std::ostringstream formatter;
         formatter.imbue(std::locale::classic());
         formatter << num_threads;
-        int thread_digits = formatter.str().size();
+        int thread_digits = int(formatter.str().size());
         formatter.fill('0');
         if (config.per_thread_log_path.empty()) {
             for (int i = 0; i != num_threads; ++i) {

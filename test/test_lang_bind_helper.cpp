@@ -121,13 +121,13 @@ TEST(LangBindHelper_LinkView)
 namespace {
 
 REALM_TABLE_4(TestTableShared,
-                first,  Int,
-                second, Int,
-                third,  Bool,
-                fourth, String)
+              first,  Int,
+              second, Int,
+              third,  Bool,
+              fourth, String)
 
 REALM_TABLE_1(TestTableInts,
-                first,  Int)
+              first,  Int)
 
 
 class ShortCircuitHistory: public TrivialReplication, public _impl::History {
@@ -11680,5 +11680,6 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
     // backlink column index in target_b from source_b should be index 1
     CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(1, 0), 1);
 }
+
 
 #endif
