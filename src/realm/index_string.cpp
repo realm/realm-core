@@ -5,6 +5,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column.hpp>
 #include <realm/column_string.hpp>
+#include <realm/column_datetime.hpp> // NewDate
 
 using namespace realm;
 using namespace realm::util;
@@ -20,6 +21,22 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 }
 
 } // anonymous namespace
+
+namespace realm {
+StringData GetIndexData<NewDate>::get_index_data(const NewDate& dt, StringIndex::StringConversionBuffer& buffer)
+{
+    if (dt.is_null())
+        return null{};
+    
+    int64_t s = dt.m_seconds;
+    uint32_t ns = dt.m_nanoseconds;
+    const char* s_buf = reinterpret_cast<const char*>(&s);
+    const char* ns_buf = reinterpret_cast<const char*>(&ns);
+    std::copy(s_buf, s_buf + sizeof(int64_t), buffer.data());
+    std::copy(ns_buf, ns_buf + sizeof(uint32_t), buffer.data() + sizeof(int64_t));
+    return StringData{buffer.data(), 12};
+}
+} // namespace realm
 
 
 Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)

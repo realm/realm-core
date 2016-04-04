@@ -1389,6 +1389,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
                                   col_type != col_type_Float &&
                                   col_type != col_type_Double &&
                                   col_type != col_type_DateTime &&
+                                  col_type != col_type_NewDate &&
                                   col_type != col_type_Bool &&
                                   col_type != col_type_Link)));
 
@@ -1443,7 +1444,10 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             // Origin table will be set by group after entire table has been created
             col = new BacklinkColumn(alloc, ref); // Throws
             break;
-        case col_type_Reserved1:
+        case col_type_NewDate:
+            // Origin table will be set by group after entire table has been created
+            col = new DateTimeColumn(alloc, ref); // Throws
+            break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
             break;
@@ -1558,6 +1562,7 @@ void Table::upgrade_file_format()
             case col_type_Bool:
             case col_type_Int:
             case col_type_DateTime: {
+                // FIXME: Do upgrade of col_type_DateTime
                 IntegerColumn& col = get_column(col_ndx);
                 col.get_search_index()->clear();
                 col.populate_search_index();
@@ -1572,7 +1577,6 @@ void Table::upgrade_file_format()
             case col_type_Binary:
             case col_type_Table:
             case col_type_Mixed:
-            case col_type_Reserved1:
             case col_type_Float:
             case col_type_Double:
             case col_type_Reserved4:
@@ -1580,6 +1584,9 @@ void Table::upgrade_file_format()
             case col_type_LinkList:
             case col_type_BackLink:
                 // Indices are not support on these column types
+                break;
+            case col_type_NewDate:
+                // Introduced after latest file format upgrade
                 break;
         }
         REALM_ASSERT(false);
@@ -1824,6 +1831,16 @@ MixedColumn& Table::get_column_mixed(size_t ndx)
     return get_column<MixedColumn, col_type_Mixed>(ndx);
 }
 
+const DateTimeColumn& Table::get_column_datetime(size_t ndx) const noexcept
+{
+    return get_column<DateTimeColumn, col_type_NewDate>(ndx);
+}
+
+DateTimeColumn& Table::get_column_datetime(size_t ndx)
+{
+    return get_column<DateTimeColumn, col_type_NewDate>(ndx);
+}
+
 const LinkColumnBase& Table::get_column_link_base(size_t ndx) const noexcept
 {
     const ColumnBase& col_base = get_column_base(ndx);
@@ -1943,6 +1960,8 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
             else {
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
+        case col_type_NewDate:
+            return DateTimeColumn::create(alloc, size); // Throws
         case col_type_Float:
             return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Double:
@@ -1962,7 +1981,6 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_BackLink:
             return BacklinkColumn::create(alloc, size); // Throws
         case col_type_StringEnum:
-        case col_type_Reserved1:
         case col_type_Reserved4:
             break;
     }
@@ -2672,6 +2690,18 @@ BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
     return column.get(ndx);
 }
 
+template<>
+NewDate Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_NewDate);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
+    return column.get(ndx);
+}
+
+
 } // namespace realm;
 
 template<class ColType, class T>
@@ -2766,6 +2796,30 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
     if (Replication* repl = get_repl())
         repl->set_int(this, col_ndx, ndx, value); // Throws
 }
+
+NewDate Table::get_newdate(size_t col_ndx, size_t ndx) const noexcept
+{
+    return get<NewDate>(col_ndx, ndx);
+}
+
+
+void Table::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_NewDate);
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
+
+    DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
+    column.set(ndx, value);
+
+    if (Replication* repl = get_repl())
+        repl->set_newdate(this, col_ndx, ndx, value); // Throws
+}
+
 
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
@@ -3034,6 +3088,8 @@ Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const noexcept
             return Mixed(column.get_bool(ndx));
         case type_DateTime:
             return Mixed(DateTime(column.get_datetime(ndx)));
+        case type_NewDate:
+            return Mixed(column.get_newdate(ndx));
         case type_Float:
             return Mixed(column.get_float(ndx));
         case type_Double:
@@ -3082,6 +3138,9 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
             break;
         case type_DateTime:
             column.set_datetime(ndx, value.get_datetime()); // Throws
+            break;
+        case type_NewDate:
+            column.set_newdate(ndx, value.get_newdate()); // Throws
             break;
         case type_Float:
             column.set_float(ndx, value.get_float()); // Throws
@@ -4422,6 +4481,21 @@ inline void out_datetime(std::ostream& out, DateTime value)
     }
 }
 
+inline void out_newdate(std::ostream& out, NewDate value)
+{
+    // FIXME: Do we want to output the full precision to json?
+    time_t rawtime = value.m_seconds;
+    struct tm* t = gmtime(&rawtime);
+    if (t) {
+        // We need a buffer for formatting dates (and binary to hex). Max
+        // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
+        char buffer[30];
+        size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
+        if (res)
+            out << buffer;
+    }
+}
+
 inline void out_binary(std::ostream& out, const BinaryData bin)
 {
     const char* p = bin.data();
@@ -4495,6 +4569,9 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
         case type_Binary:
             out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
             break;
+        case type_NewDate:
+            out << "\""; out_newdate(out, get_newdate(i, row_ndx)); out << "\"";
+            break;
         case type_Table:
             get_subtable(i, row_ndx)->to_json(out);
             break;
@@ -4527,6 +4604,9 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                     break;
                 case type_Binary:
                     out << "\""; out_binary(out, m.get_binary()); out << "\"";
+                    break;
+                case type_NewDate:
+                    out << "\""; out_newdate(out, m.get_newdate()); out << "\"";
                     break;
                 case type_Table:
                 case type_Mixed:
@@ -4673,6 +4753,8 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 width = 5;
                 break;
             case type_DateTime:
+            case type_NewDate:
+                // FIXME: Probably not correct if we output the full precision
                 width = 19;
                 break;
             case type_Int:
@@ -4725,6 +4807,8 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                             width = std::max(width, size_t(5));
                             break;
                         case type_DateTime:
+                        case type_NewDate:
+                            // FIXME: Probably not correct if we output the full precision
                             width = std::max(width, size_t(19));
                             break;
                         case type_Int:
@@ -4835,6 +4919,9 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
             case type_DateTime:
                 out_datetime(out, get_datetime(col, row_ndx));
                 break;
+            case type_NewDate:
+                out_newdate(out, get_newdate(col, row_ndx));
+                break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
                 break;
@@ -4868,6 +4955,9 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                             break;
                         case type_DateTime:
                             out_datetime(out, m.get_datetime());
+                            break;
+                        case type_NewDate:
+                            out_newdate(out, m.get_newdate());
                             break;
                         case type_Binary:
                             out.width(widths[col+1]-6); // adjust for " bytes" text
@@ -4935,6 +5025,13 @@ bool Table::compare_rows(const Table& t) const
                     if (!c1.compare(c2))
                         return false;
                 }
+                continue;
+            }
+            case col_type_NewDate: {
+                const DateTimeColumn& c1 = get_column_datetime(i);
+                const DateTimeColumn& c2 = t.get_column_datetime(i);
+                if (!c1.compare(c2))
+                    return false;
                 continue;
             }
             case col_type_Float: {
@@ -5019,7 +5116,6 @@ bool Table::compare_rows(const Table& t) const
                 continue;
             }
             case col_type_BackLink:
-            case col_type_Reserved1:
             case col_type_Reserved4:
                 break;
         }

@@ -865,6 +865,7 @@ TEST(LinkList_SortLinkView)
     table1->add_column(type_Float, "str1");
     table1->add_column(type_Double, "str1");
     table1->add_column(type_String, "str2");
+    table1->add_column(type_NewDate, "nd");
 
     // add some rows
     table1->add_empty_row();
@@ -873,6 +874,7 @@ TEST(LinkList_SortLinkView)
     table1->set_float(2, 0, 300.f);
     table1->set_double(3, 0, 300.);
     table1->set_string(4, 0, "alfa");
+    table1->set_newdate(5, 0, NewDate(300, 300));
 
     table1->add_empty_row();
     table1->set_int(0, 1, 100);
@@ -880,6 +882,7 @@ TEST(LinkList_SortLinkView)
     table1->set_float(2, 1, 100.f);
     table1->set_double(3, 1, 100.);
     table1->set_string(4, 1, "alfa");
+    table1->set_newdate(5, 1, NewDate(100, 100));
 
     table1->add_empty_row();
     table1->set_int(0, 2, 200);
@@ -887,6 +890,7 @@ TEST(LinkList_SortLinkView)
     table1->set_float(2, 2, 200.f);
     table1->set_double(3, 2, 200.);
     table1->set_string(4, 2, "alfa");
+    table1->set_newdate(5, 2, NewDate(200, 200));
 
     size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
     table2->add_empty_row();
@@ -901,6 +905,7 @@ TEST(LinkList_SortLinkView)
     lvr->add(1);
     lvr->add(2);
 
+    // Sort integer column
     lvr->sort(0);
     tv = lvr->get_sorted_view(0);
     CHECK_EQUAL(lvr->get(0).get_index(), 1);
@@ -910,6 +915,16 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 0);
 
+    // Sort NewDate column
+    lvr->sort(5);
+    tv = lvr->get_sorted_view(0);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
+    
     lvr = table2->get_linklist(col_link2, 1);
     lvr->clear();
     lvr->add(2);

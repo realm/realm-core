@@ -1398,6 +1398,11 @@ public:
         return true; // No-op
     }
 
+    bool set_newdate(size_t, size_t, NewDate) noexcept
+    {
+        return true; // No-op
+    }
+
     bool set_table(size_t col_ndx, size_t row_ndx) noexcept
     {
         if (m_table) {

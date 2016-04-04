@@ -1651,6 +1651,7 @@ TEST(Query_LimitUntyped2)
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "second1");
+    table.add_column(type_NewDate, "date");
 
     table.add_empty_row(3);
     table.set_int(0, 0, 10000);
@@ -1665,11 +1666,15 @@ TEST(Query_LimitUntyped2)
     table.set_double(2, 1, 30000.);
     table.set_double(2, 2, 40000.);
 
+    table.set_newdate(3, 0, NewDate(10000, 10000));
+    table.set_newdate(3, 1, NewDate(30000, 30000));
+    table.set_newdate(3, 2, NewDate(40000, 40000));
 
     Query q = table.where();
     int64_t sum;
     float sumf;
     double sumd;
+    NewDate nd;
 
     // sum, limited by 'limit'
     sum = q.sum_int(0, nullptr, 0, -1, 1);
@@ -1712,6 +1717,8 @@ TEST(Query_LimitUntyped2)
     size_t ndx = not_found;
 
     // max, limited by 'limit'
+
+    // int
     sum = q.maximum_int(0, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
     q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
@@ -1727,6 +1734,24 @@ TEST(Query_LimitUntyped2)
     q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
 
+    // NewDate
+/*
+    nd = q.maximum_newdate(3, nullptr, 0, -1, 1);
+    CHECK_EQUAL(NewDate(10000, 10000), nd);
+    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
+    CHECK_EQUAL(0, ndx);
+
+    nd = q.maximum_newdate(3, nullptr, 0, -1, 2);
+    CHECK_EQUAL(NewDate(30000, 30000), nd);
+    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
+    CHECK_EQUAL(1, ndx);
+
+    nd = q.maximum_newdate(3, nullptr, 0, -1);
+    CHECK_EQUAL(NewDate(40000, 40000), nd);
+    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
+    CHECK_EQUAL(2, ndx);
+*/
+    // float
     sumf = q.maximum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
     q.maximum_float(1, nullptr, 0, -1, 1, &ndx);
@@ -8548,4 +8573,111 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(not_found, match);
 }
 
+
+TEST(Query_NewDate)
+{
+    size_t match;
+    Table table;
+    table.add_column(type_NewDate, "first", true);
+    table.add_column(type_NewDate, "second", true);
+    Columns<NewDate> first = table.column<NewDate>(0);
+    Columns<NewDate> second = table.column<NewDate>(1);
+
+    table.add_empty_row(6);
+    table.set_newdate(0, 0, NewDate(111, 222));
+    table.set_newdate(0, 1, NewDate(111, 333));
+    table.set_newdate(0, 2, NewDate(333, 444));
+    table.set_newdate(0, 3, NewDate(null()));
+    table.set_newdate(0, 4, NewDate(0, 0));
+    table.set_newdate(0, 5, NewDate(-1000, 0));
+
+    table.set_newdate(1, 2, NewDate(222, 222));
+
+    CHECK(table.get_newdate(0, 0) == NewDate(111, 222));
+
+    match = (first == NewDate(111, 222)).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first != NewDate(111, 222)).find();
+    CHECK_EQUAL(match, 1);
+
+    match = (first > NewDate(111, 222)).find();
+    CHECK_EQUAL(match, 1);
+
+    match = (first < NewDate(111, 333)).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first == NewDate(0, 0)).find();
+    CHECK_EQUAL(match, 4);
+
+    match = (first < NewDate(111, 333)).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first < NewDate(0, 0)).find();
+    CHECK_EQUAL(match, 5);
+
+    // Note: .count(), not find()
+    match = (first < NewDate(0, 0)).count();
+    CHECK_EQUAL(match, 1);
+
+    match = (first != NewDate(null())).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first != NewDate(0, 0)).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first < NewDate(-100, 0)).find();
+    CHECK_EQUAL(match, 5);
+
+    // Compare column with self
+    match = (first == first).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first != first).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (first > first).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (first < first).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (first >= first).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first <= first).find();
+    CHECK_EQUAL(match, 0);
+
+    // Two different columns
+    match = (first == second).find();
+    CHECK_EQUAL(match, 3); // null == null
+
+    match = (first > second).find();
+    CHECK_EQUAL(match, 2); // NewDate(333, 444) > NewDate(111, 222)
+
+    match = (first < second).find();
+    CHECK_EQUAL(match, npos); // Note that (null < null) == false
+
+}
+
+TEST(Query_NewDate_Null)
+{
+    // Test that querying for null on non-nullable column (with default value being non-null value) is
+    // possible (i.e. does not throw or fail) and also gives no search matches.
+    Table table;
+    size_t match;
+
+    table.add_column(type_NewDate, "first", false);
+    table.add_column(type_NewDate, "second", true);
+    table.add_empty_row();
+
+    Columns<NewDate> first = table.column<NewDate>(0);
+    Columns<NewDate> second = table.column<NewDate>(1);
+    
+    match = (first == NewDate(null())).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (second == NewDate(null())).find();
+    CHECK_EQUAL(match, 0);
+}
 #endif // TEST_QUERY

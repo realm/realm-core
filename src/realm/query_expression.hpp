@@ -176,6 +176,13 @@ int only_numeric(const StringData&)
 }
 
 template<class T>
+int only_numeric(const NewDate&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
+template<class T>
 int only_numeric(const BinaryData&)
 {
     REALM_ASSERT(false);
@@ -194,6 +201,20 @@ StringData only_string(StringData in)
 {
     return in;
 }
+
+template<class T, class U>
+T no_newdate(U in)
+{
+    return static_cast<T>(util::unwrap(in));
+}
+
+template<class T>
+int no_newdate(const NewDate&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
 
 } // anonymous namespace
 
@@ -252,6 +273,7 @@ struct ValueBase
 {
     static const size_t default_size = 8;
     virtual void export_bool(ValueBase& destination) const = 0;
+    virtual void export_NewDate(ValueBase& destination) const = 0;
     virtual void export_int(ValueBase& destination) const = 0;
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
@@ -369,9 +391,9 @@ Query create(L left, const Subexpr2<R>& right)
         else if (std::is_same<Cond, Greater>::value)
             q.less(column->m_column, only_numeric<R>(left));
         else if (std::is_same<Cond, Equal>::value)
-            q.equal(column->m_column, left);
+            q.equal(column->m_column, no_newdate<R>(left));
         else if (std::is_same<Cond, NotEqual>::value)
-            q.not_equal(column->m_column, left);
+            q.not_equal(column->m_column, no_newdate<R>(left));
         else if (std::is_same<Cond, LessEqual>::value)
             q.greater_equal(column->m_column, only_numeric<R>(left));
         else if (std::is_same<Cond, GreaterEqual>::value)
@@ -416,7 +438,7 @@ Query create(L left, const Subexpr2<R>& right)
 // left-hand-side       operator                              right-hand-side
 // Subexpr2<L>          +, -, *, /, <, >, ==, !=, <=, >=      R, Subexpr2<R>
 //
-// For L = R = {int, int64_t, float, double, StringData}:
+// For L = R = {int, int64_t, float, double, StringData, NewDate}:
 template<class L, class R>
 class Overloads
 {
@@ -507,7 +529,7 @@ public:
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=},
         // but only if both columns are non-nullable, and aren't in linked tables.
         if (left_col && right_col && std::is_same<L, R>::value && !left_col->is_nullable() && !right_col->is_nullable()
-            && !left_col->links_exist() && !right_col->links_exist()) {
+            && !left_col->links_exist() && !right_col->links_exist() && !std::is_same<L, NewDate>::value) {
             const Table* t = left_col->get_base_table();
             Query q = Query(*t);
 
@@ -608,13 +630,13 @@ public:
 template<class T>
 class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
 Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
-public Overloads<T, bool>, public Overloads<T, DateTime>, public Overloads<T, null>
+public Overloads<T, bool>, public Overloads<T, NewDate>, public Overloads<T, DateTime>, public Overloads<T, null>
 {
 public:
     virtual ~Subexpr2() {};
 
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
-#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o) RLM_U2(null, o)
+#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o) RLM_U2(NewDate, o) RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/ ) RLM_U(> ) RLM_U(< ) RLM_U(== ) RLM_U(!= ) RLM_U(>= ) RLM_U(<= )
 };
 
@@ -715,7 +737,7 @@ struct NullableVector
     }
 
     template <typename Type = T>
-    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, null>::value,
+    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, NewDate, null>::value,
                             void>::type
     set(size_t index, t_storage value) {
         m_first[index] = value;
@@ -732,10 +754,13 @@ struct NullableVector
 
     inline void set(size_t index, util::Optional<Underlying> value)
     {
-        if (value)
-            set(index, *value);
-        else
+        if (value) {
+            Underlying v = *value;
+            set(index, v);
+        }
+        else {
             set_null(index);
+        }
     }
 
     void fill(T value)
@@ -866,6 +891,21 @@ template<>
 inline void NullableVector<BinaryData>::set_null(size_t index)
 {
     m_first[index] = BinaryData();
+}
+
+
+// NewDate
+
+template<>
+inline bool NullableVector<NewDate>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template<>
+inline void NullableVector<NewDate>::set_null(size_t index)
+{
+    m_first[index] = NewDate();
 }
 
 
@@ -1010,6 +1050,11 @@ public:
         REALM_ASSERT_DEBUG(false);
     }
 
+    REALM_FORCEINLINE void export_NewDate(ValueBase& destination) const override
+    {
+        export2<NewDate>(destination);
+    }
+
     REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
     {
         export2<bool>(destination);
@@ -1052,6 +1097,8 @@ public:
     {
         if (std::is_same<T, int>::value)
             source.export_int(*this);
+        else if (std::is_same<T, NewDate>::value)
+            source.export_NewDate(*this);
         else if (std::is_same<T, bool>::value)
             source.export_bool(*this);
         else if (std::is_same<T, float>::value)
@@ -1613,6 +1660,15 @@ public:
     LinkMap m_link_map;
 };
 
+
+template <>
+class Columns<NewDate> : public SimpleColumn<NewDate> {
+    using SimpleColumn::SimpleColumn;
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return make_subexpr<Columns<NewDate>>(*this);
+    }
+};
 
 template <>
 class Columns<BinaryData> : public SimpleColumn<BinaryData> {

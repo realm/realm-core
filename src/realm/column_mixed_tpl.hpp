@@ -189,6 +189,15 @@ inline BinaryData MixedColumn::get_binary(size_t ndx) const noexcept
     return m_binary_data->get(data_ndx);
 }
 
+inline NewDate MixedColumn::get_newdate(size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, m_types->size());
+    REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_NewDate);
+    REALM_ASSERT(m_datetime);
+    size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
+    return m_datetime->get(data_ndx);
+}
+
 //
 // Setters
 //
@@ -330,6 +339,14 @@ inline void MixedColumn::insert_datetime(size_t ndx, DateTime value)
 {
     int_fast64_t value_2 = int_fast64_t(value.get_datetime());
     insert_int(ndx, value_2, mixcol_Date); // Throws
+}
+
+inline void MixedColumn::insert_newdate(size_t ndx, NewDate value)
+{
+    ensure_newdate_column();
+    size_t datetime_row_ndx = m_datetime->size();
+    m_datetime->add(value); // Throws
+    insert_int(ndx, int_fast64_t(datetime_row_ndx), mixcol_NewDate);
 }
 
 inline void MixedColumn::insert_string(size_t ndx, StringData value)
