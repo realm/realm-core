@@ -16,10 +16,10 @@ namespace {
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 REALM_TABLE_4(TestTableLinks,
-                first,  String,
-                second, Int,
-                third,  Bool,
-                fourth, Enum<Days>)
+              first,  String,
+              second, Int,
+              third,  Bool,
+              fourth, Enum<Days>)
 
 } // Anonymous namespace
 

@@ -69,8 +69,9 @@ const uint16_t relaxed_sync_threshold = 50;
 // 5       Introduction of SharedInfo::file_format_version and
 //         SharedInfo::history_type.
 // 6       Using new robust mutex emulation where applicable
-// 7       Introducing `sync_client_present`, and changing `daemon_started` and
-//         `daemon_ready` from 1-bit to 8-bit fields.
+// 7       Introducing `commit_in_critical_phase` and `sync_client_present`, and
+//         changing `daemon_started` and `daemon_ready` from 1-bit to 8-bit
+//         fields.
 const uint_fast16_t g_shared_info_version = 7;
 
 // The following functions are carefully designed for minimal overhead
@@ -423,11 +424,16 @@ struct alignas(8) SharedGroup::SharedInfo {
     /// Like size_of_mutex, but for condition variable members of SharedInfo.
     uint8_t size_of_condvar; // Offset 2
 
-    /// True (1) if there is a sync client present. It is an error to start a
-    /// sync client if another one is present. If the sync client crashes and
-    /// leaves the flag set, the session will need to be restarted (lock file
-    /// reinitialized) before a new sync client can be started.
-    uint8_t sync_client_present = 0; // Offset 3
+    /// Set during the critical phase of a commit, when the logs, the ringbuffer
+    /// and the database may be out of sync with respect to each other. If a
+    /// writer crashes during this phase, there is no safe way of continuing
+    /// with further write transactions. When beginning a write transaction,
+    /// this must be checked and an exception thrown if set.
+    /// FIXME: This is a temporary approach until we get the commitlog data
+    /// moved into the realm file. After that it should be feasible to either
+    /// handle the error condition properly or preclude it by using a non-robust
+    /// mutex for the remaining and much smaller critical section.
+    uint8_t commit_in_critical_phase = 0; // Offset 3
 
     /// The target Realm file format version for the current session. This
     /// allows all session participants to be in agreement. It can only differ
@@ -466,17 +472,23 @@ struct alignas(8) SharedGroup::SharedInfo {
 
     uint64_t number_of_versions; // Offset 32
 
+    /// True (1) if there is a sync client present. It is an error to start a
+    /// sync client if another one is present. If the sync client crashes and
+    /// leaves the flag set, the session will need to be restarted (lock file
+    /// reinitialized) before a new sync client can be started.
+    uint8_t sync_client_present = 0; // Offset 40
+
     /// Set when a participant decides to start the daemon, cleared by the
     /// daemon when it decides to exit. Participants check during open() and
     /// start the daemon if running in async mode.
-    uint8_t daemon_started = 0; // Offset 40
+    uint8_t daemon_started = 0; // Offset 41
 
     /// Set by the daemon when it is ready to handle commits. Participants must
     /// wait during open() on 'daemon_becomes_ready' for this to become true.
     /// Cleared by the daemon when it decides to exit.
-    uint8_t daemon_ready = 0; // Offset 41
+    uint8_t daemon_ready = 0; // Offset 42
 
-    uint16_t filler_1; // Offset 42
+    uint8_t filler_1; // Offset 43
     uint32_t filler_2; // Offset 44
 
     InterprocessMutex::SharedPart shared_writemutex; // Offset 48
@@ -555,8 +567,8 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
                   std::is_same<decltype(size_of_mutex), uint8_t>::value &&
                   offsetof(SharedInfo, size_of_condvar) == 2 &&
                   std::is_same<decltype(size_of_condvar), uint8_t>::value &&
-                  offsetof(SharedInfo, sync_client_present) == 3 &&
-                  std::is_same<decltype(sync_client_present), uint8_t>::value &&
+                  offsetof(SharedInfo, commit_in_critical_phase) == 3 &&
+                  std::is_same<decltype(commit_in_critical_phase), uint8_t>::value &&
                   offsetof(SharedInfo, file_format_version) == 4 &&
                   std::is_same<decltype(file_format_version), uint8_t>::value &&
                   offsetof(SharedInfo, history_type) == 5 &&
@@ -573,12 +585,14 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
                   std::is_same<decltype(session_initiator_pid), uint64_t>::value &&
                   offsetof(SharedInfo, number_of_versions) == 32 &&
                   std::is_same<decltype(number_of_versions), uint64_t>::value &&
-                  offsetof(SharedInfo, daemon_started) == 40 &&
+                  offsetof(SharedInfo, sync_client_present) == 40 &&
+                  std::is_same<decltype(sync_client_present), uint8_t>::value &&
+                  offsetof(SharedInfo, daemon_started) == 41 &&
                   std::is_same<decltype(daemon_started), uint8_t>::value &&
-                  offsetof(SharedInfo, daemon_ready) == 41 &&
+                  offsetof(SharedInfo, daemon_ready) == 42 &&
                   std::is_same<decltype(daemon_ready), uint8_t>::value &&
-                  offsetof(SharedInfo, filler_1) == 42 &&
-                  std::is_same<decltype(filler_1), uint16_t>::value &&
+                  offsetof(SharedInfo, filler_1) == 43 &&
+                  std::is_same<decltype(filler_1), uint8_t>::value &&
                   offsetof(SharedInfo, filler_2) == 44 &&
                   std::is_same<decltype(filler_2), uint32_t>::value &&
                   offsetof(SharedInfo, shared_writemutex) == 48 &&
@@ -1640,13 +1654,18 @@ void SharedGroup::do_end_read() noexcept
 
 void SharedGroup::do_begin_write()
 {
+    SharedInfo* info = m_file_map.get_addr();
     // Get write lock
     // Note that this will not get released until we call
     // commit() or rollback()
     m_writemutex.lock(); // Throws
 
+    if (info->commit_in_critical_phase) {
+        m_writemutex.unlock();
+        throw std::runtime_error("Crash of other process detected, session restart required");
+    }
+
 #ifdef REALM_ASYNC_DAEMON
-    SharedInfo* info = m_file_map.get_addr();
     if (info->durability == durability_Async) {
 
         m_balancemutex.lock(); // Throws
@@ -1680,6 +1699,7 @@ Replication::version_type SharedGroup::do_commit()
 
     version_type current_version = r_info->get_current_version_unchecked();
     version_type new_version = current_version + 1;
+    r_info->commit_in_critical_phase = 1;
     if (Replication* repl = m_group.get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
@@ -1691,6 +1711,8 @@ Replication::version_type SharedGroup::do_commit()
         }
         catch (...) {
             repl->abort_transact();
+            r_info = m_reader_map.get_addr();
+            r_info->commit_in_critical_phase = 0;
             throw;
         }
         repl->finalize_commit();
@@ -1698,7 +1720,8 @@ Replication::version_type SharedGroup::do_commit()
     else {
         low_level_commit(new_version); // Throws
     }
-
+    r_info = m_reader_map.get_addr();
+    r_info->commit_in_critical_phase = 0;
     return new_version;
 }
 
