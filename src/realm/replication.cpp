@@ -146,11 +146,11 @@ public:
         return false;
     }
 
-    bool set_newdate(size_t col_ndx, size_t row_ndx, NewDate value)
+    bool set_timestamp(size_t col_ndx, size_t row_ndx, TimeStamp value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
-            log("table->set_newdate(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_newdate(col_ndx, row_ndx, value); // Throws
+            log("table->set_timestamp(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->set_timestamp(col_ndx, row_ndx, value); // Throws
             return true;
         }
         return false;
@@ -692,8 +692,8 @@ private:
                 return "type_Binary";
             case type_DateTime:
                 return "type_DataTime"; // FIXME? Can we fix this spelling mistake?
-            case type_NewDate:
-                return "type_NewDate";
+            case type_TimeStamp:
+                return "type_TimeStamp";
             case type_Table:
                 return "type_Table";
             case type_Mixed:

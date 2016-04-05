@@ -57,7 +57,7 @@ enum Instruction {
     instr_SetStringUnique       = 32,
     instr_SetBinary             = 10,
     instr_SetDateTime           = 11,
-    instr_SetNewDate            = 48,
+    instr_SetTimeStamp            = 48,
     instr_SetTable              = 12,
     instr_SetMixed              = 13,
     instr_SetLink               = 14,
@@ -158,7 +158,7 @@ public:
     bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
     bool set_binary(size_t, size_t, BinaryData) { return true; }
     bool set_date_time(size_t, size_t, DateTime) { return true; }
-    bool set_newdate(size_t, size_t, NewDate) { return true; }
+    bool set_timestamp(size_t, size_t, TimeStamp) { return true; }
     bool set_table(size_t, size_t) { return true; }
     bool set_mixed(size_t, size_t, const Mixed&) { return true; }
     bool set_link(size_t, size_t, size_t, size_t) { return true; }
@@ -227,7 +227,7 @@ public:
     bool set_string_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, StringData);
     bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData);
     bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime);
-    bool set_newdate(size_t col_ndx, size_t row_ndx, NewDate);
+    bool set_timestamp(size_t col_ndx, size_t row_ndx, TimeStamp);
     bool set_table(size_t col_ndx, size_t row_ndx);
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&);
     bool set_link(size_t col_ndx, size_t row_ndx, size_t, size_t target_group_level_ndx);
@@ -327,7 +327,7 @@ public:
     void set_string_unique(const Table*, size_t col_ndx, size_t ndx, StringData value);
     void set_binary(const Table*, size_t col_ndx, size_t ndx, BinaryData value);
     void set_date_time(const Table*, size_t col_ndx, size_t ndx, DateTime value);
-    void set_newdate(const Table*, size_t col_ndx, size_t ndx, NewDate value);
+    void set_timestamp(const Table*, size_t col_ndx, size_t ndx, TimeStamp value);
     void set_table(const Table*, size_t col_ndx, size_t ndx);
     void set_mixed(const Table*, size_t col_ndx, size_t ndx, const Mixed& value);
     void set_link(const Table*, size_t col_ndx, size_t ndx, size_t value);
@@ -460,7 +460,7 @@ private:
 
     StringData read_string(util::StringBuffer&);
     BinaryData read_binary(util::StringBuffer&);
-    NewDate read_newdate();
+    TimeStamp read_timestamp();
     void read_mixed(Mixed*);
 
     // Advance m_input_begin and m_input_end to reflect the next block of instructions
@@ -720,10 +720,10 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
             append_string_instr(instr, numbers_2, value_3); // Throws
             return;
         }
-        case type_NewDate: {
-            NewDate nd = value.get_newdate();
-            auto seconds = nd.m_seconds;
-            auto nano_seconds = nd.m_nanoseconds;
+        case type_TimeStamp: {
+            TimeStamp ts= value.get_timestamp();
+            auto seconds = ts.m_seconds;
+            auto nano_seconds = ts.m_nanoseconds;
             auto numbers_3 = append(numbers_2, seconds);
             append_simple_instr(instr, append(numbers_3, nano_seconds)); // Throws
             return;
@@ -1099,16 +1099,16 @@ inline void TransactLogConvenientEncoder::set_date_time(const Table* t, size_t c
     m_encoder.set_date_time(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
+inline bool TransactLogEncoder::set_timestamp(size_t col_ndx, size_t ndx, TimeStamp value)
 {
-    append_simple_instr(instr_SetNewDate, util::tuple(col_ndx, ndx, value.m_seconds, value.m_nanoseconds)); // Throws
+    append_simple_instr(instr_SetTimeStamp, util::tuple(col_ndx, ndx, value.m_seconds, value.m_nanoseconds)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_newdate(const Table* t, size_t col_ndx, size_t ndx, NewDate value)
+inline void TransactLogConvenientEncoder::set_timestamp(const Table* t, size_t col_ndx, size_t ndx, TimeStamp value)
 {
     select_table(t); // Throws
-    m_encoder.set_newdate(col_ndx, ndx, value); // Throws
+    m_encoder.set_timestamp(col_ndx, ndx, value); // Throws
 }
 
 inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx)
@@ -1593,13 +1593,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_SetNewDate: {
+        case instr_SetTimeStamp: {
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
             int64_t seconds = read_int<int64_t>(); // Throws
             uint32_t nanoseconds = read_int<uint32_t>(); // Throws
-            NewDate value = NewDate(seconds, nanoseconds);
-            if (!handler.set_newdate(col_ndx, row_ndx, value)) // Throws
+            TimeStamp value = TimeStamp(seconds, nanoseconds);
+            if (!handler.set_timestamp(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
@@ -2026,10 +2026,10 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
     return StringData{buffer.data(), size};
 }
 
-inline NewDate TransactLogParser::read_newdate()
+inline TimeStamp TransactLogParser::read_timestamp()
 {
     REALM_ASSERT(false);
-    return NewDate();
+    return TimeStamp();
 }
 
 
@@ -2076,9 +2076,9 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
             mixed->set_datetime(value);
             return;
         }
-        case type_NewDate: {
-            NewDate value = read_newdate(); // Throws
-            mixed->set_newdate(value);
+        case type_TimeStamp: {
+            TimeStamp value = read_timestamp(); // Throws
+            mixed->set_timestamp(value);
             return;
         }
         case type_String: {
@@ -2135,7 +2135,7 @@ inline bool TransactLogParser::is_valid_data_type(int type)
         case type_String:
         case type_Binary:
         case type_DateTime:
-        case type_NewDate:
+        case type_TimeStamp:
         case type_Table:
         case type_Mixed:
         case type_Link:
@@ -2310,9 +2310,9 @@ public:
         return true;
     }
 
-    bool set_newdate(size_t col_ndx, size_t row_ndx, NewDate value)
+    bool set_timestamp(size_t col_ndx, size_t row_ndx, TimeStamp value)
     {
-        m_encoder.set_newdate(col_ndx, row_ndx, value);
+        m_encoder.set_timestamp(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }

@@ -67,7 +67,7 @@ public:
     int64_t get_int(size_t ndx) const noexcept;
     bool get_bool(size_t ndx) const noexcept;
     DateTime get_datetime(size_t ndx) const noexcept;
-    NewDate get_newdate(size_t ndx) const noexcept;
+    TimeStamp get_timestamp(size_t ndx) const noexcept;
     float get_float(size_t ndx) const noexcept;
     double get_double(size_t ndx) const noexcept;
     StringData get_string(size_t ndx) const noexcept;
@@ -100,7 +100,7 @@ public:
     void set_int(size_t ndx, int64_t value);
     void set_bool(size_t ndx, bool value);
     void set_datetime(size_t ndx, DateTime value);
-    void set_newdate(size_t ndx, NewDate value);
+    void set_timestamp(size_t ndx, TimeStamp value);
     void set_float(size_t ndx, float value);
     void set_double(size_t ndx, double value);
     void set_string(size_t ndx, StringData value) override;
@@ -110,7 +110,7 @@ public:
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
     void insert_datetime(size_t ndx, DateTime value);
-    void insert_newdate(size_t ndx, NewDate value);
+    void insert_timestamp(size_t ndx, TimeStamp value);
     void insert_float(size_t ndx, float value);
     void insert_double(size_t ndx, double value);
     void insert_string(size_t ndx, StringData value);
@@ -167,7 +167,7 @@ private:
         mixcol_Table       =  5,
         mixcol_Mixed       =  6,
         mixcol_Date        =  7,
-        mixcol_NewDate     =  8,
+        mixcol_TimeStamp     =  8,
         mixcol_Float       =  9,
         mixcol_Double      = 10, // Positive Double
         mixcol_DoubleNeg   = 11, // Negative Double
@@ -184,7 +184,7 @@ private:
     /// Stores the data for each entry. For a subtable, the stored
     /// value is the ref of the subtable. For string, binary data,
     /// the stored value is an index within `m_binary_data`. Likewise,
-    /// for newdate, an index into `m_datetime` is stored. For other
+    /// for timestamp, an index into `m_datetime` is stored. For other
     /// types the stored value is itself. Since we only have 63 bits
     /// available for a non-ref value, the sign of numeric values is
     /// encoded as part of the type in `m_types`.
@@ -194,7 +194,7 @@ private:
     std::unique_ptr<BinaryColumn> m_binary_data;
 
     /// For the new date time, bytes are stored here.
-    std::unique_ptr<DateTimeColumn> m_datetime;
+    std::unique_ptr<TimeStampColumn> m_datetime;
 
     void do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows);
     void do_move_last_over(size_t row_ndx, size_t prior_num_rows);
@@ -203,7 +203,7 @@ private:
 
     void create(Allocator&, ref_type, Table*, size_t column_ndx);
     void ensure_binary_data_column();
-    void ensure_newdate_column();
+    void ensure_timestamp_column();
 
     MixedColType clear_value(size_t ndx, MixedColType new_type); // Returns old type
     void clear_value_and_discard_subtab_acc(size_t ndx, MixedColType new_type);

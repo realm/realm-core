@@ -121,8 +121,8 @@
     <ClCompile Include="..\..\test\test_priority_queue.cpp" />
     <ClCompile Include="..\..\test\fuzz_group.cpp" />
     <ClCompile Include="..\..\test\fuzzy\afl.cpp" />
-    <ClCompile Include="..\..\src\realm\column_datetime.cpp" />
-    <ClCompile Include="..\..\test\test_column_datetime.cpp" />
+    <ClCompile Include="..\..\src\realm\column_timestamp.cpp" />
+    <ClCompile Include="..\..\test\test_column_timestamp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
@@ -237,7 +237,7 @@
     <ClInclude Include="..\..\test\test.hpp" />
     <ClInclude Include="..\..\test\fuzz_group.hpp" />
     <ClInclude Include="..\..\src\realm\null.hpp" />
-    <ClInclude Include="..\..\src\realm\column_datetime.hpp" />
+    <ClInclude Include="..\..\src\realm\column_timestamp.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

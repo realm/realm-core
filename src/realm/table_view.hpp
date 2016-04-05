@@ -203,7 +203,7 @@ public:
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
     DateTime    get_datetime(size_t column_ndx, size_t row_ndx) const noexcept;
-    NewDate     get_newdate(size_t column_ndx, size_t row_ndx) const noexcept;
+    TimeStamp     get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
     float       get_float(size_t column_ndx, size_t row_ndx) const noexcept;
     double      get_double(size_t column_ndx, size_t row_ndx) const noexcept;
     StringData  get_string(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -255,9 +255,9 @@ public:
     DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
     DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
 
-    NewDate minimum_newdate(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    NewDate maximum_newdate(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    size_t count_newdate(size_t column_ndx, NewDate target) const;
+    TimeStamp minimum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    TimeStamp maximum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    size_t count_timestamp(size_t column_ndx, TimeStamp target) const;
 
     void apply_same_order(TableViewBase& order);
 
@@ -434,7 +434,7 @@ protected:
 private:
     void detach() const noexcept; // may have to remove const
     size_t find_first_integer(size_t column_ndx, int64_t value) const;
-    template<class oper> NewDate minmax_newdate(size_t column_ndx, size_t* return_ndx) const;
+    template<class oper> TimeStamp minmax_timestamp(size_t column_ndx, size_t* return_ndx) const;
 
     friend class Table;
     friend class Query;
@@ -499,7 +499,7 @@ public:
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
-    void set_newdate(size_t column_ndx, size_t row_ndx, NewDate value);
+    void set_timestamp(size_t column_ndx, size_t row_ndx, TimeStamp value);
     template<class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
@@ -1016,13 +1016,13 @@ inline DateTime TableViewBase::get_datetime(size_t column_ndx, size_t row_ndx) c
     return m_table->get_datetime(column_ndx, real_ndx);
 }
 
-inline NewDate TableViewBase::get_newdate(size_t column_ndx, size_t row_ndx) const noexcept
+inline TimeStamp TableViewBase::get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept
 {
-    REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_NewDate);
+    REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_TimeStamp);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     REALM_ASSERT(real_ndx != detached_ref);
-    return m_table->get_newdate(column_ndx, real_ndx);
+    return m_table->get_timestamp(column_ndx, real_ndx);
 }
 
 inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const noexcept
@@ -1526,13 +1526,13 @@ inline void TableView::set_datetime(size_t column_ndx, size_t row_ndx, DateTime 
     m_table->set_datetime(column_ndx, real_ndx, value);
 }
 
-inline void TableView::set_newdate(size_t column_ndx, size_t row_ndx, NewDate value)
+inline void TableView::set_timestamp(size_t column_ndx, size_t row_ndx, TimeStamp value)
 {
-    REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_NewDate);
+    REALM_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_TimeStamp);
 
     const size_t real_ndx = size_t(m_row_indexes.get(row_ndx));
     REALM_ASSERT(real_ndx != detached_ref);
-    m_table->set_newdate(column_ndx, real_ndx, value);
+    m_table->set_timestamp(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_float(size_t column_ndx, size_t row_ndx, float value)

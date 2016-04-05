@@ -1651,7 +1651,7 @@ TEST(Query_LimitUntyped2)
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "second1");
-    table.add_column(type_NewDate, "date");
+    table.add_column(type_TimeStamp, "date");
 
     table.add_empty_row(3);
     table.set_int(0, 0, 10000);
@@ -1666,15 +1666,15 @@ TEST(Query_LimitUntyped2)
     table.set_double(2, 1, 30000.);
     table.set_double(2, 2, 40000.);
 
-    table.set_newdate(3, 0, NewDate(10000, 10000));
-    table.set_newdate(3, 1, NewDate(30000, 30000));
-    table.set_newdate(3, 2, NewDate(40000, 40000));
+    table.set_timestamp(3, 0, TimeStamp(10000, 10000));
+    table.set_timestamp(3, 1, TimeStamp(30000, 30000));
+    table.set_timestamp(3, 2, TimeStamp(40000, 40000));
 
     Query q = table.where();
     int64_t sum;
     float sumf;
     double sumd;
-    NewDate nd;
+    TimeStamp ts;
 
     // sum, limited by 'limit'
     sum = q.sum_int(0, nullptr, 0, -1, 1);
@@ -1734,20 +1734,20 @@ TEST(Query_LimitUntyped2)
     q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
 
-    // NewDate
+    // TimeStamp
 /*
-    nd = q.maximum_newdate(3, nullptr, 0, -1, 1);
-    CHECK_EQUAL(NewDate(10000, 10000), nd);
+    ts = q.maximum_timestamp(3, nullptr, 0, -1, 1);
+    CHECK_EQUAL(TimeStamp(10000, 10000), ts);
     q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    nd = q.maximum_newdate(3, nullptr, 0, -1, 2);
-    CHECK_EQUAL(NewDate(30000, 30000), nd);
+    ts = q.maximum_timestamp(3, nullptr, 0, -1, 2);
+    CHECK_EQUAL(TimeStamp(30000, 30000), ts);
     q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
     CHECK_EQUAL(1, ndx);
 
-    nd = q.maximum_newdate(3, nullptr, 0, -1);
-    CHECK_EQUAL(NewDate(40000, 40000), nd);
+    ts = q.maximum_timestamp(3, nullptr, 0, -1);
+    CHECK_EQUAL(TimeStamp(40000, 40000), ts);
     q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
 */
@@ -8574,59 +8574,59 @@ TEST(Query_SubQueries)
 }
 
 
-TEST(Query_NewDate)
+TEST(Query_TimeStamp)
 {
     size_t match;
     Table table;
-    table.add_column(type_NewDate, "first", true);
-    table.add_column(type_NewDate, "second", true);
-    Columns<NewDate> first = table.column<NewDate>(0);
-    Columns<NewDate> second = table.column<NewDate>(1);
+    table.add_column(type_TimeStamp, "first", true);
+    table.add_column(type_TimeStamp, "second", true);
+    Columns<TimeStamp> first = table.column<TimeStamp>(0);
+    Columns<TimeStamp> second = table.column<TimeStamp>(1);
 
     table.add_empty_row(6);
-    table.set_newdate(0, 0, NewDate(111, 222));
-    table.set_newdate(0, 1, NewDate(111, 333));
-    table.set_newdate(0, 2, NewDate(333, 444));
-    table.set_newdate(0, 3, NewDate(null()));
-    table.set_newdate(0, 4, NewDate(0, 0));
-    table.set_newdate(0, 5, NewDate(-1000, 0));
+    table.set_timestamp(0, 0, TimeStamp(111, 222));
+    table.set_timestamp(0, 1, TimeStamp(111, 333));
+    table.set_timestamp(0, 2, TimeStamp(333, 444));
+    table.set_timestamp(0, 3, TimeStamp(null()));
+    table.set_timestamp(0, 4, TimeStamp(0, 0));
+    table.set_timestamp(0, 5, TimeStamp(-1000, 0));
 
-    table.set_newdate(1, 2, NewDate(222, 222));
+    table.set_timestamp(1, 2, TimeStamp(222, 222));
 
-    CHECK(table.get_newdate(0, 0) == NewDate(111, 222));
+    CHECK(table.get_timestamp(0, 0) == TimeStamp(111, 222));
 
-    match = (first == NewDate(111, 222)).find();
+    match = (first == TimeStamp(111, 222)).find();
     CHECK_EQUAL(match, 0);
 
-    match = (first != NewDate(111, 222)).find();
+    match = (first != TimeStamp(111, 222)).find();
     CHECK_EQUAL(match, 1);
 
-    match = (first > NewDate(111, 222)).find();
+    match = (first > TimeStamp(111, 222)).find();
     CHECK_EQUAL(match, 1);
 
-    match = (first < NewDate(111, 333)).find();
+    match = (first < TimeStamp(111, 333)).find();
     CHECK_EQUAL(match, 0);
 
-    match = (first == NewDate(0, 0)).find();
+    match = (first == TimeStamp(0, 0)).find();
     CHECK_EQUAL(match, 4);
 
-    match = (first < NewDate(111, 333)).find();
+    match = (first < TimeStamp(111, 333)).find();
     CHECK_EQUAL(match, 0);
 
-    match = (first < NewDate(0, 0)).find();
+    match = (first < TimeStamp(0, 0)).find();
     CHECK_EQUAL(match, 5);
 
     // Note: .count(), not find()
-    match = (first < NewDate(0, 0)).count();
+    match = (first < TimeStamp(0, 0)).count();
     CHECK_EQUAL(match, 1);
 
-    match = (first != NewDate(null())).count();
+    match = (first != TimeStamp(null())).count();
     CHECK_EQUAL(match, 5);
 
-    match = (first != NewDate(0, 0)).count();
+    match = (first != TimeStamp(0, 0)).count();
     CHECK_EQUAL(match, 5);
 
-    match = (first < NewDate(-100, 0)).find();
+    match = (first < TimeStamp(-100, 0)).find();
     CHECK_EQUAL(match, 5);
 
     // Compare column with self
@@ -8653,31 +8653,31 @@ TEST(Query_NewDate)
     CHECK_EQUAL(match, 3); // null == null
 
     match = (first > second).find();
-    CHECK_EQUAL(match, 2); // NewDate(333, 444) > NewDate(111, 222)
+    CHECK_EQUAL(match, 2); // TimeStamp(333, 444) > TimeStamp(111, 222)
 
     match = (first < second).find();
     CHECK_EQUAL(match, npos); // Note that (null < null) == false
 
 }
 
-TEST(Query_NewDate_Null)
+TEST(Query_TimeStamp_Null)
 {
     // Test that querying for null on non-nullable column (with default value being non-null value) is
     // possible (i.e. does not throw or fail) and also gives no search matches.
     Table table;
     size_t match;
 
-    table.add_column(type_NewDate, "first", false);
-    table.add_column(type_NewDate, "second", true);
+    table.add_column(type_TimeStamp, "first", false);
+    table.add_column(type_TimeStamp, "second", true);
     table.add_empty_row();
 
-    Columns<NewDate> first = table.column<NewDate>(0);
-    Columns<NewDate> second = table.column<NewDate>(1);
+    Columns<TimeStamp> first = table.column<TimeStamp>(0);
+    Columns<TimeStamp> second = table.column<TimeStamp>(1);
     
-    match = (first == NewDate(null())).find();
+    match = (first == TimeStamp(null())).find();
     CHECK_EQUAL(match, npos);
 
-    match = (second == NewDate(null())).find();
+    match = (second == TimeStamp(null())).find();
     CHECK_EQUAL(match, 0);
 }
 #endif // TEST_QUERY

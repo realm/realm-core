@@ -1396,7 +1396,7 @@ public:
         return true; // No-op
     }
 
-    bool set_newdate(size_t, size_t, NewDate) noexcept
+    bool set_timestamp(size_t, size_t, TimeStamp) noexcept
     {
         return true; // No-op
     }

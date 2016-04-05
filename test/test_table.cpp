@@ -3779,10 +3779,10 @@ void compare_table_with_slice(TestContext& test_context, const Table& table,
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
-            case type_NewDate:
+            case type_TimeStamp:
                 for (size_t i = 0; i != size; ++i) {
-                    NewDate v_1 = table.get_newdate(col_i, offset + i);
-                    NewDate v_2 = slice.get_newdate(col_i, i);
+                    TimeStamp v_1 = table.get_timestamp(col_i, offset + i);
+                    TimeStamp v_2 = slice.get_timestamp(col_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
@@ -3821,8 +3821,8 @@ void compare_table_with_slice(TestContext& test_context, const Table& table,
                             case type_DateTime:
                                 CHECK_EQUAL(v_1.get_datetime(), v_2.get_datetime());
                                 break;
-                            case type_NewDate:
-                                CHECK_EQUAL(v_1.get_newdate(), v_2.get_newdate());
+                            case type_TimeStamp:
+                                CHECK_EQUAL(v_1.get_timestamp(), v_2.get_timestamp());
                                 break;
                             case type_Table: {
                                 ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
@@ -6408,7 +6408,7 @@ TEST(Table_RowAccessor_Null)
     size_t col_double = table.add_column(type_Double,   "double", true);
     size_t col_date   = table.add_column(type_DateTime, "date",   true);
     size_t col_binary = table.add_column(type_Binary,   "binary", true);
-    size_t col_newdate = table.add_column(type_NewDate, "newdate", true);
+    size_t col_timestamp = table.add_column(type_TimeStamp, "timestamp", true);
 
     {
         table.add_empty_row();
@@ -6420,7 +6420,7 @@ TEST(Table_RowAccessor_Null)
         row.set_null(col_double);
         row.set_null(col_date);
         row.set_binary(col_binary, BinaryData());
-        row.set_null(col_newdate);
+        row.set_null(col_timestamp);
     }
     {
         table.add_empty_row();
@@ -6432,7 +6432,7 @@ TEST(Table_RowAccessor_Null)
         row.set_double(col_double, 1.0);
         row.set_datetime(col_date, DateTime(1));
         row.set_binary(col_binary, BinaryData("a"));
-        row.set_newdate(col_newdate, NewDate(1, 2));
+        row.set_timestamp(col_timestamp, TimeStamp(1, 2));
     }
 
     {
@@ -6444,7 +6444,7 @@ TEST(Table_RowAccessor_Null)
         CHECK(row.is_null(col_double));
         CHECK(row.is_null(col_date));
         CHECK(row.is_null(col_binary));
-        CHECK(row.is_null(col_newdate));
+        CHECK(row.is_null(col_timestamp));
     }
 
     {
@@ -6456,7 +6456,7 @@ TEST(Table_RowAccessor_Null)
         CHECK_EQUAL(1.0,             row.get_double(col_double));
         CHECK_EQUAL(DateTime(1),     row.get_datetime(col_date));
         CHECK_EQUAL(BinaryData("a"), row.get_binary(col_binary));
-        CHECK_EQUAL(NewDate(1, 2),   row.get_newdate(col_newdate));
+        CHECK_EQUAL(TimeStamp(1, 2),   row.get_timestamp(col_timestamp));
     }
 }
 
@@ -6780,7 +6780,7 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     size_t col_double  = t.add_column(type_Double,   "double",  true);
     size_t col_date    = t.add_column(type_DateTime, "date",    true);
     size_t col_binary  = t.add_column(type_Binary,   "binary",  true);
-    size_t col_newdate = t.add_column(type_NewDate,  "newdate", true);
+    size_t col_timestamp = t.add_column(type_TimeStamp,  "timestamp", true);
 
     t.add_empty_row(1);
 
@@ -6813,7 +6813,7 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     t.set_binary(col_binary, 0, BinaryData("binary", 7));
     _CHECK_VER_BUMP();
 
-    t.set_newdate(col_newdate, 0, NewDate(777, 888));
+    t.set_timestamp(col_timestamp, 0, TimeStamp(777, 888));
     _CHECK_VER_BUMP();
 
     t.set_null(0, 0);

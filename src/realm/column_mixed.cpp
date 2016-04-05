@@ -30,7 +30,7 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     std::unique_ptr<IntegerColumn> types;
     std::unique_ptr<RefsColumn> data;
     std::unique_ptr<BinaryColumn> binary_data;
-    std::unique_ptr<DateTimeColumn> datetime_data;
+    std::unique_ptr<TimeStampColumn> datetime_data;
     top.reset(new Array(alloc)); // Throws
     top->init_from_ref(ref);
     REALM_ASSERT(top->size() == 2 || top->size() == 3);
@@ -50,10 +50,10 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
         binary_data->set_parent(&*top, 2);
     }
 
-    // DateTimeColumn is only there if needed
+    // TimeStampColumn is only there if needed
     if (top->size() >= 4) {
-        ref_type newdate_ref = top->get_as_ref(3);
-        m_datetime.reset(new DateTimeColumn(alloc, newdate_ref)); // Throws
+        ref_type timestamp_ref = top->get_as_ref(3);
+        m_datetime.reset(new TimeStampColumn(alloc, timestamp_ref)); // Throws
         m_datetime->set_parent(&*top, 3);
     }
 
@@ -78,7 +78,7 @@ void MixedColumn::ensure_binary_data_column()
 }
 
 
-void MixedColumn::ensure_newdate_column()
+void MixedColumn::ensure_timestamp_column()
 {
     // binary data is expected at index 2
     ensure_binary_data_column();
@@ -86,8 +86,8 @@ void MixedColumn::ensure_newdate_column()
     if (m_datetime)
         return;
 
-    ref_type ref = DateTimeColumn::create(m_array->get_alloc()); // Throws
-    m_datetime.reset(new DateTimeColumn(m_array->get_alloc(), ref)); // Throws
+    ref_type ref = TimeStampColumn::create(m_array->get_alloc()); // Throws
+    m_datetime.reset(new TimeStampColumn(m_array->get_alloc(), ref)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 3);
     m_array->add(ref); // Throws
     m_datetime->set_parent(m_array.get(), 3);
@@ -126,7 +126,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             }
             goto carry_on;
         }
-        case mixcol_NewDate: {
+        case mixcol_TimeStamp: {
             size_t datetime_row_ndx = size_t(m_data->get(row_ndx) >> 1);
             if (datetime_row_ndx == m_datetime->size()-1) {
                 bool is_last = true;
@@ -135,7 +135,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             else {
                 // FIXME: But this will lead to unbounded in-file leaking in
                 // for(;;) { insert_binary(i, ...); erase(i); }
-                m_datetime->set(datetime_row_ndx, NewDate());
+                m_datetime->set(datetime_row_ndx, TimeStamp());
             }
             goto carry_on;
         }
@@ -295,15 +295,15 @@ void MixedColumn::set_binary(size_t ndx, BinaryData value)
     }
 }
 
-void MixedColumn::set_newdate(size_t ndx, NewDate value)
+void MixedColumn::set_timestamp(size_t ndx, TimeStamp value)
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
-    ensure_newdate_column();
+    ensure_timestamp_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
     // See if we can reuse data position
-    if (type == mixcol_NewDate) {
+    if (type == mixcol_TimeStamp) {
         size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
         m_datetime->set(data_ndx, value);
     }
@@ -318,7 +318,7 @@ void MixedColumn::set_newdate(size_t ndx, NewDate value)
         // Shift value one bit and set lowest bit to indicate that this is not a ref
         int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
-        m_types->set(ndx, mixcol_NewDate);
+        m_types->set(ndx, mixcol_TimeStamp);
         m_data->set(ndx, v);
     }
 }
@@ -343,8 +343,8 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
             case type_DateTime:
                 if (get_datetime(i) != c.get_datetime(i)) return false;
                 break;
-            case type_NewDate:
-                if (get_newdate(i) != c.get_newdate(i)) return false;
+            case type_TimeStamp:
+                if (get_timestamp(i) != c.get_timestamp(i)) return false;
                 break;
             case type_Float:
                 if (get_float(i) != c.get_float(i)) return false;
