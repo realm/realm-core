@@ -219,25 +219,25 @@ TEST(MixedColumn_Date)
 }
 
 
-TEST(MixedColumn_NewDate)
+TEST(MixedColumn_Timestamp)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
-    c.insert_newdate(0, NewDate(null()));
-    c.insert_newdate(1, NewDate(100, 200));
-    c.insert_newdate(2, NewDate(0, 0)); // Should *not* equal null
-    c.insert_newdate(3, NewDate(-1000, 0));
+    c.insert_timestamp(0, Timestamp(null()));
+    c.insert_timestamp(1, Timestamp(100, 200));
+    c.insert_timestamp(2, Timestamp(0, 0)); // Should *not* equal null
+    c.insert_timestamp(3, Timestamp(-1000, 0));
 
     for (size_t i = 0; i < c.size(); ++i)
-        CHECK_EQUAL(type_NewDate, c.get_type(i));
+        CHECK_EQUAL(type_Timestamp, c.get_type(i));
 
     CHECK_EQUAL(4, c.size());
-//    CHECK(c.get_newdate(0) == NewDate(null()));
-//    operator== should not be called for null according to column_datetime.hpp:38
-    CHECK(c.get_newdate(1) == NewDate(100, 200));
-    CHECK(c.get_newdate(2) == NewDate(0, 0)); // Should *not* equal null
-    CHECK(c.get_newdate(3) == NewDate(-1000, 0));
+//    CHECK(c.get_timestamp(0) == Timestamp(null()));
+//    operator== should not be called for null according to column_timestamp.hpp:38
+    CHECK(c.get_timestamp(1) == Timestamp(100, 200));
+    CHECK(c.get_timestamp(2) == Timestamp(0, 0)); // Should *not* equal null
+    CHECK(c.get_timestamp(3) == Timestamp(-1000, 0));
 
     // MixedColumn has not implemented is_null
 //    CHECK(c.is_null(0));
@@ -245,10 +245,10 @@ TEST(MixedColumn_NewDate)
 //    CHECK(!c.is_null(2));
 //    CHECK(!c.is_null(3));
 
-    c.set_newdate(0, NewDate(555, 666));
+    c.set_timestamp(0, Timestamp(555, 666));
     for (size_t i = 0; i < c.size(); ++i)
-        CHECK_EQUAL(type_NewDate, c.get_type(i));
-    CHECK(c.get_newdate(0) == NewDate(555, 666));
+        CHECK_EQUAL(type_Timestamp, c.get_type(i));
+    CHECK(c.get_timestamp(0) == Timestamp(555, 666));
 
     c.destroy();
 }
@@ -355,11 +355,11 @@ TEST(MixedColumn_Mixed)
     c.insert_subtable(0, 0);
     c.insert_float(0, 1.124f);
     c.insert_double(0, 1234.124);
-    c.insert_newdate(0, NewDate(111, 222));
+    c.insert_timestamp(0, Timestamp(111, 222));
     CHECK_EQUAL(9, c.size());
 
     // Check types
-    CHECK_EQUAL(type_NewDate, c.get_type(0));
+    CHECK_EQUAL(type_Timestamp, c.get_type(0));
     CHECK_EQUAL(type_Double, c.get_type(1));
     CHECK_EQUAL(type_Float,  c.get_type(2));
     CHECK_EQUAL(type_Table,  c.get_type(3));
@@ -377,7 +377,7 @@ TEST(MixedColumn_Mixed)
     CHECK_EQUAL(c.get_binary(4), BinaryData("binary"));
     CHECK_EQUAL(c.get_float(2), 1.124f);
     CHECK_EQUAL(c.get_double(1), 1234.124);
-    CHECK(c.get_newdate(0) == NewDate(111, 222));
+    CHECK(c.get_timestamp(0) == Timestamp(111, 222));
 
     // Change all entries to new types
     c.set_int(0, 23);
@@ -388,10 +388,10 @@ TEST(MixedColumn_Mixed)
     c.set_subtable(5, 0);
     c.set_float(6, 1.124f);
     c.set_double(7, 1234.124);
-    c.set_newdate(8, NewDate());
+    c.set_timestamp(8, Timestamp());
     CHECK_EQUAL(9, c.size());
 
-    CHECK_EQUAL(type_NewDate, c.get_type(8));
+    CHECK_EQUAL(type_Timestamp, c.get_type(8));
     CHECK_EQUAL(type_Double, c.get_type(7));
     CHECK_EQUAL(type_Float,  c.get_type(6));
     CHECK_EQUAL(type_Table,  c.get_type(5));

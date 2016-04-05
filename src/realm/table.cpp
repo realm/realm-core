@@ -1389,7 +1389,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
                                   col_type != col_type_Float &&
                                   col_type != col_type_Double &&
                                   col_type != col_type_DateTime &&
-                                  col_type != col_type_NewDate &&
+                                  col_type != col_type_Timestamp &&
                                   col_type != col_type_Bool &&
                                   col_type != col_type_Link)));
 
@@ -1444,9 +1444,9 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             // Origin table will be set by group after entire table has been created
             col = new BacklinkColumn(alloc, ref); // Throws
             break;
-        case col_type_NewDate:
+        case col_type_Timestamp:
             // Origin table will be set by group after entire table has been created
-            col = new DateTimeColumn(alloc, ref); // Throws
+            col = new TimestampColumn(alloc, ref); // Throws
             break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
@@ -1585,7 +1585,7 @@ void Table::upgrade_file_format()
             case col_type_BackLink:
                 // Indices are not support on these column types
                 break;
-            case col_type_NewDate:
+            case col_type_Timestamp:
                 // Introduced after latest file format upgrade
                 break;
         }
@@ -1831,14 +1831,14 @@ MixedColumn& Table::get_column_mixed(size_t ndx)
     return get_column<MixedColumn, col_type_Mixed>(ndx);
 }
 
-const DateTimeColumn& Table::get_column_datetime(size_t ndx) const noexcept
+const TimestampColumn& Table::get_column_datetime(size_t ndx) const noexcept
 {
-    return get_column<DateTimeColumn, col_type_NewDate>(ndx);
+    return get_column<TimestampColumn, col_type_Timestamp>(ndx);
 }
 
-DateTimeColumn& Table::get_column_datetime(size_t ndx)
+TimestampColumn& Table::get_column_datetime(size_t ndx)
 {
-    return get_column<DateTimeColumn, col_type_NewDate>(ndx);
+    return get_column<TimestampColumn, col_type_Timestamp>(ndx);
 }
 
 const LinkColumnBase& Table::get_column_link_base(size_t ndx) const noexcept
@@ -1960,8 +1960,8 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
             else {
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
-        case col_type_NewDate:
-            return DateTimeColumn::create(alloc, size); // Throws
+        case col_type_Timestamp:
+            return TimestampColumn::create(alloc, size); // Throws
         case col_type_Float:
             return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Double:
@@ -2691,13 +2691,13 @@ BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 }
 
 template<>
-NewDate Table::get(size_t col_ndx, size_t ndx) const noexcept
+Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_NewDate);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Timestamp);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
+    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     return column.get(ndx);
 }
 
@@ -2797,27 +2797,27 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
         repl->set_int(this, col_ndx, ndx, value); // Throws
 }
 
-NewDate Table::get_newdate(size_t col_ndx, size_t ndx) const noexcept
+Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept
 {
-    return get<NewDate>(col_ndx, ndx);
+    return get<Timestamp>(col_ndx, ndx);
 }
 
 
-void Table::set_newdate(size_t col_ndx, size_t ndx, NewDate value)
+void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_NewDate);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Timestamp);
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
 
-    DateTimeColumn& column = get_column<DateTimeColumn, col_type_NewDate>(col_ndx);
+    TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     column.set(ndx, value);
 
     if (Replication* repl = get_repl())
-        repl->set_newdate(this, col_ndx, ndx, value); // Throws
+        repl->set_timestamp(this, col_ndx, ndx, value); // Throws
 }
 
 
@@ -3088,8 +3088,8 @@ Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const noexcept
             return Mixed(column.get_bool(ndx));
         case type_DateTime:
             return Mixed(DateTime(column.get_datetime(ndx)));
-        case type_NewDate:
-            return Mixed(column.get_newdate(ndx));
+        case type_Timestamp:
+            return Mixed(column.get_timestamp(ndx));
         case type_Float:
             return Mixed(column.get_float(ndx));
         case type_Double:
@@ -3139,8 +3139,8 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
         case type_DateTime:
             column.set_datetime(ndx, value.get_datetime()); // Throws
             break;
-        case type_NewDate:
-            column.set_newdate(ndx, value.get_newdate()); // Throws
+        case type_Timestamp:
+            column.set_timestamp(ndx, value.get_timestamp()); // Throws
             break;
         case type_Float:
             column.set_float(ndx, value.get_float()); // Throws
@@ -4481,7 +4481,7 @@ inline void out_datetime(std::ostream& out, DateTime value)
     }
 }
 
-inline void out_newdate(std::ostream& out, NewDate value)
+inline void out_timestamp(std::ostream& out, Timestamp value)
 {
     // FIXME: Do we want to output the full precision to json?
     time_t rawtime = value.m_seconds;
@@ -4569,8 +4569,8 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
         case type_Binary:
             out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
             break;
-        case type_NewDate:
-            out << "\""; out_newdate(out, get_newdate(i, row_ndx)); out << "\"";
+        case type_Timestamp:
+            out << "\""; out_timestamp(out, get_timestamp(i, row_ndx)); out << "\"";
             break;
         case type_Table:
             get_subtable(i, row_ndx)->to_json(out);
@@ -4605,8 +4605,8 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                 case type_Binary:
                     out << "\""; out_binary(out, m.get_binary()); out << "\"";
                     break;
-                case type_NewDate:
-                    out << "\""; out_newdate(out, m.get_newdate()); out << "\"";
+                case type_Timestamp:
+                    out << "\""; out_timestamp(out, m.get_timestamp()); out << "\"";
                     break;
                 case type_Table:
                 case type_Mixed:
@@ -4753,7 +4753,7 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 width = 5;
                 break;
             case type_DateTime:
-            case type_NewDate:
+            case type_Timestamp:
                 // FIXME: Probably not correct if we output the full precision
                 width = 19;
                 break;
@@ -4807,7 +4807,7 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                             width = std::max(width, size_t(5));
                             break;
                         case type_DateTime:
-                        case type_NewDate:
+                        case type_Timestamp:
                             // FIXME: Probably not correct if we output the full precision
                             width = std::max(width, size_t(19));
                             break;
@@ -4919,8 +4919,8 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
             case type_DateTime:
                 out_datetime(out, get_datetime(col, row_ndx));
                 break;
-            case type_NewDate:
-                out_newdate(out, get_newdate(col, row_ndx));
+            case type_Timestamp:
+                out_timestamp(out, get_timestamp(col, row_ndx));
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
@@ -4956,8 +4956,8 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                         case type_DateTime:
                             out_datetime(out, m.get_datetime());
                             break;
-                        case type_NewDate:
-                            out_newdate(out, m.get_newdate());
+                        case type_Timestamp:
+                            out_timestamp(out, m.get_timestamp());
                             break;
                         case type_Binary:
                             out.width(widths[col+1]-6); // adjust for " bytes" text
@@ -5027,9 +5027,9 @@ bool Table::compare_rows(const Table& t) const
                 }
                 continue;
             }
-            case col_type_NewDate: {
-                const DateTimeColumn& c1 = get_column_datetime(i);
-                const DateTimeColumn& c2 = t.get_column_datetime(i);
+            case col_type_Timestamp: {
+                const TimestampColumn& c1 = get_column_datetime(i);
+                const TimestampColumn& c2 = t.get_column_datetime(i);
                 if (!c1.compare(c2))
                     return false;
                 continue;

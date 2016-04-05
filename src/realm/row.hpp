@@ -79,7 +79,7 @@ public:
     StringData get_string(size_t col_ndx) const noexcept;
     BinaryData get_binary(size_t col_ndx) const noexcept;
     DateTime get_datetime(size_t col_ndx) const noexcept;
-    NewDate get_newdate(size_t col_ndx) const noexcept;
+    Timestamp get_timestamp(size_t col_ndx) const noexcept;
     ConstTableRef get_subtable(size_t col_ndx) const;
     TableRef get_subtable(size_t col_ndx);
     size_t get_subtable_size(size_t col_ndx) const noexcept;
@@ -100,7 +100,7 @@ public:
     void set_string(size_t col_ndx, StringData value);
     void set_binary(size_t col_ndx, BinaryData value);
     void set_datetime(size_t col_ndx, DateTime value);
-    void set_newdate(size_t col_ndx, NewDate value);
+    void set_timestamp(size_t col_ndx, Timestamp value);
     void set_subtable(size_t col_ndx, const Table* value);
     void set_link(size_t col_ndx, size_t value);
     void nullify_link(size_t col_ndx);
@@ -397,9 +397,9 @@ inline DateTime RowFuncs<T, R>::get_datetime(size_t col_ndx) const noexcept
 }
 
 template<class T, class R>
-inline NewDate RowFuncs<T, R>::get_newdate(size_t col_ndx) const noexcept
+inline Timestamp RowFuncs<T, R>::get_timestamp(size_t col_ndx) const noexcept
 {
-    return table()->get_newdate(col_ndx, row_ndx());
+    return table()->get_timestamp(col_ndx, row_ndx());
 }
 
 template<class T, class R>
@@ -518,9 +518,9 @@ inline void RowFuncs<T, R>::set_datetime(size_t col_ndx, DateTime value)
 }
 
 template<class T, class R>
-inline void RowFuncs<T, R>::set_newdate(size_t col_ndx, NewDate value)
+inline void RowFuncs<T, R>::set_timestamp(size_t col_ndx, Timestamp value)
 {
-    table()->set_newdate(col_ndx, row_ndx(), value); // Throws
+    table()->set_timestamp(col_ndx, row_ndx(), value); // Throws
 }
 
 template<class T, class R>

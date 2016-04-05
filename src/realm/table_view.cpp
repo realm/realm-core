@@ -266,17 +266,17 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         return res;
 }
 
-// Min, Max and Count on NewDate cannot utilize existing aggregate() methods, becuase these assume we have leaf types
+// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf types
 // and also assume numeric types that support arithmetic (+, /, etc).
-template<class C> NewDate TableViewBase::minmax_newdate(size_t column_ndx, size_t* return_ndx) const
+template<class C> Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
 {
     C compare = C();
-    NewDate best = NewDate();
+    Timestamp best = Timestamp();
     size_t ndx = npos;
     for (size_t t = 0; t < size(); t++) {
-        NewDate nd = get_newdate(column_ndx, t);
-        if (ndx == npos || compare(nd, best, nd.is_null(), best.is_null())) {
-            best = nd;
+        Timestamp ts = get_timestamp(column_ndx, t);
+        if (ndx == npos || compare(ts, best, ts.is_null(), best.is_null())) {
+            best = ts;
             ndx = t;
         }
     }
@@ -328,9 +328,9 @@ DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) 
         return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 
-NewDate TableViewBase::maximum_newdate(size_t column_ndx, size_t* return_ndx) const
+Timestamp TableViewBase::maximum_timestamp(size_t column_ndx, size_t* return_ndx) const
 {
-    return minmax_newdate<realm::Greater>(column_ndx, return_ndx);
+    return minmax_timestamp<realm::Greater>(column_ndx, return_ndx);
 }
 
 
@@ -358,9 +358,9 @@ DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) 
         return aggregate<act_Max, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 
-NewDate TableViewBase::minimum_newdate(size_t column_ndx, size_t* return_ndx) const
+Timestamp TableViewBase::minimum_timestamp(size_t column_ndx, size_t* return_ndx) const
 {
-    return minmax_newdate<realm::Less> (column_ndx, return_ndx);
+    return minmax_timestamp<realm::Less> (column_ndx, return_ndx);
 }
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
@@ -397,13 +397,13 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
     return aggregate<act_Count, double, size_t, DoubleColumn>(nullptr, column_ndx, target);
 }
 
-size_t TableViewBase::count_newdate(size_t column_ndx, NewDate target) const
+size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
 {
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
-        NewDate nd = get_newdate(column_ndx, t);
+        Timestamp ts = get_timestamp(column_ndx, t);
         realm::Equal e;
-        if (e(nd, target, nd.is_null(), target.is_null())) {
+        if (e(ts, target, ts.is_null(), target.is_null())) {
             count++;
         }
     }

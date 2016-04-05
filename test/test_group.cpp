@@ -1312,7 +1312,7 @@ TEST(Group_Persist)
     table->add_column(type_String,   "string");
     table->add_column(type_Binary,   "binary");
     table->add_column(type_Mixed,    "mixed");
-    table->add_column(type_NewDate,  "newdate");
+    table->add_column(type_Timestamp,  "timestamp");
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
@@ -1320,7 +1320,7 @@ TEST(Group_Persist)
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
     table->set_mixed(5, 0, false);
-    table->set_newdate(6, 0, NewDate(111, 222));
+    table->set_timestamp(6, 0, Timestamp(111, 222));
 
     // Write changes to file
     db.commit();
@@ -1339,7 +1339,7 @@ TEST(Group_Persist)
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
-    CHECK(table->get_newdate(6, 0) == NewDate(111, 222));
+    CHECK(table->get_timestamp(6, 0) == Timestamp(111, 222));
 
     // Change a bit
     table->set_string(3, 0, "Changed!");
@@ -1361,7 +1361,7 @@ TEST(Group_Persist)
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
-    CHECK(table->get_newdate(6, 0) == NewDate(111, 222));
+    CHECK(table->get_timestamp(6, 0) == Timestamp(111, 222));
 }
 
 

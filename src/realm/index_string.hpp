@@ -62,7 +62,7 @@ using our binary search functions such as upper_bound() and lower_bound().
 namespace realm {
 
 class Spec;
-struct NewDate;
+struct Timestamp;
 
 class StringIndex {
 public:
@@ -214,8 +214,8 @@ template<> struct GetIndexData<null> {
     }
 };
 
-template<> struct GetIndexData<NewDate> {
-    static StringData get_index_data(const NewDate&, StringIndex::StringConversionBuffer&);
+template<> struct GetIndexData<Timestamp> {
+    static StringData get_index_data(const Timestamp&, StringIndex::StringConversionBuffer&);
 };
 
 template<class T> struct GetIndexData<util::Optional<T>> {

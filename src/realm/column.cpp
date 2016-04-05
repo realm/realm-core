@@ -134,8 +134,8 @@ void col_type_deleg(Op& op, ColumnType type)
         case col_type_Link:
             op.template call<IntegerColumn>();
             return;
-        case col_type_NewDate:
-            op.template call<DateTimeColumn>();
+        case col_type_Timestamp:
+            op.template call<TimestampColumn>();
         case col_type_String:
             op.template call<StringColumn>();
             return;
