@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
     // Process command line
     {
         bool empty = argc == 1;
-	bool help  = false;
+        bool help  = false;
         bool error = false;
 
         for (int i = 1; i < argc; ++i) {
