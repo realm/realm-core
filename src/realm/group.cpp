@@ -82,6 +82,9 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // that the file format it is not yet decided (only possible for empty
     // Realms where top-ref is zero).
 
+    // FIXME: @ks please write something sane here. This realm core cannot open and operate
+    // on any database file unless it is upgraded to version 5.
+
     // Stay on file format 3 (no support of in-Realm histories) if the format of
     // the opened Realm file is less than 4 and the required history type is not
     // in in-Realm history type (Replication::hist_InRealm or
@@ -92,12 +95,11 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     switch (requested_history_type_2) {
         case Replication::hist_None:
         case Replication::hist_OutOfRealm:
-            return 3;
         case Replication::hist_InRealm:
         case Replication::hist_Sync:
-            break;
+            return 5;
     }
-    return 4;
+    return 5;
 }
 
 
@@ -108,7 +110,8 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file foprmat
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT(target_file_format_version == 3 || target_file_format_version == 4);
+    REALM_ASSERT_EX(target_file_format_version == 3 || target_file_format_version == 4 || 
+                    target_file_format_version == 5, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -118,7 +121,8 @@ void Group::upgrade_file_format(int target_file_format_version)
     // vice versa).
     REALM_ASSERT_EX(current_file_format_version == 2 ||
                     current_file_format_version == 3 ||
-                    current_file_format_version == 4, current_file_format_version);
+                    current_file_format_version == 4 ||
+                    current_file_format_version == 5, current_file_format_version);
 
     // Upgrade from 2 to 3
     if (current_file_format_version <= 2 && target_file_format_version >= 3) {
@@ -126,11 +130,16 @@ void Group::upgrade_file_format(int target_file_format_version)
             TableRef table = get_table(t);
             table->upgrade_file_format();
         }
+        current_file_format_version = 3;
     }
 
-    // Upgrade from 3 to 4
-    if (current_file_format_version <= 3 && target_file_format_version >= 4) {
-        // No-op
+    // Upgrade from 3 or 4 to 5 (datetime -> timestamp)
+    if (current_file_format_version <= 4 && target_file_format_version >= 5) {
+        for (size_t t = 0; t < m_tables.size(); t++) {
+            TableRef table = get_table(t);
+            table->upgrade_datetime();
+        }
+        current_file_format_version = 5;
     }
 
     // NOTE: Additional future upgrade steps go here.

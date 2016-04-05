@@ -907,11 +907,9 @@ private:
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
-
-// FIXME
-public:
+    
+    // Upgrades DateTime columns to Timestamp columns
     void upgrade_datetime();
-private:
 
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that

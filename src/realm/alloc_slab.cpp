@@ -767,6 +767,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
             case 2:
             case 3:
             case 4:
+            case 5:
                 bad_file_format = false;
         }
     }
@@ -780,6 +781,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
         switch (file_format_version) {
             case 3:
             case 4:
+            case 5:
                 bad_file_format = false;
         }
     }
