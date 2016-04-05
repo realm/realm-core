@@ -29,6 +29,7 @@ Query::Query(const Table& table, const LinkViewRef& lv):
     m_source_link_view(lv), m_source_table_view(nullptr), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(&lv->get_target_table() == m_table);
     create();
 }
 
@@ -743,8 +744,11 @@ template<Action action, typename T, typename R, class ColType>
         else {
             for (size_t t = start; t < end && st.m_match_count < limit; t++) {
                 size_t r = peek_tableview(t);
-                if (r != not_found)
-                    st.template match<action, false>(r, 0, source_column.get_next(m_view->m_row_indexes.get(t)));
+                if (r != not_found) {
+                    int64_t view_row_index = m_view->m_row_indexes.get(t);
+                    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(view_row_index));
+                    st.template match<action, false>(r, 0, source_column.get_next(size_t(view_row_index))); //       m_view->m_row_indexes.get(t)));
+                }
             }
         }
 

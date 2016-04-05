@@ -83,10 +83,10 @@ bool allow_async = true;
 
 
 REALM_TABLE_4(TestTableShared,
-                first,  Int,
-                second, Int,
-                third,  Bool,
-                fourth, String)
+              first,  Int,
+              second, Int,
+              third,  Bool,
+              fourth, String)
 
 
 
@@ -1553,10 +1553,10 @@ TEST(Shared_FormerErrorCase1)
 namespace {
 
 REALM_TABLE_1(FormerErrorCase2_Subtable,
-                value,  Int)
+              value,  Int)
 
 REALM_TABLE_1(FormerErrorCase2_Table,
-                bar, Subtable<FormerErrorCase2_Subtable>)
+              bar, Subtable<FormerErrorCase2_Subtable>)
 
 } // namespace
 
@@ -1583,7 +1583,7 @@ TEST(Shared_FormerErrorCase2)
 namespace {
 
 REALM_TABLE_1(OverAllocTable,
-                text, String)
+              text, String)
 
 } // namespace
 
