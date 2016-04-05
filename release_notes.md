@@ -1,5 +1,9 @@
 # NEXT RELEASE
 
+### Breaking changes:
+
+* Lock file (`foo.realm.lock`) format bumped.
+
 ### Bugfixes:
 
 * Detach subspec and enumkey accessors when they are removed
@@ -13,10 +17,6 @@
 * Bug fix: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
 * Handing over a detached row accessor no longer crashes.
-
-### API breaking changes:
-
-* Lock file (`foo.realm.lock`) format bumped.
 
 ### Enhancements:
 
