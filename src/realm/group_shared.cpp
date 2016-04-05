@@ -1761,7 +1761,7 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
 bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
 {
     using _impl::SimulatedFailure;
-    SimulatedFailure::check(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
+    SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
 
     if (index >= m_local_max_entry) {
         // handle mapping expansion if required

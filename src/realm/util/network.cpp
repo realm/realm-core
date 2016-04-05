@@ -94,6 +94,7 @@ struct getaddrinfo_result_owner {
 
 
 class network_error_category: public std::error_category {
+public:
     const char* name() const noexcept override;
     std::string message(int) const override;
 };

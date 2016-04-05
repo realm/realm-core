@@ -2841,16 +2841,14 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 }
 
 
-#ifdef REALM_DEBUG
-TEST(Shared_BeginReadFailure)
+TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())
 {
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
-    using SimulatedFailure = _impl::SimulatedFailure;
-    SimulatedFailure::PrimeGuard pg(SimulatedFailure::shared_group__grow_reader_mapping);
-    CHECK_THROW(sg.begin_read(), SimulatedFailure);
+    using sf = _impl::SimulatedFailure;
+    sf::OneShotPrimeGuard pg(sf::shared_group__grow_reader_mapping);
+    CHECK_THROW(sg.begin_read(), sf);
 }
-#endif // REALM_DEBUG
 
 
 TEST(Shared_SessionDurabilityConsistency)
