@@ -1,13 +1,11 @@
+
 #include <cstddef>
 #include <cstring>
 #include <string>
 #include <iostream>
 
 #include <realm/util/features.h>
-
-#define TO_STR(x) TO_STR2(x)
-#define TO_STR2(x) #x
-
+#include <realm/version.hpp>
 
 namespace {
 
@@ -88,17 +86,15 @@ int main(int argc, char* argv[])
 
     // Process command line
     {
-        const char* prog = argv[0];
-        --argc;
-        ++argv;
-        bool help  = false;
+        bool empty = argc == 1;
+	bool help  = false;
         bool error = false;
-        int argc2 = 0;
-        for (int i=0; i<argc; ++i) {
+
+        for (int i = 1; i < argc; ++i) {
             char* arg = argv[i];
             size_t size = strlen(arg);
             if (size < 2 || strncmp(arg, "--", 2) != 0) {
-                argv[argc2++] = arg;
+                error = true;
                 continue;
             }
 
@@ -154,12 +150,9 @@ int main(int argc, char* argv[])
             error = true;
             break;
         }
-        argc = argc2;
 
-        if (argc != 0)
-            error = true;
-
-        if (error || help) {
+        if (empty || error || help) {
+	    const char* prog = argv[0];
             std::string msg =
                 "Synopsis: "+std::string(prog)+"\n\n"
                 "Options:\n"
@@ -189,7 +182,7 @@ int main(int argc, char* argv[])
             emit_flags();
             break;
         case func_ShowVersion:
-            std::cout << REALM_VERSION "\n";
+            std::cout << REALM_VER_STRING "\n";
             break;
         case func_ShowPrefix:
             std::cout << REALM_INSTALL_PREFIX "\n";
