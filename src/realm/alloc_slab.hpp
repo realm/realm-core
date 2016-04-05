@@ -27,7 +27,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
@@ -138,7 +137,8 @@ public:
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& path, Config& cfg);
 
-    /// Get the attached file
+    /// Get the attached file. Only valid when called on an allocator with 
+    /// an attached file.
     util::File& get_file();
 
     /// Attach this allocator to the specified memory buffer.
@@ -303,6 +303,7 @@ public:
     bool is_all_free() const;
     void print() const;
 #endif
+    struct MappedFile;
 
 protected:
     MemRef do_alloc(size_t size) override;
@@ -368,7 +369,6 @@ private:
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
     // The mappings are shared, if they are from a file
-    struct MappedFile;
     std::shared_ptr<MappedFile> m_file_mappings;
     char* m_data = nullptr;
     size_t m_initial_chunk_size = 0;
@@ -377,16 +377,7 @@ private:
     std::unique_ptr<size_t[]> m_section_bases;
     size_t m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
-
-    /// If a file or buffer is currently attached and validation was
-    /// not skipped during attachement, this flag is true if, and only
-    /// if the attached file has a footer specifying the top-ref, that
-    /// is, if the file is on the streaming form. This member is
-    /// deliberately placed here (after m_attach_mode) in the hope
-    /// that it leads to less padding between members due to alignment
-    /// requirements.
-    bool m_file_on_streaming_form;
-
+    bool m_file_on_streaming_form = false;
     enum FeeeSpaceState {
         free_space_Clean,
         free_space_Dirty,

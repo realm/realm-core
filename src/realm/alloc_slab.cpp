@@ -3,15 +3,17 @@
 #include <algorithm>
 #include <memory>
 #include <iostream>
+#include <mutex>
+#include <map>
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
 #  include <cstdlib>
-#  include <map>
 #endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
+#include <realm/util/thread.hpp>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
@@ -38,6 +40,7 @@ public:
 
 struct SlabAlloc::MappedFile {
 
+    util::Mutex m_mutex;
     util::File m_file;
     util::File::Map<char> m_initial_mapping;
     // additional sections beyond those covered by the initial mapping, are
@@ -46,6 +49,19 @@ struct SlabAlloc::MappedFile {
     size_t m_num_additional_mappings = 0;
     size_t m_capacity_additional_mappings = 0;
     std::unique_ptr<util::File::Map<char>[]> m_additional_mappings;
+
+    /// Version obtained when initially attaching the file.
+    int m_file_format_version;
+
+    /// If a file or buffer is currently attached and validation was
+    /// not skipped during attachement, this flag is true if, and only
+    /// if the attached file has a footer specifying the top-ref, that
+    /// is, if the file is on the streaming form. 
+    bool m_file_on_streaming_form = false;
+
+    /// Indicates if attaching to the file was succesfull
+    bool m_success = false;
+
     ~MappedFile() 
     {
         m_initial_mapping.unmap();
@@ -72,6 +88,8 @@ util::File& SlabAlloc::get_file()
 {
     return m_file_mappings->m_file;
 }
+
+
 const SlabAlloc::Header SlabAlloc::empty_file_header = {
     { 0, 0 }, // top-refs
     { 'T', '-', 'D', 'B' },
@@ -429,6 +447,8 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
         if (ref < m_initial_chunk_size) {
             addr = m_data + ref;
             if (m_file_mappings) {
+                // Once established, the initial mapping is immutable, so we
+                // don't need to grab a lock for access.
                 map = &m_file_mappings->m_initial_mapping;
                 realm::util::encryption_read_barrier(addr, Array::header_size,
                                                      map->get_encrypted_mapping(),
@@ -439,6 +459,12 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
             // reference must be inside a section mapped later
             size_t section_index = get_section_index(ref);
             REALM_ASSERT_DEBUG(m_file_mappings);
+
+            // Access to the additional mappings may conflict with allocation of a new
+            // array of mappings (or more precisely: it may conflict with the deletion
+            // of the array as it is being replaced with a new one), so we must lock it
+            std::lock_guard<util::Mutex> lock(m_file_mappings->m_mutex);
+
             size_t mapping_index = section_index - m_file_mappings->m_first_additional_mapping;
             size_t section_offset = ref - get_section_base(section_index);
             REALM_ASSERT_DEBUG(m_file_mappings->m_additional_mappings);
@@ -476,6 +502,9 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
 }
 
 
+std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>> all_files;
+util::Mutex all_files_mutex;
+
 ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in
@@ -497,7 +526,35 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     using namespace realm::util;
     File::AccessMode access = cfg.read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
-    m_file_mappings = std::make_shared<MappedFile>();
+    {
+        std::lock_guard<Mutex> lock(all_files_mutex);
+        try {
+            std::shared_ptr<SlabAlloc::MappedFile> p(all_files[path]);
+            m_file_mappings = p;
+        }
+        catch (...) {
+            m_file_mappings = std::make_shared<MappedFile>();
+            all_files[path] = m_file_mappings;
+        }
+    }
+    std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
+    if (m_file_mappings->m_success) {
+        REALM_ASSERT(!cfg.session_initiator);
+        m_file_format_version = m_file_mappings->m_file_format_version;
+        m_data = m_file_mappings->m_initial_mapping.get_addr();
+        m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
+        m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
+        m_free_space_state = free_space_Invalid;
+        if (m_file_mappings->m_num_additional_mappings) {
+            int mapping_index = m_file_mappings->m_num_additional_mappings;
+            int section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
+            m_baseline = get_section_base(section_index);
+        }
+        else {
+            m_baseline = m_file_mappings->m_initial_mapping.get_size();
+        }
+        return 0;
+    }
 
     m_file_mappings->m_file.open(path.c_str(), access, create, 0); // Throws
     if (cfg.encryption_key)
@@ -612,9 +669,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
             int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-            m_file_format_version = header.m_file_format[slot_selector];
+            m_file_mappings->m_file_format_version = header.m_file_format[slot_selector];
             uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
             m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+            m_file_mappings->m_file_on_streaming_form = m_file_on_streaming_form;
             if (m_file_on_streaming_form) {
                 const StreamingFooter& footer =
                     *(reinterpret_cast<StreamingFooter*>(map.get_addr()+initial_size_of_file) - 1);
@@ -646,7 +704,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // session initialization, even if it means writing the database during open.
     //
     // FIXME: Why does this need to be done? Explanation needed.
-    if (cfg.session_initiator && m_file_on_streaming_form) {
+    if (cfg.session_initiator && m_file_mappings->m_file_on_streaming_form) {
         const Header& header = *reinterpret_cast<Header*>(m_data);
         const StreamingFooter& footer =
             *(reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1);
@@ -675,11 +733,13 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             writable_header.m_flags |= flags_SelectBit;
             realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
+            m_file_mappings->m_file_on_streaming_form = false;
             writable_map.sync();
         }
     }
 
     fcg.release(); // Do not close
+    m_file_mappings->m_success = true;
     return top_ref;
 }
 
@@ -860,26 +920,28 @@ void SlabAlloc::remap(size_t file_size)
     REALM_ASSERT_DEBUG(matches_section_boundary(file_size));
     m_baseline = file_size;
     auto num_sections = get_section_index(file_size);
-    auto num_additional_mappings = num_sections - m_file_mappings->m_first_additional_mapping;
-
-    if (num_additional_mappings > m_file_mappings->m_capacity_additional_mappings) {
-        // FIXME: No harcoded constants here
-        m_file_mappings->m_capacity_additional_mappings = num_additional_mappings + 128;
-        std::unique_ptr<util::File::Map<char>[]> new_mappings;
-        new_mappings.reset(new util::File::Map<char>[m_file_mappings->m_capacity_additional_mappings]);
-        for (size_t j = 0; j < m_file_mappings->m_num_additional_mappings; ++j)
-            new_mappings[j] = std::move(m_file_mappings->m_additional_mappings[j]);
-        m_file_mappings->m_additional_mappings = std::move(new_mappings);
-    }
-    for (size_t k = m_file_mappings->m_num_additional_mappings; k < num_additional_mappings; ++k)
     {
-        auto section_start_offset = get_section_base(k + m_file_mappings->m_first_additional_mapping);
-        auto section_size = get_section_base(1 + k + m_file_mappings->m_first_additional_mapping) - section_start_offset;
-        util::File::Map<char> map(m_file_mappings->m_file, section_start_offset, File::access_ReadOnly, section_size);
-        m_file_mappings->m_additional_mappings[k] = std::move(map);
-    }
-    m_file_mappings->m_num_additional_mappings = num_additional_mappings;
+        std::lock_guard<util::Mutex> lock(m_file_mappings->m_mutex);
+        auto num_additional_mappings = num_sections - m_file_mappings->m_first_additional_mapping;
 
+        if (num_additional_mappings > m_file_mappings->m_capacity_additional_mappings) {
+            // FIXME: No harcoded constants here
+            m_file_mappings->m_capacity_additional_mappings = num_additional_mappings + 128;
+            std::unique_ptr<util::File::Map<char>[]> new_mappings;
+            new_mappings.reset(new util::File::Map<char>[m_file_mappings->m_capacity_additional_mappings]);
+            for (size_t j = 0; j < m_file_mappings->m_num_additional_mappings; ++j)
+                new_mappings[j] = std::move(m_file_mappings->m_additional_mappings[j]);
+            m_file_mappings->m_additional_mappings = std::move(new_mappings);
+        }
+        for (size_t k = m_file_mappings->m_num_additional_mappings; k < num_additional_mappings; ++k)
+        {
+            auto section_start_offset = get_section_base(k + m_file_mappings->m_first_additional_mapping);
+            auto section_size = get_section_base(1 + k + m_file_mappings->m_first_additional_mapping) - section_start_offset;
+            util::File::Map<char> map(m_file_mappings->m_file, section_start_offset, File::access_ReadOnly, section_size);
+            m_file_mappings->m_additional_mappings[k] = std::move(map);
+        }
+        m_file_mappings->m_num_additional_mappings = num_additional_mappings;
+    }
     // Rebase slabs and free list (assumes exactly one entry in m_free_space for
     // each entire slab in m_slabs)
     size_t slab_ref = file_size;
