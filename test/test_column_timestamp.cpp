@@ -39,13 +39,14 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(TimestampColumn_Basic)
+TEST_TYPES(DateTimeColumn_Basic, std::true_type, std::false_type)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
-    TimestampColumn c(Allocator::get_default(), ref);
+    bool nullable = TEST_TYPE::value;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
+    TimestampColumn c(Allocator::get_default(), ref, nullable);
     c.add(Timestamp(123,123));
     Timestamp ts = c.get(0);
-    CHECK(ts == Timestamp(123, 123));
+    CHECK_EQUAL(ts, Timestamp(123, 123));
 }
 
 TEST(TimestampColumn_Basic_Nulls)
@@ -77,10 +78,10 @@ TEST(TimestampColumn_Relocate)
     }
 }
 
-TEST(TimestampColumn_Compare)
+TEST_TYPES(TimestampColumn_Compare, std::true_type, std::false_type)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
-    TimestampColumn c(Allocator::get_default(), ref);
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, TEST_TYPE::value);
+    TimestampColumn c(Allocator::get_default(), ref, TEST_TYPE::value);
 
     for (unsigned int i = 0; i < 10000; i++) {
         c.add(Timestamp(i, i));
@@ -89,16 +90,16 @@ TEST(TimestampColumn_Compare)
     CHECK(c.compare(c));
 
     {
-        ref_type ref = TimestampColumn::create(Allocator::get_default());
-        TimestampColumn c2(Allocator::get_default(), ref);
+        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, TEST_TYPE::value);
+        TimestampColumn c2(Allocator::get_default(), ref, TEST_TYPE::value);
         CHECK_NOT(c.compare(c2));
     }
 }
 
-TEST(TimestampColumn_Index)
+TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
-    TimestampColumn c(Allocator::get_default(), ref);
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, TEST_TYPE::value);
+    TimestampColumn c(Allocator::get_default(), ref, TEST_TYPE::value);
     StringIndex* index = c.create_search_index();
     CHECK(index);
 

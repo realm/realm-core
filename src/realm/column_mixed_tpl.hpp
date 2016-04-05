@@ -343,6 +343,7 @@ inline void MixedColumn::insert_datetime(size_t ndx, DateTime value)
 
 inline void MixedColumn::insert_timestamp(size_t ndx, Timestamp value)
 {
+    REALM_ASSERT(!value.is_null());
     ensure_timestamp_column();
     size_t data_ndx = m_timestamp->size();
     m_timestamp->add(value); // Throws
