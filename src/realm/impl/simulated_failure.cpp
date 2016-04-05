@@ -161,7 +161,7 @@ public:
     std::string message(int) const override;
 };
 
-const ErrorCategory g_error_category;
+const ErrorCategory g_error_category{};
 
 const char* ErrorCategory::name() const noexcept
 {
