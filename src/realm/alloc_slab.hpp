@@ -513,11 +513,6 @@ inline bool SlabAlloc::is_free_space_clean() const noexcept
     return m_free_space_state == free_space_Clean;
 }
 
-inline void SlabAlloc::set_file_format_version(int file_format_version) noexcept
-{
-    m_file_format_version = file_format_version;
-}
-
 inline SlabAlloc::DetachGuard::~DetachGuard() noexcept
 {
     if (m_alloc)
