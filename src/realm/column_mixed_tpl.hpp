@@ -193,9 +193,9 @@ inline Timestamp MixedColumn::get_timestamp(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Timestamp);
-    REALM_ASSERT(m_datetime);
+    REALM_ASSERT(m_timestamp);
     size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
-    return m_datetime->get(data_ndx);
+    return m_timestamp->get(data_ndx);
 }
 
 //
@@ -344,9 +344,9 @@ inline void MixedColumn::insert_datetime(size_t ndx, DateTime value)
 inline void MixedColumn::insert_timestamp(size_t ndx, Timestamp value)
 {
     ensure_timestamp_column();
-    size_t datetime_row_ndx = m_datetime->size();
-    m_datetime->add(value); // Throws
-    insert_int(ndx, int_fast64_t(datetime_row_ndx), mixcol_Timestamp);
+    size_t data_ndx = m_timestamp->size();
+    m_timestamp->add(value); // Throws
+    insert_int(ndx, int_fast64_t(data_ndx), mixcol_Timestamp);
 }
 
 inline void MixedColumn::insert_string(size_t ndx, StringData value)

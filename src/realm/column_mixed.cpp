@@ -30,7 +30,7 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     std::unique_ptr<IntegerColumn> types;
     std::unique_ptr<RefsColumn> data;
     std::unique_ptr<BinaryColumn> binary_data;
-    std::unique_ptr<TimestampColumn> datetime_data;
+    std::unique_ptr<TimestampColumn> timestamp_data;
     top.reset(new Array(alloc)); // Throws
     top->init_from_ref(ref);
     REALM_ASSERT(top->size() == 2 || top->size() == 3);
@@ -53,15 +53,15 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     // TimestampColumn is only there if needed
     if (top->size() >= 4) {
         ref_type timestamp_ref = top->get_as_ref(3);
-        m_datetime.reset(new TimestampColumn(alloc, timestamp_ref)); // Throws
-        m_datetime->set_parent(&*top, 3);
+        m_timestamp.reset(new TimestampColumn(alloc, timestamp_ref)); // Throws
+        m_timestamp->set_parent(&*top, 3);
     }
 
     m_array = std::move(top);
     m_types = std::move(types);
     m_data = std::move(data);
     m_binary_data = std::move(binary_data);
-    m_datetime = std::move(datetime_data);
+    m_timestamp = std::move(timestamp_data);
 }
 
 
@@ -83,14 +83,14 @@ void MixedColumn::ensure_timestamp_column()
     // binary data is expected at index 2
     ensure_binary_data_column();
 
-    if (m_datetime)
+    if (m_timestamp)
         return;
 
     ref_type ref = TimestampColumn::create(m_array->get_alloc()); // Throws
-    m_datetime.reset(new TimestampColumn(m_array->get_alloc(), ref)); // Throws
+    m_timestamp.reset(new TimestampColumn(m_array->get_alloc(), ref)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 3);
     m_array->add(ref); // Throws
-    m_datetime->set_parent(m_array.get(), 3);
+    m_timestamp->set_parent(m_array.get(), 3);
 }
 
 
@@ -127,15 +127,15 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             goto carry_on;
         }
         case mixcol_Timestamp: {
-            size_t datetime_row_ndx = size_t(m_data->get(row_ndx) >> 1);
-            if (datetime_row_ndx == m_datetime->size()-1) {
+            size_t data_row_ndx = size_t(m_data->get(row_ndx) >> 1);
+            if (data_row_ndx == m_timestamp->size()-1) {
                 bool is_last = true;
-                m_datetime->erase(datetime_row_ndx, is_last);
+                m_timestamp->erase(data_row_ndx, is_last);
             }
             else {
                 // FIXME: But this will lead to unbounded in-file leaking in
                 // for(;;) { insert_binary(i, ...); erase(i); }
-                m_datetime->set(datetime_row_ndx, Timestamp());
+                m_timestamp->set(data_row_ndx, Timestamp());
             }
             goto carry_on;
         }
@@ -305,15 +305,15 @@ void MixedColumn::set_timestamp(size_t ndx, Timestamp value)
     // See if we can reuse data position
     if (type == mixcol_Timestamp) {
         size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
-        m_datetime->set(data_ndx, value);
+        m_timestamp->set(data_ndx, value);
     }
     else {
         // Remove refs or string / binary data
         clear_value_and_discard_subtab_acc(ndx, type); // Throws
 
         // Add value to data column
-        size_t data_ndx = m_datetime->size();
-        m_datetime->add(value);
+        size_t data_ndx = m_timestamp->size();
+        m_timestamp->add(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
         int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);

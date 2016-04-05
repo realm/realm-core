@@ -184,7 +184,7 @@ private:
     /// Stores the data for each entry. For a subtable, the stored
     /// value is the ref of the subtable. For string, binary data,
     /// the stored value is an index within `m_binary_data`. Likewise,
-    /// for timestamp, an index into `m_datetime` is stored. For other
+    /// for timestamp, an index into `m_timestamp` is stored. For other
     /// types the stored value is itself. Since we only have 63 bits
     /// available for a non-ref value, the sign of numeric values is
     /// encoded as part of the type in `m_types`.
@@ -193,8 +193,8 @@ private:
     /// For string and binary data types, the bytes are stored here.
     std::unique_ptr<BinaryColumn> m_binary_data;
 
-    /// For the new date time, bytes are stored here.
-    std::unique_ptr<TimestampColumn> m_datetime;
+    /// Timestamps are stored here.
+    std::unique_ptr<TimestampColumn> m_timestamp;
 
     void do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows);
     void do_move_last_over(size_t row_ndx, size_t prior_num_rows);

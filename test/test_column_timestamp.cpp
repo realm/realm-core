@@ -44,8 +44,8 @@ TEST(TimestampColumn_Basic)
     ref_type ref = TimestampColumn::create(Allocator::get_default());
     TimestampColumn c(Allocator::get_default(), ref);
     c.add(Timestamp(123,123));
-    Timestamp ndt = c.get(0);
-    CHECK(ndt == Timestamp(123, 123));
+    Timestamp ts = c.get(0);
+    CHECK(ts == Timestamp(123, 123));
 }
 
 TEST(TimestampColumn_Basic_Nulls)

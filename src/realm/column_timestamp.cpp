@@ -305,17 +305,17 @@ void TimestampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/
 
 #endif
 
-void TimestampColumn::add(const Timestamp& ndt)
+void TimestampColumn::add(const Timestamp& ts)
 {
-    bool is_null = ndt.is_null();
-    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ndt.m_seconds);
-    int32_t nanoseconds = is_null ? 0 : ndt.m_nanoseconds;
+    bool is_null = ts.is_null();
+    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.m_seconds);
+    int32_t nanoseconds = is_null ? 0 : ts.m_nanoseconds;
     m_seconds.insert(npos, seconds);
     m_nanoseconds.insert(npos, nanoseconds);
 
     if (has_search_index()) {
         size_t ndx = size() - 1; // Slow
-        m_search_index->insert(ndx, ndt, 1, true);
+        m_search_index->insert(ndx, ts, 1, true);
     }
 }
 
@@ -325,16 +325,16 @@ Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
     return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(row_ndx))) : Timestamp(null());
 }
 
-void TimestampColumn::set(size_t row_ndx, const Timestamp& ndt)
+void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
 {
-    bool is_null = ndt.is_null();
-    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ndt.m_seconds);
-    int32_t nanoseconds = is_null ? 0 : ndt.m_nanoseconds;
+    bool is_null = ts.is_null();
+    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.m_seconds);
+    int32_t nanoseconds = is_null ? 0 : ts.m_nanoseconds;
     m_seconds.set(row_ndx, seconds);
     m_nanoseconds.set(row_ndx, nanoseconds);
 
     if (has_search_index()) {
-        m_search_index->set(row_ndx, ndt);
+        m_search_index->set(row_ndx, ts);
     }
 }
 

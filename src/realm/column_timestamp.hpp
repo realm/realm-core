@@ -107,10 +107,10 @@ public:
     void do_dump_node_structure(std::ostream&, int level) const override;
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
 #endif
-    void add(const Timestamp& ndt = Timestamp{});
+    void add(const Timestamp& ts = Timestamp{});
     Timestamp get(size_t row_ndx) const noexcept;
     Timestamp get_val(size_t row_ndx) const noexcept override { return get(row_ndx); }
-    void set(size_t row_ndx, const Timestamp& ndt);
+    void set(size_t row_ndx, const Timestamp& ts);
     bool compare(const TimestampColumn& c) const noexcept;
 
     Timestamp maximum(size_t, size_t, size_t, size_t*) const { return Timestamp(); }
