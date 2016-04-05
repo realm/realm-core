@@ -27,6 +27,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/util/thread.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
@@ -136,6 +137,9 @@ public:
     /// \throw util::File::AccessError
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& path, Config& cfg);
+
+    /// Get the attached file
+    util::File& get_file();
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -363,20 +367,13 @@ private:
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
-    util::File m_file;
-
-    // The initial mapping is determined by m_data and m_initial_mapping_size,
-    util::File::Map<char> m_initial_mapping;
+    // The mappings are shared, if they are from a file
+    struct MappedFile;
+    std::shared_ptr<MappedFile> m_file_mappings;
     char* m_data = nullptr;
-    size_t m_initial_mapping_size = 0;
-    // additional sections beyond those covered by the initial mapping, are
-    // managed as separate mmap allocations, each covering one section.
-    size_t m_first_additional_mapping = 0;
-    size_t m_num_additional_mappings = 0;
-    size_t m_capacity_additional_mappings = 0;
+    size_t m_initial_chunk_size = 0;
     size_t m_initial_section_size = 0;
     int m_section_shifts = 0;
-    std::unique_ptr<util::File::Map<char>[]> m_additional_mappings;
     std::unique_ptr<size_t[]> m_section_bases;
     size_t m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
@@ -422,6 +419,7 @@ private:
     };
     mutable hash_entry cache[256];
     mutable size_t version = 1;
+
     /// Throws if free-lists are no longer valid.
     const chunks& get_free_read_only() const;
 
@@ -499,7 +497,7 @@ inline void SlabAlloc::own_buffer() noexcept
 {
     REALM_ASSERT_3(m_attach_mode, ==, attach_UsersBuffer);
     REALM_ASSERT(m_data);
-    REALM_ASSERT(!m_file.is_attached());
+    REALM_ASSERT(m_file_mappings == nullptr);
     m_attach_mode = attach_OwnedBuffer;
 }
 
@@ -527,22 +525,6 @@ inline bool SlabAlloc::is_free_space_clean() const noexcept
 inline void SlabAlloc::set_file_format_version(int file_format_version) noexcept
 {
     m_file_format_version = file_format_version;
-}
-
-inline void SlabAlloc::resize_file(size_t new_file_size)
-{
-    m_file.prealloc(0, new_file_size); // Throws
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        m_file.sync(); // Throws
-}
-
-inline void SlabAlloc::reserve_disk_space(size_t size)
-{
-    m_file.prealloc_if_supported(0, size); // Throws
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        m_file.sync(); // Throws
 }
 
 inline SlabAlloc::DetachGuard::~DetachGuard() noexcept
