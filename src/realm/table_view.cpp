@@ -698,7 +698,9 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     original.resize(size());
     std::vector<bool> ascending;
     for (size_t r = 0; r < size(); r++) {
-        original[r] = m_row_indexes.get(r);
+        int64_t row_index_r = m_row_indexes.get(r);
+        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(row_index_r));
+        original[r] = size_t(row_index_r);
         ascending.push_back(true);
     }
 
@@ -734,8 +736,11 @@ void TableViewBase::distinct(std::vector<size_t> columns)
         for (size_t c = 0; c < m_distinct_columns.size(); c++) {
 
             int cmp;
-            size_t r1 = m_row_indexes.get(r);
-            size_t r2 = m_row_indexes.get(r - 1);
+            int64_t r1_64 = m_row_indexes.get(r);
+            int64_t r2_64 = m_row_indexes.get(r - 1);
+            REALM_ASSERT(!util::int_cast_has_overflow<size_t>(r1_64) && !util::int_cast_has_overflow<size_t>(r2_64));
+            size_t r1 = size_t(r1_64);
+            size_t r2 = size_t(r2_64);
             if (const StringEnumColumn* cse = m_columns_enum[c])
                 cmp = cse->compare_values(r1, r2);
             else
@@ -747,7 +752,9 @@ void TableViewBase::distinct(std::vector<size_t> columns)
             }
         }
         if (identical) {
-            remove.insert(m_row_indexes.get(r));
+            int64_t row_index = m_row_indexes.get(r);
+            REALM_ASSERT(!util::int_cast_has_overflow<size_t>(row_index));
+            remove.insert(size_t(row_index));
         }
     }
 

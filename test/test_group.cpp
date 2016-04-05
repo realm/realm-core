@@ -66,15 +66,15 @@ namespace {
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 REALM_TABLE_4(TestTableGroup,
-                first,  String,
-                second, Int,
-                third,  Bool,
-                fourth, Enum<Days>)
+              first,  String,
+              second, Int,
+              third,  Bool,
+              fourth, Enum<Days>)
 
 REALM_TABLE_3(TestTableGroup2,
-                first,  Mixed,
-                second, Subtable<TestTableGroup>,
-                third,  Subtable<TestTableGroup>)
+              first,  Mixed,
+              second, Subtable<TestTableGroup>,
+              third,  Subtable<TestTableGroup>)
 
 } // Anonymous namespace
 

@@ -108,26 +108,26 @@ private:
 };
 
 REALM_TABLE_1(MySubsubsubtable,
-                i, Int)
+              i, Int)
 
 REALM_TABLE_3(MySubsubtable,
-                a, Int,
-                b, Subtable<MySubsubsubtable>,
-                c, Int)
+              a, Int,
+              b, Subtable<MySubsubsubtable>,
+              c, Int)
 
 REALM_TABLE_1(MySubtable,
-                t, Subtable<MySubsubtable>)
+              t, Subtable<MySubsubtable>)
 
 REALM_TABLE_9(MyTable,
-                my_int,       Int,
-                my_bool,      Bool,
-                my_float,     Float,
-                my_double,    Double,
-                my_string,    String,
-                my_binary,    Binary,
-                my_date_time, DateTime,
-                my_subtable,  Subtable<MySubtable>,
-                my_mixed,     Mixed)
+              my_int,       Int,
+              my_bool,      Bool,
+              my_float,     Float,
+              my_double,    Double,
+              my_string,    String,
+              my_binary,    Binary,
+              my_date_time, DateTime,
+              my_subtable,  Subtable<MySubtable>,
+              my_mixed,     Mixed)
 
 
 TEST(Replication_General)

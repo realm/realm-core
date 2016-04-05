@@ -1,13 +1,14 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-# Enable tracing if REALM_SCRIPT_DEBUG is set
+# Loads a .realm file in the user home directory if present
 if [ -e $HOME/.realm ]; then
     . $HOME/.realm
 fi
+
+# Enable tracing if REALM_SCRIPT_DEBUG is set
 if [ "$REALM_SCRIPT_DEBUG" ]; then
     set -x
 fi
-
 
 if ! [ "$REALM_ORIG_CWD" ]; then
     REALM_ORIG_CWD="$(pwd)" || exit 1
@@ -28,6 +29,7 @@ if ! [ -x "$PRE_PUSH_HOOK_DESTINATION" ] || ! diff "$PRE_PUSH_HOOK_DESTINATION" 
     chmod +x "$PRE_PUSH_HOOK_DESTINATION"
 fi
 
+# Set mode to first argument and shift the argument array 
 MODE="$1"
 [ $# -gt 0 ] && shift
 
@@ -66,6 +68,7 @@ Available modes are:
     config:                             
     clean:                              
     build:                              
+    build-m32:                          build in 32-bit mode
     build-arm-benchmark:
     build-config-progs:                 
     build-osx:                          
@@ -688,6 +691,14 @@ EOF
         exit 0
         ;;
 
+    "build-m32")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        $MAKE EXTRA_CFLAGS="-m32" BASE_DENOM="m32" debug || exit 1
+        echo "Done building"
+        exit 0
+        ;;
+    
     "build-config-progs")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"

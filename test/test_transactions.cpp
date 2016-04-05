@@ -61,22 +61,22 @@ enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
               kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
 
 REALM_TABLE_2(MySubsubtable,
-                value,  Int,
-                binary, Binary)
+              value,  Int,
+              binary, Binary)
 
 REALM_TABLE_2(MySubtable,
-                foo, Int,
-                bar, Subtable<MySubsubtable>)
+              foo, Int,
+              bar, Subtable<MySubsubtable>)
 
 REALM_TABLE_8(MyTable,
-                alpha,   Int,
-                beta,    Bool,
-                gamma,   Enum<MyEnum>,
-                delta,   DateTime,
-                epsilon, String,
-                zeta,    Binary,
-                eta,     Subtable<MySubtable>,
-                theta,   Mixed)
+              alpha,   Int,
+              beta,    Bool,
+              gamma,   Enum<MyEnum>,
+              delta,   DateTime,
+              epsilon, String,
+              zeta,    Binary,
+              eta,     Subtable<MySubtable>,
+              theta,   Mixed)
 
 
 const int num_threads = 23;
@@ -600,5 +600,92 @@ TEST(Transactions_RollbackMoveTableReferences)
     CHECK_EQUAL(g.get_table(0)->get_name(), StringData("t0"));
     CHECK_EQUAL(g.size(), 1);
 }
+
+
+// Check that the spec.enumkeys become detached when
+// rolling back the insertion of a string enum column
+TEST(LangBindHelper_RollbackStringEnumInsert)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_client_history(path, 0));
+    std::unique_ptr<Replication> hist_2(make_client_history(path, 0));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    SharedGroup sg_2(*hist_2, SharedGroup::durability_Full, 0);
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    Group& g2 = const_cast<Group&>(sg_2.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+
+    auto populate_with_string_enum = [](TableRef t) {
+        t->add_column(type_String, "t1_col0_string");
+        t->add_empty_row(3);
+        t->set_string(0, 0, "simple string");
+        t->set_string(0, 1, "duplicate");
+        t->set_string(0, 2, "duplicate");
+        bool force = true;
+        t->optimize(force);  // upgrade to internal string enum column type
+    };
+
+    g.add_table("t0");
+    g.add_table("t1");
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    populate_with_string_enum(g.get_table(1));
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    populate_with_string_enum(g.get_table(1));
+
+    g.get_table(1)->set_string(0, 0, "duplicate");
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::advance_read(sg_2);
+
+    CHECK_EQUAL(g2.get_table(1)->size(), 3);
+    CHECK_EQUAL(g2.get_table(1)->get_string(0, 2), "duplicate");
+
+    CHECK_EQUAL(g.size(), 2);
+    CHECK_EQUAL(g.get_table(1)->get_column_count(), 1);
+    CHECK_EQUAL(g.get_table(1)->size(), 3);
+}
+
+// Check that the table.spec.subspec array becomes detached
+// after rolling back the insertion of a subspec type
+TEST(LangBindHelper_RollbackLinkInsert)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_client_history(path, 0));
+
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.add_table("t0");
+    g.add_table("t1");
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.get_table(1)->add_column_link(type_LinkList, "t1_col0_link", *g.get_table(0));
+    // or
+    //g.get_table(0)->add_column_link(type_Link, "t0_col0_link", *g.get_table(1));
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.add_table("t2");
+    g.get_table(1)->add_column_link(type_Link, "link", *g.get_table(0));
+    // or
+    //g.get_table(0)->add_column_link(type_Link, "link", *g.get_table(1));
+
+    g.add_table("t3");
+
+    CHECK_EQUAL(g.size(), 4);
+    CHECK_EQUAL(g.get_table(1)->get_column_count(), 1);
+    CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
+}
+
 
 #endif // TEST_TRANSACTIONS

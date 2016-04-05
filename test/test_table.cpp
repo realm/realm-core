@@ -55,8 +55,8 @@ using unit_test::TestContext;
 namespace {
 
 REALM_TABLE_2(TupleTableType,
-                first,  Int,
-                second, String)
+              first,  Int,
+              second, String)
 
 } // anonymous namespace
 
@@ -64,18 +64,18 @@ REALM_TABLE_2(TupleTableType,
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
 REALM_TABLE_3(SubtableType,
-                year,  Int,
-                daysSinceLastVisit, Int,
-                conceptId, String)
+              year,  Int,
+              daysSinceLastVisit, Int,
+              conceptId, String)
 
 REALM_TABLE_7(MainTableType,
-                patientId, String,
-                gender, Int,
-                ethnicity, Int,
-                yearOfBirth, Int,
-                yearOfDeath, Int,
-                zipCode, String,
-                events, Subtable<SubtableType>)
+              patientId, String,
+              gender, Int,
+              ethnicity, Int,
+              yearOfBirth, Int,
+              yearOfDeath, Int,
+              zipCode, String,
+              events, Subtable<SubtableType>)
 
 TEST(Table_ManyColumnsCrash2)
 {
@@ -415,10 +415,10 @@ namespace {
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 REALM_TABLE_4(TestTable,
-                first,  Int,
-                second, Int,
-                third,  Bool,
-                fourth, Enum<Days>)
+              first,  Int,
+              second, Int,
+              third,  Bool,
+              fourth, Enum<Days>)
 
 } // anonymous namespace
 
@@ -465,8 +465,8 @@ TEST(Table_3)
 namespace {
 
 REALM_TABLE_2(TestTableEnum,
-                first,      Enum<Days>,
-                second,     String)
+              first,      Enum<Days>,
+              second,     String)
 
 } // anonymous namespace
 
@@ -493,8 +493,8 @@ TEST(Table_4)
 namespace {
 
 REALM_TABLE_2(TestTableFloats,
-                first,      Float,
-                second,     Double)
+              first,      Float,
+              second,     Double)
 
 } // anonymous namespace
 
@@ -1767,10 +1767,10 @@ TEST(Table_IndexInt)
 namespace {
 
 REALM_TABLE_4(TestTableAE,
-                first,  Int,
-                second, String,
-                third,  Bool,
-                fourth, Enum<Days>)
+              first,  Int,
+              second, String,
+              third,  Bool,
+              fourth, Enum<Days>)
 
 } // anonymous namespace
 
@@ -1858,10 +1858,10 @@ TEST(Table_AutoEnumerationFindFindAll)
 namespace {
 
 REALM_TABLE_4(TestTableEnum4,
-                col1, String,
-                col2, String,
-                col3, String,
-                col4, String)
+              col1, String,
+              col2, String,
+              col3, String,
+              col4, String)
 
 } // anonymous namespace
 
@@ -1910,9 +1910,9 @@ TEST(Table_AutoEnumerationOptimize)
 namespace {
 
 REALM_TABLE_1(TestSubtabEnum2,
-                str, String)
+              str, String)
 REALM_TABLE_1(TestSubtabEnum1,
-                subtab, Subtable<TestSubtabEnum2>)
+              subtab, Subtable<TestSubtabEnum2>)
 
 } // anonymous namespace
 
@@ -2792,7 +2792,7 @@ TEST(Table_Mixed)
 
 namespace {
 REALM_TABLE_1(TestTableMX,
-                first, Mixed)
+              first, Mixed)
 } // anonymous namespace
 
 TEST(Table_Mixed2)
@@ -2970,18 +2970,18 @@ TEST(Table_LowLevelSubtables)
 
 namespace {
 REALM_TABLE_2(MyTable1,
-                val, Int,
-                val2, Int)
+              val, Int,
+              val2, Int)
 
 REALM_TABLE_2(MyTable2,
-                val, Int,
-                subtab, Subtable<MyTable1>)
+              val, Int,
+              subtab, Subtable<MyTable1>)
 
 REALM_TABLE_1(MyTable3,
-                subtab, Subtable<MyTable2>)
+              subtab, Subtable<MyTable2>)
 
 REALM_TABLE_1(MyTable4,
-                mix, Mixed)
+              mix, Mixed)
 } // anonymous namespace
 
 
@@ -3146,8 +3146,8 @@ TEST(Table_SetMethod)
 
 namespace {
 REALM_TABLE_2(TableDateAndBinary,
-                date, DateTime,
-                bin, Binary)
+              date, DateTime,
+              bin, Binary)
 } // anonymous namespace
 
 TEST(Table_DateAndBinary)
@@ -3359,9 +3359,9 @@ TEST(Table_HasSharedSpec)
 
 namespace {
 REALM_TABLE_3(TableAgg,
-                c_int,   Int,
-                c_float, Float,
-                c_double, Double)
+              c_int,   Int,
+              c_float, Float,
+              c_double, Double)
 
                 // TODO: Bool? DateTime
 } // anonymous namespace
@@ -3415,7 +3415,7 @@ TEST(Table_Aggregates)
 
 namespace {
 REALM_TABLE_1(TableAgg2,
-                c_count, Int)
+              c_count, Int)
 } // anonymous namespace
 
 
@@ -3631,9 +3631,9 @@ TEST(Table_FormerLeakCase)
 namespace {
 
 REALM_TABLE_3(TablePivotAgg,
-                sex,   String,
-                age,   Int,
-                hired, Bool)
+              sex,   String,
+              age,   Int,
+              hired, Bool)
 
 } // anonymous namespace
 

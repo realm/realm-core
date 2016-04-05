@@ -585,7 +585,9 @@ void Group::remove_table(size_t table_ndx)
     for (size_t i = n; i > 0; --i)
         table->remove_column(i-1);
 
-    ref_type ref = m_tables.get(table_ndx);
+    int64_t ref_64 = m_tables.get(table_ndx);
+    REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
+    ref_type ref = ref_type(ref_64);
 
     // Remove table and move all successive tables
     m_tables.erase(table_ndx); // Throws

@@ -148,14 +148,17 @@ AESCryptor::~AESCryptor() noexcept {
 
 void AESCryptor::set_file_size(off_t new_size)
 {
-    REALM_ASSERT(new_size >= 0);
-    size_t block_count = (new_size + block_size - 1) / block_size;
+    REALM_ASSERT(new_size >= 0 && !int_cast_has_overflow<size_t>(new_size));
+    size_t new_size_casted = size_t(new_size);
+    size_t block_count = (new_size_casted + block_size - 1) / block_size;
     m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
 iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
 {
-    size_t idx = data_pos / block_size;
+    REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
+    size_t data_pos_casted = size_t(data_pos);
+    size_t idx = data_pos_casted / block_size;
     if (idx < m_iv_buffer.size())
         return m_iv_buffer[idx];
 

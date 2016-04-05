@@ -1,0 +1,12 @@
+/// \defgroup realm_primer A quick tutorial on understanding the Realm database
+///
+/// This primer tries to explain the main concepts that surround the Realm
+/// database. It is mainly focused at developers joining the Core team, but
+/// could probably also help developers who are simply using the Core API.
+///
+/// Topics that will be covered include (but not limited to):
+///
+/// - \subpage primer_intro "Introduction"
+/// - \subpage primer_architecture "Global Architecture"
+/// - API Entrypoints (how to use the API),
+/// - Development methodology.

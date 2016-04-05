@@ -176,6 +176,7 @@ private:
     ColumnInfo get_column_info(size_t column_ndx) const noexcept;
 
     size_t get_subspec_ndx_after(size_t column_ndx) const noexcept;
+    bool has_subspec() const noexcept;
 
     // Returns false if the spec has no columns, otherwise it returns
     // true and sets `type` to the type of the first column.
@@ -426,6 +427,15 @@ inline bool Spec::has_backlinks() const noexcept
     // Fixme: It's bad design that backlinks are stored and recognized like this. Backlink columns
     // should be a column type like any other, and we should find another way to hide them away from
     // the user.
+}
+
+// Spec will have a subspec when it contains a column which is one of:
+// link, linklist, backlink, or subtable. It is possible for m_top.size()
+// to contain an entry for m_subspecs (at index 3) but this reference
+// may be empty if the spec contains enumkeys (at index 4) but no subspec types.
+inline bool Spec::has_subspec() const noexcept
+{
+    return (m_top.size() >= 4) && (m_top.get_as_ref(3) != 0);
 }
 
 inline bool Spec::operator!=(const Spec &s) const noexcept
