@@ -908,6 +908,11 @@ private:
 
     void upgrade_file_format();
 
+// FIXME
+public:
+    void upgrade_datetime();
+private:
+
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
     /// calls to sync_if_needed() will bring the view up to date by reexecuting the

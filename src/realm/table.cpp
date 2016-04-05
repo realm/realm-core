@@ -1593,6 +1593,56 @@ void Table::upgrade_file_format()
     }
 }
 
+
+void Table::upgrade_datetime()
+{
+    const size_t old_column_count = get_column_count();
+
+    for (size_t col = 0; col < get_column_count(); col++) {
+        ColumnType col_type = get_real_column_type(col);
+
+        if (col_type == col_type_DateTime) {
+            bool nullable = is_nullable(col);
+            StringData name = get_column_name(col);
+
+            // Insert new Timestamp column at same position as old column
+            const size_t old_col = col + 1;
+            const size_t new_col = col;
+            insert_column(new_col, type_Timestamp, name, nullable);
+
+            // Copy payload to new column
+            for (size_t row = 0; row < size(); row++) {
+                DateTime dt = get_datetime(old_col, row);
+                Timestamp ts;
+                bool n = is_null(old_col, row);
+                REALM_ASSERT(!(!nullable && n));
+                if (n) {
+                    ts = Timestamp(null());
+                }
+                else {
+                    ts = Timestamp(dt.get_datetime(), 0);
+                }
+                set_timestamp(new_col, row, ts);
+            }
+
+            // If old DateTime column had search index, then create one for the new Timestamp column too
+            if (has_search_index(old_col)) {
+                add_search_index(new_col);
+            }
+
+            // Remove old column
+            remove_column(old_col);
+        }
+    }
+
+    REALM_ASSERT_3(old_column_count, ==, get_column_count());
+    for (size_t col = 0; col < get_column_count(); col++) {
+        ColumnType col_type = get_real_column_type(col);
+        REALM_ASSERT(col_type != col_type_DateTime);
+    }
+}
+
+
 void Table::add_search_index(size_t col_ndx)
 {
     if (REALM_UNLIKELY(!is_attached()))
