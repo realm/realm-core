@@ -5,7 +5,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column.hpp>
 #include <realm/column_string.hpp>
-#include <realm/column_timestamp.hpp> // TimeStamp
+#include <realm/column_timestamp.hpp> // Timestamp
 
 using namespace realm;
 using namespace realm::util;
@@ -23,7 +23,7 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 } // anonymous namespace
 
 namespace realm {
-StringData GetIndexData<TimeStamp>::get_index_data(const TimeStamp& dt, StringIndex::StringConversionBuffer& buffer)
+StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIndex::StringConversionBuffer& buffer)
 {
     if (dt.is_null())
         return null{};

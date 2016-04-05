@@ -410,7 +410,7 @@ public:
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
-    TimeStamp     get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
+    Timestamp     get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
 
     template<class T> T get(size_t c, size_t r) const noexcept;
 
@@ -474,7 +474,7 @@ public:
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
-    void set_timestamp(size_t column_ndx, size_t row_ndx, TimeStamp value);
+    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value);
     template<class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
@@ -1100,8 +1100,8 @@ private:
     const SubtableColumn& get_column_table(size_t column_ndx) const noexcept;
     MixedColumn& get_column_mixed(size_t column_ndx);
     const MixedColumn& get_column_mixed(size_t column_ndx) const noexcept;
-    TimeStampColumn& get_column_datetime(size_t column_ndx);
-    const TimeStampColumn& get_column_datetime(size_t column_ndx) const noexcept;
+    TimestampColumn& get_column_datetime(size_t column_ndx);
+    const TimestampColumn& get_column_datetime(size_t column_ndx) const noexcept;
     const LinkColumnBase& get_column_link_base(size_t ndx) const noexcept;
     LinkColumnBase& get_column_link_base(size_t ndx);
     const LinkColumn& get_column_link(size_t ndx) const noexcept;

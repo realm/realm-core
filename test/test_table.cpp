@@ -3779,10 +3779,10 @@ void compare_table_with_slice(TestContext& test_context, const Table& table,
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
-            case type_TimeStamp:
+            case type_Timestamp:
                 for (size_t i = 0; i != size; ++i) {
-                    TimeStamp v_1 = table.get_timestamp(col_i, offset + i);
-                    TimeStamp v_2 = slice.get_timestamp(col_i, i);
+                    Timestamp v_1 = table.get_timestamp(col_i, offset + i);
+                    Timestamp v_2 = slice.get_timestamp(col_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
@@ -3821,7 +3821,7 @@ void compare_table_with_slice(TestContext& test_context, const Table& table,
                             case type_DateTime:
                                 CHECK_EQUAL(v_1.get_datetime(), v_2.get_datetime());
                                 break;
-                            case type_TimeStamp:
+                            case type_Timestamp:
                                 CHECK_EQUAL(v_1.get_timestamp(), v_2.get_timestamp());
                                 break;
                             case type_Table: {
@@ -6408,7 +6408,7 @@ TEST(Table_RowAccessor_Null)
     size_t col_double = table.add_column(type_Double,   "double", true);
     size_t col_date   = table.add_column(type_DateTime, "date",   true);
     size_t col_binary = table.add_column(type_Binary,   "binary", true);
-    size_t col_timestamp = table.add_column(type_TimeStamp, "timestamp", true);
+    size_t col_timestamp = table.add_column(type_Timestamp, "timestamp", true);
 
     {
         table.add_empty_row();
@@ -6432,7 +6432,7 @@ TEST(Table_RowAccessor_Null)
         row.set_double(col_double, 1.0);
         row.set_datetime(col_date, DateTime(1));
         row.set_binary(col_binary, BinaryData("a"));
-        row.set_timestamp(col_timestamp, TimeStamp(1, 2));
+        row.set_timestamp(col_timestamp, Timestamp(1, 2));
     }
 
     {
@@ -6456,7 +6456,7 @@ TEST(Table_RowAccessor_Null)
         CHECK_EQUAL(1.0,             row.get_double(col_double));
         CHECK_EQUAL(DateTime(1),     row.get_datetime(col_date));
         CHECK_EQUAL(BinaryData("a"), row.get_binary(col_binary));
-        CHECK_EQUAL(TimeStamp(1, 2),   row.get_timestamp(col_timestamp));
+        CHECK_EQUAL(Timestamp(1, 2),   row.get_timestamp(col_timestamp));
     }
 }
 
@@ -6780,7 +6780,7 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     size_t col_double  = t.add_column(type_Double,   "double",  true);
     size_t col_date    = t.add_column(type_DateTime, "date",    true);
     size_t col_binary  = t.add_column(type_Binary,   "binary",  true);
-    size_t col_timestamp = t.add_column(type_TimeStamp,  "timestamp", true);
+    size_t col_timestamp = t.add_column(type_Timestamp,  "timestamp", true);
 
     t.add_empty_row(1);
 
@@ -6813,7 +6813,7 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     t.set_binary(col_binary, 0, BinaryData("binary", 7));
     _CHECK_VER_BUMP();
 
-    t.set_timestamp(col_timestamp, 0, TimeStamp(777, 888));
+    t.set_timestamp(col_timestamp, 0, Timestamp(777, 888));
     _CHECK_VER_BUMP();
 
     t.set_null(0, 0);

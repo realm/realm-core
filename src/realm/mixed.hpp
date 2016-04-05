@@ -111,7 +111,7 @@ public:
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(DateTime)   noexcept;
-    Mixed(TimeStamp)    noexcept;
+    Mixed(Timestamp)    noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -132,7 +132,7 @@ public:
     StringData  get_string()   const noexcept;
     BinaryData  get_binary()   const noexcept;
     DateTime    get_datetime() const noexcept;
-    TimeStamp     get_timestamp()  const noexcept;
+    Timestamp     get_timestamp()  const noexcept;
 
     void set_int(int64_t) noexcept;
     void set_bool(bool) noexcept;
@@ -142,7 +142,7 @@ public:
     void set_binary(BinaryData) noexcept;
     void set_binary(const char* data, size_t size) noexcept;
     void set_datetime(DateTime) noexcept;
-    void set_timestamp(TimeStamp) noexcept;
+    void set_timestamp(Timestamp) noexcept;
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
@@ -156,7 +156,7 @@ private:
         double       m_double;
         const char*  m_data;
         int_fast64_t m_date;
-        TimeStamp      m_timestamp;
+        Timestamp      m_timestamp;
     };
     size_t m_size = 0;
 };
@@ -279,9 +279,9 @@ inline Mixed::Mixed(DateTime v) noexcept
     m_date = v.get_datetime();
 }
 
-inline Mixed::Mixed(TimeStamp v) noexcept
+inline Mixed::Mixed(Timestamp v) noexcept
 {
-    m_type = type_TimeStamp;
+    m_type = type_Timestamp;
     m_timestamp = v;
 }
 
@@ -327,9 +327,9 @@ inline DateTime Mixed::get_datetime() const noexcept
     return m_date;
 }
 
-inline TimeStamp Mixed::get_timestamp() const noexcept
+inline Timestamp Mixed::get_timestamp() const noexcept
 {
-    REALM_ASSERT(m_type == type_TimeStamp);
+    REALM_ASSERT(m_type == type_Timestamp);
     return m_timestamp;
 }
 
@@ -382,10 +382,10 @@ inline void Mixed::set_datetime(DateTime v) noexcept
     m_date = v.get_datetime();
 }
 
-inline void Mixed::set_timestamp(TimeStamp v) noexcept
+inline void Mixed::set_timestamp(Timestamp v) noexcept
 {
     REALM_ASSERT(false && "not yet implemented");
-    m_type = type_TimeStamp;
+    m_type = type_Timestamp;
     m_timestamp = v;
 }
 
@@ -402,7 +402,7 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
         case type_String:   out << StringData(m.m_data, m.m_size); break;
         case type_Binary:   out << BinaryData(m.m_data, m.m_size); break;
         case type_DateTime: out << DateTime(m.m_date);             break;
-        case type_TimeStamp:  out << TimeStamp(m.m_timestamp);           break;
+        case type_Timestamp:  out << Timestamp(m.m_timestamp);           break;
         case type_Table:    out << "subtable";                     break;
         case type_Mixed:
         case type_Link:

@@ -34,7 +34,7 @@ enum DataType {
     type_String     =  2,
     type_Binary     =  4,
     type_DateTime   =  7,
-    type_TimeStamp    =  8,
+    type_Timestamp    =  8,
     type_Table      =  5,
     type_Mixed      =  6,
     type_Link       = 12,

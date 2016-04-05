@@ -24,7 +24,7 @@
 namespace realm {
 
 
-TimeStampColumn::TimeStampColumn(Allocator& alloc, ref_type ref)
+TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
@@ -44,13 +44,13 @@ TimeStampColumn::TimeStampColumn(Allocator& alloc, ref_type ref)
 }
 
 
-TimeStampColumn::~TimeStampColumn() noexcept
+TimestampColumn::~TimestampColumn() noexcept
 {
 
 }
 
 
-ref_type TimeStampColumn::create(Allocator& alloc, size_t size)
+ref_type TimestampColumn::create(Allocator& alloc, size_t size)
 {
     Array top(alloc);
     top.create(Array::type_HasRefs, false /* context_flag */, 2);
@@ -68,28 +68,28 @@ ref_type TimeStampColumn::create(Allocator& alloc, size_t size)
 
 /// Get the number of entries in this column. This operation is relatively
 /// slow.
-size_t TimeStampColumn::size() const noexcept
+size_t TimestampColumn::size() const noexcept
 {
     // FIXME: Consider debug asserts on the columns having the same size
     return m_seconds.size();
 }
 
 /// Whether or not this column is nullable.
-bool TimeStampColumn::is_nullable() const noexcept
+bool TimestampColumn::is_nullable() const noexcept
 {
     return true;
 }
 
 /// Whether or not the value at \a row_ndx is NULL. If the column is not
 /// nullable, always returns false.
-bool TimeStampColumn::is_null(size_t row_ndx) const noexcept
+bool TimestampColumn::is_null(size_t row_ndx) const noexcept
 {
     return m_seconds.is_null(row_ndx);
 }
 
 /// Sets the value at \a row_ndx to be NULL.
 /// \throw LogicError Thrown if this column is not nullable.
-void TimeStampColumn::set_null(size_t row_ndx)
+void TimestampColumn::set_null(size_t row_ndx)
 {
     m_seconds.set_null(row_ndx);
     if (has_search_index()) {
@@ -97,7 +97,7 @@ void TimeStampColumn::set_null(size_t row_ndx)
     }
 }
 
-void TimeStampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
+void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
     bool nullable)
 {
     static_cast<void>(prior_num_rows);
@@ -118,12 +118,12 @@ void TimeStampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, siz
             m_search_index->insert(row_ndx, null{}, num_rows_to_insert, is_append);
         }
         else {
-            m_search_index->insert(row_ndx, TimeStamp{0, 0}, num_rows_to_insert, is_append);
+            m_search_index->insert(row_ndx, Timestamp{0, 0}, num_rows_to_insert, is_append);
         }
     }
 }
 
-void TimeStampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t /*prior_num_rows*/,
+void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t /*prior_num_rows*/,
     bool broken_reciprocal_backlinks)
 {
     static_cast<void>(broken_reciprocal_backlinks);
@@ -138,7 +138,7 @@ void TimeStampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
     }
 }
 
-void TimeStampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     bool broken_reciprocal_backlinks)
 {
     static_cast<void>(broken_reciprocal_backlinks);
@@ -161,7 +161,7 @@ void TimeStampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     m_nanoseconds.move_last_over(row_ndx, prior_num_rows);
 }
 
-void TimeStampColumn::clear(size_t num_rows, bool broken_reciprocal_backlinks)
+void TimestampColumn::clear(size_t num_rows, bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_EX(num_rows == m_seconds.size(), num_rows, m_seconds.size());
     static_cast<void>(broken_reciprocal_backlinks);
@@ -172,7 +172,7 @@ void TimeStampColumn::clear(size_t num_rows, bool broken_reciprocal_backlinks)
     }
 }
 
-void TimeStampColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+void TimestampColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 {
     if (has_search_index()) {
         auto value_1 = get(row_ndx_1);
@@ -194,7 +194,7 @@ void TimeStampColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     m_nanoseconds.set(row_ndx_2, tmp2);
 }
 
-void TimeStampColumn::destroy() noexcept
+void TimestampColumn::destroy() noexcept
 {
     m_seconds.destroy();
     m_nanoseconds.destroy();
@@ -202,12 +202,12 @@ void TimeStampColumn::destroy() noexcept
         m_array->destroy();
 }
 
-StringData TimeStampColumn::get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
+StringData TimestampColumn::get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
 {
-    return GetIndexData<TimeStamp>::get_index_data(get(ndx), buffer);
+    return GetIndexData<Timestamp>::get_index_data(get(ndx), buffer);
 }
 
-void TimeStampColumn::populate_search_index()
+void TimestampColumn::populate_search_index()
 {
     REALM_ASSERT(has_search_index());
     // Populate the index
@@ -219,7 +219,7 @@ void TimeStampColumn::populate_search_index()
     }
 }
 
-StringIndex* TimeStampColumn::create_search_index()
+StringIndex* TimestampColumn::create_search_index()
 {
     REALM_ASSERT(!has_search_index());
     m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
@@ -227,12 +227,12 @@ StringIndex* TimeStampColumn::create_search_index()
     return m_search_index.get();
 }
 
-void TimeStampColumn::destroy_search_index() noexcept
+void TimestampColumn::destroy_search_index() noexcept
 {
     m_search_index.reset();
 }
 
-void TimeStampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
+void TimestampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
         size_t ndx_in_parent, bool allow_duplicate_values)
 {
     REALM_ASSERT(!m_search_index);
@@ -242,21 +242,21 @@ void TimeStampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
 
 
 
-MemRef TimeStampColumn::clone_deep(Allocator& /*alloc*/) const
+MemRef TimestampColumn::clone_deep(Allocator& /*alloc*/) const
 {
     // FIXME: Dummy implementation
     return MemRef();
 }
 
 
-ref_type TimeStampColumn::write(size_t /*slice_offset*/, size_t /*slice_size*/, size_t /*table_size*/,
+ref_type TimestampColumn::write(size_t /*slice_offset*/, size_t /*slice_size*/, size_t /*table_size*/,
     _impl::OutputStream&) const
 {
     // FIXME: Dummy implementation
     return 0;
 }
 
-void TimeStampColumn::set_ndx_in_parent(size_t ndx) noexcept
+void TimestampColumn::set_ndx_in_parent(size_t ndx) noexcept
 {
     m_array->set_ndx_in_parent(ndx);
     if (has_search_index()) {
@@ -264,7 +264,7 @@ void TimeStampColumn::set_ndx_in_parent(size_t ndx) noexcept
     }
 }
 
-void TimeStampColumn::update_from_parent(size_t old_baseline) noexcept
+void TimestampColumn::update_from_parent(size_t old_baseline) noexcept
 {
     ColumnBaseSimple::update_from_parent(old_baseline);
     if (has_search_index()) {
@@ -272,7 +272,7 @@ void TimeStampColumn::update_from_parent(size_t old_baseline) noexcept
     }
 }
 
-void TimeStampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
+void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
 {
     // FIXME: Dummy implementation
     
@@ -283,29 +283,29 @@ void TimeStampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
 
 #ifdef REALM_DEBUG
 
-void TimeStampColumn::verify() const
+void TimestampColumn::verify() const
 {
     // FIXME: Dummy implementation
 }
 
-void TimeStampColumn::to_dot(std::ostream&, StringData /*title*/) const
+void TimestampColumn::to_dot(std::ostream&, StringData /*title*/) const
 {
     // FIXME: Dummy implementation
 }
 
-void TimeStampColumn::do_dump_node_structure(std::ostream&, int /*level*/) const
+void TimestampColumn::do_dump_node_structure(std::ostream&, int /*level*/) const
 {
     // FIXME: Dummy implementation
 }
 
-void TimeStampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/, std::ostream&) const
+void TimestampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/, std::ostream&) const
 {
     // FIXME: Dummy implementation
 }
 
 #endif
 
-void TimeStampColumn::add(const TimeStamp& ndt)
+void TimestampColumn::add(const Timestamp& ndt)
 {
     bool is_null = ndt.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ndt.m_seconds);
@@ -319,13 +319,13 @@ void TimeStampColumn::add(const TimeStamp& ndt)
     }
 }
 
-TimeStamp TimeStampColumn::get(size_t row_ndx) const noexcept
+Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
 {
     util::Optional<int64_t> seconds = m_seconds.get(row_ndx);
-    return seconds ? TimeStamp(*seconds, int32_t(m_nanoseconds.get(row_ndx))) : TimeStamp(null());
+    return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(row_ndx))) : Timestamp(null());
 }
 
-void TimeStampColumn::set(size_t row_ndx, const TimeStamp& ndt)
+void TimestampColumn::set(size_t row_ndx, const Timestamp& ndt)
 {
     bool is_null = ndt.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ndt.m_seconds);
@@ -338,7 +338,7 @@ void TimeStampColumn::set(size_t row_ndx, const TimeStamp& ndt)
     }
 }
 
-bool TimeStampColumn::compare(const TimeStampColumn& c) const noexcept
+bool TimestampColumn::compare(const TimestampColumn& c) const noexcept
 {
     size_t n = size();
     if (c.size() != n)

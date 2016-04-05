@@ -39,21 +39,21 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(TimeStampColumn_Basic)
+TEST(TimestampColumn_Basic)
 {
-    ref_type ref = TimeStampColumn::create(Allocator::get_default());
-    TimeStampColumn c(Allocator::get_default(), ref);
-    c.add(TimeStamp(123,123));
-    TimeStamp ndt = c.get(0);
-    CHECK(ndt == TimeStamp(123, 123));
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+    c.add(Timestamp(123,123));
+    Timestamp ndt = c.get(0);
+    CHECK(ndt == Timestamp(123, 123));
 }
 
-TEST(TimeStampColumn_Basic_Nulls)
+TEST(TimestampColumn_Basic_Nulls)
 {
     // Test that default value is null() for nullable column and non-null for non-nullable column
     Table t;
-    t.add_column(type_TimeStamp, "date", false /*nullable*/);
-    t.add_column(type_TimeStamp, "date", true  /*nullable*/);
+    t.add_column(type_Timestamp, "date", false /*nullable*/);
+    t.add_column(type_Timestamp, "date", true  /*nullable*/);
 
     t.add_empty_row();
     CHECK(!t.is_null(0, 0));
@@ -62,51 +62,51 @@ TEST(TimeStampColumn_Basic_Nulls)
     CHECK_THROW_ANY(t.set_null(0, 0));
     t.set_null(1, 0);
 
-    CHECK_THROW_ANY(t.set_timestamp(0, 0, TimeStamp(null())));
+    CHECK_THROW_ANY(t.set_timestamp(0, 0, Timestamp(null())));
 }
 
-TEST(TimeStampColumn_Relocate)
+TEST(TimestampColumn_Relocate)
 {
     // Fill so much data in a column that it relocates, to check if relocation propagates up correctly
     Table t;
-    t.add_column(type_TimeStamp, "date", true  /*nullable*/);
+    t.add_column(type_Timestamp, "date", true  /*nullable*/);
 
     for (unsigned int i = 0; i < 10000; i++) {
         t.add_empty_row();
-        t.set_timestamp(0, i, TimeStamp(i, i));
+        t.set_timestamp(0, i, Timestamp(i, i));
     }
 }
 
-TEST(TimeStampColumn_Compare)
+TEST(TimestampColumn_Compare)
 {
-    ref_type ref = TimeStampColumn::create(Allocator::get_default());
-    TimeStampColumn c(Allocator::get_default(), ref);
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
 
     for (unsigned int i = 0; i < 10000; i++) {
-        c.add(TimeStamp(i, i));
+        c.add(Timestamp(i, i));
     }
 
     CHECK(c.compare(c));
 
     {
-        ref_type ref = TimeStampColumn::create(Allocator::get_default());
-        TimeStampColumn c2(Allocator::get_default(), ref);
+        ref_type ref = TimestampColumn::create(Allocator::get_default());
+        TimestampColumn c2(Allocator::get_default(), ref);
         CHECK_NOT(c.compare(c2));
     }
 }
 
-TEST(TimeStampColumn_Index)
+TEST(TimestampColumn_Index)
 {
-    ref_type ref = TimeStampColumn::create(Allocator::get_default());
-    TimeStampColumn c(Allocator::get_default(), ref);
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
 
     for (uint32_t i = 0; i < 100; ++i) {
-        c.add(TimeStamp{i + 10000, i});
+        c.add(Timestamp{i + 10000, i});
     }
 
-    TimeStamp last_value{10099, 99};
+    Timestamp last_value{10099, 99};
 
     CHECK_EQUAL(index->find_first(last_value), 99);
 

@@ -24,27 +24,27 @@
 
 namespace realm {
 
-struct TimeStamp {
-    TimeStamp(int64_t seconds, uint32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false) 
+struct Timestamp {
+    Timestamp(int64_t seconds, uint32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false) 
     {
         REALM_ASSERT_3(nanoseconds, <, 1000000000);
     }
-    TimeStamp(const null&) : m_is_null(true) { }
-    TimeStamp() : TimeStamp(null()) { }
+    Timestamp(const null&) : m_is_null(true) { }
+    Timestamp() : Timestamp(null()) { }
 
     bool is_null() const { return m_is_null; }
     
     // Note that nullability is handeled by query system. These operators are only invoked for non-null dates.
-    bool operator==(const TimeStamp& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
-    bool operator!=(const TimeStamp& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
-    bool operator>(const TimeStamp& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
-    bool operator<(const TimeStamp& rhs) const { return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds); }
-    bool operator<=(const TimeStamp& rhs) const { return *this < rhs || *this == rhs; }
-    bool operator>=(const TimeStamp& rhs) const { return *this > rhs || *this == rhs; }
-    TimeStamp& operator=(const TimeStamp& rhs) = default;
+    bool operator==(const Timestamp& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
+    bool operator!=(const Timestamp& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
+    bool operator>(const Timestamp& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
+    bool operator<(const Timestamp& rhs) const { return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds); }
+    bool operator<=(const Timestamp& rhs) const { return *this < rhs || *this == rhs; }
+    bool operator>=(const Timestamp& rhs) const { return *this > rhs || *this == rhs; }
+    Timestamp& operator=(const Timestamp& rhs) = default;
 
     template<class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const TimeStamp&);
+    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
 
     int64_t m_seconds;
     uint32_t m_nanoseconds;
@@ -52,18 +52,18 @@ struct TimeStamp {
 };
 
 template<class C, class T>
-inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const TimeStamp& d)
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
-    out << "TimeStamp(" << d.m_seconds << ", " << d.m_nanoseconds << ")";
+    out << "Timestamp(" << d.m_seconds << ", " << d.m_nanoseconds << ")";
     return out;
 }
 
 // Inherits from ColumnTemplate to get a compare_values() that can be called without knowing the
 // column type
-class TimeStampColumn : public ColumnBaseSimple, public ColumnTemplate<TimeStamp> {
+class TimestampColumn : public ColumnBaseSimple, public ColumnTemplate<Timestamp> {
 public:
-    TimeStampColumn(Allocator& alloc, ref_type ref);
-    ~TimeStampColumn() noexcept override;
+    TimestampColumn(Allocator& alloc, ref_type ref);
+    ~TimestampColumn() noexcept override;
 
     static ref_type create(Allocator& alloc, size_t size = 0);
 
@@ -107,21 +107,21 @@ public:
     void do_dump_node_structure(std::ostream&, int level) const override;
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
 #endif
-    void add(const TimeStamp& ndt = TimeStamp{});
-    TimeStamp get(size_t row_ndx) const noexcept;
-    TimeStamp get_val(size_t row_ndx) const noexcept override { return get(row_ndx); }
-    void set(size_t row_ndx, const TimeStamp& ndt);
-    bool compare(const TimeStampColumn& c) const noexcept;
+    void add(const Timestamp& ndt = Timestamp{});
+    Timestamp get(size_t row_ndx) const noexcept;
+    Timestamp get_val(size_t row_ndx) const noexcept override { return get(row_ndx); }
+    void set(size_t row_ndx, const Timestamp& ndt);
+    bool compare(const TimestampColumn& c) const noexcept;
 
-    TimeStamp maximum(size_t, size_t, size_t, size_t*) const { return TimeStamp(); }
-    size_t count(TimeStamp) const;
+    Timestamp maximum(size_t, size_t, size_t, size_t*) const { return Timestamp(); }
+    size_t count(Timestamp) const;
 
     void erase(size_t ndx, bool is_last) {
         m_seconds.erase(ndx, is_last);
         m_nanoseconds.erase(ndx, is_last);
     }
 
-    typedef TimeStamp value_type;
+    typedef Timestamp value_type;
 
 private:
     BpTree<util::Optional<int64_t>> m_seconds;

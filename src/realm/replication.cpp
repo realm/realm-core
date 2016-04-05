@@ -146,7 +146,7 @@ public:
         return false;
     }
 
-    bool set_timestamp(size_t col_ndx, size_t row_ndx, TimeStamp value)
+    bool set_timestamp(size_t col_ndx, size_t row_ndx, Timestamp value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
             log("table->set_timestamp(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
@@ -692,8 +692,8 @@ private:
                 return "type_Binary";
             case type_DateTime:
                 return "type_DataTime"; // FIXME? Can we fix this spelling mistake?
-            case type_TimeStamp:
-                return "type_TimeStamp";
+            case type_Timestamp:
+                return "type_Timestamp";
             case type_Table:
                 return "type_Table";
             case type_Mixed:

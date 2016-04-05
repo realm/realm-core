@@ -223,7 +223,7 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
 }
 
 /*
-TEST(Replication_TimeStamp)
+TEST(Replication_Timestamp)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -234,8 +234,8 @@ TEST(Replication_TimeStamp)
         WriteTransaction wt(sg_1);
         TableRef table = wt.add_table("t");
 
-        // Add nullable TimeStamp column
-        table->add_column(type_TimeStamp, "ts", true);
+        // Add nullable Timestamp column
+        table->add_column(type_Timestamp, "ts", true);
         
         wt.commit();
     }
@@ -247,9 +247,9 @@ TEST(Replication_TimeStamp)
         table->add_empty_row();
 
         table->add_empty_row();
-        table->set_timestamp(0, 1, TimeStamp(5, 6));
+        table->set_timestamp(0, 1, Timestamp(5, 6));
         table->add_empty_row();
-        table->set_timestamp(0, 2, TimeStamp(1, 2));
+        table->set_timestamp(0, 2, Timestamp(1, 2));
         wt.commit();
     }
     {
@@ -259,10 +259,10 @@ TEST(Replication_TimeStamp)
         // Overwrite non-null with null to test that 
         // TransactLogParser::parse_one(InstructionHandler& handler) correctly will see a set_null instruction
         // and not a set_new_date instruction
-        table->set_timestamp(0, 1, TimeStamp(null()));
+        table->set_timestamp(0, 1, Timestamp(null()));
 
         // Overwrite non-null with other non-null
-        table->set_timestamp(0, 2, TimeStamp(3, 4));
+        table->set_timestamp(0, 2, Timestamp(3, 4));
         wt.commit();
     }
     {
@@ -281,8 +281,8 @@ TEST(Replication_TimeStamp)
         rt_1.get_group().verify();
         ConstTableRef table = rt_1.get_table("t");
         CHECK_EQUAL(1, table->size());
-        CHECK(table->get_timestamp(0, 0) == TimeStamp(null()));;
-        CHECK(table->get_timestamp(0, 1) == TimeStamp(3, 4));;
+        CHECK(table->get_timestamp(0, 0) == Timestamp(null()));;
+        CHECK(table->get_timestamp(0, 1) == Timestamp(3, 4));;
     }
 }
 */
