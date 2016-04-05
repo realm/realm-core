@@ -97,10 +97,9 @@ void TimestampColumn::set_null(size_t row_ndx)
     }
 }
 
-void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
+void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t /*prior_num_rows*/,
     bool nullable)
 {
-    static_cast<void>(prior_num_rows);
     if (row_ndx == size())
         row_ndx = npos;
     if (nullable)
@@ -124,9 +123,8 @@ void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, siz
 }
 
 void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t /*prior_num_rows*/,
-    bool broken_reciprocal_backlinks)
+    bool /*broken_reciprocal_backlinks*/)
 {
-    static_cast<void>(broken_reciprocal_backlinks);
     bool is_last = (row_ndx + num_rows_to_erase) == size();
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
         m_seconds.erase(row_ndx + num_rows_to_erase - i - 1, is_last);
@@ -139,10 +137,8 @@ void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
 }
 
 void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-    bool broken_reciprocal_backlinks)
+    bool /*broken_reciprocal_backlinks*/)
 {
-    static_cast<void>(broken_reciprocal_backlinks);
-    
     size_t last_row_ndx = prior_num_rows - 1;
     
     if (has_search_index()) {
@@ -161,10 +157,9 @@ void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     m_nanoseconds.move_last_over(row_ndx, prior_num_rows);
 }
 
-void TimestampColumn::clear(size_t num_rows, bool broken_reciprocal_backlinks)
+void TimestampColumn::clear(size_t num_rows, bool /*broken_reciprocal_backlinks*/)
 {
     REALM_ASSERT_EX(num_rows == m_seconds.size(), num_rows, m_seconds.size());
-    static_cast<void>(broken_reciprocal_backlinks);
     m_seconds.clear();
     m_nanoseconds.clear();
     if (has_search_index()) {
