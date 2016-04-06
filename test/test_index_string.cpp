@@ -125,9 +125,6 @@ TEST_TYPES(StringIndex_BuildIndex, non_nullable, nullable)
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, nullable);
 
-
-    col.add("hello there kittyhello there kittyhello there kitty");
-
     col.add(s1);
     col.add(s2);
     col.add(s3);
