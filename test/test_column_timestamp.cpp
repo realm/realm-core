@@ -52,7 +52,7 @@ TEST(TimestampColumn_Basic_Nulls)
 {
     // Test that default value is null() for nullable column and non-null for non-nullable column
     Table t;
-    t.add_column(type_Timestamp, "date", false /*nullable*/);
+    t.add_column(type_Timestamp, "date", false /*not nullable*/);
     t.add_column(type_Timestamp, "date", true  /*nullable*/);
 
     t.add_empty_row();
@@ -112,6 +112,109 @@ TEST(TimestampColumn_Index)
 
     c.destroy_search_index();
     c.destroy();
+}
+
+TEST(TimestampColumn_Is_Nullable)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+    CHECK(c.is_nullable());
+    c.destroy();
+}
+
+TEST(TimestampColumn_Set_Null_With_Index)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+    c.add(Timestamp{1, 1});
+    CHECK(!c.is_null(0));
+
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+
+    c.set_null(0);
+    CHECK(c.is_null(0));
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
+TEST(TimestampColumn_Insert_Rows_With_Index)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+
+    c.insert_rows(0, 1, 0, true);
+    c.set(0, Timestamp{1, 1});
+    c.insert_rows(1, 1, 1, true);
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
+TEST(TimestampColumn_Move_Last_Over)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+
+    c.add(Timestamp{1, 1});
+    c.add(Timestamp{2, 2});
+    c.add(Timestamp{3, 3});
+    c.set_null(2);
+    c.move_last_row_over(0, 2, false);
+    CHECK(c.is_null(0));
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
+TEST(TimestampColumn_Clear)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+
+    c.add(Timestamp{1, 1});
+    c.add(Timestamp{2, 2});
+    c.clear(2, false);
+    c.add(Timestamp{3, 3});
+
+    Timestamp last_value{3, 3};
+    CHECK_EQUAL(c.get(0), last_value);
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
+TEST(TimestampColumn_SwapRows)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+
+    Timestamp one {1, 1};
+    Timestamp three {3, 3};
+    c.add(one);
+    c.add(Timestamp{2, 2});
+    c.add(three);
+
+
+    CHECK_EQUAL(c.get(0), one);
+    CHECK_EQUAL(c.get(2), three);
+    c.swap_rows(0, 2);
+    CHECK_EQUAL(c.get(2), one);
+    CHECK_EQUAL(c.get(0), three);
+
+    c.destroy_search_index();
+    c.destroy();
+
 }
 
 #endif // TEST_COLUMN_TIMESTAMP
