@@ -97,19 +97,19 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "\n\n// Test case generated in "  REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
             *log << "// ----------------------------------------------------------------------\n";
             const char* key = crypt_key();
-            std::string pritable_key;
+            std::string printable_key;
             if (key == nullptr) {
-                pritable_key = "nullptr";
+                printable_key = "nullptr";
             }
             else {
-                pritable_key = std::string("\"") + key + "\"";
+                printable_key = std::string("\"") + key + "\"";
             }
 
-            *log << "std::unique_ptr<Replication> hist_r(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
-            *log << "std::unique_ptr<Replication> hist_w(make_client_history(\"" << path << "\", " << pritable_key << "));\n";
+            *log << "std::unique_ptr<Replication> hist_r(make_client_history(\"" << path << "\", " << printable_key << "));\n";
+            *log << "std::unique_ptr<Replication> hist_w(make_client_history(\"" << path << "\", " << printable_key << "));\n";
 
-            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << pritable_key << ");\n";
-            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << pritable_key << ");\n";
+            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << printable_key << ");\n";
+            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << printable_key << ");\n";
 
             *log << "Group& g = const_cast<Group&>(sg_w.begin_read());\n";
             *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
