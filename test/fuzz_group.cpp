@@ -77,16 +77,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
     const size_t max_rows = 100000;
-
     using realm::test_util::crypt_key;
-    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
-    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
-    Group& g = const_cast<Group&>(sg_w.begin_read());
-    Group& g_r = const_cast<Group&>(sg_r.begin_read());
-    LangBindHelper::promote_to_write(sg_w);
 
     try {
         State s;
@@ -116,6 +107,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
             *log << "\n\n";
         }
+
+        std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+
+        SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        Group& g = const_cast<Group&>(sg_w.begin_read());
+        Group& g_r = const_cast<Group&>(sg_r.begin_read());
+        LangBindHelper::promote_to_write(sg_w);
 
         for (;;) {
             char instr = get_next(s) % COUNT;
