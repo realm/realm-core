@@ -516,14 +516,15 @@ public:
     /// has retrieved it.
 
     struct PinToken {
-        uint_fast32_t   m_reader_idx = 0;
+        uint_fast64_t m_version;
+        uint_fast32_t m_reader_idx;
     };
 
     // Pin version for handover
     PinToken pin_version(VersionID version = VersionID());
 
-    // Release pinned version (not thread safe)
-    void release_pinned_version(PinToken token);
+    // Release pinned version (thread safe)
+    void unpin_version(PinToken token);
 
 private:
     struct SharedInfo;
