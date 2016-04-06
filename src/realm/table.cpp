@@ -1636,8 +1636,10 @@ void Table::upgrade_datetime()
     }
 
     REALM_ASSERT_3(old_column_count, ==, get_column_count());
+    static_cast<void>(old_column_count);
     for (size_t col = 0; col < get_column_count(); col++) {
         ColumnType col_type = get_real_column_type(col);
+        static_cast<void>(col_type);
         REALM_ASSERT(col_type != col_type_DateTime);
     }
 }
