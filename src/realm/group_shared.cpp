@@ -1627,14 +1627,15 @@ void SharedGroup::rollback() noexcept
 
 SharedGroup::VersionID SharedGroup::pin_version()
 {
+    // Get current version
     VersionID version_id = VersionID();
-    ReadLockInfo read_lock;
+    version_id.version = m_read_lock.m_version;
+    version_id.index   = m_read_lock.m_reader_idx;
     
     util::LockGuard lg(m_handover_lock);
+    ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id); // Throws
 
-    version_id.version = read_lock.m_version;
-    version_id.index   = read_lock.m_reader_idx;
     return version_id;
 }
 
