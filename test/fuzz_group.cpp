@@ -88,8 +88,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "\n\n\n----------------------------------------------------------------------\n";
             const char* key = crypt_key();
             std::string pritable_key;
-            if (!key) {
-                pritable_key = "0";
+            if (key == nullptr) {
+                pritable_key = "nullptr";
             }
             else {
                 pritable_key = std::string("\"") + key + "\"";
