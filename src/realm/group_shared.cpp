@@ -1625,7 +1625,8 @@ void SharedGroup::rollback() noexcept
     m_transact_stage = transact_Ready;
 }
 
-SharedGroup::PinToken SharedGroup::pin_version(VersionID version_id) {
+SharedGroup::PinToken SharedGroup::pin_version(VersionID version_id)
+{
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id); // Throws
 
@@ -1635,11 +1636,12 @@ SharedGroup::PinToken SharedGroup::pin_version(VersionID version_id) {
     return token;
 }
 
-void SharedGroup::unpin_version(PinToken token) {
+void SharedGroup::unpin_version(PinToken token)
+{
     ReadLockInfo read_lock;
     read_lock.m_reader_idx = token.m_reader_idx;
 
-    util::LockGuard lg(m_handover_lock);
+    util::LockGuard lg(m_handover_lock); // no remapping
     release_read_lock(read_lock);
 }
 
