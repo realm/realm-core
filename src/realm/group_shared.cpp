@@ -1625,21 +1625,23 @@ void SharedGroup::rollback() noexcept
     m_transact_stage = transact_Ready;
 }
 
-SharedGroup::PinToken SharedGroup::pin_version(VersionID version_id)
+SharedGroup::VersionID SharedGroup::pin_version()
 {
+    VersionID version_id = VersionID();
     ReadLockInfo read_lock;
+    
+    util::LockGuard lg(m_handover_lock);
     grab_read_lock(read_lock, version_id); // Throws
 
-    PinToken token;
-    token.m_version = m_read_lock.m_version;
-    token.m_reader_idx = m_read_lock.m_reader_idx;
-    return token;
+    version_id.version = read_lock.m_version;
+    version_id.index   = read_lock.m_reader_idx;
+    return version_id;
 }
 
-void SharedGroup::unpin_version(PinToken token)
+void SharedGroup::unpin_version(VersionID token)
 {
     ReadLockInfo read_lock;
-    read_lock.m_reader_idx = token.m_reader_idx;
+    read_lock.m_reader_idx = token.index;
 
     util::LockGuard lg(m_handover_lock); // no remapping
     release_read_lock(read_lock);
@@ -1789,7 +1791,6 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
         m_local_max_entry = r_info->readers.get_num_entries();
         size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
         // std::cout << "Growing reader mapping to " << infosize << std::endl;
-        util::LockGuard lg(m_handover_lock); // pinned versions being released may need to access the mapping
         m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
         return true;
     }
@@ -1805,6 +1806,7 @@ SharedGroup::version_type SharedGroup::get_version_of_latest_snapshot()
     // under our feet, so we need to protect the entry by temporarily
     // incrementing the reader ref count until we've got a safe reading of the
     // version number.
+    util::LockGuard lg(m_handover_lock);
     while (1) {
         uint_fast32_t index;
         SharedInfo* r_info;

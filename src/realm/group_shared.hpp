@@ -511,20 +511,18 @@ public:
     std::unique_ptr<Handover<Table>> export_table_for_handover(const TableRef& accessor);
     TableRef import_table_from_handover(std::unique_ptr<Handover<Table>> handover);
 
-    /// When doing handover to background tasks that may be run a bit later, we
+    /// When doing handover to background tasks that may be run later, we
     /// may want to momentarily pin the current version until the other thread
     /// has retrieved it.
-
-    struct PinToken {
-        uint_fast64_t m_version;
-        uint_fast32_t m_reader_idx;
-    };
+    ///
+    /// The release can be done on the background thread, but it is the users
+    /// responsibilty to keep the SharedGroup alive for the duration of the pin.
 
     // Pin version for handover
-    PinToken pin_version(VersionID version = VersionID());
+    VersionID pin_version();
 
     // Release pinned version (thread safe)
-    void unpin_version(PinToken token);
+    void unpin_version(VersionID version);
 
 private:
     struct SharedInfo;

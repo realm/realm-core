@@ -9395,6 +9395,69 @@ TEST(LangBindHelper_HandoverPartialQuery)
     }
 }
 
+TEST(LangBindHelper_HandoverWithPinning)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    sg.begin_read();
+    
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+    
+    SharedGroup::VersionID vid;
+    {
+        SharedGroup::VersionID token;
+        
+        // Untyped interface
+        std::unique_ptr<SharedGroup::Handover<Query> > handover;
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            TableRef table = group_w.add_table("table2");
+            table->add_column(type_Int, "first");
+            for (int i = 0; i <100; ++i) {
+                table->add_empty_row();
+                table->set_int(0, i, i);
+            }
+            CHECK_EQUAL(100, table->size());
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            TableView view = table->where().less(0, 50).find_all();
+            TableView* tv = &view;
+            Query query(view.get_parent().where(tv));
+            handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+            
+            token = sg_w.pin_version();
+        }
+        
+        // Advance the SharedGroup past the handover version
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            
+            TableRef table = group_w.get_table("table2");
+            table->add_empty_row();
+            
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+        }
+        
+        {
+            // Now move to the pinned version
+            LangBindHelper::advance_read(sg, token);
+            
+            sg_w.unpin_version(token);
+            sg_w.close();
+            
+            // importing query
+            std::unique_ptr<Query> q(sg.import_from_handover(move(handover)));
+            TableView tv = q->greater(0, 48).find_all();
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(1, tv.size());
+            CHECK_EQUAL(49, tv.get_int(0,0));
+        }
+    }
+}
+
 
 TEST(LangBindHelper_HandoverAccessors)
 {
