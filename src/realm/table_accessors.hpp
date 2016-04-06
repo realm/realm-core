@@ -424,6 +424,29 @@ public:
     explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
+/// Field accessor specialization for timestamps.
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, Timestamp, const_tab>: public FieldAccessorBase<Taboid> {
+private:
+    typedef FieldAccessorBase<Taboid> Base;
+
+public:
+    Timestamp get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_timestamp(col_idx, Base::m_row_idx);
+    }
+
+    void set(Timestamp value) const
+    {
+        Base::m_table->get_impl()->set_timestamp(col_idx, Base::m_row_idx, value);
+    }
+
+    operator Timestamp() const noexcept { return get(); }
+    const FieldAccessor& operator=(Timestamp value) const { set(value); return *this; }
+
+
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+};
 
 /// Field accessor specialization for strings.
 template<class Taboid, int col_idx, bool const_tab>

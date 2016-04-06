@@ -531,7 +531,11 @@ struct GetColumnTypeId<Mixed>
 {
     static const DataType id = type_Mixed;
 };
-
+template<>
+struct GetColumnTypeId<Timestamp>
+{
+        static const DataType id = type_Timestamp;
+};
 
 template<class Type, int col_idx>
 struct AddCol {
@@ -650,6 +654,16 @@ struct AssignIntoCol<DateTime, col_idx> {
     static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
         t->set_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for timestamps
+template<int col_idx>
+struct AssignIntoCol<Timestamp, col_idx> {
+    template<class L>
+    static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_timestamp(col_idx, row_idx, util::at<col_idx>(tuple));
     }
 };
 
