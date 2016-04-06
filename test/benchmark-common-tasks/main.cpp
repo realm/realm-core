@@ -514,26 +514,26 @@ TEST(benchmark_common_tasks_main)
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
-#define __BENCH(B) \
+#define BENCH(B) \
     run_benchmark<B>(test_context, results)
 
-    __BENCH(BenchmarkUnorderedTableViewClear);
-    __BENCH(BenchmarkEmptyCommit);
-    __BENCH(AddTable);
-    __BENCH(BenchmarkQuery);
-    __BENCH(BenchmarkQueryNot);
-    __BENCH(BenchmarkSize);
-    __BENCH(BenchmarkSort);
-    __BENCH(BenchmarkSortInt);
-    __BENCH(BenchmarkInsert);
-    __BENCH(BenchmarkGetString);
-    __BENCH(BenchmarkSetString);
-    __BENCH(BenchmarkCreateIndex);
-    __BENCH(BenchmarkGetLongString);
-    __BENCH(BenchmarkSetLongString);
-    __BENCH(BenchmarkGetLinkList);
+    BENCH(BenchmarkUnorderedTableViewClear);
+    BENCH(BenchmarkEmptyCommit);
+    BENCH(AddTable);
+    BENCH(BenchmarkQuery);
+    BENCH(BenchmarkQueryNot);
+    BENCH(BenchmarkSize);
+    BENCH(BenchmarkSort);
+    BENCH(BenchmarkSortInt);
+    BENCH(BenchmarkInsert);
+    BENCH(BenchmarkGetString);
+    BENCH(BenchmarkSetString);
+    BENCH(BenchmarkCreateIndex);
+    BENCH(BenchmarkGetLongString);
+    BENCH(BenchmarkSetLongString);
+    BENCH(BenchmarkGetLinkList);
 
-#undef __BENCH
+#undef BENCH
 }
 
 #if !defined(REALM_IOS)
