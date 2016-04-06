@@ -1,6 +1,9 @@
 #include <cstdio>
 #include <iomanip>
-#include <iostream>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
 
 #include <realm/exceptions.hpp>
 #include <realm/index_string.hpp>
