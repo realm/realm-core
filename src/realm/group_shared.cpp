@@ -1625,6 +1625,22 @@ void SharedGroup::rollback() noexcept
     m_transact_stage = transact_Ready;
 }
 
+SharedGroup::PinToken SharedGroup::pin_version(VersionID version_id) {
+    ReadLockInfo read_lock;
+    grab_read_lock(read_lock, version_id); // Throws
+
+    PinToken token;
+    token.m_reader_idx = m_read_lock.m_reader_idx;
+    return token;
+}
+
+void SharedGroup::release_pinned_version(PinToken token) {
+    ReadLockInfo read_lock;
+    read_lock.m_reader_idx = token.m_reader_idx;
+
+    release_read_lock(read_lock);
+}
+
 
 void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 {
