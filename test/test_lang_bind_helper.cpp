@@ -121,13 +121,13 @@ TEST(LangBindHelper_LinkView)
 namespace {
 
 REALM_TABLE_4(TestTableShared,
-                first,  Int,
-                second, Int,
-                third,  Bool,
-                fourth, String)
+              first,  Int,
+              second, Int,
+              third,  Bool,
+              fourth, String)
 
 REALM_TABLE_1(TestTableInts,
-                first,  Int)
+              first,  Int)
 
 
 class ShortCircuitHistory: public TrivialReplication, public _impl::History {

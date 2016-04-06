@@ -49,19 +49,19 @@ using namespace test_util;
 namespace {
 
 REALM_TABLE_1(TestTableInt,
-                first, Int)
+              first, Int)
 
 REALM_TABLE_2(TestTableInt2,
-                first,  Int,
-                second, Int)
+              first,  Int,
+              second, Int)
 
 REALM_TABLE_2(TestTableDate,
-                first, DateTime,
-                second, Int)
+              first, DateTime,
+              second, Int)
 
 REALM_TABLE_2(TestTableFloatDouble,
-                first, Float,
-                second, Double)
+              first, Float,
+              second, Double)
 
 
 } // anonymous namespace
@@ -135,9 +135,9 @@ TEST(TableView_GetSetInteger)
 
 namespace {
 REALM_TABLE_3(TableFloats,
-                col_float, Float,
-                col_double, Double,
-                col_int, Int)
+              col_float, Float,
+              col_double, Double,
+              col_int, Int)
 }
 
 TEST(TableView_FloatsGetSet)
@@ -581,7 +581,7 @@ TEST(TableView_FindAll)
 namespace {
 
 REALM_TABLE_1(TestTableString,
-                first, String)
+              first, String)
 
 } // anonymous namespace
 
@@ -1098,15 +1098,15 @@ TEST(TableView_LowLevelSubtables)
 namespace {
 
 REALM_TABLE_1(MyTable1,
-                val, Int)
+              val, Int)
 
 REALM_TABLE_2(MyTable2,
-                val, Int,
-                subtab, Subtable<MyTable1>)
+              val, Int,
+              subtab, Subtable<MyTable1>)
 
 REALM_TABLE_2(MyTable3,
-                val, Int,
-                subtab, Subtable<MyTable2>)
+              val, Int,
+              subtab, Subtable<MyTable2>)
 
 } // anonymous namespace
 

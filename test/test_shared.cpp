@@ -87,10 +87,10 @@ bool allow_async = true;
 
 
 REALM_TABLE_4(TestTableShared,
-                first,  Int,
-                second, Int,
-                third,  Bool,
-                fourth, String)
+              first,  Int,
+              second, Int,
+              third,  Bool,
+              fourth, String)
 
 
 
@@ -1557,10 +1557,10 @@ TEST(Shared_FormerErrorCase1)
 namespace {
 
 REALM_TABLE_1(FormerErrorCase2_Subtable,
-                value,  Int)
+              value,  Int)
 
 REALM_TABLE_1(FormerErrorCase2_Table,
-                bar, Subtable<FormerErrorCase2_Subtable>)
+              bar, Subtable<FormerErrorCase2_Subtable>)
 
 } // namespace
 
@@ -1587,7 +1587,7 @@ TEST(Shared_FormerErrorCase2)
 namespace {
 
 REALM_TABLE_1(OverAllocTable,
-                text, String)
+              text, String)
 
 } // namespace
 
@@ -2845,16 +2845,14 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
 }
 
 
-#ifdef REALM_DEBUG
-TEST(Shared_BeginReadFailure)
+TEST_IF(Shared_BeginReadFailure, _impl::SimulatedFailure::is_enabled())
 {
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
-    using SimulatedFailure = _impl::SimulatedFailure;
-    SimulatedFailure::PrimeGuard pg(SimulatedFailure::shared_group__grow_reader_mapping);
-    CHECK_THROW(sg.begin_read(), SimulatedFailure);
+    using sf = _impl::SimulatedFailure;
+    sf::OneShotPrimeGuard pg(sf::shared_group__grow_reader_mapping);
+    CHECK_THROW(sg.begin_read(), sf);
 }
-#endif // REALM_DEBUG
 
 
 TEST(Shared_SessionDurabilityConsistency)

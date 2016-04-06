@@ -29,6 +29,7 @@ Query::Query(const Table& table, const LinkViewRef& lv):
     m_source_link_view(lv), m_source_table_view(nullptr), m_owns_source_table_view(false)
 {
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(&lv->get_target_table() == m_table);
     create();
 }
 

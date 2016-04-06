@@ -61,22 +61,22 @@ enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
               kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
 
 REALM_TABLE_2(MySubsubtable,
-                value,  Int,
-                binary, Binary)
+              value,  Int,
+              binary, Binary)
 
 REALM_TABLE_2(MySubtable,
-                foo, Int,
-                bar, Subtable<MySubsubtable>)
+              foo, Int,
+              bar, Subtable<MySubsubtable>)
 
 REALM_TABLE_8(MyTable,
-                alpha,   Int,
-                beta,    Bool,
-                gamma,   Enum<MyEnum>,
-                delta,   DateTime,
-                epsilon, String,
-                zeta,    Binary,
-                eta,     Subtable<MySubtable>,
-                theta,   Mixed)
+              alpha,   Int,
+              beta,    Bool,
+              gamma,   Enum<MyEnum>,
+              delta,   DateTime,
+              epsilon, String,
+              zeta,    Binary,
+              eta,     Subtable<MySubtable>,
+              theta,   Mixed)
 
 
 const int num_threads = 23;
