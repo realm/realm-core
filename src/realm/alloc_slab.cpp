@@ -815,7 +815,9 @@ void SlabAlloc::reset_free_space_tracking()
         chunk.ref = slab.ref_end;
     }
 
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(is_all_free());
+#endif
 
     m_free_space_state = free_space_Clean;
 }

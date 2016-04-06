@@ -19,7 +19,9 @@ Query::Query() : m_view(nullptr), m_source_table_view(nullptr), m_owns_source_ta
 Query::Query(Table& table, TableViewBase* tv)
     : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
+#endif
     create();
 }
 
@@ -28,7 +30,9 @@ Query::Query(const Table& table, const LinkViewRef& lv):
     m_view(lv.get()),
     m_source_link_view(lv), m_source_table_view(nullptr), m_owns_source_table_view(false)
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
+#endif
     REALM_ASSERT_DEBUG(&lv->get_target_table() == m_table);
     create();
 }
@@ -36,7 +40,9 @@ Query::Query(const Table& table, const LinkViewRef& lv):
 Query::Query(const Table& table, TableViewBase* tv)
     : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
+#endif
     create();
 }
 
@@ -45,7 +51,9 @@ Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
 {
     tv.release();
 
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
+#endif
     create();
 }
 
@@ -689,7 +697,9 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 size_t Query::peek_tableview(size_t tv_index) const
 {
     REALM_ASSERT(m_view);
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view->cookie == m_view->cookie_expected);
+#endif
     REALM_ASSERT_3(tv_index, <, m_view->size());
 
     // Cannot use to_size_t() because the get() may return -1
