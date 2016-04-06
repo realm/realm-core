@@ -39,6 +39,13 @@ int main(int argc, const char* argv[])
 
     Group group;
 
+    test_util::unit_test::TestDetails test_details;
+    test_details.test_index = 0;
+    test_details.suite_name = "FuzzyTest";
+    test_details.test_name = "TransactLogApplier";
+    test_details.file_name = __FILE__;
+    test_details.line_number = __LINE__;
+
     try {
         Replication::apply_changeset(in_aa, group);
     }
