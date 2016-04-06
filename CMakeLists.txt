@@ -87,7 +87,7 @@ include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
 
 # Include additional CMakeLists
-add_subdirectory(src/realm)
+add_subdirectory(src)
 
 # Enable CTest and include unit tests
 enable_testing()

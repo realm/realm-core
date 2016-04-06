@@ -61,38 +61,7 @@ set(REALM_SOURCES
     disable_sync_to_disk.cpp
 ) # REALM_SOURCES
 
-set(REALM_INSTALL_HEADERS
-    util/features.h
-    util/meta.hpp
-    util/inspect.hpp
-    util/assert.hpp
-    util/terminate.hpp
-    util/type_list.hpp
-    util/tuple.hpp
-    util/type_traits.hpp
-    util/safe_int_ops.hpp
-    util/bind_ptr.hpp
-    util/buffer.hpp
-    util/string_buffer.hpp
-    util/shared_ptr.hpp
-    util/memory_stream.hpp
-    util/logger.hpp
-    util/misc_errors.hpp
-    util/basic_system_errors.hpp
-    util/thread.hpp
-    util/file.hpp
-    util/optional.hpp
-    util/network.hpp
-    util/event_loop.hpp
-    util/uri.hpp
-    util/utf8.hpp
-    util/priority_queue.hpp
-    util/interprocess_condvar.hpp
-    util/interprocess_mutex.hpp
-    util/file_mapper.hpp
-    util/encrypted_file_mapping.hpp
-    util/miscellaneous.hpp
-    util/to_string.hpp
+set(REALM_INSTALL_GENERAL_HEADERS
     exceptions.hpp
     utilities.hpp
     alloc.hpp
@@ -136,7 +105,7 @@ set(REALM_INSTALL_HEADERS
     lang_bind_helper.hpp
     realm_nmmintrin.h
     importer.hpp
-    version.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/version.hpp
     unicode.hpp
     commit_log.hpp
     link_view_fwd.hpp
@@ -166,7 +135,41 @@ set(REALM_INSTALL_HEADERS
     index_string.hpp
     query_engine.hpp
     query_expression.hpp
-) # REALM_INSTALL_HEADERS
+) # REALM_INSTALL_GENERAL_HEADERS
+
+set(REALM_INSTALL_UTIL_HEADERS
+    util/features.h
+    util/meta.hpp
+    util/inspect.hpp
+    util/assert.hpp
+    util/terminate.hpp
+    util/type_list.hpp
+    util/tuple.hpp
+    util/type_traits.hpp
+    util/safe_int_ops.hpp
+    util/bind_ptr.hpp
+    util/buffer.hpp
+    util/string_buffer.hpp
+    util/shared_ptr.hpp
+    util/memory_stream.hpp
+    util/logger.hpp
+    util/misc_errors.hpp
+    util/basic_system_errors.hpp
+    util/thread.hpp
+    util/file.hpp
+    util/optional.hpp
+    util/network.hpp
+    util/event_loop.hpp
+    util/uri.hpp
+    util/utf8.hpp
+    util/priority_queue.hpp
+    util/interprocess_condvar.hpp
+    util/interprocess_mutex.hpp
+    util/file_mapper.hpp
+    util/encrypted_file_mapping.hpp
+    util/miscellaneous.hpp
+    util/to_string.hpp
+) # REALM_INSTALL_UTIL_HEADERS
 
 add_library(realm ${REALM_SOURCES})
 
@@ -188,16 +191,16 @@ endif(REALM_ENABLE_ENCRYPTION)
 
 install(TARGETS realm
         DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES ${REALM_INSTALL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm)
+install(FILES ${REALM_INSTALL_UTIL_HEADERS}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util)
 
 add_executable(realm-config config_tool.cpp)
-install(TARGETS realm-config
-        DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 add_executable(realm-importer importer_tool.cpp)
 target_link_libraries(realm-importer realm)
-install(TARGETS realm-importer
+
+install(TARGETS realm-config realm-importer
         DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(realmd realmd.cpp)
