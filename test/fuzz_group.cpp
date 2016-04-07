@@ -467,7 +467,7 @@ int run_fuzzy(int argc, const char* argv[])
 
     std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
     if (!in.is_open()) {
-        fprintf(stderr, "Could not open file for reading: %s\n", argv[file_arg]);
+        std::cerr << "Could not open file for reading: " << argv[file_arg] << "\n";
         exit(1);
     }
 
