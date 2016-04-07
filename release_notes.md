@@ -20,6 +20,9 @@
 
 ### Enhancements:
 
+* Multiple shared groups now share the read-only memory-mapping of
+  the database. This significantly lowers pressure on virtual memory
+  in multithreaded scenarios. Fixes issue #1477.
 * Added emulation of robust mutexes on platforms which do not
   provide the full posix API for it. This prevents a situation
   where a crash in one process holding the lock, would leave
