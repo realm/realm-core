@@ -906,8 +906,12 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
+    m_linked_table = std::move(tv.m_linked_table);
+    m_linked_column = tv.m_linked_column;
+    m_linked_row = tv.m_linked_row;
     m_linkview_source = std::move(tv.m_linkview_source);
     m_distinct_columns = tv.m_distinct_columns;
+    m_distinct_column_source = tv.m_distinct_column_source;
     m_sorting_predicate = std::move(tv.m_sorting_predicate);
 
     return *this;
