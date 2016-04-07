@@ -1,5 +1,9 @@
 # NEXT RELEASE
 
+### Breaking changes:
+
+* Lock file (`foo.realm.lock`) format bumped.
+
 ### Bugfixes:
 
 * Detach subspec and enumkey accessors when they are removed
@@ -13,10 +17,6 @@
 * Bug fix: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
 * Handing over a detached row accessor no longer crashes.
-
-### API breaking changes:
-
-* Lorem ipsum.
 
 ### Enhancements:
 
@@ -42,6 +42,8 @@
   failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
   (`util::Logger`) is now directly available to each unit test.
 * New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+* New failure simulation features: Ability to prime for random triggering.
+* Upgraded OpenSSL to 1.0.1s (Android).
 
 ----------------------------------------------
 
