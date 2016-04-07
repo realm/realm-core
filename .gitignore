@@ -8,6 +8,7 @@ tags
 /cover_html
 /gcovr.xml
 /tmp
+doc/html
 
 # CMake artifacts
 CMakeFiles

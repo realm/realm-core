@@ -11,10 +11,10 @@ using namespace realm;
 namespace {
 
 REALM_TABLE_1(IntegerTable,
-                first, Int)
+              first, Int)
 
 REALM_TABLE_1(StringTable,
-                first, String)
+              first, String)
 
 enum Days {
     Mon,
@@ -27,10 +27,10 @@ enum Days {
 };
 
 REALM_TABLE_4(TestTable,
-                first,  Int,
-                second, String,
-                third,  Int,
-                fourth, Enum<Days>)
+              first,  Int,
+              second, String,
+              third,  Int,
+              fourth, Enum<Days>)
 
 } // anonymous namespace
 
