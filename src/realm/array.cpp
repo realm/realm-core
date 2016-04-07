@@ -856,7 +856,7 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
 
 exit:
 
-#if REALM_DEBUG
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(ref == ret);
 #endif
 
