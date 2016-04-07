@@ -216,7 +216,7 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.1s'
+    openssl_ver='1.0.1p'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
