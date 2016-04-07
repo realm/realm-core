@@ -39,7 +39,8 @@ DataType get_type(unsigned char c)
         type_Binary,
         type_DateTime,
         type_Table,
-        type_Mixed
+        type_Mixed,
+        type_Timestamp
     };
 
     unsigned char mod = c % (sizeof(types) / sizeof(DataType));
@@ -381,6 +382,13 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                     links->add(get_next(s) % target->size());
                                 }
                             }
+                        }
+                        else if (type == type_Timestamp) {
+                            Timestamp value{ get_next(s), get_next(s) };
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                            }
+                            t->set_timestamp(col_ndx, row_ndx, value);
                         }
                     }
                 }
