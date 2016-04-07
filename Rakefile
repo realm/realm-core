@@ -197,7 +197,7 @@ task :build_dir_apple => apple_build_dir do
 end
 
 task :check_xcpretty do
-    @xcpretty_suffix = `which xcpretty`
+    @xcpretty_suffix = `which xcpretty`.chomp
     @xcpretty_suffix = "| #{@xcpretty_suffix}" unless @xcpretty_suffix.empty?
 end
 
@@ -254,16 +254,14 @@ simulator_pairs = {
     end
 
     simulator_pairs.each do |target, pair|
-        task "librealm-#{target}#{target_suffix}.a" => [:tmpdir, pair.map{|p| "build-#{p}#{target_suffix}"}].flatten do
+        task "librealm-#{target}#{target_suffix}.a" => [:tmpdir_core, pair.map{|p| "build-#{p}#{target_suffix}"}].flatten do
             inputs = pair.map{|p| "#{@build_dir}/build/#{configuration}-#{p}/librealm.a"}
-            FileUtils.mkdir_p("#{@tmpdir}/core")
             output = "#{@tmpdir}/core/librealm-#{target}#{target_suffix}.a"
             sh "lipo -create -output #{output} #{inputs.join(' ')}"
         end
     end
 
-    task "librealm-macosx#{target_suffix}.a" => "build-macosx#{target_suffix}" do
-        FileUtils.mkdir_p("#{@tmpdir}/core")
+    task "librealm-macosx#{target_suffix}.a" => [:tmpdir_core, "build-macosx#{target_suffix}"] do
         FileUtils.cp("#{@build_dir}/build/#{configuration}-macosx/librealm.a", "#{@tmpdir}/core/librealm-macosx#{target_suffix}.a")
     end
 end
@@ -274,9 +272,16 @@ apple_static_library_targets = (['-dbg', ''].map do |dbg|
 end.flatten.map {|c| "librealm-#{c}.a" })
 
 
-task :apple_static_libraries => apple_static_library_targets
+task :apple_static_libraries => apple_static_library_targets do
+    FileUtils.ln_s("librealm-macosx-dbg.a", "#{@tmpdir}/core/librealm-dbg.a")
+    FileUtils.ln_s("librealm-macosx.a",     "#{@tmpdir}/core/librealm.a")
+end
 
-task :apple_copy_headers => :tmpdir do
+task :tmpdir_core => :tmpdir do
+    FileUtils.mkdir_p("#{@tmpdir}/core")
+end
+
+task :apple_copy_headers => :tmpdir_core do
     puts "Copying headers..."
     srcdir = "#{REALM_PROJECT_ROOT}/src"
     include_dir = "#{@tmpdir}/core/include"
@@ -291,11 +296,24 @@ task :apple_copy_headers => :tmpdir do
     end
 end
 
-task :apple_copy_release_nodes_and_license => :tmpdir do
-    puts "TODO: Copy release nodes and license"
+task :apple_copy_license => :tmpdir_core do
+    puts "Copying LICENSE..."
+    FileUtils.cp("#{REALM_PROJECT_ROOT}/tools/LICENSE", "#{@tmpdir}/core/LICENSE")
 end
 
-task :apple_zip => [:apple_static_libraries, :apple_copy_headers, :apple_copy_release_nodes_and_license] do
+task :check_pandoc do
+    @pandoc = `which pandoc`.chomp
+    if @pandoc.empty?
+        $stderr.puts("Pandoc is required but it's not installed.  Aborting.")
+        exit 1
+    end
+end
+
+task :apple_release_notes => [:tmpdir_core, :check_pandoc] do
+    sh "#{@pandoc} -f markdown -t plain -o \"#{@tmpdir}/core/release_notes.txt\" #{REALM_PROJECT_ROOT}/release_notes.md"
+end
+
+task :apple_zip => [:apple_static_libraries, :apple_copy_headers, :apple_copy_license, :apple_release_notes] do
     puts "Creating core-master.zip..."
     Dir.chdir(@tmpdir) do
         sh "zip -r -q --symlinks \"#{REALM_PROJECT_ROOT}/core-master.zip\" \"core\""
