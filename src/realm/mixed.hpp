@@ -32,6 +32,7 @@
 #include <realm/datetime.hpp>
 #include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
+#include <realm/column_datetime.hpp>
 
 namespace realm {
 
@@ -110,6 +111,7 @@ public:
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(DateTime)   noexcept;
+    Mixed(NewDate)    noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -130,6 +132,7 @@ public:
     StringData  get_string()   const noexcept;
     BinaryData  get_binary()   const noexcept;
     DateTime    get_datetime() const noexcept;
+    NewDate     get_newdate()  const noexcept;
 
     void set_int(int64_t) noexcept;
     void set_bool(bool) noexcept;
@@ -139,6 +142,7 @@ public:
     void set_binary(BinaryData) noexcept;
     void set_binary(const char* data, size_t size) noexcept;
     void set_datetime(DateTime) noexcept;
+    void set_newdate(NewDate) noexcept;
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
@@ -152,6 +156,7 @@ private:
         double       m_double;
         const char*  m_data;
         int_fast64_t m_date;
+        NewDate      m_newdate;
     };
     size_t m_size = 0;
 };
@@ -274,6 +279,11 @@ inline Mixed::Mixed(DateTime v) noexcept
     m_date = v.get_datetime();
 }
 
+inline Mixed::Mixed(NewDate v) noexcept
+{
+    m_type = type_NewDate;
+    m_newdate = v;
+}
 
 inline int64_t Mixed::get_int() const noexcept
 {
@@ -317,6 +327,11 @@ inline DateTime Mixed::get_datetime() const noexcept
     return m_date;
 }
 
+inline NewDate Mixed::get_newdate() const noexcept
+{
+    REALM_ASSERT(m_type == type_NewDate);
+    return m_newdate;
+}
 
 inline void Mixed::set_int(int64_t v) noexcept
 {
@@ -367,6 +382,13 @@ inline void Mixed::set_datetime(DateTime v) noexcept
     m_date = v.get_datetime();
 }
 
+inline void Mixed::set_newdate(NewDate v) noexcept
+{
+    REALM_ASSERT(false && "not yet implemented");
+    m_type = type_NewDate;
+    m_newdate = v;
+}
+
 
 template<class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Mixed& m)
@@ -380,6 +402,7 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
         case type_String:   out << StringData(m.m_data, m.m_size); break;
         case type_Binary:   out << BinaryData(m.m_data, m.m_size); break;
         case type_DateTime: out << DateTime(m.m_date);             break;
+        case type_NewDate:  out << NewDate(m.m_newdate);           break;
         case type_Table:    out << "subtable";                     break;
         case type_Mixed:
         case type_Link:

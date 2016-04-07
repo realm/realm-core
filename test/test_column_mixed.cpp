@@ -219,6 +219,41 @@ TEST(MixedColumn_Date)
 }
 
 
+TEST(MixedColumn_NewDate)
+{
+    ref_type ref = MixedColumn::create(Allocator::get_default());
+    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+
+    c.insert_newdate(0, NewDate(0, 0));
+    c.insert_newdate(1, NewDate(100, 200));
+    c.insert_newdate(2, NewDate(0, 0)); // Should *not* equal null
+    c.insert_newdate(3, NewDate(-1000, 0));
+
+    for (size_t i = 0; i < c.size(); ++i)
+        CHECK_EQUAL(type_NewDate, c.get_type(i));
+
+    CHECK_EQUAL(4, c.size());
+//    CHECK(c.get_newdate(0) == NewDate(null()));
+//    operator== should not be called for null according to column_datetime.hpp:38
+    CHECK(c.get_newdate(1) == NewDate(100, 200));
+    CHECK(c.get_newdate(2) == NewDate(0, 0)); // Should *not* equal null
+    CHECK(c.get_newdate(3) == NewDate(-1000, 0));
+
+    // MixedColumn has not implemented is_null
+//    CHECK(c.is_null(0));
+//    CHECK(!c.is_null(1));
+//    CHECK(!c.is_null(2));
+//    CHECK(!c.is_null(3));
+
+    c.set_newdate(0, NewDate(555, 666));
+    for (size_t i = 0; i < c.size(); ++i)
+        CHECK_EQUAL(type_NewDate, c.get_type(i));
+    CHECK(c.get_newdate(0) == NewDate(555, 666));
+
+    c.destroy();
+}
+
+
 TEST(MixedColumn_String)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
@@ -320,16 +355,29 @@ TEST(MixedColumn_Mixed)
     c.insert_subtable(0, 0);
     c.insert_float(0, 1.124f);
     c.insert_double(0, 1234.124);
-    CHECK_EQUAL(8, c.size());
+    c.insert_newdate(0, NewDate(111, 222));
+    CHECK_EQUAL(9, c.size());
 
-    CHECK_EQUAL(type_Double, c.get_type(0));
-    CHECK_EQUAL(type_Float,  c.get_type(1));
-    CHECK_EQUAL(type_Table,  c.get_type(2));
-    CHECK_EQUAL(type_Binary, c.get_type(3));
-    CHECK_EQUAL(type_String, c.get_type(4));
-    CHECK_EQUAL(type_DateTime,   c.get_type(5));
-    CHECK_EQUAL(type_Bool,   c.get_type(6));
-    CHECK_EQUAL(type_Int,    c.get_type(7));
+    // Check types
+    CHECK_EQUAL(type_NewDate, c.get_type(0));
+    CHECK_EQUAL(type_Double, c.get_type(1));
+    CHECK_EQUAL(type_Float,  c.get_type(2));
+    CHECK_EQUAL(type_Table,  c.get_type(3));
+    CHECK_EQUAL(type_Binary, c.get_type(4));
+    CHECK_EQUAL(type_String, c.get_type(5));
+    CHECK_EQUAL(type_DateTime,   c.get_type(6));
+    CHECK_EQUAL(type_Bool,   c.get_type(7));
+    CHECK_EQUAL(type_Int, c.get_type(8));
+
+    // Check values
+    CHECK_EQUAL(c.get_int(8), 23);
+    CHECK_EQUAL(c.get_bool(7), false);
+    CHECK_EQUAL(c.get_datetime(6), 23423);
+    CHECK_EQUAL(c.get_string(5), "Hello");
+    CHECK_EQUAL(c.get_binary(4), BinaryData("binary"));
+    CHECK_EQUAL(c.get_float(2), 1.124f);
+    CHECK_EQUAL(c.get_double(1), 1234.124);
+    CHECK(c.get_newdate(0) == NewDate(111, 222));
 
     // Change all entries to new types
     c.set_int(0, 23);
@@ -340,7 +388,7 @@ TEST(MixedColumn_Mixed)
     c.set_subtable(5, 0);
     c.set_float(6, 1.124f);
     c.set_double(7, 1234.124);
-    CHECK_EQUAL(8, c.size());
+    CHECK_EQUAL(9, c.size());
 
     CHECK_EQUAL(type_Double, c.get_type(7));
     CHECK_EQUAL(type_Float,  c.get_type(6));

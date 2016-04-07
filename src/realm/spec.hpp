@@ -367,14 +367,14 @@ inline ColumnType Spec::get_column_type(size_t ndx) const noexcept
 
 inline void Spec::set_column_type(size_t column_ndx, ColumnType type)
 {
-    REALM_ASSERT(column_ndx < get_column_count());
+    REALM_ASSERT_3(column_ndx, <, get_column_count());
 
-    // At this point we only support upgrading to string enum
-    REALM_ASSERT(ColumnType(m_types.get(column_ndx)) == col_type_String);
-    REALM_ASSERT(type == col_type_StringEnum);
+    // At this point we only support upgrading to string enum and from datetime->newdate
+    REALM_ASSERT_EX(ColumnType(m_types.get(column_ndx)) == col_type_String && type == col_type_StringEnum ||
+        ColumnType(m_types.get(column_ndx)) == col_type_DateTime && type == col_type_NewDate,
+        ColumnType(m_types.get(column_ndx)), type);
 
     m_types.set(column_ndx, type); // Throws
-
     update_has_strong_link_columns();
 }
 

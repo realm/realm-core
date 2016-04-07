@@ -107,6 +107,66 @@ TEST(TableView_DateMaxMin)
     CHECK_EQUAL(1, ndx);
 }
 
+TEST(TableView_NewDateMaxMinCount)
+{
+    Table t;
+    t.add_column(type_NewDate, "nd", true);
+    t.add_empty_row();
+    t.set_newdate(0, 0, NewDate(300, 300));
+
+    t.add_empty_row();
+    t.set_newdate(0, 1, NewDate(100, 100));
+
+    t.add_empty_row();
+    t.set_newdate(0, 2, NewDate(200, 200));
+
+    // Add row with null. For max(), any non-null is greater, and for min() any non-null is less
+    t.add_empty_row();
+
+    TableView tv = t.where().find_all();
+    NewDate nd;
+    
+    nd = tv.maximum_newdate(0, nullptr);
+    CHECK_EQUAL(nd, NewDate(300, 300));
+    nd = tv.minimum_newdate(0, nullptr);
+    CHECK_EQUAL(nd, NewDate(100, 100));
+
+    size_t index;
+    nd = tv.maximum_newdate(0, &index);
+    CHECK_EQUAL(index, 0);
+    nd = tv.minimum_newdate(0, &index);
+    CHECK_EQUAL(index, 1);
+
+    size_t cnt;
+    cnt = tv.count_newdate(0, NewDate(100, 100));
+    CHECK_EQUAL(cnt, 1);
+
+    cnt = tv.count_newdate(0, NewDate(null()));
+    CHECK_EQUAL(cnt, 1);
+}
+
+TEST(TableView_NewDateGetSet)
+{
+    Table t;
+    t.add_column(type_NewDate, "nd", true);
+    t.add_empty_row(3);
+    t.set_newdate(0, 0, NewDate(000, 010));
+    t.set_newdate(0, 1, NewDate(100, 110));
+    t.set_newdate(0, 2, NewDate(200, 210));
+
+    TableView tv = t.where().find_all();
+    CHECK_EQUAL(tv.get_newdate(0, 0), NewDate(000,010));
+    CHECK_EQUAL(tv.get_newdate(0, 1), NewDate(100,110));
+    CHECK_EQUAL(tv.get_newdate(0, 2), NewDate(200,210));
+
+    tv.set_newdate(0, 0, NewDate(1000, 1010));
+    tv.set_newdate(0, 1, NewDate(1100, 1110));
+    tv.set_newdate(0, 2, NewDate(1200, 1210));
+    CHECK_EQUAL(tv.get_newdate(0, 0), NewDate(1000,1010));
+    CHECK_EQUAL(tv.get_newdate(0, 1), NewDate(1100,1110));
+    CHECK_EQUAL(tv.get_newdate(0, 2), NewDate(1200,1210));
+}
+
 TEST(TableView_GetSetInteger)
 {
     TestTableInt table;

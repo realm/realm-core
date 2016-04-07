@@ -38,6 +38,8 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
+#include <realm/column_binary.hpp>
+#include <realm/column_datetime.hpp>
 
 namespace realm {
 
@@ -408,6 +410,7 @@ public:
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
+    NewDate     get_newdate(size_t column_ndx, size_t row_ndx) const noexcept;
 
     template<class T> T get(size_t c, size_t r) const noexcept;
 
@@ -471,6 +474,7 @@ public:
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
+    void set_newdate(size_t column_ndx, size_t row_ndx, NewDate value);
     template<class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
@@ -792,6 +796,26 @@ public:
     static void generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch);
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
+    // FIXME: Temporary, not finished at all.
+    void Table::upgrade_datetime()
+    {
+        for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
+            ColumnType col_type = get_real_column_type(col_ndx);
+            switch (col_type) {
+                case col_type_DateTime: {
+                   // remove_search_index(col_ndx); // temporary
+                    const ColumnBase& old_datetime = get_column_base(col_ndx);                    
+                    ref_type newdates = DateTimeColumn::upgrade_from_datetime(get_alloc(), old_datetime.get_ref(), is_nullable(col_ndx));
+                    m_spec.set_column_type(col_ndx, col_type_NewDate);      
+                    // FIXME: Make sure it takes index slots in count, etc, etc...
+                    m_columns.set_as_ref(col_ndx, newdates);
+                    m_cols[col_ndx] = nullptr;
+                }
+            }
+        }
+        refresh_column_accessors();
+    }
+
 protected:
     /// Get a pointer to the accessor of the specified subtable. The
     /// accessor will be created if it does not already exist.
@@ -809,6 +833,7 @@ protected:
     bool compare_rows(const Table&) const;
 
     void set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const;
+
 
 private:
     class SliceWriter;
@@ -1096,6 +1121,8 @@ private:
     const SubtableColumn& get_column_table(size_t column_ndx) const noexcept;
     MixedColumn& get_column_mixed(size_t column_ndx);
     const MixedColumn& get_column_mixed(size_t column_ndx) const noexcept;
+    DateTimeColumn& get_column_datetime(size_t column_ndx);
+    const DateTimeColumn& get_column_datetime(size_t column_ndx) const noexcept;
     const LinkColumnBase& get_column_link_base(size_t ndx) const noexcept;
     LinkColumnBase& get_column_link_base(size_t ndx);
     const LinkColumn& get_column_link(size_t ndx) const noexcept;
@@ -1368,6 +1395,8 @@ private:
     friend class Query;
     template<class>
     friend class util::bind_ptr;
+    template<class>
+    friend class SimpleColumn;
     friend class LangBindHelper;
     friend class TableViewBase;
     template<class T>

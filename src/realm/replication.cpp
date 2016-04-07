@@ -146,6 +146,16 @@ public:
         return false;
     }
 
+    bool set_newdate(size_t col_ndx, size_t row_ndx, NewDate value)
+    {
+        if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
+            log("table->set_newdate(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->set_newdate(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
     bool set_table(size_t col_ndx, size_t row_ndx)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
@@ -681,7 +691,9 @@ private:
             case type_Binary:
                 return "type_Binary";
             case type_DateTime:
-                return "type_DataTime";
+                return "type_DataTime"; // FIXME? Can we fix this spelling mistake?
+            case type_NewDate:
+                return "type_NewDate";
             case type_Table:
                 return "type_Table";
             case type_Mixed:

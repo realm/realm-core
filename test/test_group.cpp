@@ -1309,6 +1309,7 @@ TEST(Group_Persist)
     table->add_column(type_String,   "string");
     table->add_column(type_Binary,   "binary");
     table->add_column(type_Mixed,    "mixed");
+    table->add_column(type_NewDate,  "newdate");
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
@@ -1316,6 +1317,7 @@ TEST(Group_Persist)
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
     table->set_mixed(5, 0, false);
+    table->set_newdate(6, 0, NewDate(111, 222));
 
     // Write changes to file
     db.commit();
@@ -1324,7 +1326,7 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(7, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
@@ -1334,6 +1336,7 @@ TEST(Group_Persist)
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
+    CHECK(table->get_newdate(6, 0) == NewDate(111, 222));
 
     // Change a bit
     table->set_string(3, 0, "Changed!");
@@ -1345,7 +1348,7 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(7, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
@@ -1355,6 +1358,7 @@ TEST(Group_Persist)
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
+    CHECK(table->get_newdate(6, 0) == NewDate(111, 222));
 }
 
 

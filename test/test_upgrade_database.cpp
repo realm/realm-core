@@ -73,6 +73,128 @@ using namespace realm::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
+// 3 -> 4: datetime -> timestamp
+TEST(Upgrade_Database_3_4_DateTime1)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        util::to_string(REALM_MAX_BPNODE_SIZE) + "_3_to_4_datetime1.realm";
+
+#if 1// TEST_READ_UPGRADE_MODE
+
+    // Automatic upgrade from SharedGroup
+    {
+        CHECK_OR_RETURN(File::exists(path));
+        SHARED_GROUP_TEST_PATH(temp_copy);
+
+        // Make a copy of the version 2 database so that we keep the original file intact and unmodified
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+        SharedGroup sg(temp_copy);
+        WriteTransaction rt(sg);
+        TableRef t = rt.get_table("table");
+
+        t->upgrade_datetime();
+/*
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
+        CHECK(!t->has_search_index(2));
+        CHECK(!t->has_search_index(3));
+*/
+        CHECK(!t->is_null(0, 0));
+        CHECK(!t->is_null(1, 0));
+        CHECK(!t->is_null(2, 0));
+        CHECK(!t->is_null(3, 0));
+
+        CHECK(!t->is_null(0, 1));
+        CHECK(!t->is_null(1, 1));
+        CHECK(!t->is_null(2, 1));
+        CHECK(!t->is_null(3, 1));
+
+        CHECK(t->is_null(0, 2));
+        CHECK(!t->is_null(1, 2));
+        CHECK(t->is_null(2, 2));
+        CHECK(!t->is_null(3, 2));
+
+/*
+        CHECK_EQUAL(t->get_datetime(0, 0), DateTime(1234));
+        CHECK_EQUAL(t->get_datetime(1, 0), DateTime(1234));
+        CHECK_EQUAL(t->get_datetime(2, 0), DateTime(1234));
+        CHECK_EQUAL(t->get_datetime(3, 0), DateTime(1234));
+
+        CHECK_EQUAL(t->get_datetime(0, 1), DateTime(0));
+        CHECK_EQUAL(t->get_datetime(1, 1), DateTime(0));
+        CHECK_EQUAL(t->get_datetime(2, 1), DateTime(0));
+        CHECK_EQUAL(t->get_datetime(3, 1), DateTime(0));
+
+        CHECK_EQUAL(t->get_datetime(2, 2), DateTime(0));
+        CHECK_EQUAL(t->get_datetime(3, 2), DateTime(0));
+
+        CHECK_EQUAL(t->size(), 3);
+*/
+
+        CHECK_EQUAL(t->get_newdate(0, 0), NewDate(1234, 0));
+        CHECK_EQUAL(t->get_newdate(1, 0), NewDate(1234, 0));
+        CHECK_EQUAL(t->get_newdate(2, 0), NewDate(1234, 0));
+        CHECK_EQUAL(t->get_newdate(3, 0), NewDate(1234, 0));
+
+        CHECK_EQUAL(t->get_newdate(0, 1), NewDate(0, 0));
+        CHECK_EQUAL(t->get_newdate(1, 1), NewDate(0, 0));
+        CHECK_EQUAL(t->get_newdate(2, 1), NewDate(0, 0));
+        CHECK_EQUAL(t->get_newdate(3, 1), NewDate(0, 0));
+
+        CHECK_EQUAL(t->get_newdate(1, 2), NewDate(0, 0));
+        CHECK_EQUAL(t->get_newdate(3, 2), NewDate(0, 0));
+
+        CHECK_EQUAL(t->size(), 3);
+
+
+    }
+
+
+#else // test write mode
+    char leafsize[20];
+    sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
+    File::try_remove(path);
+
+    Group g;
+    TableRef t = g.add_table("table");
+
+    // No index
+    t->add_column(type_DateTime, "dt1", true); // nullable
+    t->add_column(type_DateTime, "dt2", false); // nonnullable
+                                                // No index
+    t->add_column(type_DateTime, "dt3", true); // nullable
+    t->add_column(type_DateTime, "dt4", false); // nonnullable
+
+//    t->add_search_index(0);
+//    t->add_search_index(1);
+
+    t->add_empty_row();
+    t->set_datetime(0, 0, DateTime(1234));
+    t->set_datetime(1, 0, DateTime(1234));
+    t->set_datetime(2, 0, DateTime(1234));
+    t->set_datetime(3, 0, DateTime(1234));
+
+    t->add_empty_row();
+    t->set_datetime(0, 1, DateTime(0));
+    t->set_datetime(1, 1, DateTime(0));
+    t->set_datetime(2, 1, DateTime(0));
+    t->set_datetime(3, 1, DateTime(0));
+
+    t->add_empty_row();
+    t->set_null(0, 2);
+    t->set_datetime(1, 2, DateTime(0));
+    t->set_null(2, 2);
+    t->set_datetime(3, 2, DateTime(0));
+
+
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+
+}
+
+
 TEST(Upgrade_Database_2_3)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +

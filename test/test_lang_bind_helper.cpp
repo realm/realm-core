@@ -7414,6 +7414,7 @@ public:
     bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
     bool set_binary(size_t, size_t, BinaryData) { return false; }
     bool set_date_time(size_t, size_t, DateTime) { return false; }
+    bool set_newdate(size_t, size_t, NewDate) { return false; }
     bool set_table(size_t, size_t) { return false; }
     bool set_mixed(size_t, size_t, const Mixed&) { return false; }
     bool set_link(size_t, size_t, size_t, size_t) { return false; }
@@ -9724,7 +9725,7 @@ namespace {
 
 void attacher(std::string path)
 {
-    for (int i=0; i<1000; ++i) {
+    for (int i=0; i<100; ++i) {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
         Group& g = const_cast<Group&>(sg.begin_read());
