@@ -50,15 +50,6 @@ struct SlabAlloc::MappedFile {
     size_t m_capacity_additional_mappings = 0;
     std::unique_ptr<util::File::Map<char>[]> m_additional_mappings;
 
-    /// Version obtained when initially attaching the file.
-    int m_file_format_version;
-
-    /// If a file or buffer is currently attached and validation was
-    /// not skipped during attachement, this flag is true if, and only
-    /// if the attached file has a footer specifying the top-ref, that
-    /// is, if the file is on the streaming form. 
-    bool m_file_on_streaming_form = false;
-
     /// Indicates if attaching to the file was succesfull
     bool m_success = false;
 
@@ -540,11 +531,12 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     if (m_file_mappings->m_success) {
         REALM_ASSERT(!cfg.session_initiator);
-        m_file_format_version = m_file_mappings->m_file_format_version;
         m_data = m_file_mappings->m_initial_mapping.get_addr();
+        m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_free_space_state = free_space_Invalid;
+        m_file_on_streaming_form = false;
         if (m_file_mappings->m_num_additional_mappings) {
             int mapping_index = m_file_mappings->m_num_additional_mappings;
             int section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
@@ -669,10 +661,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         {
             const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
             int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-            m_file_mappings->m_file_format_version = header.m_file_format[slot_selector];
+            m_file_format_version = header.m_file_format[slot_selector];
             uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
             m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
-            m_file_mappings->m_file_on_streaming_form = m_file_on_streaming_form;
             if (m_file_on_streaming_form) {
                 const StreamingFooter& footer =
                     *(reinterpret_cast<StreamingFooter*>(map.get_addr()+initial_size_of_file) - 1);
@@ -704,7 +695,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // session initialization, even if it means writing the database during open.
     //
     // FIXME: Why does this need to be done? Explanation needed.
-    if (cfg.session_initiator && m_file_mappings->m_file_on_streaming_form) {
+    if (cfg.session_initiator && m_file_on_streaming_form) {
         const Header& header = *reinterpret_cast<Header*>(m_data);
         const StreamingFooter& footer =
             *(reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1);
@@ -733,7 +724,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             writable_header.m_flags |= flags_SelectBit;
             realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
-            m_file_mappings->m_file_on_streaming_form = false;
             writable_map.sync();
         }
     }
