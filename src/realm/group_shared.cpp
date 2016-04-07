@@ -1634,7 +1634,6 @@ SharedGroup::VersionID SharedGroup::pin_version()
     version_id.version = m_read_lock.m_version;
     version_id.index   = m_read_lock.m_reader_idx;
     
-    util::LockGuard lg(m_handover_lock);
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id); // Throws
 
@@ -1646,7 +1645,6 @@ void SharedGroup::unpin_version(VersionID token)
     ReadLockInfo read_lock;
     read_lock.m_reader_idx = token.index;
 
-    util::LockGuard lg(m_handover_lock); // no remapping
     release_read_lock(read_lock);
 }
 
@@ -1809,7 +1807,6 @@ SharedGroup::version_type SharedGroup::get_version_of_latest_snapshot()
     // under our feet, so we need to protect the entry by temporarily
     // incrementing the reader ref count until we've got a safe reading of the
     // version number.
-    util::LockGuard lg(m_handover_lock);
     while (1) {
         uint_fast32_t index;
         SharedInfo* r_info;

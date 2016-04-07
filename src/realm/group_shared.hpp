@@ -515,13 +515,16 @@ public:
     /// may want to momentarily pin the current version until the other thread
     /// has retrieved it.
     ///
-    /// The release can be done on the background thread, but it is the users
-    /// responsibilty to keep the SharedGroup alive for the duration of the pin.
+    /// The release can be done on the background thread, but in that case it has to
+    /// be done on the receiving (thread local) SharedGroup, rather than the sender.
+    ///
+    /// It is the users responsibility to keep the sending SharedGroup alive until
+    /// the version has been unpinned.
 
     // Pin version for handover
     VersionID pin_version();
 
-    // Release pinned version (thread safe)
+    // Release pinned version (not thread safe)
     void unpin_version(VersionID version);
 
 private:
