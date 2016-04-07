@@ -932,9 +932,6 @@ void SlabAlloc::remap(size_t file_size)
         }
         if (num_additional_mappings > m_file_mappings->m_num_additional_mappings)
             m_file_mappings->m_num_additional_mappings = num_additional_mappings;
-        size_t mapping_size = 
-            get_section_base(num_additional_mappings + m_file_mappings->m_first_additional_mapping);
-        REALM_ASSERT_DEBUG(m_baseline == mapping_size);
     }
     // Rebase slabs and free list (assumes exactly one entry in m_free_space for
     // each entire slab in m_slabs)
