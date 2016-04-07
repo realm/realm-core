@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
             emit_flags();
             break;
         case func_ShowVersion:
-            std::cout << REALM_VER_STRING "\n";
+            std::cout << REALM_VERSION_STRING "\n";
             break;
         case func_ShowPrefix:
             std::cout << REALM_INSTALL_PREFIX "\n";
