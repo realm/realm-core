@@ -4,7 +4,6 @@ cmake_minimum_required(VERSION 3.1)
 project(Realm)
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
-set(CMAKE_CXX_STANDARD 14)
 enable_testing()
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake" ${CMAKE_MODULE_PATH})
 
@@ -31,7 +30,7 @@ include(GetGitRevisionDescription)
 git_describe(REALM_VERSION)
 
 # Project-wide build flags
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic $ENV{EXTRA_CFLAGS}")
 set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
