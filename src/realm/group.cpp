@@ -1155,7 +1155,6 @@ public:
     {
         REALM_ASSERT_3(table_ndx, <=, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
-        static_cast<void>(num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
             m_group.m_table_accessors.insert(m_group.m_table_accessors.begin() + table_ndx, nullptr);
@@ -1177,7 +1176,6 @@ public:
     {
         REALM_ASSERT_3(table_ndx, <, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
-        static_cast<void>(num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
             // Link target tables do not need to be considered here, since all
