@@ -538,8 +538,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_free_space_state = free_space_Invalid;
         m_file_on_streaming_form = false;
         if (m_file_mappings->m_num_additional_mappings) {
-            int mapping_index = m_file_mappings->m_num_additional_mappings;
-            int section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
+            size_t mapping_index = m_file_mappings->m_num_additional_mappings;
+            size_t section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
             m_baseline = get_section_base(section_index);
         }
         else {
