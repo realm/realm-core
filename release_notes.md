@@ -6,6 +6,10 @@
 
 ### Bugfixes:
 
+* Fix for #1498: A crash during opening of a Realm could lead to Realm files
+  which could not later be read. The symptom would be a realm file with zeroes
+  in the end but on streaming form (which requires a footer at the end of the
+  file instead).
 * Detach subspec and enumkey accessors when they are removed
   via a transaction (ex rollback). This could cause crashes
   when removing the last column in a table of type link,
