@@ -100,20 +100,16 @@ void TimestampColumn::set_null(size_t row_ndx)
 void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t /*prior_num_rows*/,
     bool nullable)
 {
-    size_t old_size = this->size();
-    if (row_ndx == old_size)
-        row_ndx = npos;
+    bool is_append = row_ndx == size();
+    size_t row_ndx_or_npos = is_append ? realm::npos : row_ndx;
 
     if (nullable)
-        m_seconds.insert(row_ndx, null{}, num_rows_to_insert);
+        m_seconds.insert(row_ndx_or_npos, null{}, num_rows_to_insert);
     else
-        m_seconds.insert(row_ndx, 0, num_rows_to_insert);
-    m_nanoseconds.insert(row_ndx, 0, num_rows_to_insert);
+        m_seconds.insert(row_ndx_or_npos, 0, num_rows_to_insert);
+    m_nanoseconds.insert(row_ndx_or_npos, 0, num_rows_to_insert);
 
     if (has_search_index()) {
-        bool is_append = row_ndx == npos || row_ndx == old_size;
-        if (is_append)
-            row_ndx = old_size;
         if (nullable) {
             m_search_index->insert(row_ndx, null{}, num_rows_to_insert, is_append);
         }

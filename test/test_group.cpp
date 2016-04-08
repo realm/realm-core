@@ -2523,14 +2523,15 @@ TEST(Group_ToDot)
 #endif // REALM_TO_DOT
 #endif // REALM_DEBUG
 
-TEST(Group_TimestampAddAIndexAndThenInsertEmptyRows)
+TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::false_type)
 {
+    constexpr bool nullable = TEST_TYPE::value;
     Group g;
-    g.add_table("");
-    g.get_table(0)->clear();
-    g.get_table(0)->insert_column(0, type_Timestamp, "",true);
-    { TableRef t = g.get_table(0); t->add_search_index(0); }
-    g.get_table(0)->add_empty_row(5);
+    TableRef table = g.add_table("");
+    table->insert_column(0, type_Timestamp, "", nullable);
+    table->add_search_index(0);
+    table->add_empty_row(5);
+    CHECK_EQUAL(table->size(), 5);
 }
 
 #endif // TEST_GROUP
