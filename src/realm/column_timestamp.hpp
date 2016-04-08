@@ -116,17 +116,20 @@ public:
     size_t count(Timestamp) const;
 
     void erase(size_t ndx, bool is_last) {
-        m_seconds.erase(ndx, is_last);
-        m_nanoseconds.erase(ndx, is_last);
+        m_seconds->erase(ndx, is_last);
+        m_nanoseconds->erase(ndx, is_last);
     }
 
     typedef Timestamp value_type;
 
 private:
-    BpTree<util::Optional<int64_t>> m_seconds;
-    BpTree<int64_t> m_nanoseconds;
+    std::unique_ptr<BpTree<util::Optional<int64_t>>> m_seconds;
+    std::unique_ptr<BpTree<int64_t>> m_nanoseconds;
 
     std::unique_ptr<StringIndex> m_search_index;
+
+    template<class BT>
+    class CreateHandler;
 };
 
 } // namespace realm
