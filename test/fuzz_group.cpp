@@ -71,6 +71,15 @@ int64_t get_int64(State& s) {
     return v;
 }
 
+int32_t get_int32(State& s) {
+    int32_t v = 0;
+    for (size_t t = 0; t < 4; t++) {
+        unsigned char c = get_next(s);
+        *(reinterpret_cast<signed char*>(&v) + t) = c;
+    }
+    return v;
+}
+
 std::string get_current_time_stamp() {
     std::time_t t = std::time(nullptr);
     const int str_size = 100;
@@ -384,7 +393,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                         }
                         else if (type == type_Timestamp) {
-                            Timestamp value{ get_next(s), get_next(s) };
+                            Timestamp value{ get_int64(s), static_cast<uint32_t>(get_int32(s)) };
                             if (log) {
                                 *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
