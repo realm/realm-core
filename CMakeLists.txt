@@ -57,9 +57,10 @@ if(APPLE)
         set(CMAKE_XCODE_EFFECTIVE_PLATFORMS
             "-macosx;-iphoneos;-iphonesimulator;-appletvos;-appletvsimulator;-watchos;-watchsimulator"
         )
-        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
+        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO") # Overridden by Rakefile
         set(CMAKE_OSX_SYSROOT $(PLATFORM_NAME))
         set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "7.0")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Os") # FIXME: CMake does not recognize -Oz
     endif()
 endif()
 

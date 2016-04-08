@@ -181,7 +181,7 @@ end
 
 ### Apple-specific tasks
 
-REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator)
+REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx ios watchos tvos)
 if ENV['REALM_COCOA_PLATFORMS']
     REALM_COCOA_PLATFORMS = ENV['REALM_COCOA_PLATFORMS'].split.select {|p| REALM_COCOA_SUPPORTED_PLATFORMS.include?(p) }
 else
@@ -204,13 +204,14 @@ end
 desc 'Generate Xcode project (default dir: \'build.apple\')'
 task :xcode_project => [:build_dir_apple, :check_xcpretty] do
     Dir.chdir(@build_dir) do
-        sh "cmake -GXcode #{REALM_PROJECT_ROOT}"
+        sh "cmake -GXcode -DREALM_ENABLE_ENCRYPTION=1 -DREALM_ENABLE_ASSERTIONS=1 #{REALM_PROJECT_ROOT}"
     end
 end
 
 def build_apple(sdk, configuration, enable_bitcode, configuration_build_dir)
     Dir.chdir(@build_dir) do
-        bitcode_option = "ENABLE_BITCODE=#{enable_bitcode ? 'YES' : 'NO'}"
+        bitcode_mode   = configuration == 'Debug' ? 'marker' : 'bitcode'
+        bitcode_option = "ENABLE_BITCODE=#{enable_bitcode ? "YES BITCODE_GENERATION_MODE=#{bitcode_mode}" : 'NO'}"
         configuration_temp_dir  = configuration_build_dir
         archs = case sdk
         when 'macosx', 'iphonesimulator' then "i386 x86_64"
@@ -220,7 +221,18 @@ def build_apple(sdk, configuration, enable_bitcode, configuration_build_dir)
         when 'appletvos' then 'arm64'
         when 'watchos'   then 'armv7k'
         end
-        sh "xcodebuild -sdk #{sdk} -target realm -configuration #{configuration} ARCHS=\"#{archs}\" ONLY_ACTIVE_ARCH=NO CONFIGURATION_BUILD_DIR=#{configuration_build_dir} CONFIGURATION_TEMP_DIR=#{configuration_temp_dir} #{bitcode_option} #{@xcpretty_suffix}"
+        sh <<-EOS.gsub(/\s+/, ' ')
+            xcodebuild
+            -sdk #{sdk}
+            -target realm
+            -configuration #{configuration}
+            ARCHS=\"#{archs}\"
+            ONLY_ACTIVE_ARCH=NO
+            CONFIGURATION_BUILD_DIR=#{configuration_build_dir}
+            CONFIGURATION_TEMP_DIR=#{configuration_temp_dir}
+            #{bitcode_option}
+            #{@xcpretty_suffix}
+        EOS
     end
 end
 
@@ -263,19 +275,17 @@ simulator_pairs = {
 
     task "librealm-macosx#{target_suffix}.a" => [:tmpdir_core, "build-macosx#{target_suffix}"] do
         FileUtils.cp("#{@build_dir}/build/#{configuration}-macosx/librealm.a", "#{@tmpdir}/core/librealm-macosx#{target_suffix}.a")
+        FileUtils.ln_s("librealm-macosx#{target_suffix}.a", "#{@tmpdir}/core/librealm#{target_suffix}.a")
     end
 end
 
 
 apple_static_library_targets = (['-dbg', ''].map do |dbg|
-    ['ios-bitcode', 'ios-no-bitcode', 'macosx', 'tvos', 'watchos'].map {|c| "#{c}#{dbg}" }
+    REALM_COCOA_PLATFORMS.map {|p| p == 'ios' ? ['ios-bitcode', 'ios-no-bitcode'] : p}.
+        flatten.map {|c| "#{c}#{dbg}" }
 end.flatten.map {|c| "librealm-#{c}.a" })
 
-
-task :apple_static_libraries => apple_static_library_targets do
-    FileUtils.ln_s("librealm-macosx-dbg.a", "#{@tmpdir}/core/librealm-dbg.a")
-    FileUtils.ln_s("librealm-macosx.a",     "#{@tmpdir}/core/librealm.a")
-end
+task :apple_static_libraries => apple_static_library_targets
 
 task :tmpdir_core => :tmpdir do
     FileUtils.mkdir_p("#{@tmpdir}/core")
@@ -288,9 +298,15 @@ task :apple_copy_headers => :tmpdir_core do
     FileUtils.mkdir_p(include_dir)
     # FIXME: Get the real install-headers from CMake, somehow.
     files_to_copy = Dir.glob("#{srcdir}/**/*.hpp") + Dir.glob("#{srcdir}/**/*.h")
+    gendir = "#{@build_dir}/src"
+    files_to_copy += [
+        "#{@build_dir}/src/realm/version.hpp",
+        "#{@build_dir}/src/realm/util/config.h"
+    ]
     files_to_copy.reject! { |f| f =~ /win32/ }
     files_to_copy.each do |src|
-        dst = src.sub(srcdir, include_dir)
+        dst = src.sub(gendir, include_dir)
+        dst = dst.sub(srcdir, include_dir)
         FileUtils.mkdir_p(File.dirname(dst))
         FileUtils.cp(src, dst)
     end
