@@ -234,14 +234,6 @@ void TimestampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
 }
 
 
-
-MemRef TimestampColumn::clone_deep(Allocator& /*alloc*/) const
-{
-    // FIXME: Dummy implementation
-    return MemRef();
-}
-
-
 ref_type TimestampColumn::write(size_t /*slice_offset*/, size_t /*slice_size*/, size_t /*table_size*/,
     _impl::OutputStream&) const
 {

@@ -96,7 +96,6 @@ public:
     StringIndex* create_search_index() override;
     
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept override;
-    MemRef clone_deep(Allocator& alloc) const override;
     ref_type write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream&) const override;
     void update_from_parent(size_t old_baseline) noexcept override;
     void set_ndx_in_parent(size_t ndx) noexcept override;
