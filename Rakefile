@@ -60,6 +60,14 @@ REALM_CONFIGURATIONS.each do |configuration, build_type|
     end
 end
 
+desc 'Produce Makefiles for debug and release.'
+task :config, [:install_dir] do |_, args|
+    install_dir = args[:install_dir] || '/usr/local'
+    ENV['CMAKE_INSTALL_PREFIX'] = install_dir
+    Rake::Task['config-debug'].invoke
+    Rake::Task['config-release'].invoke
+end
+
 desc 'Build debug and release modes'
 task :build => ['build-debug', 'build-release']
 
