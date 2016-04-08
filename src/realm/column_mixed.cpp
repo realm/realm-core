@@ -22,6 +22,8 @@ void MixedColumn::update_from_parent(size_t old_baseline) noexcept
     m_data->update_from_parent(old_baseline);
     if (m_binary_data)
         m_binary_data->update_from_parent(old_baseline);
+    if (m_timestamp)
+        m_timestamp->update_from_parent(old_baseline);
 }
 
 void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
