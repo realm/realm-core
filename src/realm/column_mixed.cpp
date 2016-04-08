@@ -55,8 +55,8 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     // TimestampColumn is only there if needed
     if (top->size() >= 4) {
         ref_type timestamp_ref = top->get_as_ref(3);
-        m_timestamp.reset(new TimestampColumn(alloc, timestamp_ref)); // Throws
-        m_timestamp->set_parent(&*top, 3);
+        timestamp_data.reset(new TimestampColumn(alloc, timestamp_ref)); // Throws
+        timestamp_data->set_parent(&*top, 3);
     }
 
     m_array = std::move(top);
