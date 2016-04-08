@@ -120,6 +120,29 @@ task 'tsan' => [:tsan_flags, 'check-release']
 desc 'Run thread sanitizer in debug mode.'
 task 'tsan-debug' => [:tsan_flags, 'check-debug']
 
+task :guess_version_string do
+    major = nil
+    minor = nil
+    patch = nil
+    File.open("CMakeLists.txt") do |f|
+        f.each_line do |l|
+            if l =~ /set\(REALM_VERSION_([A-Z]+)\s+(\d+)\)$/
+                case $1
+                when 'MAJOR' then major = $2
+                when 'MINOR' then minor = $2
+                when 'PATCH' then patch = $2
+                end
+            end
+        end
+    end
+    @version_string = "#{major}.#{minor}.#{patch}"
+end
+
+desc 'Print the version to stdout.'
+task 'get-version' => :guess_version_string do
+    puts @version_string
+end
+
 task :jenkins_workspace do
     raise 'No WORKSPACE set.' unless ENV['WORKSPACE']
     @jenkins_workspace = File.absolute_path(ENV['WORKSPACE'])
@@ -329,10 +352,10 @@ task :apple_release_notes => [:tmpdir_core, :check_pandoc] do
     sh "#{@pandoc} -f markdown -t plain -o \"#{@tmpdir}/core/release_notes.txt\" #{REALM_PROJECT_ROOT}/release_notes.md"
 end
 
-task :apple_zip => [:apple_static_libraries, :apple_copy_headers, :apple_copy_license, :apple_release_notes] do
-    puts "Creating core-master.zip..."
+task :apple_zip => [:guess_version_string, :apple_static_libraries, :apple_copy_headers, :apple_copy_license, :apple_release_notes] do
+    puts "Creating core-#{@version_string}.zip..."
     Dir.chdir(@tmpdir) do
-        sh "zip -r -q --symlinks \"#{REALM_PROJECT_ROOT}/core-master.zip\" \"core\""
+        sh "zip -r -q --symlinks \"#{REALM_PROJECT_ROOT}/core-#{@version_string}.zip\" \"core\""
     end
 end
 
