@@ -1446,7 +1446,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             break;
         case col_type_Timestamp:
             // Origin table will be set by group after entire table has been created
-            col = new TimestampColumn(alloc, ref); // Throws
+            col = new TimestampColumn(alloc, ref, nullable); // Throws
             break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
@@ -2013,7 +2013,7 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
         case col_type_Timestamp:
-            return TimestampColumn::create(alloc, size); // Throws
+            return TimestampColumn::create(alloc, size, nullable); // Throws
         case col_type_Float:
             return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Double:
