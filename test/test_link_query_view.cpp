@@ -614,15 +614,22 @@ TEST(LinkList_QueryFindLinkTarget)
 
     // find_all on query with Link
     tv = (table1->column<Link>(col_link2) == table2->get(2)).find_all();
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_TABLE_VIEW(tv, {1});
 
     tv = (table1->column<Link>(col_link2) == table2->get(1)).find_all();
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    CHECK_TABLE_VIEW(tv, {0});
 
     tv = (table1->column<Link>(col_link2) == table2->get(3)).find_all();
-    CHECK_EQUAL(0, tv.size());
+    CHECK_TABLE_VIEW(tv, {});
+
+    tv = (table1->column<Link>(col_link2) != table2->get(2)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 2});
+
+    tv = (table1->column<Link>(col_link2) != table2->get(1)).find_all();
+    CHECK_TABLE_VIEW(tv, {1, 2});
+
+    tv = (table1->column<Link>(col_link2) != table2->get(3)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 1, 2});
 
     // find on query with LinkList
     match = (table1->column<LinkList>(col_link3) == table2->get(1)).find();
@@ -636,16 +643,22 @@ TEST(LinkList_QueryFindLinkTarget)
 
     // find_all on query with LinkList
     tv = (table1->column<LinkList>(col_link3) == table2->get(2)).find_all();
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    CHECK_TABLE_VIEW(tv, {1});
 
     tv = (table1->column<LinkList>(col_link3) == table2->get(1)).find_all();
-    CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-    CHECK_EQUAL(1, tv.get_source_ndx(1));
+    CHECK_TABLE_VIEW(tv, {0, 1});
 
     tv = (table1->column<LinkList>(col_link3) == table2->get(3)).find_all();
-    CHECK_EQUAL(0, tv.size());
+    CHECK_TABLE_VIEW(tv, {});
+
+    tv = (table1->column<LinkList>(col_link3) != table2->get(2)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 2});
+
+    tv = (table1->column<LinkList>(col_link3) != table2->get(1)).find_all();
+    CHECK_TABLE_VIEW(tv, {2});
+
+    tv = (table1->column<LinkList>(col_link3) != table2->get(3)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 1, 2});
 }
 
 
