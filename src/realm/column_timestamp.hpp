@@ -96,7 +96,6 @@ public:
     StringIndex* create_search_index() override;
     
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept override;
-    MemRef clone_deep(Allocator& alloc) const override;
     ref_type write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream&) const override;
     void update_from_parent(size_t old_baseline) noexcept override;
     void set_ndx_in_parent(size_t ndx) noexcept override;
@@ -117,17 +116,20 @@ public:
     size_t count(Timestamp) const;
 
     void erase(size_t ndx, bool is_last) {
-        m_seconds.erase(ndx, is_last);
-        m_nanoseconds.erase(ndx, is_last);
+        m_seconds->erase(ndx, is_last);
+        m_nanoseconds->erase(ndx, is_last);
     }
 
     typedef Timestamp value_type;
 
 private:
-    BpTree<util::Optional<int64_t>> m_seconds;
-    BpTree<int64_t> m_nanoseconds;
+    std::unique_ptr<BpTree<util::Optional<int64_t>>> m_seconds;
+    std::unique_ptr<BpTree<int64_t>> m_nanoseconds;
 
     std::unique_ptr<StringIndex> m_search_index;
+
+    template<class BT>
+    class CreateHandler;
 };
 
 } // namespace realm

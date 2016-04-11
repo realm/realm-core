@@ -194,7 +194,7 @@ private:
     std::unique_ptr<BinaryColumn> m_binary_data;
 
     /// Timestamps are stored here.
-    std::unique_ptr<TimestampColumn> m_timestamp;
+    std::unique_ptr<TimestampColumn> m_timestamp_data;
 
     void do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows);
     void do_move_last_over(size_t row_ndx, size_t prior_num_rows);

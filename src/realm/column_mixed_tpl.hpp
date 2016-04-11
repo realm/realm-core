@@ -193,9 +193,9 @@ inline Timestamp MixedColumn::get_timestamp(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_types->size());
     REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Timestamp);
-    REALM_ASSERT(m_timestamp);
+    REALM_ASSERT(m_timestamp_data);
     size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
-    return m_timestamp->get(data_ndx);
+    return m_timestamp_data->get(data_ndx);
 }
 
 //
@@ -344,8 +344,8 @@ inline void MixedColumn::insert_datetime(size_t ndx, DateTime value)
 inline void MixedColumn::insert_timestamp(size_t ndx, Timestamp value)
 {
     ensure_timestamp_column();
-    size_t data_ndx = m_timestamp->size();
-    m_timestamp->add(value); // Throws
+    size_t data_ndx = m_timestamp_data->size();
+    m_timestamp_data->add(value); // Throws
     insert_int(ndx, int_fast64_t(data_ndx), mixcol_Timestamp);
 }
 
@@ -474,15 +474,27 @@ inline void MixedColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
     m_types->refresh_accessor_tree(col_ndx, spec); // Throws
     m_data->refresh_accessor_tree(col_ndx, spec); // Throws
     if (m_binary_data) {
-        REALM_ASSERT_3(get_root_array()->size(), ==, 3);
+        REALM_ASSERT_3(get_root_array()->size(), >=, 3);
         m_binary_data->refresh_accessor_tree(col_ndx, spec); // Throws
-        return;
     }
+    if (m_timestamp_data) {
+        REALM_ASSERT_3(get_root_array()->size(), >=, 4);
+        m_timestamp_data->refresh_accessor_tree(col_ndx, spec); // Throws
+    }
+
+
     // See if m_binary_data needs to be created.
-    if (get_root_array()->size() == 3) {
+    if (get_root_array()->size() >= 3) {
         ref_type ref = get_root_array()->get_as_ref(2);
         m_binary_data.reset(new BinaryColumn(get_alloc(), ref)); // Throws
         m_binary_data->set_parent(get_root_array(), 2);
+    }
+
+    // See if m_timestamp_data needs to be created.
+    if (get_root_array()->size() >= 4) {
+        ref_type ref = get_root_array()->get_as_ref(3);
+        m_timestamp_data.reset(new TimestampColumn(get_alloc(), ref)); // Throws
+        m_timestamp_data->set_parent(get_root_array(), 3);
     }
 }
 
