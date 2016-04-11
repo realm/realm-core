@@ -474,15 +474,27 @@ inline void MixedColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
     m_types->refresh_accessor_tree(col_ndx, spec); // Throws
     m_data->refresh_accessor_tree(col_ndx, spec); // Throws
     if (m_binary_data) {
-        REALM_ASSERT_3(get_root_array()->size(), ==, 3);
+        REALM_ASSERT_3(get_root_array()->size(), >=, 3);
         m_binary_data->refresh_accessor_tree(col_ndx, spec); // Throws
-        return;
     }
+    if (m_timestamp) {
+        REALM_ASSERT_3(get_root_array()->size(), >=, 4);
+        m_timestamp->refresh_accessor_tree(col_ndx, spec); // Throws
+    }
+
+
     // See if m_binary_data needs to be created.
-    if (get_root_array()->size() == 3) {
+    if (get_root_array()->size() >= 3) {
         ref_type ref = get_root_array()->get_as_ref(2);
         m_binary_data.reset(new BinaryColumn(get_alloc(), ref)); // Throws
         m_binary_data->set_parent(get_root_array(), 2);
+    }
+
+    // See if m_timestamp needs to be created.
+    if (get_root_array()->size() >= 4) {
+        ref_type ref = get_root_array()->get_as_ref(3);
+        m_timestamp.reset(new TimestampColumn(get_alloc(), ref)); // Throws
+        m_timestamp->set_parent(get_root_array(), 3);
     }
 }
 

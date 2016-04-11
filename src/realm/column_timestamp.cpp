@@ -286,6 +286,11 @@ void TimestampColumn::update_from_parent(size_t old_baseline) noexcept
 
 void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
 {
+    m_array->init_from_parent();
+
+    m_seconds->init_from_parent();
+    m_nanoseconds->init_from_parent();
+
     if (has_search_index()) {
         m_search_index->refresh_accessor_tree(new_col_ndx, spec);
     }
