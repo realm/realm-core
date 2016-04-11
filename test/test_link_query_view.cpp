@@ -19,6 +19,30 @@ using namespace realm;
 using namespace test_util;
 using namespace realm::util;
 
+namespace {
+
+void check_table_view(test_util::unit_test::TestContext& test_context, const char* file, size_t line,
+                      const TableView& tv, std::vector<size_t> expected,
+                      const std::string& tv_str, const std::string& expected_str)
+{
+    test_context.check_equal(tv.size(), expected.size(), file, line,
+                             (tv_str + ".size()").c_str(), (expected_str + ".size()").c_str());
+    if (tv.size() == expected.size()) {
+        for (size_t i = 0; i < expected.size(); ++i) {
+            test_context.check_equal(tv.get_source_ndx(i), expected[i], file, line,
+                                     (tv_str + ".get_source_ndx(" + util::to_string(i) + ")").c_str(),
+                                     (expected_str + "[" + util::to_string(i) + "]").c_str());
+        }
+    }
+}
+
+}
+
+// void CHECK_TABLE_VIEW(const TableView&, std::initializer_list<size_t>);
+#define CHECK_TABLE_VIEW(_tv, ...) \
+    check_table_view(test_context, __FILE__, __LINE__, _tv, __VA_ARGS__, # _tv, # __VA_ARGS__)
+
+
 TEST(LinkList_Basic1)
 {
     Group group;
@@ -1588,21 +1612,6 @@ TEST(LinkList_QueryDateTime)
 
     CHECK_EQUAL(1, tv.size());
 }
-
-// void CHECK_TABLE_VIEW(const TableView&, std::initializer_list<size_t>);
-#define CHECK_TABLE_VIEW(_tv, ...) \
-    do { \
-        TableView tv(_tv); \
-        std::vector<size_t> expected __VA_ARGS__; \
-        CHECK_EQUAL(tv.size(), expected.size()); \
-        if (tv.size() == expected.size()) { \
-            for (size_t i = 0; i < expected.size(); ++i) { \
-                test_context.check_equal(tv.get_source_ndx(i), expected[i], __FILE__, __LINE__, \
-                                         ("tv.get_source_ndx(" + util::to_string(i) + ")").c_str(), \
-                                         ("expected[" + util::to_string(i) + "]").c_str()); \
-            } \
-        } \
-    } while (false)
 
 // Test queries involving the backlinks of a link column.
 TEST(BackLink_Query_Link)
