@@ -4,6 +4,22 @@
 # to delete them from our host.
 trap 'chown -R --reference /build-inside/build-package /out/' EXIT
 
+clean_binaries() {
+  # Remove unneeded information from binaries
+  for path in $*; do
+    cd "$path"
+
+    rm -rf usr/{lib64,libexec,bin}/*-dbg*
+
+    for file in usr/{lib64,libexec,bin}/*; do
+        strip --strip-debug --strip-unneeded "$file"
+        chrpath -d "$file" || true
+    done
+
+    cd - >/dev/null
+  done
+}
+
 # the source directory is mounted read-only to prevent issues where the build
 # could alter the source; we should copy it somewhere inside the container
 cp -a /source /tmp/build
@@ -12,34 +28,24 @@ cd /tmp/build
 # Configure the build
 sh build.sh config /usr
 # Build and install
-sh build.sh build-release
-DESTDIR=/usr/local/core sh build.sh install-prod
-DESTDIR=/usr/local/core sh build.sh install-devel
+sh build.sh build
+DESTDIR=/prod sh build.sh install-prod
+DESTDIR=/devel sh build.sh install-devel
 
-# Remove unwanted files
-rm -rf /usr/local/core/usr/lib64/*-dbg*
-rm -rf /usr/local/core/usr/libexec/*-dbg*
+clean_binaries /prod /devel
 
-# Remove unneeded information from binaries
-cd /usr/local/core/
-for file in usr/{lib64,libexec,bin}/*; do
-    strip --strip-debug --strip-unneeded "$file"
-    chrpath -d "$file" || true
-done
+# Reorganise a few files
+mkdir -p /utils/usr/bin
+mv /prod/usr/bin/realm-import /utils/usr/bin
+mv /prod/usr/lib64/*.so /devel/usr/lib64
 
-mkdir /tmp/core-files
-cd /tmp/core-files
-echo "ldconfig" > post-ldconf
-echo "echo >/dev/null" >> post-ldconf
-mv /usr/local/core/usr/lib64/*.{so,a} .
-mv /usr/local/core/usr/bin/* .
+echo "ldconfig" > /tmp/post-ldconf
+echo "echo >/dev/null" >> /tmp/post-ldconf
 
 cd /out
 
-# this is a standard fpm command. look at fpm's own help. The only thing that I like to do
-# is installing all the things in a separate dir to prevent listing all the files - but it's
-# just personal taste.
-# don't forget to list all runtime dependencies for your package (i.e. all the shared libraries you link to!)
+# don't forget to list all runtime dependencies for your package (i.e. all the
+# shared libraries you link to!)
 fpm \
     -t rpm \
     -s dir \
@@ -47,17 +53,14 @@ fpm \
     --rpm-dist el6 \
     --license "Realm License" \
     --version ${VERSION} \
+    --iteration ${BUILD_NUMBER} \
     --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
-    --after-install /tmp/core-files/post-ldconf \
-    --after-remove /tmp/core-files/post-ldconf \
-    -C /usr/local/core \
+    --after-install /tmp/post-ldconf \
+    --after-remove /tmp/post-ldconf \
+    -C /prod \
     usr/lib64 usr/libexec
-
-rm -rf /usr/local/core/usr/lib64/*
-mv /tmp/core-files/*.{so,a} /usr/local/core/usr/lib64
-mv /tmp/core-files/realm-config /usr/local/core/usr/bin
 
 fpm \
     -t rpm \
@@ -66,15 +69,13 @@ fpm \
     --rpm-dist el6 \
     --license "Realm License" \
     --version ${VERSION} \
+    --iteration ${BUILD_NUMBER} \
     --description "Development headers and tools for the realm-core C++ library" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
-    -d "realm-core = ${VERSION}" \
-    -C /usr/local/core \
+    -d "realm-core = ${VERSION}-${BUILD_NUMBER}" \
+    -C /devel \
     usr/lib64 usr/include usr/bin
-
-rm -f /usr/local/core/usr/bin/*
-mv /tmp/core-files/realm-import /usr/local/core/usr/bin
 
 fpm \
     -t rpm \
@@ -83,9 +84,10 @@ fpm \
     --rpm-dist el6 \
     --license "Realm License" \
     --version ${VERSION} \
+    --iteration ${BUILD_NUMBER} \
     --description "Utilities to work with Realm files" \
     --url "https://realm.io" \
     --category "Applications/Databases" \
-    -d "realm-core = ${VERSION}" \
-    -C /usr/local/core \
+    -d "realm-core = ${VERSION}-${BUILD_NUMBER}" \
+    -C /utils \
     usr/bin
