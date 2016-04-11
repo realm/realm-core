@@ -11683,7 +11683,7 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 }
 
 
-TEST_TYPES(Shared_AddEmptyRowsAndRollBackTimestamp, std::true_type, std::false_type)
+TEST_TYPES(LangBindHelper_AddEmptyRowsAndRollBackTimestamp, std::true_type, std::false_type)
 {
     constexpr bool nullable = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
