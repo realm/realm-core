@@ -17,6 +17,8 @@
 * Bug fix: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
 * Handing over a detached row accessor no longer crashes.
+* Linked tables were not updated properly when calling erase with num_rows = 0
+  which could be triggered by rolling back a call to insert with num_rows = 0
 
 ### Enhancements:
 
