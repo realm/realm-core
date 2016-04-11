@@ -35,7 +35,7 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     std::unique_ptr<TimestampColumn> timestamp_data;
     top.reset(new Array(alloc)); // Throws
     top->init_from_ref(ref);
-    REALM_ASSERT(top->size() == 2 || top->size() == 3);
+    REALM_ASSERT(top->size() == 2 || top->size() == 3 || top->size() == 4);
     ref_type types_ref = top->get_as_ref(0);
     ref_type data_ref  = top->get_as_ref(1);
     types.reset(new IntegerColumn(alloc, types_ref)); // Throws
