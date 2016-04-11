@@ -411,13 +411,18 @@ public:
 
 private:
     enum opt_enum {
-        opt_ReuseAddr ///< `SOL_SOCKET`, `SO_REUSEADDR`
+        opt_ReuseAddr, ///< `SOL_SOCKET`, `SO_REUSEADDR`
+        opt_Linger,    ///< `SOL_SOCKET`, `SO_LINGER`
     };
 
     template<class, int, class> class option;
 
 public:
     typedef option<bool, opt_ReuseAddr, int> reuse_address;
+
+    // linger struct defined by POSIX sys/socket.h.
+    struct linger_opt;
+    typedef option<linger_opt, opt_Linger, struct linger> linger;
 
 private:
     int m_sock_fd;
@@ -463,6 +468,21 @@ private:
     void set(socket_base&, std::error_code&) const;
 
     friend class socket_base;
+};
+
+struct socket_base::linger_opt {
+    linger_opt(bool enabled, int timeout_seconds = 0)
+    {
+        m_linger.l_onoff = enabled ? 1 : 0;
+        m_linger.l_linger = timeout_seconds;
+    }
+
+    ::linger m_linger;
+
+    operator ::linger() const { return m_linger; }
+
+    bool enabled() const { return m_linger.l_onoff != 0; }
+    int  timeout() const { return m_linger.l_linger; }
 };
 
 

@@ -928,6 +928,16 @@ void socket_base::map_option(opt_enum opt, int& level, int& option_name) const
             level       = SOL_SOCKET;
             option_name = SO_REUSEADDR;
             return;
+        case opt_Linger:
+            level       = SOL_SOCKET;
+#if REALM_PLATFORM_APPLE
+            // By default, SO_LINGER on Darwin uses "ticks" instead of
+            // seconds for better accuracy, but we want to be cross-platform.
+            option_name = SO_LINGER_SEC;
+#else
+            option_name = SO_LINGER;
+#endif // REALM_PLATFORM_APPLE
+            return;
     }
     REALM_ASSERT(false);
 }
