@@ -930,7 +930,6 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        TConditionFunction condition;
         size_t ret = m_condition_column->find<TConditionFunction>(m_value, start, end);
         return ret;
     }
