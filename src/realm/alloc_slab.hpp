@@ -370,6 +370,15 @@ private:
 
     // The mappings are shared, if they are from a file
     std::shared_ptr<MappedFile> m_file_mappings;
+
+    // We are caching local copies of all the additional mappings to allow
+    // for lock-free lookup during ref->address translation (we do not need
+    // to cache the first mapping, because it is immutable) (well, all the
+    // mappings are immutable, but the array holding them is not - it may
+    // have to be relocated)
+    std::unique_ptr<std::shared_ptr<util::File::Map<char>>[]> m_local_mappings;
+    size_t m_num_local_mappings = 0;
+
     char* m_data = nullptr;
     size_t m_initial_chunk_size = 0;
     size_t m_initial_section_size = 0;
