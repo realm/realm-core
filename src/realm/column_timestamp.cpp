@@ -148,12 +148,12 @@ void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
 {
     bool is_last = (row_ndx + num_rows_to_erase) == size();
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
-        m_seconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last);
-        m_nanoseconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last);
-        
         if (has_search_index()) {
             m_search_index->erase<StringData>(row_ndx + num_rows_to_erase - i - 1, is_last);
         }
+
+        m_seconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last);
+        m_nanoseconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last);
     }
 }
 
