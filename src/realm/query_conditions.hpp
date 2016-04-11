@@ -48,8 +48,8 @@ struct Contains : public HackClass {
     bool operator()(StringData v1, StringData v2, bool = false, bool = false) const { return v2.contains(v1); }
     bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v2.contains(v1); }
 
-    template<class A, class B>
-    bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
@@ -154,8 +154,8 @@ struct ContainsIns : public HackClass {
         return search_case_fold(v2, v1_upper.c_str(), v1_lower.c_str(), v1.size()) != v2.size();
     }
 
-    template<class A, class B>
-    bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
@@ -183,8 +183,8 @@ struct BeginsWithIns : public HackClass {
         return equal_case_fold(v2.prefix(v1.size()), v1_upper.c_str(), v1_lower.c_str());
     }
 
-    template<class A, class B>
-    bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
@@ -213,8 +213,8 @@ struct EndsWithIns : public HackClass {
         return equal_case_fold(v2.suffix(v1.size()), v1_upper.c_str(), v1_lower.c_str());
     }
 
-    template<class A, class B>
-    bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;
@@ -242,8 +242,8 @@ struct EqualIns : public HackClass {
         return equal_case_fold(v2, v1_upper.c_str() , v1_lower.c_str());
     }
 
-    template<class A, class B>
-    bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
+    template<class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
     bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
 
     static const int condition = -1;

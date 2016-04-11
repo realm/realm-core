@@ -120,6 +120,20 @@ public:
         m_nanoseconds->erase(ndx, is_last);
     }
 
+    template <class Condition> size_t find(Timestamp value, size_t begin, size_t end) const noexcept
+    {
+        // FIXME: Here we can do all sorts of clever optimizations. Use bithack-search on seconds, then for each match check
+        // nanoseconds, etc, etc, etc. Lots of possibilities. Below code is naive and slow but works.
+
+        Condition cond;
+        for (size_t t = begin; t < end; t++) {
+            Timestamp ts = get(t);
+            if (cond(ts, value, ts.is_null(), value.is_null()))
+                return t;
+        }
+        return npos;
+    }
+
     typedef Timestamp value_type;
 
 private:

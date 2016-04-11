@@ -305,6 +305,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
         case type_Binary: {
             return MakeConditionNode<BinaryNode<Cond>>::make(column_ndx, value);
         }
+        case type_Timestamp: {
+            return MakeConditionNode<TimestampNode<Cond>>::make(column_ndx, value);
+        }
         default: {
             throw LogicError{LogicError::type_mismatch};
         }
@@ -640,6 +643,33 @@ Query& Query::between(size_t column_ndx, double from, double to)
 }
 
 
+// ------------- Timestamp
+Query& Query::greater(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Greater>(column_ndx, value);
+}
+Query& Query::equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Equal>(column_ndx, value);
+}
+Query& Query::not_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<NotEqual>(column_ndx, value);
+}
+Query& Query::greater_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<GreaterEqual>(column_ndx, value);
+}
+Query& Query::less_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<LessEqual>(column_ndx, value);
+}
+Query& Query::less(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Less>(column_ndx, value);
+}
+
+
 // Strings, StringData()
 
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
@@ -655,7 +685,7 @@ Query& Query::begins_with(size_t column_ndx, StringData value, bool case_sensiti
     if (case_sensitive)
         add_condition<BeginsWith>(column_ndx, value);
     else
-        add_condition<BeginsWithIns>(column_ndx, value);
+        add_condition<BeginsWithIns>(column_ndx, value); // FIXME2
     return *this;
 }
 Query& Query::ends_with(size_t column_ndx, StringData value, bool case_sensitive)

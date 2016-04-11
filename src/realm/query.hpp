@@ -164,6 +164,13 @@ public:
     Query& less_double(size_t column_ndx1, size_t column_ndx2);
     Query& less_equal_double(size_t column_ndx1, size_t column_ndx2);
 
+    Query& equal(size_t column_ndx, Timestamp value);
+    Query& not_equal(size_t column_ndx, Timestamp value);
+    Query& greater(size_t column_ndx, Timestamp value);
+    Query& greater_equal(size_t column_ndx, Timestamp value);
+    Query& less_equal(size_t column_ndx, Timestamp value);
+    Query& less(size_t column_ndx, Timestamp value);
+
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
 

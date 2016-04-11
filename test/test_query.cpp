@@ -6483,8 +6483,9 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, { }));
 
     // As stated above, if you want to use `> null()`, you cannot do it in the old syntax. This is for source
-    // code simplicity (would need tons of new method overloads that also need unit test testing, etc).
-    CHECK_THROW_ANY(tv = table->where().greater(0, null()).find_all());
+    // code simplicity (would need tons of new method overloads that also need unit test testing, etc). So
+    // following is not possible and will not compile
+    // (tv = table->where().greater(0, null()).find_all());
 
     // Nullable floats in old syntax
     tv = table->where().equal(1, null()).find_all();
