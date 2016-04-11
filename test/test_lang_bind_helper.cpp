@@ -11682,4 +11682,84 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 }
 
 
+// Trigger erase_rows with num_rows == 0 by inserting zero rows
+// and then rolling back the transaction. There was a problem
+// where accessors were not updated correctly in this case because
+// of an early out when num_rows_to_erase is zero.
+TEST(LangBindHelper_RollbackInsertZeroRows)
+{
+    SHARED_GROUP_TEST_PATH(shared_path)
+    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.add_table("t0");
+    g.insert_table(1, "t1");
+
+    g.get_table(0)->add_empty_row(2);
+    g.get_table(1)->add_empty_row(2);
+    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
+    g.get_table(0)->set_link(0, 1, 1);
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.get_table(1)->insert_empty_row(1, 0); // Insert zero rows
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+}
+
+
+ONLY(LangBindHelper_RollbackRemoveZeroRows)
+{
+    SHARED_GROUP_TEST_PATH(shared_path)
+    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.add_table("t0");
+    g.insert_table(1, "t1");
+
+    g.get_table(0)->add_empty_row(2);
+    g.get_table(1)->add_empty_row(2);
+    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
+    g.get_table(0)->set_link(0, 1, 1);
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.get_table(1)->clear();
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 0);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 0), realm::npos);
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+}
+
+
 #endif
