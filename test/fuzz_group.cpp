@@ -39,7 +39,8 @@ DataType get_type(unsigned char c)
         type_Binary,
         type_DateTime,
         type_Table,
-        type_Mixed
+        type_Mixed,
+        type_Timestamp
     };
 
     unsigned char mod = c % (sizeof(types) / sizeof(DataType));
@@ -64,6 +65,15 @@ unsigned char get_next(State& s)
 int64_t get_int64(State& s) {
     int64_t v = 0;
     for (size_t t = 0; t < 8; t++) {
+        unsigned char c = get_next(s);
+        *(reinterpret_cast<signed char*>(&v) + t) = c;
+    }
+    return v;
+}
+
+int32_t get_int32(State& s) {
+    int32_t v = 0;
+    for (size_t t = 0; t < 4; t++) {
         unsigned char c = get_next(s);
         *(reinterpret_cast<signed char*>(&v) + t) = c;
     }
@@ -382,6 +392,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 }
                             }
                         }
+                        else if (type == type_Timestamp) {
+                            uint32_t nanoseconds = static_cast<uint32_t>(get_int32(s)) % 1000000000;
+                            Timestamp value{ get_int64(s), nanoseconds };
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                            }
+                            t->set_timestamp(col_ndx, row_ndx, value);
+                        }
                     }
                 }
             }
@@ -449,7 +467,6 @@ void usage(const char* argv[])
 int run_fuzzy(int argc, const char* argv[])
 {
     util::Optional<std::ostream&> log;
-
     size_t file_arg = size_t(-1);
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
