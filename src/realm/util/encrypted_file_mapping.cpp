@@ -114,7 +114,6 @@ void check_write(int fd, off_t pos, const void *data, size_t len)
 {
     ssize_t ret = pwrite(fd, data, len, pos);
     REALM_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
-    static_cast<void>(ret);
 }
 
 size_t check_read(int fd, off_t pos, void *dst, size_t len)
@@ -284,8 +283,6 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
     CCCryptorStatus err = CCCryptorUpdate(cryptor, src, block_size, dst, block_size, &bytesEncrypted);
     REALM_ASSERT(err == kCCSuccess);
     REALM_ASSERT(bytesEncrypted == block_size);
-    static_cast<void>(bytesEncrypted);
-    static_cast<void>(err);
 #else
     AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst),
                     block_size, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);

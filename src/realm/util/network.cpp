@@ -883,7 +883,6 @@ void socket_base::do_close() noexcept
     // POSIX, but we shall assume it anyway). `EBADF`, however, would indicate
     // an implementation bug, so we don't want to ignore that.
     REALM_ASSERT(ret != -1 || errno != EBADF);
-    static_cast<void>(ret);
     m_sock_fd = -1;
 }
 

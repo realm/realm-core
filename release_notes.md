@@ -46,7 +46,6 @@
   (`util::Logger`) is now directly available to each unit test.
 * New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 * New failure simulation features: Ability to prime for random triggering.
-* Upgraded OpenSSL to 1.0.1s (Android).
 
 ----------------------------------------------
 
