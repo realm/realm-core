@@ -326,16 +326,25 @@ public:
     virtual ~TableViewBase() noexcept;
 
 protected:
-    // This TableView can be "born" from 4 different sources : LinkView, Table::get_distinct_view(),
-    // Table::find_all() or Query. Return the version of the source it was created from.
+    // This TableView can be "born" from 5 different sources:
+    // - LinkView
+    // - Table::find_all()
+    // - Query::find_all()
+    // - Table::get_distinct_view()
+    // - Table::get_backlink_view()
+    // Return the version of the source it was created from.
     uint64_t outside_version() const;
 
     void do_sync();
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
+    // Contains a reference to the table that is the target of the link.
+    // Null unless this TableView was created using Table::get_backlink_view.
     mutable TableRef m_linked_table;
+    // The index of the link column that this view contain backlinks for.
     size_t m_linked_column;
+    // The index of the target row that rows in this view link to.
     size_t m_linked_row;
 
     // If this TableView was created from a LinkView, then this reference points to it. Otherwise it's 0
@@ -906,8 +915,12 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
+    m_linked_table = std::move(tv.m_linked_table);
+    m_linked_column = tv.m_linked_column;
+    m_linked_row = tv.m_linked_row;
     m_linkview_source = std::move(tv.m_linkview_source);
-    m_distinct_columns = tv.m_distinct_columns;
+    m_distinct_columns = std::move(tv.m_distinct_columns);
+    m_distinct_column_source = tv.m_distinct_column_source;
     m_sorting_predicate = std::move(tv.m_sorting_predicate);
 
     return *this;

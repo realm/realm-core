@@ -1669,6 +1669,53 @@ TEST(TableView_Backlinks)
     }
 }
 
+// Verify that a TableView that represents backlinks to a row functions correctly
+// after being move-assigned.
+TEST(TableView_BacklinksAfterMoveAssign)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    source->add_column(type_Int, "int");
+
+    TableRef links = group.add_table("links");
+    links->add_column_link(type_Link, "link", *source);
+    links->add_column_link(type_LinkList, "link_list", *source);
+
+    source->add_empty_row(3);
+
+    { // Links
+        TableView tv_source = source->get_backlink_view(2, links.get(), 0);
+        TableView tv;
+        tv = std::move(tv_source);
+
+        CHECK_EQUAL(tv.size(), 0);
+
+        links->add_empty_row();
+        links->set_link(0, 0, 2);
+
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), 1);
+        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+    }
+    { // LinkViews
+        TableView tv_source = source->get_backlink_view(2, links.get(), 1);
+        TableView tv;
+        tv = std::move(tv_source);
+
+        CHECK_EQUAL(tv.size(), 0);
+
+        auto ll = links->get_linklist(1, 0);
+        ll->add(2);
+        ll->add(0);
+        ll->add(2);
+
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), 2);
+        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+    }
+}
+
 
 TEST(TableView_Distinct)
 {
