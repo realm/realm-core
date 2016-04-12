@@ -11724,7 +11724,7 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
 }
 
 
-ONLY(LangBindHelper_RollbackRemoveZeroRows)
+TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
     SHARED_GROUP_TEST_PATH(shared_path)
     std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
