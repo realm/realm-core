@@ -326,16 +326,25 @@ public:
     virtual ~TableViewBase() noexcept;
 
 protected:
-    // This TableView can be "born" from 4 different sources : LinkView, Table::get_distinct_view(),
-    // Table::find_all() or Query. Return the version of the source it was created from.
+    // This TableView can be "born" from 5 different sources:
+    // - LinkView
+    // - Table::find_all()
+    // - Query::find_all()
+    // - Table::get_distinct_view()
+    // - Table::get_backlink_view()
+    // Return the version of the source it was created from.
     uint64_t outside_version() const;
 
     void do_sync();
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
+    // Contains a reference to the table that is the target of the link.
+    // Null unless this TableView was created using Table::get_backlink_view.
     mutable TableRef m_linked_table;
+    // The index of the link column that this view contain backlinks for.
     size_t m_linked_column;
+    // The index of the target row that rows in this view link to.
     size_t m_linked_row;
 
     // If this TableView was created from a LinkView, then this reference points to it. Otherwise it's 0
