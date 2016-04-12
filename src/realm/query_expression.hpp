@@ -2023,8 +2023,11 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
             (link_map.m_link_types[0] == col_type_Link || link_map.m_link_types[0] == col_type_LinkList)) {
             const Table* t = column->get_base_table();
             Query query(*t);
-            if (std::is_same<Operator, NotEqual>::value)
+
+            if (std::is_same<Operator, NotEqual>::value) {
+                // Negate the following `links_to`.
                 query.Not();
+            }
             query.links_to(link_map.m_link_column_indexes[0], row);
             return query;
         }
