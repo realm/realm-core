@@ -234,4 +234,20 @@ TEST(TimestampColumn_DeleteWithIndex)
 
 }
 
+TEST(TimestampColumn_DeleteAfterSetWithIndex)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+
+    c.add(Timestamp{1, 1});
+    c.set(0,Timestamp{2, 2});
+    c.erase_rows(0, 1, 1, false);
+    CHECK_EQUAL(c.size(), 0);
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
 #endif // TEST_COLUMN_TIMESTAMP
