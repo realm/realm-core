@@ -1285,7 +1285,7 @@ public:
             if (unordered) {
                 // Unordered insertion of multiple rows is not yet supported (and not
                 // yet needed).
-                REALM_ASSERT_7(num_rows_to_insert, ==, 1, ||, num_rows_to_insert, ==, 0);
+                REALM_ASSERT_EX((num_rows_to_insert == 1) || (num_rows_to_insert == 0), num_rows_to_insert);
                 size_t from_row_ndx = row_ndx;
                 size_t to_row_ndx = prior_num_rows;
                 tf::adj_acc_move_over(*m_table, from_row_ndx, to_row_ndx);
@@ -1303,7 +1303,7 @@ public:
         if (unordered) {
             // Unordered removal of multiple rows is not yet supported (and not
             // yet needed).
-            REALM_ASSERT_7(num_rows_to_erase, ==, 1, ||, num_rows_to_erase, ==, 0);
+            REALM_ASSERT_EX((num_rows_to_erase == 1) || (num_rows_to_erase == 0), num_rows_to_erase);
             typedef _impl::TableFriend tf;
             if (m_table) {
                 size_t prior_last_row_ndx = prior_num_rows - 1;
