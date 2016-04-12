@@ -342,8 +342,8 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
             case type_Bool:
                 if (get_bool(i) != c.get_bool(i)) return false;
                 break;
-            case type_DateTime:
-                if (get_datetime(i) != c.get_datetime(i)) return false;
+            case type_OldDateTime:
+                if (get_olddatetime(i) != c.get_olddatetime(i)) return false;
                 break;
             case type_Timestamp:
                 if (get_timestamp(i) != c.get_timestamp(i)) return false;

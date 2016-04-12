@@ -989,7 +989,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         TableRef table_w = wt.get_table("t");
         table_w->set_mixed(0, 0, Mixed(int_type(2)));
         table_w->set_mixed(0, 1, Mixed(true));
-        table_w->set_mixed(0, 2, Mixed(DateTime(3)));
+        table_w->set_mixed(0, 2, Mixed(OldDateTime(3)));
         table_w->set_mixed(1, 0, Mixed(4.0f));
         table_w->set_mixed(1, 1, Mixed(5.0));
         wt.get_group().verify();
@@ -1004,8 +1004,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
     CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1)) &&
         CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(0, 2)) &&
-        CHECK_EQUAL(DateTime(3), table->get_mixed(0, 2).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(OldDateTime(3), table->get_mixed(0, 2).get_olddatetime());
     CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) &&
         CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
     CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
@@ -1031,7 +1031,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         table_w->set_mixed(1, 2, Mixed(int_type(40)));
         table_w->set_mixed(2, 0, Mixed(50.0));
         table_w->set_mixed(2, 1, Mixed(StringData("Banach")));
-        table_w->set_mixed(2, 2, Mixed(DateTime(60)));
+        table_w->set_mixed(2, 2, Mixed(OldDateTime(60)));
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1052,8 +1052,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
-        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 2).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
 
     // Insert rows before
     {
@@ -1080,8 +1080,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(50.0, table->get_mixed(2, 8+0).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2, 8+1)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2, 8+1).get_string());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 8+2)) &&
-        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 8+2).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 8+2)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 8+2).get_olddatetime());
 
     // Move rows by remove() (ordered removal)
     {
@@ -1109,8 +1109,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(50.0, table->get_mixed(2, 6+0).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2, 6+1)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2, 6+1).get_string());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 6+2)) &&
-        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 6+2).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 6+2)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 6+2).get_olddatetime());
 
     // Move rows by move_last_over() (unordered removal)
     {
@@ -1139,8 +1139,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2, 4)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 2)) &&
-        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 2).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
 
     // Swap rows
     {
@@ -1168,15 +1168,15 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2, 0)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2, 5)) &&
-        CHECK_EQUAL(DateTime(60), table->get_mixed(2, 5).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 5)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 5).get_olddatetime());
 
     // Insert columns before
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
         table_w->insert_column(0, type_Int,      "x1");
-        table_w->insert_column(0, type_DateTime, "x2");
+        table_w->insert_column(0, type_OldDateTime, "x2");
         table_w->insert_column(1, type_Float,    "x3");
         table_w->insert_column(0, type_Double,   "x4");
         table_w->insert_column(2, type_String,   "x5");
@@ -1203,8 +1203,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(50.0, table->get_mixed(2+8, 4).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2+8, 0)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2+8, 0).get_string());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2+8, 5)) &&
-        CHECK_EQUAL(DateTime(60), table->get_mixed(2+8, 5).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2+8, 5)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2+8, 5).get_olddatetime());
 
     // Remove columns before
     {
@@ -1232,8 +1232,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(50.0, table->get_mixed(2+6, 4).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(2+6, 0)) &&
         CHECK_EQUAL("Banach", table->get_mixed(2+6, 0).get_string());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(2+6, 5)) &&
-        CHECK_EQUAL(DateTime(60), table->get_mixed(2+6, 5).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2+6, 5)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2+6, 5).get_olddatetime());
 
     // Move columns around
     {
@@ -1264,8 +1264,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double());
     CHECK_EQUAL(type_String, table->get_mixed_type(3, 0)) &&
         CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
-    CHECK_EQUAL(type_DateTime, table->get_mixed_type(3, 5)) &&
-        CHECK_EQUAL(DateTime(60), table->get_mixed(3, 5).get_datetime());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(3, 5)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(3, 5).get_olddatetime());
 }
 
 
@@ -7413,7 +7413,7 @@ public:
     bool set_string(size_t, size_t, StringData) { return false; }
     bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
     bool set_binary(size_t, size_t, BinaryData) { return false; }
-    bool set_date_time(size_t, size_t, DateTime) { return false; }
+    bool set_date_time(size_t, size_t, OldDateTime) { return false; }
     bool set_timestamp(size_t, size_t, Timestamp) { return false; }
     bool set_table(size_t, size_t) { return false; }
     bool set_mixed(size_t, size_t, const Mixed&) { return false; }

@@ -1440,7 +1440,7 @@ TEST(Shared_FormerErrorCase1)
         table->add_column(type_Int,      "alpha");
         table->add_column(type_Bool,     "beta");
         table->add_column(type_Int,      "gamma");
-        table->add_column(type_DateTime, "delta");
+        table->add_column(type_OldDateTime, "delta");
         table->add_column(type_String,   "epsilon");
         table->add_column(type_Binary,   "zeta");
         table->add_column(type_Table,    "eta", &sub_1);

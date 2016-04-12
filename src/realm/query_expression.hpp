@@ -112,7 +112,7 @@ First note that at array level, nulls are distinguished between non-null in diff
 String:
     m_data == 0 && m_size == 0
 
-Integer, Bool, DateTime stored in ArrayIntNull:
+Integer, Bool, OldDateTime stored in ArrayIntNull:
     value == get(0) (entry 0 determins a magic value that represents nulls)
 
 Float/double:
@@ -154,7 +154,7 @@ T minimum(T a, T b)
 // FIXME, this needs to exist elsewhere
 typedef int64_t             Int;
 typedef bool                Bool;
-typedef realm::DateTime   DateTime;
+typedef realm::OldDateTime   OldDateTime;
 typedef float               Float;
 typedef double              Double;
 typedef realm::StringData String;
@@ -527,7 +527,7 @@ public:
             const Table* t = left_col->get_base_table();
             Query q = Query(*t);
 
-            if (std::numeric_limits<L>::is_integer || std::is_same<L, DateTime>::value) {
+            if (std::numeric_limits<L>::is_integer || std::is_same<L, OldDateTime>::value) {
                 if (std::is_same<Cond, Less>::value)
                     q.less_int(left_col->m_column, right_col->m_column);
                 else if (std::is_same<Cond, Greater>::value)
@@ -624,19 +624,19 @@ public:
 template<class T>
 class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
 Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, public Overloads<T, StringData>,
-public Overloads<T, bool>, public Overloads<T, Timestamp>, public Overloads<T, DateTime>, public Overloads<T, null>
+public Overloads<T, bool>, public Overloads<T, Timestamp>, public Overloads<T, OldDateTime>, public Overloads<T, null>
 {
 public:
     virtual ~Subexpr2() {};
 
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
-#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(DateTime, o) RLM_U2(Timestamp, o) RLM_U2(null, o)
+#define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(OldDateTime, o) RLM_U2(Timestamp, o) RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/ ) RLM_U(> ) RLM_U(< ) RLM_U(== ) RLM_U(!= ) RLM_U(>= ) RLM_U(<= )
 };
 
 
 /*
-This class is used to store N values of type T = {int64_t, bool, DateTime or StringData}, and allows an entry
+This class is used to store N values of type T = {int64_t, bool, OldDateTime or StringData}, and allows an entry
 to be null too. It's used by the Value class for internal storage.
 
 To indicate nulls, we could have chosen a separate bool vector or some other bitmask construction. But for
@@ -731,7 +731,7 @@ struct NullableVector
     }
 
     template <typename Type = T>
-    typename std::enable_if<realm::is_any<Type, float, double, DateTime, BinaryData, StringData, Timestamp, null>::value,
+    typename std::enable_if<realm::is_any<Type, float, double, OldDateTime, BinaryData, StringData, Timestamp, null>::value,
                             void>::type
     set(size_t index, t_storage value) {
         m_first[index] = value;
@@ -845,16 +845,16 @@ inline bool NullableVector<null>::is_null(size_t) const
 }
 
 
-// DateTime
+// OldDateTime
 template<>
-inline bool NullableVector<DateTime>::is_null(size_t index) const
+inline bool NullableVector<OldDateTime>::is_null(size_t index) const
 {
-    return m_first[index].get_datetime() == m_null;
+    return m_first[index].get_olddatetime() == m_null;
 }
 
 
 template<>
-inline void NullableVector<DateTime>::set_null(size_t index)
+inline void NullableVector<OldDateTime>::set_null(size_t index)
 {
     m_first[index] = m_null;
 }
@@ -1099,7 +1099,7 @@ public:
             source.export_float(*this);
         else if (std::is_same<T, double>::value)
             source.export_double(*this);
-        else if (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value ||  std::is_same<T, DateTime>::value)
+        else if (std::is_same<T, int64_t>::value || std::is_same<T, bool>::value ||  std::is_same<T, OldDateTime>::value)
             source.export_int64_t(*this);
         else if (std::is_same<T, StringData>::value)
             source.export_StringData(*this);

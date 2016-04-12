@@ -293,7 +293,7 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
     switch (type) {
         case type_Int:
         case type_Bool:
-        case type_DateTime: {
+        case type_OldDateTime: {
             if (is_nullable) {
                 return MakeConditionNode<IntegerNode<IntNullColumn, Cond>>::make(column_ndx, value);
             }
@@ -885,7 +885,7 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
-DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
+OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
                                  size_t limit, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
@@ -929,7 +929,7 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
                                       return_ndx);
 }
 
-DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                                  size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {

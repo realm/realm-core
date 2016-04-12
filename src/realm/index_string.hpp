@@ -29,7 +29,7 @@
 #include <realm/column_fwd.hpp>
 
  /*
-The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_DateTime and
+The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_OldDateTime and
 type_Int. When used for integral types, the 64-bit integer is simply casted to a string of 8 bytes through a
 pretty simple "wrapper layer" in all public methods.
 

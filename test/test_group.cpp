@@ -1262,7 +1262,7 @@ TEST(Group_Serialize_All)
 
     table->add_column(type_Int,      "int");
     table->add_column(type_Bool,     "bool");
-    table->add_column(type_DateTime, "date");
+    table->add_column(type_OldDateTime, "date");
     table->add_column(type_String,   "string");
     table->add_column(type_Binary,   "binary");
     table->add_column(type_Mixed,    "mixed");
@@ -1270,7 +1270,7 @@ TEST(Group_Serialize_All)
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
-    table->set_datetime(2, 0, 12345);
+    table->set_olddatetime(2, 0, 12345);
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
     table->set_mixed(5, 0, false);
@@ -1286,7 +1286,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK_EQUAL(12345, t->get_datetime(2, 0));
+    CHECK_EQUAL(12345, t->get_olddatetime(2, 0));
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).size());
     CHECK_EQUAL("binary", t->get_binary(4, 0).data());
@@ -1305,7 +1305,7 @@ TEST(Group_Persist)
     TableRef table = db.add_table("test");
     table->add_column(type_Int,      "int");
     table->add_column(type_Bool,     "bool");
-    table->add_column(type_DateTime, "date");
+    table->add_column(type_OldDateTime, "date");
     table->add_column(type_String,   "string");
     table->add_column(type_Binary,   "binary");
     table->add_column(type_Mixed,    "mixed");
@@ -1313,7 +1313,7 @@ TEST(Group_Persist)
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
-    table->set_datetime(2, 0, 12345);
+    table->set_olddatetime(2, 0, 12345);
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
     table->set_mixed(5, 0, false);
@@ -1330,7 +1330,7 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(12345, table->get_datetime(2, 0));
+    CHECK_EQUAL(12345, table->get_olddatetime(2, 0));
     CHECK_EQUAL("test", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -1352,7 +1352,7 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(12345, table->get_datetime(2, 0));
+    CHECK_EQUAL(12345, table->get_olddatetime(2, 0));
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -2427,7 +2427,7 @@ TEST(Group_ToDot)
     DescriptorRef subdesc;
     s.add_column(type_Int,      "int");
     s.add_column(type_Bool,     "bool");
-    s.add_column(type_DateTime, "date");
+    s.add_column(type_OldDateTime, "date");
     s.add_column(type_String,   "string");
     s.add_column(type_String,   "string_long");
     s.add_column(type_String,   "string_enum"); // becomes StringEnumColumn
@@ -2442,7 +2442,7 @@ TEST(Group_ToDot)
         table->insert_empty_row(i);
         table->set_int(0, i, i);
         table->set_bool(1, i, (i % 2 ? true : false));
-        table->set_datetime(2, i, 12345);
+        table->set_olddatetime(2, i, 12345);
 
         std::stringstream ss;
         ss << "string" << i;

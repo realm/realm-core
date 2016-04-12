@@ -24,7 +24,7 @@ const char* LangBindHelper::get_data_type_name(DataType type) noexcept
         case type_Double:   return "double";
         case type_String:   return "string";
         case type_Binary:   return "binary";
-        case type_DateTime: return "date";
+        case type_OldDateTime: return "date";
         case type_Timestamp:  return "timestamp";
         case type_Table:    return "table";
         case type_Mixed:    return "mixed";

@@ -125,7 +125,7 @@ REALM_TABLE_9(MyTable,
               my_double,    Double,
               my_string,    String,
               my_binary,    Binary,
-              my_date_time, DateTime,
+              my_date_time, OldDateTime,
               my_subtable,  Subtable<MySubtable>,
               my_mixed,     Mixed)
 

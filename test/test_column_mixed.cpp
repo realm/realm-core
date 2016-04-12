@@ -191,28 +191,28 @@ TEST(MixedColumn_Date)
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
-    c.insert_datetime(0,     2);
-    c.insert_datetime(1,   100);
-    c.insert_datetime(2, 20000);
+    c.insert_olddatetime(0,     2);
+    c.insert_olddatetime(1,   100);
+    c.insert_olddatetime(2, 20000);
     CHECK_EQUAL(3, c.size());
 
     for (size_t i = 0; i < c.size(); ++i)
-        CHECK_EQUAL(type_DateTime, c.get_type(i));
+        CHECK_EQUAL(type_OldDateTime, c.get_type(i));
 
-    CHECK_EQUAL(    2, c.get_datetime(0));
-    CHECK_EQUAL(  100, c.get_datetime(1));
-    CHECK_EQUAL(20000, c.get_datetime(2));
+    CHECK_EQUAL(    2, c.get_olddatetime(0));
+    CHECK_EQUAL(  100, c.get_olddatetime(1));
+    CHECK_EQUAL(20000, c.get_olddatetime(2));
 
-    c.set_datetime(0,   400);
-    c.set_datetime(1,     0);
-    c.set_datetime(2, 99999);
+    c.set_olddatetime(0,   400);
+    c.set_olddatetime(1,     0);
+    c.set_olddatetime(2, 99999);
 
     for (size_t i = 0; i < c.size(); ++i)
-        CHECK_EQUAL(type_DateTime, c.get_type(i));
+        CHECK_EQUAL(type_OldDateTime, c.get_type(i));
 
-    CHECK_EQUAL(  400, c.get_datetime(0));
-    CHECK_EQUAL(    0, c.get_datetime(1));
-    CHECK_EQUAL(99999, c.get_datetime(2));
+    CHECK_EQUAL(  400, c.get_olddatetime(0));
+    CHECK_EQUAL(    0, c.get_olddatetime(1));
+    CHECK_EQUAL(99999, c.get_olddatetime(2));
     CHECK_EQUAL(3, c.size());
 
     c.destroy();
@@ -349,7 +349,7 @@ TEST(MixedColumn_Mixed)
     // Insert mixed types
     c.insert_int(0, 23);
     c.insert_bool(0, false);
-    c.insert_datetime(0, 23423);
+    c.insert_olddatetime(0, 23423);
     c.insert_string(0, "Hello");
     c.insert_binary(0, BinaryData("binary"));
     c.insert_subtable(0, 0);
@@ -365,14 +365,14 @@ TEST(MixedColumn_Mixed)
     CHECK_EQUAL(type_Table,  c.get_type(3));
     CHECK_EQUAL(type_Binary, c.get_type(4));
     CHECK_EQUAL(type_String, c.get_type(5));
-    CHECK_EQUAL(type_DateTime,   c.get_type(6));
+    CHECK_EQUAL(type_OldDateTime,   c.get_type(6));
     CHECK_EQUAL(type_Bool,   c.get_type(7));
     CHECK_EQUAL(type_Int, c.get_type(8));
 
     // Check values
     CHECK_EQUAL(c.get_int(8), 23);
     CHECK_EQUAL(c.get_bool(7), false);
-    CHECK_EQUAL(c.get_datetime(6), 23423);
+    CHECK_EQUAL(c.get_olddatetime(6), 23423);
     CHECK_EQUAL(c.get_string(5), "Hello");
     CHECK_EQUAL(c.get_binary(4), BinaryData("binary"));
     CHECK_EQUAL(c.get_float(2), 1.124f);
@@ -382,7 +382,7 @@ TEST(MixedColumn_Mixed)
     // Change all entries to new types
     c.set_int(0, 23);
     c.set_bool(1, false);
-    c.set_datetime(2, 23423);
+    c.set_olddatetime(2, 23423);
     c.set_string(3, "Hello");
     c.set_binary(4, BinaryData("binary"));
     c.set_subtable(5, 0);
@@ -397,7 +397,7 @@ TEST(MixedColumn_Mixed)
     CHECK_EQUAL(type_Table,  c.get_type(5));
     CHECK_EQUAL(type_Binary, c.get_type(4));
     CHECK_EQUAL(type_String, c.get_type(3));
-    CHECK_EQUAL(type_DateTime,   c.get_type(2));
+    CHECK_EQUAL(type_OldDateTime,   c.get_type(2));
     CHECK_EQUAL(type_Bool,   c.get_type(1));
     CHECK_EQUAL(type_Int,    c.get_type(0));
 
