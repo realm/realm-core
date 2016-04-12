@@ -57,6 +57,8 @@ fpm \
     --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Sebastian Lauwers <sl@realm.io>" \
     --after-install /tmp/post-ldconf \
     --after-remove /tmp/post-ldconf \
     -C /prod \
@@ -73,6 +75,8 @@ fpm \
     --description "Development headers and tools for the realm-core C++ library" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Sebastian Lauwers <sl@realm.io>" \
     -d "realm-core = ${VERSION}-${BUILD_NUMBER}" \
     -C /devel \
     usr/lib64 usr/include usr/bin
@@ -88,6 +92,8 @@ fpm \
     --description "Utilities to work with Realm files" \
     --url "https://realm.io" \
     --category "Applications/Databases" \
+    --vendor "Realm" \
+    --maintainer "Sebastian Lauwers <sl@realm.io>" \
     -d "realm-core = ${VERSION}-${BUILD_NUMBER}" \
     -C /utils \
     usr/bin
