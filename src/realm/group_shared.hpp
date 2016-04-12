@@ -541,10 +541,15 @@ private:
     // Member variables
     Group m_group;
     ReadLockInfo m_read_lock;
-    uint_fast32_t m_local_max_entry;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
-    util::File::Map<SharedInfo> m_reader_map;
+    // remapped only under lock (m_reader_map_lock), with side-effects
+    // deposited in atomics m_local_max_entry and m_reader_map_base.
+    // hence: never call m_reader_map.get_addr(), use m_reader_map_base instead
+    util::File::Map<SharedInfo> m_reader_map; 
+    std::atomic<uint_fast32_t> m_local_max_entry;
+    std::atomic<SharedInfo*> m_reader_map_base;
+    util::Mutex m_reader_map_lock;
     bool m_wait_for_change_enabled;
     std::string m_lockfile_path;
     std::string m_lockfile_prefix;
