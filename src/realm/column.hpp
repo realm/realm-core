@@ -1254,7 +1254,6 @@ template<class T> struct NullOrDefaultValue<T, typename std::enable_if<!Implicit
     static T null_or_default_value(bool is_null)
     {
         REALM_ASSERT(!is_null);
-        static_cast<void>(is_null);
         return T{};
     }
 };

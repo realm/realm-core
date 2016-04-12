@@ -11,6 +11,22 @@
 using namespace realm;
 using namespace realm::util;
 
+// Determines whether or not to run the shared group verify function
+// after each transaction. This will find errors earlier but is expensive.
+#define REALM_VERIFY true
+
+#if REALM_VERIFY
+    #define REALM_DO_IF_VERIFY(log, op) \
+        do { \
+            if (log) *log << #op << ";\n"; \
+            op; \
+        } \
+        while(false)
+#else
+    #define REALM_DO_IF_VERIFY(log, owner) \
+        do {} while(false)
+#endif
+
 struct EndOfFile {};
 
 std::string create_string(unsigned char byte)
@@ -417,38 +433,33 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             else if (instr == COMMIT) {
                 if (log) {
                     *log << "LangBindHelper::commit_and_continue_as_read(sg_w);\n";
-                    *log << "g.verify();\n";
                 }
                 LangBindHelper::commit_and_continue_as_read(sg_w);
-                g.verify();
+                REALM_DO_IF_VERIFY(log, g.verify());
                 if (log) {
                     *log << "LangBindHelper::promote_to_write(sg_w);\n";
-                    *log << "g.verify();\n";
                 }
                 LangBindHelper::promote_to_write(sg_w);
-                g.verify();
+                REALM_DO_IF_VERIFY(log, g.verify());
             }
             else if (instr == ROLLBACK) {
                 if (log) {
                     *log << "LangBindHelper::rollback_and_continue_as_read(sg_w);\n";
-                    *log << "g.verify();\n";
                 }
                 LangBindHelper::rollback_and_continue_as_read(sg_w);
-                g.verify();
+                REALM_DO_IF_VERIFY(log, g.verify());
                 if (log) {
                     *log << "LangBindHelper::promote_to_write(sg_w);\n";
-                    *log << "g.verify();\n";
                 }
                 LangBindHelper::promote_to_write(sg_w);
-                g.verify();
+                REALM_DO_IF_VERIFY(log, g.verify());
             }
             else if (instr == ADVANCE) {
                 if (log) {
                     *log << "LangBindHelper::advance_read(sg_r);\n";
-                    *log << "g_r.verify();\n";
                 }
                 LangBindHelper::advance_read(sg_r);
-                g_r.verify();
+                REALM_DO_IF_VERIFY(log, g_r.verify());
             }
         }
     }
