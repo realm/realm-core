@@ -530,22 +530,8 @@ void Array::set(size_t ndx, int64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    bool do_expand = value < m_lbound || value > m_ubound;
-    if (do_expand) {
-        size_t width = bit_width(value);
-        REALM_ASSERT_DEBUG(width > m_width);
-        Getter old_getter = m_getter;    // Save old getter before width expansion
-        alloc(m_size, width); // Throws
-        set_width(width);
-
-        // Expand the old values
-        size_t i = m_size;
-        while (i != 0) {
-            --i;
-            int64_t v = (this->*old_getter)(i);
-            (this->*(m_vtable->setter))(i, v);
-        }
-    }
+    // Grow the array if needed to store this value
+    ensure_minimum_width(value); // Throws
 
     // Set the value
     (this->*(m_vtable->setter))(ndx, value);
@@ -733,6 +719,37 @@ void Array::set_all_to_zero()
 
     // Update header
     set_header_width(0);
+}
+
+void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
+{
+    for (size_t i = 0, n = size(); i != n; ) {
+        REALM_TEMPEX(i = adjust_ge, m_width, (i, n, limit, diff))
+    }
+}
+
+template<size_t w>
+size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff)
+{
+    // Check if we need to copy before modifying
+    copy_on_write(); // Throws
+
+    for (size_t i = start; i != end; ++i) {
+        int_fast64_t v = get<w>(i);
+        if (v >= limit) {
+            int64_t shifted = v + diff;
+
+            // Make sure the new value can actually be stored. If this changes
+            // the width, return the current position to the caller so that it
+            // can switch to the appropriate specialization for the new width.
+            ensure_minimum_width(shifted); // Throws
+            if (m_width != w)
+                return i;
+
+            set<w>(i, shifted);
+        }
+    }
+    return end;
 }
 
 
