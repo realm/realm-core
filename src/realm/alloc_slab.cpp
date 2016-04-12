@@ -438,6 +438,9 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
                 // Once established, the initial mapping is immutable, so we
                 // don't need to grab a lock for access.
                 map = &m_file_mappings->m_initial_mapping;
+                realm::util::encryption_read_barrier(addr, Array::header_size,
+                                                     map->get_encrypted_mapping(),
+                                                     Array::get_byte_size_from_header);
             }
         }
         else {
@@ -452,10 +455,10 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
             map = m_local_mappings[mapping_index].get();
             REALM_ASSERT_DEBUG(map->get_addr() != nullptr);
             addr = map->get_addr() + section_offset;
+            realm::util::encryption_read_barrier(addr, Array::header_size,
+                                                 map->get_encrypted_mapping(),
+                                                 Array::get_byte_size_from_header);
         }
-        realm::util::encryption_read_barrier(addr, Array::header_size,
-                                             map->get_encrypted_mapping(),
-                                             Array::get_byte_size_from_header);
     }
     else {
         typedef slabs::const_iterator iter;
@@ -526,7 +529,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_free_space_state = free_space_Invalid;
         m_file_on_streaming_form = false;
-        if (m_file_mappings->m_num_global_mappings) {
+        if (m_file_mappings->m_num_global_mappings != 0) {
             size_t mapping_index = m_file_mappings->m_num_global_mappings;
             size_t section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
             m_baseline = get_section_base(section_index);
