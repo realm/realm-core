@@ -35,15 +35,16 @@ echo "Cleaning up the findings directory"
 pkill afl-fuzz
 rm -rf findings/* &> /dev/null
 
+TIME_OUT="100" # ms
+MEMORY="100" # MB
+
 # if we have only one fuzzer
 if [ $NUM_CORES -eq 1 ]; then
-    afl-fuzz  -i testcases -o findings $EXECUTABLE_PATH @@
+    afl-fuzz  -t $TIME_OUT -m $MEMORY -i testcases -o findings $EXECUTABLE_PATH @@
     exit 0
 fi
 
-# start the fuzzers
-TIME_OUT="100" # ms
-MEMORY="100" # MB
+# start the fuzzers in parallel
 afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -M fuzzer1 $EXECUTABLE_PATH @@ --name fuzzer1 > /dev/null 2>&1 &
 
 for i in `seq 2 $NUM_CORES`;
