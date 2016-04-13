@@ -2,20 +2,34 @@
 
 set -euo pipefail
 
+function showUsage () {
+  cat <<EOF
+Usage: $0 <branch>|<commit>|<tag>
+Commit can be the 7-letter commit ID.
+NB! A tag must begin with tags/.
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h | --help )
+      showUsage
+      exit 0
+      ;;
+    * )
+      break
+      ;;
+  esac
+done
+
 if [ $# -lt 1 ]; then
-  REF=master
+  showUsage
+  exit 1
 else
   REF=$1
 fi
 
-BRANCH="$(basename "${REF}")"
-if [ "${BRANCH}" == "${REF}" ]; then
-  REF="origin/${REF}"
-fi
-
-ORIGINDIR="${PWD}"
-
-BASEDIR="core-builds/${BRANCH}"
+BASEDIR="core-builds/${REF}"
 mkdir -p "${BASEDIR}"
 BASEDIR="$(realpath "${BASEDIR}")"
 
@@ -29,7 +43,13 @@ fi
 
 cd "${SRCDIR}"
 
-git checkout -B "${BRANCH}" "${REF}"
+if [ `git branch -r | grep "^\\s*origin/${REF}$"` ]; then
+  REMOTE="origin/${REF}"
+else
+  REMOTE="${REF}"
+fi
+
+git checkout -B "${REF}" "${REMOTE}"
 sh build.sh clean
 sh build.sh config "${BASEDIR}"
 sh build.sh build
