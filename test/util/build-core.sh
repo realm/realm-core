@@ -35,12 +35,10 @@ else
   REF=$1
 fi
 
-BASEDIR="${BUILDDIR}/${REF}"
-mkdir -p "${BASEDIR}"
-BASEDIR="$(realpath "${BASEDIR}")"
-
+BASEDIR="$(realpath "${BUILDDIR}/${REF}")"
 SRCDIR="${BASEDIR}/src"
 
+mkdir -p "${BASEDIR}"
 if [ ! -d "${SRCDIR}" ]; then
   git clone git@github.com:realm/realm-core.git "${SRCDIR}"
 else
