@@ -77,7 +77,7 @@ fpm \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Sebastian Lauwers <sl@realm.io>" \
-    -d "realm-core = ${VERSION}-${BUILD_NUMBER}" \
+    -d "realm-core = ${VERSION}-${BUILD_NUMBER}.el7" \
     -C /devel \
     usr/lib64 usr/include usr/bin
 
@@ -94,6 +94,6 @@ fpm \
     --category "Applications/Databases" \
     --vendor "Realm" \
     --maintainer "Sebastian Lauwers <sl@realm.io>" \
-    -d "realm-core = ${VERSION}-${BUILD_NUMBER}" \
+    -d "realm-core = ${VERSION}-${BUILD_NUMBER}.el7" \
     -C /utils \
     usr/bin
