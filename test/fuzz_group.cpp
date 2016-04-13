@@ -463,7 +463,7 @@ void usage(const char* argv[])
 int run_fuzzy(int argc, const char* argv[])
 {
     util::Optional<std::ostream&> log;
-    std::string name = "";
+    std::string name = "fuzz-test";
 
     size_t file_arg = size_t(-1);
     for (size_t i = 1; i < size_t(argc); ++i) {
@@ -490,7 +490,7 @@ int run_fuzzy(int argc, const char* argv[])
     }
 
     disable_sync_to_disk();
-    realm::test_util::SharedGroupTestPathGuard path("/tmp/fuzz.realm.test" + name);
+    realm::test_util::SharedGroupTestPathGuard path("/tmp/" + name + ".realm");
 
     try {
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
