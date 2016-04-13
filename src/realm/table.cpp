@@ -416,7 +416,7 @@ DescriptorRef Table::get_descriptor()
     else {
         desc.reset(m_descriptor);
     }
-    return move(desc);
+    return desc;
 }
 
 
@@ -1884,8 +1884,6 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, 
         REALM_ASSERT_3(col_type, ==, real_col_type);
     }
     static_cast<void>(column);
-    static_cast<void>(ndx);
-    static_cast<void>(real_col_type);
 }
 
 

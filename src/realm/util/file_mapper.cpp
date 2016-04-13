@@ -256,7 +256,6 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
     else
 #else
     REALM_ASSERT(!encryption_key);
-    static_cast<void>(encryption_key);
 #endif
     {
         int prot = PROT_READ;

@@ -547,15 +547,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_file_mappings->m_file.set_encryption_key(cfg.encryption_key);
     File::CloseGuard fcg(m_file_mappings->m_file);
 
-    size_t initial_size_of_file;
     size_t size;
-
-    // We can only safely mmap the file, if its size matches a section. If not,
-    // we must change the size to match before mmaping it.
-    // This can fail due to a race with a concurrent commmit, in which case we
-    // must throw allowing the caller to retry, but the common case is to succeed
-    // at first attempt
-
     // The size of a database file must not exceed what can be encoded in
     // size_t.
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file_mappings->m_file.get_size(), size)))
@@ -588,11 +580,93 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             m_file_mappings->m_file.sync(); // Throws
         size = initial_size;
     }
+    ref_type top_ref;
+    try {
+        File::Map<char> map(m_file_mappings->m_file, File::access_ReadOnly, size); // Throws
+        // we'll read header and (potentially) footer
+        realm::util::encryption_read_barrier(map, 0, sizeof(Header));
+        realm::util::encryption_read_barrier(map, size - sizeof(Header), sizeof(Header));
 
-    // We must now make sure the filesize matches a mmap boundary...
-    // first, save the original filesize for use during validation and
-    // (potentially) conversion from streaming format.
-    initial_size_of_file = size;
+        if (!cfg.skip_validate) {
+            // Verify the data structures
+            validate_buffer(map.get_addr(), size, path, cfg.is_shared); // Throws
+        }
+
+        {
+            const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
+            int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+            m_file_format_version = header.m_file_format[slot_selector];
+            uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+            m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+            if (m_file_on_streaming_form) {
+                const StreamingFooter& footer =
+                    *(reinterpret_cast<StreamingFooter*>(map.get_addr()+size) - 1);
+                top_ref = ref_type(footer.m_top_ref);
+            }
+            else {
+                top_ref = ref_type(ref);
+            }
+        }
+
+        m_data = map.get_addr();
+        m_file_mappings->m_initial_mapping = std::move(map);
+        m_baseline = size;
+        m_initial_chunk_size = size;
+        m_file_mappings->m_first_additional_mapping = get_section_index(m_initial_chunk_size);
+        m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
+    }
+    catch (DecryptionFailed) {
+        throw InvalidDatabase("Realm file decryption failed", path);
+    }
+    // make sure that any call to begin_read cause any slab to be placed in free
+    // lists correctly
+    m_free_space_state = free_space_Invalid;
+
+    // Ensure clean up, if we need to back out:
+    DetachGuard dg(*this);
+
+    // make sure the database is not on streaming format. If we did not do this, 
+    // a later commit would have to do it. That would require coordination with
+    // anybody concurrently joining the session, so it seems easier to do it at
+    // session initialization, even if it means writing the database during open.
+    if (cfg.session_initiator && m_file_on_streaming_form) {
+        const Header& header = *reinterpret_cast<Header*>(m_data);
+        const StreamingFooter& footer =
+            *(reinterpret_cast<StreamingFooter*>(m_data+size) - 1);
+        // Don't compare file format version fields as they are allowed to differ.
+        // Also don't compare reserved fields (todo, is it correct to ignore?)
+        static_cast<void>(header);
+        REALM_ASSERT_3(header.m_flags, == , 0);
+        REALM_ASSERT_3(header.m_mnemonic[0], == , uint8_t('T'));
+        REALM_ASSERT_3(header.m_mnemonic[1], == , uint8_t('-'));
+        REALM_ASSERT_3(header.m_mnemonic[2], == , uint8_t('D'));
+        REALM_ASSERT_3(header.m_mnemonic[3], == , uint8_t('B'));
+        REALM_ASSERT_3(header.m_top_ref[0], == , 0xFFFFFFFFFFFFFFFFULL);
+        REALM_ASSERT_3(header.m_top_ref[1], == , 0);
+
+        REALM_ASSERT_3(footer.m_magic_cookie, ==, footer_magic_cookie);
+        {
+            File::Map<Header> writable_map(m_file_mappings->m_file, File::access_ReadWrite,
+                                           sizeof (Header)); // Throws
+            Header& writable_header = *writable_map.get_addr();
+            realm::util::encryption_read_barrier(writable_map, 0);
+            writable_header.m_top_ref[1] = footer.m_top_ref;
+            writable_header.m_file_format[1] = writable_header.m_file_format[0];
+            realm::util::encryption_write_barrier(writable_map, 0);
+            writable_map.sync();
+            realm::util::encryption_read_barrier(writable_map, 0);
+            writable_header.m_flags |= flags_SelectBit;
+            realm::util::encryption_write_barrier(writable_map, 0);
+            m_file_on_streaming_form = false;
+            writable_map.sync();
+        }
+    }
+
+    // We can only safely mmap the file, if its size matches a section. If not,
+    // we must change the size to match before mmaping it.
+    // This can fail due to a race with a concurrent commmit, in which case we
+    // must throw allowing the caller to retry, but the common case is to succeed
+    // at first attempt
 
     if (!matches_section_boundary(size)) {
         // The file size did not match a section boundary.
@@ -627,6 +701,12 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
                 // actual size of the file.
                 size = get_upper_section_boundary(size);
                 m_file_mappings->m_file.prealloc(0, size);
+                m_file_mappings->m_initial_mapping.remap(m_file_mappings->m_file, 
+                                                         File::access_ReadOnly, size);
+                m_data = m_file_mappings->m_initial_mapping.get_addr();
+                m_baseline = size;
+                m_initial_chunk_size = size;
+                m_file_mappings->m_first_additional_mapping = get_section_index(m_initial_chunk_size);
             }
             else {
                 // Getting here, we have a file of a size that will not work, and without being
@@ -639,89 +719,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             }
         }
     }
-
-    ref_type top_ref;
-    try {
-        File::Map<char> map(m_file_mappings->m_file, File::access_ReadOnly, size); // Throws
-        // we'll read header and (potentially) footer
-        realm::util::encryption_read_barrier(map, 0, sizeof(Header));
-        realm::util::encryption_read_barrier(map, initial_size_of_file - sizeof(Header), sizeof(Header));
-
-        if (!cfg.skip_validate) {
-            // Verify the data structures
-            validate_buffer(map.get_addr(), initial_size_of_file, path, cfg.is_shared); // Throws
-        }
-
-        {
-            const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
-            int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-            m_file_format_version = header.m_file_format[slot_selector];
-            uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
-            m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
-            if (m_file_on_streaming_form) {
-                const StreamingFooter& footer =
-                    *(reinterpret_cast<StreamingFooter*>(map.get_addr()+initial_size_of_file) - 1);
-                top_ref = ref_type(footer.m_top_ref);
-            }
-            else {
-                top_ref = ref_type(ref);
-            }
-        }
-
-        m_data = map.get_addr();
-        m_file_mappings->m_initial_mapping = std::move(map);
-        m_baseline = size;
-        m_initial_chunk_size = size;
-        m_file_mappings->m_first_additional_mapping = get_section_index(m_initial_chunk_size);
-        m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
-
-        // Below this point (assignment to `m_attach_mode`), nothing must throw.
-    }
-    catch (DecryptionFailed) {
-        throw InvalidDatabase("Realm file decryption failed", path);
-    }
-
-    // make sure that any call to begin_read cause any slab to be placed in free
-    // lists correctly
-    m_free_space_state = free_space_Invalid;
-
-    // make sure the database is not on streaming format. This has to be done at
-    // session initialization, even if it means writing the database during open.
-    //
-    // FIXME: Why does this need to be done? Explanation needed.
-    if (cfg.session_initiator && m_file_on_streaming_form) {
-        const Header& header = *reinterpret_cast<Header*>(m_data);
-        const StreamingFooter& footer =
-            *(reinterpret_cast<StreamingFooter*>(m_data+initial_size_of_file) - 1);
-        // Don't compare file format version fields as they are allowed to differ.
-        // Also don't compare reserved fields (todo, is it correct to ignore?)
-        static_cast<void>(header);
-        REALM_ASSERT_3(header.m_flags, == , 0);
-        REALM_ASSERT_3(header.m_mnemonic[0], == , uint8_t('T'));
-        REALM_ASSERT_3(header.m_mnemonic[1], == , uint8_t('-'));
-        REALM_ASSERT_3(header.m_mnemonic[2], == , uint8_t('D'));
-        REALM_ASSERT_3(header.m_mnemonic[3], == , uint8_t('B'));
-        REALM_ASSERT_3(header.m_top_ref[0], == , 0xFFFFFFFFFFFFFFFFULL);
-        REALM_ASSERT_3(header.m_top_ref[1], == , 0);
-
-        REALM_ASSERT_3(footer.m_magic_cookie, ==, footer_magic_cookie);
-        {
-            File::Map<Header> writable_map(m_file_mappings->m_file, File::access_ReadWrite,
-                                           sizeof (Header)); // Throws
-            Header& writable_header = *writable_map.get_addr();
-            realm::util::encryption_read_barrier(writable_map, 0);
-            writable_header.m_top_ref[1] = footer.m_top_ref;
-            writable_header.m_file_format[1] = writable_header.m_file_format[0];
-            realm::util::encryption_write_barrier(writable_map, 0);
-            writable_map.sync();
-            realm::util::encryption_read_barrier(writable_map, 0);
-            writable_header.m_flags |= flags_SelectBit;
-            realm::util::encryption_write_barrier(writable_map, 0);
-            m_file_on_streaming_form = false;
-            writable_map.sync();
-        }
-    }
-
+    dg.release();
     fcg.release(); // Do not close
     m_file_mappings->m_success = true;
     return top_ref;
@@ -887,7 +885,9 @@ void SlabAlloc::reset_free_space_tracking()
         chunk.ref = slab.ref_end;
     }
 
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(is_all_free());
+#endif
 
     m_free_space_state = free_space_Clean;
 }

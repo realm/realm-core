@@ -6,6 +6,10 @@
 
 ### Bugfixes:
 
+* Fix for #1498: A crash during opening of a Realm could lead to Realm files
+  which could not later be read. The symptom would be a realm file with zeroes
+  in the end but on streaming form (which requires a footer at the end of the
+  file instead).
 * Detach subspec and enumkey accessors when they are removed
   via a transaction (ex rollback). This could cause crashes
   when removing the last column in a table of type link,
@@ -17,6 +21,10 @@
 * Bug fix: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
 * Handing over a detached row accessor no longer crashes.
+* Linked tables were not updated properly when calling erase with num_rows = 0
+  which could be triggered by rolling back a call to insert with num_rows = 0
+* `TableView`s created by `Table::get_backlink_view` are now correctly handled by
+  `TableView`'s move assignment operator. Previously they would crash when used.
 
 ### Enhancements:
 
@@ -31,6 +39,12 @@
   separate ".management" subdirectory.
 * Adding `util::network::buffered_input_stream::reset()`.
 * Added support for queries that traverse backlinks. Fixes #776.
+* Improve the performance of advance_read() over transations that inserted rows
+  when there are live TableViews.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links.
 
 -----------
 
@@ -46,7 +60,6 @@
   (`util::Logger`) is now directly available to each unit test.
 * New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 * New failure simulation features: Ability to prime for random triggering.
-* Upgraded OpenSSL to 1.0.1s (Android).
 
 ----------------------------------------------
 
