@@ -452,7 +452,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
 void usage(const char* argv[])
 {
-    fprintf(stderr, "Usage: %s <LOGFILE> [--log]\n(where <LOGFILE> is a instruction file that will be replayed.)\nPass --log to have code printed to stdout producing the same instructions.", argv[0]);
+    fprintf(stderr, "Usage: %s <LOGFILE> [--log] [--name testName]\n(where <LOGFILE> is a instruction file that will "
+            "be replayed.)\nPass --log to have code printed to stdout producing the same instructions.\nPass --name "
+            "testName with distinct values when running on multiple threads, to make sure the test don't use the same"
+            " file", argv[0]);
     exit(1);
 }
 
@@ -460,12 +463,16 @@ void usage(const char* argv[])
 int run_fuzzy(int argc, const char* argv[])
 {
     util::Optional<std::ostream&> log;
+    std::string name = "fuzz-test";
 
     size_t file_arg = size_t(-1);
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
         if (arg == "--log") {
             log = util::some<std::ostream&>(std::cout);
+        }
+        else if (arg == "--name"){
+            name = argv[++i];
         }
         else {
             file_arg = i;
@@ -483,7 +490,7 @@ int run_fuzzy(int argc, const char* argv[])
     }
 
     disable_sync_to_disk();
-    realm::test_util::SharedGroupTestPathGuard path("fuzz.realm.test");
+    realm::test_util::SharedGroupTestPathGuard path(name + ".realm");
 
     try {
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
