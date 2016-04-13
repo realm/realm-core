@@ -6,8 +6,9 @@ BUILDDIR=core-builds
 
 function showUsage () {
   cat <<EOF
-Usage: $0 <branch>|<commit>|<tag>
+Usage: $0 [<branch>|<commit>|<tag>]
 Builds the given core under ${BUILDDIR} in working directory.
+Defaults to $0 master
 Commit can be the 7-letter commit ID.
 NB! A tag must begin with tags/.
 EOF
@@ -25,9 +26,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ $# -ne 1 ]; then
+if [ $# -gt 1 ]; then
   showUsage
   exit 1
+elif [ $# -eq 0 ]; then
+  REF=master
 else
   REF=$1
 fi
