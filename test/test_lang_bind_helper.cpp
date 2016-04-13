@@ -11780,10 +11780,9 @@ TEST(LangBindHelper_AdvanceLink)
     g.get_table(0)->add_column_link(type_Link, "", *g.get_table(0));
     g.get_table(0)->add_column(DataType(0), "", false);
     g.get_table(0)->add_column_link(type_Link, "", *g.get_table(0));
-    g.get_table(0)->add_empty_row(1);
-    g.get_table(1)->add_empty_row(1);
+    g.get_table(0)->add_empty_row();
+    g.get_table(1)->add_empty_row();
     g.get_table(0)->set_link(0, 0, 0);
-    g.get_table(0)->set_null(3, 0);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
     g.get_table(0)->set_null(0, 0);
