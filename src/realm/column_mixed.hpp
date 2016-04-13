@@ -166,8 +166,8 @@ private:
         mixcol_Binary      =  4,
         mixcol_Table       =  5,
         mixcol_Mixed       =  6,
-        mixcol_Date        =  7,
-        mixcol_Timestamp     =  8,
+        mixcol_OldDateTime =  7,
+        mixcol_Timestamp   =  8,
         mixcol_Float       =  9,
         mixcol_Double      = 10, // Positive Double
         mixcol_DoubleNeg   = 11, // Negative Double

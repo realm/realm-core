@@ -105,7 +105,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
         case mixcol_Int:
         case mixcol_IntNeg:
         case mixcol_Bool:
-        case mixcol_Date:
+        case mixcol_OldDateTime:
         case mixcol_Float:
         case mixcol_Double:
         case mixcol_DoubleNeg:
