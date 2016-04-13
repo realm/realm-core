@@ -7413,7 +7413,7 @@ public:
     bool set_string(size_t, size_t, StringData) { return false; }
     bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
     bool set_binary(size_t, size_t, BinaryData) { return false; }
-    bool set_date_time(size_t, size_t, OldDateTime) { return false; }
+    bool set_olddatetime(size_t, size_t, OldDateTime) { return false; }
     bool set_timestamp(size_t, size_t, Timestamp) { return false; }
     bool set_table(size_t, size_t) { return false; }
     bool set_mixed(size_t, size_t, const Mixed&) { return false; }

@@ -136,7 +136,7 @@ public:
         return false;
     }
 
-    bool set_date_time(size_t col_ndx, size_t row_ndx, OldDateTime value)
+    bool set_olddatetime(size_t col_ndx, size_t row_ndx, OldDateTime value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
             log("table->set_olddatetime(%1, %2, %3);", col_ndx, row_ndx, value); // Throws

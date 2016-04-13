@@ -2921,7 +2921,7 @@ void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_date_time(this, col_ndx, ndx, value); // Throws
+        repl->set_olddatetime(this, col_ndx, ndx, value); // Throws
 }
 
 

@@ -1401,7 +1401,7 @@ public:
         return true; // No-op
     }
 
-    bool set_date_time(size_t, size_t, OldDateTime) noexcept
+    bool set_olddatetime(size_t, size_t, OldDateTime) noexcept
     {
         return true; // No-op
     }
