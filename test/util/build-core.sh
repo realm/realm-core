@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ $# -lt 1 ]; then
+if [ $# -ne 1 ]; then
   showUsage
   exit 1
 else
