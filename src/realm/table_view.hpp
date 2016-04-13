@@ -868,8 +868,8 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     RowIndexes(std::move(tv.m_row_indexes)),
-    m_table(move(tv.m_table)),
-    m_linked_table(move(tv.m_linked_table)),
+    m_table(std::move(tv.m_table)),
+    m_linked_table(std::move(tv.m_linked_table)),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(std::move(tv.m_linkview_source)),
@@ -903,7 +903,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
 {
     if (m_table)
         m_table->unregister_view(this);
-    m_table = move(tv.m_table);
+    m_table = std::move(tv.m_table);
     if (m_table)
         m_table->move_registered_view(&tv, this);
 
