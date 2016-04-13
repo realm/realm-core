@@ -14,10 +14,12 @@ if [ "${BRANCH}" == "${REF}" ]; then
 fi
 
 ORIGINDIR="${PWD}"
-BASEDIR="$(realpath "core-builds/${BRANCH}")"
-SRCDIR="${BASEDIR}/src"
 
+BASEDIR="core-builds/${BRANCH}"
 mkdir -p "${BASEDIR}"
+BASEDIR="$(realpath "${BASEDIR}")"
+
+SRCDIR="${BASEDIR}/src"
 
 if [ ! -d "${SRCDIR}" ]; then
   git clone git@github.com:realm/realm-core.git "${SRCDIR}"
