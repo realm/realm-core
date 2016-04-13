@@ -45,7 +45,10 @@ enum basic_system_errors {
     connection_aborted = ECONNABORTED,
 
     /// Connection reset by peer
-    connection_reset = ECONNRESET
+    connection_reset = ECONNRESET,
+
+    /// Broken pipe
+    broken_pipe = EPIPE,
 };
 
 std::error_code make_error_code(basic_system_errors);
