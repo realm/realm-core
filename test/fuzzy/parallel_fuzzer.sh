@@ -32,7 +32,7 @@ CXX=$COMPILER make -j check-debug-norun $FLAGS
 
 # clean the findings directory
 echo "Cleaning up the findings directory"
-killall afl-fuzz &> /dev/null
+pkill afl-fuzz
 rm -rf findings/* &> /dev/null
 
 # if we have only one fuzzer
@@ -53,5 +53,5 @@ done
 
 echo
 echo "Use afl-whatsup findings/ to check progress"
-echo "Use killall afl-fuzz to kill the fuzzers"
+echo "Use pkill afl-fuzz to kill the fuzzers"
 echo
