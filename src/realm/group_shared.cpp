@@ -700,23 +700,333 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 
-// NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
-//
-// According to the 'process-sharing example' in the POSIX man page
-// for pthread_mutexattr_init() other processes may continue to use a
-// process-shared mutex after exit of the process that initialized
-// it. Also, the example does not contain any call to
-// pthread_mutex_destroy(), so apparently a process-shared mutex need
-// not be destroyed at all, nor can it be that a process-shared mutex
-// is associated with any resources that are local to the initializing
-// process, because that would imply a leak.
-//
-// While it is not explicitely guaranteed in the man page, we shall
-// assume that is is valid to initialize a process-shared mutex twice
-// without an intervending call to pthread_mutex_destroy(). We need to
-// be able to reinitialize a process-shared mutex if the first
-// initializing process crashes and leaves the shared memory in an
-// undefined state.
+// Initialize the lockfile. This is the very first thing done when a new
+// session is being established. It must be called with an exclusive lock
+// on the lockfile. It returns with a valid memory mapping for the lockfile
+// or throws.
+void SharedGroup::initialize_lockfile(DurabilityLevel durability, 
+                                      Replication::HistoryType history_type)
+{
+    // We're alone in the world, and it is Ok to initialize the
+    // file. Start by truncating the file, to maximize the chance of a
+    // an incorrectly initialized file gets rejected by other session
+    // participants that get the shared file lock after the initiator
+    // has dies half way through the initialization. Note, however, that
+    // this can still happen if the initializing process is dies before
+    // the truncation, but after obtaining the exclusive file lock.
+    m_file.resize(0);
+
+    // Write an initialized SharedInfo structure to the file, but with
+    // init_complete = 0. Need to fill with zeros before constructing
+    // due to the bit field members. Otherwise we would write
+    // uninitialized bits to the file.
+    alignas(SharedInfo) char buffer[sizeof (SharedInfo)] = {0};
+    new (buffer) SharedInfo(durability, history_type); // Throws
+    m_file.write(buffer, sizeof buffer); // Throws
+    // Make sure that a crash cannot manage to set init_complete = 1, 
+    // but somehow "forget" earlier initialization - we achieve this as
+    // a side effect of the system call implied by mmapping
+    m_file_map.map(m_file, File::access_ReadWrite,
+                   sizeof (SharedInfo), File::map_NoSync); // Throws
+    SharedInfo* info = m_file_map.get_addr();
+    info->init_complete = 1;
+    m_file_map.unmap();
+}
+
+
+// This is the first step taken by anyone who wants to join an established
+// session. It presumes that a session is already established, because the
+// caller has failed to obtain an exclusive lock but succeeded in getting
+// a shared lock on the lockfile. It either throws or returns with an
+// established memory mapping of the lockfile.
+bool SharedGroup::validate_lockfile()
+{
+    // If the file is not completely initialized at this point in time, the
+    // preceeding initialization attempt must have failed. We know that an
+    // initialization process was in progress, because this thread (or
+    // process) failed to get an exclusive lock on the file. Because this
+    // thread (or process) currently has a shared lock on the file, we also
+    // know that the initialization process can no longer be in progress, so
+    // the initialization must either have completed or failed at this time.
+
+    // The file is taken to be completely initialized if it is large enough
+    // to contain the `init_complete` field, and `init_complete` is true. If
+    // the file was not completely initialized, this thread must give up its
+    // shared lock, and retry to become the initializer. Eventually, one of
+    // two things must happen; either this thread, or another thread
+    // succeeds in completing the initialization, or this thread becomes the
+    // initializer, and fails the initialization. In either case, the retry
+    // loop will eventually terminate.
+
+    // FIXME: This scheme fails to guarantee reinitialization after
+    // system-level crash. If the system crashes (e.g. due to abrupt power
+    // off), the lock file is generally left in an abitrary, and likely
+    // inconsistent state, but it will still appear properly initialized to
+    // a subsequent session initiator.
+
+    // An empty file is (and was) never a successfully initialized file.
+    size_t info_size = sizeof (SharedInfo);
+    {
+        auto file_size = m_file.get_size();
+        if (util::int_less_than(file_size, info_size)) {
+            if (file_size == 0)
+                return false; // Retry
+            info_size = size_t(file_size);
+        }
+    }
+
+    // Map the initial section of the SharedInfo file that corresponds to
+    // the SharedInfo struct, or less if the file is smaller. We know that
+    // we have at least one byte, and that is enough to read the
+    // `init_complete` flag.
+    m_file_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
+    File::UnmapGuard fug_1(m_file_map);
+    SharedInfo* info = m_file_map.get_addr();
+    static_assert(offsetof(SharedInfo, init_complete) + sizeof SharedInfo::init_complete <= 1,
+                  "Unexpected position or size of SharedInfo::init_complete");
+    if (info->init_complete == 0)
+        return false;
+    REALM_ASSERT(info->init_complete == 1);
+
+    // At this time, we know that the file was completely initialized, but
+    // we still need to verify that is was initialized with the memory
+    // layout expected by this session participant. We could find that it is
+    // initializaed with a different memory layout if other concurrent
+    // session participants use different versions of the core library.
+    if (info_size < sizeof (SharedInfo)) {
+        std::stringstream ss;
+        ss << "Info size doesn't match, " << info_size << " " << sizeof(SharedInfo) <<  ".";
+        throw IncompatibleLockFile(ss.str());
+    }
+    if (info->shared_info_version != g_shared_info_version) {
+        std::stringstream ss;
+        ss << "Shared info version doesn't match, " << info->shared_info_version <<
+            " " << g_shared_info_version << ".";
+        throw IncompatibleLockFile(ss.str());
+    }
+    // Validate compatible sizes of mutex and condvar types. Sizes of all
+    // other fields are architecture independent, so if condvar and mutex
+    // sizes match, the entire struct matches. The offsets of
+    // `size_of_mutex` and `size_of_condvar` are known to be as expected due
+    // to the preceeding check in `shared_info_version`.
+    if (info->size_of_mutex != sizeof info->shared_controlmutex) {
+        std::stringstream ss;
+        ss << "Mutex size doesn't match: " << info->size_of_mutex << " "  <<
+            sizeof(info->shared_controlmutex) << ".";
+        throw IncompatibleLockFile(ss.str());
+    }
+#ifndef _WIN32
+    if (info->size_of_condvar != sizeof info->room_to_write) {
+        std::stringstream ss;
+        ss << "Condtion var size doesn't match: " << info->size_of_condvar << " " <<
+            sizeof(info->room_to_write) << ".";
+        throw IncompatibleLockFile(ss.str());
+    }
+#endif
+    m_writemutex.set_shared_part(info->shared_writemutex,m_lockfile_prefix,"write");
+#ifdef REALM_ASYNC_DAEMON
+    m_balancemutex.set_shared_part(info->shared_balancemutex,m_lockfile_prefix,"balance");
+#endif
+    m_controlmutex.set_shared_part(info->shared_controlmutex,m_lockfile_prefix,"control");
+ // Even though fields match wrt alignment and size, there may still be
+    // incompatibilities between implementations, so lets ask one of the
+    // mutexes if it thinks it'll work.
+    //
+    // FIXME: Calling util::RobustMutex::is_valid() on a mutex object of
+    // unknown, and possibly invalid state has undefined behaviour, and is
+    // therfore dangerous. It should not be done.
+    //
+    // FIXME: This check tries to lock the mutex, and only unlocks it if the
+    // return value is zero. If pthread_mutex_trylock() fails with
+    // EOWNERDEAD, this leads to deadlock during the following propper
+    // attempt to lock. This cannot be fixed by also unlocking on failure
+    // with EOWNERDEAD, because that would mark the mutex as consistent
+    // again and prevent us from being notified below.
+    if (!m_controlmutex.is_valid())
+        throw IncompatibleLockFile("Invalid control mutex.");
+
+    // Succes!
+    fug_1.release();
+    return true;
+}
+
+
+// Simple helper function which attaches the database (establishes a memory mapping)
+ref_type SharedGroup::attach_database(bool begin_new_session, DurabilityLevel durability,
+                                      bool no_create_file)
+{
+    SlabAlloc& alloc = m_group.m_alloc;
+    // proceed to initialize versioning and other metadata information related to
+    // the database. Also create the database if we're beginning a new session
+    SlabAlloc::Config cfg;
+    cfg.session_initiator = begin_new_session;
+    cfg.is_shared = true;
+    cfg.read_only = false;
+    cfg.skip_validate = !begin_new_session;
+
+    // only the session initiator is allowed to create the database, all other
+    // must assume that it already exists.
+    cfg.no_create = begin_new_session ? no_create_file : true;
+
+    // if we're opening a MemOnly file that isn't already opened by
+    // someone else then it's a file which should have been deleted on
+    // close previously, but wasn't (perhaps due to the process crashing)
+    cfg.clear_file = durability == durability_MemOnly && begin_new_session;
+    cfg.encryption_key = m_key;
+    return alloc.attach_file(m_db_path, cfg); // Throws
+}
+
+
+// Validate the file format and obtain version information from
+// the database. Both file format version and snapshot version
+// are fetched from the database and returned for later use.
+void SharedGroup::validate_file_format(ref_type top_ref, 
+                                       Replication::HistoryType history_type,
+                                       version_type& snapshot_version,
+                                       int& target_file_format_version)
+{
+
+    // Determine target file format version for session (upgrade
+    // required if greater than file format version of attached file).
+    using gf = _impl::GroupFriend;
+    int current_file_format_version = gf::get_file_format_version(m_group);
+    target_file_format_version =
+        gf::get_target_file_format_version_for_session(current_file_format_version,
+                                                       history_type);
+    SlabAlloc& alloc = m_group.m_alloc;
+    SharedInfo* info = m_file_map.get_addr();
+
+    // Determine version (snapshot number) and check history type
+    // compatibility
+    snapshot_version = 0;
+    int stored_history_type = 0;
+    gf::get_version_and_history_type(alloc, top_ref, snapshot_version, 
+                                     stored_history_type);
+    bool good_history_type = false;
+    switch (history_type) {
+        case Replication::hist_None:
+        case Replication::hist_OutOfRealm:
+            good_history_type = (stored_history_type == Replication::hist_None);
+            break;
+        case Replication::hist_InRealm:
+            good_history_type = (stored_history_type == Replication::hist_InRealm ||
+                                 stored_history_type == Replication::hist_None);
+            break;
+        case Replication::hist_Sync:
+            good_history_type =
+                ((stored_history_type == Replication::hist_Sync) ||
+                 (stored_history_type == Replication::hist_None && top_ref == 0));
+    }
+    if (!good_history_type)
+        throw InvalidDatabase("Bad or incompatible history type", m_db_path);
+
+    info->file_format_version = uint_fast8_t(target_file_format_version);
+}
+
+
+// Initialize the session data in the lockfile, most importantly the
+// ringbuffer which holds all open transactions. Also informs the replication
+// object that a session is being initialized.
+void SharedGroup::initialize_session(ref_type top_ref, version_type version)
+{
+    using gf = _impl::GroupFriend;
+    SlabAlloc& alloc = m_group.m_alloc;
+    SharedInfo* info = m_file_map.get_addr();
+
+    if (Replication* repl = gf::get_replication(m_group))
+        repl->initiate_session(version); // Throws
+
+#ifndef _WIN32
+    if (m_key) {
+        static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
+        info->session_initiator_pid = uint_fast64_t(getpid());
+    }
+#endif
+    // Initially there is a single version in the file
+    info->number_of_versions = 1;
+
+    info->latest_version_number = version;
+
+    SharedInfo* r_info = m_reader_map.get_addr();
+    size_t file_size = alloc.get_baseline();
+    r_info->init_versioning(top_ref, file_size, version);
+}
+
+
+// Join an already initialised session
+int SharedGroup::join_session(Replication::HistoryType history_type,
+                              DurabilityLevel durability)
+{
+
+    // Determine target file format version for session (upgrade
+    // required if greater than file format version of attached file).
+    using gf = _impl::GroupFriend;
+    int target_file_format_version;
+    int current_file_format_version = gf::get_file_format_version(m_group);
+    target_file_format_version =
+        gf::get_target_file_format_version_for_session(current_file_format_version,
+                                                       history_type);
+    SharedInfo* info = m_file_map.get_addr();
+
+    // Durability setting must be consistent across a session. An
+    // inconsistency is a logic error, as the user is required to
+    // make sure that all possible concurrent session participants
+    // use the same durability setting for the same Realm file.
+    if (info->durability != durability)
+        throw LogicError(LogicError::mixed_durability);
+
+    // History type must be consistent across a session. An
+    // inconsistency is a logic error, as the user is required to
+    // make sure that all possible concurrent session participants
+    // use the same history type for the same Realm file.
+    if (info->history_type != history_type)
+        throw LogicError(LogicError::mixed_history_type);
+
+#ifndef _WIN32
+    if (m_key && info->session_initiator_pid != uint64_t(getpid()))
+        throw std::runtime_error(m_db_path + ": Encrypted interprocess sharing is currently unsupported");
+#endif
+    // We need per session agreement among all participants on the
+    // target Realm file format. From a technical perspective, the
+    // best way to ensure that, would be to require a bumping of the
+    // SharedInfo file format version on any change that could lead
+    // to a different result from
+    // get_target_file_format_for_session() given the same current
+    // Realm file format version and the same history type, as that
+    // would prevent the outcome of the Realm opening process from
+    // depending on race conditions. However, for practical reasons,
+    // we shall instead simply check that there is agreement, and
+    // throw the same kind of exception, as would have been thrown
+    // with a bumped SharedInfo file format version, if there isn't.
+    if (info->file_format_version != target_file_format_version) {
+        std::stringstream ss;
+        ss << "File format version deosn't match: " << info->file_format_version << " " <<
+            target_file_format_version << ".";
+        throw IncompatibleLockFile(ss.str());
+    }
+    return target_file_format_version;
+}
+
+
+// Make sure the ringbuffer (active transaction list) is memory mapped
+// so that it is safe to access it.
+void SharedGroup::setup_ringbuffer_mapping()
+{
+    SharedInfo* info = m_file_map.get_addr();
+
+    // we need a thread-local copy of the number of ringbuffer entries in order
+    // to later detect concurrent expansion of the ringbuffer.
+    m_local_max_entry = info->readers.get_num_entries();
+
+    // We need to map the info file once more for the readers part
+    // since that part can be resized and as such remapped which
+    // could move our mutexes (which we don't want to risk moving while
+    // they are locked)
+    size_t reader_info_size =
+        sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
+    m_reader_map.map(m_file, File::access_ReadWrite, reader_info_size, File::map_NoSync);
+}
+
 
 void SharedGroup::do_open(const std::string& path, bool no_create_file, DurabilityLevel durability,
                           bool is_backend, const char* encryption_key,
@@ -737,6 +1047,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     m_db_path = path;
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
+    int target_file_format_version;
     try {
         make_dir(m_coordination_dir);
     } catch (File::Exists&) {
@@ -748,301 +1059,65 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     Replication::HistoryType history_type = Replication::hist_None;
     if (Replication* repl = m_group.get_replication())
         history_type = repl->get_history_type();
-
-    int target_file_format_version;
-
+    int sleep_amount = 0;
     for (;;) {
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
 
         if (m_file.try_lock_exclusive()) { // Throws
-            File::UnlockGuard ulg(m_file);
 
-            // We're alone in the world, and it is Ok to initialize the
-            // file. Start by truncating the file, to maximize the chance of a
-            // an incorrectly initialized file gets rejected by other session
-            // participants that get the shared file lock after the initiator
-            // has dies half way through the initialization. Note, however, that
-            // this can still happen if the initializing process is dies before
-            // the truncation, but after obtaining the exclusive file lock.
-            m_file.resize(0);
-
-            // Write an initialized SharedInfo structure to the file, but with
-            // init_complete = 0. Need to fill with zeros before constructing
-            // due to the bit field members. Otherwise we would write
-            // uninitialized bits to the file.
-            alignas(SharedInfo) char buffer[sizeof (SharedInfo)] = {0};
-            new (buffer) SharedInfo(durability, history_type); // Throws
-            m_file.write(buffer, sizeof buffer); // Throws
-
-            // Mark the file as completely initialized via a memory
-            // mapping. Since this is done as a separate final step (involving
-            // separate system calls) there is no chance of the individual
-            // modifications to get reordered, even in case of a crash at a
-            // random position during the initialization (except if it happens
-            // before the truncation). This could also have been done by a
-            // util::File::write(), but it is more convenient to manipulate the
-            // structure via its type.
-            m_file_map.map(m_file, File::access_ReadWrite,
-                           sizeof (SharedInfo), File::map_NoSync); // Throws
-            File::UnmapGuard fug(m_file_map);
-            SharedInfo* info_2 = m_file_map.get_addr();
-            info_2->init_complete = 1;
+            // Initializing a session:
+            initialize_lockfile(durability, history_type);
+            m_file.unlock();
         }
+        // exponential backoff (if not, a stream of failing readers can prevent initialization):
+        if (sleep_amount) {
+            //std::cerr << "backoff value " << sleep_amount << std::endl;
+            millisleep(sleep_amount);
+        }
+        if (sleep_amount < 500) sleep_amount = 2 * sleep_amount + 1;
 
-        // We hold the shared lock from here until we close the file!
         m_file.lock_shared(); // Throws
 
-        // If the file is not completely initialized at this point in time, the
-        // preceeding initialization attempt must have failed. We know that an
-        // initialization process was in progress, because this thread (or
-        // process) failed to get an exclusive lock on the file. Because this
-        // thread (or process) currently has a shared lock on the file, we also
-        // know that the initialization process can no longer be in progress, so
-        // the initialization must either have completed or failed at this time.
-
-        // The file is taken to be completely initialized if it is large enough
-        // to contain the `init_complete` field, and `init_complete` is true. If
-        // the file was not completely initialized, this thread must give up its
-        // shared lock, and retry to become the initializer. Eventually, one of
-        // two things must happen; either this thread, or another thread
-        // succeeds in completing the initialization, or this thread becomes the
-        // initializer, and fails the initialization. In either case, the retry
-        // loop will eventually terminate.
-
-        // FIXME: This scheme fails to guarantee reinitialization after
-        // system-level crash. If the system crashes (e.g. due to abrupt power
-        // off), the lock file is generally left in an abitrary, and likely
-        // inconsistent state, but it will still appear properly initialized to
-        // a subsequent session initiator.
-
-        // An empty file is (and was) never a successfully initialized file.
-        size_t info_size = sizeof (SharedInfo);
+        // if the lock file was never fully initialized due to a crash
+        // we detect this scenario below and start over, hoping to get the
+        // exclusive lock next time round.
+        if (!validate_lockfile()) {
+            continue; // retry
+        }
         {
-            auto file_size = m_file.get_size();
-            if (util::int_less_than(file_size, info_size)) {
-                if (file_size == 0)
-                    continue; // Retry
-                info_size = size_t(file_size);
-            }
-        }
-
-        // Map the initial section of the SharedInfo file that corresponds to
-        // the SharedInfo struct, or less if the file is smaller. We know that
-        // we have at least one byte, and that is enough to read the
-        // `init_complete` flag.
-        m_file_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
-        File::UnmapGuard fug_1(m_file_map);
-        SharedInfo* info = m_file_map.get_addr();
-        static_assert(offsetof(SharedInfo, init_complete) + sizeof SharedInfo::init_complete <= 1,
-                      "Unexpected position or size of SharedInfo::init_complete");
-        if (info->init_complete == 0)
-            continue;
-        REALM_ASSERT(info->init_complete == 1);
-
-        // At this time, we know that the file was completely initialized, but
-        // we still need to verify that is was initialized with the memory
-        // layout expected by this session participant. We could find that it is
-        // initializaed with a different memory layout if other concurrent
-        // session participants use different versions of the core library.
-        if (info_size < sizeof (SharedInfo)) {
-            std::stringstream ss;
-            ss << "Info size doesn't match, " << info_size << " " << sizeof(SharedInfo) <<  ".";
-            throw IncompatibleLockFile(ss.str());
-        }
-        if (info->shared_info_version != g_shared_info_version) {
-            std::stringstream ss;
-            ss << "Shared info version doesn't match, " << info->shared_info_version <<
-                " " << g_shared_info_version << ".";
-            throw IncompatibleLockFile(ss.str());
-        }
-        // Validate compatible sizes of mutex and condvar types. Sizes of all
-        // other fields are architecture independent, so if condvar and mutex
-        // sizes match, the entire struct matches. The offsets of
-        // `size_of_mutex` and `size_of_condvar` are known to be as expected due
-        // to the preceeding check in `shared_info_version`.
-        if (info->size_of_mutex != sizeof info->shared_controlmutex) {
-            std::stringstream ss;
-            ss << "Mutex size doesn't match: " << info->size_of_mutex << " "  <<
-                sizeof(info->shared_controlmutex) << ".";
-            throw IncompatibleLockFile(ss.str());
-        }
-#ifndef _WIN32
-        if (info->size_of_condvar != sizeof info->room_to_write) {
-            std::stringstream ss;
-            ss << "Condtion var size doesn't match: " << info->size_of_condvar << " " <<
-                    sizeof(info->room_to_write) << ".";
-            throw IncompatibleLockFile(ss.str());
-        }
-#endif
-        // Even though fields match wrt alignment and size, there may still be
-        // incompatibilities between implementations, so lets ask one of the
-        // mutexes if it thinks it'll work.
-        //
-        // FIXME: Calling util::RobustMutex::is_valid() on a mutex object of
-        // unknown, and possibly invalid state has undefined behaviour, and is
-        // therfore dangerous. It should not be done.
-        //
-        // FIXME: This check tries to lock the mutex, and only unlocks it if the
-        // return value is zero. If pthread_mutex_trylock() fails with
-        // EOWNERDEAD, this leads to deadlock during the following propper
-        // attempt to lock. This cannot be fixed by also unlocking on failure
-        // with EOWNERDEAD, because that would mark the mutex as consistent
-        // again and prevent us from being notified below.
-
-        m_writemutex.set_shared_part(info->shared_writemutex,m_lockfile_prefix,"write");
-#ifdef REALM_ASYNC_DAEMON
-        m_balancemutex.set_shared_part(info->shared_balancemutex,m_lockfile_prefix,"balance");
-#endif
-        m_controlmutex.set_shared_part(info->shared_controlmutex,m_lockfile_prefix,"control");
-
-        // even though fields match wrt alignment and size, there may still be incompatibilities
-        // between implementations, so lets ask one of the mutexes if it thinks it'll work.
-        if (!m_controlmutex.is_valid()) {
-            throw IncompatibleLockFile("Control mutex is invalid.");
-        }
-
-        // OK! lock file appears valid. We can now continue operations under the protection
-        // of the controlmutex. The controlmutex protects the following activities:
-        // - attachment of the database file
-        // - start of the async daemon
-        // - stop of the async daemon
-        // - SharedGroup beginning/ending a session
-        // - Waiting for and signalling database changes
-        {
+            File::UnmapGuard fug_1(m_file_map);
+            SharedInfo* info = m_file_map.get_addr();
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-            // we need a thread-local copy of the number of ringbuffer entries in order
-            // to later detect concurrent expansion of the ringbuffer.
-            m_local_max_entry = info->readers.get_num_entries();
-
-            // We need to map the info file once more for the readers part
-            // since that part can be resized and as such remapped which
-            // could move our mutexes (which we don't want to risk moving while
-            // they are locked)
-            size_t reader_info_size =
-                sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
-            m_reader_map.map(m_file, File::access_ReadWrite, reader_info_size, File::map_NoSync);
-            File::UnmapGuard fug_2(m_reader_map);
-
-            // proceed to initialize versioning and other metadata information related to
-            // the database. Also create the database if we're beginning a new session
             bool begin_new_session = (info->num_participants == 0);
-            SlabAlloc::Config cfg;
-            cfg.session_initiator = begin_new_session;
-            cfg.is_shared = true;
-            cfg.read_only = false;
-            cfg.skip_validate = !begin_new_session;
-
-            // only the session initiator is allowed to create the database, all other
-            // must assume that it already exists.
-            cfg.no_create = begin_new_session ? no_create_file : true;
-
-            // if we're opening a MemOnly file that isn't already opened by
-            // someone else then it's a file which should have been deleted on
-            // close previously, but wasn't (perhaps due to the process crashing)
-            cfg.clear_file = durability == durability_MemOnly && begin_new_session;
-
-            cfg.encryption_key = encryption_key;
             ref_type top_ref;
             try {
-                top_ref = alloc.attach_file(path, cfg); // Throws
+                top_ref = attach_database(begin_new_session, durability, no_create_file); 
             }
             catch (SlabAlloc::Retry&) {
-                continue;
+                continue; // retry!
             }
-
-            // Determine target file format version for session (upgrade
-            // required if greater than file format version of attached file).
-            using gf = _impl::GroupFriend;
-            int current_file_format_version = gf::get_file_format_version(m_group);
-            target_file_format_version =
-                gf::get_target_file_format_version_for_session(current_file_format_version,
-                                                               history_type);
-
+            SlabAlloc::DetachGuard dg(alloc);
+            setup_ringbuffer_mapping();
+            File::UnmapGuard fug_2(m_reader_map);
             if (begin_new_session) {
-                // Determine version (snapshot number) and check history type
-                // compatibility
-                version_type version = 0;
-                int stored_history_type = 0;
-                gf::get_version_and_history_type(alloc, top_ref, version, stored_history_type);
-                bool good_history_type = false;
-                switch (history_type) {
-                    case Replication::hist_None:
-                    case Replication::hist_OutOfRealm:
-                        good_history_type = (stored_history_type == Replication::hist_None);
-                        break;
-                    case Replication::hist_InRealm:
-                        good_history_type = (stored_history_type == Replication::hist_InRealm ||
-                                             stored_history_type == Replication::hist_None);
-                        break;
-                    case Replication::hist_Sync:
-                        good_history_type =
-                            ((stored_history_type == Replication::hist_Sync) ||
-                             (stored_history_type == Replication::hist_None && top_ref == 0));
-                }
-                if (!good_history_type)
-                    throw InvalidDatabase("Bad or incompatible history type", path);
-
-                if (Replication* repl = gf::get_replication(m_group))
-                    repl->initiate_session(version); // Throws
-
-#ifndef _WIN32
-                if (encryption_key) {
-                    static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
-                    info->session_initiator_pid = uint_fast64_t(getpid());
-                }
-#endif
-
-                info->file_format_version = uint_fast8_t(target_file_format_version);
-
-                // Initially there is a single version in the file
-                info->number_of_versions = 1;
-
-                info->latest_version_number = version;
-
-                SharedInfo* r_info = m_reader_map.get_addr();
-                size_t file_size = alloc.get_baseline();
-                r_info->init_versioning(top_ref, file_size, version);
+                version_type snapshot_version;
+                validate_file_format(top_ref, history_type, snapshot_version,
+                                     target_file_format_version);
+                initialize_session(top_ref, snapshot_version);
             }
-            else { // Not the session initiator
-                // Durability setting must be consistent across a session. An
-                // inconsistency is a logic error, as the user is required to
-                // make sure that all possible concurrent session participants
-                // use the same durability setting for the same Realm file.
-                if (info->durability != durability)
-                    throw LogicError(LogicError::mixed_durability);
-
-                // History type must be consistent across a session. An
-                // inconsistency is a logic error, as the user is required to
-                // make sure that all possible concurrent session participants
-                // use the same history type for the same Realm file.
-                if (info->history_type != history_type)
-                    throw LogicError(LogicError::mixed_history_type);
-
-#ifndef _WIN32
-                if (encryption_key && info->session_initiator_pid != uint64_t(getpid()))
-                    throw std::runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
-#endif
-
-                // We need per session agreement among all participants on the
-                // target Realm file format. From a technical perspective, the
-                // best way to ensure that, would be to require a bumping of the
-                // SharedInfo file format version on any change that could lead
-                // to a different result from
-                // get_target_file_format_for_session() given the same current
-                // Realm file format version and the same history type, as that
-                // would prevent the outcome of the Realm opening process from
-                // depending on race conditions. However, for practical reasons,
-                // we shall instead simply check that there is agreement, and
-                // throw the same kind of exception, as would have been thrown
-                // with a bumped SharedInfo file format version, if there isn't.
-                if (info->file_format_version != target_file_format_version) {
-                    std::stringstream ss;
-                    ss << "File format version deosn't match: " << info->file_format_version << " " <<
-                        target_file_format_version << ".";
-                    throw IncompatibleLockFile(ss.str());
-                }
+            else { // not new session:
+                target_file_format_version = join_session(history_type, durability);
             }
+            // make our presence noted
+            ++info->num_participants;
+            m_transact_stage = transact_Ready;
+            // Set initial version so we can track if other instances
+            // change the db
+            m_read_lock.m_version = get_version_of_latest_snapshot();
+
+            // Initially wait_for_change is enabled
+            m_wait_for_change_enabled = true;
 
 #ifndef _WIN32
             m_new_commit_available.set_shared_part(info->new_commit_available,m_lockfile_prefix,"new_commit");
@@ -1051,75 +1126,55 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             m_work_to_do.set_shared_part(info->work_to_do,m_lockfile_prefix,"work_ready");
             m_room_to_write.set_shared_part(info->room_to_write,m_lockfile_prefix,"allow_write");
             // In async mode, we need to make sure the daemon is running and ready:
-            if (durability == durability_Async && !is_backend) {
-                while (info->daemon_ready == 0) {
-                    if (info->daemon_started == 0) {
-                        spawn_daemon(path);
-                        info->daemon_started = 1;
+            if (durability == durability_Async) {
+                if (!is_backend) {
+                    while (info->daemon_ready == 0) {
+                        if (info->daemon_started == 0) {
+                            spawn_daemon(path);
+                            info->daemon_started = 1;
+                        }
+                        // FIXME: It might be more robust to sleep a little, then restart the loop
+                        // std::cerr << "Waiting for daemon" << std::endl;
+                        m_daemon_becomes_ready.wait(m_controlmutex, 0);
+                        // std::cerr << " - notified" << std::endl;
                     }
-                    // FIXME: It might be more robust to sleep a little, then restart the loop
-                    // std::cerr << "Waiting for daemon" << std::endl;
-                    m_daemon_becomes_ready.wait(m_controlmutex, 0);
-                    // std::cerr << " - notified" << std::endl;
+                    // std::cerr << "daemon should be ready" << std::endl;
+                }
+                else { // is_backend
+                    do_async_commits();
                 }
             }
-            // std::cerr << "daemon should be ready" << std::endl;
+#else
+            static_cast<void>(is_backend);
 #endif // REALM_ASYNC_DAEMON
 #endif // !defined _WIN32
 
-            // Set initial version so we can track if other instances
-            // change the db
-            m_read_lock.m_version = get_version_of_latest_snapshot();
-
-            // make our presence noted:
-            ++info->num_participants;
-
-            // Initially wait_for_change is enabled
-            m_wait_for_change_enabled = true;
-
             // Keep the mappings and file open:
+            dg.release();
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close
         }
-        break;
+        break; // Succes, exit retry loop
     }
-
-    m_transact_stage = transact_Ready;
-    // std::cerr << "open completed" << std::endl;
-
-#ifdef REALM_ASYNC_DAEMON
-    if (durability == durability_Async) {
-        if (is_backend) {
-            do_async_commits();
-        }
+    CloseGuard cg(*this);
+    using gf = _impl::GroupFriend;
+    int current_file_format_version = gf::get_file_format_version(m_group);
+    if (current_file_format_version == 0) {
+        // If the current file format is still undecided, no upgrade is
+        // necessary, but we still need to make the chosen file format
+        // visible to the rest of the core library by updating that value
+        // that will be subsequently returned by
+        // Group::get_file_format_version(). For this to work, all session
+        // participants must adopt the chosen target Realm file format when
+        // the stored file format version is zero regardless of the version
+        // of the core library used.
+        gf::set_file_format_version(m_group, target_file_format_version);
     }
-#else
-    static_cast<void>(is_backend);
-#endif
-
-    try {
-        using gf = _impl::GroupFriend;
-        int current_file_format_version = gf::get_file_format_version(m_group);
-        if (current_file_format_version == 0) {
-            // If the current file format is still undecided, no upgrade is
-            // necessary, but we still need to make the chosen file format
-            // visible to the rest of the core library by updating that value
-            // that will be subsequently returned by
-            // Group::get_file_format_version(). For this to work, all session
-            // participants must adopt the chosen target Realm file format when
-            // the stored file format version is zero regardless of the version
-            // of the core library used.
-            gf::set_file_format_version(m_group, target_file_format_version);
-        }
-        else {
-            upgrade_file_format(allow_upgrafe_file_format, target_file_format_version); // Throws
-        }
+    else {
+        upgrade_file_format(allow_upgrafe_file_format, target_file_format_version); // Throws
     }
-    catch (...) {
-        close();
-        throw;
-    }
+    cg.release();
 }
 
 
@@ -1257,11 +1312,11 @@ void SharedGroup::close() noexcept
     m_daemon_becomes_ready.close();
     m_new_commit_available.close();
 #endif
+    m_file_map.unmap();
+    m_reader_map.unmap();
     m_file.unlock();
     // info->~SharedInfo(); // DO NOT Call destructor
     m_file.close();
-    m_file_map.unmap();
-    m_reader_map.unmap();
 }
 
 bool SharedGroup::has_changed()

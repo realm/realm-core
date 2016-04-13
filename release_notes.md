@@ -137,6 +137,8 @@ versions [0.97.0].**
 
 ### Enhancements:
 
+* The opening of the realm file (SharedGroup::do_open) has been made more robust
+  and easier to understand.
 * Adds support for in-Realm history of changes (`<realm/history.hpp>`), but
   keeps the current history implementation as the default for now
   (`<realm/commit_log.hpp>`).

@@ -217,6 +217,22 @@ public:
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
 
+    /// CloseGuard for SharedGroup, useful for ensuring it is closed properly.
+    class CloseGuard {
+    public:
+        CloseGuard(SharedGroup& sg) { m_sg = &sg; }
+        ~CloseGuard()
+        {
+            if (m_sg) { 
+                m_sg->close(); 
+                m_sg = nullptr; 
+            } 
+        }
+        void release() { m_sg = nullptr; }
+    private:
+        SharedGroup* m_sg = nullptr;
+    };
+
     /// A SharedGroup may be created in the unattached state, and then
     /// later attached to a file with a call to open(). Calling any
     /// function other than open(), is_attached(), and ~SharedGroup()
@@ -546,7 +562,22 @@ private:
     util::InterprocessCondVar m_daemon_becomes_ready;
     util::InterprocessCondVar m_new_commit_available;
 #endif
-
+    // internal helper functions assisting do_open()
+    void initialize_lockfile(DurabilityLevel durability, 
+                             Replication::HistoryType history_type);
+    // true if the lockfile is ok, false to retry.
+    // throws if consistency check fails
+    bool validate_lockfile();
+    void validate_file_format(ref_type top_ref, Replication::HistoryType history_type,
+                              version_type& snapshot_version, 
+                              int& target_file_format_version); // throws if validation fails
+    void initialize_session(ref_type top_ref, version_type version);
+    void setup_ringbuffer_mapping();
+    int join_session(Replication::HistoryType history_type,
+                     DurabilityLevel durability); // throws if validation fails
+    ref_type attach_database(bool is_session_initiator,
+                             DurabilityLevel durability,
+                             bool no_create_file); // throws 
     void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
                  const char* encryption_key, bool allow_file_format_upgrade);
 
