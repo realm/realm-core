@@ -20,6 +20,15 @@ if [ "`uname`" = "Darwin" ]; then
     echo "launchctl unload -w /System/Library/LaunchAgents/com.apple.ReportCrash.plist"
     echo "sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.ReportCrash.Root.plist"
     echo "----------------------------------------------------------------------------------------"
+else
+    # FIXME: Check if AFL works if the core pattern is different, but does not start with | and test for that
+    if [ "`cat /proc/sys/kernel/core_pattern`" != "core" ]; then
+        echo "----------------------------------------------------------------------------------------"
+        echo "AFL might mistake crashes with hangs if the core is outputed to an external process"
+        echo "Please run 'echo core > /proc/sys/kernel/core_pattern'"
+        echo "----------------------------------------------------------------------------------------"
+        exit 1
+    fi
 fi
 
 # build core
