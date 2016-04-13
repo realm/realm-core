@@ -47,6 +47,9 @@ fi
 
 cd "${SRCDIR}"
 
+# Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
+# Otherwise, git-checkout will complain about updating paths and switching
+# branches at the same time.
 if [ `git branch -r | grep "^\\s*origin/${REF}$"` ]; then
   REMOTE="origin/${REF}"
 else
