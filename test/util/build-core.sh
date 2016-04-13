@@ -51,12 +51,12 @@ cd "${SRCDIR}"
 # Otherwise, git-checkout will complain about updating paths and switching
 # branches at the same time.
 if [ `git branch -r | grep "^\\s*origin/${REF}$"` ]; then
-  REMOTE="origin/${REF}"
+  REMOTEREF="origin/${REF}"
 else
-  REMOTE="${REF}"
+  REMOTEREF="${REF}"
 fi
 
-git checkout -B "${REF}" "${REMOTE}"
+git checkout -B "${REF}" "${REMOTEREF}"
 sh build.sh clean
 sh build.sh config "${BASEDIR}"
 sh build.sh build
