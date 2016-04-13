@@ -82,7 +82,7 @@ struct AddTable : Benchmark {
         TableRef t = tr.add_table(name());
         t->add_column(type_String, "first");
         t->add_column(type_Int, "second");
-        t->add_column(type_DateTime, "third");
+        t->add_column(type_OldDateTime, "third");
         tr.commit();
     }
 

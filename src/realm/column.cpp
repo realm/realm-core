@@ -130,7 +130,7 @@ void col_type_deleg(Op& op, ColumnType type)
     switch (type) {
         case col_type_Int:
         case col_type_Bool:
-        case col_type_DateTime:
+        case col_type_OldDateTime:
         case col_type_Link:
             op.template call<IntegerColumn>();
             return;

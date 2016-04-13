@@ -137,7 +137,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     if (current_file_format_version <= 4 && target_file_format_version >= 5) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
-            table->upgrade_datetime();
+            table->upgrade_olddatetime();
         }
         current_file_format_version = 5;
     }
@@ -1401,7 +1401,7 @@ public:
         return true; // No-op
     }
 
-    bool set_date_time(size_t, size_t, DateTime) noexcept
+    bool set_olddatetime(size_t, size_t, OldDateTime) noexcept
     {
         return true; // No-op
     }

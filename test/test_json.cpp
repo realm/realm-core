@@ -70,7 +70,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         DescriptorRef sub1;
         table.add_column(type_Int, "int");              //  0
         table.add_column(type_Bool, "bool");             //  1
-        table.add_column(type_DateTime, "date");             //  2
+        table.add_column(type_OldDateTime, "date");             //  2
         table.add_column(type_Float, "float");            //  3
         table.add_column(type_Double, "double");           //  4
         table.add_column(type_String, "string");           //  5
@@ -93,7 +93,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     for (size_t i = 0; i < rows; ++i)
         table.set_bool(1, i, (i % 2 ? true : false));
     for (size_t i = 0; i < rows; ++i)
-        table.set_datetime(2, i, 12345);
+        table.set_olddatetime(2, i, 12345);
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
         table.set_float(3, i, 123.456f*sign);
@@ -168,7 +168,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
             table.set_mixed(11, i, "string");
             break;
         case 3:
-            table.set_mixed(11, i, DateTime(123456789));
+            table.set_mixed(11, i, OldDateTime(123456789));
             break;
         case 4:
             table.set_mixed(11, i, BinaryData("binary", 7));

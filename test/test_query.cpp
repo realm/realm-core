@@ -72,7 +72,7 @@ REALM_TABLE_2(TupleTableType,
 REALM_TABLE_5(DateIntStringFloatDouble,
               first, Int,
               second, String,
-              third, DateTime,
+              third, OldDateTime,
               fourth, Float,
               fifth, Double)
 
@@ -88,7 +88,7 @@ REALM_TABLE_5(PeopleTable,
               name, String,
               age, Int,
               male, Bool,
-              hired, DateTime,
+              hired, OldDateTime,
               photo, Binary)
 
 REALM_TABLE_2(FloatTable,
@@ -2076,37 +2076,37 @@ TEST(Query_TwoSameCols)
     Table table;
     table.add_column(type_Bool, "first1");
     table.add_column(type_Bool, "first2");
-    table.add_column(type_DateTime, "second1");
-    table.add_column(type_DateTime, "second2");
+    table.add_column(type_OldDateTime, "second1");
+    table.add_column(type_OldDateTime, "second2");
     table.add_column(type_String, "third1");
     table.add_column(type_String, "third2");
 
     table.add_empty_row();
     table.set_bool(0, 0, false);
     table.set_bool(1, 0, true);
-    table.set_datetime(2, 0, DateTime(0));
-    table.set_datetime(3, 0, DateTime(1));
+    table.set_olddatetime(2, 0, OldDateTime(0));
+    table.set_olddatetime(3, 0, OldDateTime(1));
     table.set_string(4, 0, StringData("a"));
     table.set_string(5, 0, StringData("b"));
 
     table.add_empty_row();
     table.set_bool(0, 1, true);
     table.set_bool(1, 1, true);
-    table.set_datetime(2, 1, DateTime(1));
-    table.set_datetime(3, 1, DateTime(1));
+    table.set_olddatetime(2, 1, OldDateTime(1));
+    table.set_olddatetime(3, 1, OldDateTime(1));
     table.set_string(4, 1, StringData("b"));
     table.set_string(5, 1, StringData("b"));
 
     table.add_empty_row();
     table.set_bool(0, 2, false);
     table.set_bool(1, 2, true);
-    table.set_datetime(2, 2, DateTime(0));
-    table.set_datetime(3, 2, DateTime(1));
+    table.set_olddatetime(2, 2, OldDateTime(0));
+    table.set_olddatetime(3, 2, OldDateTime(1));
     table.set_string(4, 2, StringData("a"));
     table.set_string(5, 2, StringData("b"));
 
     Query q1 = table.column<Bool>(0) == table.column<Bool>(1);
-    Query q2 = table.column<DateTime>(2) == table.column<DateTime>(3);
+    Query q2 = table.column<OldDateTime>(2) == table.column<OldDateTime>(3);
     Query q3 = table.column<String>(4) == table.column<String>(5);
 
     CHECK_EQUAL(1, q1.find());
@@ -2117,7 +2117,7 @@ TEST(Query_TwoSameCols)
     CHECK_EQUAL(1, q3.count());
 
     Query q4 = table.column<Bool>(0) != table.column<Bool>(1);
-    Query q5 = table.column<DateTime>(2) != table.column<DateTime>(3);
+    Query q5 = table.column<OldDateTime>(2) != table.column<OldDateTime>(3);
     Query q6 = table.column<String>(4) != table.column<String>(5);
 
     CHECK_EQUAL(0, q5.find());
@@ -2131,14 +2131,14 @@ TEST(Query_TwoSameCols)
 TEST(Query_DateTest)
 {
     Table table;
-    table.add_column(type_DateTime, "second1");
+    table.add_column(type_OldDateTime, "second1");
 
     for (int i = 1; i < 10; i++) {
         table.add_empty_row();
-        table.set_datetime(0, i - 1, DateTime(i * 1000));
+        table.set_olddatetime(0, i - 1, OldDateTime(i * 1000));
     }
 
-    Query q = table.where().equal_datetime(0, DateTime(5000));
+    Query q = table.where().equal_olddatetime(0, OldDateTime(5000));
     CHECK_EQUAL(1, q.count());
     TableView tv = q.find_all();
     CHECK_EQUAL(1, tv.size());
@@ -2919,13 +2919,13 @@ TEST(Query_DateQuery)
 {
     PeopleTable table;
 
-    table.add("Mary", 28, false, realm::DateTime(2012, 1, 24), realm::BinaryData("bin \0\n data 1", 13));
-    table.add("Frank", 56, true, realm::DateTime(2008, 4, 15), realm::BinaryData("bin \0\n data 2", 13));
-    table.add("Bob", 24, true, realm::DateTime(2010, 12, 1), realm::BinaryData("bin \0\n data 3", 13));
+    table.add("Mary", 28, false, realm::OldDateTime(2012, 1, 24), realm::BinaryData("bin \0\n data 1", 13));
+    table.add("Frank", 56, true, realm::OldDateTime(2008, 4, 15), realm::BinaryData("bin \0\n data 2", 13));
+    table.add("Bob", 24, true, realm::OldDateTime(2010, 12, 1), realm::BinaryData("bin \0\n data 3", 13));
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
-    PeopleTable::View view5 = table.where().hired.greater_equal(realm::DateTime(2012, 1, 1).get_datetime())
-        .hired.less(realm::DateTime(2013, 1, 1).get_datetime()).find_all();
+    PeopleTable::View view5 = table.where().hired.greater_equal(realm::OldDateTime(2012, 1, 1).get_olddatetime())
+        .hired.less(realm::OldDateTime(2013, 1, 1).get_olddatetime()).find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
 }
@@ -3622,14 +3622,14 @@ TEST(Query_SortDescending)
 TEST(Query_SortDates)
 {
     Table table;
-    table.add_column(type_DateTime, "first");
+    table.add_column(type_OldDateTime, "first");
 
     table.insert_empty_row(0);
-    table.set_datetime(0, 0, 1000);
+    table.set_olddatetime(0, 0, 1000);
     table.insert_empty_row(1);
-    table.set_datetime(0, 1, 3000);
+    table.set_olddatetime(0, 1, 3000);
     table.insert_empty_row(2);
-    table.set_datetime(0, 2, 2000);
+    table.set_olddatetime(0, 2, 2000);
 
     TableView tv = table.where().find_all();
     CHECK(tv.size() == 3);
@@ -3640,9 +3640,9 @@ TEST(Query_SortDates)
     tv.sort(0);
 
     CHECK(tv.size() == 3);
-    CHECK(tv.get_datetime(0, 0) == DateTime(1000));
-    CHECK(tv.get_datetime(0, 1) == DateTime(2000));
-    CHECK(tv.get_datetime(0, 2) == DateTime(3000));
+    CHECK(tv.get_olddatetime(0, 0) == OldDateTime(1000));
+    CHECK(tv.get_olddatetime(0, 1) == OldDateTime(2000));
+    CHECK(tv.get_olddatetime(0, 2) == OldDateTime(3000));
 }
 
 
@@ -5105,15 +5105,15 @@ TEST(Query_SumMinMaxAvg)
 {
     DateIntStringFloatDouble t;
 
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(2, "b", DateTime(300), 3.0f, 3.0);
-    t.add(3, "c", DateTime(50), 5.0f, 5.0);
-    t.add(0, "a", DateTime(100), 1.0f, 1.0);
-    t.add(0, "b", DateTime(3000), 30.0f, 30.0);
-    t.add(0, "c", DateTime(5), 0.5f, 0.5);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(2, "b", OldDateTime(300), 3.0f, 3.0);
+    t.add(3, "c", OldDateTime(50), 5.0f, 5.0);
+    t.add(0, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(0, "b", OldDateTime(3000), 30.0f, 30.0);
+    t.add(0, "c", OldDateTime(5), 0.5f, 0.5);
 
     CHECK_EQUAL(9, t.where().first.sum());
 
@@ -5161,8 +5161,8 @@ TEST(Query_SumMinMaxAvg)
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where().first.average(), 0.001);
 
-    CHECK_EQUAL(DateTime(3000), t.where().third.maximum());
-    CHECK_EQUAL(DateTime(5), t.where().third.minimum());
+    CHECK_EQUAL(OldDateTime(3000), t.where().third.maximum());
+    CHECK_EQUAL(OldDateTime(5), t.where().third.minimum());
 
     size_t cnt;
     CHECK_EQUAL(0, t.where().first.sum(&cnt, 0, 0));
@@ -5194,15 +5194,15 @@ TEST(Query_SumMinMaxAvg_where)
 {
     DateIntStringFloatDouble t;
 
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(2, "b", DateTime(300), 3.0f, 3.0);
-    t.add(3, "c", DateTime(50), 5.0f, 5.0);
-    t.add(0, "a", DateTime(100), 1.0f, 1.0);
-    t.add(0, "b", DateTime(3000), 30.0f, 30.0);
-    t.add(0, "c", DateTime(5), 0.5f, 0.5);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(2, "b", OldDateTime(300), 3.0f, 3.0);
+    t.add(3, "c", OldDateTime(50), 5.0f, 5.0);
+    t.add(0, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(0, "b", OldDateTime(3000), 30.0f, 30.0);
+    t.add(0, "c", OldDateTime(5), 0.5f, 0.5);
 
     DateIntStringFloatDouble::View v = t.where().find_all();
 
@@ -5239,8 +5239,8 @@ TEST(Query_SumMinMaxAvg_where)
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).first.average(), 0.001);
 
-    CHECK_EQUAL(DateTime(3000), t.where(&v).third.maximum());
-    CHECK_EQUAL(DateTime(5), t.where(&v).third.minimum());
+    CHECK_EQUAL(OldDateTime(3000), t.where(&v).third.maximum());
+    CHECK_EQUAL(OldDateTime(5), t.where(&v).third.minimum());
 
     size_t cnt;
     CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 0, 0));
@@ -5429,7 +5429,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         table.add_column(type_Double, "dbl", n);
         table.add_column(type_String, "str", n);
         table.add_column(type_Binary, "bin", n);
-        table.add_column(type_DateTime, "dat", n);
+        table.add_column(type_OldDateTime, "dat", n);
         table.add_column(type_Table, "tab", &sub1);
         table.add_column(type_Mixed, "mix");
         sub1->add_column(type_Int, "sub_int");
@@ -5449,7 +5449,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         table.set_double(3, 0, 0.8);
         table.set_string(4, 0, "foo");
         table.set_binary(5, 0, bin1);
-        table.set_datetime(6, 0, 0);
+        table.set_olddatetime(6, 0, 0);
         table.set_mixed(8, 0, mix_int);
 
         table.add_empty_row();
@@ -5459,7 +5459,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         table.set_double(3, 1, 8.8);
         table.set_string(4, 1, "banach");
         table.set_binary(5, 1, bin2);
-        table.set_datetime(6, 1, time_now);
+        table.set_olddatetime(6, 1, time_now);
         TableRef subtab = table.get_subtable(7, 1);
         subtab->add_empty_row();
         subtab->set_int(0, 0, 100);
@@ -5471,7 +5471,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
         CHECK_EQUAL(1, table.where().equal(4, "foo").count());
         CHECK_EQUAL(1, table.where().equal(5, bin1).count());
-        CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
+        CHECK_EQUAL(1, table.where().equal_olddatetime(6, 0).count());
         //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
         //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
 
@@ -5545,7 +5545,7 @@ REALM_TABLE_9(TestQueryAllTypes,
               double_col, Double,
               string_col, String,
               binary_col, Binary,
-              date_col, DateTime,
+              date_col, OldDateTime,
               table_col, Subtable<TestQuerySub>,
               mixed_col, Mixed)
 
@@ -6244,7 +6244,7 @@ void create_columns(TableRef table, bool nullable = true)
     table->insert_column(2, type_String, "Description", nullable);
     table->insert_column(3, type_Double, "Rating", nullable);
     table->insert_column(4, type_Bool, "Stock", nullable);
-    table->insert_column(5, type_DateTime, "Delivery date", nullable);
+    table->insert_column(5, type_OldDateTime, "Delivery date", nullable);
     table->insert_column(6, type_Binary, "Photo", nullable);
 }
 
@@ -6286,9 +6286,9 @@ void fill_data(TableRef table) {
     table->set_null(4, 1);
     table->set_bool(4, 2, false);
 
-    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_olddatetime(5, 0, OldDateTime(2016, 2, 2));
     table->set_null(5, 1);
-    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+    table->set_olddatetime(5, 2, OldDateTime(2016, 6, 6));
 }
 
 } // unnamed namespace
@@ -6314,7 +6314,7 @@ TEST(Query_NullShowcase)
 
     NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
-        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>   Photo<BinaryData>
+        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<OldDateTime>   Photo<BinaryData>
         -------------------------------------------------------------------------------------------------------------------------------------
     0   null            null                null                    1.1                 true          2016-2-2             "foo"
     1   10              null                "foo"                   2.2                 null          null                 zero-lenght non-null
@@ -6356,9 +6356,9 @@ TEST(Query_NullShowcase)
     table->set_null(4, 1);
     table->set_bool(4, 2, false);
 
-    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_olddatetime(5, 0, OldDateTime(2016, 2, 2));
     table->set_null(5, 1);
-    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+    table->set_olddatetime(5, 2, OldDateTime(2016, 6, 6));
 
     table->set_binary(6, 0, BinaryData("foo"));
     table->set_binary(6, 1, BinaryData("", 0)); // remember 0, else it will have length of 1 due to 0 termination of c++
@@ -6368,7 +6368,7 @@ TEST(Query_NullShowcase)
     Columns<Float> shipping = table->column<Float>(1);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
-    Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
     Columns<BinaryData> photo = table->column<BinaryData>(6);
 
     // check int/double type mismatch error handling
@@ -6442,10 +6442,10 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, { 0, 2 }));
 
     // Dates
-    tv = (delivery == DateTime(2016, 6, 6)).find_all();
+    tv = (delivery == OldDateTime(2016, 6, 6)).find_all();
     CHECK(equals(tv, { 2 }));
 
-    tv = (delivery != DateTime(2016, 6, 6)).find_all();
+    tv = (delivery != OldDateTime(2016, 6, 6)).find_all();
     CHECK(equals(tv, { 0, 1 }));
 
     tv = (delivery == null()).find_all();
@@ -6504,7 +6504,7 @@ TEST(Query_NullShowcase)
     size_t count;
     int64_t i;
     double d;
-    DateTime dt;
+    OldDateTime dt;
     tv = table->where().find_all();
 
     // Integer column
@@ -6548,11 +6548,11 @@ TEST(Query_NullShowcase)
     d = tv.sum_double(3);
     CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
 
-    // DateTime column
-    dt = tv.maximum_datetime(5);
-    CHECK_EQUAL(dt, DateTime(2016, 6, 6));
-    dt = tv.minimum_datetime(5);
-    CHECK_EQUAL(dt, DateTime(2016, 2, 2));
+    // OldDateTime column
+    dt = tv.maximum_olddatetime(5);
+    CHECK_EQUAL(dt, OldDateTime(2016, 6, 6));
+    dt = tv.minimum_olddatetime(5);
+    CHECK_EQUAL(dt, OldDateTime(2016, 2, 2));
 
     // NaN
     // null converts to 0 when calling get_float() on it. We intentionally do not return the bit pattern
@@ -6678,7 +6678,7 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         CHECK_EQUAL(table->get_float(1, 0), 0.0f);
         CHECK_EQUAL(table->get_double(3, 0), 0.0);
         CHECK_EQUAL(table->get_bool(4, 0), false);
-        CHECK_EQUAL(table->get_datetime(5, 0), DateTime(0));
+        CHECK_EQUAL(table->get_olddatetime(5, 0), OldDateTime(0));
 
         // Set everything to non-null values
         table->set_int(0, 0, 0);
@@ -6686,7 +6686,7 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         table->set_string(2, 0, StringData("", 0));
         table->set_double(3, 0, 0.);
         table->set_bool(4, 0, false);
-        table->set_datetime(5, 0, DateTime(0));
+        table->set_olddatetime(5, 0, OldDateTime(0));
 
         CHECK(!table->is_null(0, 0));
         CHECK(!table->is_null(1, 0));
@@ -6725,12 +6725,12 @@ TEST(Query_Null_Two_Columns)
     Columns<String> description = table->column<String>(2);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
-    Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
 
     TableView tv;
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<OldDateTime>
     ----------------------------------------------------------------------------------------------------------------
     0   1           null                null                    1.1                 true          2016-2-2
     1   null        null                "foo"                   2.2                 null          null
@@ -6889,7 +6889,7 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     table->add_empty_row();
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<DateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<OldDateTime>
     ----------------------------------------------------------------------------------------------------------------
     null            null                null                    null                null            null
     */
@@ -6945,11 +6945,11 @@ TEST(Query_Null_BetweenMinMax_Nullable)
 
         // date
         match = 123;
-        tv.maximum_datetime(5, &match);
+        tv.maximum_olddatetime(5, &match);
         CHECK_EQUAL(match, npos);
 
         match = 123;
-        tv.minimum_datetime(5, &match);
+        tv.minimum_olddatetime(5, &match);
         CHECK_EQUAL(match, npos);
     };
 
@@ -6963,7 +6963,7 @@ TEST(Query_Null_BetweenMinMax_Nullable)
 
     // Now we test that average does not include nulls in row count:
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<DateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<OldDateTime>
     ----------------------------------------------------------------------------------------------------------------
     null            null                null                    null                null            null
     10              10.f                null                    10.                 null            null
@@ -7001,7 +7001,7 @@ TEST(Query_Null_ManyRows)
     Columns<String> description = table->column<String>(2);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
-    Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
 
     // Create lots of non-null rows
     for (size_t t = 0; t < 2000; t++) {
@@ -7011,7 +7011,7 @@ TEST(Query_Null_ManyRows)
         table->set_string(2, t, "foo");
         table->set_double(3, t, 12.3);
         table->set_bool(4, t, true);
-        table->set_datetime(5, t, DateTime(2016, 2, 2));
+        table->set_olddatetime(5, t, OldDateTime(2016, 2, 2));
     }
 
     // Reference lists used to verify query results
@@ -7097,14 +7097,14 @@ TEST(Query_Null_Sort)
     table->set_string(2, 0, "0");
     table->set_double(3, 0, 0.0);
     table->set_bool(4, 0, false);
-    table->set_datetime(5, 0, DateTime(0));
+    table->set_olddatetime(5, 0, OldDateTime(0));
 
     table->set_int(0, 2, 2);
     table->set_float(1, 2, 2.f);
     table->set_string(2, 2, "2");
     table->set_double(3, 2, 2.0);
     table->set_bool(4, 2, true);
-    table->set_datetime(5, 2, DateTime(2000));
+    table->set_olddatetime(5, 2, OldDateTime(2000));
 
     for (int i = 0; i <= 5; i++) {
         TableView tv = table->where().find_all();

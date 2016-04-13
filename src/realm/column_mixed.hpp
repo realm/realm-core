@@ -66,7 +66,7 @@ public:
 
     int64_t get_int(size_t ndx) const noexcept;
     bool get_bool(size_t ndx) const noexcept;
-    DateTime get_datetime(size_t ndx) const noexcept;
+    OldDateTime get_olddatetime(size_t ndx) const noexcept;
     Timestamp get_timestamp(size_t ndx) const noexcept;
     float get_float(size_t ndx) const noexcept;
     double get_double(size_t ndx) const noexcept;
@@ -99,7 +99,7 @@ public:
 
     void set_int(size_t ndx, int64_t value);
     void set_bool(size_t ndx, bool value);
-    void set_datetime(size_t ndx, DateTime value);
+    void set_olddatetime(size_t ndx, OldDateTime value);
     void set_timestamp(size_t ndx, Timestamp value);
     void set_float(size_t ndx, float value);
     void set_double(size_t ndx, double value);
@@ -109,7 +109,7 @@ public:
 
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
-    void insert_datetime(size_t ndx, DateTime value);
+    void insert_olddatetime(size_t ndx, OldDateTime value);
     void insert_timestamp(size_t ndx, Timestamp value);
     void insert_float(size_t ndx, float value);
     void insert_double(size_t ndx, double value);
@@ -166,8 +166,8 @@ private:
         mixcol_Binary      =  4,
         mixcol_Table       =  5,
         mixcol_Mixed       =  6,
-        mixcol_Date        =  7,
-        mixcol_Timestamp     =  8,
+        mixcol_OldDateTime =  7,
+        mixcol_Timestamp   =  8,
         mixcol_Float       =  9,
         mixcol_Double      = 10, // Positive Double
         mixcol_DoubleNeg   = 11, // Negative Double

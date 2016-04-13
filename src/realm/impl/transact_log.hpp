@@ -27,7 +27,7 @@
 #include <realm/string_data.hpp>
 #include <realm/data_type.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/datetime.hpp>
+#include <realm/olddatetime.hpp>
 #include <realm/mixed.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
@@ -56,8 +56,8 @@ enum Instruction {
     instr_SetString             =  9,
     instr_SetStringUnique       = 32,
     instr_SetBinary             = 10,
-    instr_SetDateTime           = 11,
-    instr_SetTimestamp            = 48,
+    instr_SetOldDateTime        = 11,
+    instr_SetTimestamp          = 48,
     instr_SetTable              = 12,
     instr_SetMixed              = 13,
     instr_SetLink               = 14,
@@ -68,7 +68,7 @@ enum Instruction {
     instr_InsertEmptyRows       = 17,
     instr_EraseRows             = 18, // Remove (multiple) rows
     instr_SwapRows              = 19,
-    instr_ChangeLinkTargets       = 47, // Replace links pointing to row A with links to row B
+    instr_ChangeLinkTargets     = 47, // Replace links pointing to row A with links to row B
     instr_ClearTable            = 20, // Remove all rows in selected table
     instr_OptimizeTable         = 21,
     instr_SelectDescriptor      = 22, // Select descriptor from currently selected root table
@@ -157,7 +157,7 @@ public:
     bool set_string(size_t, size_t, StringData) { return true; }
     bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
     bool set_binary(size_t, size_t, BinaryData) { return true; }
-    bool set_date_time(size_t, size_t, DateTime) { return true; }
+    bool set_olddatetime(size_t, size_t, OldDateTime) { return true; }
     bool set_timestamp(size_t, size_t, Timestamp) { return true; }
     bool set_table(size_t, size_t) { return true; }
     bool set_mixed(size_t, size_t, const Mixed&) { return true; }
@@ -226,7 +226,7 @@ public:
     bool set_string(size_t col_ndx, size_t row_ndx, StringData);
     bool set_string_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, StringData);
     bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData);
-    bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime);
+    bool set_olddatetime(size_t col_ndx, size_t row_ndx, OldDateTime);
     bool set_timestamp(size_t col_ndx, size_t row_ndx, Timestamp);
     bool set_table(size_t col_ndx, size_t row_ndx);
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&);
@@ -326,7 +326,7 @@ public:
     void set_string(const Table*, size_t col_ndx, size_t ndx, StringData value);
     void set_string_unique(const Table*, size_t col_ndx, size_t ndx, StringData value);
     void set_binary(const Table*, size_t col_ndx, size_t ndx, BinaryData value);
-    void set_date_time(const Table*, size_t col_ndx, size_t ndx, DateTime value);
+    void set_olddatetime(const Table*, size_t col_ndx, size_t ndx, OldDateTime value);
     void set_timestamp(const Table*, size_t col_ndx, size_t ndx, Timestamp value);
     void set_table(const Table*, size_t col_ndx, size_t ndx);
     void set_mixed(const Table*, size_t col_ndx, size_t ndx, const Mixed& value);
@@ -705,8 +705,8 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
         case type_Double:
             append_simple_instr(instr, append(numbers_2, value.get_double())); // Throws
             return;
-        case type_DateTime: {
-            auto value_2 = value.get_datetime().get_datetime();
+        case type_OldDateTime: {
+            auto value_2 = value.get_olddatetime().get_olddatetime();
             append_simple_instr(instr, append(numbers_2, value_2)); // Throws
             return;
         }
@@ -1085,18 +1085,18 @@ inline void TransactLogConvenientEncoder::set_binary(const Table* t, size_t col_
     m_encoder.set_binary(col_ndx, ndx, value); // Throws
 }
 
-inline bool TransactLogEncoder::set_date_time(size_t col_ndx, size_t ndx, DateTime value)
+inline bool TransactLogEncoder::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value)
 {
-    append_simple_instr(instr_SetDateTime, util::tuple(col_ndx, ndx,
-                                                       value.get_datetime())); // Throws
+    append_simple_instr(instr_SetOldDateTime, util::tuple(col_ndx, ndx,
+                                                          value.get_olddatetime())); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_date_time(const Table* t, size_t col_ndx,
-                                       size_t ndx, DateTime value)
+inline void TransactLogConvenientEncoder::set_olddatetime(const Table* t, size_t col_ndx,
+                                                          size_t ndx, OldDateTime value)
 {
     select_table(t); // Throws
-    m_encoder.set_date_time(col_ndx, ndx, value); // Throws
+    m_encoder.set_olddatetime(col_ndx, ndx, value); // Throws
 }
 
 inline bool TransactLogEncoder::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
@@ -1585,11 +1585,11 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_SetDateTime: {
+        case instr_SetOldDateTime: {
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
             int_fast64_t value = read_int<int_fast64_t>(); // Throws
-            if (!handler.set_date_time(col_ndx, row_ndx, value)) // Throws
+            if (!handler.set_olddatetime(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
         }
@@ -2071,9 +2071,9 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
             mixed->set_double(value);
             return;
         }
-        case type_DateTime: {
+        case type_OldDateTime: {
             int_fast64_t value = read_int<int_fast64_t>(); // Throws
-            mixed->set_datetime(value);
+            mixed->set_olddatetime(value);
             return;
         }
         case type_Timestamp: {
@@ -2134,7 +2134,7 @@ inline bool TransactLogParser::is_valid_data_type(int type)
         case type_Double:
         case type_String:
         case type_Binary:
-        case type_DateTime:
+        case type_OldDateTime:
         case type_Timestamp:
         case type_Table:
         case type_Mixed:
@@ -2303,9 +2303,9 @@ public:
         return true;
     }
 
-    bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
+    bool set_olddatetime(size_t col_ndx, size_t row_ndx, OldDateTime value)
     {
-        m_encoder.set_date_time(col_ndx, row_ndx, value);
+        m_encoder.set_olddatetime(col_ndx, row_ndx, value);
         append_instruction();
         return true;
     }

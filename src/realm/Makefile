@@ -47,7 +47,7 @@ impl/destroy_guard.hpp \
 impl/output_stream.hpp \
 impl/simulated_failure.hpp \
 null.hpp \
-datetime.hpp \
+olddatetime.hpp \
 string_data.hpp \
 impl/input_stream.hpp \
 impl/transact_log.hpp \

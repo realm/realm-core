@@ -136,11 +136,11 @@ public:
         return false;
     }
 
-    bool set_date_time(size_t col_ndx, size_t row_ndx, DateTime value)
+    bool set_olddatetime(size_t col_ndx, size_t row_ndx, OldDateTime value)
     {
         if (REALM_LIKELY(check_set_cell(col_ndx, row_ndx))) {
-            log("table->set_datetime(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_datetime(col_ndx, row_ndx, value); // Throws
+            log("table->set_olddatetime(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->set_olddatetime(col_ndx, row_ndx, value); // Throws
             return true;
         }
         return false;
@@ -690,7 +690,7 @@ private:
                 return "type_String";
             case type_Binary:
                 return "type_Binary";
-            case type_DateTime:
+            case type_OldDateTime:
                 return "type_DataTime"; // FIXME? Can we fix this spelling mistake?
             case type_Timestamp:
                 return "type_Timestamp";

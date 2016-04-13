@@ -184,15 +184,15 @@ public:
     ///
     /// <pre>
     ///
-    ///   type_Int       ->  "int"
-    ///   type_Bool      ->  "bool"
-    ///   type_Float     ->  "float"
-    ///   type_Double    ->  "double"
-    ///   type_String    ->  "string"
-    ///   type_Binary    ->  "binary"
-    ///   type_DateTime  ->  "date"
-    ///   type_Table     ->  "table"
-    ///   type_Mixed     ->  "mixed"
+    ///   type_Int          ->  "int"
+    ///   type_Bool         ->  "bool"
+    ///   type_Float        ->  "float"
+    ///   type_Double       ->  "double"
+    ///   type_String       ->  "string"
+    ///   type_Binary       ->  "binary"
+    ///   type_OldDateTime  ->  "date" (deprecated)
+    ///   type_Table        ->  "table"
+    ///   type_Mixed        ->  "mixed"
     ///
     /// </pre>
     static const char* get_data_type_name(DataType) noexcept;

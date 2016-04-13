@@ -56,7 +56,7 @@ REALM_TABLE_2(TestTableInt2,
               second, Int)
 
 REALM_TABLE_2(TestTableDate,
-              first, DateTime,
+              first, OldDateTime,
               second, Int)
 
 REALM_TABLE_2(TestTableFloatDouble,
@@ -92,18 +92,18 @@ TEST(TableView_DateMaxMin)
 {
     TestTableDate ttd;
 
-    ttd.add(DateTime(2014, 7, 10), 1);
-    ttd.add(DateTime(2013, 7, 10), 1);
-    ttd.add(DateTime(2015, 8, 10), 1);
-    ttd.add(DateTime(2015, 7, 10), 1);
+    ttd.add(OldDateTime(2014, 7, 10), 1);
+    ttd.add(OldDateTime(2013, 7, 10), 1);
+    ttd.add(OldDateTime(2015, 8, 10), 1);
+    ttd.add(OldDateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
     size_t ndx = not_found;
 
-    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum(&ndx));
+    CHECK_EQUAL(OldDateTime(2015, 8, 10), v.column().first.maximum(&ndx));
     CHECK_EQUAL(2, ndx);
 
-    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum(&ndx));
+    CHECK_EQUAL(OldDateTime(2013, 7, 10), v.column().first.minimum(&ndx));
     CHECK_EQUAL(1, ndx);
 }
 

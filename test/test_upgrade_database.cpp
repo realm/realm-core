@@ -805,7 +805,7 @@ TEST(Upgrade_InRealmHistory)
 
 
 // Open an existing database-file-format-version 4 file and check that it automatically upgrades to version 5.
-// The upgrade will change all DateTime columns into TimeStamp columns.
+// The upgrade will change all OldDateTime columns into TimeStamp columns.
 TEST(Upgrade_Database_4_5_DateTime1)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
@@ -821,7 +821,7 @@ TEST(Upgrade_Database_4_5_DateTime1)
         // Make a copy of the version 4 database so that we keep the original file intact and unmodified
         CHECK_OR_RETURN(File::copy(path, temp_copy));
 
-        // Constructing this SharedGroup will trigger Table::upgrade_datetime() for all tables because the file is
+        // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
         // in version 4
         SharedGroup sg(temp_copy);
 
@@ -875,32 +875,32 @@ TEST(Upgrade_Database_4_5_DateTime1)
     TableRef t = g.add_table("table");
 
     // No index
-    t->add_column(type_DateTime, "dt1", true);  // nullable
-    t->add_column(type_DateTime, "dt2", false); // nonnullable
+    t->add_column(type_OldDateTime, "dt1", true);  // nullable
+    t->add_column(type_OldDateTime, "dt2", false); // nonnullable
                                                 // No index
-    t->add_column(type_DateTime, "dt3", true);  // nullable
-    t->add_column(type_DateTime, "dt4", false); // nonnullable
+    t->add_column(type_OldDateTime, "dt3", true);  // nullable
+    t->add_column(type_OldDateTime, "dt4", false); // nonnullable
 
     t->add_search_index(0);
     t->add_search_index(1);
 
     t->add_empty_row();
-    t->set_datetime(0, 0, DateTime(1234));
-    t->set_datetime(1, 0, DateTime(1234));
-    t->set_datetime(2, 0, DateTime(1234));
-    t->set_datetime(3, 0, DateTime(1234));
+    t->set_olddatetime(0, 0, OldDateTime(1234));
+    t->set_olddatetime(1, 0, OldDateTime(1234));
+    t->set_olddatetime(2, 0, OldDateTime(1234));
+    t->set_olddatetime(3, 0, OldDateTime(1234));
 
     t->add_empty_row();
-    t->set_datetime(0, 1, DateTime(0));
-    t->set_datetime(1, 1, DateTime(0));
-    t->set_datetime(2, 1, DateTime(0));
-    t->set_datetime(3, 1, DateTime(0));
+    t->set_olddatetime(0, 1, OldDateTime(0));
+    t->set_olddatetime(1, 1, OldDateTime(0));
+    t->set_olddatetime(2, 1, OldDateTime(0));
+    t->set_olddatetime(3, 1, OldDateTime(0));
 
     t->add_empty_row();
     t->set_null(0, 2);
-    t->set_datetime(1, 2, DateTime(0));
+    t->set_olddatetime(1, 2, OldDateTime(0));
     t->set_null(2, 2);
-    t->set_datetime(3, 2, DateTime(0));
+    t->set_olddatetime(3, 2, OldDateTime(0));
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE

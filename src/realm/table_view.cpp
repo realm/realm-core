@@ -107,7 +107,7 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 
 // Searching
 
-// find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
+// find_*_integer() methods are used for all "kinds" of integer values (bool, int, OldDateTime)
 
 size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
@@ -320,7 +320,7 @@ double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) cons
 {
     return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
+OldDateTime TableViewBase::maximum_olddatetime(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
@@ -350,7 +350,7 @@ double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) cons
 {
     return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
+OldDateTime TableViewBase::minimum_olddatetime(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
         return aggregate<act_Max, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);

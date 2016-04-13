@@ -136,11 +136,11 @@ inline bool MixedColumn::get_bool(size_t ndx) const noexcept
     return (get_value(ndx) != 0);
 }
 
-inline DateTime MixedColumn::get_datetime(size_t ndx) const noexcept
+inline OldDateTime MixedColumn::get_olddatetime(size_t ndx) const noexcept
 {
-    REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_Date);
+    REALM_ASSERT_3(m_types->get(ndx), ==, mixcol_OldDateTime);
 
-    return DateTime(get_value(ndx));
+    return OldDateTime(get_value(ndx));
 }
 
 inline float MixedColumn::get_float(size_t ndx) const noexcept
@@ -254,9 +254,9 @@ inline void MixedColumn::set_bool(size_t ndx, bool value)
     set_value(ndx, (value ? 1 : 0), mixcol_Bool); // Throws
 }
 
-inline void MixedColumn::set_datetime(size_t ndx, DateTime value)
+inline void MixedColumn::set_olddatetime(size_t ndx, OldDateTime value)
 {
-    set_value(ndx, int64_t(value.get_datetime()), mixcol_Date); // Throws
+    set_value(ndx, int64_t(value.get_olddatetime()), mixcol_OldDateTime); // Throws
 }
 
 inline void MixedColumn::set_subtable(size_t ndx, const Table* t)
@@ -335,10 +335,10 @@ inline void MixedColumn::insert_bool(size_t ndx, bool value)
     insert_int(ndx, value_2, mixcol_Bool); // Throws
 }
 
-inline void MixedColumn::insert_datetime(size_t ndx, DateTime value)
+inline void MixedColumn::insert_olddatetime(size_t ndx, OldDateTime value)
 {
-    int_fast64_t value_2 = int_fast64_t(value.get_datetime());
-    insert_int(ndx, value_2, mixcol_Date); // Throws
+    int_fast64_t value_2 = int_fast64_t(value.get_olddatetime());
+    insert_int(ndx, value_2, mixcol_OldDateTime); // Throws
 }
 
 inline void MixedColumn::insert_timestamp(size_t ndx, Timestamp value)
