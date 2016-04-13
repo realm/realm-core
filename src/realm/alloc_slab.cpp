@@ -481,9 +481,13 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
     return file_format_version;
 }
 
+namespace {
 
 std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>> all_files;
 util::Mutex all_files_mutex;
+
+}
+
 
 ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 {
@@ -903,10 +907,10 @@ void SlabAlloc::remap(size_t file_size)
     // Extend mapping by adding sections
     REALM_ASSERT_DEBUG(matches_section_boundary(file_size));
     m_baseline = file_size;
-    auto num_sections = get_section_index(file_size);
+    size_t num_sections = get_section_index(file_size);
     {
         std::lock_guard<util::Mutex> lock(m_file_mappings->m_mutex);
-        auto num_additional_mappings = num_sections - m_file_mappings->m_first_additional_mapping;
+        size_t num_additional_mappings = num_sections - m_file_mappings->m_first_additional_mapping;
 
         if (num_additional_mappings > m_file_mappings->m_capacity_global_mappings) {
             // FIXME: No harcoded constants here
@@ -919,8 +923,8 @@ void SlabAlloc::remap(size_t file_size)
         }
         for (size_t k = m_file_mappings->m_num_global_mappings; k < num_additional_mappings; ++k)
         {
-            auto section_start_offset = get_section_base(k + m_file_mappings->m_first_additional_mapping);
-            auto section_size = get_section_base(1 + k + m_file_mappings->m_first_additional_mapping) - section_start_offset;
+            size_t section_start_offset = get_section_base(k + m_file_mappings->m_first_additional_mapping);
+            size_t section_size = get_section_base(1 + k + m_file_mappings->m_first_additional_mapping) - section_start_offset;
             m_file_mappings->m_global_mappings[k] = 
                 std::make_shared<util::File::Map<char>>(m_file_mappings->m_file, section_start_offset, File::access_ReadOnly, section_size);
         }
