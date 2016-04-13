@@ -11762,4 +11762,40 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
 }
 
 
+// Found by AFL during development of Timestamp
+TEST(LangBindHelper_AdvanceLink)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, nullptr));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, nullptr);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.add_table("");
+    g.add_table("1");
+    g.get_table(0)->add_column_link(type_Link, "", *g.get_table(1));
+    g.get_table(0)->add_column_link(type_Link, "", *g.get_table(0));
+    g.get_table(0)->add_column(DataType(0), "", false);
+    g.get_table(1)->insert_empty_row(0, 48);
+    g.get_table(0)->add_empty_row(48);
+    g.get_table(0)->set_null(0, 0);
+    g.get_table(0)->set_link(0, 0, 0);
+    g.get_table(0)->insert_column_link(3, type_Link, "", *g.get_table(0));
+    g.get_table(0)->add_column(DataType(0), "", true);
+    g.get_table(0)->set_null(3, 0);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+    g.get_table(0)->set_null(3, 0);
+    g.get_table(0)->set_null(0, 0);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+}
+
+
 #endif
