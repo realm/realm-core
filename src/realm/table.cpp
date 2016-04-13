@@ -1883,12 +1883,12 @@ MixedColumn& Table::get_column_mixed(size_t ndx)
     return get_column<MixedColumn, col_type_Mixed>(ndx);
 }
 
-const TimestampColumn& Table::get_column_olddatetime(size_t ndx) const noexcept
+const TimestampColumn& Table::get_column_timestamp(size_t ndx) const noexcept
 {
     return get_column<TimestampColumn, col_type_Timestamp>(ndx);
 }
 
-TimestampColumn& Table::get_column_olddatetime(size_t ndx)
+TimestampColumn& Table::get_column_timestamp(size_t ndx)
 {
     return get_column<TimestampColumn, col_type_Timestamp>(ndx);
 }
@@ -5078,8 +5078,8 @@ bool Table::compare_rows(const Table& t) const
                 continue;
             }
             case col_type_Timestamp: {
-                const TimestampColumn& c1 = get_column_olddatetime(i);
-                const TimestampColumn& c2 = t.get_column_olddatetime(i);
+                const TimestampColumn& c1 = get_column_timestamp(i);
+                const TimestampColumn& c2 = t.get_column_timestamp(i);
                 if (!c1.compare(c2))
                     return false;
                 continue;

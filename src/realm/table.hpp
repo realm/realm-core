@@ -1103,8 +1103,8 @@ private:
     const SubtableColumn& get_column_table(size_t column_ndx) const noexcept;
     MixedColumn& get_column_mixed(size_t column_ndx);
     const MixedColumn& get_column_mixed(size_t column_ndx) const noexcept;
-    TimestampColumn& get_column_olddatetime(size_t column_ndx);
-    const TimestampColumn& get_column_olddatetime(size_t column_ndx) const noexcept;
+    TimestampColumn& get_column_timestamp(size_t column_ndx);
+    const TimestampColumn& get_column_timestamp(size_t column_ndx) const noexcept;
     const LinkColumnBase& get_column_link_base(size_t ndx) const noexcept;
     LinkColumnBase& get_column_link_base(size_t ndx);
     const LinkColumn& get_column_link(size_t ndx) const noexcept;
