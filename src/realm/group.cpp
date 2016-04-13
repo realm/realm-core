@@ -585,7 +585,9 @@ void Group::remove_table(size_t table_ndx)
     for (size_t i = n; i > 0; --i)
         table->remove_column(i-1);
 
-    ref_type ref = m_tables.get(table_ndx);
+    int64_t ref_64 = m_tables.get(table_ndx);
+    REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
+    ref_type ref = ref_type(ref_64);
 
     // Remove table and move all successive tables
     m_tables.erase(table_ndx); // Throws
@@ -1153,7 +1155,6 @@ public:
     {
         REALM_ASSERT_3(table_ndx, <=, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
-        static_cast<void>(num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
             m_group.m_table_accessors.insert(m_group.m_table_accessors.begin() + table_ndx, nullptr);
@@ -1175,7 +1176,6 @@ public:
     {
         REALM_ASSERT_3(table_ndx, <, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
-        static_cast<void>(num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
             // Link target tables do not need to be considered here, since all
@@ -1283,19 +1283,12 @@ public:
         typedef _impl::TableFriend tf;
         if (m_table) {
             if (unordered) {
-                // FIXME: Explain what the `num_rows_to_insert == 0` case is all
-                // about (Thomas Goyne).
-                if (num_rows_to_insert == 0) {
-                    tf::mark_opposite_link_tables(*m_table);
-                }
-                else {
-                    // Unordered insertion of multiple rows is not yet supported (and not
-                    // yet needed).
-                    REALM_ASSERT(num_rows_to_insert == 1);
-                    size_t from_row_ndx = row_ndx;
-                    size_t to_row_ndx = prior_num_rows;
-                    tf::adj_acc_move_over(*m_table, from_row_ndx, to_row_ndx);
-                }
+                // Unordered insertion of multiple rows is not yet supported (and not
+                // yet needed).
+                REALM_ASSERT_EX((num_rows_to_insert == 1) || (num_rows_to_insert == 0), num_rows_to_insert);
+                size_t from_row_ndx = row_ndx;
+                size_t to_row_ndx = prior_num_rows;
+                tf::adj_acc_move_over(*m_table, from_row_ndx, to_row_ndx);
             }
             else {
                 tf::adj_acc_insert_rows(*m_table, row_ndx, num_rows_to_insert);
@@ -1310,7 +1303,7 @@ public:
         if (unordered) {
             // Unordered removal of multiple rows is not yet supported (and not
             // yet needed).
-            REALM_ASSERT_3(num_rows_to_erase, ==, 1);
+            REALM_ASSERT_EX((num_rows_to_erase == 1) || (num_rows_to_erase == 0), num_rows_to_erase);
             typedef _impl::TableFriend tf;
             if (m_table) {
                 size_t prior_last_row_ndx = prior_num_rows - 1;
@@ -1320,8 +1313,16 @@ public:
         else {
             typedef _impl::TableFriend tf;
             if (m_table) {
-                for (size_t i = 0; i < num_rows_to_erase; ++i)
-                    tf::adj_acc_erase_row(*m_table, row_ndx + num_rows_to_erase - 1 - i);
+                // Linked tables must still be marked for accessor updates in the case
+                // where num_rows_to_erase == 0. Without doing this here it wouldn't be done
+                // at all because the contents of the for loop do not get executed.
+                if (num_rows_to_erase == 0) {
+                    tf::mark_opposite_link_tables(*m_table);
+                }
+                else {
+                    for (size_t i = 0; i < num_rows_to_erase; ++i)
+                        tf::adj_acc_erase_row(*m_table, row_ndx + num_rows_to_erase - 1 - i);
+                }
             }
         }
         return true;

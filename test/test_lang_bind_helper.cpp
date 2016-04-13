@@ -121,13 +121,13 @@ TEST(LangBindHelper_LinkView)
 namespace {
 
 REALM_TABLE_4(TestTableShared,
-                first,  Int,
-                second, Int,
-                third,  Bool,
-                fourth, String)
+              first,  Int,
+              second, Int,
+              third,  Bool,
+              fourth, String)
 
 REALM_TABLE_1(TestTableInts,
-                first,  Int)
+              first,  Int)
 
 
 class ShortCircuitHistory: public TrivialReplication, public _impl::History {
@@ -10473,6 +10473,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryNot;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryAndAndOr;
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryWithExpression;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQueryLinksToDetached;
 
     {
         LangBindHelper::promote_to_write(sg_w);
@@ -10483,35 +10484,42 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         size_t col_link = source->add_column_link(type_Link, "link", *target);
         size_t col_name = target->add_column(type_String, "name");
 
-        target->add_empty_row(3);
+        target->add_empty_row(4);
         target->set_string(col_name, 0, "A");
         target->set_string(col_name, 1, "B");
         target->set_string(col_name, 2, "C");
+        target->set_string(col_name, 3, "D");
 
         source->add_empty_row(3);
         source->set_link(col_link, 0, 0);
         source->set_link(col_link, 1, 1);
         source->set_link(col_link, 2, 2);
 
+        Row detached_row = target->get(3);
+        target->move_last_over(3);
+
         LangBindHelper::commit_and_continue_as_read(sg_w);
 
-        Query query = source->where().links_to(col_link, target->get(0));
+        Query query = source->column<Link>(col_link) == target->get(0);
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
 
-        Query queryOr = source->where().links_to(col_link, target->get(0)).Or().links_to(col_link, target->get(1));
+        Query queryOr = source->column<Link>(col_link) == target->get(0) || source->column<Link>(col_link) == target->get(1);
         handoverQueryOr = sg_w.export_for_handover(queryOr, ConstSourcePayload::Copy);
 
-        Query queryAnd = source->where().links_to(col_link, target->get(0)).links_to(col_link, target->get(0));
+        Query queryAnd = source->column<Link>(col_link) == target->get(0) && source->column<Link>(col_link) == target->get(0);
         handoverQueryAnd = sg_w.export_for_handover(queryAnd, ConstSourcePayload::Copy);
 
-        Query queryNot = source->where().Not().links_to(col_link, target->get(0)).links_to(col_link, target->get(1));
+        Query queryNot = !(source->column<Link>(col_link) == target->get(0)) && source->column<Link>(col_link) == target->get(1);
         handoverQueryNot = sg_w.export_for_handover(queryNot, ConstSourcePayload::Copy);
 
         Query queryAndAndOr = source->where().group().and_query(queryOr).end_group().and_query(queryAnd);
         handoverQueryAndAndOr = sg_w.export_for_handover(queryAndAndOr, ConstSourcePayload::Copy);
 
-        Query queryWithExpression = source->column<LinkList>(col_link).is_not_null() && query;
+        Query queryWithExpression = source->column<Link>(col_link).is_not_null() && query;
         handoverQueryWithExpression = sg_w.export_for_handover(queryWithExpression, ConstSourcePayload::Copy);
+
+        Query queryLinksToDetached = source->where().links_to(col_link, detached_row);
+        handoverQueryLinksToDetached = sg_w.export_for_handover(queryLinksToDetached, ConstSourcePayload::Copy);
     }
 
     SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
@@ -10524,6 +10532,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         std::unique_ptr<Query> queryNot(sg.import_from_handover(move(handoverQueryNot)));
         std::unique_ptr<Query> queryAndAndOr(sg.import_from_handover(move(handoverQueryAndAndOr)));
         std::unique_ptr<Query> queryWithExpression(sg.import_from_handover(move(handoverQueryWithExpression)));
+        std::unique_ptr<Query> queryLinksToDetached(sg.import_from_handover(move(handoverQueryLinksToDetached)));
 
         CHECK_EQUAL(1, query->count());
         CHECK_EQUAL(2, queryOr->count());
@@ -10531,6 +10540,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         CHECK_EQUAL(1, queryNot->count());
         CHECK_EQUAL(1, queryAndAndOr->count());
         CHECK_EQUAL(1, queryWithExpression->count());
+        CHECK_EQUAL(0, queryLinksToDetached->count());
 
 
         // Remove the linked-to row.
@@ -10550,6 +10560,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         CHECK_EQUAL(1, queryNot->count());
         CHECK_EQUAL(1, queryAndAndOr->count());
         CHECK_EQUAL(1, queryWithExpression->count());
+        CHECK_EQUAL(0, queryLinksToDetached->count());
     }
 }
 
@@ -11669,5 +11680,86 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
     // backlink column index in target_b from source_b should be index 1
     CHECK_EQUAL(tf::get_spec(*target_b).find_backlink_column(1, 0), 1);
 }
+
+
+// Trigger erase_rows with num_rows == 0 by inserting zero rows
+// and then rolling back the transaction. There was a problem
+// where accessors were not updated correctly in this case because
+// of an early out when num_rows_to_erase is zero.
+TEST(LangBindHelper_RollbackInsertZeroRows)
+{
+    SHARED_GROUP_TEST_PATH(shared_path)
+    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.add_table("t0");
+    g.insert_table(1, "t1");
+
+    g.get_table(0)->add_empty_row(2);
+    g.get_table(1)->add_empty_row(2);
+    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
+    g.get_table(0)->set_link(0, 1, 1);
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.get_table(1)->insert_empty_row(1, 0); // Insert zero rows
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+}
+
+
+TEST(LangBindHelper_RollbackRemoveZeroRows)
+{
+    SHARED_GROUP_TEST_PATH(shared_path)
+    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.add_table("t0");
+    g.insert_table(1, "t1");
+
+    g.get_table(0)->add_empty_row(2);
+    g.get_table(1)->add_empty_row(2);
+    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
+    g.get_table(0)->set_link(0, 1, 1);
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.get_table(1)->clear();
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 0);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 0), realm::npos);
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    CHECK_EQUAL(g.get_table(0)->size(), 2);
+    CHECK_EQUAL(g.get_table(1)->size(), 2);
+    CHECK_EQUAL(g.get_table(0)->get_link(0, 1), 1);
+}
+
 
 #endif

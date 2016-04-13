@@ -12,6 +12,7 @@
 
 #include <realm.hpp>
 #include <realm/impl/destroy_guard.hpp>
+#include <realm/impl/simulated_failure.hpp>
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_mixed.hpp>
@@ -23,9 +24,6 @@
 
 #include "../test.hpp"
 #include "../util/demangle.hpp"
-#include "../util/random.hpp"
-#include "../util/thread_wrapper.hpp"
-#include "../util/random.hpp"
 
 using namespace realm;
 using namespace realm::util;

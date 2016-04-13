@@ -11,7 +11,6 @@
 #include <realm/util/features.h>
 
 #include "test.hpp"
-#include "util/thread_wrapper.hpp"
 
 using namespace realm::util;
 using namespace realm::test_util;

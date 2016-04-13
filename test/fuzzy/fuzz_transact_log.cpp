@@ -37,13 +37,6 @@ int main(int argc, const char* argv[])
     buffer.resize(1024);
     _impl::NoCopyInputStreamAdaptor in_aa{in_a, buffer.data(), buffer.size()};
 
-    test_util::unit_test::TestDetails test_details;
-    test_details.test_index = 0;
-    test_details.suite_name = "FuzzyTest";
-    test_details.test_name = "TransactLogApplier";
-    test_details.file_name = __FILE__;
-    test_details.line_number = __LINE__;
-
     Group group;
 
     try {

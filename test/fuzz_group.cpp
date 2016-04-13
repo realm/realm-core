@@ -1,13 +1,31 @@
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/lang_bind_helper.hpp>
 #include "test.hpp"
 
+#include <ctime>
 #include <stdio.h>
 #include <fstream>
 
 using namespace realm;
 using namespace realm::util;
+
+// Determines whether or not to run the shared group verify function
+// after each transaction. This will find errors earlier but is expensive.
+#define REALM_VERIFY true
+
+#if REALM_VERIFY
+    #define REALM_DO_IF_VERIFY(log, op) \
+        do { \
+            if (log) *log << #op << ";\n"; \
+            op; \
+        } \
+        while(false)
+#else
+    #define REALM_DO_IF_VERIFY(log, owner) \
+        do {} while(false)
+#endif
 
 struct EndOfFile {};
 
@@ -22,6 +40,7 @@ std::string create_string(unsigned char byte)
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
+            COMMIT, ROLLBACK, ADVANCE,
 
             COUNT};
 
@@ -67,7 +86,15 @@ int64_t get_int64(State& s) {
     return v;
 }
 
-void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std::ostream&> log)
+std::string get_current_time_stamp() {
+    std::time_t t = std::time(nullptr);
+    const int str_size = 100;
+    char str_buffer [str_size] = { 0 };
+    std::strftime(str_buffer, str_size, "%c", std::localtime(&t));
+    return str_buffer;
+}
+
+void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
 {
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
     const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
@@ -75,6 +102,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
     // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
     const size_t max_rows = 100000;
+    using realm::test_util::crypt_key;
 
     try {
         State s;
@@ -82,9 +110,38 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
         s.pos = 0;
 
         if (log) {
-            *log << "\n\n\n----------------------------------------------------------------------\n";
-            *log << "Group g;\n\n";
+            *log << "\n\n// Test case generated in "  REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
+            *log << "// ----------------------------------------------------------------------\n";
+            const char* key = crypt_key();
+            std::string printable_key;
+            if (key == nullptr) {
+                printable_key = "nullptr";
+            }
+            else {
+                printable_key = std::string("\"") + key + "\"";
+            }
+
+            *log << "std::unique_ptr<Replication> hist_r(make_client_history(\"" << path << "\", " << printable_key << "));\n";
+            *log << "std::unique_ptr<Replication> hist_w(make_client_history(\"" << path << "\", " << printable_key << "));\n";
+
+            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << printable_key << ");\n";
+            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << printable_key << ");\n";
+
+            *log << "Group& g = const_cast<Group&>(sg_w.begin_read());\n";
+            *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
+            *log << "LangBindHelper::promote_to_write(sg_w);\n";
+
+            *log << "\n";
         }
+
+        std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+
+        SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        Group& g = const_cast<Group&>(sg_w.begin_read());
+        Group& g_r = const_cast<Group&>(sg_r.begin_read());
+        LangBindHelper::promote_to_write(sg_w);
 
         for (;;) {
             char instr = get_next(s) % COUNT;
@@ -355,6 +412,37 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                     t->remove(row_ndx);
                 }
             }
+            else if (instr == COMMIT) {
+                if (log) {
+                    *log << "LangBindHelper::commit_and_continue_as_read(sg_w);\n";
+                }
+                LangBindHelper::commit_and_continue_as_read(sg_w);
+                REALM_DO_IF_VERIFY(log, g.verify());
+                if (log) {
+                    *log << "LangBindHelper::promote_to_write(sg_w);\n";
+                }
+                LangBindHelper::promote_to_write(sg_w);
+                REALM_DO_IF_VERIFY(log, g.verify());
+            }
+            else if (instr == ROLLBACK) {
+                if (log) {
+                    *log << "LangBindHelper::rollback_and_continue_as_read(sg_w);\n";
+                }
+                LangBindHelper::rollback_and_continue_as_read(sg_w);
+                REALM_DO_IF_VERIFY(log, g.verify());
+                if (log) {
+                    *log << "LangBindHelper::promote_to_write(sg_w);\n";
+                }
+                LangBindHelper::promote_to_write(sg_w);
+                REALM_DO_IF_VERIFY(log, g.verify());
+            }
+            else if (instr == ADVANCE) {
+                if (log) {
+                    *log << "LangBindHelper::advance_read(sg_r);\n";
+                }
+                LangBindHelper::advance_read(sg_r);
+                REALM_DO_IF_VERIFY(log, g_r.verify());
+            }
         }
     }
     catch (const EndOfFile&) {
@@ -390,26 +478,16 @@ int run_fuzzy(int argc, const char* argv[])
 
     std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
     if (!in.is_open()) {
-        fprintf(stderr, "Could not open file for reading: %s\n", argv[1]);
+        std::cerr << "Could not open file for reading: " << argv[file_arg] << "\n";
         exit(1);
     }
 
-    Group group;
+    disable_sync_to_disk();
+    realm::test_util::SharedGroupTestPathGuard path("fuzz.realm.test");
 
     try {
-        if (log) {
-            time_t t = time(0);
-            tm t0;
-#ifndef _MSC_VER // fixme
-            localtime_r(&t, &t0);
-            char buffer[100] = { 0 };
-            strftime(buffer, sizeof(buffer), "%c", &t0);
-            *log << "// Test case generated by " << argv[0] << " on " << buffer << ".\n";
-#endif
-            *log << "Group g;\n";
-        }
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-        parse_and_apply_instructions(contents, group, std::cerr);
+        parse_and_apply_instructions(contents, path, log);
     }
     catch (const EndOfFile&) {
         return 0;

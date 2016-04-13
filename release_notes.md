@@ -1,10 +1,30 @@
 # NEXT RELEASE
 
+### Breaking changes:
+
+* Lock file (`foo.realm.lock`) format bumped.
+
 ### Bugfixes:
 
-### API breaking changes:
-
-* Lorem ipsum.
+* Fix for #1498: A crash during opening of a Realm could lead to Realm files
+  which could not later be read. The symptom would be a realm file with zeroes
+  in the end but on streaming form (which requires a footer at the end of the
+  file instead).
+* Detach subspec and enumkey accessors when they are removed
+  via a transaction (ex rollback). This could cause crashes
+  when removing the last column in a table of type link,
+  linklist, backlink, subtable, or enumkey. See #1585.
+* Update table accessors after table move rollback, issue #1551. This
+  issue could have caused corruption or crashes when tables are moved
+  and then the transaction is rolled back.
+* Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
+* Bug fix: Access dangling pointer while handling canceled asynchronous accept
+  in POSIX networking API.
+* Handing over a detached row accessor no longer crashes.
+* Linked tables were not updated properly when calling erase with num_rows = 0
+  which could be triggered by rolling back a call to insert with num_rows = 0
+* `TableView`s created by `Table::get_backlink_view` are now correctly handled by
+  `TableView`'s move assignment operator. Previously they would crash when used.
 
 ### Enhancements:
 
@@ -14,6 +34,14 @@
   the database locked. Fixes issue #1429
 * Moved all supporting files (all files except the .realm file) into a
   separate ".management" subdirectory.
+* Adding `util::network::buffered_input_stream::reset()`.
+* Added support for queries that traverse backlinks. Fixes #776.
+* Improve the performance of advance_read() over transations that inserted rows
+  when there are live TableViews.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links.
 
 -----------
 
@@ -23,6 +51,30 @@
   it could run forever.
 * Fixed a few compiler warnings
 * Disabled unittest Shared_WaitForChange again, as it can still run forever
+* New features in the unit test framework: Ability to log to a file (one for
+  each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
+  failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
+  (`util::Logger`) is now directly available to each unit test.
+* New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+* New failure simulation features: Ability to prime for random triggering.
+
+----------------------------------------------
+
+# 0.97.3 Release notes
+
+### Bugfixes:
+
+* Update table accessors after table move rollback, issue #1551. This
+  issue could have caused corruption or crashes when tables are moved
+  and then the transaction is rolled back.
+* Detach subspec and enumkey accessors when they are removed
+  via a transaction (ex rollback). This could cause crashes
+  when removing the last column in a table of type link,
+  linklist, backlink, subtable, or enumkey. See #1585.
+* Handing over a detached row accessor no longer crashes.
+
+**NOTE: This is a hotfix release. The above changes are not present in
+versions [0.97.2].**
 
 ----------------------------------------------
 

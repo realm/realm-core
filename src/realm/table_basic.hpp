@@ -693,7 +693,7 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::create(Allocator& alloc)
 {
     TableRef table = Table::create(alloc);
     set_dynamic_type(*table);
-    return unchecked_cast<BasicTable<Spec>>(move(table));
+    return unchecked_cast<BasicTable<Spec>>(std::move(table));
 }
 
 
