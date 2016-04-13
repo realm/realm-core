@@ -490,7 +490,7 @@ int run_fuzzy(int argc, const char* argv[])
     }
 
     disable_sync_to_disk();
-    realm::test_util::SharedGroupTestPathGuard path("/tmp/" + name + ".realm");
+    realm::test_util::SharedGroupTestPathGuard path(name + ".realm");
 
     try {
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
