@@ -23,6 +23,8 @@
 * Handing over a detached row accessor no longer crashes.
 * Linked tables were not updated properly when calling erase with num_rows = 0
   which could be triggered by rolling back a call to insert with num_rows = 0
+* `TableView`s created by `Table::get_backlink_view` are now correctly handled by
+  `TableView`'s move assignment operator. Previously they would crash when used.
 
 ### Enhancements:
 
@@ -34,6 +36,12 @@
   separate ".management" subdirectory.
 * Adding `util::network::buffered_input_stream::reset()`.
 * Added support for queries that traverse backlinks. Fixes #776.
+* Improve the performance of advance_read() over transations that inserted rows
+  when there are live TableViews.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links.
 
 -----------
 

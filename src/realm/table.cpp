@@ -416,7 +416,7 @@ DescriptorRef Table::get_descriptor()
     else {
         desc.reset(m_descriptor);
     }
-    return move(desc);
+    return desc;
 }
 
 

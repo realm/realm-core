@@ -7914,9 +7914,9 @@ TEST(Query_LinksToDeletedOrMovedRow)
     source->set_link(col_link, 1, 1);
     source->set_link(col_link, 2, 2);
 
-    Query qA = source->where().links_to(col_link, target->get(0));
-    Query qB = source->where().links_to(col_link, target->get(1));
-    Query qC = source->where().links_to(col_link, target->get(2));
+    Query qA = source->column<Link>(col_link) == target->get(0);
+    Query qB = source->column<Link>(col_link) == target->get(1);
+    Query qC = source->column<Link>(col_link) == target->get(2);
 
     // Move row C over row A. Row C is now at position 0, and row A has been removed.
     target->move_last_over(0);
