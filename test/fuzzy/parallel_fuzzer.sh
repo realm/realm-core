@@ -44,11 +44,11 @@ fi
 # start the fuzzers
 TIME_OUT="100" # ms
 MEMORY="100" # MB
-afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -M fuzzer1 $EXECUTABLE_PATH @@ > /dev/null 2>&1 &
+afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -M fuzzer1 $EXECUTABLE_PATH @@ --name fuzzer1 > /dev/null 2>&1 &
 
 for i in `seq 2 $NUM_CORES`;
 do
-    afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -S fuzzer$i $EXECUTABLE_PATH @@ > /dev/null 2>&1 &
+    afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -S fuzzer$i $EXECUTABLE_PATH @@ --name fuzzer$i > /dev/null 2>&1 &
 done
 
 echo
