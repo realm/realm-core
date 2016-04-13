@@ -3,38 +3,30 @@
 ### Breaking changes:
 
 * Lock file (`foo.realm.lock`) format bumped.
+* Moved all supporting files (all files except the .realm file) into a
+  separate ".management" subdirectory.
 
 ### Bugfixes:
 
-* Fix for #1498: A crash during opening of a Realm could lead to Realm files
+* #1498: A crash during opening of a Realm could lead to Realm files
   which could not later be read. The symptom would be a realm file with zeroes
   in the end but on streaming form (which requires a footer at the end of the
   file instead).
-* Detach subspec and enumkey accessors when they are removed
-  via a transaction (ex rollback). This could cause crashes
-  when removing the last column in a table of type link,
-  linklist, backlink, subtable, or enumkey. See #1585.
-* Update table accessors after table move rollback, issue #1551. This
-  issue could have caused corruption or crashes when tables are moved
-  and then the transaction is rolled back.
-* Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
-* Bug fix: Access dangling pointer while handling canceled asynchronous accept
-  in POSIX networking API.
-* Handing over a detached row accessor no longer crashes.
 * Linked tables were not updated properly when calling erase with num_rows = 0
   which could be triggered by rolling back a call to insert with num_rows = 0
 * `TableView`s created by `Table::get_backlink_view` are now correctly handled by
   `TableView`'s move assignment operator. Previously they would crash when used.
+
+* S: Misbehavior of empty asynchronous write in POSIX networking API.
+* S: Access dangling pointer while handling canceled asynchronous accept
+  in POSIX networking API.
 
 ### Enhancements:
 
 * Added emulation of robust mutexes on platforms which do not
   provide the full posix API for it. This prevents a situation
   where a crash in one process holding the lock, would leave
-  the database locked. Fixes issue #1429
-* Moved all supporting files (all files except the .realm file) into a
-  separate ".management" subdirectory.
-* Adding `util::network::buffered_input_stream::reset()`.
+  the database locked. Fixes #1429
 * Added support for queries that traverse backlinks. Fixes #776.
 * Improve the performance of advance_read() over transations that inserted rows
   when there are live TableViews.
@@ -42,6 +34,8 @@
   `Columns<Link>` and row accessors. This allows for link equality
   comparisons involving backlinks, and those that traverse multiple
   levels of links.
+
+* S: Adding `util::network::buffered_input_stream::reset()`.
 
 -----------
 
@@ -55,8 +49,9 @@
   each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
   failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
   (`util::Logger`) is now directly available to each unit test.
-* New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 * New failure simulation features: Ability to prime for random triggering.
+
+* S: New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 
 ----------------------------------------------
 
