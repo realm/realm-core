@@ -2,9 +2,12 @@
 
 set -euo pipefail
 
+BUILDDIR=core-builds
+
 function showUsage () {
   cat <<EOF
 Usage: $0 <branch>|<commit>|<tag>
+Builds the given core under ${BUILDDIR} in working directory.
 Commit can be the 7-letter commit ID.
 NB! A tag must begin with tags/.
 EOF
@@ -29,7 +32,7 @@ else
   REF=$1
 fi
 
-BASEDIR="core-builds/${REF}"
+BASEDIR="${BUILDDIR}/${REF}"
 mkdir -p "${BASEDIR}"
 BASEDIR="$(realpath "${BASEDIR}")"
 
