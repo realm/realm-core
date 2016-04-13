@@ -25,7 +25,9 @@ else
     if [ "`cat /proc/sys/kernel/core_pattern`" != "core" ]; then
         echo "----------------------------------------------------------------------------------------"
         echo "AFL might mistake crashes with hangs if the core is outputed to an external process"
-        echo "Please run 'echo core > /proc/sys/kernel/core_pattern'"
+        echo "Please run:"
+        echo
+        echo "sudo sh -c 'echo core > /proc/sys/kernel/core_pattern'"
         echo "----------------------------------------------------------------------------------------"
         exit 1
     fi
