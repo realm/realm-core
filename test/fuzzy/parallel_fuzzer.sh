@@ -35,6 +35,12 @@ echo "Cleaning up the findings directory"
 killall afl-fuzz &> /dev/null
 rm -rf findings/* &> /dev/null
 
+# if we have only one fuzzer
+if [ $NUM_CORES -eq 1 ]; then
+    afl-fuzz  -i testcases -o findings $EXECUTABLE_PATH @@
+    exit 0
+fi
+
 # start the fuzzers
 TIME_OUT="100" # ms
 MEMORY="100" # MB
