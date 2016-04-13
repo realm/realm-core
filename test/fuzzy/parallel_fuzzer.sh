@@ -45,11 +45,11 @@ if [ $NUM_CORES -eq 1 ]; then
 fi
 
 # start the fuzzers in parallel
-afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -M fuzzer1 $EXECUTABLE_PATH @@ --name fuzzer1 > /dev/null 2>&1 &
+afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -M fuzzer1 $EXECUTABLE_PATH @@ --name fuzzer1 &> /dev/null &
 
 for i in `seq 2 $NUM_CORES`;
 do
-    afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -S fuzzer$i $EXECUTABLE_PATH @@ --name fuzzer$i > /dev/null 2>&1 &
+    afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -S fuzzer$i $EXECUTABLE_PATH @@ --name fuzzer$i &> /dev/null &
 done
 
 echo
