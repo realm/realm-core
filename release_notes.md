@@ -1,3 +1,23 @@
+
+# 0.97.4 Release notes
+
+### Bugfixes:
+
+* #1498: A crash during opening of a Realm could lead to Realm files
+  which could not later be read. The symptom would be a realm file with zeroes
+  in the end but on streaming form (which requires a footer at the end of the
+  file instead). See issue #1638.
+* Linked tables were not updated properly when calling erase with num_rows = 0
+  which could be triggered by rolling back a call to insert with num_rows = 0.
+  See issue #1652.
+* `TableView`s created by `Table::get_backlink_view` are now correctly handled by
+  `TableView`'s move assignment operator. Previously they would crash when used.
+  See issue #1641.
+
+**NOTE: This is a hotfix release which is built on top of [0.97.3].**
+
+----------------------------------------------
+
 # 0.97.3 Release notes
 
 ### Bugfixes:
