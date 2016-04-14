@@ -6,12 +6,10 @@ fi
 NUM_CORES=$1
 EXECUTABLE_PATH=$2
 
-COMPILER="afl-g++"
+COMPILER="afl-clang++"
 FLAGS="COMPILER_IS_GCC_LIKE=yes"
 
 if [ "`uname`" = "Darwin" ]; then
-    COMPILER="afl-clang++"
-
     # FIXME: Consider detecting if ReportCrash was already unloaded and skip this message
     #        or print and don't try to run AFL.
     echo "----------------------------------------------------------------------------------------"
