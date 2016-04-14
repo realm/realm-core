@@ -994,6 +994,19 @@ std::error_code socket::write(const char* data, size_t size, std::error_code& ec
 }
 
 
+std::error_code socket::shutdown(shutdown_type what, std::error_code& ec) noexcept
+{
+    int how = what;
+    int ret = ::shutdown(get_sock_fd(), how);
+    if (REALM_UNLIKELY(ret == -1)) {
+        ec = make_basic_system_error_code(errno);
+        return ec;
+    }
+    ec = std::error_code(); // Success
+    return ec;
+}
+
+
 size_t socket::do_read_some(char* buffer, size_t size, std::error_code& ec) noexcept
 {
     int flags = 0;
