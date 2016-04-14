@@ -234,6 +234,8 @@ TEST(TimestampColumn_DeleteWithIndex)
 
 }
 
+
+// Bug found by AFL during development of TimestampColumn
 TEST(TimestampColumn_DeleteAfterSetWithIndex)
 {
     ref_type ref = TimestampColumn::create(Allocator::get_default());
@@ -250,6 +252,8 @@ TEST(TimestampColumn_DeleteAfterSetWithIndex)
     c.destroy();
 }
 
+
+// Bug found by AFL during development of TimestampColumn
 TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
 {
     ref_type ref = TimestampColumn::create(Allocator::get_default());
