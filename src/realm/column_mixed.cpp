@@ -117,8 +117,8 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             //
             // FIXME: this is a leak. We should adjust
             size_t data_ndx = size_t(uint64_t(m_data->get(row_ndx)) >> 1);
-            if (data_ndx == m_binary_data->size()-1) {
-                bool is_last = true;
+            const bool is_last = data_ndx == m_binary_data->size() - 1;
+            if (is_last) {
                 m_binary_data->erase(data_ndx, is_last);
             }
             else {
@@ -130,8 +130,8 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
         }
         case mixcol_Timestamp: {
             size_t data_row_ndx = size_t(m_data->get(row_ndx) >> 1);
-            if (data_row_ndx == m_timestamp_data->size()-1) {
-                bool is_last = true;
+            const bool is_last = data_row_ndx == m_timestamp_data->size() - 1;
+            if (is_last) {
                 m_timestamp_data->erase(data_row_ndx, is_last);
             }
             else {
