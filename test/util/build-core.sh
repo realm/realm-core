@@ -52,7 +52,7 @@ function checkout () {
     REMOTEREF="${REF}"
   fi
 
-  git checkout -B "${REF}" "${REMOTEREF}"
+  git checkout "${REMOTEREF}"
 }
 
 if [ ! -d "${SRCDIR}" ]; then
