@@ -240,7 +240,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (t->get_column_count() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     if (log) {
-                        *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << "); }\n";
+                        *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
                     }
                     t->remove_column(col_ndx);
                 }
@@ -256,7 +256,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                                   type != type_Binary);
                     if (supports_search_index) {
                         if (log) {
-                            *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->add_search_index(" << col_ndx << "); }\n";
+                            *log << "g.get_table(" << table_ndx << ")->add_search_index(" << col_ndx << ");\n";
                         }
                         t->add_search_index(col_ndx);
                     }
@@ -270,7 +270,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     // We don't need to check if the column is of a type that is indexable or if it has index on or off
                     // because Realm will just do a no-op at worst (no exception or assert).
                     if (log) {
-                        *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->remove_search_index(" << col_ndx << "); }\n";
+                        *log << "g.get_table(" << table_ndx << ")->remove_search_index(" << col_ndx << ");\n";
                     }
                     t->remove_search_index(col_ndx);
                 }
