@@ -115,10 +115,10 @@ bool TimestampColumn::is_null(size_t row_ndx) const noexcept
 /// \throw LogicError Thrown if this column is not nullable.
 void TimestampColumn::set_null(size_t row_ndx)
 {
-    m_seconds->set_null(row_ndx);
     if (has_search_index()) {
         m_search_index->set(row_ndx, null{});
     }
+    m_seconds->set_null(row_ndx);
 }
 
 void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t /*prior_num_rows*/,
