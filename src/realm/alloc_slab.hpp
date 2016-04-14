@@ -376,7 +376,7 @@ private:
     // to cache the first mapping, because it is immutable) (well, all the
     // mappings are immutable, but the array holding them is not - it may
     // have to be relocated)
-    std::unique_ptr<std::shared_ptr<util::File::Map<char>>[]> m_local_mappings;
+    std::unique_ptr<std::shared_ptr<const util::File::Map<char>>[]> m_local_mappings;
     size_t m_num_local_mappings = 0;
 
     char* m_data = nullptr;

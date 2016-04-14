@@ -48,7 +48,7 @@ struct SlabAlloc::MappedFile {
     size_t m_first_additional_mapping = 0;
     size_t m_num_global_mappings = 0;
     size_t m_capacity_global_mappings = 0;
-    std::unique_ptr<std::shared_ptr<util::File::Map<char>>[]> m_global_mappings;
+    std::unique_ptr<std::shared_ptr<const util::File::Map<char>>[]> m_global_mappings;
 
     /// Indicates if attaching to the file was succesfull
     bool m_success = false;
@@ -525,6 +525,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         }
     }
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
+
+    // If the file has already been mapped by another thread, reuse all relevant data
+    // from the earlier mapping.
     if (m_file_mappings->m_success) {
         REALM_ASSERT(!cfg.session_initiator);
         m_data = m_file_mappings->m_initial_mapping.get_addr();
@@ -533,12 +536,12 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_free_space_state = free_space_Invalid;
         m_file_on_streaming_form = false;
-        if (m_file_mappings->m_num_global_mappings != 0) {
+        if (m_file_mappings->m_num_global_mappings > 0) {
             size_t mapping_index = m_file_mappings->m_num_global_mappings;
             size_t section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
             m_baseline = get_section_base(section_index);
             m_num_local_mappings = m_file_mappings->m_num_global_mappings;
-            m_local_mappings.reset(new std::shared_ptr<util::File::Map<char>>[m_num_local_mappings]);
+            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
             for (size_t k=0; k<m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
@@ -548,6 +551,8 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         }
         return 0;
     }
+    // Even though we're the first to map the file, we cannot assume that we're
+    // the session initiator. Another process may have the session initiator.
 
     m_file_mappings->m_file.open(path.c_str(), access, create, 0); // Throws
     if (cfg.encryption_key)
@@ -910,34 +915,46 @@ void SlabAlloc::remap(size_t file_size)
     // Extend mapping by adding sections
     REALM_ASSERT_DEBUG(matches_section_boundary(file_size));
     m_baseline = file_size;
-    size_t num_sections = get_section_index(file_size);
     {
+        // Serialize manipulations of the shared mappings:
         std::lock_guard<util::Mutex> lock(m_file_mappings->m_mutex);
+
+        // figure out how many mappings we need to match the requested size
+        size_t num_sections = get_section_index(file_size);
         size_t num_additional_mappings = num_sections - m_file_mappings->m_first_additional_mapping;
 
+        // If the mapping array is filled to capacity, create a new one and copy over
+        // the references to the existing mappings.
         if (num_additional_mappings > m_file_mappings->m_capacity_global_mappings) {
             // FIXME: No harcoded constants here
             m_file_mappings->m_capacity_global_mappings = num_additional_mappings + 128;
-            std::unique_ptr<std::shared_ptr<util::File::Map<char>>[]> new_mappings;
-            new_mappings.reset(new std::shared_ptr<util::File::Map<char>>[m_file_mappings->m_capacity_global_mappings]);
+            std::unique_ptr<std::shared_ptr<const util::File::Map<char>>[]> new_mappings;
+            new_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_file_mappings->m_capacity_global_mappings]);
             for (size_t j = 0; j < m_file_mappings->m_num_global_mappings; ++j)
                 new_mappings[j] = m_file_mappings->m_global_mappings[j];
             m_file_mappings->m_global_mappings = std::move(new_mappings);
         }
+
+        // Add any additional mappings needed to fully map the larger file
         for (size_t k = m_file_mappings->m_num_global_mappings; k < num_additional_mappings; ++k)
         {
             size_t section_start_offset = get_section_base(k + m_file_mappings->m_first_additional_mapping);
             size_t section_size = get_section_base(1 + k + m_file_mappings->m_first_additional_mapping) - section_start_offset;
             m_file_mappings->m_global_mappings[k] = 
-                std::make_shared<util::File::Map<char>>(m_file_mappings->m_file, section_start_offset, File::access_ReadOnly, section_size);
+                std::make_shared<const util::File::Map<char>>(m_file_mappings->m_file, section_start_offset, File::access_ReadOnly, section_size);
         }
+
+        // Share the increased number of mappings. This *must* be a conditional update to ensure
+        // that the number of mappings is ever only increased. Multiple threads may want to grow
+        // to different file sizes. While the actual growth process is serialized, the target size
+        // is determined earlier and without serialization. The largest target size must "win" the race.
         if (num_additional_mappings > m_file_mappings->m_num_global_mappings)
             m_file_mappings->m_num_global_mappings = num_additional_mappings;
 
         // update local cache of mappings, if global mappings have been extended beyond local
         if (num_additional_mappings > m_num_local_mappings) {
             m_num_local_mappings = num_additional_mappings;
-            m_local_mappings.reset(new std::shared_ptr<util::File::Map<char>>[m_num_local_mappings]);
+            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
             for (size_t k=0; k<m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
@@ -1052,7 +1069,6 @@ void SlabAlloc::reserve_disk_space(size_t size)
 void SlabAlloc::set_file_format_version(int file_format_version) noexcept
 {
     m_file_format_version = file_format_version;
-    // FIXME does this invalidate the ability to share the mapping??
 }
 
 
