@@ -396,13 +396,23 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             TableRef target = t->get_link_target(col_ndx);
                             if (target->size() > 0) {
                                 LinkViewRef links = t->get_linklist(col_ndx, row_ndx);
-
                                 // either add or set, 50/50 probability
                                 if (links->size() > 0 && get_next(s) > 128) {
-                                    links->set(get_next(s) % links->size(), get_next(s) % target->size());
+                                    size_t linklist_row = get_next(s) % links->size();
+                                    size_t target_link_ndx = get_next(s) % target->size();
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
+                                            << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx << ");\n";
+                                    }
+                                    links->set(linklist_row, target_link_ndx);
                                 }
                                 else {
-                                    links->add(get_next(s) % target->size());
+                                    size_t target_link_ndx = get_next(s) % target->size();
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
+                                            << row_ndx << ")->add(" << target_link_ndx << ");\n";
+                                    }
+                                    links->add(target_link_ndx);
                                 }
                             }
                         }
