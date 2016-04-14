@@ -268,4 +268,24 @@ TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
     c.destroy();
 }
 
+
+// Bug found by AFL during development of TimestampColumn
+TEST(TimestampColumn_LargeNegativeTimestampSearchIndex)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+
+    c.add(Timestamp{-1934556340879361, 0});
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+    c.set_null(0);
+
+    c.erase_rows(0, 1, 1, false);
+    CHECK_EQUAL(c.size(), 0);
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
+
 #endif // TEST_COLUMN_TIMESTAMP

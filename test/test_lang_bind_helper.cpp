@@ -11805,22 +11805,4 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
 }
 
 
-// Bug found by AFL during development of TimestampColumn
-TEST(LangBindHelper_LargeNegativeTimestampSearchIndex)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
-    Group& g = const_cast<Group&>(sg_w.begin_read());
-    LangBindHelper::promote_to_write(sg_w);
-    TableRef t = g.add_table("");
-    t->add_column(DataType(8), "", true);
-    t->add_empty_row();
-    t->set_timestamp(0, 0, Timestamp(-1934556340879361, 6597427));
-    t->add_search_index(0);
-    t->set_null(0, 0);
-    t->remove(0);
-}
-
-
 #endif
