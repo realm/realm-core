@@ -219,7 +219,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 // Mixed and Subtable cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\"," << (nullable ? "true" : "false") << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
                 }
                 g.get_table(table_ndx)->add_column(type, name, nullable);
             }
@@ -230,7 +230,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 std::string name = create_string(get_next(s) % Group::max_table_name_length);
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\"," << (nullable ? "true" : "false") << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
                 }
                 g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
             }
