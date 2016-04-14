@@ -97,7 +97,7 @@ std::string get_current_time_stamp() {
 void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
 {
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
-    const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
+    const size_t max_tables = 2 ^ sizeof(unsigned char); // operations are modulo get_next()
 
     // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
