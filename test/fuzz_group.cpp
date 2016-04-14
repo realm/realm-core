@@ -315,16 +315,24 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (t->get_column_count() > 0 && t->size() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     size_t row_ndx = get_next(s) % t->size();
+                    DataType type = t->get_column_type(col_ndx);
 
                     // With equal probability, either set to null or to a value
                     if (get_next(s) % 2 == 0 && t->is_nullable(col_ndx)) {
-                        if (log) {
-                            *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx << ");\n";
+                        if (type == type_Link) {
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->nullify_link(" << col_ndx << ", " << row_ndx << ");\n";
+                            }
+                            t->nullify_link(col_ndx, row_ndx);
                         }
-                        t->set_null(col_ndx, row_ndx);
+                        else {
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx << ");\n";
+                            }
+                            t->set_null(col_ndx, row_ndx);
+                        }
                     }
                     else {
-                        DataType type = t->get_column_type(col_ndx);
                         if (type == type_String) {
                             std::string str = create_string(get_next(s));
                             if (log) {
