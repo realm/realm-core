@@ -111,7 +111,8 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
         ThreadWrapper thread;
         thread.start([&] { service_1.run(); });
         service_2.run();
-        REALM_ASSERT(!thread.join()); // FIXME: Transport exception
+        bool exception_in_thread = thread.join(); // FIXME: Transport exception instead
+        REALM_ASSERT(!exception_in_thread);
     }
     if (ec_1)
         throw std::system_error(ec_1);
