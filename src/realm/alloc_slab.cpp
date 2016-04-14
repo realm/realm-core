@@ -515,14 +515,12 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
     {
         std::lock_guard<Mutex> lock(all_files_mutex);
-        try {
-            std::shared_ptr<SlabAlloc::MappedFile> p(all_files[path]);
-            m_file_mappings = p;
+        std::shared_ptr<SlabAlloc::MappedFile> p = all_files[path].lock();
+        if (!bool(p)) {
+            p = std::make_shared<MappedFile>();
+            all_files[path] = p;
         }
-        catch (...) {
-            m_file_mappings = std::make_shared<MappedFile>();
-            all_files[path] = m_file_mappings;
-        }
+        m_file_mappings = p;
     }
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
 
