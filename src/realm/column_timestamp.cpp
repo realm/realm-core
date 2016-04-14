@@ -143,6 +143,15 @@ void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, siz
     }
 }
 
+void TimestampColumn::erase(size_t row_ndx, bool is_last)
+{
+    if (has_search_index()) {
+        m_search_index->erase<StringData>(row_ndx, is_last);
+    }
+    m_seconds->erase(row_ndx, is_last);
+    m_nanoseconds->erase(row_ndx, is_last);
+}
+
 void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t /*prior_num_rows*/,
     bool /*broken_reciprocal_backlinks*/)
 {
