@@ -11763,7 +11763,7 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
 
 
 // Found by AFL during development of Timestamp
-TEST(LangBindHelper_AdvanceLink)
+TEST(LangBindHelper_AdvanceNullifyLink)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_client_history(path, nullptr));
@@ -11785,12 +11785,15 @@ TEST(LangBindHelper_AdvanceLink)
     g.get_table(0)->set_link(0, 0, 0);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
-    g.get_table(0)->set_null(0, 0);
+    //g.get_table(0)->set_null(0, 0);  // cannot use set_null for link columns
+    g.get_table(0)->nullify_link(0, 0);
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
     LangBindHelper::commit_and_continue_as_read(sg_w);
+    CHECK_EQUAL(g_r.get_table(0)->get_link(0, 0), 0);
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
+    CHECK_EQUAL(g_r.get_table(0)->get_link(0, 0), realm::npos);
 }
 
 
