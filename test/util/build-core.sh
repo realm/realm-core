@@ -41,25 +41,31 @@ BASEDIR="$(realpath "${BASEDIR}")"
 
 SRCDIR="${BASEDIR}/src"
 
+function checkout () {
+
+  # Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
+  # Otherwise, git-checkout will complain about updating paths and switching
+  # branches at the same time.
+  if [ `git branch -r | grep "^\\s*origin/${REF}$"` ]; then
+    REMOTEREF="origin/${REF}"
+  else
+    REMOTEREF="${REF}"
+  fi
+
+  git checkout -B "${REF}" "${REMOTEREF}"
+}
+
 if [ ! -d "${SRCDIR}" ]; then
   git clone git@github.com:realm/realm-core.git "${SRCDIR}"
+  cd "${SRCDIR}"
+  checkout
+  sh build.sh clean
+  sh build.sh config "${BASEDIR}"
 else
+  cd "${SRCDIR}"
   git fetch
+  checkout
 fi
 
-cd "${SRCDIR}"
-
-# Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
-# Otherwise, git-checkout will complain about updating paths and switching
-# branches at the same time.
-if [ `git branch -r | grep "^\\s*origin/${REF}$"` ]; then
-  REMOTEREF="origin/${REF}"
-else
-  REMOTEREF="${REF}"
-fi
-
-git checkout -B "${REF}" "${REMOTEREF}"
-sh build.sh clean
-sh build.sh config "${BASEDIR}"
 sh build.sh build
 sh build.sh install
