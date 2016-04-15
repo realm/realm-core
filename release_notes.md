@@ -4,7 +4,7 @@
 
 * #1498: A crash during opening of a Realm could lead to Realm files
   which could not later be read. The symptom would be a realm file with zeroes
-  in the end but on streaming form (which requires a footer at the end of the
+  at the end but in streaming form (which requires a footer at the end of the
   file instead). See issue #1638.
 * Linked tables were not updated properly when calling erase with num_rows = 0
   which could be triggered by rolling back a call to insert with num_rows = 0.
