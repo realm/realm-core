@@ -11,6 +11,7 @@
 * S: Misbehavior of empty asynchronous write in POSIX networking API.
 * S: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
+* Fix a crash that occurred after moving a `Query` that owned a `TableView`.
 
 ### Enhancements:
 
