@@ -428,6 +428,7 @@ public:
     ///
     /// Examples (assuming POSIX):
     ///
+    ///    resolve("file", "dir")        -> "dir/file"
     ///    resolve("../baz", "/foo/bar") -> "/foo/baz"
     ///    resolve("foo", ".")           -> "./foo"
     ///    resolve(".", "/foo/")         -> "/foo"
