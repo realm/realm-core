@@ -8,6 +8,10 @@
   comparisons involving backlinks, and those that traverse multiple
   levels of links.
 
+### Bugfixes:
+
+* Fix a crash that occurred after moving a `Query` that owned a `TableView`.
+
 **NOTE: This is a hotfix release which is built on top of [0.97.4].**
 
 ----------------------------------------------
