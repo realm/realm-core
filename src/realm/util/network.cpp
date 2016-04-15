@@ -1139,7 +1139,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     for (;;) {
 #if HAVE_LINUX_ACCEPT4
         // On Linux (HAVE_LINUX_ACCEPT4), make the accepted socket inherit the
-        // O_NONBLOCK status flag from the accepting socket to avoid an axtra
+        // O_NONBLOCK status flag from the accepting socket to avoid an extra
         // call to fcntl(). Note, it is deemed most likely that the accepted
         // socket is going to be used in nonblocking when, and only when the
         // accepting socket is used in nonblocking mode. Other platforms are
