@@ -80,7 +80,7 @@ namespace realm {
 namespace util {
 namespace error {
 
-std::error_code make_error_code(basic_system_errors err)
+std::error_code make_error_code(basic_system_errors err) noexcept
 {
     return std::error_code(err, g_system_category);
 }

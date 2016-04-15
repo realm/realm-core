@@ -66,6 +66,11 @@ public:
         return false;
     }
 
+    bool joinable() noexcept
+    {
+        return m_thread.joinable();
+    }
+
 private:
     util::Thread m_thread;
     bool m_except;
