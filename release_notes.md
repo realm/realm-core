@@ -5,6 +5,8 @@
 * Lock file (`foo.realm.lock`) format bumped.
 * Moved all supporting files (all files except the .realm file) into a
   separate ".management" subdirectory.
+* New nanosecond precision `Timestamp` data type and column replace our
+  current `DateTime` data type.
 
 ### Bugfixes:
 
