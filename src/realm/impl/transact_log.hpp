@@ -1101,7 +1101,8 @@ inline void TransactLogConvenientEncoder::set_olddatetime(const Table* t, size_t
 
 inline bool TransactLogEncoder::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
 {
-    append_simple_instr(instr_SetTimestamp, util::tuple(col_ndx, ndx, value.m_seconds, value.m_nanoseconds)); // Throws
+    append_simple_instr(instr_SetTimestamp, util::tuple(col_ndx, ndx,
+                                                        value.m_seconds, value.m_nanoseconds)); // Throws
     return true;
 }
 
