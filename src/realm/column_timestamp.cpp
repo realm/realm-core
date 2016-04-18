@@ -309,7 +309,8 @@ void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
 
 void TimestampColumn::verify() const
 {
-    // FIXME: Dummy implementation
+    m_seconds->verify();
+    m_nanoseconds->verify();
 }
 
 void TimestampColumn::to_dot(std::ostream&, StringData /*title*/) const
