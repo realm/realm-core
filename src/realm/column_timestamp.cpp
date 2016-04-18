@@ -249,7 +249,7 @@ StringIndex* TimestampColumn::create_search_index()
 {
     REALM_ASSERT(!has_search_index());
     m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
-    populate_search_index();
+    populate_search_index(); // Throws
     return m_search_index.get();
 }
 
