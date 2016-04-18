@@ -345,7 +345,7 @@ find_apple_sdks()
             elif [ "$x" = "appletvos" ]; then
                 archs="arm64"
             elif [ "$x" = "macosx" ]; then
-                archs="i386,x86_64"
+                archs="x86_64"
             else
                 continue
             fi
