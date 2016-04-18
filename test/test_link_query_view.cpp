@@ -19,6 +19,30 @@ using namespace realm;
 using namespace test_util;
 using namespace realm::util;
 
+namespace {
+
+void check_table_view(test_util::unit_test::TestContext& test_context, const char* file, size_t line,
+                      const TableView& tv, std::vector<size_t> expected,
+                      const std::string& tv_str, const std::string& expected_str)
+{
+    test_context.check_equal(tv.size(), expected.size(), file, line,
+                             (tv_str + ".size()").c_str(), (expected_str + ".size()").c_str());
+    if (tv.size() == expected.size()) {
+        for (size_t i = 0; i < expected.size(); ++i) {
+            test_context.check_equal(tv.get_source_ndx(i), expected[i], file, line,
+                                     (tv_str + ".get_source_ndx(" + util::to_string(i) + ")").c_str(),
+                                     (expected_str + "[" + util::to_string(i) + "]").c_str());
+        }
+    }
+}
+
+}
+
+// void CHECK_TABLE_VIEW(const TableView&, std::initializer_list<size_t>);
+#define CHECK_TABLE_VIEW(_tv, ...) \
+    check_table_view(test_context, __FILE__, __LINE__, _tv, __VA_ARGS__, # _tv, # __VA_ARGS__)
+
+
 TEST(LinkList_Basic1)
 {
     Group group;
@@ -578,50 +602,63 @@ TEST(LinkList_QueryFindLinkTarget)
 
 
     // find on query with Link
-    match = table1->where().links_to(col_link2, table2->get(1)).find();
+    match = (table1->column<Link>(col_link2) == table2->get(1)).find();
     CHECK_EQUAL(0, match);
 
-    match = table1->where().links_to(col_link2, table2->get(2)).find();
+    match = (table1->column<Link>(col_link2) == table2->get(2)).find();
     CHECK_EQUAL(1, match);
 
-    match = table1->where().links_to(col_link2, table2->get(3)).find();
+    match = (table1->column<Link>(col_link2) == table2->get(3)).find();
     CHECK_EQUAL(not_found, match);
 
 
     // find_all on query with Link
-    tv = table1->where().links_to(col_link2, table2->get(2)).find_all();
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    tv = (table1->column<Link>(col_link2) == table2->get(2)).find_all();
+    CHECK_TABLE_VIEW(tv, {1});
 
-    tv = table1->where().links_to(col_link2, table2->get(1)).find_all();
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
+    tv = (table1->column<Link>(col_link2) == table2->get(1)).find_all();
+    CHECK_TABLE_VIEW(tv, {0});
 
-    tv = table1->where().links_to(col_link2, table2->get(3)).find_all();
-    CHECK_EQUAL(0, tv.size());
+    tv = (table1->column<Link>(col_link2) == table2->get(3)).find_all();
+    CHECK_TABLE_VIEW(tv, {});
+
+    tv = (table1->column<Link>(col_link2) != table2->get(2)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 2});
+
+    tv = (table1->column<Link>(col_link2) != table2->get(1)).find_all();
+    CHECK_TABLE_VIEW(tv, {1, 2});
+
+    tv = (table1->column<Link>(col_link2) != table2->get(3)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 1, 2});
 
     // find on query with LinkList
-    match = table1->where().links_to(col_link3, table2->get(1)).find();
+    match = (table1->column<LinkList>(col_link3) == table2->get(1)).find();
     CHECK_EQUAL(0, match);
 
-    match = table1->where().links_to(col_link3, table2->get(2)).find();
+    match = (table1->column<LinkList>(col_link3) == table2->get(2)).find();
     CHECK_EQUAL(1, match);
 
-    match = table1->where().links_to(col_link3, table2->get(3)).find();
+    match = (table1->column<LinkList>(col_link3) == table2->get(3)).find();
     CHECK_EQUAL(not_found, match);
 
     // find_all on query with LinkList
-    tv = table1->where().links_to(col_link3, table2->get(2)).find_all();
-    CHECK_EQUAL(1, tv.size());
-    CHECK_EQUAL(1, tv.get_source_ndx(0));
+    tv = (table1->column<LinkList>(col_link3) == table2->get(2)).find_all();
+    CHECK_TABLE_VIEW(tv, {1});
 
-    tv = table1->where().links_to(col_link3, table2->get(1)).find_all();
-    CHECK_EQUAL(2, tv.size());
-    CHECK_EQUAL(0, tv.get_source_ndx(0));
-    CHECK_EQUAL(1, tv.get_source_ndx(1));
+    tv = (table1->column<LinkList>(col_link3) == table2->get(1)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 1});
 
-    tv = table1->where().links_to(col_link3, table2->get(3)).find_all();
-    CHECK_EQUAL(0, tv.size());
+    tv = (table1->column<LinkList>(col_link3) == table2->get(3)).find_all();
+    CHECK_TABLE_VIEW(tv, {});
+
+    tv = (table1->column<LinkList>(col_link3) != table2->get(2)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 2});
+
+    tv = (table1->column<LinkList>(col_link3) != table2->get(1)).find_all();
+    CHECK_TABLE_VIEW(tv, {2});
+
+    tv = (table1->column<LinkList>(col_link3) != table2->get(3)).find_all();
+    CHECK_TABLE_VIEW(tv, {0, 1, 2});
 }
 
 
@@ -1257,7 +1294,7 @@ TEST(Link_FirstResultPastRow1000)
 
     link_table->set_link(0, 1000, 0);
 
-    TableView tv = link_table->where().links_to(0, data_table->get(0)).find_all();
+    TableView tv = (link_table->column<Link>(0) == data_table->get(0)).find_all();
     CHECK_EQUAL(1, tv.size());
 }
 
@@ -1456,6 +1493,12 @@ TEST(LinkList_QueryLinkNull)
 
     CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
     CHECK_EQUAL(0, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(0));
+
+    CHECK_EQUAL(1, (data_table->column<Link>(1) == realm::null()).count());
+    CHECK_EQUAL(2, (data_table->column<Link>(1) != realm::null()).count());
+
+    CHECK_EQUAL(0, (data_table->column<Link>(1) == Row()).count());
+    CHECK_EQUAL(3, (data_table->column<Link>(1) != Row()).count());
 }
 
 
@@ -1582,21 +1625,6 @@ TEST(LinkList_QueryDateTime)
 
     CHECK_EQUAL(1, tv.size());
 }
-
-// void CHECK_TABLE_VIEW(const TableView&, std::initializer_list<size_t>);
-#define CHECK_TABLE_VIEW(_tv, ...) \
-    do { \
-        TableView tv(_tv); \
-        std::vector<size_t> expected __VA_ARGS__; \
-        CHECK_EQUAL(tv.size(), expected.size()); \
-        if (tv.size() == expected.size()) { \
-            for (size_t i = 0; i < expected.size(); ++i) { \
-                test_context.check_equal(tv.get_source_ndx(i), expected[i], __FILE__, __LINE__, \
-                                         ("tv.get_source_ndx(" + util::to_string(i) + ")").c_str(), \
-                                         ("expected[" + util::to_string(i) + "]").c_str()); \
-            } \
-        } \
-    } while (false)
 
 // Test queries involving the backlinks of a link column.
 TEST(BackLink_Query_Link)
@@ -1755,20 +1783,20 @@ TEST(BackLink_Query_MultipleLevels)
         return row;
     };
 
-    auto hannah   = add_person("Hannah", 0, {});
-    auto elijah   = add_person("Elijah", 3, {});
+    auto hannah   = add_person("Hannah",    0, {});
+    auto elijah   = add_person("Elijah",    3, {});
 
-    auto mark     = add_person("Mark",  30, {hannah});
-    auto jason    = add_person("Jason", 31, {elijah});
+    auto mark     = add_person("Mark",     30, {hannah});
+    auto jason    = add_person("Jason",    31, {elijah});
 
-    auto diane    = add_person("Diane", 29, {hannah});
-    auto carol    = add_person("Carol", 32, {});
+    auto diane    = add_person("Diane",    29, {hannah});
+    auto carol    = add_person("Carol",    31, {});
 
-    auto don      = add_person("Don",   64, {diane, carol});
-    auto diane_sr = add_person("Diane", 60, {diane, carol});
+    auto don      = add_person("Don",      64, {diane, carol});
+    auto diane_sr = add_person("Diane",    60, {diane, carol});
 
-    add_person("Michael",  57, {jason, mark});
-    add_person("Raewynne", 56, {jason, mark});
+    auto michael  = add_person("Michael",  57, {jason, mark});
+    auto raewynne = add_person("Raewynne", 56, {jason, mark});
 
     // People that have a parent with a name that starts with 'M'.
     Query q1 = people->backlink(*people, col_children).column<String>(col_name).begins_with("M");
@@ -1793,6 +1821,42 @@ TEST(BackLink_Query_MultipleLevels)
     // People that have at least one sibling.
     Query q6 = people->column<BackLink>(*people, col_children, people->column<Link>(col_children).count() > 1).count() > 0;
     CHECK_TABLE_VIEW(q6.find_all(), {mark, jason, diane, carol});
+
+    // People that have Raewynne as a parent.
+    Query q7 = people->column<BackLink>(*people, col_children) == people->get(raewynne);
+    CHECK_TABLE_VIEW(q7.find_all(), {mark, jason});
+
+    // People that have Mark as a child.
+    Query q8 = people->column<Link>(col_children) == people->get(mark);
+    CHECK_TABLE_VIEW(q8.find_all(), {michael, raewynne});
+
+    // People that have Michael as a grandparent.
+    Query q9 = people->backlink(*people, col_children).column<BackLink>(*people, col_children) == people->get(michael);
+    CHECK_TABLE_VIEW(q9.find_all(), {hannah, elijah});
+
+    // People that have Hannah as a grandchild.
+    Query q10 = people->link(col_children).column<Link>(col_children) == people->get(hannah);
+    CHECK_TABLE_VIEW(q10.find_all(), {don, diane_sr, michael, raewynne});
+
+    // People that have no listed parents.
+    Query q11 = people->column<BackLink>(*people, col_children).is_null();
+    CHECK_TABLE_VIEW(q11.find_all(), {don, diane_sr, michael, raewynne});
+
+    // Backlinks can never contain null so this will match no rows.
+    Query q12 = people->column<BackLink>(*people, col_children) == null();
+    CHECK_TABLE_VIEW(q12.find_all(), {});
+
+    // Backlinks can never contain null so this will match all rows with backlinks.
+    Query q13 = people->column<BackLink>(*people, col_children) != null();
+    CHECK_TABLE_VIEW(q13.find_all(), {hannah, elijah, mark, jason, diane, carol});
+
+    // No links are equal to a detached row accessor.
+    Query q14 = people->column<BackLink>(*people, col_children) == Row();
+    CHECK_TABLE_VIEW(q14.find_all(), {});
+
+    // All links are not equal to a detached row accessor so this will match all rows with backlinks.
+    Query q15 = people->column<BackLink>(*people, col_children) != Row();
+    CHECK_TABLE_VIEW(q15.find_all(), {hannah, elijah, mark, jason, diane, carol});
 }
 
 #endif

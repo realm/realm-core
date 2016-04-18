@@ -416,7 +416,7 @@ DescriptorRef Table::get_descriptor()
     else {
         desc.reset(m_descriptor);
     }
-    return move(desc);
+    return desc;
 }
 
 
@@ -1884,8 +1884,6 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, 
         REALM_ASSERT_3(col_type, ==, real_col_type);
     }
     static_cast<void>(column);
-    static_cast<void>(ndx);
-    static_cast<void>(real_col_type);
 }
 
 
@@ -3243,6 +3241,7 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
     if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
+    REALM_ASSERT(!is_link_type(m_spec.get_column_type(col_ndx))); // Use nullify_link().
 
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);

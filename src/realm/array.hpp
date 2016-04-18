@@ -1149,6 +1149,9 @@ private:
     template<size_t w>
     size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
 
+    template<size_t w>
+    size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
+
 protected:
     /// The total size in bytes (including the header) of a new empty
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
@@ -1823,16 +1826,6 @@ inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
     // FIXME: Should be optimized
     for (size_t i = begin; i != end; ++i)
         adjust(i, diff); // Throws
-}
-
-inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
-{
-    size_t n = size();
-    for (size_t i = 0; i != n; ++i) {
-        int_fast64_t v = get(i);
-        if (v >= limit)
-            set(i, int64_t(v + diff)); // Throws
-    }
 }
 
 

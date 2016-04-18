@@ -29,7 +29,7 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
     }
 
   out:
-    return move(subdesc);
+    return subdesc;
 }
 
 

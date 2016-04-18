@@ -11,6 +11,22 @@
 using namespace realm;
 using namespace realm::util;
 
+// Determines whether or not to run the shared group verify function
+// after each transaction. This will find errors earlier but is expensive.
+#define REALM_VERIFY true
+
+#if REALM_VERIFY
+    #define REALM_DO_IF_VERIFY(log, op) \
+        do { \
+            if (log) *log << #op << ";\n"; \
+            op; \
+        } \
+        while(false)
+#else
+    #define REALM_DO_IF_VERIFY(log, owner) \
+        do {} while(false)
+#endif
+
 struct EndOfFile {};
 
 std::string create_string(unsigned char byte)
@@ -299,16 +315,24 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (t->get_column_count() > 0 && t->size() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     size_t row_ndx = get_next(s) % t->size();
+                    DataType type = t->get_column_type(col_ndx);
 
                     // With equal probability, either set to null or to a value
                     if (get_next(s) % 2 == 0 && t->is_nullable(col_ndx)) {
-                        if (log) {
-                            *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx << ");\n";
+                        if (type == type_Link) {
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->nullify_link(" << col_ndx << ", " << row_ndx << ");\n";
+                            }
+                            t->nullify_link(col_ndx, row_ndx);
                         }
-                        t->set_null(col_ndx, row_ndx);
+                        else {
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx << ");\n";
+                            }
+                            t->set_null(col_ndx, row_ndx);
+                        }
                     }
                     else {
-                        DataType type = t->get_column_type(col_ndx);
                         if (type == type_String) {
                             std::string str = create_string(get_next(s));
                             if (log) {
@@ -372,13 +396,23 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             TableRef target = t->get_link_target(col_ndx);
                             if (target->size() > 0) {
                                 LinkViewRef links = t->get_linklist(col_ndx, row_ndx);
-
                                 // either add or set, 50/50 probability
                                 if (links->size() > 0 && get_next(s) > 128) {
-                                    links->set(get_next(s) % links->size(), get_next(s) % target->size());
+                                    size_t linklist_row = get_next(s) % links->size();
+                                    size_t target_link_ndx = get_next(s) % target->size();
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
+                                            << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx << ");\n";
+                                    }
+                                    links->set(linklist_row, target_link_ndx);
                                 }
                                 else {
-                                    links->add(get_next(s) % target->size());
+                                    size_t target_link_ndx = get_next(s) % target->size();
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
+                                            << row_ndx << ")->add(" << target_link_ndx << ");\n";
+                                    }
+                                    links->add(target_link_ndx);
                                 }
                             }
                         }
@@ -399,38 +433,33 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             else if (instr == COMMIT) {
                 if (log) {
                     *log << "LangBindHelper::commit_and_continue_as_read(sg_w);\n";
-                    *log << "g.verify();\n";
                 }
                 LangBindHelper::commit_and_continue_as_read(sg_w);
-                g.verify();
+                REALM_DO_IF_VERIFY(log, g.verify());
                 if (log) {
                     *log << "LangBindHelper::promote_to_write(sg_w);\n";
-                    *log << "g.verify();\n";
                 }
                 LangBindHelper::promote_to_write(sg_w);
-                g.verify();
+                REALM_DO_IF_VERIFY(log, g.verify());
             }
             else if (instr == ROLLBACK) {
                 if (log) {
                     *log << "LangBindHelper::rollback_and_continue_as_read(sg_w);\n";
-                    *log << "g.verify();\n";
                 }
                 LangBindHelper::rollback_and_continue_as_read(sg_w);
-                g.verify();
+                REALM_DO_IF_VERIFY(log, g.verify());
                 if (log) {
                     *log << "LangBindHelper::promote_to_write(sg_w);\n";
-                    *log << "g.verify();\n";
                 }
                 LangBindHelper::promote_to_write(sg_w);
-                g.verify();
+                REALM_DO_IF_VERIFY(log, g.verify());
             }
             else if (instr == ADVANCE) {
                 if (log) {
                     *log << "LangBindHelper::advance_read(sg_r);\n";
-                    *log << "g_r.verify();\n";
                 }
                 LangBindHelper::advance_read(sg_r);
-                g_r.verify();
+                REALM_DO_IF_VERIFY(log, g_r.verify());
             }
         }
     }
@@ -441,7 +470,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
 void usage(const char* argv[])
 {
-    fprintf(stderr, "Usage: %s <LOGFILE> [--log]\n(where <LOGFILE> is a instruction file that will be replayed.)\nPass --log to have code printed to stdout producing the same instructions.", argv[0]);
+    fprintf(stderr, "Usage: %s <LOGFILE> [--log] [--name testName]\n(where <LOGFILE> is a instruction file that will "
+            "be replayed.)\nPass --log to have code printed to stdout producing the same instructions.\nPass --name "
+            "testName with distinct values when running on multiple threads, to make sure the test don't use the same"
+            " file", argv[0]);
     exit(1);
 }
 
@@ -449,12 +481,16 @@ void usage(const char* argv[])
 int run_fuzzy(int argc, const char* argv[])
 {
     util::Optional<std::ostream&> log;
+    std::string name = "fuzz-test";
 
     size_t file_arg = size_t(-1);
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
         if (arg == "--log") {
             log = util::some<std::ostream&>(std::cout);
+        }
+        else if (arg == "--name"){
+            name = argv[++i];
         }
         else {
             file_arg = i;
@@ -472,7 +508,7 @@ int run_fuzzy(int argc, const char* argv[])
     }
 
     disable_sync_to_disk();
-    realm::test_util::SharedGroupTestPathGuard path("fuzz.realm.test");
+    realm::test_util::SharedGroupTestPathGuard path(name + ".realm");
 
     try {
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));

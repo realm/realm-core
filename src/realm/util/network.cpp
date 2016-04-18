@@ -15,6 +15,14 @@
 #include <realm/util/features.h>
 
 
+// Note: Linux specific accept4() is not available on Android.
+#if defined _GNU_SOURCE && defined SOCK_NONBLOCK
+#  define HAVE_LINUX_ACCEPT4 1
+#else
+#  define HAVE_LINUX_ACCEPT4 0
+#endif
+
+
 using namespace realm::util;
 using namespace realm::util::network;
 
@@ -883,7 +891,6 @@ void socket_base::do_close() noexcept
     // POSIX, but we shall assume it anyway). `EBADF`, however, would indicate
     // an implementation bug, so we don't want to ignore that.
     REALM_ASSERT(ret != -1 || errno != EBADF);
-    static_cast<void>(ret);
     m_sock_fd = -1;
 }
 
@@ -928,6 +935,16 @@ void socket_base::map_option(opt_enum opt, int& level, int& option_name) const
         case opt_ReuseAddr:
             level       = SOL_SOCKET;
             option_name = SO_REUSEADDR;
+            return;
+        case opt_Linger:
+            level       = SOL_SOCKET;
+#if REALM_PLATFORM_APPLE
+            // By default, SO_LINGER on Darwin uses "ticks" instead of
+            // seconds for better accuracy, but we want to be cross-platform.
+            option_name = SO_LINGER_SEC;
+#else
+            option_name = SO_LINGER;
+#endif // REALM_PLATFORM_APPLE
             return;
     }
     REALM_ASSERT(false);
@@ -979,6 +996,19 @@ std::error_code socket::write(const char* data, size_t size, std::error_code& ec
         REALM_ASSERT(n > 0);
         REALM_ASSERT(n <= size_t(end-begin));
         begin += n;
+    }
+    ec = std::error_code(); // Success
+    return ec;
+}
+
+
+std::error_code socket::shutdown(shutdown_type what, std::error_code& ec) noexcept
+{
+    int how = what;
+    int ret = ::shutdown(get_sock_fd(), how);
+    if (REALM_UNLIKELY(ret == -1)) {
+        ec = make_basic_system_error_code(errno);
+        return ec;
     }
     ec = std::error_code(); // Success
     return ec;
@@ -1107,7 +1137,20 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     socklen_t addr_len = sizeof buffer;
     int sock_fd;
     for (;;) {
+#if HAVE_LINUX_ACCEPT4
+        // On Linux (HAVE_LINUX_ACCEPT4), make the accepted socket inherit the
+        // O_NONBLOCK status flag from the accepting socket to avoid an extra
+        // call to fcntl(). Note, it is deemed most likely that the accepted
+        // socket is going to be used in nonblocking when, and only when the
+        // accepting socket is used in nonblocking mode. Other platforms are
+        // handled below.
+        int flags = 0;
+        if (!m_in_blocking_mode)
+            flags |= SOCK_NONBLOCK;
+        sock_fd = ::accept4(get_sock_fd(), addr, &addr_len, flags);
+#else
         sock_fd = ::accept(get_sock_fd(), addr, &addr_len);
+#endif
         if (sock_fd != -1)
             break;
         if (REALM_UNLIKELY(errno != EINTR)) {
@@ -1121,6 +1164,27 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     if (REALM_UNLIKELY(addr_len != expected_addr_len))
         REALM_TERMINATE("Unexpected peer address length");
 
+    // On some platforms (such as Mac OS X), the accepted socket inherits file
+    // status flags from the accepting socket, but on other systems, this is not
+    // the case. In the case of Linux (_GNU_SOURCE), the inheriting behaviour is
+    // obtained by using the Linux specific accept4() system call.
+    //
+    // For other platforms, we need to be sure that m_in_blocking_mode for the
+    // new socket is initialized to reflect the actual state of O_NONBLOCK on
+    // the new socket.
+    //
+    // Note: This implementation currently never modifies status flags other
+    // than O_NONBLOCK, so we only need to consider that flag.
+#if !REALM_PLATFORM_APPLE && !HAVE_LINUX_ACCEPT4
+    // Make the accepted socket inherit the state of O_NONBLOCK from the
+    // accepting socket.
+    if (set_nonblocking(sock_fd, !m_in_blocking_mode, ec)) {
+        ec = make_basic_system_error_code(errno);
+        ::close(sock_fd);
+        return ec;
+    }
+#endif
+
 #if REALM_PLATFORM_APPLE
     int optval = 1;
     int ret = ::setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
@@ -1132,7 +1196,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
 #endif
 
     sock.m_sock_fd = sock_fd;
-    sock.m_in_blocking_mode = true;
+    sock.m_in_blocking_mode = m_in_blocking_mode; // Inherit
     if (ep) {
         ep->m_protocol = m_protocol;
         ep->m_sockaddr_union = buffer.m_sockaddr_union;

@@ -328,10 +328,10 @@ private:
 class resolver::query {
 public:
     enum {
-        ///< Locally bound socket endpoint (server side)
+        /// Locally bound socket endpoint (server side)
         passive = AI_PASSIVE,
 
-        ///< Ignore families without a configured non-loopback address
+        /// Ignore families without a configured non-loopback address
         address_configured = AI_ADDRCONFIG
     };
 
@@ -411,13 +411,18 @@ public:
 
 private:
     enum opt_enum {
-        opt_ReuseAddr ///< `SOL_SOCKET`, `SO_REUSEADDR`
+        opt_ReuseAddr, ///< `SOL_SOCKET`, `SO_REUSEADDR`
+        opt_Linger,    ///< `SOL_SOCKET`, `SO_LINGER`
     };
 
     template<class, int, class> class option;
 
 public:
     typedef option<bool, opt_ReuseAddr, int> reuse_address;
+
+    // linger struct defined by POSIX sys/socket.h.
+    struct linger_opt;
+    typedef option<linger_opt, opt_Linger, struct linger> linger;
 
 private:
     int m_sock_fd;
@@ -463,6 +468,21 @@ private:
     void set(socket_base&, std::error_code&) const;
 
     friend class socket_base;
+};
+
+struct socket_base::linger_opt {
+    linger_opt(bool enabled, int timeout_seconds = 0)
+    {
+        m_linger.l_onoff = enabled ? 1 : 0;
+        m_linger.l_linger = timeout_seconds;
+    }
+
+    ::linger m_linger;
+
+    operator ::linger() const { return m_linger; }
+
+    bool enabled() const { return m_linger.l_onoff != 0; }
+    int  timeout() const { return m_linger.l_linger; }
 };
 
 
@@ -596,6 +616,26 @@ public:
     /// when \a ec is set to indicate success.
     size_t write_some(const char* data, size_t size);
     size_t write_some(const char* data, size_t size, std::error_code&) noexcept;
+    /// @}
+
+    enum shutdown_type {
+        /// Shutdown the receive side of the socket.
+        shutdown_receive = SHUT_RD,
+
+        /// Shutdown the send side of the socket.
+        shutdown_send = SHUT_WR,
+
+        /// Shutdown both send and receive on the socket.
+        shutdown_both = SHUT_RDWR
+    };
+
+    /// @{ \brief Shut down the connected sockets sending and/or receiving
+    /// side.
+    ///
+    /// It is an error to call this function when the socket is not both open
+    /// and connected.
+    void shutdown(shutdown_type);
+    std::error_code shutdown(shutdown_type, std::error_code&) noexcept;
     /// @}
 
 private:
@@ -1260,8 +1300,7 @@ inline bool io_service::async_oper::is_canceled() const noexcept
 inline void io_service::async_oper::set_is_complete(bool value) noexcept
 {
     REALM_ASSERT(!m_complete);
-    if (value)
-        REALM_ASSERT(m_in_use);
+    REALM_ASSERT(!value || m_in_use);
     m_complete = value;
 }
 
@@ -1735,6 +1774,13 @@ inline size_t socket::write_some(const char* data, size_t size, std::error_code&
     if (ensure_blocking_mode(ec))
         return 0;
     return do_write_some(data, size, ec);
+}
+
+inline void socket::shutdown(shutdown_type what)
+{
+    std::error_code ec;
+    if (shutdown(what, ec))
+        throw std::system_error(ec);
 }
 
 inline void socket::do_async_connect(LendersConnectOperPtr op)

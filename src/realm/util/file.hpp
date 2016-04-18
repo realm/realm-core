@@ -428,16 +428,17 @@ public:
     ///
     /// Examples (assuming POSIX):
     ///
-    ///    resolve("/foo/bar", "../baz") -> "/foo/baz"
-    ///    resolve(".", "foo")           -> "./foo"
-    ///    resolve("/foo/", ".")         -> "/foo"
-    ///    resolve("foo", "..")          -> "."
-    ///    resolve("foo", "../..")       -> ".."
+    ///    resolve("file", "dir")        -> "dir/file"
+    ///    resolve("../baz", "/foo/bar") -> "/foo/baz"
+    ///    resolve("foo", ".")           -> "./foo"
+    ///    resolve(".", "/foo/")         -> "/foo"
+    ///    resolve("..", "foo")          -> "."
+    ///    resolve("../..", "foo")       -> ".."
     ///    resolve("..", "..")           -> "../.."
     ///    resolve("", "")               -> "."
-    ///    resolve("/", "")              -> "/."
-    ///    resolve("/", "..")            -> "/."
-    ///    resolve("foo//bar", "..")     -> "foo"
+    ///    resolve("", "/")              -> "/."
+    ///    resolve("..", "/")            -> "/."
+    ///    resolve("..", "foo//bar")     -> "foo"
     ///
     /// This function does not access the file system.
     ///
