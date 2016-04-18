@@ -114,11 +114,7 @@ public:
 
     Timestamp maximum(size_t, size_t, size_t, size_t*) const { return Timestamp(); }
     size_t count(Timestamp) const;
-
-    void erase(size_t row_ndx, bool is_last) {
-        m_seconds->erase(row_ndx, is_last);
-        m_nanoseconds->erase(row_ndx, is_last);
-    }
+    void erase(size_t row_ndx, bool is_last);
 
     template <class Condition> size_t find(Timestamp value, size_t begin, size_t end) const noexcept
     {

@@ -234,6 +234,8 @@ TEST(TimestampColumn_DeleteWithIndex)
 
 }
 
+
+// Bug found by AFL during development of TimestampColumn
 TEST(TimestampColumn_DeleteAfterSetWithIndex)
 {
     ref_type ref = TimestampColumn::create(Allocator::get_default());
@@ -245,6 +247,64 @@ TEST(TimestampColumn_DeleteAfterSetWithIndex)
     c.set(0,Timestamp{2, 2});
     c.erase_rows(0, 1, 1, false);
     CHECK_EQUAL(c.size(), 0);
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
+
+// Bug found by AFL during development of TimestampColumn
+TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+
+    c.add(Timestamp{0, 0});
+    c.set_null(0);
+    c.add(Timestamp{1, 1});
+    c.add(Timestamp{2, 2});
+    c.erase_rows(0, 1, 1, false);
+    CHECK_EQUAL(c.size(), 2);
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
+
+// Bug found by AFL during development of TimestampColumn
+TEST(TimestampColumn_LargeNegativeTimestampSearchIndex)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+
+    c.add(Timestamp{-1934556340879361, 0});
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+    c.set_null(0);
+
+    c.erase_rows(0, 1, 1, false);
+    CHECK_EQUAL(c.size(), 0);
+
+    c.destroy_search_index();
+    c.destroy();
+}
+
+
+TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+
+    c.add(Timestamp{-1934556340879361, 0});
+    StringIndex* index = c.create_search_index();
+    CHECK(index);
+    c.set_null(0);
+
+    c.erase(0, true);
+    CHECK_EQUAL(c.size(), 0);
+    CHECK(index->is_empty());
 
     c.destroy_search_index();
     c.destroy();
