@@ -79,14 +79,14 @@ namespace realm {
 namespace util {
 
 
-void make_dir(const std::string& path)
+bool make_dir(const std::string& path)
 {
 #ifdef _WIN32
     if (_mkdir(path.c_str()) == 0)
-        return;
+        return true;
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) == 0)
-        return;
+        return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("make_dir() failed: ", err);
@@ -95,7 +95,7 @@ void make_dir(const std::string& path)
         case EROFS:
             throw File::PermissionDenied(msg, path);
         case EEXIST:
-            throw File::Exists(msg, path);
+            return false;
         case ELOOP:
         case EMLINK:
         case ENAMETOOLONG:
