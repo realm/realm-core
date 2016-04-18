@@ -34,7 +34,7 @@ struct Timestamp {
 
     bool is_null() const { return m_is_null; }
     
-    // Note that nullability is handeled by query system. These operators are only invoked for non-null dates.
+    // Note that nullability is handled by query system. These operators are only invoked for non-null dates.
     bool operator==(const Timestamp& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
     bool operator!=(const Timestamp& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
     bool operator>(const Timestamp& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
