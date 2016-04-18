@@ -15,6 +15,14 @@
 #include <realm/util/features.h>
 
 
+// Note: Linux specific accept4() is not available on Android.
+#if defined _GNU_SOURCE && defined SOCK_NONBLOCK
+#  define HAVE_LINUX_ACCEPT4 1
+#else
+#  define HAVE_LINUX_ACCEPT4 0
+#endif
+
+
 using namespace realm::util;
 using namespace realm::util::network;
 
@@ -1129,7 +1137,20 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     socklen_t addr_len = sizeof buffer;
     int sock_fd;
     for (;;) {
+#if HAVE_LINUX_ACCEPT4
+        // On Linux (HAVE_LINUX_ACCEPT4), make the accepted socket inherit the
+        // O_NONBLOCK status flag from the accepting socket to avoid an extra
+        // call to fcntl(). Note, it is deemed most likely that the accepted
+        // socket is going to be used in nonblocking when, and only when the
+        // accepting socket is used in nonblocking mode. Other platforms are
+        // handled below.
+        int flags = 0;
+        if (!m_in_blocking_mode)
+            flags |= SOCK_NONBLOCK;
+        sock_fd = ::accept4(get_sock_fd(), addr, &addr_len, flags);
+#else
         sock_fd = ::accept(get_sock_fd(), addr, &addr_len);
+#endif
         if (sock_fd != -1)
             break;
         if (REALM_UNLIKELY(errno != EINTR)) {
@@ -1143,6 +1164,27 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     if (REALM_UNLIKELY(addr_len != expected_addr_len))
         REALM_TERMINATE("Unexpected peer address length");
 
+    // On some platforms (such as Mac OS X), the accepted socket inherits file
+    // status flags from the accepting socket, but on other systems, this is not
+    // the case. In the case of Linux (_GNU_SOURCE), the inheriting behaviour is
+    // obtained by using the Linux specific accept4() system call.
+    //
+    // For other platforms, we need to be sure that m_in_blocking_mode for the
+    // new socket is initialized to reflect the actual state of O_NONBLOCK on
+    // the new socket.
+    //
+    // Note: This implementation currently never modifies status flags other
+    // than O_NONBLOCK, so we only need to consider that flag.
+#if !REALM_PLATFORM_APPLE && !HAVE_LINUX_ACCEPT4
+    // Make the accepted socket inherit the state of O_NONBLOCK from the
+    // accepting socket.
+    if (set_nonblocking(sock_fd, !m_in_blocking_mode, ec)) {
+        ec = make_basic_system_error_code(errno);
+        ::close(sock_fd);
+        return ec;
+    }
+#endif
+
 #if REALM_PLATFORM_APPLE
     int optval = 1;
     int ret = ::setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
@@ -1154,7 +1196,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
 #endif
 
     sock.m_sock_fd = sock_fd;
-    sock.m_in_blocking_mode = true;
+    sock.m_in_blocking_mode = m_in_blocking_mode; // Inherit
     if (ep) {
         ep->m_protocol = m_protocol;
         ep->m_sockaddr_union = buffer.m_sockaddr_union;

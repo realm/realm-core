@@ -1005,6 +1005,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                 r_info->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
+                REALM_ASSERT(top_ref == 0);
                 // Durability setting must be consistent across a session. An
                 // inconsistency is a logic error, as the user is required to
                 // make sure that all possible concurrent session participants
