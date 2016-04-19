@@ -1380,7 +1380,7 @@ private:
     template<class>
     friend class util::bind_ptr;
     template<class>
-    friend class SimpleColumn;
+    friend class SimpleQueryColumn;
     friend class LangBindHelper;
     friend class TableViewBase;
     template<class T>
