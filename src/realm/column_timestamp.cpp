@@ -353,7 +353,7 @@ void TimestampColumn::add(const Timestamp& ts)
 Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
 {
     util::Optional<int64_t> seconds = m_seconds->get(row_ndx);
-    return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds->get(row_ndx))) : Timestamp(null());
+    return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds->get(row_ndx))) : Timestamp();
 }
 
 void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)

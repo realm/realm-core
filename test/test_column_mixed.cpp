@@ -224,7 +224,7 @@ TEST(MixedColumn_Timestamp)
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
-    c.insert_timestamp(0, Timestamp(null()));
+    c.insert_timestamp(0, Timestamp());
     c.insert_timestamp(1, Timestamp(100, 200));
     c.insert_timestamp(2, Timestamp(0, 0)); // Should *not* equal null
     c.insert_timestamp(3, Timestamp(-1000, 0));
