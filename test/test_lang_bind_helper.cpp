@@ -8789,6 +8789,29 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 #if !REALM_ENABLE_ENCRYPTION
 // Interprocess communication does not work with encryption enabled
 
+TEST(Shared_InterProcessSharing)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    int pid = fork();
+    if (pid == 0) {
+        auto history = realm::make_client_history(path);
+        SharedGroup sg(*history);
+        WriteTransaction wt(sg);
+        wt.add_table("table");
+        wt.commit();
+        sleep(100);
+    }
+    else {
+        sleep(5);
+        auto history = realm::make_client_history(path);
+        SharedGroup sg(*history);
+        WriteTransaction wt(sg);
+        wt.add_table("table 2");
+        wt.commit();
+    }
+}
+
 #if !defined(REALM_ANDROID) && !defined(REALM_IOS)
 // fork should not be used on android or ios.
 
