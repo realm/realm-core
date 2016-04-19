@@ -119,7 +119,8 @@ public:
     size_t count(Timestamp) const;
     void erase(size_t row_ndx, bool is_last);
 
-    template <class Condition> size_t find(Timestamp value, size_t begin, size_t end) const noexcept
+    template <class Condition>
+    size_t find(Timestamp value, size_t begin, size_t end) const noexcept
     {
         // FIXME: Here we can do all sorts of clever optimizations. Use bithack-search on seconds, then for each match check
         // nanoseconds, etc, etc, etc. Lots of possibilities. Below code is naive and slow but works.
@@ -144,7 +145,8 @@ private:
     template<class BT>
     class CreateHandler;
 
-    template <class Condition> Timestamp minmax(size_t& result_index) const noexcept
+    template <class Condition>
+    Timestamp minmax(size_t& result_index) const noexcept
     {
         // Condition is realm::Greater for maximum and realm::Less for minimum.
         Timestamp best;
