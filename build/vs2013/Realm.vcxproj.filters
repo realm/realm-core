@@ -238,6 +238,7 @@
     <ClInclude Include="..\..\test\fuzz_group.hpp" />
     <ClInclude Include="..\..\src\realm\null.hpp" />
     <ClInclude Include="..\..\src\realm\column_timestamp.hpp" />
+    <ClInclude Include="..\..\src\realm\timestamp.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
