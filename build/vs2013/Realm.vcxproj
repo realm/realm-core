@@ -1143,6 +1143,7 @@
     <ClInclude Include="..\..\src\realm\query_expression.hpp" />
     <ClInclude Include="..\..\src\realm\string_data.hpp" />
     <ClInclude Include="..\..\src\realm\table_basic_fwd.hpp" />
+    <ClInclude Include="..\..\src\realm\timestamp.hpp" />
     <ClInclude Include="..\..\src\realm\unicode.hpp" />
     <ClInclude Include="..\..\src\realm\util\assert.hpp" />
     <ClInclude Include="..\..\src\realm\util\basic_system_errors.hpp" />

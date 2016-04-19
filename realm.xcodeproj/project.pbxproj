@@ -307,6 +307,9 @@
 		65033A7B1C7DD3F40019E9F2 /* column_timestamp.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 65033A751C7DD3B80019E9F2 /* column_timestamp.hpp */; };
 		65033A7E1C7DD51F0019E9F2 /* test_column_timestamp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65033A7C1C7DD5180019E9F2 /* test_column_timestamp.cpp */; };
 		65033A7F1C7DD5200019E9F2 /* test_column_timestamp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65033A7C1C7DD5180019E9F2 /* test_column_timestamp.cpp */; };
+		6508530A1CC6C4DC0020F9BB /* timestamp.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650853091CC6C4DC0020F9BB /* timestamp.hpp */; };
+		6508530B1CC6C6150020F9BB /* timestamp.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650853091CC6C4DC0020F9BB /* timestamp.hpp */; };
+		6508530C1CC6C6150020F9BB /* timestamp.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650853091CC6C4DC0020F9BB /* timestamp.hpp */; };
 		650FBA3D1C84954C00F8771B /* null.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650FBA3C1C84954C00F8771B /* null.hpp */; };
 		651AEEA31B31945F0048C8EE /* test_upgrade_database_4_1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEE9D1B31945F0048C8EE /* test_upgrade_database_4_1.realm */; };
 		651AEEA41B31945F0048C8EE /* test_upgrade_database_4_2.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEE9E1B31945F0048C8EE /* test_upgrade_database_4_2.realm */; };
@@ -949,6 +952,7 @@
 		65033A741C7DD3B80019E9F2 /* column_timestamp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = column_timestamp.cpp; path = realm/column_timestamp.cpp; sourceTree = "<group>"; };
 		65033A751C7DD3B80019E9F2 /* column_timestamp.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_timestamp.hpp; path = realm/column_timestamp.hpp; sourceTree = "<group>"; };
 		65033A7C1C7DD5180019E9F2 /* test_column_timestamp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_column_timestamp.cpp; sourceTree = "<group>"; };
+		650853091CC6C4DC0020F9BB /* timestamp.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = timestamp.hpp; path = realm/timestamp.hpp; sourceTree = "<group>"; };
 		650FBA3C1C84954C00F8771B /* null.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = null.hpp; path = realm/null.hpp; sourceTree = "<group>"; };
 		651AEE9D1B31945F0048C8EE /* test_upgrade_database_4_1.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_1.realm; sourceTree = "<group>"; };
 		651AEE9E1B31945F0048C8EE /* test_upgrade_database_4_2.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_2.realm; sourceTree = "<group>"; };
@@ -1281,6 +1285,7 @@
 				365CCE2A157CC37D00172BF8 /* table_view.hpp */,
 				365CCE2B157CC37D00172BF8 /* table.cpp */,
 				365CCE2C157CC37D00172BF8 /* table.hpp */,
+				650853091CC6C4DC0020F9BB /* timestamp.hpp */,
 				522EA518192C4D3C002AD3B6 /* unicode.cpp */,
 				522EA51A192C4D4B002AD3B6 /* unicode.hpp */,
 				52D7C4661852A01700633748 /* util */,
@@ -1641,6 +1646,7 @@
 				365CCE54157CC37D00172BF8 /* column.hpp in Headers */,
 				5D3205901C880FFF00864053 /* link_view_fwd.hpp in Headers */,
 				3658CE721921AC6F009A7085 /* column_backlink.hpp in Headers */,
+				6508530A1CC6C4DC0020F9BB /* timestamp.hpp in Headers */,
 				C08FE2B91B45BD750037AFCE /* simulated_failure.hpp in Headers */,
 				365CCE47157CC37D00172BF8 /* column_binary.hpp in Headers */,
 				365CCE48157CC37D00172BF8 /* column_fwd.hpp in Headers */,
@@ -1770,6 +1776,7 @@
 				4142C97A1623478700B3B902 /* table_accessors.hpp in Headers */,
 				C0552C571B45CEA8007FF3AA /* simulated_failure.hpp in Headers */,
 				4142C97B1623478700B3B902 /* table_basic.hpp in Headers */,
+				6508530B1CC6C6150020F9BB /* timestamp.hpp in Headers */,
 				36A1DC9D16C3F3F40086A836 /* table_basic_fwd.hpp in Headers */,
 				4142C97C1623478700B3B902 /* table_macros.hpp in Headers */,
 				4142C97D1623478700B3B902 /* table_ref.hpp in Headers */,
@@ -1817,6 +1824,7 @@
 				C008FF701B67F02F0042669E /* array_string.hpp in Headers */,
 				C008FF711B67F02F0042669E /* array_string_long.hpp in Headers */,
 				C008FF721B67F02F0042669E /* binary_data.hpp in Headers */,
+				6508530C1CC6C6150020F9BB /* timestamp.hpp in Headers */,
 				C008FF731B67F02F0042669E /* column.hpp in Headers */,
 				5DC597341B854CBA0020D712 /* column_type_traits.hpp in Headers */,
 				C008FF741B67F02F0042669E /* column_binary.hpp in Headers */,
