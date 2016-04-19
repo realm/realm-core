@@ -1612,8 +1612,7 @@ void Table::upgrade_olddatetime()
 
             // Copy payload to new column
             for (size_t row = 0; row < size(); row++) {
-                bool dt_is_null = is_null(old_col, row);
-                if (dt_is_null) {
+                if (is_null(old_col, row)) {
                     set_null(new_col, row);
                 }
                 else {
