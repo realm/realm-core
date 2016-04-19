@@ -1643,16 +1643,16 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 
 
 // If we add a new Realm type T and quickly want Query support for it, then simply inherit from it like
-// `template <> class Columns<T> : public SimpleQueryColumn<T>` and you're done. Any operators of the set
+// `template <> class Columns<T> : public SimpleQuerySupport<T>` and you're done. Any operators of the set
 // { ==, >=, <=, !=, >, < } that are supported by T will be supported by the "query expression syntax"
 // automatically. NOTE: This method of Query support will be slow because it goes through Table::get<T>.
 // To get faster Query support, either add SequentialGetter support (faster) or create a query_engine.hpp
 // node for it (super fast).
 
 template <class T>
-class SimpleQueryColumn : public Subexpr2<T> {
+class SimpleQuerySupport : public Subexpr2<T> {
 public:
-    SimpleQueryColumn(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
+    SimpleQuerySupport(size_t column, const Table* table, const std::vector<size_t>& links = {}) :
         m_column(column), m_link_map(table, links)
     {
     }
@@ -1707,8 +1707,8 @@ public:
 
 
 template <>
-class Columns<Timestamp> : public SimpleQueryColumn<Timestamp> {
-    using SimpleQueryColumn::SimpleQueryColumn;
+class Columns<Timestamp> : public SimpleQuerySupport<Timestamp> {
+    using SimpleQuerySupport::SimpleQuerySupport;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<Timestamp>>(*this);
@@ -1716,8 +1716,8 @@ class Columns<Timestamp> : public SimpleQueryColumn<Timestamp> {
 };
 
 template <>
-class Columns<BinaryData> : public SimpleQueryColumn<BinaryData> {
-    using SimpleQueryColumn::SimpleQueryColumn;
+class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
+    using SimpleQuerySupport::SimpleQuerySupport;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<Columns<BinaryData>>(*this);
@@ -1726,9 +1726,9 @@ class Columns<BinaryData> : public SimpleQueryColumn<BinaryData> {
 
 
 template <>
-class Columns<StringData> : public SimpleQueryColumn<StringData> {
+class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
-    using SimpleQueryColumn::SimpleQueryColumn;
+    using SimpleQuerySupport::SimpleQuerySupport;
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const override
     {
         return make_subexpr<Columns<StringData>>(*this);
