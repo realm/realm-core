@@ -54,6 +54,7 @@ impl/transact_log.hpp \
 binary_data.hpp \
 mixed.hpp \
 owned_data.hpp \
+timestamp.hpp \
 table.hpp \
 table_ref.hpp \
 table_basic_fwd.hpp \
