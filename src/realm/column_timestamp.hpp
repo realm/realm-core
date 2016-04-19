@@ -27,9 +27,9 @@ namespace realm {
 struct Timestamp {
     Timestamp(int64_t seconds, uint32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false) 
     {
-        REALM_ASSERT_3(nanoseconds, <, 1000000000);
+        REALM_ASSERT_3(nanoseconds, <, nanoseconds_in_second);
     }
-    Timestamp(const null&) : m_is_null(true) { }
+    explicit Timestamp(const null&) : m_is_null(true) { }
     Timestamp() : Timestamp(null()) { }
 
     bool is_null() const { return m_is_null; }
@@ -49,6 +49,8 @@ struct Timestamp {
     int64_t m_seconds;
     uint32_t m_nanoseconds;
     bool m_is_null;
+
+    static constexpr size_t nanoseconds_in_second = 1000000000;
 };
 
 template<class C, class T>

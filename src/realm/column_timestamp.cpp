@@ -309,6 +309,12 @@ void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
 
 void TimestampColumn::verify() const
 {
+    REALM_ASSERT_3(m_seconds->size(), ==, m_nanoseconds->size());
+
+    for (size_t t = 0; t < size(); t++) {
+        REALM_ASSERT_3(m_nanoseconds->get(t), <, Timestamp::nanoseconds_in_second);
+    }
+
     m_seconds->verify();
     m_nanoseconds->verify();
 }
