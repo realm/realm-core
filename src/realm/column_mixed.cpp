@@ -39,9 +39,9 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     ref_type types_ref = top->get_as_ref(0);
     ref_type data_ref  = top->get_as_ref(1);
     types.reset(new IntegerColumn(alloc, types_ref)); // Throws
-    types->set_parent(&*top, 0);
+    types->set_parent(top.get(), 0);
     data.reset(new RefsColumn(alloc, data_ref, table, column_ndx)); // Throws
-    data->set_parent(&*top, 1);
+    data->set_parent(top.get(), 1);
     REALM_ASSERT_3(types->size(), ==, data->size());
 
     // Binary data column with values that does not fit in data column is only
@@ -49,14 +49,14 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     if (top->size() >= 3) {
         ref_type binary_data_ref = top->get_as_ref(2);
         binary_data.reset(new BinaryColumn(alloc, binary_data_ref)); // Throws
-        binary_data->set_parent(&*top, 2);
+        binary_data->set_parent(top.get(), 2);
     }
 
     // TimestampColumn is only there if needed
     if (top->size() >= 4) {
         ref_type timestamp_ref = top->get_as_ref(3);
         timestamp_data.reset(new TimestampColumn(alloc, timestamp_ref)); // Throws
-        timestamp_data->set_parent(&*top, 3);
+        timestamp_data->set_parent(top.get(), 3);
     }
 
     m_array = std::move(top);

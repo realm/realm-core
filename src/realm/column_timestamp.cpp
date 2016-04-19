@@ -38,11 +38,11 @@ TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref)
 
     seconds.reset(new BpTree<util::Optional<int64_t>>(alloc)); // Throws
     seconds->init_from_ref(alloc, seconds_ref);
-    seconds->set_parent(&*top, 0);
+    seconds->set_parent(top.get(), 0);
 
     nanoseconds.reset(new BpTree<int64_t>(alloc)); // Throws
     nanoseconds->init_from_ref(alloc, nanoseconds_ref);
-    nanoseconds->set_parent(&*top, 1);
+    nanoseconds->set_parent(top.get(), 1);
 
     m_array = std::move(top);
     m_seconds = std::move(seconds);
