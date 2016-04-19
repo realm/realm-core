@@ -3436,7 +3436,7 @@ TEST(Table_Aggregates2)
 }
 
 // Test Table methods max, min, avg, sum, on both nullable and non-nullable columns
-ONLY(Table_Aggregates3)
+TEST(Table_Aggregates3)
 {
     bool nullable = false;
 
