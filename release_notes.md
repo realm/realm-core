@@ -13,6 +13,7 @@
 * S: Misbehavior of empty asynchronous write in POSIX networking API.
 * S: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
+* Changed group operator== to take table names into account.  
 
 ### Enhancements:
 

@@ -924,7 +924,7 @@ void setup_table(TestTableGroup::Ref t)
 
 TEST(Group_Equal)
 {
-    Group g1, g2;
+    Group g1, g2, g3;
     CHECK(g1 == g2);
     TestTableGroup::Ref t1 = g1.add_table<TestTableGroup>("TABLE1");
     CHECK_NOT(g1 == g2);
@@ -934,6 +934,9 @@ TEST(Group_Equal)
     CHECK(g1 == g2);
     t2->add("hey", 2, false, Thu);
     CHECK(g1 != g2);
+    TestTableGroup::Ref t3 = g3.add_table<TestTableGroup>("TABLE3");
+    setup_table(t3);
+    CHECK(g1 != g3);
 }
 
 

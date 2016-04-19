@@ -992,6 +992,11 @@ bool Group::operator==(const Group& g) const
     if (n != g.size())
         return false;
     for (size_t i = 0; i < n; ++i) {
+        const StringData& table_name_1 = get_table_name(i); // Throws
+        const StringData& table_name_2 = g.get_table_name(i); // Throws
+        if (table_name_1 != table_name_2)
+            return false;
+
         ConstTableRef table_1 = get_table(i); // Throws
         ConstTableRef table_2 = g.get_table(i); // Throws
         if (*table_1 != *table_2)

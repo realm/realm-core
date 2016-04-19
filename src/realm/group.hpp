@@ -524,6 +524,7 @@ public:
     /// only if, they contain the same tables in the same order, that
     /// is, for each table T at index I in one of the groups, there is
     /// a table at index I in the other group that is equal to T.
+    /// Tables are equal if they have the same content and the same table name.
     bool operator==(const Group&) const;
 
     /// Compare two groups for inequality. See operator==().

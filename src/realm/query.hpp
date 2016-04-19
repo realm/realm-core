@@ -392,12 +392,12 @@ private:
     // points to the base class of the restricting view. If the restricting
     // view is a link view, m_source_link_view is non-zero. If it is a table view,
     // m_source_table_view is non-zero.
-    RowIndexes* m_view;
+    RowIndexes* m_view = nullptr;
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
     LinkViewRef m_source_link_view; // link views are refcounted and shared.
-    TableViewBase* m_source_table_view; // table views are not refcounted, and not owned by the query.
-    bool m_owns_source_table_view; // <--- except when indicated here
+    TableViewBase* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
+    std::unique_ptr<TableViewBase> m_owned_source_table_view; // <--- except when indicated here
 };
 
 // Implementation:

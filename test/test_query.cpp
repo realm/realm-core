@@ -8574,6 +8574,23 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(not_found, match);
 }
 
+// Ensure that Query's move constructor and move assignment operator don't result in
+// a TableView owned by the query being double-deleted when the queries are destroyed.
+TEST(Query_MoveDoesntDoubleDelete)
+{
+    Table table;
+
+    {
+        Query q1(table, std::unique_ptr<TableView>(new TableView()));
+        Query q2 = std::move(q1);
+    }
+
+    {
+        Query q1(table, std::unique_ptr<TableView>(new TableView()));
+        Query q2;
+        q2 = std::move(q1);
+    }
+}
 
 TEST(Query_Timestamp)
 {
