@@ -1612,19 +1612,15 @@ void Table::upgrade_olddatetime()
 
             // Copy payload to new column
             for (size_t row = 0; row < size(); row++) {
-                OldDateTime dt = get_olddatetime(old_col, row);
-                Timestamp ts;
-                bool n = is_null(old_col, row);
-                // (!nullable && n) is an error situration (you cannot have a null (the `n`
-                // if at the same time the column is not nullable (the `!nullable`).
-                REALM_ASSERT(!(!nullable && n));
-                if (n) {
-                    ts = Timestamp(null());
+                bool dt_is_null = is_null(old_col, row);
+                if (dt_is_null) {
+                    set_null(new_col, row);
                 }
                 else {
-                    ts = Timestamp(dt.get_olddatetime(), 0);
+                    OldDateTime dt = get_olddatetime(old_col, row);
+                    Timestamp ts = Timestamp(dt.get_olddatetime(), 0);
+                    set_timestamp(new_col, row, ts);
                 }
-                set_timestamp(new_col, row, ts);
             }
 
             // If old OldDateTime column had search index, then create one for the new Timestamp column too
