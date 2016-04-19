@@ -29,7 +29,7 @@ struct Timestamp {
     {
         REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
     }
-    explicit Timestamp(const null&) : m_is_null(true) { }
+    explicit Timestamp(const null&) : m_seconds(0), m_nanoseconds(0), m_is_null(true) { }
     Timestamp() : Timestamp(null()) { }
 
     bool is_null() const { return m_is_null; }
