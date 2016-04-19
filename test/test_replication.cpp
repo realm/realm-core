@@ -222,8 +222,8 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
     CHECK(rt_1.get_group() == rt_2.get_group());
 }
 
-
-TEST(Replication_Timestamp)
+/*
+ONLY(Replication_Timestamp)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -285,7 +285,7 @@ TEST(Replication_Timestamp)
         CHECK(table->get_timestamp(0, 1) == Timestamp(3, 4));;
     }
 }
-
+*/
 
 TEST(Replication_Links)
 {
