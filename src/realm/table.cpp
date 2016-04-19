@@ -1615,6 +1615,8 @@ void Table::upgrade_olddatetime()
                 OldDateTime dt = get_olddatetime(old_col, row);
                 Timestamp ts;
                 bool n = is_null(old_col, row);
+                // (!nullable && n) is an error situration (you cannot have a null (the `n`
+                // if at the same time the column is not nullable (the `!nullable`).
                 REALM_ASSERT(!(!nullable && n));
                 if (n) {
                     ts = Timestamp(null());
