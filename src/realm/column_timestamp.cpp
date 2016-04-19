@@ -360,7 +360,7 @@ void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
 {
     bool is_null = ts.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.m_seconds);
-    int32_t nanoseconds = is_null ? 0 : ts.m_nanoseconds;
+    int32_t nanoseconds = ts.m_nanoseconds;
 
     if (has_search_index()) {
         m_search_index->set(row_ndx, ts); // Throws
