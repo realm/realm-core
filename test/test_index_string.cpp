@@ -1322,4 +1322,53 @@ TEST(StringIndex_Deny_Duplicates)
     col.destroy();
 }
 
+// There is a corner case where two very long strings are
+// inserted into the string index which are identical except
+// for the characters at the end (they have an identical very
+// long prefix). This was causing a stack overflow because of
+// the recursive nature of the insert function.
+ONLY(StringIndex_InsertLongPrefix) {
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, true);
+
+    col.create_search_index();
+
+    col.add("test_index_string1");
+    col.add("test_index_string2");
+
+    col.get_search_index()->do_dump_node_structure(std::cout, 0);
+
+    CHECK_EQUAL(col.find_first("test_index_string1"), 0);
+    CHECK_EQUAL(col.find_first("test_index_string2"), 1);
+
+    std::string base(107, 'a');
+    col.add(base + "b");
+    col.add(base + "c");
+
+    CHECK_EQUAL(col.find_first(base + "b"), 2);
+    CHECK_EQUAL(col.find_first(base + "c"), 3);
+
+    for (size_t i = 0; i < col.size(); ++i) {
+        std::cout << col.get(i) << "\n";
+    }
+    std::string base2(999408, 'a');
+    col.add(base2 + "b");
+    col.add(base2 + "c");
+
+    CHECK_EQUAL(col.find_first(base2 + "b"), 4);
+    CHECK_EQUAL(col.find_first(base2 + "c"), 5);
+
+    //col.clear();
+//
+//        // if that didn't work for you, let's try more.
+//        for (int i = 9408; i < 100000; ++i) {
+//            std::cout << "testing size " << i << "\n";
+//            std::string base_i(i, 'a');
+//            col.add(base_i + "b");
+//            col.add(base_i + "c");
+//        }
+
+    //TODO: check for other recursive functions such as do_update_ref(); do_delete();
+}
+
 #endif // TEST_INDEX_STRING
