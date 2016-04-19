@@ -494,7 +494,8 @@ bool Spec::operator==(const Spec& spec) const noexcept
     // check each column's type
     const size_t column_count = get_column_count();
     for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx) {
-        switch (m_types.get(col_ndx))
+        ColumnType col_type = ColumnType(m_types.get(col_ndx));
+        switch (col_type)
         {
             case col_type_String:
             case col_type_StringEnum:
