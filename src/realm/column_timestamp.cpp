@@ -383,5 +383,15 @@ bool TimestampColumn::compare(const TimestampColumn& c) const noexcept
     return true;
 }
 
+Timestamp TimestampColumn::maximum(size_t& result_index) const
+{
+    return minmax<Greater>(result_index);
+}
+
+Timestamp TimestampColumn::minimum(size_t& result_index) const
+{
+    return minmax<Less>(result_index);
+}
+
 
 }

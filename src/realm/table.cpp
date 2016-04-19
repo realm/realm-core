@@ -3540,6 +3540,15 @@ OldDateTime Table::minimum_olddatetime(size_t col_ndx, size_t* return_ndx) const
     }
 }
 
+Timestamp Table::minimum_timestamp(size_t col_ndx, size_t* return_ndx) const
+{
+    if (!m_columns.is_attached())
+        return 0;
+
+    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    return column.minimum(*return_ndx);
+}
+
 // maximum ----------------------------------------------
 
 int64_t Table::maximum_int(size_t col_ndx, size_t* return_ndx) const
@@ -3604,6 +3613,17 @@ OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
         return column.maximum(0, npos, npos, return_ndx);
     }
 }
+
+
+Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
+{
+    if (!m_columns.is_attached())
+        return 0;
+
+    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    return column.maximum(*return_ndx);
+}
+
 
 namespace {
 

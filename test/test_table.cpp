@@ -3436,7 +3436,7 @@ TEST(Table_Aggregates2)
 }
 
 // Test Table methods max, min, avg, sum, on both nullable and non-nullable columns
-TEST(Table_Aggregates3)
+ONLY(Table_Aggregates3)
 {
     bool nullable = false;
 
@@ -3453,6 +3453,7 @@ TEST(Table_Aggregates3)
         table->insert_column(1, type_Float, "Shipping", nullable);
         table->insert_column(2, type_Double, "Rating", nullable);
         table->insert_column(3, type_OldDateTime, "Delivery date", nullable);
+        table->insert_column(4, type_Timestamp, "Delivery date 2", nullable);
 
         table->add_empty_row(3);
 
@@ -3471,6 +3472,10 @@ TEST(Table_Aggregates3)
         table->set_olddatetime(3, 0, OldDateTime(2016, 2, 2));
         // table->set_null(3, 1);
         table->set_olddatetime(3, 2, OldDateTime(2016, 6, 6));
+
+        table->set_timestamp(4, 0, Timestamp(2, 2));
+        // table->set_null(4, 1);
+        table->set_timestamp(4, 2, Timestamp(6, 6));
 
         size_t count;
         size_t pos;
@@ -3492,6 +3497,10 @@ TEST(Table_Aggregates3)
             CHECK_EQUAL(table->maximum_olddatetime(3, &pos), OldDateTime(2016, 6, 6));
             CHECK_EQUAL(pos, 2);
 
+            pos = 123;
+            CHECK_EQUAL(table->maximum_timestamp(4, &pos), Timestamp(6, 6));
+            CHECK_EQUAL(pos, 2);
+
             // min
             pos = 123;
             CHECK_EQUAL(table->minimum_int(0, &pos), 1);
@@ -3507,6 +3516,10 @@ TEST(Table_Aggregates3)
 
             pos = 123;
             CHECK_EQUAL(table->minimum_olddatetime(3, &pos), OldDateTime(2016, 2, 2));
+            CHECK_EQUAL(pos, 0);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_timestamp(4, &pos), Timestamp(2, 2));
             CHECK_EQUAL(pos, 0);
 
             // average
@@ -3545,6 +3558,10 @@ TEST(Table_Aggregates3)
             CHECK_EQUAL(table->maximum_olddatetime(3, &pos), OldDateTime(2016, 6, 6));
             CHECK_EQUAL(pos, 2);
 
+            pos = 123;
+            CHECK_EQUAL(table->maximum_timestamp(4, &pos), Timestamp(6, 6));
+            CHECK_EQUAL(pos, 2);
+
             // min
             pos = 123;
             CHECK_EQUAL(table->minimum_int(0, &pos), 0);
@@ -3560,6 +3577,11 @@ TEST(Table_Aggregates3)
 
             pos = 123;
             CHECK_EQUAL(table->minimum_olddatetime(3, &pos), OldDateTime(0));
+            CHECK_EQUAL(pos, 1);
+
+            pos = 123;
+            // Timestamp(0, 0) is default value for non-nullable column
+            CHECK_EQUAL(table->minimum_timestamp(4, &pos), Timestamp(0, 0));
             CHECK_EQUAL(pos, 1);
 
             // average

@@ -563,10 +563,12 @@ public:
     float   maximum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  maximum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
     OldDateTime maximum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
     int64_t minimum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
     float   minimum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  minimum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
     OldDateTime minimum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  average_int(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_double(size_t column_ndx, size_t* value_count = nullptr) const;
