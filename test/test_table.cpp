@@ -3605,6 +3605,25 @@ TEST(Table_Aggregates3)
     }
 }
 
+
+TEST(Table_EmptyMinmax)
+{
+    Group g;
+    TableRef table = g.add_table("");
+    table->add_column(type_Timestamp, "");
+
+    size_t min_index;
+    Timestamp min_ts = table->minimum_timestamp(0, &min_index);
+    CHECK_EQUAL(min_index, realm::npos);
+    CHECK(min_ts.is_null());
+
+    size_t max_index;
+    Timestamp max_ts = table->maximum_timestamp(0, &max_index);
+    CHECK_EQUAL(max_index, realm::npos);
+    CHECK(max_ts.is_null());
+}
+
+
 TEST(Table_LanguageBindings)
 {
    Table* table = LangBindHelper::new_table();
