@@ -223,7 +223,7 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
 }
 
 /*
-TEST(Replication_Timestamp)
+ONLY(Replication_Timestamp)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
