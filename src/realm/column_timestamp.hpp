@@ -149,7 +149,6 @@ private:
     {
         // Condition is realm::Greater for maximum and realm::Less for minimum.
 
-
         if (size() == 0) {
             result_index = npos;
             return Timestamp();
