@@ -268,7 +268,8 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
 
 // Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf types
 // and also assume numeric types that support arithmetic (+, /, etc).
-template<class C> Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
+template<class C>
+Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
 {
     C compare = C();
     Timestamp best = Timestamp();
