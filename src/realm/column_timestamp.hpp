@@ -50,7 +50,7 @@ struct Timestamp {
     uint32_t m_nanoseconds;
     bool m_is_null;
 
-    static constexpr size_t nanoseconds_in_second = 1000000000;
+    static constexpr uint32_t nanoseconds_in_second = 1000000000;
 };
 
 template<class C, class T>
