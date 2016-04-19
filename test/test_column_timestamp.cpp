@@ -62,7 +62,7 @@ TEST(TimestampColumn_Basic_Nulls)
     CHECK_THROW_ANY(t.set_null(0, 0));
     t.set_null(1, 0);
 
-    CHECK_THROW_ANY(t.set_timestamp(0, 0, Timestamp(null())));
+    CHECK_THROW_ANY(t.set_timestamp(0, 0, Timestamp()));
 }
 
 TEST(TimestampColumn_Relocate)

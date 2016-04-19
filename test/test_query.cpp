@@ -8588,7 +8588,7 @@ TEST(Query_Timestamp)
     table.set_timestamp(0, 0, Timestamp(111, 222));
     table.set_timestamp(0, 1, Timestamp(111, 333));
     table.set_timestamp(0, 2, Timestamp(333, 444));
-    table.set_timestamp(0, 3, Timestamp(null()));
+    table.set_timestamp(0, 3, Timestamp());
     table.set_timestamp(0, 4, Timestamp(0, 0));
     table.set_timestamp(0, 5, Timestamp(-1000, 0));
 
@@ -8621,7 +8621,7 @@ TEST(Query_Timestamp)
     match = (first < Timestamp(0, 0)).count();
     CHECK_EQUAL(match, 1);
 
-    match = (first != Timestamp(null())).count();
+    match = (first != Timestamp()).count();
     CHECK_EQUAL(match, 5);
 
     match = (first != Timestamp(0, 0)).count();
@@ -8675,10 +8675,10 @@ TEST(Query_Timestamp_Null)
     Columns<Timestamp> first = table.column<Timestamp>(0);
     Columns<Timestamp> second = table.column<Timestamp>(1);
     
-    match = (first == Timestamp(null())).find();
+    match = (first == Timestamp()).find();
     CHECK_EQUAL(match, npos);
 
-    match = (second == Timestamp(null())).find();
+    match = (second == Timestamp()).find();
     CHECK_EQUAL(match, 0);
 }
 #endif // TEST_QUERY
