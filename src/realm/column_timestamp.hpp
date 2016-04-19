@@ -148,15 +148,17 @@ private:
     Timestamp minmax(size_t& result_index) const noexcept
     {
         // Condition is realm::Greater for maximum and realm::Less for minimum.
-        Timestamp best;
-        result_index = npos;
 
-        if (size() > 0) {
-            best = get(0);
-            result_index = 0;
+
+        if (size() == 0) {
+            result_index = npos;
+            return Timestamp();
         }
 
-        for (size_t i = 0; i < size(); ++i) {
+        Timestamp best = get(0);
+        result_index = 0;
+
+        for (size_t i = 1; i < size(); ++i) {
             if (Condition()(get(i), best, get(i).is_null(), best.is_null())) {
                 best = get(i);
                 result_index = i;
