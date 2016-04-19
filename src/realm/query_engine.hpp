@@ -922,7 +922,9 @@ public:
         m_dD = 100.0;
         m_table = &table;
         m_condition_column = static_cast<const TimestampColumn*>(&get_column_base(table, m_condition_column_idx));
+        REALM_ASSERT(dynamic_cast<const TimestampColumn*>(&get_column_base(table, m_condition_column_idx)));
         m_column_type = get_real_column_type(table, m_condition_column_idx);
+        REALM_ASSERT_3(m_column_type, == , col_type_Timestamp);
 
         if (m_child)
             m_child->init(table);
