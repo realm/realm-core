@@ -2868,8 +2868,12 @@ void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
     TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     column.set(ndx, value);
 
-    if (Replication* repl = get_repl())
-        repl->set_timestamp(this, col_ndx, ndx, value); // Throws
+    if (Replication* repl = get_repl()) {
+        if (value.is_null())
+            repl->set_null(this, col_ndx, ndx); // Throws
+        else
+            repl->set_timestamp(this, col_ndx, ndx, value); // Throws
+    }
 }
 
 
