@@ -312,7 +312,7 @@ void TimestampColumn::verify() const
     REALM_ASSERT_3(m_seconds->size(), ==, m_nanoseconds->size());
 
     for (size_t t = 0; t < size(); t++) {
-        REALM_ASSERT_3(m_nanoseconds->get(t), <, Timestamp::nanoseconds_in_second);
+        REALM_ASSERT_3(m_nanoseconds->get(t), <, Timestamp::nanoseconds_per_second);
     }
 
     m_seconds->verify();
