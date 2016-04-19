@@ -116,9 +116,9 @@ bool TimestampColumn::is_null(size_t row_ndx) const noexcept
 void TimestampColumn::set_null(size_t row_ndx)
 {
     if (has_search_index()) {
-        m_search_index->set(row_ndx, null{});
+        m_search_index->set(row_ndx, null{}); // Throws
     }
-    m_seconds->set_null(row_ndx);
+    m_seconds->set_null(row_ndx); // Throws
 }
 
 void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t /*prior_num_rows*/,
@@ -128,17 +128,17 @@ void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, siz
     size_t row_ndx_or_npos = is_append ? realm::npos : row_ndx;
 
     if (nullable)
-        m_seconds->insert(row_ndx_or_npos, null{}, num_rows_to_insert);
+        m_seconds->insert(row_ndx_or_npos, null{}, num_rows_to_insert); // Throws
     else
-        m_seconds->insert(row_ndx_or_npos, 0, num_rows_to_insert);
-    m_nanoseconds->insert(row_ndx_or_npos, 0, num_rows_to_insert);
+        m_seconds->insert(row_ndx_or_npos, 0, num_rows_to_insert); // Throws
+    m_nanoseconds->insert(row_ndx_or_npos, 0, num_rows_to_insert); // Throws
 
     if (has_search_index()) {
         if (nullable) {
-            m_search_index->insert(row_ndx, null{}, num_rows_to_insert, is_append);
+            m_search_index->insert(row_ndx, null{}, num_rows_to_insert, is_append); // Throws
         }
         else {
-            m_search_index->insert(row_ndx, Timestamp{0, 0}, num_rows_to_insert, is_append);
+            m_search_index->insert(row_ndx, Timestamp{0, 0}, num_rows_to_insert, is_append); // Throws
         }
     }
 }
@@ -146,10 +146,10 @@ void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, siz
 void TimestampColumn::erase(size_t row_ndx, bool is_last)
 {
     if (has_search_index()) {
-        m_search_index->erase<StringData>(row_ndx, is_last);
+        m_search_index->erase<StringData>(row_ndx, is_last); // Throws
     }
-    m_seconds->erase(row_ndx, is_last);
-    m_nanoseconds->erase(row_ndx, is_last);
+    m_seconds->erase(row_ndx, is_last); // Throws
+    m_nanoseconds->erase(row_ndx, is_last); // Throws
 }
 
 void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t /*prior_num_rows*/,
@@ -158,11 +158,11 @@ void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
     bool is_last = (row_ndx + num_rows_to_erase) == size();
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
         if (has_search_index()) {
-            m_search_index->erase<StringData>(row_ndx + num_rows_to_erase - i - 1, is_last);
+            m_search_index->erase<StringData>(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
         }
 
-        m_seconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last);
-        m_nanoseconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last);
+        m_seconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
+        m_nanoseconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
     }
 }
 
@@ -183,18 +183,18 @@ void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
         }
     }
 
-    m_seconds->move_last_over(row_ndx, prior_num_rows);
-    m_nanoseconds->move_last_over(row_ndx, prior_num_rows);
+    m_seconds->move_last_over(row_ndx, prior_num_rows); // Throws
+    m_nanoseconds->move_last_over(row_ndx, prior_num_rows); // Throws
 }
 
 void TimestampColumn::clear(size_t num_rows, bool /*broken_reciprocal_backlinks*/)
 {
     REALM_ASSERT_EX(num_rows == m_seconds->size(), num_rows, m_seconds->size());
     static_cast<void>(num_rows);
-    m_seconds->clear();
-    m_nanoseconds->clear();
+    m_seconds->clear(); // Throws
+    m_nanoseconds->clear(); // Throws
     if (has_search_index()) {
-        m_search_index->clear();
+        m_search_index->clear(); // Throws
     }
 }
 
@@ -206,18 +206,18 @@ void TimestampColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         size_t size = this->size();
         bool row_ndx_1_is_last = row_ndx_1 == size - 1;
         bool row_ndx_2_is_last = row_ndx_2 == size - 1;
-        m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last);
-        m_search_index->insert(row_ndx_1, value_2, 1, row_ndx_1_is_last);
-        m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last);
-        m_search_index->insert(row_ndx_2, value_1, 1, row_ndx_2_is_last);
+        m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last); // Throws
+        m_search_index->insert(row_ndx_1, value_2, 1, row_ndx_1_is_last); // Throws
+        m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last); // Throws
+        m_search_index->insert(row_ndx_2, value_1, 1, row_ndx_2_is_last); // Throws
     }
 
     auto tmp1 = m_seconds->get(row_ndx_1);
-    m_seconds->set(row_ndx_1, m_seconds->get(row_ndx_2));
-    m_seconds->set(row_ndx_2, tmp1);
+    m_seconds->set(row_ndx_1, m_seconds->get(row_ndx_2)); // Throws
+    m_seconds->set(row_ndx_2, tmp1); // Throws
     auto tmp2 = m_nanoseconds->get(row_ndx_1);
-    m_nanoseconds->set(row_ndx_1, m_nanoseconds->get(row_ndx_2));
-    m_nanoseconds->set(row_ndx_2, tmp2);
+    m_nanoseconds->set(row_ndx_1, m_nanoseconds->get(row_ndx_2)); // Throws
+    m_nanoseconds->set(row_ndx_2, tmp2); // Throws
 }
 
 void TimestampColumn::destroy() noexcept
@@ -301,7 +301,7 @@ void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
     m_nanoseconds->init_from_parent();
 
     if (has_search_index()) {
-        m_search_index->refresh_accessor_tree(new_col_ndx, spec);
+        m_search_index->refresh_accessor_tree(new_col_ndx, spec); // Throws
     }
 }
 
@@ -335,12 +335,12 @@ void TimestampColumn::add(const Timestamp& ts)
     bool is_null = ts.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.m_seconds);
     int32_t nanoseconds = is_null ? 0 : ts.m_nanoseconds;
-    m_seconds->insert(npos, seconds);
-    m_nanoseconds->insert(npos, nanoseconds);
+    m_seconds->insert(npos, seconds); // Throws
+    m_nanoseconds->insert(npos, nanoseconds); // Throws
 
     if (has_search_index()) {
         size_t ndx = size() - 1; // Slow
-        m_search_index->insert(ndx, ts, 1, true);
+        m_search_index->insert(ndx, ts, 1, true); // Throws
     }
 }
 
@@ -357,11 +357,11 @@ void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
     int32_t nanoseconds = is_null ? 0 : ts.m_nanoseconds;
 
     if (has_search_index()) {
-        m_search_index->set(row_ndx, ts);
+        m_search_index->set(row_ndx, ts); // Throws
     }
 
-    m_seconds->set(row_ndx, seconds);
-    m_nanoseconds->set(row_ndx, nanoseconds);
+    m_seconds->set(row_ndx, seconds); // Throws
+    m_nanoseconds->set(row_ndx, nanoseconds); // Throws
 }
 
 bool TimestampColumn::compare(const TimestampColumn& c) const noexcept
