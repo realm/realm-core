@@ -693,7 +693,7 @@ Query& Query::begins_with(size_t column_ndx, StringData value, bool case_sensiti
     if (case_sensitive)
         add_condition<BeginsWith>(column_ndx, value);
     else
-        add_condition<BeginsWithIns>(column_ndx, value); // FIXME2
+        add_condition<BeginsWithIns>(column_ndx, value);
     return *this;
 }
 Query& Query::ends_with(size_t column_ndx, StringData value, bool case_sensitive)
