@@ -11,7 +11,6 @@
 * S: Misbehavior of empty asynchronous write in POSIX networking API.
 * S: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
-* Fix a crash that occurred after moving a `Query` that owned a `TableView`.
 
 ### Enhancements:
 
@@ -22,13 +21,8 @@
   provide the full posix API for it. This prevents a situation
   where a crash in one process holding the lock, would leave
   the database locked. Fixes #1429
-* Added support for queries that traverse backlinks. Fixes #776.
 * Improve the performance of advance_read() over transations that inserted rows
   when there are live TableViews.
-* The query expression API now supports equality comparisons between
-  `Columns<Link>` and row accessors. This allows for link equality
-  comparisons involving backlinks, and those that traverse multiple
-  levels of links.
 
 * S: Adding `util::network::buffered_input_stream::reset()`.
 
@@ -47,6 +41,24 @@
 * New failure simulation features: Ability to prime for random triggering.
 
 * S: New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+
+----------------------------------------------
+
+# 0.98.0 Release notes
+
+### Enhancements:
+
+* Added support for queries that traverse backlinks. Fixes #776.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links.
+
+### Bugfixes:
+
+* Fix a crash that occurred after moving a `Query` that owned a `TableView`.
+
+**NOTE: This is a hotfix release which is built on top of [0.97.4].**
 
 ----------------------------------------------
 
