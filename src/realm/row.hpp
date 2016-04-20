@@ -69,8 +69,8 @@ public:
     typedef BasicTableRef<T> TableRef; // Same as ConstTableRef if `T` is 'const'
 
     typedef typename util::CopyConst<T, LinkView>::type L;
-    typedef util::bind_ptr<const L> ConstLinkViewRef;
-    typedef util::bind_ptr<L> LinkViewRef; // Same as ConstLinkViewRef if `T` is 'const'
+    typedef std::shared_ptr<const L> ConstLinkViewRef;
+    typedef std::shared_ptr<L> LinkViewRef; // Same as ConstLinkViewRef if `T` is 'const'
 
     int_fast64_t get_int(size_t col_ndx) const noexcept;
     bool get_bool(size_t col_ndx) const noexcept;

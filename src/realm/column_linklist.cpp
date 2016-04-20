@@ -349,32 +349,30 @@ void LinkListColumn::do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_
 
 void LinkListColumn::unregister_linkview(const LinkView& list)
 {
-    validate_list_accessors();
-    auto it = std::lower_bound(m_list_accessors.begin(), m_list_accessors.end(), list_entry{ list.get_origin_row_index(), nullptr });
-    REALM_ASSERT_DEBUG(it != m_list_accessors.end());
-    if (it != m_list_accessors.end() && it->m_list == &list) {
-        it->m_list = nullptr;
-        m_list_accessors_contains_tombstones = true;
-    }
+    m_list_accessors_contains_tombstones = true;
 }
 
-LinkView* LinkListColumn::get_ptr(size_t row_ndx) const
+std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
 {
     REALM_ASSERT_3(row_ndx, <, size());
     validate_list_accessors();
 
     // Check if we already have a linkview for this row
-    auto it = std::lower_bound(m_list_accessors.begin(), m_list_accessors.end(), list_entry{ row_ndx, nullptr });
-    if (it != m_list_accessors.end() && it->m_row_ndx == row_ndx && it->m_list)
-        return it->m_list;
+    list_entry key;
+    key.m_row_ndx = row_ndx;
+    auto it = std::lower_bound(m_list_accessors.begin(), m_list_accessors.end(), key);
+    if (it != m_list_accessors.end() && it->m_row_ndx == row_ndx && it->m_list.lock())
+        return it->m_list.lock();
 
     if (it == m_list_accessors.end() || it->m_row_ndx != row_ndx) {
-        it = m_list_accessors.insert(it, { row_ndx, nullptr }); // Throws
+        it = m_list_accessors.insert(it, key); // Throws
     }
 
     it->m_row_ndx = row_ndx;
-    it->m_list = new LinkView(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
-    return it->m_list;
+    std::shared_ptr<LinkView> ptr(
+        new LinkView(m_table, const_cast<LinkListColumn&>(*this), row_ndx)); // Throws
+    it->m_list = ptr;
+    return ptr;
 }
 
 void LinkListColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
@@ -405,8 +403,9 @@ void LinkListColumn::discard_child_accessors() noexcept
 {
     validate_list_accessors();
     for (auto& entry : m_list_accessors) {
-        if (entry.m_list)
-            entry.m_list->detach();
+        std::shared_ptr<LinkView> p = entry.m_list.lock();
+        if (p)
+            p->detach();
     }
     m_list_accessors.clear();
 }
@@ -418,7 +417,7 @@ void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 
     LinkColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     for (auto& entry : m_list_accessors)
-        entry.m_list->refresh_accessor_tree(entry.m_row_ndx);
+        entry.m_list.lock()->refresh_accessor_tree(entry.m_row_ndx);
 }
 
 
@@ -465,11 +464,11 @@ void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) n
     prune_list_accessor_tombstones();
 
     auto end = m_list_accessors.end();
-    auto it = std::lower_bound(m_list_accessors.begin(), end, list_entry{ row_ndx, nullptr });
+    auto it = std::lower_bound(m_list_accessors.begin(), end, list_entry{ row_ndx, std::weak_ptr<LinkView>() });
     for (; it != end; ++it) {
         it->m_row_ndx += num_rows_inserted;
         if (fix_ndx_in_parent)
-            it->m_list->set_origin_row_index(it->m_row_ndx);
+            it->m_list.lock()->set_origin_row_index(it->m_row_ndx);
     }
 
     validate_list_accessors();
@@ -482,8 +481,8 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
     prune_list_accessor_tombstones();
 
     auto end = m_list_accessors.end();
-    auto erased_begin = std::lower_bound(m_list_accessors.begin(), end, list_entry{ row_ndx, nullptr });
-    auto erased_end = std::lower_bound(erased_begin, end, list_entry{ row_ndx + num_rows_erased, nullptr });
+    auto erased_begin = std::lower_bound(m_list_accessors.begin(), end, list_entry{ row_ndx, std::weak_ptr<LinkView>() });
+    auto erased_end = std::lower_bound(erased_begin, end, list_entry{ row_ndx + num_rows_erased, std::weak_ptr<LinkView>() });
 
     for (auto it = erased_begin; it != erased_end; ++it) {
         // Must hold a counted reference while detaching
@@ -494,7 +493,7 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
     for (auto it = erased_end; it != end; ++it) {
         it->m_row_ndx -= num_rows_erased;
         if (fix_ndx_in_parent)
-            it->m_list->set_origin_row_index(it->m_row_ndx);
+            it->m_list.lock()->set_origin_row_index(it->m_row_ndx);
     }
 
      m_list_accessors.erase(erased_begin, erased_end);
@@ -512,14 +511,14 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
     auto end = m_list_accessors.end();
 
     bool to_is_valid = false;
-    auto to = std::lower_bound(begin, end, list_entry{ to_row_ndx, nullptr });
+    auto to = std::lower_bound(begin, end, list_entry{ to_row_ndx, std::weak_ptr<LinkView>() });
     if (to != end && to->m_row_ndx == to_row_ndx) {
         to_is_valid = true;
 
         // Must hold a counted reference while detaching
         LinkViewRef list(to->m_list);
         list->detach();
-        to->m_list = nullptr;
+        to->m_list.reset();
         m_list_accessors_contains_tombstones = true;
     }
     if (from_row_ndx == to_row_ndx) {
@@ -527,11 +526,11 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
         return;
     }
 
-    auto from = std::lower_bound(begin, end, list_entry{ from_row_ndx, nullptr });
+    auto from = std::lower_bound(begin, end, list_entry{ from_row_ndx, std::weak_ptr<LinkView>() });
     if (from != end && from->m_row_ndx == from_row_ndx) {
         from->m_row_ndx = to_row_ndx;
         if (fix_ndx_in_parent)
-            from->m_list->set_origin_row_index(to_row_ndx);
+            from->m_list.lock()->set_origin_row_index(to_row_ndx);
 
         if (to_is_valid) {
             to->m_row_ndx = from_row_ndx;
@@ -557,16 +556,16 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
     auto begin = m_list_accessors.begin();
     auto end = m_list_accessors.end();
 
-    auto it_1 = std::lower_bound(begin, end, list_entry{ row_ndx_1, nullptr });
+    auto it_1 = std::lower_bound(begin, end, list_entry{ row_ndx_1, std::weak_ptr<LinkView>() });
     bool row_1_found = (it_1 != end && it_1->m_row_ndx == row_ndx_1);
 
-    auto it_2 = std::lower_bound(begin, end, list_entry{ row_ndx_2, nullptr });
+    auto it_2 = std::lower_bound(begin, end, list_entry{ row_ndx_2, std::weak_ptr<LinkView>() });
     bool row_2_found = (it_2 != end && it_2->m_row_ndx == row_ndx_2);
 
     if (row_1_found && row_2_found) {
         if (fix_ndx_in_parent) {
-            it_1->m_list->set_origin_row_index(row_ndx_2);
-            it_2->m_list->set_origin_row_index(row_ndx_1);
+            it_1->m_list.lock()->set_origin_row_index(row_ndx_2);
+            it_2->m_list.lock()->set_origin_row_index(row_ndx_1);
         }
         std::swap(it_1->m_list, it_2->m_list);
     }
@@ -577,7 +576,7 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
         if (row_1_found) {
             it_1->m_row_ndx = row_ndx_2;
             if (fix_ndx_in_parent)
-                it_1->m_list->set_origin_row_index(row_ndx_2);
+                it_1->m_list.lock()->set_origin_row_index(row_ndx_2);
 
             single = it_1;
             remainder = it_2;
@@ -585,7 +584,7 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
         else {
             it_2->m_row_ndx = row_ndx_1;
             if (fix_ndx_in_parent)
-                it_2->m_list->set_origin_row_index(row_ndx_1);
+                it_2->m_list.lock()->set_origin_row_index(row_ndx_1);
 
             single = it_2;
             remainder = it_1;
@@ -616,7 +615,7 @@ void LinkListColumn::update_from_parent(size_t old_baseline) noexcept
     prune_list_accessor_tombstones();
 
     for (auto& list_accessor : m_list_accessors) {
-        list_accessor.m_list->update_from_parent(old_baseline);
+        list_accessor.m_list.lock()->update_from_parent(old_baseline);
     }
 }
 
@@ -641,7 +640,7 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
         return;
 
     auto remove_from = std::remove_if(m_list_accessors.begin(), m_list_accessors.end(), [](const list_entry& e) {
-        return e.m_list == nullptr;
+            return e.m_list.expired();
     });
     m_list_accessors.erase(remove_from, m_list_accessors.end());
     m_list_accessors_contains_tombstones = false;

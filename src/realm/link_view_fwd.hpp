@@ -20,13 +20,13 @@
 #ifndef REALM_LINK_VIEW_FWD_HPP
 #define REALM_LINK_VIEW_FWD_HPP
 
-#include <realm/util/bind_ptr.hpp>
+#include <memory>
 
 namespace realm {
 
 class LinkView;
-typedef util::bind_ptr<LinkView> LinkViewRef;
-typedef util::bind_ptr<const LinkView> ConstLinkViewRef;
+typedef std::shared_ptr<LinkView> LinkViewRef;
+typedef std::shared_ptr<const LinkView> ConstLinkViewRef;
 
 } // namespace realm
 

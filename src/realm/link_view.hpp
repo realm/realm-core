@@ -20,7 +20,6 @@
 #ifndef REALM_LINK_VIEW_HPP
 #define REALM_LINK_VIEW_HPP
 
-#include <realm/util/bind_ptr.hpp>
 #include <realm/column.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/link_view_fwd.hpp>
@@ -41,7 +40,7 @@ class TransactLogConvenientEncoder;
 /// exceptions are is_attached() and the destructor.
 ///
 /// FIXME: Rename this class to `LinkList`.
-class LinkView : public RowIndexes {
+class LinkView : public RowIndexes, public std::enable_shared_from_this<LinkView> {
 public:
     ~LinkView() noexcept;
     bool is_attached() const noexcept;
@@ -133,9 +132,6 @@ private:
     void do_update_link(size_t old_target_row_ndx, size_t new_target_row_ndx);
     void do_swap_link(size_t target_row_ndx_1, size_t target_row_ndx_2);
 
-    void bind_ptr() const noexcept;
-    void unbind_ptr() const noexcept;
-
     void refresh_accessor_tree(size_t new_row_ndx) noexcept;
 
     void update_from_parent(size_t old_baseline) noexcept;
@@ -150,8 +146,6 @@ private:
 
     friend class _impl::LinkListFriend;
     friend class LinkListColumn;
-    friend class util::bind_ptr<LinkView>;
-    friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
     friend class SharedGroup;
     friend class Query;
@@ -179,19 +173,6 @@ inline LinkView::~LinkView() noexcept
         repl_unselect();
         m_origin_column.unregister_linkview(*this);
     }
-}
-
-inline void LinkView::bind_ptr() const noexcept
-{
-    ++m_ref_count;
-}
-
-inline void LinkView::unbind_ptr() const noexcept
-{
-    if (--m_ref_count > 0)
-        return;
-
-    delete this;
 }
 
 inline void LinkView::detach()

@@ -111,8 +111,8 @@ TEST(LangBindHelper_LinkView)
     origin->add_empty_row();
     target->add_empty_row();
     Row row = origin->get(0);
-    LinkView* link_view = LangBindHelper::get_linklist_ptr(row, 0);
-    link_view->add(0);
+    LinkViewRef* link_view = LangBindHelper::get_linklist_ptr(row, 0);
+    (*link_view)->add(0);
     LangBindHelper::unbind_linklist_ptr(link_view);
     CHECK_EQUAL(1, origin->get_link_count(0,0));
 }
