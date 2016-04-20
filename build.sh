@@ -1261,8 +1261,8 @@ EOF
         printf ",s/#define REALM_VER_MINOR .*/#define REALM_VER_MINOR $realm_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
         printf ",s/#define REALM_VER_PATCH .*/#define REALM_VER_PATCH $realm_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
 
-        # update packagaginga/env.list
-        sed -i "s/^VERSION.*/VERSION=$realm_version/" packaging/env.list
+        # update packaging/env.list
+        sed -i.bck "s/^VERSION.*/VERSION=$realm_version/" packaging/env.list && rm -f packaging/env.list.bck
 
         sh tools/add-deb-changelog.sh "$realm_version" "$(pwd)/debian/changelog.in" librealm || exit 1
         sh build.sh release-notes-prerelease || exit 1
