@@ -1525,4 +1525,32 @@ TEST(Array_FindGTE_WithIndirection)
     lut.destroy();
 }
 
+// Check that we can delete nested arrays larger than the
+// stack size to make sure we are not limited by recursion.
+TEST(Array_DeepDestroyMany)
+{
+    const size_t larger_than_stack_size = 1000000;
+    Allocator& alloc = Allocator::get_default();
+    ref_type parent_ref = Array::create_empty_array(Array::type_HasRefs, false, alloc).m_ref;
+    ref_type top_ref = parent_ref;
+
+    for (size_t i = 0; i < larger_than_stack_size; ++i) {
+        Array parent(alloc);
+        parent.init_from_ref(parent_ref);
+
+        Array child(alloc);
+        child.create(Array::type_HasRefs);
+        ref_type child_ref = child.get_ref();
+        parent.add(child_ref);
+        child.set_parent(&parent, 0);
+        parent_ref = child_ref;
+    }
+
+    Array top(alloc);
+    top.init_from_ref(top_ref);
+    top.verify();
+    top.destroy_deep();
+    CHECK(top.is_attached() == false);
+}
+
 #endif // TEST_ARRAY

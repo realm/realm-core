@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Changed Array::destroy_deep to be iterative instead of recursive
+  so that Arrays support nesting beyond the stack size. 
 
 ### API breaking changes:
 

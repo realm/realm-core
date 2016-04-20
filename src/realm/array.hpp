@@ -1711,12 +1711,49 @@ inline void Array::destroy_deep() noexcept
     if (!is_attached())
         return;
 
-    if (m_has_refs)
-        destroy_children();
+    // early out for the simple case
+    if (!m_has_refs) {
+        destroy();
+        return;
+    }
 
-    char* header = get_header_from_data(m_data);
-    m_alloc.free_(m_ref, header);
-    m_data = nullptr;
+    std::vector<MemRef> stack;
+    stack.push_back(MemRef(m_ref, m_alloc));
+
+    while (!stack.empty()) {
+        MemRef cur_mem = stack.back();
+        stack.pop_back();
+        Array cur_array(m_alloc);
+        cur_array.init_from_mem(cur_mem);
+
+        if (cur_array.m_has_refs) {
+            for (size_t i = 0; i != cur_array.m_size; ++i) {
+                int64_t value = cur_array.get(i);
+
+                // Null-refs indicate empty sub-trees
+                if (value == 0)
+                    continue;
+
+                // A ref is always 8-byte aligned, so the lowest bit
+                // cannot be set. If it is, it means that it should not be
+                // interpreted as a ref.
+                if ((value & 1) != 0)
+                    continue;
+
+                ref_type ref = to_ref(value);
+                MemRef child_ref = MemRef(ref, m_alloc);
+                if (!Array::get_hasrefs_from_header(child_ref.m_addr)) {
+                    m_alloc.free_(child_ref);
+                    continue;
+                }
+                stack.push_back(child_ref);
+            }
+        }
+
+        cur_array.destroy();
+    }
+
+    m_data = nullptr;   // detach this accessor (memory is already freed)
 }
 
 inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const
