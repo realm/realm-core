@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.99.0 Release notes
 
 ### Breaking changes:
 
