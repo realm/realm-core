@@ -6,18 +6,28 @@ BUILDDIR=core-builds
 
 function showUsage () {
   cat <<EOF
-Usage: $0 [<branch>|<commit>|<tag>]
-Builds the given core under ${BUILDDIR} in working directory.
-Defaults to $0 master
-Commit can be the 7-letter commit ID.
-NB! A tag must begin with tags/.
+Usage: $0 [-h|--help] [<branch>|<commit>|<tag>]
+EOF
+}
+
+function showHelp () {
+  echo ""
+  showUsage
+  echo ""
+  cat <<EOF
+Builds core at given <branch>, <commit>, or <tag> under
+${BUILDDIR} in the current working directory.
+
+By default, the master branch gets built.
+The commit can be the 7-character commit ID.
+A tag must begin with tags/ (e.g., tags/v0.97.3).
 EOF
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     -h | --help )
-      showUsage
+      showHelp
       exit 0
       ;;
     * )
