@@ -347,7 +347,7 @@ void LinkListColumn::do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_
     links->do_swap_link(target_row_ndx_1, target_row_ndx_2);
 }
 
-void LinkListColumn::unregister_linkview(const LinkView& list)
+void LinkListColumn::unregister_linkview()
 {
     m_list_accessors_contains_tombstones = true;
 }

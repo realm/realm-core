@@ -115,7 +115,7 @@ private:
     void do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
                       size_t target_row_ndx_2) override;
 
-    void unregister_linkview(const LinkView& view);
+    void unregister_linkview();
     ref_type get_row_ref(size_t row_ndx) const noexcept;
     void set_row_ref(size_t row_ndx, ref_type new_ref);
     void add_backlink(size_t target_row, size_t source_row);

@@ -171,7 +171,7 @@ inline LinkView::~LinkView() noexcept
 {
     if (is_attached()) {
         repl_unselect();
-        m_origin_column.unregister_linkview(*this);
+        m_origin_column.unregister_linkview();
     }
 }
 
