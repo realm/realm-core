@@ -4,13 +4,13 @@ set -euo pipefail
 
 builddir=core-builds
 
-function showUsage () {
+showUsage () {
   cat <<EOF
 Usage: $0 [-h|--help] [<branch>|<commit>|<tag>]
 EOF
 }
 
-function showHelp () {
+showHelp () {
   echo ""
   showUsage
   echo ""
