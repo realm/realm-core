@@ -166,7 +166,7 @@ TEST(TimestampColumn_Move_Last_Over)
     c.add(Timestamp{2, 2});
     c.add(Timestamp{3, 3});
     c.set_null(2);
-    c.move_last_row_over(0, 2, false);
+    c.move_last_row_over(0, 3, false);
     CHECK(c.is_null(0));
 
     c.destroy_search_index();

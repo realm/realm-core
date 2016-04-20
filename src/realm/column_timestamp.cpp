@@ -183,8 +183,8 @@ void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
         }
     }
 
-    m_seconds->move_last_over(row_ndx, prior_num_rows); // Throws
-    m_nanoseconds->move_last_over(row_ndx, prior_num_rows); // Throws
+    m_seconds->move_last_over(row_ndx, last_row_ndx); // Throws
+    m_nanoseconds->move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
 void TimestampColumn::clear(size_t num_rows, bool /*broken_reciprocal_backlinks*/)

@@ -222,8 +222,8 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
     CHECK(rt_1.get_group() == rt_2.get_group());
 }
 
-/*
-ONLY(Replication_Timestamp)
+
+TEST(Replication_Timestamp)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -245,6 +245,7 @@ ONLY(Replication_Timestamp)
 
         // First row is to have a row that we can test move_last_over() on later
         table->add_empty_row();
+        CHECK(table->get_timestamp(0, 0).is_null());
 
         table->add_empty_row();
         table->set_timestamp(0, 1, Timestamp(5, 6));
@@ -259,7 +260,7 @@ ONLY(Replication_Timestamp)
         // Overwrite non-null with null to test that 
         // TransactLogParser::parse_one(InstructionHandler& handler) correctly will see a set_null instruction
         // and not a set_new_date instruction
-        table->set_timestamp(0, 1, Timestamp(null()));
+        table->set_timestamp(0, 1, Timestamp());
 
         // Overwrite non-null with other non-null
         table->set_timestamp(0, 2, Timestamp(3, 4));
@@ -280,12 +281,12 @@ ONLY(Replication_Timestamp)
         ReadTransaction rt_1(sg_1);
         rt_1.get_group().verify();
         ConstTableRef table = rt_1.get_table("t");
-        CHECK_EQUAL(1, table->size());
-        CHECK(table->get_timestamp(0, 0) == Timestamp(null()));;
-        CHECK(table->get_timestamp(0, 1) == Timestamp(3, 4));;
+        CHECK_EQUAL(2, table->size());
+        CHECK(table->get_timestamp(0, 0) == Timestamp(3, 4));
+        CHECK(table->get_timestamp(0, 1).is_null());
     }
 }
-*/
+
 
 TEST(Replication_Links)
 {
