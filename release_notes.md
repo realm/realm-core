@@ -1,5 +1,27 @@
 # NEXT RELEASE
 
+### Bugfixes:
+
+* Lorem ipsum.
+
+### API breaking changes:
+
+* Lorem ipsum.
+
+### Enhancements:
+
+* Lorem ipsum.
+
+-----------
+
+### Internals:
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 0.99.0 Release notes
+
 ### Breaking changes:
 
 * Lock file (`foo.realm.lock`) format bumped.
@@ -11,6 +33,7 @@
 * S: Misbehavior of empty asynchronous write in POSIX networking API.
 * S: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
+* Changed group operator== to take table names into account.  
 
 ### Enhancements:
 
@@ -21,8 +44,13 @@
   provide the full posix API for it. This prevents a situation
   where a crash in one process holding the lock, would leave
   the database locked. Fixes #1429
+* Added support for queries that traverse backlinks. Fixes #776.
 * Improve the performance of advance_read() over transations that inserted rows
   when there are live TableViews.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links.
 
 * S: Adding `util::network::buffered_input_stream::reset()`.
 
@@ -43,24 +71,24 @@
 * S: New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 
 ----------------------------------------------
-
 # 0.98.0 Release notes
 
 ### Enhancements:
 
-* Added support for queries that traverse backlinks. Fixes #776.
+* Added support for queries that traverse backlinks. Fixes #776. See #1598.
 * The query expression API now supports equality comparisons between
   `Columns<Link>` and row accessors. This allows for link equality
   comparisons involving backlinks, and those that traverse multiple
-  levels of links.
+  levels of links. See #1609.
 
 ### Bugfixes:
 
 * Fix a crash that occurred after moving a `Query` that owned a `TableView`.
+  See #1672.
 
 **NOTE: This is a hotfix release which is built on top of [0.97.4].**
 
-----------------------------------------------
+-----------------------------------------------
 
 # 0.97.4 Release notes
 
