@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-BUILDDIR=core-builds
+builddir=core-builds
 
 function showUsage () {
   cat <<EOF
@@ -16,7 +16,7 @@ function showHelp () {
   echo ""
   cat <<EOF
 Builds core at given <branch>, <commit>, or <tag> under
-${BUILDDIR} in the current working directory.
+${builddir} in the current working directory.
 
 By default, the master branch gets built.
 The commit can be the 7-character commit ID.
@@ -40,39 +40,39 @@ if [ $# -gt 1 ]; then
   showUsage
   exit 1
 elif [ $# -eq 0 ]; then
-  REF=master
+  ref=master
 else
-  REF=$1
+  ref=$1
 fi
 
-BASEDIR="${BUILDDIR}/${REF}"
-mkdir -p "${BASEDIR}"
-BASEDIR="$(realpath "${BASEDIR}")"
+basedir="${builddir}/${ref}"
+mkdir -p "${basedir}"
+basedir="$(realpath "${basedir}")"
 
-SRCDIR="${BASEDIR}/src"
+srcdir="${basedir}/src"
 
 function checkout () {
 
   # Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
   # Otherwise, git-checkout will complain about updating paths and switching
   # branches at the same time.
-  if [ `git branch -r | grep "^\\s*origin/${REF}$"` ]; then
-    REMOTEREF="origin/${REF}"
+  if [ `git branch -r | grep "^\\s*origin/${ref}$"` ]; then
+    remoteref="origin/${ref}"
   else
-    REMOTEREF="${REF}"
+    remoteref="${ref}"
   fi
 
-  git checkout "${REMOTEREF}"
+  git checkout "${remoteref}"
 }
 
-if [ ! -d "${SRCDIR}" ]; then
-  git clone git@github.com:realm/realm-core.git "${SRCDIR}"
-  cd "${SRCDIR}"
+if [ ! -d "${srcdir}" ]; then
+  git clone git@github.com:realm/realm-core.git "${srcdir}"
+  cd "${srcdir}"
   checkout
   sh build.sh clean
-  sh build.sh config "${BASEDIR}"
+  sh build.sh config "${basedir}"
 else
-  cd "${SRCDIR}"
+  cd "${srcdir}"
   git fetch
   checkout
 fi
