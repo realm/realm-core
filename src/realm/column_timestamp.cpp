@@ -376,14 +376,10 @@ bool TimestampColumn::compare(const TimestampColumn& c) const noexcept
     if (c.size() != n)
         return false;
     for (size_t i = 0; i < n; ++i) {
-        bool left_is_null = is_null(i);
-        bool right_is_null = c.is_null(i);
-        if (left_is_null != right_is_null) {
+        Timestamp left = get(i);
+        Timestamp right = c.get(i);
+        if (realm::Equal()(left, right, left.is_null(), right.is_null())) {
             return false;
-        }
-        if (!left_is_null) {
-            if (get(i) != c.get(i))
-                return false;
         }
     }
     return true;
