@@ -840,7 +840,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
     else if (is_shared) {
         // In shared mode (Realm file opened via a SharedGroup instance) this
         // version of the core library is able to open Realms using file format
-        // versions 2, 3, 4, and 5. Versoin 2, 3, and 4 files need to be
+        // versions 2, 3, 4, and 5. Version 2, 3, and 4 files need to be
         // upgraded.
         switch (file_format_version) {
             case 2:
