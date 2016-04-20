@@ -2,11 +2,15 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most 
+  likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
+  possibly also #1164 (crash in SharedGroup destructor on OS X).
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* The return value for LangBindHelper::get_linklist_ptr() and the argument
+  to LangBindHelper::unbind_linklist_ptr has changed from being a 'LinkView*'
+  into a 'LinkViewRef*'.
 
 ### Enhancements:
 
