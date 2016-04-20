@@ -49,6 +49,24 @@
 * S: New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 
 ----------------------------------------------
+# 0.98.0 Release notes
+
+### Enhancements:
+
+* Added support for queries that traverse backlinks. Fixes #776. See #1598.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links. See #1609.
+
+### Bugfixes:
+
+* Fix a crash that occurred after moving a `Query` that owned a `TableView`.
+  See #1672.
+
+**NOTE: This is a hotfix release which is built on top of [0.97.4].**
+
+-----------------------------------------------
 
 # 0.97.4 Release notes
 
