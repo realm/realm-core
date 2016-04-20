@@ -378,7 +378,7 @@ bool TimestampColumn::compare(const TimestampColumn& c) const noexcept
     for (size_t i = 0; i < n; ++i) {
         Timestamp left = get(i);
         Timestamp right = c.get(i);
-        if (realm::Equal()(left, right, left.is_null(), right.is_null())) {
+        if (!realm::Equal()(left, right, left.is_null(), right.is_null())) {
             return false;
         }
     }
