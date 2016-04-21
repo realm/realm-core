@@ -37,11 +37,13 @@ struct Timestamp {
 
     int64_t get_seconds() const noexcept
     {
+        REALM_ASSERT(!m_is_null);
         return m_seconds;
     }
 
     uint32_t get_nanoseconds() const noexcept
     {
+        REALM_ASSERT(!m_is_null);
         return m_nanoseconds;
     }
 
