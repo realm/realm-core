@@ -105,7 +105,7 @@ private:
     // of `std::vector::erase` that would otherwise be incurred each time an 
     // accessor is removed.
     mutable std::vector<list_entry> m_list_accessors;
-    mutable bool m_list_accessors_contains_tombstones = false;
+    mutable std::atomic<bool> m_list_accessors_contains_tombstones;
 
     std::shared_ptr<LinkView> get_ptr(size_t row_ndx) const;
 
