@@ -452,7 +452,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
                 if (t->size() > 0) {
-                    size_t row_ndx = get_next(s) % t->size();
+                    int32_t row_ndx = get_int32(s) % t->size();
                     if (log) {
                         *log << "g.get_table(" << table_ndx << ")->move_last_over(" << row_ndx << ");\n";
                     }
