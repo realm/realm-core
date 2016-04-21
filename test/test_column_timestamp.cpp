@@ -332,7 +332,7 @@ TEST(TimestampColumn_Operators)
     // Note that the Timestamp::operator==, operator>, operator<, operator>=, etc, do not work
     // if one of the Timestamps are null! Please use realm::Greater, realm::Equal, etc instead.
 
-    auto compare = [&](auto& a, auto& b, auto condition) {
+    auto compare = [&](auto&& a, auto&& b, auto&& condition) {
         return condition(a, b, a.is_null(), b.is_null()); 
     };
 
