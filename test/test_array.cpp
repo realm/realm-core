@@ -1548,7 +1548,8 @@ TEST(Array_DeepDestroyMany)
 
     Array top(alloc);
     top.init_from_ref(top_ref);
-    top.verify();
+    CHECK(top.is_attached());
+    CHECK(top.has_refs());
     top.destroy_deep();
     CHECK(top.is_attached() == false);
 }
