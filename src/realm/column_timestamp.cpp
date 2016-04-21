@@ -118,7 +118,11 @@ void TimestampColumn::set_null(size_t row_ndx)
     if (has_search_index()) {
         m_search_index->set(row_ndx, null{}); // Throws
     }
+
+    // FIXME: Consider not setting 0 on m_nanoseconds
+    // The current setting of 0 forces an arguably unnecessary copy-on-write etc of that leaf node
     m_seconds->set_null(row_ndx); // Throws
+    m_nanoseconds->set(row_ndx, 0); // Throws
 }
 
 void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t /*prior_num_rows*/,
@@ -364,16 +368,17 @@ Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
 
 void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
 {
-    bool is_null = ts.is_null();
-    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
-    uint32_t nanoseconds = is_null ? 0 : ts.get_nanoseconds();
+    if (ts.is_null()) {
+        return set_null(row_ndx); // Throws
+    }
+
+    util::Optional<int64_t> seconds = util::make_optional(ts.get_seconds());
+    uint32_t nanoseconds = ts.get_nanoseconds();
 
     if (has_search_index()) {
         m_search_index->set(row_ndx, ts); // Throws
     }
 
-    // FIXME: Consider not updating the nanoseconds bptree in the case of setting null
-    // The current setting of 0 forces an arguably unnecessary copy-on-write etc of that leaf node.
     m_seconds->set(row_ndx, seconds); // Throws
     m_nanoseconds->set(row_ndx, nanoseconds); // Throws
 }
