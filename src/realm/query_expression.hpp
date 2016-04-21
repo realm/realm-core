@@ -1235,7 +1235,7 @@ private:
 // left-hand-side       operator                              right-hand-side
 // L                    +, -, *, /, <, >, ==, !=, <=, >=      Subexpr2<R>
 //
-// For L = R = {int, int64_t, float, double}:
+// For L = R = {int, int64_t, float, double, Timestamp}:
 // Compare numeric values
 template<class R>
 Query operator > (double left, const Subexpr2<R>& right) {
@@ -1254,6 +1254,11 @@ Query operator > (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, Greater, R>(left, right);
 }
 template<class R>
+Query operator > (Timestamp left, const Subexpr2<R>& right) {
+    return create<Timestamp, Greater, R>(left, right);
+}
+
+template<class R>
 Query operator < (double left, const Subexpr2<R>& right) {
     return create<float, Less, R>(left, right);
 }
@@ -1268,6 +1273,10 @@ Query operator < (int left, const Subexpr2<R>& right) {
 template<class R>
 Query operator < (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, Less, R>(left, right);
+}
+template<class R>
+Query operator < (Timestamp left, const Subexpr2<R>& right) {
+    return create<Timestamp, Less, R>(left, right);
 }
 template<class R>
 Query operator == (double left, const Subexpr2<R>& right) {
@@ -1286,6 +1295,10 @@ Query operator == (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, Equal, R>(left, right);
 }
 template<class R>
+Query operator == (Timestamp left, const Subexpr2<R>& right) {
+    return create<Timestamp, Equal, R>(left, right);
+}
+template<class R>
 Query operator >= (double left, const Subexpr2<R>& right) {
     return create<double, GreaterEqual, R>(left, right);
 }
@@ -1300,6 +1313,10 @@ Query operator >= (int left, const Subexpr2<R>& right) {
 template<class R>
 Query operator >= (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, GreaterEqual, R>(left, right);
+}
+template<class R>
+Query operator >= (Timestamp left, const Subexpr2<R>& right) {
+    return create<Timestamp, GreaterEqual, R>(left, right);
 }
 template<class R>
 Query operator <= (double left, const Subexpr2<R>& right) {
@@ -1318,6 +1335,10 @@ Query operator <= (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, LessEqual, R>(left, right);
 }
 template<class R>
+Query operator <= (Timestamp left, const Subexpr2<R>& right) {
+    return create<Timestamp, LessEqual, R>(left, right);
+}
+template<class R>
 Query operator != (double left, const Subexpr2<R>& right) {
     return create<double, NotEqual, R>(left, right);
 }
@@ -1332,6 +1353,10 @@ Query operator != (int left, const Subexpr2<R>& right) {
 template<class R>
 Query operator != (int64_t left, const Subexpr2<R>& right) {
     return create<int64_t, NotEqual, R>(left, right);
+}
+template<class R>
+Query operator != (Timestamp left, const Subexpr2<R>& right) {
+    return create<Timestamp, NotEqual, R>(left, right);
 }
 
 // Arithmetic

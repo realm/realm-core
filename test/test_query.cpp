@@ -8647,6 +8647,28 @@ TEST(Query_Timestamp)
     match = (first < Timestamp(-100, 0)).find();
     CHECK_EQUAL(match, 5);
 
+    // Left-hand-side being Timestamp() constant, right being column
+    match = (Timestamp(111, 222) > first).find();
+    CHECK_EQUAL(match, 4);
+
+    match = (Timestamp(111, 333) < first).find();
+    CHECK_EQUAL(match, 2);
+
+    match = (Timestamp(111, 222) >= first).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (Timestamp(111, 111) >= first).find();
+    CHECK_EQUAL(match, 4);
+
+    match = (Timestamp(333, 444) <= first).find();
+    CHECK_EQUAL(match, 2);
+
+    match = (Timestamp(111, 300) <= first).find();
+    CHECK_EQUAL(match, 1);
+
+    match = (Timestamp(111, 222) != first).find();
+    CHECK_EQUAL(match, 1);
+
     // Compare column with self
     match = (first == first).find();
     CHECK_EQUAL(match, 0);
@@ -8664,8 +8686,8 @@ TEST(Query_Timestamp)
     CHECK_EQUAL(match, 0);
 
     match = (first <= first).find();
-    CHECK_EQUAL(match, 0);
-
+    CHECK_EQUAL(match, 0); 
+    
     // Two different columns
     match = (first == second).find();
     CHECK_EQUAL(match, 3); // null == null
