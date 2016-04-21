@@ -192,6 +192,82 @@ TEST(TimestampColumn_Clear)
     c.destroy();
 }
 
+TEST(TimestampColumn_StringIndex)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+
+    Timestamp first(123, 123);
+    Timestamp second(1234, 1234);
+
+    CHECK_EQUAL(c.size(), 0);
+    CHECK_EQUAL(first, first);
+    CHECK_NOT_EQUAL(first, second);
+
+    CHECK(!c.has_search_index());
+
+    c.add(first);
+
+    CHECK_EQUAL(c.size(), 1);
+
+    Timestamp ts = c.get(0);
+    CHECK(ts == Timestamp(123, 123));
+
+    StringIndex* index = c.create_search_index();
+    c.add(second);
+
+    CHECK_EQUAL(index->count(second), 1);
+    CHECK_EQUAL(c.size(), 2);
+
+    c.erase_rows(1, 1, c.size(), false);
+    CHECK_EQUAL(c.size(), 1);
+    CHECK_EQUAL(index->count(second), 0);
+    c.erase_rows(0, 1, c.size(), false);
+    CHECK_EQUAL(index->count(first), 0);
+    CHECK_EQUAL(c.size(), 0);
+
+    c.add(first);
+    c.add(second);
+
+    c.swap_rows(0, 1);
+
+    CHECK_EQUAL(c.get(0), second);
+    CHECK_EQUAL(c.get(1), first);
+    CHECK_EQUAL(index->find_first(second), 0);
+    CHECK_EQUAL(index->find_first(first), 1);
+
+    c.set(0, first);
+    c.set(1, second);
+
+    CHECK_EQUAL(c.get(0), first);
+    CHECK_EQUAL(c.get(1), second);
+    CHECK_EQUAL(index->find_first(first), 0);
+    CHECK_EQUAL(index->find_first(second), 1);
+
+    c.set_null(0);
+
+    CHECK(c.get(0).is_null());
+    CHECK_EQUAL(index->find_first(first), realm::npos);
+
+    c.move_last_row_over(0, c.size(), true);
+
+    CHECK(c.size() == 1);
+    CHECK_EQUAL(c.get(0), second);
+    CHECK_EQUAL(index->find_first(second), 0);
+
+    c.clear(1, false);
+    CHECK(c.size() == 0);
+    CHECK_EQUAL(index->find_first(second), realm::npos);
+
+    c.insert_rows(0, 5, 0, false);
+    CHECK(c.size() == 5);
+    c.set(4, first);
+    CHECK_EQUAL(c.get(4), first);
+    CHECK_EQUAL(index->find_first(first), 4);
+
+    c.destroy();
+}
+
 TEST(TimestampColumn_SwapRows)
 {
     ref_type ref = TimestampColumn::create(Allocator::get_default());
