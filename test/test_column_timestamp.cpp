@@ -401,16 +401,20 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
     c.destroy();
 }
 
-// FIXME: Remove #if when we switch to C++14 officially.
-#if __cplusplus >= 201402L || defined(REALM_HAVE_AT_LEAST_MSVC_11_2012) // needs c++14 for auto arguments
+namespace { // anonymous namespace
+
+template<class T, class C>
+bool compare(T&& a, T&& b, C&& condition)
+{
+  return condition(a, b, a.is_null(), b.is_null());
+}
+
+} // anonymous namespace
+
 TEST(TimestampColumn_Operators)
 {
     // Note that the Timestamp::operator==, operator>, operator<, operator>=, etc, do not work
     // if one of the Timestamps are null! Please use realm::Greater, realm::Equal, etc instead.
-
-    auto compare = [&](auto&& a, auto&& b, auto&& condition) {
-        return condition(a, b, a.is_null(), b.is_null()); 
-    };
 
     // Test A. Note that Timestamp() is null and Timestamp(0, 0) is non-null
     // -----------------------------------------------------------------------------------------
@@ -500,7 +504,6 @@ TEST(TimestampColumn_Operators)
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::LessEqual()) ==
         compare(StringData(""), StringData(""), realm::LessEqual()));
 }
-#endif
 
 
 TEST(TimestampColumn_ForceReallocate)
