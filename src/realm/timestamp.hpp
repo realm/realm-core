@@ -50,7 +50,7 @@ struct Timestamp {
         m_seconds = seconds;
     }
 
-    void set_nanoseconds(uint64_t nanoseconds) noexcept
+    void set_nanoseconds(uint32_t nanoseconds) noexcept
     {
         REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
         m_nanoseconds = nanoseconds;
