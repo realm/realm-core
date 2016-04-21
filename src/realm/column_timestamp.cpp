@@ -36,11 +36,11 @@ TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref)
     ref_type seconds_ref = top->get_as_ref(0);
     ref_type nanoseconds_ref = top->get_as_ref(1);
 
-    seconds.reset(new BpTree<util::Optional<int64_t>>(alloc)); // Throws
+    seconds.reset(new BpTree<util::Optional<int64_t>>(BpTreeBase::unattached_tag{})); // Throws
     seconds->init_from_ref(alloc, seconds_ref);
     seconds->set_parent(top.get(), 0);
 
-    nanoseconds.reset(new BpTree<int64_t>(alloc)); // Throws
+    nanoseconds.reset(new BpTree<int64_t>(BpTreeBase::unattached_tag{})); // Throws
     nanoseconds->init_from_ref(alloc, nanoseconds_ref);
     nanoseconds->set_parent(top.get(), 1);
 
@@ -360,12 +360,14 @@ void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
 {
     bool is_null = ts.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
-    uint32_t nanoseconds = ts.get_nanoseconds();
+    uint32_t nanoseconds = is_null ? 0 : ts.get_nanoseconds();
 
     if (has_search_index()) {
         m_search_index->set(row_ndx, ts); // Throws
     }
 
+    // FIXME: Consider not updating the nanoseconds bptree in the case of setting null
+    // The current setting of 0 forces an arguably unnecessary copy-on-write etc of that leaf node.
     m_seconds->set(row_ndx, seconds); // Throws
     m_nanoseconds->set(row_ndx, nanoseconds); // Throws
 }

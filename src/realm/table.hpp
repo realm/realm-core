@@ -403,14 +403,14 @@ public:
     // Get cell values. Will assert if the requested type does not match the column type
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
-    OldDateTime    get_olddatetime(size_t column_ndx, size_t row_ndx) const noexcept;
+    OldDateTime get_olddatetime(size_t column_ndx, size_t row_ndx) const noexcept;
     float       get_float(size_t column_ndx, size_t row_ndx) const noexcept;
     double      get_double(size_t column_ndx, size_t row_ndx) const noexcept;
     StringData  get_string(size_t column_ndx, size_t row_ndx) const noexcept;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
-    Timestamp     get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
+    Timestamp   get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
 
     template<class T> T get(size_t c, size_t r) const noexcept;
 
