@@ -1358,15 +1358,15 @@ ONLY(StringIndex_InsertLongPrefix) {
     CHECK_EQUAL(col.find_first(base2 + "b"), 4);
     CHECK_EQUAL(col.find_first(base2 + "c"), 5);
 
-    //col.clear();
-//
-//        // if that didn't work for you, let's try more.
-//        for (int i = 9408; i < 100000; ++i) {
-//            std::cout << "testing size " << i << "\n";
-//            std::string base_i(i, 'a');
-//            col.add(base_i + "b");
-//            col.add(base_i + "c");
-//        }
+    //col.clear(); // crash from Array::destroy_deep();
+
+    // if that didn't work for you, let's try more.
+    for (int i = 9408; i < 100000; ++i) {
+        std::cout << "testing size " << i << "\n";
+        std::string base_i(i, 'a');
+        col.add(base_i + "b");
+        col.add(base_i + "c");
+    }
 
     //TODO: check for other recursive functions such as do_update_ref(); do_delete();
 }
