@@ -43,14 +43,17 @@ class EncryptedFileMapping;
 
 /// Create the specified directory in the file system.
 ///
-/// \return True if the directory was created, or false if it already existed.
-///
-/// \throw File::AccessError If the directory could not be created for a reason
-/// other than it already existing. If the reason corresponds to one of the
-/// exception types that are derived from File::AccessError, the derived
-/// exception type is thrown (as long as the underlying system provides the
-/// information to unambiguously distinguish that particular reason).
-bool make_dir(const std::string& path);
+/// \throw File::AccessError If the directory could not be created. If
+/// the reason corresponds to one of the exception types that are
+/// derived from File::AccessError, the derived exception type is
+/// thrown (as long as the underlying system provides the information
+/// to unambiguously distinguish that particular reason).
+void make_dir(const std::string& path);
+
+/// Same as make_dir() except that this one returns false, rather than throwing
+/// an exception, if the specified directory already existed. If the directory
+// did not already exist and was newly created, this returns true.
+bool try_make_dir(const std::string& path);
 
 /// Remove the specified directory path from the file system. If the
 /// specified path is a directory, this function is equivalent to

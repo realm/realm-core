@@ -91,7 +91,7 @@ TestPathGuard::~TestPathGuard() noexcept
 TestDirGuard::TestDirGuard(const std::string& path):
     m_path(path)
 {
-    if (!make_dir(path)) {
+    if (!try_make_dir(path)) {
         clean_dir(path);
     }
 }

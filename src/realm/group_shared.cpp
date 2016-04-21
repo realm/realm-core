@@ -737,7 +737,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     m_db_path = path;
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
-    make_dir(m_coordination_dir);
+    try_make_dir(m_coordination_dir);
     m_key = encryption_key;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_group.m_alloc;
