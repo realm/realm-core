@@ -360,12 +360,14 @@ void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
 {
     bool is_null = ts.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
-    int32_t nanoseconds = ts.get_nanoseconds();
+    int32_t nanoseconds = is_null ? 0 : ts.get_nanoseconds();
 
     if (has_search_index()) {
         m_search_index->set(row_ndx, ts); // Throws
     }
 
+    // FIXME: Consider not updating the nanoseconds bptree in the case of setting null
+    // The current setting of 0 forces an arguably unnecessary copy-on-write etc of that leaf node.
     m_seconds->set(row_ndx, seconds); // Throws
     m_nanoseconds->set(row_ndx, nanoseconds); // Throws
 }
