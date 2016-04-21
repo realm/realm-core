@@ -40,7 +40,7 @@ struct Timestamp {
         return m_seconds;
     }
 
-    uint64_t get_nanoseconds() const noexcept
+    uint32_t get_nanoseconds() const noexcept
     {
         return m_nanoseconds;
     }
