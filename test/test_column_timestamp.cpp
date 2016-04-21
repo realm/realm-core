@@ -425,4 +425,20 @@ TEST(TimestampColumn_Operators)
 }
 #endif
 
+
+TEST(TimestampColumn_ForceReallocate)
+{
+    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    TimestampColumn c(Allocator::get_default(), ref);
+
+    uint32_t items_count = REALM_MAX_BPNODE_SIZE * 5;
+    for (uint32_t i = 0; i < items_count; ++i) {
+        c.add(Timestamp{i, i});
+    }
+
+    CHECK_EQUAL(c.size(), items_count);
+
+    c.destroy();
+}
+
 #endif // TEST_COLUMN_TIMESTAMP
