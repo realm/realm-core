@@ -36,10 +36,13 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
       m_linked_table(TableRef()),
       m_linked_column(src.m_linked_column),
       m_linked_row(src.m_linked_row),
-      m_linkview_source(LinkViewRef()),
-      m_query(src.m_query, patch.query_patch, mode)
+      m_linkview_source(LinkViewRef())
 {
     patch.was_in_sync = src.is_in_sync();
+    // m_query must be exported after patch.was_in_sync is updated
+    // as exporting m_query will bring src out of sync.
+    m_query = Query(src.m_query, patch.query_patch, mode);
+
     Table::generate_patch(src.m_table, patch.m_table);
     Table::generate_patch(src.m_linked_table, patch.linked_table);
     patch.linked_column = src.m_linked_column;
