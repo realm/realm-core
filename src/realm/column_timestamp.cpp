@@ -339,8 +339,8 @@ void TimestampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/
 void TimestampColumn::add(const Timestamp& ts)
 {
     bool is_null = ts.is_null();
-    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.m_seconds);
-    int32_t nanoseconds = is_null ? 0 : ts.m_nanoseconds;
+    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
+    int32_t nanoseconds = is_null ? 0 : ts.get_nanoseconds();
     m_seconds->insert(npos, seconds); // Throws
     m_nanoseconds->insert(npos, nanoseconds); // Throws
 
@@ -359,8 +359,8 @@ Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
 void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
 {
     bool is_null = ts.is_null();
-    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.m_seconds);
-    int32_t nanoseconds = ts.m_nanoseconds;
+    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
+    int32_t nanoseconds = ts.get_nanoseconds();
 
     if (has_search_index()) {
         m_search_index->set(row_ndx, ts); // Throws

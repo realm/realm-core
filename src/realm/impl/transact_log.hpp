@@ -722,8 +722,8 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
         }
         case type_Timestamp: {
             Timestamp ts= value.get_timestamp();
-            auto seconds = ts.m_seconds;
-            auto nano_seconds = ts.m_nanoseconds;
+            auto seconds = ts.get_seconds();
+            auto nano_seconds = ts.get_nanoseconds();
             auto numbers_3 = append(numbers_2, seconds);
             append_simple_instr(instr, append(numbers_3, nano_seconds)); // Throws
             return;
@@ -1102,7 +1102,7 @@ inline void TransactLogConvenientEncoder::set_olddatetime(const Table* t, size_t
 inline bool TransactLogEncoder::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
 {
     append_simple_instr(instr_SetTimestamp, util::tuple(col_ndx, ndx,
-                                                        value.m_seconds, value.m_nanoseconds)); // Throws
+                                                        value.get_seconds(), value.get_nanoseconds())); // Throws
     return true;
 }
 

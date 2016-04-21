@@ -34,7 +34,29 @@ struct Timestamp {
     Timestamp() : m_is_null(true) { }
 
     bool is_null() const { return m_is_null; }
-    
+
+    int64_t get_seconds() const noexcept
+    {
+        return m_seconds;
+    }
+
+    uint64_t get_nanoseconds() const noexcept
+    {
+        return m_nanoseconds;
+    }
+
+    void set_seconds(uint64_t seconds) noexcept
+    {
+        m_seconds = seconds;
+    }
+
+    void set_nanoseconds(uint64_t nanoseconds) noexcept
+    {
+        REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
+        m_nanoseconds = nanoseconds;
+    }
+
+
     // Note that nullability is handled by query system. These operators are only invoked for non-null dates.
     bool operator==(const Timestamp& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
     bool operator!=(const Timestamp& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
@@ -46,12 +68,12 @@ struct Timestamp {
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
+    static constexpr uint32_t nanoseconds_per_second = 1000000000;
 
+private:
     int64_t m_seconds;
     uint32_t m_nanoseconds;
     bool m_is_null;
-
-    static constexpr uint32_t nanoseconds_per_second = 1000000000;
 };
 
 template<class C, class T>

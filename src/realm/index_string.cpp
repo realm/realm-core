@@ -28,8 +28,8 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
     if (dt.is_null())
         return null{};
     
-    int64_t s = dt.m_seconds;
-    uint32_t ns = dt.m_nanoseconds;
+    int64_t s = dt.get_seconds();
+    uint32_t ns = dt.get_nanoseconds();
     const char* s_buf = reinterpret_cast<const char*>(&s);
     const char* ns_buf = reinterpret_cast<const char*>(&ns);
     std::copy(s_buf, s_buf + sizeof(int64_t), buffer.data());
