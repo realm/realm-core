@@ -8648,6 +8648,12 @@ TEST(Query_Timestamp)
     CHECK_EQUAL(match, 5);
 
     // Left-hand-side being Timestamp() constant, right being column
+    match = (Timestamp(111, 222) == first).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (Timestamp() == first).find();
+    CHECK_EQUAL(match, 3);
+
     match = (Timestamp(111, 222) > first).find();
     CHECK_EQUAL(match, 4);
 

@@ -62,12 +62,12 @@ struct Timestamp {
     // types (query_conditions.hpp) to ensure that all types sort and compare null vs. non-null in the same manner,
     // especially for int/float where we cannot override operators. This design is open for discussion, though, because
     // it has usability drawbacks
-    bool operator==(const Timestamp& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
-    bool operator!=(const Timestamp& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
-    bool operator>(const Timestamp& rhs) const { return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
-    bool operator<(const Timestamp& rhs) const { return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds); }
-    bool operator<=(const Timestamp& rhs) const { return *this < rhs || *this == rhs; }
-    bool operator>=(const Timestamp& rhs) const { return *this > rhs || *this == rhs; }
+    bool operator==(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
+    bool operator!=(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
+    bool operator>(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
+    bool operator<(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds); }
+    bool operator<=(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return *this < rhs || *this == rhs; }
+    bool operator>=(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return *this > rhs || *this == rhs; }
     Timestamp& operator=(const Timestamp& rhs) = default;
 
     template<class Ch, class Tr>
