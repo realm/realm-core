@@ -1,3 +1,16 @@
+# 0.98.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug, where handing over a TableView based on a Query restricted
+  by another TableView would fail to propagate synchronization status correctly
+  (issue #1698)
+
+**Note: This is a hotfix release. The above bugfix is not present
+        in version 0.99
+
+----------------------------------------------
+
 # 0.98.0 Release notes
 
 ### Enhancements:
