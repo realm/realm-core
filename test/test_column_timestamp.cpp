@@ -557,4 +557,13 @@ TEST(TimestampColumn_FindFirst)
     CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(-1, 0)), 5);
 }
 
+ONLY(TimestampColumn_AddColumnAfterRows)
+{
+    Table t;
+    t.add_column(type_Int, "1", false);
+    t.add_empty_row();
+    t.add_column(type_Timestamp, "2", false);
+    t.get_timestamp(1, 0).get_seconds();
+}
+
 #endif // TEST_COLUMN_TIMESTAMP
