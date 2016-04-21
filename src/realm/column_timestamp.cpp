@@ -157,10 +157,13 @@ void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
 {
     bool is_last = (row_ndx + num_rows_to_erase) == size();
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
+        // Update search index
+        // (it is important here that we do it before actually setting
+        //  the value, or the index would not be able to find the correct
+        //  position to update (as it looks for the old value))
         if (has_search_index()) {
             m_search_index->erase<StringData>(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
         }
-
         m_seconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
         m_nanoseconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
     }
@@ -170,7 +173,7 @@ void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     bool /*broken_reciprocal_backlinks*/)
 {
     size_t last_row_ndx = prior_num_rows - 1;
-    
+
     if (has_search_index()) {
         // remove the value to be overwritten from index
         bool is_last = true; // This tells StringIndex::erase() to not adjust subsequent indexes
@@ -226,6 +229,9 @@ void TimestampColumn::destroy() noexcept
     m_nanoseconds->destroy();
     if (m_array)
         m_array->destroy();
+
+    if (m_search_index)
+        m_search_index->destroy();
 }
 
 StringData TimestampColumn::get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
