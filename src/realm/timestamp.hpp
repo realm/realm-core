@@ -45,18 +45,6 @@ struct Timestamp {
         return m_nanoseconds;
     }
 
-    void set_seconds(uint64_t seconds) noexcept
-    {
-        m_seconds = seconds;
-    }
-
-    void set_nanoseconds(uint32_t nanoseconds) noexcept
-    {
-        REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
-        m_nanoseconds = nanoseconds;
-    }
-
-
     // Note that these operators do not work if one of the Timestamps are null! Please use realm::Greater, realm::Equal
     // etc instead. This is in order to collect all treatment of null behaviour in a single place for all 
     // types (query_conditions.hpp) to ensure that all types sort and compare null vs. non-null in the same manner,
