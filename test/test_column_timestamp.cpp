@@ -46,6 +46,7 @@ TEST(TimestampColumn_Basic)
     c.add(Timestamp(123,123));
     Timestamp ts = c.get(0);
     CHECK(ts == Timestamp(123, 123));
+    c.destroy();
 }
 
 TEST(TimestampColumn_Basic_Nulls)
@@ -92,7 +93,10 @@ TEST(TimestampColumn_Compare)
         ref_type ref = TimestampColumn::create(Allocator::get_default());
         TimestampColumn c2(Allocator::get_default(), ref);
         CHECK_NOT(c.compare(c2));
+        c2.destroy();
     }
+
+    c.destroy();
 }
 
 TEST(TimestampColumn_Index)
@@ -110,6 +114,7 @@ TEST(TimestampColumn_Index)
 
     CHECK_EQUAL(index->find_first(last_value), 99);
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
@@ -135,6 +140,7 @@ TEST(TimestampColumn_Set_Null_With_Index)
     c.set_null(0);
     CHECK(c.is_null(0));
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
@@ -151,6 +157,7 @@ TEST(TimestampColumn_Insert_Rows_With_Index)
     c.set(0, Timestamp{1, 1});
     c.insert_rows(1, 1, 1, true);
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
@@ -169,6 +176,7 @@ TEST(TimestampColumn_Move_Last_Over)
     c.move_last_row_over(0, 3, false);
     CHECK(c.is_null(0));
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
@@ -188,6 +196,7 @@ TEST(TimestampColumn_Clear)
     Timestamp last_value{3, 3};
     CHECK_EQUAL(c.get(0), last_value);
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
@@ -212,6 +221,7 @@ TEST(TimestampColumn_SwapRows)
     CHECK_EQUAL(c.get(2), one);
     CHECK_EQUAL(c.get(0), three);
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 
@@ -229,6 +239,7 @@ TEST(TimestampColumn_DeleteWithIndex)
     c.erase_rows(0, 1, 1, false);
     CHECK_EQUAL(c.size(), 0);
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 
@@ -248,6 +259,7 @@ TEST(TimestampColumn_DeleteAfterSetWithIndex)
     c.erase_rows(0, 1, 1, false);
     CHECK_EQUAL(c.size(), 0);
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
@@ -268,6 +280,7 @@ TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
     c.erase_rows(0, 1, 1, false);
     CHECK_EQUAL(c.size(), 2);
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
@@ -287,6 +300,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndex)
     c.erase_rows(0, 1, 1, false);
     CHECK_EQUAL(c.size(), 0);
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
@@ -306,6 +320,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
     CHECK_EQUAL(c.size(), 0);
     CHECK(index->is_empty());
 
+    index->destroy();
     c.destroy_search_index();
     c.destroy();
 }
