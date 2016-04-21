@@ -2,7 +2,9 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fixed a bug, where handing over a TableView based on a Query restricted
+  by another TableView would fail to propagate synchronization status correctly
+  (issue #1698)
 
 ### API breaking changes:
 
