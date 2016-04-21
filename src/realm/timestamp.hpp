@@ -45,18 +45,6 @@ struct Timestamp {
         return m_nanoseconds;
     }
 
-    void set_seconds(uint64_t seconds) noexcept
-    {
-        m_seconds = seconds;
-    }
-
-    void set_nanoseconds(uint32_t nanoseconds) noexcept
-    {
-        REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
-        m_nanoseconds = nanoseconds;
-    }
-
-
     // Note that nullability is handled by query system. These operators are only invoked for non-null dates.
     bool operator==(const Timestamp& rhs) const { return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
     bool operator!=(const Timestamp& rhs) const { return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
