@@ -310,7 +310,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
     c.destroy();
 }
 
-#if __cplusplus == 201402L || defined(_MSC_VER) // needs c++14 for auto arguments
+#if __cplusplus == 201402L || defined(REALM_HAVE_AT_LEAST_MSVC_11_2012) // needs c++14 for auto arguments
 TEST(TimestampColumn_Operators)
 {
     // Note that the Timestamp::operator==, operator>, operator<, operator>=, etc, do not work
