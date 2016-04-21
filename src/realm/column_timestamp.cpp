@@ -340,7 +340,7 @@ void TimestampColumn::add(const Timestamp& ts)
 {
     bool is_null = ts.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
-    int32_t nanoseconds = is_null ? 0 : ts.get_nanoseconds();
+    uint32_t nanoseconds = is_null ? 0 : ts.get_nanoseconds();
     m_seconds->insert(npos, seconds); // Throws
     m_nanoseconds->insert(npos, nanoseconds); // Throws
 
@@ -353,14 +353,14 @@ void TimestampColumn::add(const Timestamp& ts)
 Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
 {
     util::Optional<int64_t> seconds = m_seconds->get(row_ndx);
-    return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds->get(row_ndx))) : Timestamp();
+    return seconds ? Timestamp(*seconds, uint32_t(m_nanoseconds->get(row_ndx))) : Timestamp();
 }
 
 void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
 {
     bool is_null = ts.is_null();
     util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
-    int32_t nanoseconds = ts.get_nanoseconds();
+    uint32_t nanoseconds = ts.get_nanoseconds();
 
     if (has_search_index()) {
         m_search_index->set(row_ndx, ts); // Throws
