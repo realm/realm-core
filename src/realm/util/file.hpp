@@ -50,6 +50,11 @@ class EncryptedFileMapping;
 /// to unambiguously distinguish that particular reason).
 void make_dir(const std::string& path);
 
+/// Same as make_dir() except that this one returns false, rather than throwing
+/// an exception, if the specified directory already existed. If the directory
+// did not already exist and was newly created, this returns true.
+bool try_make_dir(const std::string& path);
+
 /// Remove the specified directory path from the file system. If the
 /// specified path is a directory, this function is equivalent to
 /// std::remove(const char*).

@@ -18,7 +18,8 @@
 
 ### Internals:
 
-* Lorem ipsum.
+* Opening a Realm file which already has a management directory no longer throws
+  and catches an exception.
 
 ----------------------------------------------
 
