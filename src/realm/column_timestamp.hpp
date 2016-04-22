@@ -79,8 +79,8 @@ public:
     void set(size_t row_ndx, const Timestamp& ts);
     bool compare(const TimestampColumn& c) const noexcept;
 
-    Timestamp maximum(size_t& result_index) const;
-    Timestamp minimum(size_t& result_index) const;
+    Timestamp maximum(size_t* result_index) const;
+    Timestamp minimum(size_t* result_index) const;
     size_t count(Timestamp) const;
     void erase(size_t row_ndx, bool is_last);
 
@@ -111,22 +111,26 @@ private:
     class CreateHandler;
 
     template <class Condition>
-    Timestamp minmax(size_t& result_index) const noexcept
+    Timestamp minmax(size_t* result_index) const noexcept
     {
         // Condition is realm::Greater for maximum and realm::Less for minimum.
 
         if (size() == 0) {
-            result_index = npos;
+            if (result_index)
+                *result_index = npos;
             return Timestamp();
         }
 
         Timestamp best = get(0);
-        result_index = 0;
+        if (result_index)
+            *result_index = 0;
 
         for (size_t i = 1; i < size(); ++i) {
-            if (Condition()(get(i), best, get(i).is_null(), best.is_null())) {
-                best = get(i);
-                result_index = i;
+            auto candidate = get(i);
+            if (Condition()(candidate, best, candidate.is_null(), best.is_null())) {
+                best = candidate;
+                if (result_index)
+                    *result_index = i;
             }
         }
         return best;

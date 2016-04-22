@@ -3547,7 +3547,7 @@ Timestamp Table::minimum_timestamp(size_t col_ndx, size_t* return_ndx) const
         return Timestamp();
 
     const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
-    return column.minimum(*return_ndx);
+    return column.minimum(return_ndx);
 }
 
 // maximum ----------------------------------------------
@@ -3622,7 +3622,7 @@ Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
         return Timestamp();
 
     const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
-    return column.maximum(*return_ndx);
+    return column.maximum(return_ndx);
 }
 
 
