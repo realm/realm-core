@@ -799,3 +799,26 @@ void TableViewBase::do_sync()
 
     m_last_seen_version = outside_version();
 }
+
+bool TableViewBase::is_in_table_order() const
+{
+    if (!m_table) {
+        return false;
+    }
+    else if (m_linkview_source) {
+        return false;
+    }
+    else if (m_table && m_linked_table) {
+        return false;
+    }
+    else if (!m_query.m_table) {
+        // TableView originated from Table::find_all().
+        return !m_sorting_predicate;
+    }
+    else if (m_query.produces_results_in_table_order()) {
+        return !m_sorting_predicate;
+    }
+    else {
+        return false;
+    }
+}
