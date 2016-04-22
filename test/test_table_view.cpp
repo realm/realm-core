@@ -1716,6 +1716,51 @@ TEST(TableView_BacklinksAfterMoveAssign)
     }
 }
 
+// Verify that a TableView that represents backlinks continues to track the correct row
+// when it moves within a table or is deleted.
+TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    source->add_column(type_Int, "int");
+
+    TableRef links = group.add_table("links");
+    size_t col_link = links->add_column_link(type_Link, "link", *source);
+    size_t col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
+
+    source->add_empty_row(3);
+
+    links->add_empty_row(3);
+    links->set_link(col_link, 0, 1);
+    LinkViewRef ll = links->get_linklist(col_linklist, 0);
+    ll->add(1);
+    ll->add(0);
+
+    links->set_link(col_link, 1, 1);
+    ll = links->get_linklist(col_linklist, 1);
+    ll->add(1);
+
+    links->set_link(col_link, 2, 0);
+
+    TableView tv_link = source->get_backlink_view(1, links.get(), col_link);
+    TableView tv_linklist = source->get_backlink_view(1, links.get(), col_linklist);
+
+    CHECK_EQUAL(tv_link.size(), 2);
+    CHECK_EQUAL(tv_linklist.size(), 2);
+
+    source->swap_rows(1, 0);
+    tv_link.sync_if_needed();
+    tv_linklist.sync_if_needed();
+
+    CHECK_EQUAL(tv_link.size(), 2);
+    CHECK_EQUAL(tv_linklist.size(), 2);
+
+    source->move_last_over(0);
+    CHECK(tv_link.depends_on_deleted_object());
+    CHECK(tv_linklist.depends_on_deleted_object());
+}
+
 
 TEST(TableView_Distinct)
 {
