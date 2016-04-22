@@ -12,7 +12,7 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* TableView can now report whether its rows are guaranteed to be in table order.
 
 -----------
 
