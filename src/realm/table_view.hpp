@@ -283,8 +283,8 @@ public:
     // it, it too will become outdated.
     bool is_in_sync() const;
 
-    // Tells if this TableView depends on a LinkList that has been deleted.
-    bool depends_on_deleted_linklist() const;
+    // Tells if this TableView depends on a LinkList or row that has been deleted.
+    bool depends_on_deleted_object() const;
 
     // Synchronize a view to match a table or tableview from which it
     // has been derived. Synchronization is achieved by rerunning the
@@ -344,8 +344,8 @@ protected:
     mutable TableRef m_linked_table;
     // The index of the link column that this view contain backlinks for.
     size_t m_linked_column;
-    // The index of the target row that rows in this view link to.
-    size_t m_linked_row;
+    // The target row that rows in this view link to.
+    ConstRow m_linked_row;
 
     // If this TableView was created from a LinkView, then this reference points to it. Otherwise it's 0
     mutable ConstLinkViewRef m_linkview_source;
@@ -379,7 +379,7 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
+    TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -614,7 +614,7 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(Table *parent, Table *linked_table, size_t column, size_t row_ndx);
+    TableView(Table *parent, Table *linked_table, size_t column, ConstRowExpr row);
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
@@ -818,12 +818,12 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
-inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t column, size_t row_ndx):
+inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
     m_linked_table(linked_table->get_table_ref()), // Throws
     m_linked_column(column),
-    m_linked_row(row_ndx),
+    m_linked_row(row),
     m_last_seen_version(m_table ? m_table->m_version : 0)
 {
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
@@ -1222,8 +1222,8 @@ inline TableView::TableView(Table& parent, Query& query, size_t start, size_t en
 {
 }
 
-inline TableView::TableView(Table *parent, Table *linked_table, size_t column, size_t row_ndx):
-    TableViewBase(parent, linked_table, column, row_ndx)
+inline TableView::TableView(Table *parent, Table *linked_table, size_t column, ConstRowExpr row):
+    TableViewBase(parent, linked_table, column, row)
 {
 }
 

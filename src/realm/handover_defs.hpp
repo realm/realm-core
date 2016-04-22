@@ -28,6 +28,7 @@ namespace realm {
 enum class ConstSourcePayload { Copy, Stay };
 enum class MutableSourcePayload { Move };
 
+struct RowBaseHandoverPatch;
 struct TableViewHandoverPatch;
 
 struct TableHandoverPatch {
@@ -57,8 +58,7 @@ struct QueryHandoverPatch {
 struct TableViewHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
     std::unique_ptr<TableHandoverPatch> linked_table;
-    size_t linked_column;
-    size_t linked_row;
+    std::unique_ptr<RowBaseHandoverPatch> linked_row;
     bool was_in_sync;
     QueryHandoverPatch query_patch;
     std::unique_ptr<LinkViewHandoverPatch> linkview_patch;
