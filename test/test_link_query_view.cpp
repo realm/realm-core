@@ -652,13 +652,13 @@ TEST(LinkList_QueryFindLinkTarget)
     CHECK_TABLE_VIEW(tv, {});
 
     tv = (table1->column<LinkList>(col_link3) != table2->get(2)).find_all();
-    CHECK_TABLE_VIEW(tv, {0, 2});
+    CHECK_TABLE_VIEW(tv, {0, 1});
 
     tv = (table1->column<LinkList>(col_link3) != table2->get(1)).find_all();
-    CHECK_TABLE_VIEW(tv, {2});
+    CHECK_TABLE_VIEW(tv, {0, 1});
 
     tv = (table1->column<LinkList>(col_link3) != table2->get(3)).find_all();
-    CHECK_TABLE_VIEW(tv, {0, 1, 2});
+    CHECK_TABLE_VIEW(tv, {0, 1});
 }
 
 
