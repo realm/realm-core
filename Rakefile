@@ -198,14 +198,14 @@ task :tmpdir do
 end
 
 task :guess_operating_system do
-    @operating_system = `uname`.chomp
+    @operating_system = `uname -s`.chomp
 end
 
 task :guess_num_processors => :guess_operating_system do
     if @operating_system == 'Darwin' or @operating_system == 'FreeBSD'
         @num_processors = `sysctl -n hw.ncpu`.chomp
     else # assume Linux
-        @num_processors = `cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l`.chomp
+        @num_processors = `grep -cE 'processor[[:space:]]*:' /proc/cpuinfo`.chomp
     end
 end
 
