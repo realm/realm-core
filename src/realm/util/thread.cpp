@@ -26,9 +26,9 @@
 #  include <unistd.h>
 #endif
 
-// "Process shared mutexes" are not officially supported on Android,
-// but they appear to work anyway.
-#if _POSIX_THREAD_PROCESS_SHARED > 0 || REALM_ANDROID
+// "Process shared mutexes" are not officially supported on Android or
+// FreeBSD, but they appear to work anyway.
+#if _POSIX_THREAD_PROCESS_SHARED > 0 || REALM_ANDROID || __FreeBSD__
 #  define REALM_HAVE_PTHREAD_PROCESS_SHARED
 #endif
 
