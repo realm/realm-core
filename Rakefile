@@ -202,7 +202,7 @@ task :guess_operating_system do
 end
 
 task :guess_num_processors => :guess_operating_system do
-    if @operating_system == 'Darwin'
+    if @operating_system == 'Darwin' or @operating_system == 'FreeBSD'
         @num_processors = `sysctl -n hw.ncpu`.chomp
     else # assume Linux
         @num_processors = `cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l`.chomp
