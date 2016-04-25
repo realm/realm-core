@@ -972,6 +972,10 @@ TEST(ColumnIntNull_Null)
 
             CHECK_EQUAL(a.get(0), default_value);
             CHECK_NOT(a.is_null(0));
+            a.insert(1); // default is null / none
+            CHECK_EQUAL(a.get(0), default_value);
+            CHECK_NOT(a.is_null(0));
+            CHECK(a.is_null(1));
             a.destroy();
         }
     }
