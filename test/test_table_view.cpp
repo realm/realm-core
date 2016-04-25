@@ -1756,7 +1756,11 @@ TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
     CHECK_EQUAL(tv_link.size(), 2);
     CHECK_EQUAL(tv_linklist.size(), 2);
 
+    CHECK(!tv_link.depends_on_deleted_object());
+    CHECK(!tv_linklist.depends_on_deleted_object());
+
     source->move_last_over(0);
+    
     CHECK(tv_link.depends_on_deleted_object());
     CHECK(tv_linklist.depends_on_deleted_object());
 }
