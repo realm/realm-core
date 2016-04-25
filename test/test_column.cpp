@@ -961,6 +961,22 @@ TEST(ColumnIntNull_Null)
     }
 
     {
+        constexpr int default_values[] = {0, 1, 3, 42};
+        constexpr size_t num_default_values = sizeof(default_values) / sizeof(default_values[0]);
+
+        for (size_t i = 0; i < num_default_values; ++i) {
+            int default_value = default_values[i];
+            // test that another default value (0) may be used
+            ref_type ref = IntNullColumn::create(Allocator::get_default(), Array::type_Normal, 1, default_value);
+            IntNullColumn a(Allocator::get_default(), ref);
+
+            CHECK_EQUAL(a.get(0), default_value);
+            CHECK_NOT(a.is_null(0));
+            a.destroy();
+        }
+    }
+
+    {
         ref_type ref = IntNullColumn::create(Allocator::get_default());
         IntNullColumn a(Allocator::get_default(), ref);
 
