@@ -121,7 +121,7 @@ namespace {
     }
 }
 
-int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming)
+int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming) const
 {
     // We just need any number -- it could have been `rand()`, but
     // random numbers are hard, and we don't want to risk locking mutices
@@ -139,7 +139,7 @@ int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming)
     }
 }
 
-bool ArrayIntNull::can_use_as_null(int64_t candidate)
+bool ArrayIntNull::can_use_as_null(int64_t candidate) const
 {
     return find_first(candidate) == npos;
 }
