@@ -902,6 +902,7 @@ TEST(LinkList_SortLinkView)
     table1->add_column(type_Float, "str1");
     table1->add_column(type_Double, "str1");
     table1->add_column(type_String, "str2");
+    table1->add_column(type_Timestamp, "ts");
 
     // add some rows
     table1->add_empty_row();
@@ -910,6 +911,7 @@ TEST(LinkList_SortLinkView)
     table1->set_float(2, 0, 300.f);
     table1->set_double(3, 0, 300.);
     table1->set_string(4, 0, "alfa");
+    table1->set_timestamp(5, 0, Timestamp(300, 300));
 
     table1->add_empty_row();
     table1->set_int(0, 1, 100);
@@ -917,6 +919,7 @@ TEST(LinkList_SortLinkView)
     table1->set_float(2, 1, 100.f);
     table1->set_double(3, 1, 100.);
     table1->set_string(4, 1, "alfa");
+    table1->set_timestamp(5, 1, Timestamp(100, 100));
 
     table1->add_empty_row();
     table1->set_int(0, 2, 200);
@@ -924,6 +927,7 @@ TEST(LinkList_SortLinkView)
     table1->set_float(2, 2, 200.f);
     table1->set_double(3, 2, 200.);
     table1->set_string(4, 2, "alfa");
+    table1->set_timestamp(5, 2, Timestamp(200, 200));
 
     size_t col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
     table2->add_empty_row();
@@ -938,6 +942,7 @@ TEST(LinkList_SortLinkView)
     lvr->add(1);
     lvr->add(2);
 
+    // Sort integer column
     lvr->sort(0);
     tv = lvr->get_sorted_view(0);
     CHECK_EQUAL(lvr->get(0).get_index(), 1);
@@ -947,6 +952,16 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 0);
 
+    // Sort Timestamp column
+    lvr->sort(5);
+    tv = lvr->get_sorted_view(0);
+    CHECK_EQUAL(lvr->get(0).get_index(), 1);
+    CHECK_EQUAL(lvr->get(1).get_index(), 2);
+    CHECK_EQUAL(lvr->get(2).get_index(), 0);
+    CHECK_EQUAL(tv.get(0).get_index(), 1);
+    CHECK_EQUAL(tv.get(1).get_index(), 2);
+    CHECK_EQUAL(tv.get(2).get_index(), 0);
+    
     lvr = table2->get_linklist(col_link2, 1);
     lvr->clear();
     lvr->add(2);
@@ -1431,7 +1446,7 @@ TEST(LinkList_QueryLinkNull)
     data_table->add_column_link(type_Link, "link", *data_table);
     data_table->add_column(type_Int, "int", true);
     data_table->add_column(type_Double, "double", true);
-    data_table->add_column(type_DateTime, "date", true);
+    data_table->add_column(type_OldDateTime, "date", true);
 
     // +-+--------+------+------+--------+------+
     // | |   0    |  1   |   2  |  3     |  4   |
@@ -1448,7 +1463,7 @@ TEST(LinkList_QueryLinkNull)
     data_table->set_link(1, 0, 0);
     data_table->set_int(2, 0, 1);
     data_table->set_double(3, 0, 1.0);
-    data_table->set_datetime(4, 0, DateTime(1));
+    data_table->set_olddatetime(4, 0, OldDateTime(1));
 
     data_table->add_empty_row();
     data_table->set_string(0, 1, realm::null());
@@ -1462,14 +1477,14 @@ TEST(LinkList_QueryLinkNull)
     data_table->set_link(1, 2, 1);
     data_table->set_int(2, 2, 2);
     data_table->set_double(3, 2, 2.0);
-    data_table->set_datetime(4, 2, DateTime(2));
+    data_table->set_olddatetime(4, 2, OldDateTime(2));
 
     CHECK_EQUAL(1, data_table->where().and_query(data_table->column<String>(0) == realm::null()).count());
     CHECK_EQUAL(2, data_table->where().and_query(data_table->column<String>(0) != realm::null()).count());
 
     CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Int>(2) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->column<Double>(3) == realm::null()).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<DateTime>(4) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->column<OldDateTime>(4) == realm::null()).count());
 
     CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<String>(0) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).count());
@@ -1481,8 +1496,8 @@ TEST(LinkList_QueryLinkNull)
     CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<Double>(3) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) != realm::null()).count());
 
-    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<DateTime>(4) == realm::null()).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<DateTime>(4) != realm::null()).count());
+    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<OldDateTime>(4) == realm::null()).count());
+    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<OldDateTime>(4) != realm::null()).count());
 
     CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
@@ -1612,16 +1627,16 @@ TEST(LinkList_QueryDateTime)
 
     table1->add_column_link(type_LinkList, "link", *table2);
 
-    table2->add_column(type_DateTime, "date");
+    table2->add_column(type_OldDateTime, "date");
 
     table2->add_empty_row();
-    table2->set_datetime(0, 0, DateTime(1));
+    table2->set_olddatetime(0, 0, OldDateTime(1));
 
     table1->add_empty_row();
     LinkViewRef lvr = table1->get_linklist(0, 0);
     lvr->add(0);
 
-    TableView tv = (table1->link(0).column<DateTime>(0) >= DateTime(1)).find_all();
+    TableView tv = (table1->link(0).column<OldDateTime>(0) >= OldDateTime(1)).find_all();
 
     CHECK_EQUAL(1, tv.size());
 }

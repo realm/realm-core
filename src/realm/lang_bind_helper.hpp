@@ -180,19 +180,14 @@ public:
 
     //@}
 
-    /// Returns the name of the specified data type as follows:
+    /// Returns the name of the specified data type. Examples:
     ///
     /// <pre>
     ///
-    ///   type_Int       ->  "int"
-    ///   type_Bool      ->  "bool"
-    ///   type_Float     ->  "float"
-    ///   type_Double    ->  "double"
-    ///   type_String    ->  "string"
-    ///   type_Binary    ->  "binary"
-    ///   type_DateTime  ->  "date"
-    ///   type_Table     ->  "table"
-    ///   type_Mixed     ->  "mixed"
+    ///   type_Int          ->  "int"
+    ///   type_Bool         ->  "bool"
+    ///   type_Float        ->  "float"
+    ///   ...
     ///
     /// </pre>
     static const char* get_data_type_name(DataType) noexcept;

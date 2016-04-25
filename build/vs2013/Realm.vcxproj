@@ -600,6 +600,7 @@
     <ClCompile Include="..\..\src\realm\array_string_long.cpp" />
     <ClCompile Include="..\..\src\realm\bptree.cpp" />
     <ClCompile Include="..\..\src\realm\column.cpp" />
+    <ClCompile Include="..\..\src\realm\column_timestamp.cpp" />
     <ClCompile Include="..\..\src\realm\column_link_base.cpp" />
     <ClCompile Include="..\..\src\realm\column_backlink.cpp" />
     <ClCompile Include="..\..\src\realm\column_binary.cpp" />
@@ -699,6 +700,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\test\test_column_timestamp.cpp" />
     <ClCompile Include="..\..\test\test_destroy_guard.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -1117,6 +1119,7 @@
     <ClInclude Include="..\..\src\realm\binary_data.hpp" />
     <ClInclude Include="..\..\src\realm\bptree.hpp" />
     <ClInclude Include="..\..\src\realm\column_backlink.hpp" />
+    <ClInclude Include="..\..\src\realm\column_timestamp.hpp" />
     <ClInclude Include="..\..\src\realm\column_link.hpp" />
     <ClInclude Include="..\..\src\realm\column_linkbase.hpp" />
     <ClInclude Include="..\..\src\realm\column_linklist.hpp" />
@@ -1140,6 +1143,7 @@
     <ClInclude Include="..\..\src\realm\query_expression.hpp" />
     <ClInclude Include="..\..\src\realm\string_data.hpp" />
     <ClInclude Include="..\..\src\realm\table_basic_fwd.hpp" />
+    <ClInclude Include="..\..\src\realm\timestamp.hpp" />
     <ClInclude Include="..\..\src\realm\unicode.hpp" />
     <ClInclude Include="..\..\src\realm\util\assert.hpp" />
     <ClInclude Include="..\..\src\realm\util\basic_system_errors.hpp" />
@@ -1171,7 +1175,7 @@
     <ClInclude Include="..\..\src\realm\column_type.hpp" />
     <ClInclude Include="..\..\src\realm\column_type_traits.hpp" />
     <ClInclude Include="..\..\src\realm\util\features.h" />
-    <ClInclude Include="..\..\src\realm\datetime.hpp" />
+    <ClInclude Include="..\..\src\realm\olddatetime.hpp" />
     <ClInclude Include="..\..\src\realm\group.hpp" />
     <ClInclude Include="..\..\src\realm\group_shared.hpp" />
     <ClInclude Include="..\..\src\realm\impl\continuous_transactions_history.hpp" />

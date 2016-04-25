@@ -119,15 +119,15 @@ REALM_TABLE_1(MySubtable,
               t, Subtable<MySubsubtable>)
 
 REALM_TABLE_9(MyTable,
-              my_int,       Int,
-              my_bool,      Bool,
-              my_float,     Float,
-              my_double,    Double,
-              my_string,    String,
-              my_binary,    Binary,
-              my_date_time, DateTime,
-              my_subtable,  Subtable<MySubtable>,
-              my_mixed,     Mixed)
+              my_int,         Int,
+              my_bool,        Bool,
+              my_float,       Float,
+              my_double,      Double,
+              my_string,      String,
+              my_binary,      Binary,
+              my_olddatetime, OldDateTime,
+              my_subtable,    Subtable<MySubtable>,
+              my_mixed,       Mixed)
 
 
 TEST(Replication_General)
@@ -220,6 +220,71 @@ void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& 
     rt_1.get_group().verify();
     rt_2.get_group().verify();
     CHECK(rt_1.get_group() == rt_2.get_group());
+}
+
+
+TEST(Replication_Timestamp)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.add_table("t");
+
+        // Add nullable Timestamp column
+        table->add_column(type_Timestamp, "ts", true);
+        
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("t");
+
+        // First row is to have a row that we can test move_last_over() on later
+        table->add_empty_row();
+        CHECK(table->get_timestamp(0, 0).is_null());
+
+        table->add_empty_row();
+        table->set_timestamp(0, 1, Timestamp(5, 6));
+        table->add_empty_row();
+        table->set_timestamp(0, 2, Timestamp(1, 2));
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("t");
+        
+        // Overwrite non-null with null to test that 
+        // TransactLogParser::parse_one(InstructionHandler& handler) correctly will see a set_null instruction
+        // and not a set_new_date instruction
+        table->set_timestamp(0, 1, Timestamp());
+
+        // Overwrite non-null with other non-null
+        table->set_timestamp(0, 2, Timestamp(3, 4));
+        wt.commit();
+    }
+    {
+        // move_last_over
+        WriteTransaction wt(sg_1);
+        TableRef table = wt.get_table("t");
+        table->move_last_over(0);
+        wt.commit();
+    }
+
+    std::unique_ptr<util::Logger> replay_logger;
+    SharedGroup sg_2(path_2);
+    repl.replay_transacts(sg_2, replay_logger.get());
+    {
+        ReadTransaction rt_1(sg_1);
+        rt_1.get_group().verify();
+        ConstTableRef table = rt_1.get_table("t");
+        CHECK_EQUAL(2, table->size());
+        CHECK(table->get_timestamp(0, 0) == Timestamp(3, 4));
+        CHECK(table->get_timestamp(0, 1).is_null());
+    }
 }
 
 
