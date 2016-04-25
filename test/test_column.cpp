@@ -932,6 +932,35 @@ TEST_IF(ColumnIntNull_PrependMany, TEST_DURATION >= 1)
 TEST(ColumnIntNull_Null)
 {
     {
+        // test that the default value is null / none
+        ref_type ref = IntNullColumn::create(Allocator::get_default());
+        IntNullColumn a(Allocator::get_default(), ref);
+
+        a.insert(0);
+        CHECK(a.is_null(0));
+        a.insert(1, 3);
+        CHECK(a.is_null(0));
+        CHECK_EQUAL(a.get(1), 3);
+        CHECK_NOT(a.is_null(1));
+
+        a.destroy();
+    }
+
+    {
+        // test that the default value is null / none
+        ref_type ref = IntNullColumn::create(Allocator::get_default(), Array::type_Normal, 1);
+        IntNullColumn a(Allocator::get_default(), ref);
+
+        CHECK(a.is_null(0));
+        a.insert(1, 3);
+        CHECK(a.is_null(0));
+        CHECK_EQUAL(a.get(1), 3);
+        CHECK_NOT(a.is_null(1));
+
+        a.destroy();
+    }
+
+    {
         ref_type ref = IntNullColumn::create(Allocator::get_default());
         IntNullColumn a(Allocator::get_default(), ref);
 
