@@ -9,6 +9,8 @@
   moves within its table. (Issue #1710)
 * Fixed incorrect semantics when comparing a LinkList column with a Row using a
   query expression. (Issue #1713)
+* Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
+  the target row has been deleted.
 
 ### API breaking changes:
 
