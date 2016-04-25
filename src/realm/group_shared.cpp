@@ -700,6 +700,14 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 
+namespace realm {
+namespace _impl {
+void REALM_CONCAT(please_rebuild_with_REALM_DEBUG_defined_as_, REALM_DEBUG_NOT)() {
+    // Do nothing.
+}
+} // namespace _impl
+} // namespace realm
+
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
 // According to the 'process-sharing example' in the POSIX man page
