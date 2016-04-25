@@ -320,8 +320,11 @@ public:
     void distinct(size_t column);
     void distinct(std::vector<size_t> columns);
 
-    // Actual sorting facility is provided by the base class:
-    using RowIndexes::sort;
+    // Returns whether the rows are guaranteed to be in table order.
+    // This is true only of unsorted TableViews created from either:
+    // - Table::find_all()
+    // - Query::find_all() when the query is not restricted to a view.
+    bool is_in_table_order() const;
 
     virtual ~TableViewBase() noexcept;
 
@@ -336,6 +339,10 @@ protected:
     uint64_t outside_version() const;
 
     void do_sync();
+
+    // Actual sorting facility is provided by the base class:
+    using RowIndexes::sort;
+
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 

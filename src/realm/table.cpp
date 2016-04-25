@@ -4076,7 +4076,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
 TableView Table::get_range_view(size_t begin, size_t end)
 {
-    REALM_ASSERT(!m_columns.is_attached() || end < size());
+    REALM_ASSERT(!m_columns.is_attached() || end <= size());
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
