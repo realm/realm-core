@@ -80,9 +80,9 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, val
             // For all other bit widths, we use the upper bound to represent null (also stored at index 0).
             int_fast64_t null_value = arr.m_ubound;
             if (val == null_value) {
-                arr.ensure_minimum_width(arr.m_ubound + 1); // Throws
-                null_value = arr.m_ubound;
                 // the initial value is equal to the existing upper bound, so expand to next bit width
+                int_fast64_t next_upper_bound = ubound_for_width(bit_width(arr.m_ubound + 1));
+                null_value = next_upper_bound;
             }
             arr.Array::set(0, null_value); // Throws
         }
