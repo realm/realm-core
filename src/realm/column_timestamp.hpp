@@ -32,7 +32,7 @@ public:
     TimestampColumn(Allocator& alloc, ref_type ref);
     ~TimestampColumn() noexcept override;
 
-    static ref_type create(Allocator& alloc, size_t size = 0);
+    static ref_type create(Allocator& alloc, size_t size, bool nullable);
 
     /// Get the number of entries in this column. This operation is relatively
     /// slow.

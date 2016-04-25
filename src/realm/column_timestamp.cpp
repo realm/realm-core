@@ -72,12 +72,13 @@ private:
 };
 
 
-ref_type TimestampColumn::create(Allocator& alloc, size_t size)
+ref_type TimestampColumn::create(Allocator& alloc, size_t size, bool nullable)
 {
     Array top(alloc);
     top.create(Array::type_HasRefs, false /* context_flag */, 2);
 
-    CreateHandler<BpTree<util::Optional<int64_t>>> create_handler{null{}, alloc};
+    util::Optional<int64_t> default_value = nullable ? util::none : util::make_optional<int64_t>(0);
+    CreateHandler<BpTree<util::Optional<int64_t>>> create_handler{default_value, alloc};
     ref_type seconds_ref = ColumnBase::create(alloc, size, create_handler);
 
     CreateHandler<BpTree<int64_t>> nano_create_handler{0, alloc};
@@ -131,10 +132,8 @@ void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, siz
     bool is_append = row_ndx == size();
     size_t row_ndx_or_npos = is_append ? realm::npos : row_ndx;
 
-    if (nullable)
-        m_seconds->insert(row_ndx_or_npos, null{}, num_rows_to_insert); // Throws
-    else
-        m_seconds->insert(row_ndx_or_npos, 0, num_rows_to_insert); // Throws
+    util::Optional<int64_t> default_value = nullable ? util::none : util::make_optional<int64_t>(0);
+    m_seconds->insert(row_ndx_or_npos, default_value, num_rows_to_insert); // Throws
     m_nanoseconds->insert(row_ndx_or_npos, 0, num_rows_to_insert); // Throws
 
     if (has_search_index()) {

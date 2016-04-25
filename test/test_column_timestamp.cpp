@@ -41,7 +41,7 @@ using namespace realm;
 
 TEST(TimestampColumn_Basic)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     c.add(Timestamp(123,123));
     Timestamp ts = c.get(0);
@@ -80,7 +80,7 @@ TEST(TimestampColumn_Relocate)
 
 TEST(TimestampColumn_Compare)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
 
     for (unsigned int i = 0; i < 10000; i++) {
@@ -90,7 +90,7 @@ TEST(TimestampColumn_Compare)
     CHECK(c.compare(c));
 
     {
-        ref_type ref = TimestampColumn::create(Allocator::get_default());
+        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
         TimestampColumn c2(Allocator::get_default(), ref);
         CHECK_NOT(c.compare(c2));
         c2.destroy();
@@ -101,7 +101,7 @@ TEST(TimestampColumn_Compare)
 
 TEST(TimestampColumn_Index)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -121,7 +121,7 @@ TEST(TimestampColumn_Index)
 
 TEST(TimestampColumn_Is_Nullable)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     CHECK(c.is_nullable());
     c.destroy();
@@ -129,7 +129,7 @@ TEST(TimestampColumn_Is_Nullable)
 
 TEST(TimestampColumn_Set_Null_With_Index)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     c.add(Timestamp{1, 1});
     CHECK(!c.is_null(0));
@@ -147,7 +147,7 @@ TEST(TimestampColumn_Set_Null_With_Index)
 
 TEST(TimestampColumn_Insert_Rows_With_Index)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
 
     StringIndex* index = c.create_search_index();
@@ -164,7 +164,7 @@ TEST(TimestampColumn_Insert_Rows_With_Index)
 
 TEST(TimestampColumn_Move_Last_Over)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -183,7 +183,7 @@ TEST(TimestampColumn_Move_Last_Over)
 
 TEST(TimestampColumn_Clear)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -203,7 +203,7 @@ TEST(TimestampColumn_Clear)
 
 TEST(TimestampColumn_StringIndex)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
 
     Timestamp first(123, 123);
@@ -279,7 +279,7 @@ TEST(TimestampColumn_StringIndex)
 
 TEST(TimestampColumn_SwapRows)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -305,7 +305,7 @@ TEST(TimestampColumn_SwapRows)
 
 TEST(TimestampColumn_DeleteWithIndex)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -325,7 +325,7 @@ TEST(TimestampColumn_DeleteWithIndex)
 // Bug found by AFL during development of TimestampColumn
 TEST(TimestampColumn_DeleteAfterSetWithIndex)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -344,7 +344,7 @@ TEST(TimestampColumn_DeleteAfterSetWithIndex)
 // Bug found by AFL during development of TimestampColumn
 TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -365,7 +365,7 @@ TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
 // Bug found by AFL during development of TimestampColumn
 TEST(TimestampColumn_LargeNegativeTimestampSearchIndex)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
 
     c.add(Timestamp{-1934556340879361, 0});
@@ -384,7 +384,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndex)
 
 TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
 
     c.add(Timestamp{-1934556340879361, 0});
@@ -508,7 +508,7 @@ TEST(TimestampColumn_Operators)
 
 TEST(TimestampColumn_ForceReallocate)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default());
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
     TimestampColumn c(Allocator::get_default(), ref);
 
     uint32_t items_count = REALM_MAX_BPNODE_SIZE * 5;
