@@ -6,17 +6,19 @@
   by another TableView would fail to propagate synchronization status correctly
   (issue #1698)
 * Fixed TableViews that represent backlinks to track the same row, even if that row
-  moves within its table.
+  moves within its table. (Issue #1710)
+* Fixed incorrect semantics when comparing a LinkList column with a Row using a
+  query expression. (Issue #1713)
 
 ### API breaking changes:
 
 * `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
   and will also return true if the target row of a `TableView` that represents backlinks
-  is deleted.
+  is deleted. (Issue #1710)
 
 ### Enhancements:
 
-* TableView can now report whether its rows are guaranteed to be in table order.
+* TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
 
 -----------
 
