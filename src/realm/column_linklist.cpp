@@ -352,6 +352,13 @@ void LinkListColumn::unregister_linkview()
     m_list_accessors_contains_tombstones = true;
 }
 
+// Derived class in order to open up for using make_shared to create a LinkView.
+class LinkViewDeriv : public LinkView {
+public:
+    LinkViewDeriv(Table* origin_table, LinkListColumn& ll, size_t row_ndx)
+        : LinkView(origin_table, ll, row_ndx) {}
+};
+
 std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
 {
     REALM_ASSERT_3(row_ndx, <, size());
@@ -371,8 +378,7 @@ std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
     }
 
     it->m_row_ndx = row_ndx;
-    std::shared_ptr<LinkView> ptr(
-        new LinkView(m_table, const_cast<LinkListColumn&>(*this), row_ndx)); // Throws
+    auto ptr = std::make_shared<LinkViewDeriv>(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
     it->m_list = ptr;
     return ptr;
 }

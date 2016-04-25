@@ -108,6 +108,9 @@ public:
 
     const Table& get_target_table() const noexcept;
     Table& get_target_table() noexcept;
+protected:
+    // constructor, not accessible to end users
+    LinkView(Table* origin_table, LinkListColumn&, size_t row_ndx);
 
 private:
     TableRef m_origin_table;
@@ -117,9 +120,6 @@ private:
     using HandoverPatch = LinkViewHandoverPatch;
     static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch);
     static LinkViewRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
-
-    // constructor (protected since it can only be used by friends)
-    LinkView(Table* origin_table, LinkListColumn&, size_t row_ndx);
 
     void detach();
     void set_origin_row_index(size_t row_ndx) noexcept;
