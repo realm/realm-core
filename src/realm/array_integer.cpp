@@ -146,7 +146,7 @@ bool ArrayIntNull::can_use_as_null(int64_t candidate)
 
 void ArrayIntNull::replace_nulls_with(int64_t new_null)
 {
-    int64_t old_null = Array::get(0);
+    int64_t old_null = null_value();
     Array::set(0, new_null);
     size_t i = 1;
     while (true) {
