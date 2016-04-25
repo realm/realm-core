@@ -302,7 +302,7 @@ ArrayIntNull::~ArrayIntNull() noexcept
 inline
 void ArrayIntNull::create(Type type, bool context_flag)
 {
-    MemRef r = create_array(type, context_flag, 0, 0, m_alloc);
+    MemRef r = create_array(type, context_flag, 0, util::none, m_alloc);
     init_from_mem(r);
 }
 
