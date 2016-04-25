@@ -961,6 +961,7 @@ TEST(ColumnIntNull_Null)
     }
 
     {
+        // IntNullColumn::create failed if the default value was an upper bound for any bit width (i.e. 0, 1, 3 below)
         constexpr int default_values[] = {0, 1, 3, 42};
         constexpr size_t num_default_values = sizeof(default_values) / sizeof(default_values[0]);
 
