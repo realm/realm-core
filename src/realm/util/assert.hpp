@@ -44,6 +44,8 @@
 #endif
 
 #define REALM_STRINGIFY(X) #X
+#define REALM_CONCAT2(X, Y) X ## Y
+#define REALM_CONCAT(X, Y) REALM_CONCAT2(X, Y)
 
 #define REALM_ASSERT_RELEASE_EX(condition, ...) \
     ((condition) ? static_cast<void>(0) : \
