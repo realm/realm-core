@@ -521,4 +521,40 @@ TEST(TimestampColumn_ForceReallocate)
     c.destroy();
 }
 
+TEST(TimestampColumn_FindFirst)
+{
+    Table t;
+    t.add_column(type_Timestamp, "date", true  /*nullable*/);
+    t.add_column(type_Timestamp, "date", false /*not nullable*/);
+
+    t.add_empty_row(10);
+    
+    t.set_timestamp(0, 0, Timestamp()); // null
+    t.set_timestamp(0, 1, Timestamp(0, 0));
+    t.set_timestamp(0, 2, Timestamp(1, 0));
+    t.set_timestamp(0, 3, Timestamp(0, 1));
+    t.set_timestamp(0, 4, Timestamp(1, 1));
+    t.set_timestamp(0, 5, Timestamp(-1, 0));
+
+    t.set_timestamp(1, 0, Timestamp(0, 0)); // null not possible, so insert (0, 0 instead)
+    t.set_timestamp(1, 1, Timestamp(0, 0));
+    t.set_timestamp(1, 2, Timestamp(1, 0));
+    t.set_timestamp(1, 3, Timestamp(0, 1));
+    t.set_timestamp(1, 4, Timestamp(1, 1));
+    t.set_timestamp(1, 5, Timestamp(-1, 0));
+
+    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp()), 0);
+    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(0, 0)), 1);
+    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(1, 0)), 2);
+    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(0, 1)), 3);
+    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(1, 1)), 4);
+    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(-1, 0)), 5);
+
+    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(0, 0)), 0);
+    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(1, 0)), 2);
+    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(0, 1)), 3);
+    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(1, 1)), 4);
+    CHECK_EQUAL(t.find_first_timestamp(1, Timestamp(-1, 0)), 5);
+}
+
 #endif // TEST_COLUMN_TIMESTAMP

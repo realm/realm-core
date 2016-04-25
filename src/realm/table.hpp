@@ -578,6 +578,7 @@ public:
     size_t    find_first_int(size_t column_ndx, int64_t value) const;
     size_t    find_first_bool(size_t column_ndx, bool value) const;
     size_t    find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
+    size_t    find_first_timestamp(size_t column_ndx, Timestamp value) const;
     size_t    find_first_float(size_t column_ndx, float value) const;
     size_t    find_first_double(size_t column_ndx, double value) const;
     size_t    find_first_string(size_t column_ndx, StringData value) const;

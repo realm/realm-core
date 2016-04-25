@@ -3695,6 +3695,18 @@ size_t Table::find_first_olddatetime(size_t col_ndx, OldDateTime value) const
         return find_first<OldDateTime>(col_ndx, value);
 }
 
+size_t Table::find_first_timestamp(size_t col_ndx, Timestamp value) const
+{
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
+
+    if (!m_columns.is_attached())
+        return not_found;
+
+    const TimestampColumn& column = get_column_timestamp(col_ndx);
+    return column.find<realm::Equal>(value, 0, column.size());
+}
+
 size_t Table::find_first_float(size_t col_ndx, float value) const
 {
     return find_first<Float>(col_ndx, value);
