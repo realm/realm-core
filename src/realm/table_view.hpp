@@ -295,8 +295,8 @@ public:
     // before any of the other access-methods whenever the view may have become
     // outdated.
     //
-    // This method will throw a DeletedLinkView exception if the TableView
-    // depends on a LinkList that was deleted from its table.
+    // This will make the TableView empty and in sync with the highest possible table version
+    // if the TableView depends on an object (LinkView or row) that has been deleted.
     uint_fast64_t sync_if_needed() const;
 
     // Set this undetached TableView to be a distinct view, and sync immediately.

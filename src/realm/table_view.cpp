@@ -764,11 +764,12 @@ void TableViewBase::do_sync()
     }
     else if (m_table && m_linked_table) {
         m_row_indexes.clear();
-        REALM_ASSERT(m_linked_row);
-        size_t linked_row_ndx = m_linked_row.get_index();
-        size_t backlink_count = m_linked_table->get_backlink_count(linked_row_ndx, *m_table, m_linked_column);
-        for (size_t i = 0; i < backlink_count; i++)
-            m_row_indexes.add(m_linked_table->get_backlink(linked_row_ndx, *m_table, m_linked_column, i));
+        if (m_linked_row.is_attached()) {
+            size_t linked_row_ndx = m_linked_row.get_index();
+            size_t backlink_count = m_linked_table->get_backlink_count(linked_row_ndx, *m_table, m_linked_column);
+            for (size_t i = 0; i < backlink_count; i++)
+                m_row_indexes.add(m_linked_table->get_backlink(linked_row_ndx, *m_table, m_linked_column, i));
+        }
     }
     // precondition: m_table is attached
     else if (!m_query.m_table) {
