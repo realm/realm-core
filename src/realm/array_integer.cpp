@@ -62,6 +62,8 @@ std::vector<int64_t> ArrayInteger::to_vector() const
     return v;
 }
 
+// if value does not contain an integer, then create an all 0 array with 0 also represeting null
+// if value contains an integer, make sure to pick a different integer to represent null
 MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, value_type value, Allocator& alloc)
 {
     int64_t val = value.value_or(0);
@@ -75,7 +77,14 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, val
             arr.Array::set(0, null_value); // Throws
         }
         else {
-            arr.Array::set(0, arr.m_ubound); // Throws
+            // For all other bit widths, we use the upper bound to represent null (also stored at index 0).
+            int_fast64_t null_value = arr.m_ubound;
+            if (val == null_value) {
+                arr.ensure_minimum_width(arr.m_ubound + 1); // Throws
+                null_value = arr.m_ubound;
+                // the initial value is equal to the existing upper bound, so expand to next bit width
+            }
+            arr.Array::set(0, null_value); // Throws
         }
     }
     dg.release();
