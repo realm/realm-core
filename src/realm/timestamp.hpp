@@ -26,8 +26,9 @@
 
 namespace realm {
 
-struct Timestamp {
-    Timestamp(int64_t seconds, uint32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false) 
+class Timestamp {
+public:
+    Timestamp(int64_t seconds, uint32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
     {
         REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
     }
