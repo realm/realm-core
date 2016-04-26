@@ -88,7 +88,8 @@ void MixedColumn::ensure_timestamp_column()
     if (m_timestamp_data)
         return;
 
-    ref_type ref = TimestampColumn::create(m_array->get_alloc(), 0, true /*nullable*/); // Throws
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(m_array->get_alloc(), 0, nullable); // Throws
     m_timestamp_data.reset(new TimestampColumn(m_array->get_alloc(), ref)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 3);
     m_array->add(ref); // Throws
