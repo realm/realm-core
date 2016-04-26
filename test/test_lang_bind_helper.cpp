@@ -11812,15 +11812,15 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
 // Bug found by AFL during development of TimestampColumn
 TEST_TYPES(LangBindHelper_AddEmptyRowsAndRollBackTimestamp, std::true_type, std::false_type)
 {
-    constexpr bool nullable = TEST_TYPE::value;
+    constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
     TableRef t = g.insert_table(0, "");
-    t->insert_column(0, DataType(0), "", nullable);
-    t->insert_column(1, DataType(8), "", nullable);
+    t->insert_column(0, DataType(0), "", nullable_toggle);
+    t->insert_column(1, DataType(8), "", nullable_toggle);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
     t->insert_empty_row(0, 224);
@@ -11832,7 +11832,7 @@ TEST_TYPES(LangBindHelper_AddEmptyRowsAndRollBackTimestamp, std::true_type, std:
 // Another bug found by AFL during development of TimestampColumn
 TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
 {
-    constexpr bool nullable = TEST_TYPE::value;
+    constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
@@ -11840,7 +11840,7 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
     LangBindHelper::promote_to_write(sg_w);
 
     TableRef t = g.add_table("");
-    t->add_column(DataType(8), "", nullable);
+    t->add_column(DataType(8), "", nullable_toggle);
 
     for (int i = 0; i < 27; ++i) {
         LangBindHelper::commit_and_continue_as_read(sg_w);
