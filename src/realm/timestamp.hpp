@@ -31,7 +31,7 @@ struct Timestamp {
     {
         REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
     }
-    Timestamp(null) : m_is_null(true) { }
+    Timestamp(realm::null) : m_is_null(true) { }
     Timestamp() : Timestamp(null{}) { }
 
     bool is_null() const { return m_is_null; }
