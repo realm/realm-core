@@ -92,7 +92,7 @@ TEST_TYPES(TimestampColumn_Compare, std::true_type, std::false_type)
     CHECK(c.compare(c));
 
     {
-        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
+        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
         TimestampColumn c2(Allocator::get_default(), ref);
         CHECK_NOT(c.compare(c2));
         c2.destroy();
