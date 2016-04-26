@@ -1763,6 +1763,24 @@ TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
     
     CHECK(tv_link.depends_on_deleted_object());
     CHECK(tv_linklist.depends_on_deleted_object());
+
+    CHECK(!tv_link.is_in_sync());
+    CHECK(!tv_linklist.is_in_sync());
+
+    tv_link.sync_if_needed();
+    tv_linklist.sync_if_needed();
+
+    CHECK(tv_link.is_in_sync());
+    CHECK(tv_linklist.is_in_sync());
+
+    CHECK_EQUAL(tv_link.size(), 0);
+    CHECK_EQUAL(tv_linklist.size(), 0);
+
+    source->add_empty_row();
+
+    // TableViews that depend on a deleted row will stay in sync despite modifications to their table.
+    CHECK(tv_link.is_in_sync());
+    CHECK(tv_linklist.is_in_sync());
 }
 
 
