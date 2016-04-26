@@ -1,3 +1,15 @@
+# 0.98.3 Release notes
+
+### Bugfixes:
+
+* Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
+  the target row has been deleted. (Issue #1723)
+
+**Note: This is a hotfix release built on top of 0.98.2. The above fixes are
+        not present in version 0.99**
+
+----------------------------------------------
+
 # 0.98.2 Release notes
 
 ### Bugfixes:
