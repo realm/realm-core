@@ -8641,6 +8641,9 @@ TEST(Query_Timestamp)
     match = (first != Timestamp(null{})).count();
     CHECK_EQUAL(match, 5);
 
+    match = (first != null{}).count();
+    CHECK_EQUAL(match, 5);
+
     match = (first != Timestamp(0, 0)).count();
     CHECK_EQUAL(match, 5);
 
