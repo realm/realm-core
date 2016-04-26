@@ -98,6 +98,8 @@ public:
             }
         }
 
+        explicit operator bool() const { return !m_column_indexes.empty(); }
+
         std::vector<size_t> m_column_indexes;
         std::vector<bool> m_ascending;
         std::vector<const ColumnTemplateBase*> m_columns;

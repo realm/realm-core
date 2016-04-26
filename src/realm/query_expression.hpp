@@ -2094,17 +2094,22 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
         LinkMap link_map = column->link_map();
         REALM_ASSERT(link_map.target_table() == row.get_table() || !row.is_attached());
 #ifdef REALM_OLDQUERY_FALLBACK
-        if (link_map.m_link_columns.size() == 1 &&
-            (link_map.m_link_types[0] == col_type_Link || link_map.m_link_types[0] == col_type_LinkList)) {
-            const Table* t = column->get_base_table();
-            Query query(*t);
+        if (link_map.m_link_columns.size() == 1) {
+            // We can fall back to Query::links_to for != and == operations on links, but only
+            // for == on link lists. This is because negating query.links_to(…) is equivalent to
+            // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
+            if (link_map.m_link_types[0] == col_type_Link ||
+                (link_map.m_link_types[0] == col_type_LinkList && std::is_same<Operator, Equal>::value)) {
+                const Table* t = column->get_base_table();
+                Query query(*t);
 
-            if (std::is_same<Operator, NotEqual>::value) {
-                // Negate the following `links_to`.
-                query.Not();
+                if (std::is_same<Operator, NotEqual>::value) {
+                    // Negate the following `links_to`.
+                    query.Not();
+                }
+                query.links_to(link_map.m_link_column_indexes[0], row);
+                return query;
             }
-            query.links_to(link_map.m_link_column_indexes[0], row);
-            return query;
         }
 #endif
     }

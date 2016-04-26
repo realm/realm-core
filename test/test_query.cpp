@@ -8431,15 +8431,15 @@ TEST(Query_ReferDeletedLinkView)
     // TableView that depends on LinkView soon to be deleted
     TableView tv_sorted = links->get_sorted_view(1);
 
-    // First test depends_on_deleted_linklist()
-    CHECK(!tv_sorted.depends_on_deleted_linklist());
+    // First test depends_on_deleted_object()
+    CHECK(!tv_sorted.depends_on_deleted_object());
     TableView tv2 = table->where(&tv).find_all();
-    CHECK(!tv2.depends_on_deleted_linklist());
+    CHECK(!tv2.depends_on_deleted_object());
 
     // Delete LinkList so LinkView gets detached
     table->move_last_over(0);
     CHECK(!links->is_attached());
-    CHECK(tv_sorted.depends_on_deleted_linklist());
+    CHECK(tv_sorted.depends_on_deleted_object());
 
     // See if "Query that depends on LinkView" returns sane "empty"-like values
     CHECK_EQUAL(q.find_all().size(), 0);

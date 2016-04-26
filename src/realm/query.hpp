@@ -282,6 +282,9 @@ public:
 
     TableRef& get_table() {return m_table;}
 
+    // True if matching rows are guaranteed to be returned in table order.
+    bool produces_results_in_table_order() const { return !m_view; }
+
     std::string validate();
 
 protected:

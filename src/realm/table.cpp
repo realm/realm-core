@@ -4220,7 +4220,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
 TableView Table::get_range_view(size_t begin, size_t end)
 {
-    REALM_ASSERT(!m_columns.is_attached() || end < size());
+    REALM_ASSERT(!m_columns.is_attached() || end <= size());
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
@@ -4239,7 +4239,7 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 
 TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_col_ndx)
 {
-    TableView tv(src_table, this, src_col_ndx, row_ndx);
+    TableView tv(src_table, this, src_col_ndx, get(row_ndx));
     tv.do_sync();
     return tv;
 }

@@ -5,20 +5,27 @@
 * Fixed a bug, where handing over a TableView based on a Query restricted
   by another TableView would fail to propagate synchronization status correctly
   (issue #1698)
+* Fixed TableViews that represent backlinks to track the same row, even if that row
+  moves within its table. (Issue #1710)
+* Fixed incorrect semantics when comparing a LinkList column with a Row using a
+  query expression. (Issue #1713)
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
+  and will also return true if the target row of a `TableView` that represents backlinks
+  is deleted. (Issue #1710)
 
 ### Enhancements:
 
-* Lorem ipsum.
+* TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
 
 -----------
 
 ### Internals:
 
-* Lorem ipsum.
+* Opening a Realm file which already has a management directory no longer throws
+  and catches an exception.
 
 ----------------------------------------------
 
@@ -73,6 +80,30 @@
 * New failure simulation features: Ability to prime for random triggering.
 
 * S: New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+
+----------------------------------------------
+
+# 0.98.2 Release notes
+
+### Bugfixes:
+
+* Fixed TableViews that represent backlinks to track the same row, even if that row
+  moves within its table. (Issue #1710)
+* Fixed incorrect semantics when comparing a LinkList column with a Row using a
+  query expression. (Issue #1713)
+
+### API breaking changes:
+
+* `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
+  and will also return true if the target row of a `TableView` that represents backlinks
+  is deleted. (Issue #1710)
+
+### Enhancements:
+
+* TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
+
+**Note: This is a hotfix release built on top of 0.98.1. The above fixes are
+        not present in version 0.99
 
 ----------------------------------------------
 
