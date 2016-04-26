@@ -571,8 +571,12 @@ TEST(TimestampColumn_AddColumnAfterRows)
     Table t;
     t.add_column(type_Int, "1", false);
     t.add_empty_row();
-    t.add_column(type_Timestamp, "2", false);
-    t.get_timestamp(1, 0).get_seconds();
+    t.add_column(type_Timestamp, "2", false /*non-nullable*/);
+    t.add_column(type_Timestamp, "3", true /*nullable*/);
+    CHECK_EQUAL(t.get_timestamp(1, 0).get_seconds(), 0);
+    CHECK_EQUAL(t.get_timestamp(1, 0).get_nanoseconds(), 0);
+    CHECK(t.get_timestamp(2, 0).is_null());
+    CHECK(t.is_null(2, 0));
 }
 
 #endif // TEST_COLUMN_TIMESTAMP
