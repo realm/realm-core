@@ -3482,56 +3482,69 @@ TEST(Table_Aggregates3)
         if (nullable) {
             // max
             pos = 123;
+            CHECK_EQUAL(table->maximum_int(0), 3);
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
             CHECK_EQUAL(pos, 2);
 
             pos = 123;
+            CHECK_EQUAL(table->maximum_float(1), 30.f);
             CHECK_EQUAL(table->maximum_float(1, &pos), 30.f);
             CHECK_EQUAL(pos, 2);
 
             pos = 123;
+            CHECK_EQUAL(table->maximum_double(2), 2.2);
             CHECK_EQUAL(table->maximum_double(2, &pos), 2.2);
             CHECK_EQUAL(pos, 1);
 
             pos = 123;
+            CHECK_EQUAL(table->maximum_olddatetime(3), OldDateTime(2016, 6, 6));
             CHECK_EQUAL(table->maximum_olddatetime(3, &pos), OldDateTime(2016, 6, 6));
             CHECK_EQUAL(pos, 2);
 
             pos = 123;
+            CHECK_EQUAL(table->maximum_timestamp(4), Timestamp(6, 6));
             CHECK_EQUAL(table->maximum_timestamp(4, &pos), Timestamp(6, 6));
             CHECK_EQUAL(pos, 2);
 
             // min
             pos = 123;
+            CHECK_EQUAL(table->minimum_int(0), 1);
             CHECK_EQUAL(table->minimum_int(0, &pos), 1);
             CHECK_EQUAL(pos, 0);
 
             pos = 123;
+            CHECK_EQUAL(table->minimum_float(1), 30.f);
             CHECK_EQUAL(table->minimum_float(1, &pos), 30.f);
             CHECK_EQUAL(pos, 2);
 
             pos = 123;
+            CHECK_EQUAL(table->minimum_double(2), 1.1);
             CHECK_EQUAL(table->minimum_double(2, &pos), 1.1);
             CHECK_EQUAL(pos, 0);
 
             pos = 123;
+            CHECK_EQUAL(table->minimum_olddatetime(3), OldDateTime(2016, 2, 2));
             CHECK_EQUAL(table->minimum_olddatetime(3, &pos), OldDateTime(2016, 2, 2));
             CHECK_EQUAL(pos, 0);
 
             pos = 123;
+            CHECK_EQUAL(table->minimum_timestamp(4), Timestamp(2, 2));
             CHECK_EQUAL(table->minimum_timestamp(4, &pos), Timestamp(2, 2));
             CHECK_EQUAL(pos, 0);
 
             // average
             count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(0), (1 + 3) / 2., 0.01);
             CHECK_APPROXIMATELY_EQUAL(table->average_int(0, &count), (1 + 3) / 2., 0.01);
             CHECK_EQUAL(count, 2);
 
             count = 123;
+            CHECK_EQUAL(table->average_float(1), 30.f);
             CHECK_EQUAL(table->average_float(1, &count), 30.f);
             CHECK_EQUAL(count, 1);
 
             count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(2), (1.1 + 2.2) / 2., 0.01);
             CHECK_APPROXIMATELY_EQUAL(table->average_double(2, &count), (1.1 + 2.2) / 2., 0.01);
             CHECK_EQUAL(count, 2);
 
