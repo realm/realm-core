@@ -62,6 +62,8 @@ std::vector<int64_t> ArrayInteger::to_vector() const
     return v;
 }
 
+// if value does not contain an integer, then create an all 0 array with 0 also represeting null
+// if value contains an integer, make sure to pick a different integer to represent null
 MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, value_type value, Allocator& alloc)
 {
     int64_t val = value.value_or(0);
@@ -75,7 +77,14 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, val
             arr.Array::set(0, null_value); // Throws
         }
         else {
-            arr.Array::set(0, arr.m_ubound); // Throws
+            // For all other bit widths, we use the upper bound to represent null (also stored at index 0).
+            int_fast64_t null_value = arr.m_ubound;
+            if (val == null_value) {
+                // the initial value is equal to the existing upper bound, so expand to next bit width
+                int_fast64_t next_upper_bound = ubound_for_width(bit_width(arr.m_ubound + 1));
+                null_value = next_upper_bound;
+            }
+            arr.Array::set(0, null_value); // Throws
         }
     }
     dg.release();
@@ -121,7 +130,7 @@ namespace {
     }
 }
 
-int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming)
+int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming) const
 {
     // We just need any number -- it could have been `rand()`, but
     // random numbers are hard, and we don't want to risk locking mutices
@@ -139,14 +148,14 @@ int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming)
     }
 }
 
-bool ArrayIntNull::can_use_as_null(int64_t candidate)
+bool ArrayIntNull::can_use_as_null(int64_t candidate) const
 {
     return find_first(candidate) == npos;
 }
 
 void ArrayIntNull::replace_nulls_with(int64_t new_null)
 {
-    int64_t old_null = Array::get(0);
+    int64_t old_null = null_value();
     Array::set(0, new_null);
     size_t i = 1;
     while (true) {
