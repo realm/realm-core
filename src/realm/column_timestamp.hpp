@@ -122,17 +122,17 @@ private:
         }
 
         Timestamp best = get(0);
-        if (result_index)
-            *result_index = 0;
+        size_t best_index = 0;
 
         for (size_t i = 1; i < size(); ++i) {
             Timestamp candidate = get(i);
             if (Condition()(candidate, best, candidate.is_null(), best.is_null())) {
                 best = candidate;
-                if (result_index)
-                    *result_index = i;
+                best_index = i;
             }
         }
+        if (result_index)
+            *result_index = best_index;
         return best;
     }
 };
