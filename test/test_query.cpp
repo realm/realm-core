@@ -8647,7 +8647,7 @@ TEST(Query_Timestamp)
     match = (first < Timestamp(-100, 0)).find();
     CHECK_EQUAL(match, 5);
 
-    // Left-hand-side being Timestamp(null{}) constant, right being column
+    // Left-hand-side being Timestamp() constant, right being column
     match = (Timestamp(111, 222) == first).find();
     CHECK_EQUAL(match, 0);
 
