@@ -52,10 +52,13 @@ TEST_TYPES(TimestampColumn_Basic, std::true_type, std::false_type)
 
 TEST(TimestampColumn_Basic_Nulls)
 {
+    constexpr bool nullable = true;
+    constexpr bool non_nullable = false;
+
     // Test that default value is null() for nullable column and non-null for non-nullable column
     Table t;
-    t.add_column(type_Timestamp, "date", false /*not nullable*/);
-    t.add_column(type_Timestamp, "date", true  /*nullable*/);
+    t.add_column(type_Timestamp, "date", non_nullable);
+    t.add_column(type_Timestamp, "date", nullable);
 
     t.add_empty_row();
     CHECK(!t.is_null(0, 0));
@@ -69,9 +72,11 @@ TEST(TimestampColumn_Basic_Nulls)
 
 TEST(TimestampColumn_Relocate)
 {
+    constexpr bool nullable = true;
+
     // Fill so much data in a column that it relocates, to check if relocation propagates up correctly
     Table t;
-    t.add_column(type_Timestamp, "date", true  /*nullable*/);
+    t.add_column(type_Timestamp, "date", nullable);
 
     for (unsigned int i = 0; i < 10000; i++) {
         t.add_empty_row();
@@ -124,7 +129,8 @@ TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
 
 TEST(TimestampColumn_Is_Nullable)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
     TimestampColumn c(Allocator::get_default(), ref);
     CHECK(c.is_nullable());
     c.destroy();
@@ -132,7 +138,8 @@ TEST(TimestampColumn_Is_Nullable)
 
 TEST(TimestampColumn_Set_Null_With_Index)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
     TimestampColumn c(Allocator::get_default(), ref);
     c.add(Timestamp{1, 1});
     CHECK(!c.is_null(0));
@@ -168,7 +175,8 @@ TEST_TYPES(TimestampColumn_Insert_Rows_With_Index, std::true_type, std::false_ty
 
 TEST(TimestampColumn_Move_Last_Over)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -208,7 +216,8 @@ TEST_TYPES(TimestampColumn_Clear, std::true_type, std::false_type)
 
 TEST(TimestampColumn_StringIndex)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
     TimestampColumn c(Allocator::get_default(), ref);
 
     Timestamp first(123, 123);
@@ -352,7 +361,8 @@ TEST_TYPES(TimestampColumn_DeleteAfterSetWithIndex, std::true_type, std::false_t
 // Bug found by AFL during development of TimestampColumn
 TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
     TimestampColumn c(Allocator::get_default(), ref);
     StringIndex* index = c.create_search_index();
     CHECK(index);
@@ -373,7 +383,8 @@ TEST(TimestampColumn_DeleteAfterSetNullWithIndex)
 // Bug found by AFL during development of TimestampColumn
 TEST(TimestampColumn_LargeNegativeTimestampSearchIndex)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
     TimestampColumn c(Allocator::get_default(), ref);
 
     c.add(Timestamp{-1934556340879361, 0});
@@ -392,7 +403,8 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndex)
 
 TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
 {
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, true /*nullable*/);
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
     TimestampColumn c(Allocator::get_default(), ref);
 
     c.add(Timestamp{-1934556340879361, 0});
@@ -532,9 +544,12 @@ TEST_TYPES(TimestampColumn_ForceReallocate, std::true_type, std::false_type)
 
 TEST(TimestampColumn_FindFirst)
 {
+    constexpr bool nullable = true;
+    constexpr bool non_nullable = false;
+
     Table t;
-    t.add_column(type_Timestamp, "date", true  /*nullable*/);
-    t.add_column(type_Timestamp, "date", false /*not nullable*/);
+    t.add_column(type_Timestamp, "date", nullable);
+    t.add_column(type_Timestamp, "date", non_nullable);
 
     t.add_empty_row(10);
     
@@ -568,11 +583,14 @@ TEST(TimestampColumn_FindFirst)
 
 TEST(TimestampColumn_AddColumnAfterRows)
 {
+    constexpr bool nullable = true;
+    constexpr bool non_nullable = false;
+
     Table t;
-    t.add_column(type_Int, "1", false);
+    t.add_column(type_Int, "1", non_nullable);
     t.add_empty_row();
-    t.add_column(type_Timestamp, "2", false /*non-nullable*/);
-    t.add_column(type_Timestamp, "3", true /*nullable*/);
+    t.add_column(type_Timestamp, "2", non_nullable);
+    t.add_column(type_Timestamp, "3", nullable);
     CHECK_EQUAL(t.get_timestamp(1, 0).get_seconds(), 0);
     CHECK_EQUAL(t.get_timestamp(1, 0).get_nanoseconds(), 0);
     CHECK(t.get_timestamp(2, 0).is_null());
