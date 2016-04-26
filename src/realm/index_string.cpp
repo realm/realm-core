@@ -381,7 +381,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             // not equal. Extend the tree until the prefix of these strings is different.
 
             key_type key_for_value = create_key(value, suboffset);
-            key_type key_for_v2 = create_key(value, suboffset);
+            key_type key_for_v2 = create_key(v2, suboffset);
             size_t start_offset = suboffset;
 
             // Fast forward suboffset until there is a difference in the strings
@@ -458,12 +458,49 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     }
 
     // The key matches, but there is a subindex here so go down a level in the tree.
-    StringIndex subindex(ref, m_array.get(), ins_pos_refs, m_target_column,
+    // The loop below optimizes out recursive calls via insert_with_offset to children
+    // which themselves contain another match at the next level (identical prefixes).
+    size_t sub_ndx_in_parent = ins_pos_refs;
+    key_type next_key = create_key(value, suboffset);
+    ref_type parent_array_ref = m_array->get_ref();
+
+    while (suboffset + index_key_length < value.size()) {
+        Array parent_array(alloc);
+        parent_array.init_from_ref(parent_array_ref);
+        StringIndex subindex(ref, &parent_array, sub_ndx_in_parent, m_target_column,
+                             m_deny_duplicate_values, alloc);
+        if (!subindex.m_array->is_inner_bptree_node()) { // Sub-StringIndices are store in leaf nodes
+            Array sub_values(alloc);
+            get_child(*(subindex.m_array.get()), 0, sub_values); // Index 0 is ref to values
+            size_t sub_ndx_to_check = sub_values.find_first(next_key); // Search in immediate children
+            if (sub_ndx_to_check != realm::npos) {
+                size_t sub_ndx_to_check_refs = sub_ndx_to_check + 1; // First index is ref to values array
+                int_fast64_t slot_value = subindex.m_array->get(sub_ndx_to_check_refs);
+                if ((slot_value & 1) == 0) { // Lowest bit NOT set indicates ref (to subindex or list).
+                    size_t next_ref = to_ref(slot_value);
+                    char* header = alloc.translate(next_ref);
+                    if (Array::get_context_flag_from_header(header)) { // Not a list. Therefore this match is a subindex.
+                        ref = next_ref;
+                        suboffset += index_key_length;
+                        next_key = create_key(value, suboffset);
+                        sub_ndx_in_parent = sub_ndx_to_check_refs;
+                        parent_array_ref = subindex.m_array->get_ref();
+                        continue;
+                    }
+                }
+            }
+        }
+        break;
+    }
+    Array parent_array(alloc);
+    parent_array.init_from_ref(parent_array_ref);
+    StringIndex subindex(ref, &parent_array, sub_ndx_in_parent, m_target_column,
                          m_deny_duplicate_values, alloc);
     subindex.insert_with_offset(row_ndx, value, suboffset);
 
     return true;
 }
+
 
 void StringIndex::distinct(IntegerColumn& result) const
 {

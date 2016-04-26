@@ -1327,7 +1327,7 @@ TEST(StringIndex_Deny_Duplicates)
 // for the characters at the end (they have an identical very
 // long prefix). This was causing a stack overflow because of
 // the recursive nature of the insert function.
-ONLY(StringIndex_InsertLongPrefix) {
+TEST(StringIndex_InsertLongPrefix) {
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, true);
 
@@ -1335,8 +1335,6 @@ ONLY(StringIndex_InsertLongPrefix) {
 
     col.add("test_index_string1");
     col.add("test_index_string2");
-
-    col.get_search_index()->do_dump_node_structure(std::cout, 0);
 
     CHECK_EQUAL(col.find_first("test_index_string1"), 0);
     CHECK_EQUAL(col.find_first("test_index_string2"), 1);
@@ -1348,9 +1346,6 @@ ONLY(StringIndex_InsertLongPrefix) {
     CHECK_EQUAL(col.find_first(base + "b"), 2);
     CHECK_EQUAL(col.find_first(base + "c"), 3);
 
-    for (size_t i = 0; i < col.size(); ++i) {
-        std::cout << col.get(i) << "\n";
-    }
     std::string base2(999408, 'a');
     col.add(base2 + "b");
     col.add(base2 + "c");
@@ -1361,14 +1356,14 @@ ONLY(StringIndex_InsertLongPrefix) {
     //col.clear(); // crash from Array::destroy_deep();
 
     // if that didn't work for you, let's try more.
-    for (int i = 9408; i < 100000; ++i) {
-        std::cout << "testing size " << i << "\n";
+    for (int i = 9408; i < 10000; ++i) {
         std::string base_i(i, 'a');
         col.add(base_i + "b");
         col.add(base_i + "c");
     }
 
     //TODO: check for other recursive functions such as do_update_ref(); do_delete();
+    //TODO: check moving long strings from list to subindex and reversed after removal
 }
 
 #endif // TEST_INDEX_STRING
