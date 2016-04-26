@@ -118,7 +118,7 @@ private:
         if (size() == 0) {
             if (result_index)
                 *result_index = npos;
-            return Timestamp();
+            return Timestamp(null{});
         }
 
         Timestamp best = get(0);

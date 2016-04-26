@@ -224,7 +224,7 @@ TEST(MixedColumn_Timestamp)
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
-    c.insert_timestamp(0, Timestamp());
+    c.insert_timestamp(0, Timestamp(null{}));
     c.insert_timestamp(1, Timestamp(100, 200));
     c.insert_timestamp(2, Timestamp(0, 0)); // Should *not* equal null
     c.insert_timestamp(3, Timestamp(-1000, 0));
@@ -388,7 +388,7 @@ TEST(MixedColumn_Mixed)
     c.set_subtable(5, 0);
     c.set_float(6, 1.124f);
     c.set_double(7, 1234.124);
-    c.set_timestamp(8, Timestamp());
+    c.set_timestamp(8, Timestamp(null{}));
     CHECK_EQUAL(9, c.size());
 
     CHECK_EQUAL(type_Timestamp, c.get_type(8));

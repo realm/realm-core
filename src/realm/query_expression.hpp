@@ -941,7 +941,7 @@ inline bool NullableVector<Timestamp>::is_null(size_t index) const
 template<>
 inline void NullableVector<Timestamp>::set_null(size_t index)
 {
-    m_first[index] = Timestamp();
+    m_first[index] = Timestamp(null{});
 }
 
 
