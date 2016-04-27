@@ -2,6 +2,15 @@
 
 ### Bugfixes:
 
+* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most 
+  likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
+  possibly also #1164 (crash in SharedGroup destructor on OS X).
+
+### API breaking changes:
+
+* The return value for LangBindHelper::get_linklist_ptr() and the argument
+  to LangBindHelper::unbind_linklist_ptr has changed from being a 'LinkView*'
+  into a 'const LinkViewRef&'.
 * Fixed a bug, where handing over a TableView based on a Query restricted
   by another TableView would fail to propagate synchronization status correctly
   (issue #1698)
@@ -11,9 +20,6 @@
   query expression. (Issue #1713)
 * Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
   the target row has been deleted.
-
-### API breaking changes:
-
 * `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
   and will also return true if the target row of a `TableView` that represents backlinks
   is deleted. (Issue #1710)

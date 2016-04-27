@@ -93,18 +93,21 @@ protected:
 private:
     struct list_entry {
         size_t m_row_ndx;
-        LinkView* m_list;
+        std::weak_ptr<LinkView> m_list;
         bool operator<(const list_entry& other) const { return m_row_ndx < other.m_row_ndx; }
     };
 
-    // The accessors stored in `m_list_accessors` are sorted by their row index. When an accessor is unregistered,
-    // its entry is replaced by a tombstone (an entry with a null `m_list`). These tombstones are pruned at a later
-    // time by `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost of `std::vector::erase` that
-    // would otherwise be incurred each time an accessor is removed.
+    // The accessors stored in `m_list_accessors` are sorted by their row index.
+    // When a LinkList accessor is destroyed because the last shared_ptr pointing
+    // to it dies, its entry is implicitly replaced by a tombstone (an entry with 
+    // an empty `m_list`). These tombstones are pruned at a later time by 
+    // `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost 
+    // of `std::vector::erase` that would otherwise be incurred each time an 
+    // accessor is removed.
     mutable std::vector<list_entry> m_list_accessors;
-    mutable bool m_list_accessors_contains_tombstones = false;
+    mutable std::atomic<bool> m_list_accessors_contains_tombstones;
 
-    LinkView* get_ptr(size_t row_ndx) const;
+    std::shared_ptr<LinkView> get_ptr(size_t row_ndx) const;
 
     void do_nullify_link(size_t row_ndx, size_t old_target_row_ndx) override;
     void do_update_link(size_t row_ndx, size_t old_target_row_ndx,
@@ -112,7 +115,7 @@ private:
     void do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
                       size_t target_row_ndx_2) override;
 
-    void unregister_linkview(const LinkView& view);
+    void unregister_linkview();
     ref_type get_row_ref(size_t row_ndx) const noexcept;
     void set_row_ref(size_t row_ndx, ref_type new_ref);
     void add_backlink(size_t target_row, size_t source_row);
@@ -192,14 +195,12 @@ inline size_t LinkListColumn::get_link_count(size_t row_ndx) const noexcept
 
 inline ConstLinkViewRef LinkListColumn::get(size_t row_ndx) const
 {
-    LinkView* link_list = get_ptr(row_ndx); // Throws
-    return ConstLinkViewRef(link_list);
+    return get_ptr(row_ndx);
 }
 
 inline LinkViewRef LinkListColumn::get(size_t row_ndx)
 {
-    LinkView* link_list = get_ptr(row_ndx); // Throws
-    return LinkViewRef(link_list);
+    return get_ptr(row_ndx);
 }
 
 inline bool LinkListColumn::is_null(size_t) const noexcept

@@ -388,7 +388,10 @@ private:
     mutable util::Buffer<size_t> m_subtab_path_buf;
     mutable const Table*    m_selected_table;
     mutable const Spec*     m_selected_spec;
-    mutable const LinkView* m_selected_link_list;
+    // Has to be atomic to support concurrent reset when a linklist
+    // is unselected. This can happen on a different thread. In case
+    // of races, setting of a new value must win.
+    mutable std::atomic<const LinkView*> m_selected_link_list;
 
     void unselect_all() noexcept;
     void select_table(const Table*); // unselects descriptor and link list
@@ -763,6 +766,7 @@ inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
     m_selected_table     = nullptr;
     m_selected_spec      = nullptr;
+    // no race with on_link_list_destroyed since both are setting to nullptr
     m_selected_link_list = nullptr;
 }
 
@@ -771,6 +775,7 @@ inline void TransactLogConvenientEncoder::select_table(const Table* table)
     if (table != m_selected_table)
         do_select_table(table); // Throws
     m_selected_spec      = nullptr;
+    // no race with on_link_list_destroyed since both are setting to nullptr
     m_selected_link_list = nullptr;
 }
 
@@ -779,13 +784,22 @@ inline void TransactLogConvenientEncoder::select_desc(const Descriptor& desc)
     typedef _impl::DescriptorFriend df;
     if (&df::get_spec(desc) != m_selected_spec)
         do_select_desc(desc); // Throws
+    // no race with on_link_list_destroyed since both are setting to nullptr
     m_selected_link_list = nullptr;
 }
 
 inline void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
 {
-    if (&list != m_selected_link_list)
+    // A race between this and a call to on_link_list_destroyed() must
+    // end up with m_selected_link_list pointing to the list argument given
+    // here. We assume that the list given to on_link_list_destroyed() can
+    // *never* be the same as the list argument given here. We resolve the
+    // race by a) always updating m_selected_link_list in do_select_link_list()
+    // and b) only atomically and conditionally updating it in 
+    // on_link_list_destroyed().
+    if (&list != m_selected_link_list) {
         do_select_link_list(list); // Throws
+    }
     m_selected_spec = nullptr;
 }
 
@@ -1442,8 +1456,12 @@ inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) noexc
 
 inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) noexcept
 {
-    if (m_selected_link_list == &list)
-        m_selected_link_list = nullptr;
+    const LinkView* lw_ptr = &list;
+    // atomically clear m_selected_link_list iff it already points to 'list':
+    // (lw_ptr will be modified if the swap fails, but we ignore that)
+    m_selected_link_list.compare_exchange_strong(lw_ptr, nullptr,
+                                                 std::memory_order_relaxed,
+                                                 std::memory_order_relaxed);
 }
 
 

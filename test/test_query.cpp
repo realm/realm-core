@@ -8555,12 +8555,12 @@ TEST(Query_MoveDoesntDoubleDelete)
     Table table;
 
     {
-        Query q1(table, std::unique_ptr<TableView>(new TableView()));
+        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
         Query q2 = std::move(q1);
     }
 
     {
-        Query q1(table, std::unique_ptr<TableView>(new TableView()));
+        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
         Query q2;
         q2 = std::move(q1);
     }
