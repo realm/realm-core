@@ -28,6 +28,32 @@ namespace realm {
 
 class Timestamp {
 public:
+    // Construct from the number of seconds and nanoseconds since the UNIX epoch: 00:00:00 UTC on 1 January 1970
+    //
+    // To split a native nanosecond representation, only division and modulo are necessary:
+    //
+    //     s = native_nano / nanoseconds_per_second
+    //     n = native_nano % nanoseconds_per_second
+    //     Timestamp ts(s, n);
+    //
+    // To convert back into native nanosecond representation, simple multiply and add:
+    //
+    //     native_nano = ts.s * nanoseconds_per_second + ts.n
+    //
+    // Specifically this allows the nanosecond part to become negative (only) for Timestamps before the UNIX epoch.
+    // Usually this will not need special attention, but for reference, valid Timestamps will have one of the
+    // following sign combinations:
+    //
+    //    s | n
+    //    -----
+    //    + | +
+    //    + | 0
+    //    0 | +
+    //    0 | 0
+    //    0 | -
+    //    - | 0
+    //    - | -
+    //
     Timestamp(int64_t seconds, int32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
     {
         const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
