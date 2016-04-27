@@ -28,9 +28,6 @@ namespace realm {
 
 class Timestamp {
 public:
-    // Construct from the number of seconds and nanoseconds since the UNIX epoch: 00:00:00 UTC on 1 January 1970
-    // To represent time before the epoch in a canonical and unambiguous way, only the seconds part may be negative.
-    // E.g. 2,5 seconds before the epoch is represented as (-3 seconds, +500000000 nanoseconds).
     Timestamp(int64_t seconds, uint32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
     {
         REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
