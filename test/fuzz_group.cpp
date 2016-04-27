@@ -434,7 +434,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
                             const bool correct_timestamp = both_non_negative || both_non_positive;
                             if (!correct_timestamp) {
-                                nanoseconds *= -1;
+                                nanoseconds = -nanoseconds;
                             }
                             Timestamp value{ seconds, nanoseconds };
                             if (log) {
