@@ -25,8 +25,8 @@
 namespace realm {
 
 class LinkView;
-typedef std::shared_ptr<LinkView> LinkViewRef;
-typedef std::shared_ptr<const LinkView> ConstLinkViewRef;
+using LinkViewRef = std::shared_ptr<LinkView>;
+using ConstLinkViewRef = std::shared_ptr<const LinkView>;
 
 } // namespace realm
 

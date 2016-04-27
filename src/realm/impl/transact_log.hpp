@@ -1457,6 +1457,8 @@ inline void TransactLogConvenientEncoder::on_spec_destroyed(const Spec* s) noexc
 inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView& list) noexcept
 {
     const LinkView* lw_ptr = &list;
+    // atomically clear m_selected_link_list iff it already points to 'list':
+    // (lw_ptr will be modified if the swap fails, but we ignore that)
     m_selected_link_list.compare_exchange_strong(lw_ptr, nullptr,
                                                  std::memory_order_relaxed,
                                                  std::memory_order_relaxed);

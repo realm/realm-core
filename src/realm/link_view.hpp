@@ -108,11 +108,10 @@ public:
 
     const Table& get_target_table() const noexcept;
     Table& get_target_table() noexcept;
-protected:
-    // constructor, not accessible to end users
-    LinkView(Table* origin_table, LinkListColumn&, size_t row_ndx);
 
 private:
+    struct ctor_cookie {};
+
     TableRef m_origin_table;
     LinkListColumn& m_origin_column;
     mutable size_t m_ref_count;
@@ -143,6 +142,8 @@ private:
 #ifdef REALM_DEBUG
     void verify(size_t row_ndx) const;
 #endif
+    // allocate using make_shared:
+    static std::shared_ptr<LinkView> create(Table* origin_table, LinkListColumn&, size_t row_ndx);
 
     friend class _impl::LinkListFriend;
     friend class LinkListColumn;
@@ -150,12 +151,17 @@ private:
     friend class SharedGroup;
     friend class Query;
     friend class TableViewBase;
+
+    // must be public for use by make_shared, but cannot be called from outside,
+    // because ctor_cookie is private
+public:
+    LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn&, size_t row_ndx);
 };
 
 
 // Implementation
 
-inline LinkView::LinkView(Table* origin_table, LinkListColumn& column, size_t row_ndx):
+inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn& column, size_t row_ndx):
     RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()), // Throws
     m_origin_table(origin_table->get_table_ref()),
     m_origin_column(column),
@@ -165,6 +171,12 @@ inline LinkView::LinkView(Table* origin_table, LinkListColumn& column, size_t ro
     root.set_parent(&column, row_ndx);
     if (ref_type ref = root.get_ref_from_parent())
         root.init_from_ref(ref);
+}
+
+inline std::shared_ptr<LinkView> 
+LinkView::create(Table* origin_table, LinkListColumn& column, size_t row_ndx)
+{
+    return std::make_shared<LinkView>(ctor_cookie(), origin_table, column, row_ndx);
 }
 
 inline LinkView::~LinkView() noexcept

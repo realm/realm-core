@@ -103,8 +103,8 @@ public:
     static void set_mixed_subtable(Table& parent, size_t col_ndx, size_t row_ndx,
                                    const Table& source);
 
-    static LinkViewRef* get_linklist_ptr(Row&, size_t col_ndx);
-    static void unbind_linklist_ptr(LinkViewRef*);
+    static const LinkViewRef& get_linklist_ptr(Row&, size_t col_ndx);
+    static void unbind_linklist_ptr(const LinkViewRef&);
 
     using VersionID = SharedGroup::VersionID;
 
@@ -329,15 +329,15 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, size_t col_ndx,
     parent.set_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
-inline LinkViewRef* LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)
+inline const LinkViewRef& LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)
 {
     LinkViewRef* link_view = new LinkViewRef(row.get_linklist(col_ndx));
-    return link_view;
+    return *link_view;
 }
 
-inline void LangBindHelper::unbind_linklist_ptr(LinkViewRef* link_view)
+inline void LangBindHelper::unbind_linklist_ptr(const LinkViewRef& link_view)
 {
-    delete link_view;
+    delete (&link_view);
 }
 
 inline void LangBindHelper::advance_read(SharedGroup& sg, VersionID version)

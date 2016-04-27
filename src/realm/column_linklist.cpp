@@ -352,12 +352,6 @@ void LinkListColumn::unregister_linkview()
     m_list_accessors_contains_tombstones = true;
 }
 
-// Derived class in order to open up for using make_shared to create a LinkView.
-class LinkViewDeriv : public LinkView {
-public:
-    LinkViewDeriv(Table* origin_table, LinkListColumn& ll, size_t row_ndx)
-        : LinkView(origin_table, ll, row_ndx) {}
-};
 
 std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
 {
@@ -369,7 +363,7 @@ std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
     key.m_row_ndx = row_ndx;
     auto it = std::lower_bound(m_list_accessors.begin(), m_list_accessors.end(), key);
     if (it != m_list_accessors.end() && it->m_row_ndx == row_ndx) {
-        auto p = it->m_list.lock();
+        std::shared_ptr<LinkView> p = it->m_list.lock();
         if (p)
             return p;
     }
@@ -378,7 +372,7 @@ std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
     }
 
     it->m_row_ndx = row_ndx;
-    auto ptr = std::make_shared<LinkViewDeriv>(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
+    auto ptr = LinkView::create(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
     it->m_list = ptr;
     return ptr;
 }
@@ -425,7 +419,7 @@ void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 
     LinkColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     for (auto& entry : m_list_accessors) {
-        auto p = entry.m_list.lock();
+        std::shared_ptr<LinkView> p = entry.m_list.lock();
         if (p)
             p->refresh_accessor_tree(entry.m_row_ndx);
     }
@@ -479,7 +473,7 @@ void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) n
     for (; it != end; ++it) {
         it->m_row_ndx += num_rows_inserted;
         if (fix_ndx_in_parent) {
-            auto p = it->m_list.lock();
+            std::shared_ptr<LinkView> p = it->m_list.lock();
             if (p)
                 p->set_origin_row_index(it->m_row_ndx);
         }
@@ -507,7 +501,7 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
     for (auto it = erased_end; it != end; ++it) {
         it->m_row_ndx -= num_rows_erased;
         if (fix_ndx_in_parent) {
-            auto p = it->m_list.lock();
+            std::shared_ptr<LinkView> p = it->m_list.lock();
             if (p)
                 p->set_origin_row_index(it->m_row_ndx);
         }
@@ -547,7 +541,7 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
     if (from != end && from->m_row_ndx == from_row_ndx) {
         from->m_row_ndx = to_row_ndx;
         if (fix_ndx_in_parent) {
-            auto p = from->m_list.lock();
+            std::shared_ptr<LinkView> p = from->m_list.lock();
             if (p)
                 p->set_origin_row_index(to_row_ndx);
         }
@@ -645,7 +639,7 @@ void LinkListColumn::update_from_parent(size_t old_baseline) noexcept
     prune_list_accessor_tombstones();
 
     for (auto& list_accessor : m_list_accessors) {
-        auto p = list_accessor.m_list.lock();
+        std::shared_ptr<LinkView> p = list_accessor.m_list.lock();
         if (p)
             p->update_from_parent(old_baseline);
     }
@@ -672,7 +666,11 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
     if (!had_tombstones)
         return;
     // While we scan through and remove tombstones, new one may be generated.
-    // this is ok.
+    // this is ok, because it does not actually change the list. Tombstones are
+    // represented by expired weak_ptrs. This also implies, that after a call
+    // to prune_list_accessor_tombstones() there is *no* guarantee that all tombstones
+    // have been removed. It is merely a best effort at reducing the size of the
+    // vector.
     auto remove_from = std::remove_if(m_list_accessors.begin(), m_list_accessors.end(), [](const list_entry& e) {
             return e.m_list.expired();
     });
