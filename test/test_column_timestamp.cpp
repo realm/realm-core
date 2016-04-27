@@ -624,21 +624,21 @@ TEST(TimestampColumn_AggregateBug)
 
     t.set_timestamp(0, 2, Timestamp(1, 0));
 
-    ts = t.where().maximum_timestamp(0, nullptr, 0, size_t(-1), size_t(-1), &index);
+    ts = t.where().maximum_timestamp(0, &index);
     CHECK_EQUAL(2, index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 
-    ts = t.where().minimum_timestamp(0, nullptr, 0, size_t(-1), size_t(-1), &index);
+    ts = t.where().minimum_timestamp(0, &index);
     CHECK_EQUAL(2, index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 
     t.set_timestamp(0, 3, Timestamp(1, 1));
 
-    ts = t.where().maximum_timestamp(0, nullptr, 0, size_t(-1), size_t(-1), &index);
+    ts = t.where().maximum_timestamp(0, &index);
     CHECK_EQUAL(3, index);
     CHECK_EQUAL(ts, Timestamp(1, 1));
 
-    ts = t.where().minimum_timestamp(0, nullptr, 0, size_t(-1), size_t(-1), &index);
+    ts = t.where().minimum_timestamp(0, &index);
     CHECK_EQUAL(2, index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
 
