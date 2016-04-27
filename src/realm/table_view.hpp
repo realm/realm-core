@@ -295,8 +295,8 @@ public:
     // before any of the other access-methods whenever the view may have become
     // outdated.
     //
-    // This method will throw a DeletedLinkView exception if the TableView
-    // depends on a LinkList that was deleted from its table.
+    // This will make the TableView empty and in sync with the highest possible table version
+    // if the TableView depends on an object (LinkView or row) that has been deleted.
     uint_fast64_t sync_if_needed() const;
 
     // Set this undetached TableView to be a distinct view, and sync immediately.
@@ -320,8 +320,11 @@ public:
     void distinct(size_t column);
     void distinct(std::vector<size_t> columns);
 
-    // Actual sorting facility is provided by the base class:
-    using RowIndexes::sort;
+    // Returns whether the rows are guaranteed to be in table order.
+    // This is true only of unsorted TableViews created from either:
+    // - Table::find_all()
+    // - Query::find_all() when the query is not restricted to a view.
+    bool is_in_table_order() const;
 
     virtual ~TableViewBase() noexcept;
 
@@ -336,6 +339,10 @@ protected:
     uint64_t outside_version() const;
 
     void do_sync();
+
+    // Actual sorting facility is provided by the base class:
+    using RowIndexes::sort;
+
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
