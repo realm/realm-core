@@ -937,6 +937,23 @@ OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, s
     return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
+Timestamp Query::minimum_timestamp(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                                   size_t* return_ndx)
+{
+    ConstTableView tv;
+    tv = find_all(start, end, limit);
+    Timestamp ts = tv.minimum_timestamp(column_ndx, return_ndx);
+    return ts;
+}
+
+Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                                   size_t* return_ndx)
+{
+    ConstTableView tv = find_all(start, end, limit);
+    Timestamp ts = tv.maximum_timestamp(column_ndx, return_ndx);
+    return ts;
+}
+
 
 // Average
 

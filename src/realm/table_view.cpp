@@ -270,7 +270,9 @@ Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx)
     size_t ndx = npos;
     for (size_t t = 0; t < size(); t++) {
         Timestamp ts = get_timestamp(column_ndx, t);
-        if (ndx == npos || compare(ts, best, ts.is_null(), best.is_null())) {
+        // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
+        // the first non-null entry
+        if ((ndx == npos && !ts.is_null()) || compare(ts, best, ts.is_null(), best.is_null())) {
             best = ts;
             ndx = t;
         }

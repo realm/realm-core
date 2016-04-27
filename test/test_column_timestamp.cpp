@@ -597,4 +597,51 @@ TEST(TimestampColumn_AddColumnAfterRows)
     CHECK(t.is_null(2, 0));
 }
 
+// max/min on pure null timestamps must reuturn npos like for int, float and double
+TEST(TimestampColumn_AggregateBug)
+{
+    size_t index;
+    Table t;
+    TableView tv;
+    Timestamp ts;
+
+    t.add_column(type_Timestamp, "ts", true);
+    t.add_empty_row(4);
+    tv = t.where().find_all();
+    CHECK_EQUAL(4, tv.size());
+    ts = tv.maximum_timestamp(0, &index);
+    CHECK_EQUAL(npos, index);
+    ts = tv.minimum_timestamp(0, &index);
+    CHECK_EQUAL(npos, index);
+
+    Query q;
+    
+    ts = t.where().maximum_timestamp(0, &index);
+    CHECK_EQUAL(npos, index);
+
+    ts = t.where().minimum_timestamp(0, &index);
+    CHECK_EQUAL(npos, index);
+
+    t.set_timestamp(0, 2, Timestamp(1, 0));
+
+    ts = t.where().maximum_timestamp(0, nullptr, 0, size_t(-1), size_t(-1), &index);
+    CHECK_EQUAL(2, index);
+    CHECK_EQUAL(ts, Timestamp(1, 0));
+
+    ts = t.where().minimum_timestamp(0, nullptr, 0, size_t(-1), size_t(-1), &index);
+    CHECK_EQUAL(2, index);
+    CHECK_EQUAL(ts, Timestamp(1, 0));
+
+    t.set_timestamp(0, 3, Timestamp(1, 1));
+
+    ts = t.where().maximum_timestamp(0, nullptr, 0, size_t(-1), size_t(-1), &index);
+    CHECK_EQUAL(3, index);
+    CHECK_EQUAL(ts, Timestamp(1, 1));
+
+    ts = t.where().minimum_timestamp(0, nullptr, 0, size_t(-1), size_t(-1), &index);
+    CHECK_EQUAL(2, index);
+    CHECK_EQUAL(ts, Timestamp(1, 0));
+
+}
+
 #endif // TEST_COLUMN_TIMESTAMP

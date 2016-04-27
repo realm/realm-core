@@ -6246,6 +6246,7 @@ void create_columns(TableRef table, bool nullable = true)
     table->insert_column(4, type_Bool, "Stock", nullable);
     table->insert_column(5, type_OldDateTime, "Delivery date", nullable);
     table->insert_column(6, type_Binary, "Photo", nullable);
+    table->insert_column(7, type_Timestamp, "ts", nullable);
 }
 
 bool equals(TableView& tv, std::vector<size_t> indexes)
@@ -6889,9 +6890,9 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     table->add_empty_row();
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<OldDateTime>
-    ----------------------------------------------------------------------------------------------------------------
-    null            null                null                    null                null            null
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<OldDateTime>     ts<Timestamp>
+    --------------------------------------------------------------------------------------------------------------------------------------
+    null            null                null                    null                null            null                      null
     */
 
     TableView tv;
@@ -6951,6 +6952,16 @@ TEST(Query_Null_BetweenMinMax_Nullable)
         match = 123;
         tv.minimum_olddatetime(5, &match);
         CHECK_EQUAL(match, npos);
+
+        // timestamp
+        match = 123;
+        tv.maximum_timestamp(7, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_timestamp(7, &match);
+        CHECK_EQUAL(match, npos);
+
     };
 
     // There are rows in TableView but they all point to null
