@@ -183,9 +183,9 @@ private:
     bool minmax_helper(int64_t& result, size_t start = 0, size_t end = npos,
                          size_t* return_ndx = nullptr) const;
 
-    int_fast64_t choose_random_null(int64_t incoming);
+    int_fast64_t choose_random_null(int64_t incoming) const;
     void replace_nulls_with(int64_t new_null);
-    bool can_use_as_null(int64_t value);
+    bool can_use_as_null(int64_t value) const;
 };
 
 
@@ -302,7 +302,7 @@ ArrayIntNull::~ArrayIntNull() noexcept
 inline
 void ArrayIntNull::create(Type type, bool context_flag)
 {
-    MemRef r = create_array(type, context_flag, 0, 0, m_alloc);
+    MemRef r = create_array(type, context_flag, 0, util::none, m_alloc);
     init_from_mem(r);
 }
 

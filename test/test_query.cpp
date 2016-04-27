@@ -8405,15 +8405,15 @@ TEST(Query_ReferDeletedLinkView)
     // TableView that depends on LinkView soon to be deleted
     TableView tv_sorted = links->get_sorted_view(1);
 
-    // First test depends_on_deleted_linklist()
-    CHECK(!tv_sorted.depends_on_deleted_linklist());
+    // First test depends_on_deleted_object()
+    CHECK(!tv_sorted.depends_on_deleted_object());
     TableView tv2 = table->where(&tv).find_all();
-    CHECK(!tv2.depends_on_deleted_linklist());
+    CHECK(!tv2.depends_on_deleted_object());
 
     // Delete LinkList so LinkView gets detached
     table->move_last_over(0);
     CHECK(!links->is_attached());
-    CHECK(tv_sorted.depends_on_deleted_linklist());
+    CHECK(tv_sorted.depends_on_deleted_object());
 
     // See if "Query that depends on LinkView" returns sane "empty"-like values
     CHECK_EQUAL(q.find_all().size(), 0);
@@ -8548,4 +8548,21 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(not_found, match);
 }
 
+// Ensure that Query's move constructor and move assignment operator don't result in
+// a TableView owned by the query being double-deleted when the queries are destroyed.
+TEST(Query_MoveDoesntDoubleDelete)
+{
+    Table table;
+
+    {
+        Query q1(table, std::unique_ptr<TableView>(new TableView()));
+        Query q2 = std::move(q1);
+    }
+
+    {
+        Query q1(table, std::unique_ptr<TableView>(new TableView()));
+        Query q2;
+        q2 = std::move(q1);
+    }
+}
 #endif // TEST_QUERY

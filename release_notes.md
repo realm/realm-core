@@ -1,40 +1,60 @@
 # NEXT RELEASE
 
-### Breaking changes:
-
-* Lock file (`foo.realm.lock`) format bumped.
-
 ### Bugfixes:
 
-* Fix for #1498: A crash during opening of a Realm could lead to Realm files
-  which could not later be read. The symptom would be a realm file with zeroes
-  in the end but on streaming form (which requires a footer at the end of the
-  file instead).
-* Detach subspec and enumkey accessors when they are removed
-  via a transaction (ex rollback). This could cause crashes
-  when removing the last column in a table of type link,
-  linklist, backlink, subtable, or enumkey. See #1585.
-* Update table accessors after table move rollback, issue #1551. This
-  issue could have caused corruption or crashes when tables are moved
-  and then the transaction is rolled back.
-* Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
-* Bug fix: Access dangling pointer while handling canceled asynchronous accept
-  in POSIX networking API.
-* Handing over a detached row accessor no longer crashes.
-* Linked tables were not updated properly when calling erase with num_rows = 0
-  which could be triggered by rolling back a call to insert with num_rows = 0
-* `TableView`s created by `Table::get_backlink_view` are now correctly handled by
-  `TableView`'s move assignment operator. Previously they would crash when used.
+* Fixed a bug, where handing over a TableView based on a Query restricted
+  by another TableView would fail to propagate synchronization status correctly
+  (issue #1698)
+* Fixed TableViews that represent backlinks to track the same row, even if that row
+  moves within its table. (Issue #1710)
+* Fixed incorrect semantics when comparing a LinkList column with a Row using a
+  query expression. (Issue #1713)
+* Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
+  the target row has been deleted.
+
+### API breaking changes:
+
+* `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
+  and will also return true if the target row of a `TableView` that represents backlinks
+  is deleted. (Issue #1710)
 
 ### Enhancements:
 
+* TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
+
+-----------
+
+### Internals:
+
+* Opening a Realm file which already has a management directory no longer throws
+  and catches an exception.
+
+----------------------------------------------
+
+# 0.99.0 Release notes
+
+### Breaking changes:
+
+* Lock file (`foo.realm.lock`) format bumped.
+* Moved all supporting files (all files except the .realm file) into a
+  separate ".management" subdirectory.
+
+### Bugfixes:
+
+* S: Misbehavior of empty asynchronous write in POSIX networking API.
+* S: Access dangling pointer while handling canceled asynchronous accept
+  in POSIX networking API.
+* Changed group operator== to take table names into account.  
+
+### Enhancements:
+
+* Multiple shared groups now share the read-only memory-mapping of
+  the database. This significantly lowers pressure on virtual memory
+  in multithreaded scenarios. Fixes issue #1477.
 * Added emulation of robust mutexes on platforms which do not
   provide the full posix API for it. This prevents a situation
   where a crash in one process holding the lock, would leave
-  the database locked. Fixes issue #1429
-* Moved all supporting files (all files except the .realm file) into a
-  separate ".management" subdirectory.
-* Adding `util::network::buffered_input_stream::reset()`.
+  the database locked. Fixes #1429
 * Added support for queries that traverse backlinks. Fixes #776.
 * Improve the performance of advance_read() over transations that inserted rows
   when there are live TableViews.
@@ -42,6 +62,8 @@
   `Columns<Link>` and row accessors. This allows for link equality
   comparisons involving backlinks, and those that traverse multiple
   levels of links.
+
+* S: Adding `util::network::buffered_input_stream::reset()`.
 
 -----------
 
@@ -55,8 +77,96 @@
   each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
   failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
   (`util::Logger`) is now directly available to each unit test.
-* New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
 * New failure simulation features: Ability to prime for random triggering.
+
+* S: New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+
+----------------------------------------------
+
+# 0.98.3 Release notes
+
+### Bugfixes:
+
+* Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
+  the target row has been deleted. (Issue #1723)
+
+**Note: This is a hotfix release built on top of 0.98.2. The above fixes are
+        not present in version 0.99**
+
+----------------------------------------------
+
+# 0.98.2 Release notes
+
+### Bugfixes:
+
+* Fixed TableViews that represent backlinks to track the same row, even if that row
+  moves within its table. (Issue #1710)
+* Fixed incorrect semantics when comparing a LinkList column with a Row using a
+  query expression. (Issue #1713)
+
+### API breaking changes:
+
+* `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
+  and will also return true if the target row of a `TableView` that represents backlinks
+  is deleted. (Issue #1710)
+
+### Enhancements:
+
+* TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
+
+**Note: This is a hotfix release built on top of 0.98.1. The above fixes are
+        not present in version 0.99
+
+----------------------------------------------
+
+# 0.98.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug, where handing over a TableView based on a Query restricted
+  by another TableView would fail to propagate synchronization status correctly
+  (issue #1698)
+
+**Note: This is a hotfix release. The above bugfix is not present
+        in version 0.99
+
+----------------------------------------------
+
+# 0.98.0 Release notes
+
+### Enhancements:
+
+* Added support for queries that traverse backlinks. Fixes #776. See #1598.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links. See #1609.
+
+### Bugfixes:
+
+* Fix a crash that occurred after moving a `Query` that owned a `TableView`.
+  See #1672.
+
+**NOTE: This is a hotfix release which is built on top of [0.97.4].**
+
+-----------------------------------------------
+
+# 0.97.4 Release notes
+
+### Bugfixes:
+
+* #1498: A crash during opening of a Realm could lead to Realm files
+  which could not later be read. The symptom would be a realm file with zeroes
+  in the end but on streaming form (which requires a footer at the end of the
+  file instead). See issue #1638.
+* Linked tables were not updated properly when calling erase with num_rows = 0
+  which could be triggered by rolling back a call to insert with num_rows = 0.
+  See issue #1652.
+* `TableView`s created by `Table::get_backlink_view` are now correctly handled by
+  `TableView`'s move assignment operator. Previously they would crash when used.
+  See issue #1641.
+
+**NOTE: This is a hotfix release which is built on top of [0.97.3].**
 
 ----------------------------------------------
 

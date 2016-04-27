@@ -9395,6 +9395,52 @@ TEST(LangBindHelper_HandoverPartialQuery)
     }
 }
 
+// Verify that an in-sync TableView backed by a Query that is restricted to a TableView
+// remains in sync when handed-over using a mutable payload.
+TEST(LangBindHelper_HandoverNestedTableViews)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    sg.begin_read();
+
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        // Untyped interface
+        std::unique_ptr<SharedGroup::Handover<TableView> > handover;
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            TableRef table = group_w.add_table("table2");
+            table->add_column(type_Int, "first");
+            for (int i = 0; i < 100; ++i) {
+                table->add_empty_row();
+                table->set_int(0, i, i);
+            }
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+
+            // Create a TableView tv2 that is backed by a Query that is restricted to rows from TableView tv1.
+            TableView tv1 = table->where().less_equal(0, 50).find_all();
+            TableView tv2 = tv1.get_parent().where(&tv1).find_all();
+            handover = sg_w.export_for_handover(tv2, MutableSourcePayload::Move);
+        }
+        {
+            LangBindHelper::advance_read(sg, vid);
+            sg_w.close();
+
+            std::unique_ptr<TableView> tv(sg.import_from_handover(std::move(handover)));
+
+            CHECK(tv->is_in_sync());
+            CHECK(tv->is_attached());
+            CHECK_EQUAL(51, tv->size());
+        }
+    }
+}
+
 
 TEST(LangBindHelper_HandoverAccessors)
 {

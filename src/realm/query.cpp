@@ -11,13 +11,13 @@
 
 using namespace realm;
 
-Query::Query() : m_view(nullptr), m_source_table_view(nullptr), m_owns_source_table_view(false)
+Query::Query()
 {
     create();
 }
 
 Query::Query(Table& table, TableViewBase* tv)
-    : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
+    : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv)
 {
 #ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
@@ -28,7 +28,7 @@ Query::Query(Table& table, TableViewBase* tv)
 Query::Query(const Table& table, const LinkViewRef& lv):
     m_table((const_cast<Table&>(table)).get_table_ref()),
     m_view(lv.get()),
-    m_source_link_view(lv), m_source_table_view(nullptr), m_owns_source_table_view(false)
+    m_source_link_view(lv)
 {
 #ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
@@ -38,21 +38,20 @@ Query::Query(const Table& table, const LinkViewRef& lv):
 }
 
 Query::Query(const Table& table, TableViewBase* tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
+    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv)
 {
 #ifdef REALM_DEBUG
-    REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
 #endif
     create();
 }
 
 Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv.get()), m_source_table_view(tv.get()), m_owns_source_table_view(true)
+    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv.get()), m_source_table_view(tv.get()),
+    m_owned_source_table_view(std::move(tv))
 {
-    tv.release();
-
 #ifdef REALM_DEBUG
-    REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
+    REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
 #endif
     create();
 }
@@ -71,9 +70,11 @@ Query::Query(const Query& copy)
     error_code = copy.error_code;
     m_view = copy.m_view;
     m_source_link_view = copy.m_source_link_view;
-    m_source_table_view = copy.m_source_table_view;
-    m_owns_source_table_view = false;
     m_current_descriptor = copy.m_current_descriptor;
+
+    // FIXME: The lifetime of `m_source_table_view` may be tied to that of `copy`, which can easily
+    // turn `m_source_table_view` into a dangling reference.
+    m_source_table_view = copy.m_source_table_view;
 }
 
 Query& Query::operator = (const Query& source)
@@ -83,7 +84,11 @@ Query& Query::operator = (const Query& source)
         m_table = source.m_table;
         m_view = source.m_view;
         m_source_link_view = source.m_source_link_view;
+
+        // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
+        // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
+        m_owned_source_table_view = nullptr;
 
         if (m_table)
             fetch_descriptor();
@@ -94,24 +99,19 @@ Query& Query::operator = (const Query& source)
 Query::Query(Query&&) = default;
 Query& Query::operator=(Query&&) = default;
 
-Query::~Query() noexcept
-{
-    if (m_owns_source_table_view)
-        delete m_source_table_view;
-}
+Query::~Query() noexcept = default;
 
 Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table, patch.m_table);
     if (source.m_source_table_view) {
-        m_source_table_view =
-            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
-        m_owns_source_table_view = true;
+        m_owned_source_table_view =
+            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_source_table_view = m_owned_source_table_view.get();
     }
     else {
         patch.table_view_data = nullptr;
-        m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
@@ -122,17 +122,16 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
 }
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table, patch.m_table);
     if (source.m_source_table_view) {
-        m_source_table_view =
-            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
-        m_owns_source_table_view = true;
+        m_owned_source_table_view =
+            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_source_table_view = m_owned_source_table_view.get();
     }
     else {
         patch.table_view_data = nullptr;
-        m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 

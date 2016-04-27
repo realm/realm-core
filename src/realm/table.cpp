@@ -3241,6 +3241,7 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
     if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
+    REALM_ASSERT(!is_link_type(m_spec.get_column_type(col_ndx))); // Use nullify_link().
 
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
@@ -4075,7 +4076,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
 TableView Table::get_range_view(size_t begin, size_t end)
 {
-    REALM_ASSERT(!m_columns.is_attached() || end < size());
+    REALM_ASSERT(!m_columns.is_attached() || end <= size());
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
@@ -4094,7 +4095,7 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 
 TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_col_ndx)
 {
-    TableView tv(src_table, this, src_col_ndx, row_ndx);
+    TableView tv(src_table, this, src_col_ndx, get(row_ndx));
     tv.do_sync();
     return tv;
 }

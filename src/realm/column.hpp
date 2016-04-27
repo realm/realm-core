@@ -539,7 +539,7 @@ public:
     bool compare(const Column&) const noexcept;
 
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
-                           size_t size = 0, T value = 0);
+                           size_t size = 0, T value = T{});
 
     // Overriding method in ColumnBase
     ref_type write(size_t, size_t, size_t,

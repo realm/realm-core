@@ -33,17 +33,16 @@ using namespace realm;
 TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
                              MutableSourcePayload mode)
     : RowIndexes(src, mode),
-      m_linked_table(TableRef()),
-      m_linked_column(src.m_linked_column),
-      m_linked_row(src.m_linked_row),
-      m_linkview_source(LinkViewRef()),
-      m_query(src.m_query, patch.query_patch, mode)
+      m_linked_column(src.m_linked_column)
 {
     patch.was_in_sync = src.is_in_sync();
+    // m_query must be exported after patch.was_in_sync is updated
+    // as exporting m_query will bring src out of sync.
+    m_query = Query(src.m_query, patch.query_patch, mode);
+
     Table::generate_patch(src.m_table, patch.m_table);
     Table::generate_patch(src.m_linked_table, patch.linked_table);
-    patch.linked_column = src.m_linked_column;
-    patch.linked_row = src.m_linked_row;
+    Row::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
     src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
@@ -60,10 +59,7 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
 TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
                              ConstSourcePayload mode)
     : RowIndexes(src, mode),
-      m_linked_table(TableRef()),
       m_linked_column(src.m_linked_column),
-      m_linked_row(src.m_linked_row),
-      m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
     if (mode == ConstSourcePayload::Stay)
@@ -72,8 +68,7 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
         patch.was_in_sync = src.is_in_sync();
     Table::generate_patch(src.m_table, patch.m_table);
     Table::generate_patch(src.m_linked_table, patch.linked_table);
-    patch.linked_column = src.m_linked_column;
-    patch.linked_row = src.m_linked_row;
+    ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
     m_last_seen_version = 0;
@@ -95,8 +90,7 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 
     if (patch.linked_table) {
         m_linked_table = Table::create_from_and_consume_patch(patch.linked_table, group);
-        m_linked_column = patch.linked_column;
-        m_linked_row = patch.linked_row;
+        m_linked_row.apply_and_consume_patch(patch.linked_row, group);
     }
 
     if (patch.was_in_sync)
@@ -443,11 +437,11 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
 }
 
 
-bool TableViewBase::depends_on_deleted_linklist() const
+bool TableViewBase::depends_on_deleted_object() const
 {
     uint64_t max = std::numeric_limits<uint64_t>::max();
     // outside_version() will call itself recursively for each TableView in the dependency chain
-    // and terminate with `max` if the deepest depends on a deleted LinkList
+    // and terminate with `max` if the deepest depends on a deleted LinkList or Row
     return outside_version() == max;
 }
 
@@ -488,10 +482,14 @@ uint64_t TableViewBase::outside_version() const
             return max;
         }
     }
-    else {
-        // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)
-        return m_table->m_version;
+
+    if (m_linked_table && !m_linked_row) {
+        // m_linked_table is set when created by Table::get_backlink_view.
+        return max;
     }
+
+    // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)
+    return m_table->m_version;
 }
 
 bool TableViewBase::is_in_sync() const
@@ -766,9 +764,12 @@ void TableViewBase::do_sync()
     }
     else if (m_table && m_linked_table) {
         m_row_indexes.clear();
-        size_t backlink_count = m_linked_table->get_backlink_count(m_linked_row, *m_table, m_linked_column);
-        for (size_t i = 0; i < backlink_count; i++)
-            m_row_indexes.add(m_linked_table->get_backlink(m_linked_row, *m_table, m_linked_column, i));
+        if (m_linked_row.is_attached()) {
+            size_t linked_row_ndx = m_linked_row.get_index();
+            size_t backlink_count = m_linked_table->get_backlink_count(linked_row_ndx, *m_table, m_linked_column);
+            for (size_t i = 0; i < backlink_count; i++)
+                m_row_indexes.add(m_linked_table->get_backlink(linked_row_ndx, *m_table, m_linked_column, i));
+        }
     }
     // precondition: m_table is attached
     else if (!m_query.m_table) {
@@ -805,4 +806,27 @@ void TableViewBase::do_sync()
         distinct(m_distinct_columns);
 
     m_last_seen_version = outside_version();
+}
+
+bool TableViewBase::is_in_table_order() const
+{
+    if (!m_table) {
+        return false;
+    }
+    else if (m_linkview_source) {
+        return false;
+    }
+    else if (m_table && m_linked_table) {
+        return false;
+    }
+    else if (!m_query.m_table) {
+        // TableView originated from Table::find_all().
+        return !m_sorting_predicate;
+    }
+    else if (m_query.produces_results_in_table_order()) {
+        return !m_sorting_predicate;
+    }
+    else {
+        return false;
+    }
 }

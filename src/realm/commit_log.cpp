@@ -325,8 +325,8 @@ inline void WriteLogCollector::map_header_if_needed() const
     if (m_header.is_attached() == false) {
         File header_file(m_header_name, File::mode_Update);
         m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
+        m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
     }
-    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, m_header_name, "0");
 }
 
 
@@ -405,7 +405,7 @@ void WriteLogCollector::reset_header()
     if (!disable_sync)
         header_file.sync(); // Throws
     m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
-    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, m_header_name, "0");
+    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
 }
 
 

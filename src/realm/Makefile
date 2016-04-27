@@ -30,6 +30,9 @@ util/file_mapper.hpp \
 util/encrypted_file_mapping.hpp \
 util/miscellaneous.hpp \
 util/to_string.hpp \
+util/scope_exit.hpp \
+util/call_with_tuple.hpp \
+util/hex_dump.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
