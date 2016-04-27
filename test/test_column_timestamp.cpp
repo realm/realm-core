@@ -660,4 +660,49 @@ TEST(Table_DistinctTimestamp)
     TableView view = table.get_distinct_view(0);
     CHECK_EQUAL(3, view.size());
 }
+
+
+namespace {
+    // Since C++11, modulo with negative operands is well-defined
+
+    // "Reference implementations" for conversions to and from milliseconds
+    Timestamp milliseconds_to_timestamp(int64_t milliseconds) {
+        int64_t seconds = milliseconds / 1000;
+        int32_t nanoseconds = (milliseconds % 1000) * 1000000;
+        return Timestamp(seconds, nanoseconds);
+    }
+
+    int64_t timestamp_to_milliseconds(const Timestamp& ts) {
+        const int64_t seconds = ts.get_seconds();
+        const int32_t nanoseconds = ts.get_nanoseconds();
+        const int64_t milliseconds = seconds * 1000 + nanoseconds / 1000000; // This may overflow
+        return milliseconds;
+    }
+
+} // unnamed namespace
+
+
+TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
+{
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
+    TimestampColumn c(Allocator::get_default(), ref);
+
+    constexpr int64_t millis[] = {1, 0, -1, 1000, -1000, 1001, -1001, 203558400, 1461746402,-1000000000};
+    constexpr size_t num_millis = sizeof(millis) / sizeof(millis[0]);
+
+    for (size_t i = 0; i < num_millis; ++i) {
+        const int64_t milliseconds = millis[i];
+        const Timestamp ts = milliseconds_to_timestamp(milliseconds);
+        c.add(ts);
+    }
+
+    for (size_t i = 0; i < num_millis; ++i) {
+        const Timestamp ts = c.get(i);
+        const int64_t milliseconds = timestamp_to_milliseconds(ts);
+        CHECK_EQUAL(milliseconds, millis[i]);
+    }
+}
+
+
 #endif // TEST_COLUMN_TIMESTAMP
