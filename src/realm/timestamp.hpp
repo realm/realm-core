@@ -44,22 +44,22 @@ public:
     // Usually this will not need special attention, but for reference, valid Timestamps will have one of the
     // following sign combinations:
     //
-    //    s | n
-    //    -----
-    //    + | +
-    //    + | 0
-    //    0 | +
-    //    0 | 0
-    //    0 | -
-    //    - | 0
-    //    - | -
+    //     s | n
+    //     -----
+    //     + | +
+    //     + | 0
+    //     0 | +
+    //     0 | 0
+    //     0 | -
+    //     - | 0
+    //     - | -
     //
     // Examples:
-    //    The UNIX epoch is constructed by Timestamp(0, 0)
-    //    1 second after the UNIX epoch is constructed by Timestamp(1, 0)
-    //    1 nanosecond after the UNIX epoch is constructed by Timestamp(0, 1)
-    //    1,1 seconds after the UNIX epoch is constructed by Timestamp(1, 100000000)
-    //    -1,1 seconds before the UNIX epoch is constructed by Timestamp(-1, -100000000)
+    //     The UNIX epoch is constructed by Timestamp(0, 0)
+    //     1 second after the UNIX epoch is constructed by Timestamp(1, 0)
+    //     1 nanosecond after the UNIX epoch is constructed by Timestamp(0, 1)
+    //     1,1 seconds after the UNIX epoch is constructed by Timestamp(1, 100000000)
+    //     -1,1 seconds before the UNIX epoch is constructed by Timestamp(-1, -100000000)
     //
     Timestamp(int64_t seconds, int32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
     {
