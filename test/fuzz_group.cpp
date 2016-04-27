@@ -427,8 +427,16 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                         }
                         else if (type == type_Timestamp) {
-                            uint32_t nanoseconds = static_cast<uint32_t>(get_int32(s)) % 1000000000;
-                            Timestamp value{ get_int64(s), nanoseconds };
+                            int64_t seconds = get_int64(s);
+                            int32_t nanoseconds = get_int32(s) % 1000000000;
+                            // Make sure the values form a sensible Timestamp
+                            const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+                            const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+                            const bool correct_timestamp = both_non_negative || both_non_positive;
+                            if (!correct_timestamp) {
+                                nanoseconds *= -1;
+                            }
+                            Timestamp value{ seconds, nanoseconds };
                             if (log) {
                                 *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }

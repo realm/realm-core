@@ -114,7 +114,7 @@ TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
     StringIndex* index = c.create_search_index();
     CHECK(index);
 
-    for (uint32_t i = 0; i < 100; ++i) {
+    for (int32_t i = 0; i < 100; ++i) {
         c.add(Timestamp{i + 10000, i});
     }
 
@@ -441,7 +441,7 @@ TEST(TimestampColumn_Operators)
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Equal()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::Equal()));
-    CHECK(compare(Timestamp(-1, 2), Timestamp(-1, 2), realm::Equal()));
+    CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::Equal()));
 
     // Test B
     // -----------------------------------------------------------------------------------------
@@ -467,12 +467,12 @@ TEST(TimestampColumn_Operators)
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::GreaterEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::GreaterEqual()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::GreaterEqual()));
-    CHECK(compare(Timestamp(-1, 2), Timestamp(-1, 2), realm::GreaterEqual()));
+    CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::GreaterEqual()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::LessEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::LessEqual()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::LessEqual()));
-    CHECK(compare(Timestamp(-1, 2), Timestamp(-1, 2), realm::LessEqual()));
+    CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::LessEqual()));
 
     // Test E: Sorting order of nulls vs. non-nulls should be the same for Timestamp as for other types
     // -----------------------------------------------------------------------------------------
@@ -532,8 +532,8 @@ TEST_TYPES(TimestampColumn_ForceReallocate, std::true_type, std::false_type)
     ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
     TimestampColumn c(Allocator::get_default(), ref);
 
-    uint32_t items_count = REALM_MAX_BPNODE_SIZE * 5;
-    for (uint32_t i = 0; i < items_count; ++i) {
+    int32_t items_count = REALM_MAX_BPNODE_SIZE * 5;
+    for (int32_t i = 0; i < items_count; ++i) {
         c.add(Timestamp{i, i});
     }
 

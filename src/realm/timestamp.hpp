@@ -28,9 +28,11 @@ namespace realm {
 
 class Timestamp {
 public:
-    Timestamp(int64_t seconds, uint32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
+    Timestamp(int64_t seconds, int32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
     {
-        REALM_ASSERT_3(nanoseconds, <, nanoseconds_per_second);
+        const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+        const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+        REALM_ASSERT_EX(both_non_negative || both_non_positive, both_non_negative, both_non_positive);
     }
     Timestamp(realm::null) : m_is_null(true) { }
     Timestamp() : Timestamp(null{}) { }
@@ -43,7 +45,7 @@ public:
         return m_seconds;
     }
 
-    uint32_t get_nanoseconds() const noexcept
+    int32_t get_nanoseconds() const noexcept
     {
         REALM_ASSERT(!m_is_null);
         return m_nanoseconds;
@@ -64,11 +66,11 @@ public:
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
-    static constexpr uint32_t nanoseconds_per_second = 1000000000;
+    static constexpr int32_t nanoseconds_per_second = 1000000000;
 
 private:
     int64_t m_seconds;
-    uint32_t m_nanoseconds;
+    int32_t m_nanoseconds;
     bool m_is_null;
 };
 
