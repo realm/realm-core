@@ -11819,8 +11819,8 @@ TEST_TYPES(LangBindHelper_AddEmptyRowsAndRollBackTimestamp, std::true_type, std:
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
     TableRef t = g.insert_table(0, "");
-    t->insert_column(0, DataType(0), "", nullable_toggle);
-    t->insert_column(1, DataType(8), "", nullable_toggle);
+    t->insert_column(0, type_Int, "", nullable_toggle);
+    t->insert_column(1, type_Timestamp, "", nullable_toggle);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
     t->insert_empty_row(0, 224);
@@ -11840,7 +11840,7 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
     LangBindHelper::promote_to_write(sg_w);
 
     TableRef t = g.add_table("");
-    t->add_column(DataType(8), "", nullable_toggle);
+    t->add_column(type_Timestamp, "", nullable_toggle);
 
     for (int i = 0; i < 27; ++i) {
         LangBindHelper::commit_and_continue_as_read(sg_w);

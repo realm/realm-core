@@ -62,7 +62,7 @@ using our binary search functions such as upper_bound() and lower_bound().
 namespace realm {
 
 class Spec;
-struct Timestamp;
+class Timestamp;
 
 class StringIndex {
 public:
