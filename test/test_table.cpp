@@ -11,6 +11,7 @@
 #include <realm/commit_log.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/buffer.hpp>
+#include <realm/util/to_string.hpp>
 
 #include "util/misc.hpp"
 
@@ -662,8 +663,10 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     }
     for (size_t i = 0; i < rows; ++i)
         table.set_string(5, i, strings[i]);
-    for (size_t i = 0; i < rows; ++i)
-        table.set_string(6, i, strings[i] + " very long string.........");
+    for (size_t i = 0; i < rows; ++i) {
+        std::string str_i(strings[i] + " very long string.........");
+        table.set_string(6, i, str_i);
+    }
     for (size_t i = 0; i < rows; ++i) {
         switch (i % 2) {
             case 0: {
@@ -6071,22 +6074,18 @@ TEST(Table_IndexStringDelete)
     t.add_column(type_String, "str");
     t.add_search_index(0);
 
-    std::ostringstream out;
-
     for (size_t i = 0; i < 1000; ++i) {
         t.add_empty_row();
-        out.str(std::string());
-        out << i;
-        t.set_string(0, i, out.str());
+        std::string out(util::to_string(i));
+        t.set_string(0, i, out);
     }
 
     t.clear();
 
     for (size_t i = 0; i < 1000; ++i) {
         t.add_empty_row();
-        out.str(std::string());
-        out << i;
-        t.set_string(0, i, out.str());
+        std::string out(util::to_string(i));
+        t.set_string(0, i, out);
     }
 }
 

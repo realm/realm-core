@@ -89,6 +89,10 @@ public:
     template<class T, class A>
     operator std::basic_string<char, T, A>() const;
 
+    // StringData does not store data, callers must manage their own strings.
+    template<class T, class A>
+    StringData(std::basic_string<char, T, A>&&) = delete;
+
     template<class T, class A>
     StringData(const util::Optional<std::basic_string<char, T, A>>&);
 

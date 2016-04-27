@@ -507,7 +507,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
         for (int i = 0; i < 16; ++i) {
             std::stringstream ss;
             ss << "table_" << i;
-            wt.add_table(ss.str());
+            std::string str(ss.str());
+            wt.add_table(str);
         }
         wt.commit();
     }
@@ -1387,9 +1388,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         size_t n = table_w->size();
         for (size_t i = 0; i < n; ++i) {
 //            std::cerr << i << " " << v << "\n";
-            std::ostringstream out;
-            out << v;
-            table_w->set_string(1, i, out.str());
+            std::string out(util::to_string(v));
+            table_w->set_string(1, i, out);
             table_w->set_int(3, i, v);
             v = (v + 1581757577LL) % 1000;
         }
@@ -11112,11 +11112,13 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         for (size_t i = 0; i < numberOfOwner; i++) {
 
             size_t r = owner->add_empty_row();
-            owner->set_string(0, r, std::string("owner") + to_string(i));
+            std::string owner_str(std::string("owner") + to_string(i));
+            owner->set_string(0, r, owner_str);
 
             for (size_t j = 0; j < numberOfDogsPerOwner; j++) {
                 size_t r = dog->add_empty_row();
-                dog->set_string(0, r, std::string("dog") + to_string(i * numberOfOwner + j));
+                std::string dog_str(std::string("dog") + to_string(i * numberOfOwner + j));
+                dog->set_string(0, r, dog_str);
                 dog->set_link(1, r, i);
                 LinkViewRef ll = owner->get_linklist(1, i);
                 ll->add(r);

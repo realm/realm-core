@@ -28,6 +28,7 @@
 
 * Opening a Realm file which already has a management directory no longer throws
   and catches an exception.
+* Constructing a StringData object with r-value data is explicitly not supported
 
 ----------------------------------------------
 
