@@ -848,17 +848,23 @@ template<class T>
 void Column<T>::populate_search_index()
 {
     REALM_ASSERT(has_search_index());
-    // Populate the index
-    size_t num_rows = size();
-    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        bool is_append = true;
-        if (is_null(row_ndx)) {
-            m_search_index->insert(row_ndx, null{}, 1, is_append); // Throws
+    try {
+        // Populate the index
+        size_t num_rows = size();
+        for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+            bool is_append = true;
+            if (is_null(row_ndx)) {
+                m_search_index->insert(row_ndx, null{}, 1, is_append); // Throws
+            }
+            else {
+                T value = get(row_ndx);
+                m_search_index->insert(row_ndx, value, 1, is_append); // Throws
+            }
         }
-        else {
-            T value = get(row_ndx);
-            m_search_index->insert(row_ndx, value, 1, is_append); // Throws
-        }
+    } catch (LogicError& e) {
+        m_search_index->destroy();
+        m_search_index.reset(nullptr);
+        throw e;
     }
 }
 

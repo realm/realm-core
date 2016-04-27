@@ -64,6 +64,8 @@ const char* LogicError::what() const noexcept
         case mixed_history_type:
             return "History type (as specified by the Replication implementation passed to "
                 "the SharedGroup constructor) was not consistent across the session";
+        case string_too_long_for_index:
+            return "StringIndex should only be used for short strings";
     }
     return "Unknown error";
     // LCOV_EXCL_STOP (LogicError messages)

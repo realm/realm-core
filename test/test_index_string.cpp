@@ -1322,4 +1322,53 @@ TEST(StringIndex_Deny_Duplicates)
     col.destroy();
 }
 
+TEST(StringIndex_MaxStringLength)
+{
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, true);
+
+    std::string std_max(StringIndex::max_string_index_length, 'a');
+    std::string std_over_max(std_max + "a");
+
+    StringData max(std_max);
+    StringData over_max(std_over_max);
+
+    col.add(over_max);
+    CHECK_EQUAL(col.size(), 1);
+    CHECK_EQUAL(col.get(0), over_max);
+    CHECK_THROW(col.create_search_index(), realm::LogicError);
+    CHECK(!col.has_search_index());
+    CHECK_EQUAL(col.get(0), over_max);
+    CHECK_EQUAL(col.find_first(over_max), 0);   // linear search
+
+    col.clear();
+    CHECK_EQUAL(col.size(), 0);
+    col.add(max);
+    CHECK_EQUAL(col.size(), 1);
+    CHECK_EQUAL(col.get(0), max);
+    col.create_search_index();
+    CHECK(col.has_search_index());
+    CHECK_EQUAL(col.get(0), max);
+    CHECK_EQUAL(col.find_first(max), 0);    // string index search
+
+    auto validate = [&]() {
+        CHECK_EQUAL(col.size(), 1);
+        CHECK(col.has_search_index());
+        CHECK_EQUAL(col.get(0), max);
+        CHECK_EQUAL(col.find_first(max), 0);
+        CHECK_EQUAL(col.find_first(over_max), realm::npos);
+    };
+
+    CHECK_THROW(col.add(over_max), realm::LogicError);
+    validate();
+
+    CHECK_THROW(col.insert(1, over_max), realm::LogicError);
+    validate();
+
+    CHECK_THROW(col.set(0, over_max), realm::LogicError);
+    validate();
+
+    col.destroy();
+}
+
 #endif // TEST_INDEX_STRING

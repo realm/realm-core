@@ -268,15 +268,19 @@ StringIndex* StringEnumColumn::create_search_index()
     std::unique_ptr<StringIndex> index;
     index.reset(new StringIndex(this, get_alloc())); // Throws
 
-    // Populate the index
-    size_t num_rows = size();
-    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        StringData value = get(row_ndx);
-        size_t num_rows = 1;
-        bool is_append = true;
-        index->insert(row_ndx, value, num_rows, is_append); // Throws
+    try {
+        // Populate the index
+        size_t num_rows = size();
+        for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+            StringData value = get(row_ndx);
+            size_t num_rows = 1;
+            bool is_append = true;
+            index->insert(row_ndx, value, num_rows, is_append); // Throws
+        }
+    } catch (LogicError& e) {
+        index->destroy();
+        throw e;
     }
-
     m_search_index = std::move(index);
     return m_search_index.get();
 }

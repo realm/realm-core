@@ -190,12 +190,18 @@ void StringColumn::populate_search_index()
 {
     REALM_ASSERT(m_search_index);
 
-    size_t num_rows = size();
-    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-        StringData value = get(row_ndx);
-        size_t num_rows = 1;
-        bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    try {
+        size_t num_rows = size();
+        for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+            StringData value = get(row_ndx);
+            size_t num_rows = 1;
+            bool is_append = true;
+            m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        }
+    } catch (LogicError& e) {
+        m_search_index->destroy();
+        m_search_index.reset(nullptr);
+        throw e;
     }
 }
 

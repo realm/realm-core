@@ -205,6 +205,8 @@ public:
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
 
+    static const size_t max_string_index_length = 500;
+
 private:
     std::unique_ptr<Array> m_array;
     ColumnBase* m_target_column;
@@ -349,6 +351,9 @@ void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_appen
 {
     REALM_ASSERT_3(row_ndx, !=, npos);
 
+    if (REALM_UNLIKELY(to_str(value).size() > max_string_index_length))
+        throw LogicError(LogicError::string_too_long_for_index);
+
     // If the new row is inserted after the last row in the table, we don't need
     // to adjust any row indexes.
     if (!is_append) {
@@ -379,6 +384,9 @@ void StringIndex::insert(size_t row_ndx, util::Optional<T> value, size_t num_row
 template<class T>
 void StringIndex::set(size_t row_ndx, T new_value)
 {
+    if (REALM_UNLIKELY(to_str(new_value).size() > max_string_index_length))
+        throw LogicError(LogicError::string_too_long_for_index);
+
     StringConversionBuffer buffer;
     StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value);
