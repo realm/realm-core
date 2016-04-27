@@ -688,7 +688,7 @@ TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
     ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
     TimestampColumn c(Allocator::get_default(), ref);
 
-    constexpr int64_t millis[] = {1, 0, -1, 1000, -1000, 1001, -1001, 203558400, 1461746402,-1000000000};
+    constexpr int64_t millis[] = {1, 0, -1, 1000, -1000, 1001, -1001, 203558400, 1461746402, -1000000000};
     constexpr size_t num_millis = sizeof(millis) / sizeof(millis[0]);
 
     for (size_t i = 0; i < num_millis; ++i) {
