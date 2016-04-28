@@ -36,7 +36,9 @@
 
 * Opening a Realm file which already has a management directory no longer throws
   and catches an exception.
-
+* Fix a wrong disabling of the unit-test suite.
+* Fix a missing note in the release_notes about the above.
+* Add the first self-referring release_note in the release_notes file.
 ----------------------------------------------
 
 # 0.99.0 Release notes
