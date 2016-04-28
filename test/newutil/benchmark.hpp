@@ -20,6 +20,8 @@ class Benchmark
     std::string lead_text();
     std::string ident();
 
+    void run_once(SharedGroup&, Timer&);
+
 public:
     void run(Results& results);
 };

@@ -20,14 +20,25 @@ std::string Benchmark::ident()
     return stream.str();
 }
 
+void Benchmark::run_once(SharedGroup& sg, Timer& timer)
+{
+    timer.pause();
+    this->before_each(sg);
+    timer.unpause();
+
+    this(sg);
+
+    timer.pause();
+    this->after_each(sg);
+    timer.unpause();
+}
+
 void Benchmark::run(Results& results)
 {
-    Timer timer(Timer::type_UserTime);
-
     std::string lead_text = this->lead_text();
     std::string ident = this->ident();
 
-    std::string realm_path = "results.txt";
+    std::string realm_path = "results.realm";
     std::unique_ptr<SharedGroup> group;
     group.reset(new SharedGroup(realm_path, false,
                                 SharedGroup::durability_MemOnly, nullptr));
