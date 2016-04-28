@@ -8707,7 +8707,7 @@ TEST(Query_Timestamp)
 
     match = (first <= first).find();
     CHECK_EQUAL(match, 0); 
-    
+
     // Two different columns
     match = (first == second).find();
     CHECK_EQUAL(match, 3); // null == null
@@ -8733,12 +8733,13 @@ TEST(Query_Timestamp_Null)
 
     Columns<Timestamp> first = table.column<Timestamp>(0);
     Columns<Timestamp> second = table.column<Timestamp>(1);
-    
+
     match = (first == Timestamp(null{})).find();
     CHECK_EQUAL(match, npos);
 
     match = (second == Timestamp(null{})).find();
     CHECK_EQUAL(match, 0);
+}
 
 // Ensure that coyping a Query copies a restricting TableView if the query owns the view.
 TEST(Query_CopyRestrictingTableViewWhenOwned)
