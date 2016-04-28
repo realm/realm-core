@@ -1,11 +1,12 @@
-set(BIN benchmark-datetime)
+get_filename_component(POSTFIX ${CMAKE_CURRENT_LIST_DIR} NAME)
+set(BIN benchmark-${POSTFIX})
+set(CORE_BUILD core-build-${POSTFIX})
 
 ################
 ## Core Build ##
 ################
 
 set(TAG v0.97.3)
-set(CORE_BUILD "core-build-tags-${TAG}")
 set(REF "tags/${TAG}")
 
 add_custom_target(
