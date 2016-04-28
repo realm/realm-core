@@ -19,6 +19,8 @@ class Benchmark
 
     std::string lead_text();
     std::string ident();
+
+public:
     void run(Results& results);
 };
 

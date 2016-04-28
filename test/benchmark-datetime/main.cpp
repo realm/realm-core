@@ -28,5 +28,7 @@ struct OneColumn : Benchmark {
 };
 
 int main() {
-    Table t;
+    Results results(10);
+    OneColumn bench;
+    bench.run(results);
 }
