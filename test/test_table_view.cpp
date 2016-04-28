@@ -56,7 +56,7 @@ REALM_TABLE_2(TestTableInt2,
               second, Int)
 
 REALM_TABLE_2(TestTableDate,
-              first, DateTime,
+              first, OldDateTime,
               second, Int)
 
 REALM_TABLE_2(TestTableFloatDouble,
@@ -92,19 +92,79 @@ TEST(TableView_DateMaxMin)
 {
     TestTableDate ttd;
 
-    ttd.add(DateTime(2014, 7, 10), 1);
-    ttd.add(DateTime(2013, 7, 10), 1);
-    ttd.add(DateTime(2015, 8, 10), 1);
-    ttd.add(DateTime(2015, 7, 10), 1);
+    ttd.add(OldDateTime(2014, 7, 10), 1);
+    ttd.add(OldDateTime(2013, 7, 10), 1);
+    ttd.add(OldDateTime(2015, 8, 10), 1);
+    ttd.add(OldDateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
     size_t ndx = not_found;
 
-    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum(&ndx));
+    CHECK_EQUAL(OldDateTime(2015, 8, 10), v.column().first.maximum(&ndx));
     CHECK_EQUAL(2, ndx);
 
-    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum(&ndx));
+    CHECK_EQUAL(OldDateTime(2013, 7, 10), v.column().first.minimum(&ndx));
     CHECK_EQUAL(1, ndx);
+}
+
+TEST(TableView_TimestampMaxMinCount)
+{
+    Table t;
+    t.add_column(type_Timestamp, "ts", true);
+    t.add_empty_row();
+    t.set_timestamp(0, 0, Timestamp(300, 300));
+
+    t.add_empty_row();
+    t.set_timestamp(0, 1, Timestamp(100, 100));
+
+    t.add_empty_row();
+    t.set_timestamp(0, 2, Timestamp(200, 200));
+
+    // Add row with null. For max(), any non-null is greater, and for min() any non-null is less
+    t.add_empty_row();
+
+    TableView tv = t.where().find_all();
+    Timestamp ts;
+
+    ts = tv.maximum_timestamp(0, nullptr);
+    CHECK_EQUAL(ts, Timestamp(300, 300));
+    ts = tv.minimum_timestamp(0, nullptr);
+    CHECK_EQUAL(ts, Timestamp(100, 100));
+
+    size_t index;
+    ts = tv.maximum_timestamp(0, &index);
+    CHECK_EQUAL(index, 0);
+    ts = tv.minimum_timestamp(0, &index);
+    CHECK_EQUAL(index, 1);
+
+    size_t cnt;
+    cnt = tv.count_timestamp(0, Timestamp(100, 100));
+    CHECK_EQUAL(cnt, 1);
+
+    cnt = tv.count_timestamp(0, Timestamp(null{}));
+    CHECK_EQUAL(cnt, 1);
+}
+
+TEST(TableView_TimestampGetSet)
+{
+    Table t;
+    t.add_column(type_Timestamp, "ts", true);
+    t.add_empty_row(3);
+    t.set_timestamp(0, 0, Timestamp(000, 010));
+    t.set_timestamp(0, 1, Timestamp(100, 110));
+    t.set_timestamp(0, 2, Timestamp(200, 210));
+
+    TableView tv = t.where().find_all();
+    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(000,010));
+    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(100,110));
+    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(200,210));
+
+    tv.set_timestamp(0, 0, Timestamp(1000, 1010));
+    tv.set_timestamp(0, 1, Timestamp(1100, 1110));
+    tv.set_timestamp(0, 2, Timestamp(1200, 1210));
+    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(1000,1010));
+    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(1100,1110));
+    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(1200,1210));
 }
 
 TEST(TableView_GetSetInteger)

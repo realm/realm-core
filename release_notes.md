@@ -27,6 +27,8 @@
 * `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
   and will also return true if the target row of a `TableView` that represents backlinks
   is deleted. (Issue #1710)
+* New nanosecond precision `Timestamp` data type and column replace our
+  current `DateTime` data type. (Issue #1476)
 
 ### Enhancements:
 

@@ -78,26 +78,23 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     Replication::HistoryType requested_history_type_2 =
         Replication::HistoryType(requested_history_type);
 
+    // Note: This function is responsible for choosing the target file format
+    // for a sessions. If it selects a file format that is different from
+    // `current_file_format_version`, it will trigger a file format upgrade
+    // process.
+
+    // Note: Previously it was necessary to base the decision on the current
+    // (original) file format and the selected type of history (of
+    // changesets). At the present time, however (since the introduction of file
+    // format version 5), all files need to use the latest file format.
+
     // Note: `current_file_format_version` may be zero at this time, which means
     // that the file format it is not yet decided (only possible for empty
     // Realms where top-ref is zero).
 
-    // Stay on file format 3 (no support of in-Realm histories) if the format of
-    // the opened Realm file is less than 4 and the required history type is not
-    // in in-Realm history type (Replication::hist_InRealm or
-    // Replication::hist_OutOfRealm). File format 2 needs upgrade in any case
-    // (to 3 or 4 depending on history type).
-    if (current_file_format_version >= 4)
-        return current_file_format_version;
-    switch (requested_history_type_2) {
-        case Replication::hist_None:
-        case Replication::hist_OutOfRealm:
-            return 3;
-        case Replication::hist_InRealm:
-        case Replication::hist_Sync:
-            break;
-    }
-    return 4;
+    static_cast<void>(current_file_format_version);
+    static_cast<void>(requested_history_type_2);
+    return 5;
 }
 
 
@@ -108,7 +105,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file foprmat
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT(target_file_format_version == 3 || target_file_format_version == 4);
+    REALM_ASSERT_EX(target_file_format_version == 5, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -131,6 +128,14 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Upgrade from 3 to 4
     if (current_file_format_version <= 3 && target_file_format_version >= 4) {
         // No-op
+    }
+
+    // Upgrade from 4 to 5 (datetime -> timestamp)
+    if (current_file_format_version <= 4 && target_file_format_version >= 5) {
+        for (size_t t = 0; t < m_tables.size(); t++) {
+            TableRef table = get_table(t);
+            table->upgrade_olddatetime();
+        }
     }
 
     // NOTE: Additional future upgrade steps go here.
@@ -1397,7 +1402,12 @@ public:
         return true; // No-op
     }
 
-    bool set_date_time(size_t, size_t, DateTime) noexcept
+    bool set_olddatetime(size_t, size_t, OldDateTime) noexcept
+    {
+        return true; // No-op
+    }
+
+    bool set_timestamp(size_t, size_t, Timestamp) noexcept
     {
         return true; // No-op
     }

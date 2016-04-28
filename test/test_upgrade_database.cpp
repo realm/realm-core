@@ -298,7 +298,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(3, sgf::get_file_format_version(g));
+    CHECK_EQUAL(5, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -438,7 +438,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(3, sgf::get_file_format_version(g));
+    CHECK_EQUAL(5, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -784,7 +784,7 @@ TEST(Upgrade_InRealmHistory)
         CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
     }
 
-    // Try again, but do it in two steps (2->3, 3->4).
+    // Try again, but do it in two steps (2->3, 3->5).
     {
         File::remove(temp_path);
         CHECK_OR_RETURN(File::copy(path, temp_path));
@@ -792,7 +792,7 @@ TEST(Upgrade_InRealmHistory)
         {
             SharedGroup sg(temp_path, no_create);
             using sgf = _impl::SharedGroupFriend;
-            CHECK_EQUAL(3, sgf::get_file_format_version(sg));
+            CHECK_EQUAL(5, sgf::get_file_format_version(sg));
         }
         {
             std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
@@ -801,6 +801,110 @@ TEST(Upgrade_InRealmHistory)
             CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
         }
     }
+}
+
+
+// Open an existing database-file-format-version 4 file and check that it automatically upgrades to version 5.
+// The upgrade will change all OldDateTime columns into TimeStamp columns.
+TEST(Upgrade_Database_4_5_DateTime1)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+        util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+
+#if 1// TEST_READ_UPGRADE_MODE
+
+    // Automatic upgrade from SharedGroup
+    {
+        CHECK_OR_RETURN(File::exists(path));
+        SHARED_GROUP_TEST_PATH(temp_copy);
+
+        // Make a copy of the version 4 database so that we keep the original file intact and unmodified
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+        // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
+        // in version 4
+        SharedGroup sg(temp_copy);
+
+        WriteTransaction rt(sg);
+        TableRef t = rt.get_table("table");
+        
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
+        CHECK(!t->has_search_index(2));
+        CHECK(!t->has_search_index(3));
+        
+        CHECK(!t->is_null(0, 0));
+        CHECK(!t->is_null(1, 0));
+        CHECK(!t->is_null(2, 0));
+        CHECK(!t->is_null(3, 0));
+
+        CHECK(!t->is_null(0, 1));
+        CHECK(!t->is_null(1, 1));
+        CHECK(!t->is_null(2, 1));
+        CHECK(!t->is_null(3, 1));
+
+        CHECK(t->is_null(0, 2));
+        CHECK(!t->is_null(1, 2));
+        CHECK(t->is_null(2, 2));
+        CHECK(!t->is_null(3, 2));
+
+        CHECK_EQUAL(t->get_timestamp(0, 0), Timestamp(1234, 0));
+        CHECK_EQUAL(t->get_timestamp(1, 0), Timestamp(1234, 0));
+        CHECK_EQUAL(t->get_timestamp(2, 0), Timestamp(1234, 0));
+        CHECK_EQUAL(t->get_timestamp(3, 0), Timestamp(1234, 0));
+
+        CHECK_EQUAL(t->get_timestamp(0, 1), Timestamp(0, 0));
+        CHECK_EQUAL(t->get_timestamp(1, 1), Timestamp(0, 0));
+        CHECK_EQUAL(t->get_timestamp(2, 1), Timestamp(0, 0));
+        CHECK_EQUAL(t->get_timestamp(3, 1), Timestamp(0, 0));
+
+        CHECK_EQUAL(t->get_timestamp(1, 2), Timestamp(0, 0));
+        CHECK_EQUAL(t->get_timestamp(3, 2), Timestamp(0, 0));
+
+        CHECK_EQUAL(t->size(), 3);
+    }
+
+#else // test write mode
+    // NOTE: This code must be executed from an old file-format-version 4 core in order to create
+    // a file-format-version 4 test file!
+    char leafsize[20];
+    sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
+    File::try_remove(path);
+
+    Group g;
+    TableRef t = g.add_table("table");
+
+    // No index
+    t->add_column(type_OldDateTime, "dt1", true);  // nullable
+    t->add_column(type_OldDateTime, "dt2", false); // nonnullable
+                                                // No index
+    t->add_column(type_OldDateTime, "dt3", true);  // nullable
+    t->add_column(type_OldDateTime, "dt4", false); // nonnullable
+
+    t->add_search_index(0);
+    t->add_search_index(1);
+
+    t->add_empty_row();
+    t->set_olddatetime(0, 0, OldDateTime(1234));
+    t->set_olddatetime(1, 0, OldDateTime(1234));
+    t->set_olddatetime(2, 0, OldDateTime(1234));
+    t->set_olddatetime(3, 0, OldDateTime(1234));
+
+    t->add_empty_row();
+    t->set_olddatetime(0, 1, OldDateTime(0));
+    t->set_olddatetime(1, 1, OldDateTime(0));
+    t->set_olddatetime(2, 1, OldDateTime(0));
+    t->set_olddatetime(3, 1, OldDateTime(0));
+
+    t->add_empty_row();
+    t->set_null(0, 2);
+    t->set_olddatetime(1, 2, OldDateTime(0));
+    t->set_null(2, 2);
+    t->set_olddatetime(3, 2, OldDateTime(0));
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+
 }
 
 #endif // TEST_GROUP

@@ -101,7 +101,7 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 
 // Searching
 
-// find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
+// find_*_integer() methods are used for all "kinds" of integer values (bool, int, OldDateTime)
 
 size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
@@ -260,8 +260,31 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         return res;
 }
 
-// sum
+// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf types
+// and also assume numeric types that support arithmetic (+, /, etc).
+template<class C>
+Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
+{
+    C compare = C();
+    Timestamp best = Timestamp(null{});
+    size_t ndx = npos;
+    for (size_t t = 0; t < size(); t++) {
+        Timestamp ts = get_timestamp(column_ndx, t);
+        // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
+        // the first non-null entry
+        if ((ndx == npos && !ts.is_null()) || compare(ts, best, ts.is_null(), best.is_null())) {
+            best = ts;
+            ndx = t;
+        }
+    }
 
+    if (return_ndx)
+        *return_ndx = ndx;
+
+    return best;
+}
+
+// sum
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
@@ -279,7 +302,6 @@ double TableViewBase::sum_double(size_t column_ndx) const
 }
 
 // Maximum
-
 int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
@@ -295,7 +317,7 @@ double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) cons
 {
     return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
+OldDateTime TableViewBase::maximum_olddatetime(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
@@ -303,8 +325,13 @@ DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) 
         return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 
-// Minimum
+Timestamp TableViewBase::maximum_timestamp(size_t column_ndx, size_t* return_ndx) const
+{
+    return minmax_timestamp<realm::Greater>(column_ndx, return_ndx);
+}
 
+
+// Minimum
 int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
@@ -320,12 +347,17 @@ double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) cons
 {
     return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
+OldDateTime TableViewBase::minimum_olddatetime(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
         return aggregate<act_Max, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
     else
         return aggregate<act_Max, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+}
+
+Timestamp TableViewBase::minimum_timestamp(size_t column_ndx, size_t* return_ndx) const
+{
+    return minmax_timestamp<realm::Less> (column_ndx, return_ndx);
 }
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
@@ -360,6 +392,19 @@ size_t TableViewBase::count_float(size_t column_ndx, float target) const
 size_t TableViewBase::count_double(size_t column_ndx, double target) const
 {
     return aggregate<act_Count, double, size_t, DoubleColumn>(nullptr, column_ndx, target);
+}
+
+size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
+{
+    size_t count = 0;
+    for (size_t t = 0; t < size(); t++) {
+        Timestamp ts = get_timestamp(column_ndx, t);
+        realm::Equal e;
+        if (e(ts, target, ts.is_null(), target.is_null())) {
+            count++;
+        }
+    }
+    return count;
 }
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.

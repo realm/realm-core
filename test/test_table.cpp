@@ -614,7 +614,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
         DescriptorRef sub1;
         table.add_column(type_Int,      "int");              //  0
         table.add_column(type_Bool,     "bool");             //  1
-        table.add_column(type_DateTime, "date");             //  2
+        table.add_column(type_OldDateTime, "date");             //  2
         table.add_column(type_Float,    "float");            //  3
         table.add_column(type_Double,   "double");           //  4
         table.add_column(type_String,   "string");           //  5
@@ -645,7 +645,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i)
         table.set_bool(1, i, (i % 2 ? true : false));
     for (size_t i = 0; i < rows; ++i)
-        table.set_datetime(2, i, 12345);
+        table.set_olddatetime(2, i, 12345);
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.set_float(3, i, 123.456f*sign);
@@ -720,7 +720,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
                 table.set_mixed(11, i, "string");
                 break;
             case 3:
-                table.set_mixed(11, i, DateTime(123456789));
+                table.set_mixed(11, i, OldDateTime(123456789));
                 break;
             case 4:
                 table.set_mixed(11, i, BinaryData("binary", 7));
@@ -888,7 +888,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
         sub_1->add_column(type_Bool,     "bool");          // 1
         sub_1->add_column(type_Float,    "float");         // 2
         sub_1->add_column(type_Double,   "double");        // 3
-        sub_1->add_column(type_DateTime, "date");          // 4
+        sub_1->add_column(type_OldDateTime, "date");          // 4
         sub_1->add_column(type_String,   "string");        // 5
         sub_1->add_column(type_Binary,   "binary");        // 6
         sub_1->add_column(type_Table,    "table", &sub_2); // 7
@@ -913,7 +913,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->find_first_bool(1, false));
     CHECK_EQUAL(not_found, degen_child->find_first_float(2, 0));
     CHECK_EQUAL(not_found, degen_child->find_first_double(3, 0));
-    CHECK_EQUAL(not_found, degen_child->find_first_datetime(4, DateTime()));
+    CHECK_EQUAL(not_found, degen_child->find_first_olddatetime(4, OldDateTime()));
     CHECK_EQUAL(not_found, degen_child->find_first_string(5, StringData("")));
 //    CHECK_EQUAL(not_found, degen_child->find_first_binary(6, BinaryData())); // Exists but not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->find_first_subtable(7, subtab)); // Not yet implemented
@@ -923,7 +923,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->find_all_bool(1, false).size());
     CHECK_EQUAL(0, degen_child->find_all_float(2, 0).size());
     CHECK_EQUAL(0, degen_child->find_all_double(3, 0).size());
-    CHECK_EQUAL(0, degen_child->find_all_datetime(4, DateTime()).size());
+    CHECK_EQUAL(0, degen_child->find_all_olddatetime(4, OldDateTime()).size());
     CHECK_EQUAL(0, degen_child->find_all_string(5, StringData("")).size());
 //    CHECK_EQUAL(0, degen_child->find_all_binary(6, BinaryData()).size()); // Exists but not yet implemented
 //    CHECK_EQUAL(0, degen_child->find_all_subtable(7, subtab).size()); // Not yet implemented
@@ -965,12 +965,12 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->minimum_int(0));
     CHECK_EQUAL(0, degen_child->minimum_float(2));
     CHECK_EQUAL(0, degen_child->minimum_double(3));
-    CHECK_EQUAL(0, degen_child->minimum_datetime(4));
+    CHECK_EQUAL(0, degen_child->minimum_olddatetime(4));
 
     CHECK_EQUAL(0, degen_child->maximum_int(0));
     CHECK_EQUAL(0, degen_child->maximum_float(2));
     CHECK_EQUAL(0, degen_child->maximum_double(3));
-    CHECK_EQUAL(0, degen_child->maximum_datetime(4));
+    CHECK_EQUAL(0, degen_child->maximum_olddatetime(4));
 
     CHECK_EQUAL(0, degen_child->sum_int(0));
     CHECK_EQUAL(0, degen_child->sum_float(2));
@@ -986,7 +986,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().equal(1, false).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal_datetime(4, DateTime()).find());
+    CHECK_EQUAL(not_found, degen_child->where().equal_olddatetime(4, OldDateTime()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData("")).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().equal(7, subtab).find()); // Not yet implemented
@@ -995,7 +995,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().not_equal(0, int64_t()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(2, float()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(3, double()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal_datetime(4, DateTime()).find());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal_olddatetime(4, OldDateTime()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData("")).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find()); // Not yet implemented
@@ -1376,7 +1376,7 @@ TEST(Table_IndexStringTwice)
 }
 
 
-// Tests Table part of index on Int, DateTime and Bool columns. For a more exhaustive
+// Tests Table part of index on Int, OldDateTime and Bool columns. For a more exhaustive
 // test of the integer index (bypassing Table), see test_index_string.cpp)
 TEST(Table_IndexInteger)
 {
@@ -1384,7 +1384,7 @@ TEST(Table_IndexInteger)
     size_t r;
 
     table.add_column(type_Int, "ints");
-    table.add_column(type_DateTime, "date");
+    table.add_column(type_OldDateTime, "date");
     table.add_column(type_Bool, "date");
 
     table.add_empty_row(13);
@@ -1410,8 +1410,8 @@ TEST(Table_IndexInteger)
     table.add_search_index(2);
     CHECK(table.has_search_index(2));
 
-    table.set_datetime(1, 10, DateTime(43));
-    r = table.find_first_datetime(1, DateTime(43));
+    table.set_olddatetime(1, 10, OldDateTime(43));
+    r = table.find_first_olddatetime(1, OldDateTime(43));
     CHECK_EQUAL(10, r);
 
     table.set_bool(2, 11, true);
@@ -1630,12 +1630,12 @@ TEST(Table_DistinctDouble)
 TEST(Table_DistinctDateTime)
 {
     Table table;
-    table.add_column(type_DateTime, "first");
+    table.add_column(type_OldDateTime, "first");
     table.add_empty_row(4);
-    table.set_datetime(0, 0, DateTime(0));
-    table.set_datetime(0, 1, DateTime(1));
-    table.set_datetime(0, 2, DateTime(3));
-    table.set_datetime(0, 3, DateTime(3));
+    table.set_olddatetime(0, 0, OldDateTime(0));
+    table.set_olddatetime(0, 1, OldDateTime(1));
+    table.set_olddatetime(0, 2, OldDateTime(3));
+    table.set_olddatetime(0, 3, OldDateTime(3));
 
     table.add_search_index(0);
     CHECK(table.has_search_index(0));
@@ -2681,7 +2681,7 @@ TEST(Table_Mixed)
 
     table.insert_empty_row(3);
     table.set_int(0, 3, 0);
-    table.set_mixed(1, 3, DateTime(324234));
+    table.set_mixed(1, 3, OldDateTime(324234));
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -2689,11 +2689,11 @@ TEST(Table_Mixed)
     CHECK_EQUAL(type_Bool,    table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(type_Int,     table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(type_String,  table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_DateTime,table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_OldDateTime,table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_olddatetime());
 
     table.insert_empty_row(4);
     table.set_int(0, 4, 43);
@@ -2706,12 +2706,12 @@ TEST(Table_Mixed)
     CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_OldDateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_olddatetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
@@ -2727,13 +2727,13 @@ TEST(Table_Mixed)
     CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_OldDateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(type_Table,  table.get_mixed(1, 5).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_olddatetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
@@ -2770,7 +2770,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_OldDateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(type_Table,  table.get_mixed(1, 5).get_type());
     CHECK_EQUAL(type_Float,  table.get_mixed(1, 6).get_type());
@@ -2778,7 +2778,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_olddatetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
     CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
@@ -2801,17 +2801,17 @@ TEST(Table_Mixed2)
 
     table.add(int64_t(1));
     table.add(true);
-    table.add(DateTime(1234));
+    table.add(OldDateTime(1234));
     table.add("test");
 
     CHECK_EQUAL(type_Int,      table[0].first.get_type());
     CHECK_EQUAL(type_Bool,     table[1].first.get_type());
-    CHECK_EQUAL(type_DateTime, table[2].first.get_type());
+    CHECK_EQUAL(type_OldDateTime, table[2].first.get_type());
     CHECK_EQUAL(type_String,   table[3].first.get_type());
 
     CHECK_EQUAL(1,            table[0].first.get_int());
     CHECK_EQUAL(true,         table[1].first.get_bool());
-    CHECK_EQUAL(1234,         table[2].first.get_datetime());
+    CHECK_EQUAL(1234,         table[2].first.get_olddatetime());
     CHECK_EQUAL("test",       table[3].first.get_string());
 }
 
@@ -3146,7 +3146,7 @@ TEST(Table_SetMethod)
 
 namespace {
 REALM_TABLE_2(TableDateAndBinary,
-              date, DateTime,
+              date, OldDateTime,
               bin, Binary)
 } // anonymous namespace
 
@@ -3171,7 +3171,7 @@ TEST(Table_DateAndBinary)
         int64_t date = std::numeric_limits<int64_t>::max() - 400;
 
         t.add(date, BinaryData(""));
-        CHECK_EQUAL(t[0].date.get().get_datetime(), date);
+        CHECK_EQUAL(t[0].date.get().get_olddatetime(), date);
     }
 }
 
@@ -3363,7 +3363,7 @@ REALM_TABLE_3(TableAgg,
               c_float, Float,
               c_double, Double)
 
-                // TODO: Bool? DateTime
+                // TODO: Bool? OldDateTime
 } // anonymous namespace
 
 #if TEST_DURATION > 0
@@ -3452,7 +3452,8 @@ TEST(Table_Aggregates3)
         table->insert_column(0, type_Int, "Price", nullable);
         table->insert_column(1, type_Float, "Shipping", nullable);
         table->insert_column(2, type_Double, "Rating", nullable);
-        table->insert_column(3, type_DateTime, "Delivery date", nullable);
+        table->insert_column(3, type_OldDateTime, "Delivery date", nullable);
+        table->insert_column(4, type_Timestamp, "Delivery date 2", nullable);
 
         table->add_empty_row(3);
 
@@ -3468,57 +3469,82 @@ TEST(Table_Aggregates3)
         table->set_double(2, 1, 2.2);
         // table->set_null(2, 2);
 
-        table->set_datetime(3, 0, DateTime(2016, 2, 2));
+        table->set_olddatetime(3, 0, OldDateTime(2016, 2, 2));
         // table->set_null(3, 1);
-        table->set_datetime(3, 2, DateTime(2016, 6, 6));
+        table->set_olddatetime(3, 2, OldDateTime(2016, 6, 6));
+
+        table->set_timestamp(4, 0, Timestamp(2, 2));
+        // table->set_null(4, 1);
+        table->set_timestamp(4, 2, Timestamp(6, 6));
 
         size_t count;
         size_t pos;
         if (nullable) {
             // max
             pos = 123;
+            CHECK_EQUAL(table->maximum_int(0), 3);
             CHECK_EQUAL(table->maximum_int(0, &pos), 3);
             CHECK_EQUAL(pos, 2);
 
             pos = 123;
+            CHECK_EQUAL(table->maximum_float(1), 30.f);
             CHECK_EQUAL(table->maximum_float(1, &pos), 30.f);
             CHECK_EQUAL(pos, 2);
 
             pos = 123;
+            CHECK_EQUAL(table->maximum_double(2), 2.2);
             CHECK_EQUAL(table->maximum_double(2, &pos), 2.2);
             CHECK_EQUAL(pos, 1);
 
             pos = 123;
-            CHECK_EQUAL(table->maximum_datetime(3, &pos), DateTime(2016, 6, 6));
+            CHECK_EQUAL(table->maximum_olddatetime(3), OldDateTime(2016, 6, 6));
+            CHECK_EQUAL(table->maximum_olddatetime(3, &pos), OldDateTime(2016, 6, 6));
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_timestamp(4), Timestamp(6, 6));
+            CHECK_EQUAL(table->maximum_timestamp(4, &pos), Timestamp(6, 6));
             CHECK_EQUAL(pos, 2);
 
             // min
             pos = 123;
+            CHECK_EQUAL(table->minimum_int(0), 1);
             CHECK_EQUAL(table->minimum_int(0, &pos), 1);
             CHECK_EQUAL(pos, 0);
 
             pos = 123;
+            CHECK_EQUAL(table->minimum_float(1), 30.f);
             CHECK_EQUAL(table->minimum_float(1, &pos), 30.f);
             CHECK_EQUAL(pos, 2);
 
             pos = 123;
+            CHECK_EQUAL(table->minimum_double(2), 1.1);
             CHECK_EQUAL(table->minimum_double(2, &pos), 1.1);
             CHECK_EQUAL(pos, 0);
 
             pos = 123;
-            CHECK_EQUAL(table->minimum_datetime(3, &pos), DateTime(2016, 2, 2));
+            CHECK_EQUAL(table->minimum_olddatetime(3), OldDateTime(2016, 2, 2));
+            CHECK_EQUAL(table->minimum_olddatetime(3, &pos), OldDateTime(2016, 2, 2));
+            CHECK_EQUAL(pos, 0);
+
+            pos = 123;
+            CHECK_EQUAL(table->minimum_timestamp(4), Timestamp(2, 2));
+            CHECK_EQUAL(table->minimum_timestamp(4, &pos), Timestamp(2, 2));
             CHECK_EQUAL(pos, 0);
 
             // average
             count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_int(0), (1 + 3) / 2., 0.01);
             CHECK_APPROXIMATELY_EQUAL(table->average_int(0, &count), (1 + 3) / 2., 0.01);
             CHECK_EQUAL(count, 2);
 
             count = 123;
+            CHECK_EQUAL(table->average_float(1), 30.f);
             CHECK_EQUAL(table->average_float(1, &count), 30.f);
             CHECK_EQUAL(count, 1);
 
             count = 123;
+            CHECK_APPROXIMATELY_EQUAL(table->average_double(2), (1.1 + 2.2) / 2., 0.01);
             CHECK_APPROXIMATELY_EQUAL(table->average_double(2, &count), (1.1 + 2.2) / 2., 0.01);
             CHECK_EQUAL(count, 2);
 
@@ -3542,7 +3568,11 @@ TEST(Table_Aggregates3)
             CHECK_EQUAL(pos, 1);
 
             pos = 123;
-            CHECK_EQUAL(table->maximum_datetime(3, &pos), DateTime(2016, 6, 6));
+            CHECK_EQUAL(table->maximum_olddatetime(3, &pos), OldDateTime(2016, 6, 6));
+            CHECK_EQUAL(pos, 2);
+
+            pos = 123;
+            CHECK_EQUAL(table->maximum_timestamp(4, &pos), Timestamp(6, 6));
             CHECK_EQUAL(pos, 2);
 
             // min
@@ -3559,7 +3589,12 @@ TEST(Table_Aggregates3)
             CHECK_EQUAL(pos, 2);
 
             pos = 123;
-            CHECK_EQUAL(table->minimum_datetime(3, &pos), DateTime(0));
+            CHECK_EQUAL(table->minimum_olddatetime(3, &pos), OldDateTime(0));
+            CHECK_EQUAL(pos, 1);
+
+            pos = 123;
+            // Timestamp(0, 0) is default value for non-nullable column
+            CHECK_EQUAL(table->minimum_timestamp(4, &pos), Timestamp(0, 0));
             CHECK_EQUAL(pos, 1);
 
             // average
@@ -3582,6 +3617,25 @@ TEST(Table_Aggregates3)
         }
     }
 }
+
+
+TEST(Table_EmptyMinmax)
+{
+    Group g;
+    TableRef table = g.add_table("");
+    table->add_column(type_Timestamp, "");
+
+    size_t min_index;
+    Timestamp min_ts = table->minimum_timestamp(0, &min_index);
+    CHECK_EQUAL(min_index, realm::npos);
+    CHECK(min_ts.is_null());
+
+    size_t max_index;
+    Timestamp max_ts = table->maximum_timestamp(0, &max_index);
+    CHECK_EQUAL(max_index, realm::npos);
+    CHECK(max_ts.is_null());
+}
+
 
 TEST(Table_LanguageBindings)
 {
@@ -3772,10 +3826,17 @@ void compare_table_with_slice(TestContext& test_context, const Table& table,
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
-            case type_DateTime:
+            case type_OldDateTime:
                 for (size_t i = 0; i != size; ++i) {
-                    DateTime v_1 = table.get_datetime(col_i, offset + i);
-                    DateTime v_2 = slice.get_datetime(col_i, i);
+                    OldDateTime v_1 = table.get_olddatetime(col_i, offset + i);
+                    OldDateTime v_2 = slice.get_olddatetime(col_i, i);
+                    CHECK_EQUAL(v_1, v_2);
+                }
+                break;
+            case type_Timestamp:
+                for (size_t i = 0; i != size; ++i) {
+                    Timestamp v_1 = table.get_timestamp(col_i, offset + i);
+                    Timestamp v_2 = slice.get_timestamp(col_i, i);
                     CHECK_EQUAL(v_1, v_2);
                 }
                 break;
@@ -3811,8 +3872,11 @@ void compare_table_with_slice(TestContext& test_context, const Table& table,
                             case type_Binary:
                                 CHECK_EQUAL(v_1.get_binary(), v_2.get_binary());
                                 break;
-                            case type_DateTime:
-                                CHECK_EQUAL(v_1.get_datetime(), v_2.get_datetime());
+                            case type_OldDateTime:
+                                CHECK_EQUAL(v_1.get_olddatetime(), v_2.get_olddatetime());
+                                break;
+                            case type_Timestamp:
+                                CHECK_EQUAL(v_1.get_timestamp(), v_2.get_timestamp());
                                 break;
                             case type_Table: {
                                 ConstTableRef t_1 = table.get_subtable(col_i, offset + i);
@@ -4808,7 +4872,7 @@ TEST(Table_RowAccessor)
     table.add_column(type_Double,   "");
     table.add_column(type_String,   "");
     table.add_column(type_Binary,   "", true);
-    table.add_column(type_DateTime, "");
+    table.add_column(type_OldDateTime, "");
     table.add_column(type_Table,    "", &subdesc);
     table.add_column(type_Mixed,    "");
     subdesc->add_column(type_Int, "i");
@@ -4835,7 +4899,7 @@ TEST(Table_RowAccessor)
     table.set_double   (3, 1, 2169.0);
     table.set_string   (4, 1, "str");
     table.set_binary   (5, 1, bin);
-    table.set_datetime (6, 1, 7739);
+    table.set_olddatetime (6, 1, 7739);
     table.set_subtable (7, 1, &one_subtab);
     table.set_mixed    (8, 1, Mixed("mix"));
 
@@ -4855,7 +4919,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(double(),        table[0].get_double        (3));
         CHECK_EQUAL(StringData(""),    table[0].get_string        (4));
         CHECK_EQUAL(BinaryData(),    table[0].get_binary        (5));
-        CHECK_EQUAL(DateTime(),      table[0].get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(),      table[0].get_olddatetime      (6));
         CHECK_EQUAL(0,               table[0].get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  table[0].get_mixed         (8));
         CHECK_EQUAL(type_Int,        table[0].get_mixed_type    (8));
@@ -4866,7 +4930,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(2169.0,          table[1].get_double        (3));
         CHECK_EQUAL("str",           table[1].get_string        (4));
         CHECK_EQUAL(bin,             table[1].get_binary        (5));
-        CHECK_EQUAL(DateTime(7739),  table[1].get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(7739),  table[1].get_olddatetime      (6));
         CHECK_EQUAL(1,               table[1].get_subtable_size (7));
         CHECK_EQUAL("mix",           table[1].get_mixed         (8));
         CHECK_EQUAL(type_String,     table[1].get_mixed_type    (8));
@@ -4896,7 +4960,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(double(),        const_table[0].get_double        (3));
         CHECK_EQUAL(StringData(""),  const_table[0].get_string        (4));
         CHECK_EQUAL(BinaryData(),  const_table[0].get_binary        (5));
-        CHECK_EQUAL(DateTime(),      const_table[0].get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(),      const_table[0].get_olddatetime      (6));
         CHECK_EQUAL(0,               const_table[0].get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  const_table[0].get_mixed         (8));
         CHECK_EQUAL(type_Int,        const_table[0].get_mixed_type    (8));
@@ -4907,7 +4971,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(2169.0,          const_table[1].get_double        (3));
         CHECK_EQUAL("str",           const_table[1].get_string        (4));
         CHECK_EQUAL(bin,             const_table[1].get_binary        (5));
-        CHECK_EQUAL(DateTime(7739),  const_table[1].get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(7739),  const_table[1].get_olddatetime      (6));
         CHECK_EQUAL(1,               const_table[1].get_subtable_size (7));
         CHECK_EQUAL("mix",           const_table[1].get_mixed         (8));
         CHECK_EQUAL(type_String,     const_table[1].get_mixed_type    (8));
@@ -4938,7 +5002,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(double(),        row_0.get_double        (3));
         CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
         CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
-        CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(),      row_0.get_olddatetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
         CHECK_EQUAL(type_Int,        row_0.get_mixed_type    (8));
@@ -4949,7 +5013,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(2169.0,          row_1.get_double        (3));
         CHECK_EQUAL("str",           row_1.get_string        (4));
         CHECK_EQUAL(bin,             row_1.get_binary        (5));
-        CHECK_EQUAL(DateTime(7739),  row_1.get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(7739),  row_1.get_olddatetime      (6));
         CHECK_EQUAL(1,               row_1.get_subtable_size (7));
         CHECK_EQUAL("mix",           row_1.get_mixed         (8));
         CHECK_EQUAL(type_String,     row_1.get_mixed_type    (8));
@@ -4972,7 +5036,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(double(),        row_0.get_double        (3));
         CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
         CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
-        CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(),      row_0.get_olddatetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
         CHECK_EQUAL(type_Int,        row_0.get_mixed_type    (8));
@@ -4983,7 +5047,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(2169.0,          row_1.get_double        (3));
         CHECK_EQUAL("str",           row_1.get_string        (4));
         CHECK_EQUAL(bin,             row_1.get_binary        (5));
-        CHECK_EQUAL(DateTime(7739),  row_1.get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(7739),  row_1.get_olddatetime      (6));
         CHECK_EQUAL(1,               row_1.get_subtable_size (7));
         CHECK_EQUAL("mix",           row_1.get_mixed         (8));
         CHECK_EQUAL(type_String,     row_1.get_mixed_type    (8));
@@ -5006,7 +5070,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(double(),        row_0.get_double        (3));
         CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
         CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
-        CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(),      row_0.get_olddatetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
         CHECK_EQUAL(type_Int,        row_0.get_mixed_type    (8));
@@ -5017,7 +5081,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(2169.0,          row_1.get_double        (3));
         CHECK_EQUAL("str",           row_1.get_string        (4));
         CHECK_EQUAL(bin,             row_1.get_binary        (5));
-        CHECK_EQUAL(DateTime(7739),  row_1.get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(7739),  row_1.get_olddatetime      (6));
         CHECK_EQUAL(1,               row_1.get_subtable_size (7));
         CHECK_EQUAL("mix",           row_1.get_mixed         (8));
         CHECK_EQUAL(type_String,     row_1.get_mixed_type    (8));
@@ -5040,7 +5104,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(double(),        row_0.get_double        (3));
         CHECK_EQUAL(StringData(""),  row_0.get_string        (4));
         CHECK_EQUAL(BinaryData(),  row_0.get_binary        (5));
-        CHECK_EQUAL(DateTime(),      row_0.get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(),      row_0.get_olddatetime      (6));
         CHECK_EQUAL(0,               row_0.get_subtable_size (7));
         CHECK_EQUAL(int_fast64_t(),  row_0.get_mixed         (8));
         CHECK_EQUAL(type_Int,        row_0.get_mixed_type    (8));
@@ -5051,7 +5115,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(2169.0,          row_1.get_double        (3));
         CHECK_EQUAL("str",           row_1.get_string        (4));
         CHECK_EQUAL(bin,             row_1.get_binary        (5));
-        CHECK_EQUAL(DateTime(7739),  row_1.get_datetime      (6));
+        CHECK_EQUAL(OldDateTime(7739),  row_1.get_olddatetime      (6));
         CHECK_EQUAL(1,               row_1.get_subtable_size (7));
         CHECK_EQUAL("mix",           row_1.get_mixed         (8));
         CHECK_EQUAL(type_String,     row_1.get_mixed_type    (8));
@@ -5074,7 +5138,7 @@ TEST(Table_RowAccessor)
         row_0.set_double   (3, 1937.0);
         row_0.set_string   (4, "foo");
         row_0.set_binary   (5, bin);
-        row_0.set_datetime (6, DateTime(9992));
+        row_0.set_olddatetime (6, OldDateTime(9992));
         row_0.set_subtable (7, &one_subtab);
         row_0.set_mixed    (8, Mixed(3637.0f));
 
@@ -5084,7 +5148,7 @@ TEST(Table_RowAccessor)
         row_1.set_double   (3, double());
         row_1.set_string   (4, StringData(""));
         row_1.set_binary   (5, BinaryData());
-        row_1.set_datetime (6, DateTime());
+        row_1.set_olddatetime (6, OldDateTime());
         row_1.set_subtable (7, 0);
         row_1.set_mixed    (8, Mixed());
 
@@ -5096,7 +5160,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(1937.0,          table.get_double   (3,0));
         CHECK_EQUAL("foo",           table.get_string   (4,0));
         CHECK_EQUAL(bin,             table.get_binary   (5,0));
-        CHECK_EQUAL(DateTime(9992),  table.get_datetime (6,0));
+        CHECK_EQUAL(OldDateTime(9992),  table.get_olddatetime (6,0));
         CHECK_EQUAL(3637.0f,         table.get_mixed    (8,0));
 
         CHECK_EQUAL(int_fast64_t(),  table.get_int      (0,1));
@@ -5105,7 +5169,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(double(),        table.get_double   (3,1));
         CHECK_EQUAL(StringData(""),  table.get_string   (4,1));
         CHECK_EQUAL(BinaryData(),  table.get_binary   (5,1));
-        CHECK_EQUAL(DateTime(),      table.get_datetime (6,1));
+        CHECK_EQUAL(OldDateTime(),      table.get_olddatetime (6,1));
         CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,1));
 
         TableRef subtab_0 = table.get_subtable(7,0);
@@ -5135,7 +5199,7 @@ TEST(Table_RowAccessor)
         table[0].set_double   (3, double());
         table[0].set_string   (4, StringData(""));
         table[0].set_binary   (5, BinaryData());
-        table[0].set_datetime (6, DateTime());
+        table[0].set_olddatetime (6, OldDateTime());
         table[0].set_subtable (7, 0);
         table[0].set_mixed    (8, Mixed());
 
@@ -5145,7 +5209,7 @@ TEST(Table_RowAccessor)
         table[1].set_double   (3, 1937.0);
         table[1].set_string   (4, "foo");
         table[1].set_binary   (5, bin);
-        table[1].set_datetime (6, DateTime(9992));
+        table[1].set_olddatetime (6, OldDateTime(9992));
         table[1].set_subtable (7, &one_subtab);
         table[1].set_mixed    (8, Mixed(3637.0f));
 
@@ -5157,7 +5221,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(double(),        table.get_double   (3,0));
         CHECK_EQUAL(StringData(""),  table.get_string   (4,0));
         CHECK_EQUAL(BinaryData(),  table.get_binary   (5,0));
-        CHECK_EQUAL(DateTime(),      table.get_datetime (6,0));
+        CHECK_EQUAL(OldDateTime(),      table.get_olddatetime (6,0));
         CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,0));
 
         CHECK_EQUAL(5651,            table.get_int      (0,1));
@@ -5166,7 +5230,7 @@ TEST(Table_RowAccessor)
         CHECK_EQUAL(1937.0,          table.get_double   (3,1));
         CHECK_EQUAL("foo",           table.get_string   (4,1));
         CHECK_EQUAL(bin,             table.get_binary   (5,1));
-        CHECK_EQUAL(DateTime(9992),  table.get_datetime (6,1));
+        CHECK_EQUAL(OldDateTime(9992),  table.get_olddatetime (6,1));
         CHECK_EQUAL(3637.0f,         table.get_mixed    (8,1));
 
         TableRef subtab_0 = table.get_subtable(7,0);
@@ -6184,22 +6248,22 @@ TEST(Table_Nulls)
         Table t;
         t.add_column(type_Int, "int", true);        // nullable = true
         t.add_column(type_Bool, "bool", true);      // nullable = true
-        t.add_column(type_DateTime, "bool", true);  // nullable = true
+        t.add_column(type_OldDateTime, "bool", true);  // nullable = true
 
         t.add_empty_row(2);
 
         t.set_int(0, 0, 65);
         t.set_bool(1, 0, false);
-        t.set_datetime(2, 0, DateTime(3));
+        t.set_olddatetime(2, 0, OldDateTime(3));
 
         CHECK_EQUAL(65, t.get_int(0, 0));
         CHECK_EQUAL(false, t.get_bool(1, 0));
-        CHECK_EQUAL(DateTime(3), t.get_datetime(2, 0));
+        CHECK_EQUAL(OldDateTime(3), t.get_olddatetime(2, 0));
 
         CHECK_EQUAL(65, t.maximum_int(0));
         CHECK_EQUAL(65, t.minimum_int(0));
-        CHECK_EQUAL(DateTime(3), t.maximum_datetime(2));
-        CHECK_EQUAL(DateTime(3), t.minimum_datetime(2));
+        CHECK_EQUAL(OldDateTime(3), t.maximum_olddatetime(2));
+        CHECK_EQUAL(OldDateTime(3), t.minimum_olddatetime(2));
 
         CHECK(!t.is_null(0, 0));
         CHECK(!t.is_null(1, 0));
@@ -6215,11 +6279,11 @@ TEST(Table_Nulls)
 
         CHECK_EQUAL(not_found, t.find_first_int(0, -1));
         CHECK_EQUAL(not_found, t.find_first_bool(1, true));
-        CHECK_EQUAL(not_found, t.find_first_datetime(2, DateTime(5)));
+        CHECK_EQUAL(not_found, t.find_first_olddatetime(2, OldDateTime(5)));
 
         CHECK_EQUAL(0, t.find_first_int(0, 65));
         CHECK_EQUAL(0, t.find_first_bool(1, false));
-        CHECK_EQUAL(0, t.find_first_datetime(2, DateTime(3)));
+        CHECK_EQUAL(0, t.find_first_olddatetime(2, OldDateTime(3)));
 
         t.set_null(0, 0);
         t.set_null(1, 0);
@@ -6396,8 +6460,9 @@ TEST(Table_RowAccessor_Null)
     size_t col_string = table.add_column(type_String,   "string", true);
     size_t col_float  = table.add_column(type_Float,    "float",  true);
     size_t col_double = table.add_column(type_Double,   "double", true);
-    size_t col_date   = table.add_column(type_DateTime, "date",   true);
+    size_t col_date   = table.add_column(type_OldDateTime, "date",   true);
     size_t col_binary = table.add_column(type_Binary,   "binary", true);
+    size_t col_timestamp = table.add_column(type_Timestamp, "timestamp", true);
 
     {
         table.add_empty_row();
@@ -6409,6 +6474,7 @@ TEST(Table_RowAccessor_Null)
         row.set_null(col_double);
         row.set_null(col_date);
         row.set_binary(col_binary, BinaryData());
+        row.set_null(col_timestamp);
     }
     {
         table.add_empty_row();
@@ -6418,8 +6484,9 @@ TEST(Table_RowAccessor_Null)
         row.set_string(col_string, "1");
         row.set_float(col_float, 1.0);
         row.set_double(col_double, 1.0);
-        row.set_datetime(col_date, DateTime(1));
+        row.set_olddatetime(col_date, OldDateTime(1));
         row.set_binary(col_binary, BinaryData("a"));
+        row.set_timestamp(col_timestamp, Timestamp(1, 2));
     }
 
     {
@@ -6431,6 +6498,7 @@ TEST(Table_RowAccessor_Null)
         CHECK(row.is_null(col_double));
         CHECK(row.is_null(col_date));
         CHECK(row.is_null(col_binary));
+        CHECK(row.is_null(col_timestamp));
     }
 
     {
@@ -6440,8 +6508,9 @@ TEST(Table_RowAccessor_Null)
         CHECK_EQUAL("1",             row.get_string(col_string));
         CHECK_EQUAL(1.0,             row.get_float(col_float));
         CHECK_EQUAL(1.0,             row.get_double(col_double));
-        CHECK_EQUAL(DateTime(1),     row.get_datetime(col_date));
+        CHECK_EQUAL(OldDateTime(1),     row.get_olddatetime(col_date));
         CHECK_EQUAL(BinaryData("a"), row.get_binary(col_binary));
+        CHECK_EQUAL(Timestamp(1, 2),   row.get_timestamp(col_timestamp));
     }
 }
 
@@ -6758,13 +6827,14 @@ TEST(Table_StaleLinkIndexOnTableRemove)
 
 TEST(Table_getVersionCounterAfterRowAccessor) {
     Table t;
-    size_t col_bool   = t.add_column(type_Bool,     "bool",   true);
-    size_t col_int    = t.add_column(type_Int,      "int",    true);
-    size_t col_string = t.add_column(type_String,   "string", true);
-    size_t col_float  = t.add_column(type_Float,    "float",  true);
-    size_t col_double = t.add_column(type_Double,   "double", true);
-    size_t col_date   = t.add_column(type_DateTime, "date",   true);
-    size_t col_binary = t.add_column(type_Binary,   "binary", true);
+    size_t col_bool    = t.add_column(type_Bool,     "bool",    true);
+    size_t col_int     = t.add_column(type_Int,      "int",     true);
+    size_t col_string  = t.add_column(type_String,   "string",  true);
+    size_t col_float   = t.add_column(type_Float,    "float",   true);
+    size_t col_double  = t.add_column(type_Double,   "double",  true);
+    size_t col_date    = t.add_column(type_OldDateTime, "date",    true);
+    size_t col_binary  = t.add_column(type_Binary,   "binary",  true);
+    size_t col_timestamp = t.add_column(type_Timestamp,  "timestamp", true);
 
     t.add_empty_row(1);
 
@@ -6791,10 +6861,13 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     t.set_double(col_double, 0, 0.42);
     _CHECK_VER_BUMP();
 
-    t.set_datetime(col_date, 0, 1234);
+    t.set_olddatetime(col_date, 0, 1234);
     _CHECK_VER_BUMP();
 
     t.set_binary(col_binary, 0, BinaryData("binary", 7));
+    _CHECK_VER_BUMP();
+
+    t.set_timestamp(col_timestamp, 0, Timestamp(777, 888));
     _CHECK_VER_BUMP();
 
     t.set_null(0, 0);

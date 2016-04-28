@@ -92,7 +92,12 @@ REALM_TABLE_4(TestTableShared,
               third,  Bool,
               fourth, String)
 
-
+REALM_TABLE_5(TestTableSharedTimestamp,
+                  first,  Int,
+                  second, Int,
+                  third,  Bool,
+                  fourth, String,
+                  fifth, Timestamp)
 
 void writer(std::string path, int id)
 {
@@ -585,13 +590,14 @@ TEST(Shared_1)
     {
         // Create a new shared db
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+        Timestamp first_timestamp_value{1,1};
 
         // Create first table in group
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            t1->add(1, 2, false, "test");
+            TestTableSharedTimestamp::Ref t1 = wt.add_table<TestTableSharedTimestamp>("test");
+            t1->add(1, 2, false, "test", Timestamp{1,1});
             wt.commit();
         }
 
@@ -602,19 +608,20 @@ TEST(Shared_1)
             rt.get_group().verify();
 
             // Verify that last set of changes are commited
-            TestTableShared::ConstRef t2 = rt.get_table<TestTableShared>("test");
+            TestTableSharedTimestamp::ConstRef t2 = rt.get_table<TestTableSharedTimestamp>("test");
             CHECK(t2->size() == 1);
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
             CHECK_EQUAL("test", t2[0].fourth);
+            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
 
             // Do a new change while stil having current read transaction open
             {
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-                t1->add(2, 3, true, "more test");
+                TestTableSharedTimestamp::Ref t1 = wt.get_table<TestTableSharedTimestamp>("test");
+                t1->add(2, 3, true, "more test", Timestamp{2,2});
                 wt.commit();
             }
 
@@ -625,14 +632,14 @@ TEST(Shared_1)
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
             CHECK_EQUAL("test", t2[0].fourth);
-
+            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
             // Do one more new change while stil having current read transaction open
             // so we know that it does not overwrite data held by
             {
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-                t1->add(0, 1, false, "even more test");
+                TestTableSharedTimestamp::Ref t1 = wt.get_table<TestTableSharedTimestamp>("test");
+                t1->add(0, 1, false, "even more test", Timestamp{3,3});
                 wt.commit();
             }
 
@@ -643,27 +650,33 @@ TEST(Shared_1)
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
             CHECK_EQUAL("test", t2[0].fourth);
+            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
         }
 
         // Start a new read transaction and verify that it can now see the changes
         {
             ReadTransaction rt(sg2);
             rt.get_group().verify();
-            TestTableShared::ConstRef t3 = rt.get_table<TestTableShared>("test");
+            TestTableSharedTimestamp::ConstRef t3 = rt.get_table<TestTableSharedTimestamp>("test");
 
             CHECK(t3->size() == 3);
             CHECK_EQUAL(1, t3[0].first);
             CHECK_EQUAL(2, t3[0].second);
             CHECK_EQUAL(false, t3[0].third);
             CHECK_EQUAL("test", t3[0].fourth);
+            CHECK_EQUAL(first_timestamp_value, t3[0].fifth);
             CHECK_EQUAL(2, t3[1].first);
             CHECK_EQUAL(3, t3[1].second);
             CHECK_EQUAL(true, t3[1].third);
             CHECK_EQUAL("more test", t3[1].fourth);
+            Timestamp second_timestamp_value{2,2};
+            CHECK_EQUAL(second_timestamp_value, t3[1].fifth);
             CHECK_EQUAL(0, t3[2].first);
             CHECK_EQUAL(1, t3[2].second);
             CHECK_EQUAL(false, t3[2].third);
             CHECK_EQUAL("even more test", t3[2].fourth);
+            Timestamp third_timestamp_value{3,3};
+            CHECK_EQUAL(third_timestamp_value, t3[2].fifth);
         }
     }
 
@@ -1427,7 +1440,7 @@ TEST(Shared_FormerErrorCase1)
         table->add_column(type_Int,      "alpha");
         table->add_column(type_Bool,     "beta");
         table->add_column(type_Int,      "gamma");
-        table->add_column(type_DateTime, "delta");
+        table->add_column(type_OldDateTime, "delta");
         table->add_column(type_String,   "epsilon");
         table->add_column(type_Binary,   "zeta");
         table->add_column(type_Table,    "eta", &sub_1);

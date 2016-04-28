@@ -1265,7 +1265,7 @@ TEST(Group_Serialize_All)
 
     table->add_column(type_Int,      "int");
     table->add_column(type_Bool,     "bool");
-    table->add_column(type_DateTime, "date");
+    table->add_column(type_OldDateTime, "date");
     table->add_column(type_String,   "string");
     table->add_column(type_Binary,   "binary");
     table->add_column(type_Mixed,    "mixed");
@@ -1273,7 +1273,7 @@ TEST(Group_Serialize_All)
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
-    table->set_datetime(2, 0, 12345);
+    table->set_olddatetime(2, 0, 12345);
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
     table->set_mixed(5, 0, false);
@@ -1289,7 +1289,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK_EQUAL(12345, t->get_datetime(2, 0));
+    CHECK_EQUAL(12345, t->get_olddatetime(2, 0));
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).size());
     CHECK_EQUAL("binary", t->get_binary(4, 0).data());
@@ -1308,17 +1308,19 @@ TEST(Group_Persist)
     TableRef table = db.add_table("test");
     table->add_column(type_Int,      "int");
     table->add_column(type_Bool,     "bool");
-    table->add_column(type_DateTime, "date");
+    table->add_column(type_OldDateTime, "date");
     table->add_column(type_String,   "string");
     table->add_column(type_Binary,   "binary");
     table->add_column(type_Mixed,    "mixed");
+    table->add_column(type_Timestamp,  "timestamp");
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
-    table->set_datetime(2, 0, 12345);
+    table->set_olddatetime(2, 0, 12345);
     table->set_string(3, 0, "test");
     table->set_binary(4, 0, BinaryData("binary", 7));
     table->set_mixed(5, 0, false);
+    table->set_timestamp(6, 0, Timestamp(111, 222));
 
     // Write changes to file
     db.commit();
@@ -1327,16 +1329,17 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(7, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(12345, table->get_datetime(2, 0));
+    CHECK_EQUAL(12345, table->get_olddatetime(2, 0));
     CHECK_EQUAL("test", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
+    CHECK(table->get_timestamp(6, 0) == Timestamp(111, 222));
 
     // Change a bit
     table->set_string(3, 0, "Changed!");
@@ -1348,16 +1351,17 @@ TEST(Group_Persist)
     db.verify();
 #endif
 
-    CHECK_EQUAL(6, table->get_column_count());
+    CHECK_EQUAL(7, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(12345, table->get_datetime(2, 0));
+    CHECK_EQUAL(12345, table->get_olddatetime(2, 0));
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
+    CHECK(table->get_timestamp(6, 0) == Timestamp(111, 222));
 }
 
 
@@ -2426,7 +2430,7 @@ TEST(Group_ToDot)
     DescriptorRef subdesc;
     s.add_column(type_Int,      "int");
     s.add_column(type_Bool,     "bool");
-    s.add_column(type_DateTime, "date");
+    s.add_column(type_OldDateTime, "date");
     s.add_column(type_String,   "string");
     s.add_column(type_String,   "string_long");
     s.add_column(type_String,   "string_enum"); // becomes StringEnumColumn
@@ -2441,7 +2445,7 @@ TEST(Group_ToDot)
         table->insert_empty_row(i);
         table->set_int(0, i, i);
         table->set_bool(1, i, (i % 2 ? true : false));
-        table->set_datetime(2, i, 12345);
+        table->set_olddatetime(2, i, 12345);
 
         std::stringstream ss;
         ss << "string" << i;
@@ -2521,5 +2525,16 @@ TEST(Group_ToDot)
 
 #endif // REALM_TO_DOT
 #endif // REALM_DEBUG
+
+TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::false_type)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+    Group g;
+    TableRef table = g.add_table("");
+    table->insert_column(0, type_Timestamp, "", nullable);
+    table->add_search_index(0);
+    table->add_empty_row(5);
+    CHECK_EQUAL(table->size(), 5);
+}
 
 #endif // TEST_GROUP

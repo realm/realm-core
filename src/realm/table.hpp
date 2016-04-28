@@ -38,6 +38,8 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
+#include <realm/column_binary.hpp>
+#include <realm/column_timestamp.hpp>
 
 namespace realm {
 
@@ -401,13 +403,14 @@ public:
     // Get cell values. Will assert if the requested type does not match the column type
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
-    DateTime    get_datetime(size_t column_ndx, size_t row_ndx) const noexcept;
+    OldDateTime get_olddatetime(size_t column_ndx, size_t row_ndx) const noexcept;
     float       get_float(size_t column_ndx, size_t row_ndx) const noexcept;
     double      get_double(size_t column_ndx, size_t row_ndx) const noexcept;
     StringData  get_string(size_t column_ndx, size_t row_ndx) const noexcept;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
+    Timestamp   get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
 
     template<class T> T get(size_t c, size_t r) const noexcept;
 
@@ -470,7 +473,8 @@ public:
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
+    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value);
+    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value);
     template<class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
@@ -558,11 +562,13 @@ public:
     int64_t maximum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
     float   maximum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  maximum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    OldDateTime maximum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
     int64_t minimum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
     float   minimum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  minimum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    OldDateTime minimum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  average_int(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_double(size_t column_ndx, size_t* value_count = nullptr) const;
@@ -571,7 +577,8 @@ public:
     size_t    find_first_link(size_t target_row_index) const;
     size_t    find_first_int(size_t column_ndx, int64_t value) const;
     size_t    find_first_bool(size_t column_ndx, bool value) const;
-    size_t    find_first_datetime(size_t column_ndx, DateTime value) const;
+    size_t    find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
+    size_t    find_first_timestamp(size_t column_ndx, Timestamp value) const;
     size_t    find_first_float(size_t column_ndx, float value) const;
     size_t    find_first_double(size_t column_ndx, double value) const;
     size_t    find_first_string(size_t column_ndx, StringData value) const;
@@ -584,8 +591,8 @@ public:
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(size_t column_ndx, bool value);
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    TableView      find_all_datetime(size_t column_ndx, DateTime value);
-    ConstTableView find_all_datetime(size_t column_ndx, DateTime value) const;
+    TableView      find_all_olddatetime(size_t column_ndx, OldDateTime value);
+    ConstTableView find_all_olddatetime(size_t column_ndx, OldDateTime value) const;
     TableView      find_all_float(size_t column_ndx, float value);
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     TableView      find_all_double(size_t column_ndx, double value);
@@ -597,7 +604,7 @@ public:
     TableView      find_all_null(size_t column_ndx);
     ConstTableView find_all_null(size_t column_ndx) const;
 
-    /// The following column types are supported: String, Integer, DateTime, Bool
+    /// The following column types are supported: String, Integer, OldDateTime, Bool
     TableView      get_distinct_view(size_t column_ndx);
     ConstTableView get_distinct_view(size_t column_ndx) const;
 
@@ -903,6 +910,9 @@ private:
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
+    
+    // Upgrades OldDateTime columns to Timestamp columns
+    void upgrade_olddatetime();
 
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
@@ -1096,6 +1106,8 @@ private:
     const SubtableColumn& get_column_table(size_t column_ndx) const noexcept;
     MixedColumn& get_column_mixed(size_t column_ndx);
     const MixedColumn& get_column_mixed(size_t column_ndx) const noexcept;
+    TimestampColumn& get_column_timestamp(size_t column_ndx);
+    const TimestampColumn& get_column_timestamp(size_t column_ndx) const noexcept;
     const LinkColumnBase& get_column_link_base(size_t ndx) const noexcept;
     LinkColumnBase& get_column_link_base(size_t ndx);
     const LinkColumn& get_column_link(size_t ndx) const noexcept;
@@ -1368,6 +1380,8 @@ private:
     friend class Query;
     template<class>
     friend class util::bind_ptr;
+    template<class>
+    friend class SimpleQuerySupport;
     friend class LangBindHelper;
     friend class TableViewBase;
     template<class T>
@@ -1697,7 +1711,7 @@ inline Columns<T> Table::column(size_t column)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
         throw(LogicError::type_mismatch);
-    else if (std::is_same<T, realm::DateTime>::value && ct != type_DateTime)
+    else if (std::is_same<T, realm::OldDateTime>::value && ct != type_OldDateTime)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, float>::value && ct != type_Float)
         throw(LogicError::type_mismatch);

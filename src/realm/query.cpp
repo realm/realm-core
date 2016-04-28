@@ -306,7 +306,7 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
     switch (type) {
         case type_Int:
         case type_Bool:
-        case type_DateTime: {
+        case type_OldDateTime: {
             if (is_nullable) {
                 return MakeConditionNode<IntegerNode<IntNullColumn, Cond>>::make(column_ndx, value);
             }
@@ -325,6 +325,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
         }
         case type_Binary: {
             return MakeConditionNode<BinaryNode<Cond>>::make(column_ndx, value);
+        }
+        case type_Timestamp: {
+            return MakeConditionNode<TimestampNode<Cond>>::make(column_ndx, value);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};
@@ -661,6 +664,33 @@ Query& Query::between(size_t column_ndx, double from, double to)
 }
 
 
+// ------------- Timestamp
+Query& Query::greater(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Greater>(column_ndx, value);
+}
+Query& Query::equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Equal>(column_ndx, value);
+}
+Query& Query::not_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<NotEqual>(column_ndx, value);
+}
+Query& Query::greater_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<GreaterEqual>(column_ndx, value);
+}
+Query& Query::less_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<LessEqual>(column_ndx, value);
+}
+Query& Query::less(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Less>(column_ndx, value);
+}
+
+
 // Strings, StringData()
 
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
@@ -868,7 +898,7 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
-DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
+OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
                                  size_t limit, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
@@ -912,13 +942,28 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
                                       return_ndx);
 }
 
-DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                                  size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
     return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+}
+
+Timestamp Query::minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
+{
+    ConstTableView tv;
+    tv = find_all(start, end, limit);
+    Timestamp ts = tv.minimum_timestamp(column_ndx, return_ndx);
+    return ts;
+}
+
+Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
+{
+    ConstTableView tv = find_all(start, end, limit);
+    Timestamp ts = tv.maximum_timestamp(column_ndx, return_ndx);
+    return ts;
 }
 
 
