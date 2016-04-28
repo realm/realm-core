@@ -1493,6 +1493,17 @@ Query Query::operator!()
     return q;
 }
 
+util::Optional<uint_fast64_t> Query::sync_view_if_needed() const
+{
+    if (m_view)
+        return m_view->sync_if_needed();
+
+    if (m_table)
+        return m_table->get_version_counter();
+
+    return util::none;
+}
+
 QueryGroup::QueryGroup(const QueryGroup& other) :
     m_root_node(other.m_root_node ? other.m_root_node->clone() : nullptr),
     m_pending_not(other.m_pending_not), m_subtable_column(other.m_subtable_column), m_state(other.m_state)
