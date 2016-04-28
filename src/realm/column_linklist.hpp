@@ -47,6 +47,7 @@ class TransactLogConvenientEncoder;
 class LinkListColumn: public LinkColumnBase, public ArrayParent {
 public:
     using LinkColumnBase::LinkColumnBase;
+    LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
     ~LinkListColumn() noexcept override;
 
     static ref_type create(Allocator&, size_t size = 0);
@@ -163,6 +164,12 @@ private:
 
 
 // Implementation
+
+inline LinkListColumn::LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx):
+    LinkColumnBase(alloc, ref, table, column_ndx)
+{ 
+    m_list_accessors_contains_tombstones.store(false); 
+}
 
 inline LinkListColumn::~LinkListColumn() noexcept
 {
