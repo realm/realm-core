@@ -49,7 +49,7 @@ public:
     bool is_empty() const noexcept;
 
     /// This method will return 0 if the LinkView is detached (no assert).
-    size_t size() const noexcept override;
+    size_t size() const noexcept;
 
     bool operator==(const LinkView&) const noexcept;
     bool operator!=(const LinkView&) const noexcept;
@@ -100,7 +100,7 @@ public:
     /// returned.
     size_t find(size_t target_row_ndx, size_t start=0) const noexcept;
 
-    const ColumnBase& get_column_base(size_t index) const override; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
+    const ColumnBase& get_column_base(size_t index) const; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
     const Table& get_origin_table() const noexcept;
     Table& get_origin_table() noexcept;
 
@@ -108,10 +108,6 @@ public:
 
     const Table& get_target_table() const noexcept;
     Table& get_target_table() noexcept;
-
-    // No-op because LinkViews are always kept in sync.
-    uint_fast64_t sync_if_needed() const override;
-    bool is_in_sync() const override { return true; }
 
 private:
     struct ctor_cookie {};

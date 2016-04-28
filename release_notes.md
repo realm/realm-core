@@ -27,8 +27,6 @@
 ### Enhancements:
 
 * TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
-* `Query::sync_view_if_needed()` allows for bringing a query's restricting view into sync with
-  its underlying data source.
 
 -----------
 
