@@ -615,7 +615,7 @@ TEST(TimestampColumn_AggregateBug)
     CHECK_EQUAL(npos, index);
 
     Query q;
-    
+
     ts = t.where().maximum_timestamp(0, &index);
     CHECK_EQUAL(npos, index);
 
@@ -702,6 +702,8 @@ TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
         const int64_t milliseconds = timestamp_to_milliseconds(ts);
         CHECK_EQUAL(milliseconds, millis[i]);
     }
+
+    c.destroy();
 }
 
 
