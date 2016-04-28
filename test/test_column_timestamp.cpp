@@ -114,7 +114,7 @@ TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
     StringIndex* index = c.create_search_index();
     CHECK(index);
 
-    for (uint32_t i = 0; i < 100; ++i) {
+    for (int32_t i = 0; i < 100; ++i) {
         c.add(Timestamp{i + 10000, i});
     }
 
@@ -441,7 +441,7 @@ TEST(TimestampColumn_Operators)
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Equal()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::Equal()));
-    CHECK(compare(Timestamp(-1, 2), Timestamp(-1, 2), realm::Equal()));
+    CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::Equal()));
 
     // Test B
     // -----------------------------------------------------------------------------------------
@@ -467,12 +467,12 @@ TEST(TimestampColumn_Operators)
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::GreaterEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::GreaterEqual()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::GreaterEqual()));
-    CHECK(compare(Timestamp(-1, 2), Timestamp(-1, 2), realm::GreaterEqual()));
+    CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::GreaterEqual()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::LessEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::LessEqual()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::LessEqual()));
-    CHECK(compare(Timestamp(-1, 2), Timestamp(-1, 2), realm::LessEqual()));
+    CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::LessEqual()));
 
     // Test E: Sorting order of nulls vs. non-nulls should be the same for Timestamp as for other types
     // -----------------------------------------------------------------------------------------
@@ -532,8 +532,8 @@ TEST_TYPES(TimestampColumn_ForceReallocate, std::true_type, std::false_type)
     ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
     TimestampColumn c(Allocator::get_default(), ref);
 
-    uint32_t items_count = REALM_MAX_BPNODE_SIZE * 5;
-    for (uint32_t i = 0; i < items_count; ++i) {
+    int32_t items_count = REALM_MAX_BPNODE_SIZE * 5;
+    for (int32_t i = 0; i < items_count; ++i) {
         c.add(Timestamp{i, i});
     }
 
@@ -660,4 +660,49 @@ TEST(Table_DistinctTimestamp)
     TableView view = table.get_distinct_view(0);
     CHECK_EQUAL(3, view.size());
 }
+
+
+namespace {
+    // Since C++11, modulo with negative operands is well-defined
+
+    // "Reference implementations" for conversions to and from milliseconds
+    Timestamp milliseconds_to_timestamp(int64_t milliseconds) {
+        int64_t seconds = milliseconds / 1000;
+        int32_t nanoseconds = (milliseconds % 1000) * 1000000;
+        return Timestamp(seconds, nanoseconds);
+    }
+
+    int64_t timestamp_to_milliseconds(const Timestamp& ts) {
+        const int64_t seconds = ts.get_seconds();
+        const int32_t nanoseconds = ts.get_nanoseconds();
+        const int64_t milliseconds = seconds * 1000 + nanoseconds / 1000000; // This may overflow
+        return milliseconds;
+    }
+
+} // unnamed namespace
+
+
+TEST_TYPES(Timestamp_Conversions, std::true_type, std::false_type)
+{
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
+    TimestampColumn c(Allocator::get_default(), ref);
+
+    constexpr int64_t millis[] = {1, 0, -1, 1000, -1000, 1001, -1001, 203558400, 1461746402, -1000000000};
+    constexpr size_t num_millis = sizeof(millis) / sizeof(millis[0]);
+
+    for (size_t i = 0; i < num_millis; ++i) {
+        const int64_t milliseconds = millis[i];
+        const Timestamp ts = milliseconds_to_timestamp(milliseconds);
+        c.add(ts);
+    }
+
+    for (size_t i = 0; i < num_millis; ++i) {
+        const Timestamp ts = c.get(i);
+        const int64_t milliseconds = timestamp_to_milliseconds(ts);
+        CHECK_EQUAL(milliseconds, millis[i]);
+    }
+}
+
+
 #endif // TEST_COLUMN_TIMESTAMP
