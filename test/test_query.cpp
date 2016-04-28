@@ -8566,7 +8566,7 @@ TEST(Query_MoveDoesntDoubleDelete)
     }
 }
 
-ONLY(Query_SyncViewIfNeeded)
+TEST(Query_SyncViewIfNeeded)
 {
     Group group;
     TableRef source = group.add_table("source");
