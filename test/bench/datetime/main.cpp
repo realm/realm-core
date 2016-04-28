@@ -4,9 +4,6 @@
 #include "results.hpp"
 #include "random.hpp"
 
-#include <iostream>
-using namespace std;
-
 using namespace realm;
 using namespace realm::test_util;
 
