@@ -5,6 +5,9 @@
 * Fix of #1605 (LinkView destruction/creation should be thread-safe) and most 
   likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
   possibly also #1164 (crash in SharedGroup destructor on OS X).
+* Copying a `Query` restricted by a `TableView` will now avoid creating a dangling
+  reference to the restricting view if the query owns the view. Dangling references
+  may still occur if the `Query` does not own the restricting `TableView`.
 
 ### API breaking changes:
 
