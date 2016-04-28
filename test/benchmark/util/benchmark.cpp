@@ -1,7 +1,7 @@
-#include "benchmark.hpp" // Benchmark
+#include "benchmark.hpp"
 
-#include "results.hpp" // Results
-#include "timer.hpp" // Timer
+#include "results.hpp"      // Results
+#include "timer.hpp"        // Timer
 
 using namespace realm;
 using namespace realm::test_util;
@@ -39,14 +39,17 @@ void Benchmark::run(Results& results)
     std::string ident = this->ident();
 
     std::string realm_path = "results.realm";
-    std::unique_ptr<SharedGroup> group;
-    group.reset(new SharedGroup(realm_path, false,
-                                SharedGroup::durability_MemOnly, nullptr));
+    std::unique_ptr<SharedGroup> sg;
+    sg.reset(new SharedGroup(realm_path, false,
+                             SharedGroup::durability_MemOnly, nullptr));
 
-    this->before_all(*group);
+    this->before_all(*sg);
 
+    Timer t;
+    this->run_once(*sg, t);
+    results.submit(ident.c_str(), t.get_elapsed_time());
 
-    this->after_all(*group);
+    this->after_all(*sg);
 
     results.finish(ident, lead_text);
 }
