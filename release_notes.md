@@ -8,6 +8,7 @@
 * Copying a `Query` restricted by a `TableView` will now avoid creating a dangling
   reference to the restricting view if the query owns the view. Dangling references
   may still occur if the `Query` does not own the restricting `TableView`.
+* Fixed #1747 (valgrind report of unitialized variable).
 
 ### API breaking changes:
 
