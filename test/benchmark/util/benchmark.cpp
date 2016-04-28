@@ -26,7 +26,7 @@ void Benchmark::run_once(SharedGroup& sg, Timer& timer)
     this->before_each(sg);
     timer.unpause();
 
-    this(sg);
+    this->operator()(sg);
 
     timer.pause();
     this->after_each(sg);

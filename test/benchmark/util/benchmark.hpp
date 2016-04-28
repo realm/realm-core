@@ -3,7 +3,8 @@
 
 #include <realm.hpp>
 
-#include "results.hpp" // Results
+#include "timer.hpp"    // Timer
+#include "results.hpp"  // Results
 
 namespace realm {
 namespace test_util {
