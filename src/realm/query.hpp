@@ -291,6 +291,11 @@ public:
     // True if matching rows are guaranteed to be returned in table order.
     bool produces_results_in_table_order() const { return !m_view; }
 
+    // Calls sync_if_needed on the restricting view, if present.
+    // Returns the current version of the table(s) this query depends on,
+    // or util::none if the query is not associated with a table.
+    util::Optional<uint_fast64_t> sync_view_if_needed() const;
+
     std::string validate();
 
 protected:

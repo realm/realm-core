@@ -300,8 +300,8 @@ public:
     // before any of the other access-methods whenever the view may have become
     // outdated.
     //
-    // This method will throw a DeletedLinkView exception if the TableView
-    // depends on a LinkList that was deleted from its table.
+    // This will make the TableView empty and in sync with the highest possible table version
+    // if the TableView depends on an object (LinkView or row) that has been deleted.
     uint_fast64_t sync_if_needed() const;
 
     // Set this undetached TableView to be a distinct view, and sync immediately.
@@ -332,6 +332,11 @@ public:
     bool is_in_table_order() const;
 
     virtual ~TableViewBase() noexcept;
+
+    virtual std::unique_ptr<TableViewBase> clone() const
+    {
+        return std::unique_ptr<TableViewBase>(new TableViewBase(*this));
+    }
 
 protected:
     // This TableView can be "born" from 5 different sources:
@@ -585,6 +590,11 @@ public:
     Table& get_parent() noexcept;
     const Table& get_parent() const noexcept;
 
+    std::unique_ptr<TableViewBase> clone() const override
+    {
+        return std::unique_ptr<TableViewBase>(new TableView(*this));
+    }
+
     std::unique_ptr<TableViewBase>
     clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const override
     {
@@ -694,6 +704,11 @@ public:
     ConstTableView find_all_string(size_t column_ndx, StringData value) const;
 
     const Table& get_parent() const noexcept;
+
+    std::unique_ptr<TableViewBase> clone() const override
+    {
+        return std::unique_ptr<TableViewBase>(new ConstTableView(*this));
+    }
 
     std::unique_ptr<TableViewBase>
     clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const override

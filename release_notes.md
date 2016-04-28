@@ -2,6 +2,19 @@
 
 ### Bugfixes:
 
+* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most 
+  likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
+  possibly also #1164 (crash in SharedGroup destructor on OS X).
+* Copying a `Query` restricted by a `TableView` will now avoid creating a dangling
+  reference to the restricting view if the query owns the view. Dangling references
+  may still occur if the `Query` does not own the restricting `TableView`.
+* Fixed #1747 (valgrind report of unitialized variable).
+
+### API breaking changes:
+
+* The return value for LangBindHelper::get_linklist_ptr() and the argument
+  to LangBindHelper::unbind_linklist_ptr has changed from being a 'LinkView*'
+  into a 'const LinkViewRef&'.
 * Fixed a bug, where handing over a TableView based on a Query restricted
   by another TableView would fail to propagate synchronization status correctly
   (issue #1698)
@@ -9,9 +22,8 @@
   moves within its table. (Issue #1710)
 * Fixed incorrect semantics when comparing a LinkList column with a Row using a
   query expression. (Issue #1713)
-
-### API breaking changes:
-
+* Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
+  the target row has been deleted.
 * `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
   and will also return true if the target row of a `TableView` that represents backlinks
   is deleted. (Issue #1710)
@@ -21,6 +33,8 @@
 ### Enhancements:
 
 * TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
+* `Query::sync_view_if_needed()` allows for bringing a query's restricting view into sync with
+  its underlying data source.
 
 -----------
 
@@ -80,6 +94,36 @@
 * New failure simulation features: Ability to prime for random triggering.
 
 * S: New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+
+----------------------------------------------
+
+# 0.98.4 Release notes
+
+### Bugfixes:
+
+* Copying a `Query` restricted by a `TableView` will now avoid creating a dangling
+  reference to the restricting view if the query owns the view. Dangling references
+  may still occur if the `Query` does not own the restricting `TableView`. (#1741)
+
+### Enhancements:
+
+* `Query::sync_view_if_needed()` allows for bringing a query's restricting view into sync with
+  its underlying data source. (#1742)
+
+**Note: This is a hotfix release built on top of 0.98.3. The above fixes are
+        not present in version 0.99**
+
+----------------------------------------------
+
+# 0.98.3 Release notes
+
+### Bugfixes:
+
+* Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
+  the target row has been deleted. (Issue #1723)
+
+**Note: This is a hotfix release built on top of 0.98.2. The above fixes are
+        not present in version 0.99**
 
 ----------------------------------------------
 

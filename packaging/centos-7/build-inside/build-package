@@ -58,7 +58,7 @@ fpm \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
-    --maintainer "Sebastian Lauwers <sl@realm.io>" \
+    --maintainer "Realm <help@realm.io>" \
     --after-install /tmp/post-ldconf \
     --after-remove /tmp/post-ldconf \
     -C /prod \
@@ -76,7 +76,7 @@ fpm \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
-    --maintainer "Sebastian Lauwers <sl@realm.io>" \
+    --maintainer "Realm <help@realm.io>" \
     -d "realm = ${VERSION}-${BUILD_NUMBER}.el7" \
     -C /devel \
     usr/lib64 usr/include usr/bin
@@ -93,7 +93,7 @@ fpm \
     --url "https://realm.io" \
     --category "Applications/Databases" \
     --vendor "Realm" \
-    --maintainer "Sebastian Lauwers <sl@realm.io>" \
+    --maintainer "Realm <help@realm.io>" \
     -d "realm = ${VERSION}-${BUILD_NUMBER}.el7" \
     -C /utils \
     usr/bin
