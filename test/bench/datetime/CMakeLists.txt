@@ -17,9 +17,9 @@ add_custom_target(
 )
 
 include_directories(
-    "${CMAKE_CURRENT_LIST_DIR}../../core-builds/${REF}/include")
+    "${CMAKE_CURRENT_LIST_DIR}/../../core-builds/${REF}/include")
 link_directories(
-    "${CMAKE_CURRENT_LIST_DIR}../../core-builds/${REF}/lib")
+    "${CMAKE_CURRENT_LIST_DIR}/../../core-builds/${REF}/lib")
 
 ##########
 ## Util ##
