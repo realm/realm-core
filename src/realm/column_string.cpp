@@ -362,6 +362,10 @@ void StringColumn::set(size_t ndx, StringData value)
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
+
+    // Additionally, if StringIndex::set throws, it is important that
+    // this function returns without actually adding the value to the column.
+
     if (m_search_index) {
         m_search_index->set(ndx, value); // Throws
     }
@@ -1047,7 +1051,15 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
     if (m_search_index) {
         bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
+        try {
+            m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
+        } catch (LogicError& e) {
+            std::unique_ptr<StringIndex> tmp_owner(std::move(m_search_index));
+            // Erase without touching the StringIndex
+            erase_rows(row_ndx_2, num_rows, size(), false);
+            tmp_owner.swap(m_search_index);
+            throw e;
+        }
     }
 }
 
@@ -1057,8 +1069,17 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, 
     size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     bptree_insert(row_ndx_2, value, num_rows); // Throws
 
-    if (m_search_index)
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    if (m_search_index) {
+        try {
+            m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        } catch (LogicError& e) {
+            std::unique_ptr<StringIndex> tmp_owner(std::move(m_search_index));
+            // Erase without touching the StringIndex
+            erase_rows(row_ndx, num_rows, size(), false);
+            tmp_owner.swap(m_search_index);
+            throw e;
+        }
+    }
 }
 
 

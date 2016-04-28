@@ -205,9 +205,43 @@ public:
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
 
-    static const size_t max_string_index_length = 500;
+    // StringIndex is highly optimized for methods like find/count etc. Strings
+    // are stored in chunks of 4 bytes in an unbalanced tree structure. If two
+    // strings have a common prefix, more levels are added to the tree, storing
+    // more of the strings until they differ (fully equivilent strings are stored
+    // in a list though). If two strings are not equivilent but have a very long
+    // common prefix, then the tree structure will be very deeply nested to a depth
+    // of (common_prefix_length / 4). The recursive nature of many functions in
+    // StringIndex (and in realm generally such as array::destroy_deep and group::write)
+    // assume that array nesting is to a reasonable depth, which is certainly true for
+    // a balanced tree structure but not for StringIndex. In practice we observe a
+    // stack overflow in StringIndex for strings with long common prefixes. (Reproducible
+    // on a mac with lengths of 9408 == tree depth of 2352). Rather than removing recursion
+    // we limit the input length to StringIndex here. Stack size may differ across devices
+    // so we use a conservative number here.
+    static const size_t max_string_index_length = 2000;
 
 private:
+
+    // m_array is a compact representation for storing the children of this StringIndex.
+    // Children can be:
+    // 1) a row number
+    // 2) a reference to a list which stores row numbers (for duplicate strings).
+    // 3) a reference to a sub-index
+    // m_array[0] is always a reference to a values array which stores the 4 byte chunk
+    // of payload data for quick string chunk comparisons. The array stored
+    // at m_array[0] lines up with the indices of values in m_array[1] so for example
+    // starting with an empty StringIndex:
+    // StringColumn::insert(target_row_ndx=42, value="test_string") would result with
+    // get_array_from_ref(m_array[0])[0] == create_key("test") and
+    // m_array[1] == 42
+    // In this way, m_array which store one child has a size of two.
+    // Children are type 1 (row number) if the LSB of the value is set.
+    // To get the actual row value, shift value down by one.
+    // If the LSB of the value is 0 then the value is a reference and can be either
+    // type 2, or type 3 (no shifting in either case).
+    // References point to a list if the context header flag is NOT set.
+    // If the header flag is set, references point to a sub-StringIndex (nesting).
     std::unique_ptr<Array> m_array;
     ColumnBase* m_target_column;
     bool m_deny_duplicate_values;
@@ -384,12 +418,12 @@ void StringIndex::insert(size_t row_ndx, util::Optional<T> value, size_t num_row
 template<class T>
 void StringIndex::set(size_t row_ndx, T new_value)
 {
-    if (REALM_UNLIKELY(to_str(new_value).size() > max_string_index_length))
-        throw LogicError(LogicError::string_too_long_for_index);
-
     StringConversionBuffer buffer;
     StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value);
+
+    if (REALM_UNLIKELY(to_str(new_value).size() > max_string_index_length))
+        throw LogicError(LogicError::string_too_long_for_index);
 
     // Note that insert_with_offset() throws UniqueConstraintViolation.
 

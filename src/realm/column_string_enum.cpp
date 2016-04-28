@@ -73,6 +73,10 @@ void StringEnumColumn::set(size_t ndx, StringData value)
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
+
+    // Additionally, if StringIndex::set throws, it is important that
+    // this function returns without actually adding the value to the column.
+
     if (m_search_index) {
         m_search_index->set(ndx, value);
     }
@@ -91,7 +95,15 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
     if (m_search_index) {
         bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
+        try {
+            m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
+        } catch (LogicError& e) {
+            std::unique_ptr<StringIndex> tmp(std::move(m_search_index));
+            // Erase inserted rows without touching StringIndex
+            erase_rows(row_ndx_2, num_rows, size(), false);
+            tmp.swap(m_search_index);
+            throw e;
+        }
     }
 }
 
@@ -103,8 +115,17 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
     int64_t value_2 = int64_t(key_ndx);
     insert_without_updating_index(row_ndx_2, value_2, num_rows); // Throws
 
-    if (m_search_index)
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    if (m_search_index) {
+        try {
+            m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        } catch (LogicError& e) {
+            std::unique_ptr<StringIndex> tmp(std::move(m_search_index));
+            // Erase inserted rows without touching StringIndex
+            erase_rows(row_ndx_2, num_rows, size(), false);
+            tmp.swap(m_search_index);
+            throw e;
+        }
+    }
 }
 
 

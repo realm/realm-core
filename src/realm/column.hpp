@@ -1142,7 +1142,15 @@ void Column<T>::insert(size_t row_ndx, T value, size_t num_rows)
 
     if (has_search_index()) {
         row_ndx = is_append ? size : row_ndx;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        try {
+            m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        } catch (...) {
+            for (size_t i = num_rows; i > 0; --i) {
+                size_t row_ndx_2 = row_ndx + i - 1;
+                erase_without_updating_index(row_ndx_2, is_append); // Throws
+            }
+            throw;
+        }
     }
 }
 

@@ -105,7 +105,6 @@ public:
     void populate_search_index();
     void destroy_search_index() noexcept override;
 
-    // Optimizing data layout
     // Optimizing data layout. enforce == true will enforce enumeration;
     // enforce == false will auto-evaluate if it should be enumerated or not
     bool auto_enumerate(ref_type& keys, ref_type& values, bool enforce = false) const;

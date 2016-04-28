@@ -30,7 +30,7 @@ class StringIndex;
 
 /// From the point of view of the application, an enumerated strings column
 /// (StringEnumColumn) is like a string column (StringColumn), yet it manages
-/// its stings in such a way that each unique string is stored only once. In
+/// its strings in such a way that each unique string is stored only once. In
 /// fact, an enumerated strings column is a combination of two subcolumns; a
 /// regular string column (StringColumn) that stores the unique strings, and an
 /// integer column that stores one unique string index for each entry in the
