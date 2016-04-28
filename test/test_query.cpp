@@ -8566,6 +8566,35 @@ TEST(Query_MoveDoesntDoubleDelete)
     }
 }
 
+// Ensure that coyping a Query copies a restricting TableView if the query owns the view.
+TEST(Query_CopyRestrictingTableViewWhenOwned)
+{
+    Table table;
+
+    {
+        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q2(q1);
+
+        // Reset the source query, destroying the original TableView.
+        q1 = {};
+
+        // Operations on the copied query that touch the restricting view should not crash.
+        CHECK_EQUAL(0, q2.count());
+    }
+
+    {
+        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q2;
+        q2 = q1;
+
+        // Reset the source query, destroying the original TableView.
+        q1 = {};
+
+        // Operations on the copied query that touch the restricting view should not crash.
+        CHECK_EQUAL(0, q2.count());
+    }
+}
+
 TEST(Query_SyncViewIfNeeded)
 {
     Group group;

@@ -328,6 +328,11 @@ public:
 
     virtual ~TableViewBase() noexcept;
 
+    virtual std::unique_ptr<TableViewBase> clone() const
+    {
+        return std::unique_ptr<TableViewBase>(new TableViewBase(*this));
+    }
+
 protected:
     // This TableView can be "born" from 5 different sources:
     // - LinkView
@@ -576,6 +581,11 @@ public:
     Table& get_parent() noexcept;
     const Table& get_parent() const noexcept;
 
+    std::unique_ptr<TableViewBase> clone() const override
+    {
+        return std::unique_ptr<TableViewBase>(new TableView(*this));
+    }
+
     std::unique_ptr<TableViewBase>
     clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const override
     {
@@ -685,6 +695,11 @@ public:
     ConstTableView find_all_string(size_t column_ndx, StringData value) const;
 
     const Table& get_parent() const noexcept;
+
+    std::unique_ptr<TableViewBase> clone() const override
+    {
+        return std::unique_ptr<TableViewBase>(new ConstTableView(*this));
+    }
 
     std::unique_ptr<TableViewBase>
     clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const override
