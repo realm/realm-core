@@ -56,10 +56,11 @@ public:
     //
     // Examples:
     //     The UNIX epoch is constructed by Timestamp(0, 0)
-    //     1 second after the UNIX epoch is constructed by Timestamp(1, 0)
-    //     1 nanosecond after the UNIX epoch is constructed by Timestamp(0, 1)
-    //     1,1 seconds after the UNIX epoch is constructed by Timestamp(1, 100000000)
-    //     -1,1 seconds before the UNIX epoch is constructed by Timestamp(-1, -100000000)
+    //     Relative times are constructed as follows:
+    //       +1 second is constructed by Timestamp(1, 0)
+    //       +1 nanosecond is constructed by Timestamp(0, 1)
+    //       +1.1 seconds (1100 milliseconds after the epoch) is constructed by Timestamp(1, 100000000)
+    //       -1.1 seconds (1100 milliseconds before the epoch) is constructed by Timestamp(-1, -100000000)
     //
     Timestamp(int64_t seconds, int32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
     {
