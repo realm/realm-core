@@ -418,6 +418,14 @@ void LinkView::repl_unselect() noexcept
         repl->on_link_list_destroyed(*this);
 }
 
+uint_fast64_t LinkView::sync_if_needed() const
+{
+    if (m_origin_table)
+        return m_origin_table->m_version;
+
+    return std::numeric_limits<uint_fast64_t>::max();
+}
+
 
 #ifdef REALM_DEBUG
 
