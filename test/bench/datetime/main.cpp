@@ -55,14 +55,8 @@ class WithNullColumn_Add1000RandomRows :
     }
 };
 
-template<class Benchmark>
-void run(Results& results) {
-    Benchmark benchmark;
-    benchmark.run(results);
-}
-
 int main() {
     Results results(10);
-    run<WithNullColumn_Add1000EmptyRows>(results);
-    run<WithNullColumn_Add1000RandomRows>(results);
+    bench<WithNullColumn_Add1000EmptyRows>(results);
+    bench<WithNullColumn_Add1000RandomRows>(results);
 }

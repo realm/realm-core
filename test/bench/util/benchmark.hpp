@@ -74,6 +74,12 @@ class WithEmptyRows : public WithClass {
     }
 };
 
+template<class Benchmark>
+void bench(Results& results) {
+    Benchmark benchmark;
+    benchmark.run(results);
+}
+
 } // namespace test_util
 } // namespace realm
 
