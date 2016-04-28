@@ -23,17 +23,11 @@ class AddRandomRows : public WithClass {
     void before_all(SharedGroup& sg)
     {
         Random random;
-        int year, month, day, hours, minutes, seconds;
+        int_fast64_t sinceEpoch;
 
         for (size_t i = 0; i < N; i++) {
-            year = random.draw_int<int>(1970, 10000); // FIXME: Better max.
-            month = random.draw_int<int>(1, 12);
-            day = random.draw_int<int>(1, 31);
-            hours = random.draw_int<int>(0, 23);
-            minutes = random.draw_int<int>(0, 59);
-            seconds = random.draw_int<int>(0, 59);
-            dts[i] = DateTime(
-                year, month, day, hours, minutes, seconds);
+            sinceEpoch = random.draw_int<int_fast64_t>();
+            dts[i] = DateTime(sinceEpoch);
         }
 
         WithClass::before_all(sg);
