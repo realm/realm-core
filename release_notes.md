@@ -1,3 +1,21 @@
+# 0.98.4 Release notes
+
+### Bugfixes:
+
+* Copying a `Query` restricted by a `TableView` will now avoid creating a dangling
+  reference to the restricting view if the query owns the view. Dangling references
+  may still occur if the `Query` does not own the restricting `TableView`. (#1741)
+
+### Enhancements:
+
+* `Query::sync_view_if_needed()` allows for bringing a query's restricting view into sync with
+  its underlying data source. (#1742)
+
+**Note: This is a hotfix release built on top of 0.98.3. The above fixes are
+        not present in version 0.99**
+
+----------------------------------------------
+
 # 0.98.3 Release notes
 
 ### Bugfixes:
