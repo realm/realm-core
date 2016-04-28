@@ -63,6 +63,7 @@ public:
     //
     Timestamp(int64_t seconds, int32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
     {
+        REALM_ASSERT_EX(-nanoseconds_per_second < nanoseconds && nanoseconds < nanoseconds_per_second, nanoseconds);
         const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
         const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
         REALM_ASSERT_EX(both_non_negative || both_non_positive, both_non_negative, both_non_positive);
