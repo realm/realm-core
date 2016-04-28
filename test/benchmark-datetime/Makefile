@@ -14,8 +14,8 @@ all: bench.bin
 bench.bin: $(OBJECTS) main.cpp
 	$(CC) $(CFLAGS) $? -o $@ $(LDFLAGS)
 
-%.o: %.cpp
-	$(CC) $(CFLAGS) -c $? -o $@
+%.o: %.cpp %.hpp
+	$(CC) $(CFLAGS) -c $?
 
 clean:
 	rm -f *.bin
