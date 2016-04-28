@@ -1336,6 +1336,7 @@ TEST(StringIndex_MaxStringLength)
     col.add(over_max);
     CHECK_EQUAL(col.size(), 1);
     CHECK_EQUAL(col.get(0), over_max);
+    CHECK_EQUAL(col.count(over_max), 1);
     CHECK_THROW(col.create_search_index(), realm::LogicError);
     CHECK(!col.has_search_index());
     CHECK_EQUAL(col.get(0), over_max);
@@ -1357,12 +1358,17 @@ TEST(StringIndex_MaxStringLength)
         CHECK_EQUAL(col.get(0), max);
         CHECK_EQUAL(col.find_first(max), 0);
         CHECK_EQUAL(col.find_first(over_max), realm::npos);
+        CHECK_EQUAL(col.count(max), 1);
+        CHECK_EQUAL(col.count(over_max), 0);
     };
 
     CHECK_THROW(col.add(over_max), realm::LogicError);
     validate();
 
     CHECK_THROW(col.insert(1, over_max), realm::LogicError);
+    validate();
+
+    CHECK_THROW(col.insert(0, over_max), realm::LogicError);
     validate();
 
     CHECK_THROW(col.set(0, over_max), realm::LogicError);

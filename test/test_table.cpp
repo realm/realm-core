@@ -54,6 +54,18 @@ using unit_test::TestContext;
 
 namespace {
 
+struct StringColumnType {
+    static constexpr bool value = false;
+    StringColumn* col = nullptr;
+    void set_col(ColumnBase* c) { col = dynamic_cast<StringColumn*>(c); }
+};
+
+struct StringEnumColumnType {
+    static constexpr bool value = true;
+    StringEnumColumn* col = nullptr;
+    void set_col(ColumnBase* c) { col = dynamic_cast<StringEnumColumn*>(c); }
+};
+
 REALM_TABLE_2(TupleTableType,
               first,  Int,
               second, String)
@@ -6800,5 +6812,84 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     t.set_null(0, 0);
     _CHECK_VER_BUMP();
 }
+
+
+TEST_TYPES(Table_MaxStringLengthInStringAndEnum, StringColumnType, StringEnumColumnType)
+{
+    constexpr bool force_string_enum_col = TEST_TYPE::value;
+
+    std::string std_max(StringIndex::max_string_index_length, 'a');
+    std::string std_over_max(std_max + "a");
+    StringData max(std_max);
+    StringData over_max(std_over_max);
+
+    Table t;
+    t.add_column(type_String, "str_col");
+    t.add_search_index(0);
+
+    if (force_string_enum_col) {
+        bool force = true;
+        t.optimize(force);
+    }
+
+    CHECK_EQUAL(t.get_column_count(), 1);
+    CHECK_EQUAL(t.get_column_type(0), type_String); // actually an enum type
+    size_t col_ndx = 0;
+
+    CHECK(t.has_search_index(col_ndx));
+    CHECK_EQUAL(t.size(), 0);
+    t.insert_empty_row(0, 2);
+    CHECK_EQUAL(t.size(), 2);
+
+    auto validate_table = [&]() {
+        CHECK(t.has_search_index(col_ndx));
+        CHECK_EQUAL(t.size(), 2);
+        CHECK_EQUAL(t.get_string(col_ndx, 0), max);
+        CHECK_EQUAL(t.get_string(col_ndx, 1), "");
+        CHECK_EQUAL(t.count_string(col_ndx, max), 1);
+        CHECK_EQUAL(t.count_string(col_ndx, over_max), 0);
+        CHECK_EQUAL(t.find_first_string(col_ndx, max), 0);
+        CHECK_EQUAL(t.find_first_string(col_ndx, over_max), realm::npos);
+    };
+
+    t.set_string(col_ndx, 0, max);
+    validate_table();
+
+    CHECK_THROW(t.set_string(col_ndx, 1, over_max), realm::LogicError);
+    validate_table();
+
+    CHECK_THROW(t.insert_substring(col_ndx, 1, 0, over_max), realm::LogicError);
+    validate_table();
+
+    // StringColumn and StringEnumColumn share methods but they are not in a common base class
+    TEST_TYPE wrapper;
+    wrapper.set_col(&_impl::TableFriend::get_column(t, col_ndx));
+    CHECK(wrapper.col != nullptr);
+    CHECK(wrapper.col->has_search_index());
+
+    CHECK_THROW(wrapper.col->insert(1, over_max), realm::LogicError);
+    validate_table();
+
+    CHECK_THROW(wrapper.col->set(1, over_max), realm::LogicError);
+    validate_table();
+
+    CHECK_THROW(wrapper.col->add(over_max), realm::LogicError);
+    validate_table();
+
+    t.remove_search_index(col_ndx);
+    CHECK(!wrapper.col->has_search_index());
+
+    t.set_string(col_ndx, 1, over_max);
+    CHECK_EQUAL(t.get_string(col_ndx, 1), over_max);
+    CHECK_EQUAL(t.count_string(col_ndx, over_max), 1);
+    CHECK_EQUAL(t.find_first_string(col_ndx, over_max), 1);
+
+    CHECK_THROW(t.add_search_index(col_ndx), realm::LogicError);
+    CHECK(!wrapper.col->has_search_index());
+    CHECK_EQUAL(t.get_string(col_ndx, 1), over_max);
+    CHECK_EQUAL(t.count_string(col_ndx, over_max), 1);
+    CHECK_EQUAL(t.find_first_string(col_ndx, over_max), 1);
+}
+
 
 #endif // TEST_TABLE
