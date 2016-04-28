@@ -15,19 +15,21 @@ add_custom_target(
   cd ../../.. && ./util/build-core.sh "${REF}"
 )
 
-include_directories("../../core-builds/${REF}/include")
-link_directories("../../core-builds/${REF}/lib")
+include_directories(
+    "${CMAKE_CURRENT_LIST_DIR}../../core-builds/${REF}/include")
+link_directories(
+    "${CMAKE_CURRENT_LIST_DIR}../../core-builds/${REF}/lib")
 
 ##########
 ## Util ##
 ##########
 
 add_subdirectory(
-    ${CMAKE_CURRENT_LIST_DIR}/../util
-    ${CMAKE_CURRENT_BINARY_DIR}/util)
+    "${CMAKE_CURRENT_LIST_DIR}/../util"
+    "${CMAKE_CURRENT_BINARY_DIR}/util")
 include_directories(
-    ${CMAKE_CURRENT_LIST_DIR}/../util
-    ${CMAKE_CURRENT_BINARY_DIR}/util)
+    "${CMAKE_CURRENT_LIST_DIR}/../util"
+    "${CMAKE_CURRENT_BINARY_DIR}/util")
 
 ################
 ## The Binary ##
