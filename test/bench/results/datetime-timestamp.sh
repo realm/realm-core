@@ -3,12 +3,13 @@
 set -euo pipefail
 
 rm -rf results.*
+
 cat <<EOF
 ##############
 ## Baseline ##
 ##############
 EOF
-../datetime/_build/benchmark # Baseline
+../datetime/_build/benchmark
 
 cat <<EOF
 ##############
