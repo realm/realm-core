@@ -11,11 +11,6 @@ namespace test_util {
 
 class Benchmark
 {
-    virtual const char* name() const = 0;
-    virtual void before_all(SharedGroup&) {}
-    virtual void after_all(SharedGroup&) {}
-    virtual void before_each(SharedGroup&) {}
-    virtual void after_each(SharedGroup&) {}
     virtual void operator()(SharedGroup&) = 0;
 
     std::string lead_text();
@@ -23,6 +18,12 @@ class Benchmark
 
     void run_once(SharedGroup&, Timer&);
 
+protected:
+    virtual const char* name() const = 0;
+    virtual void before_all(SharedGroup&) {}
+    virtual void after_all(SharedGroup&) {}
+    virtual void before_each(SharedGroup&) {}
+    virtual void after_each(SharedGroup&) {}
 public:
     void run(Results& results);
 };
