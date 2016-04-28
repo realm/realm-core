@@ -111,8 +111,7 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
         ThreadWrapper thread;
         thread.start([&] { service_1.run(); });
         service_2.run();
-        bool exception_in_thread = thread.join(); // FIXME: Transport exception instead
-        REALM_ASSERT(!exception_in_thread);
+        thread.join();
     }
     if (ec_1)
         throw std::system_error(ec_1);
@@ -223,7 +222,7 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Stop the event loop
     service.stop();
-    CHECK_NOT(thread_1.join());
+    thread_1.join();
 
     // Check that the event loop remains in the stopped state
     int var = 381;
@@ -245,7 +244,7 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Stop the event loop by canceling the blocking operation
     service.post([&] { acceptor.cancel(); });
-    CHECK_NOT(thread_2.join());
+    thread_2.join();
 
     CHECK_EQUAL(var, 824);
 }
@@ -322,7 +321,7 @@ TEST(Network_ReadWrite)
     socket_2.write(data, sizeof data);
     socket_2.close();
 
-    CHECK_NOT(thread.join());
+    thread.join();
 }
 
 
@@ -513,7 +512,7 @@ TEST(Network_AcceptorMixedAsyncSync)
         thread.start(connect);
         network::socket socket(service);
         acceptor.accept(socket);
-        CHECK_NOT(thread.join());
+        thread.join();
     }
 
     // Asynchronous accept -> switch to nonblocking mode
@@ -529,7 +528,7 @@ TEST(Network_AcceptorMixedAsyncSync)
         acceptor.async_accept(socket, accept_handler);
         service.run();
         CHECK(was_accepted);
-        CHECK_NOT(thread.join());
+        thread.join();
     }
 
     // Synchronous accept -> switch back to blocking mode
@@ -538,7 +537,7 @@ TEST(Network_AcceptorMixedAsyncSync)
         thread.start(connect);
         network::socket socket(service);
         acceptor.accept(socket);
-        CHECK_NOT(thread.join());
+        thread.join();
     }
 }
 
@@ -591,7 +590,7 @@ TEST(Network_SocketMixedAsyncSync)
                 CHECK(std::equal(buffer.get(), buffer.get()+size, message));
         }
 
-        CHECK_NOT(thread.join());
+        thread.join();
     }
 
     {
@@ -627,7 +626,7 @@ TEST(Network_SocketMixedAsyncSync)
         in.async_read(buffer.get(), buffer_size, read_handler);
         service.run();
 
-        CHECK_NOT(thread.join());
+        thread.join();
     }
 }
 
@@ -1382,10 +1381,10 @@ TEST(Network_HeavyAsyncPost)
     for (int i = 0; i < num_threads; ++i)
         threads[i].start([&func, i] { func(i); });
     for (int i = 0; i < num_threads; ++i)
-        CHECK_NOT(threads[i].join());
+        threads[i].join();
 
     service.post([&] { dummy_timer.cancel(); });
-    CHECK_NOT(looper_thread.join());
+    looper_thread.join();
 
     // Check that every post operation ran exactly once
     using longlong = long long;
@@ -1461,7 +1460,7 @@ TEST(Network_RepeatedCancelAndRestartRead)
         }
         socket_1.close();
 
-        CHECK_NOT(thread.join());
+        thread.join();
         CHECK_EQUAL(num_bytes_written, num_bytes_read);
     }
 }

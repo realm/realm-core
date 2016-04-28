@@ -421,15 +421,8 @@ TEST(Transactions_General)
             threads[i].start([this, i, &path] { thread(test_context, i, path); });
 
         // Wait for threads to finish
-        for (int i = 0; i != num_threads; ++i) {
-            bool thread_has_thrown = false;
-            std::string except_msg;
-            if (threads[i].join(except_msg)) {
-                std::cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
-                thread_has_thrown = true;
-            }
-            CHECK(!thread_has_thrown);
-        }
+        for (int i = 0; i != num_threads; ++i)
+            threads[i].join();
     }
 
     // Verify database contents

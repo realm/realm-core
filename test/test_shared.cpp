@@ -2017,15 +2017,8 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
                          { multiprocess_thread(test_context, path, base+i); });
 
     // Wait for threads to finish
-    for (size_t i = 0; i != num_threads; ++i) {
-        bool thread_has_thrown = false;
-        std::string except_msg;
-        if (threads[i].join(except_msg)) {
-            std::cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
-            thread_has_thrown = true;
-        }
-        CHECK(!thread_has_thrown);
-    }
+    for (size_t i = 0; i != num_threads; ++i)
+        threads[i].join();
 
     // Verify that the changes were made
     {

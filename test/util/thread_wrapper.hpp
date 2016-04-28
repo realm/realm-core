@@ -21,49 +21,43 @@
 #define REALM_TEST_UTIL_THREAD_WRAPPER_HPP
 
 #include <exception>
-#include <string>
-#include <iostream>
+#include <stdexcept> // For Android hack
+#include <string> // For Android hack
 
+#include <realm/util/features.h> // For Android hack
 #include <realm/util/thread.hpp>
 
 namespace realm {
 namespace test_util {
 
 
-/// Catch exceptions thrown in threads and make the exception message
-/// available to the thread that calls ThreadWrapper::join().
+/// Same as util::Thread, but if an uncaught exception terminates the thread,
+/// transport that exception to the joining thread, that is, rethrow that
+/// exception from the call to join().
+///
+/// FIXME: Unfortunately, Android NDK has no support for exception
+/// transportation (at least with some of the offered STL implementations, and
+/// at least up to version 10e of the NDK), so on that platform, the exception
+/// thrown by join() will be of type std::runtime_error regardless of the type
+/// of exception that terminated the thread.
 class ThreadWrapper {
 public:
     template<class F>
     void start(const F& func)
     {
-        m_except = false;
         m_thread.start([=] { Runner<F>::run(func, this); });
     }
 
-    /// Returns 'true' if thread has thrown an exception. In that case
-    /// the exception message will also be writte to std::cerr.
-    bool join()
-    {
-        std::string except_msg;
-        if (join(except_msg)) {
-            std::cerr << "Exception thrown in thread: "<<except_msg<<"\n";
-            return true;
-        }
-        return false;
-    }
-
-    /// Returns 'true' if thread has thrown an exception. In that
-    /// case the exception message will have been assigned to \a
-    /// except_msg.
-    bool join(std::string& except_msg)
+    void join()
     {
         m_thread.join();
-        if (m_except) {
-            except_msg = m_except_msg;
-            return true;
-        }
-        return false;
+#if REALM_ANDROID
+        if (m_exception_thrown)
+            throw std::runtime_error(std::move(m_exception_message));
+#else
+        if (m_exception)
+            std::rethrow_exception(m_exception);
+#endif
     }
 
     bool joinable() noexcept
@@ -73,8 +67,12 @@ public:
 
 private:
     util::Thread m_thread;
-    bool m_except;
-    std::string m_except_msg;
+#if REALM_ANDROID
+    std::string m_exception_message;
+    bool m_exception_thrown = false;
+#else
+    std::exception_ptr m_exception;
+#endif
 
     template<class F>
     struct Runner {
@@ -83,13 +81,19 @@ private:
             try {
                 func();
             }
-            catch (std::exception& e) {
-                tw->m_except = true;
-                tw->m_except_msg = e.what();
+#if REALM_ANDROID
+            catch (std::exception& ex) {
+                tw->m_exception_message = ex.what(); // Throws
+                tw->m_exception_thrown = true;
             }
+#endif
             catch (...) {
-                tw->m_except = true;
-                tw->m_except_msg = "Unknown error";
+#if REALM_ANDROID
+                tw->m_exception_message = "Unknown"; // Throws
+                tw->m_exception_thrown = true;
+#else
+                tw->m_exception = std::current_exception();
+#endif
             }
         }
     };
