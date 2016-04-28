@@ -182,15 +182,11 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
     for (int i = 0; i < WRITERS1; ++i)
         write_threads[i].start([this, &path, i] { write_thread(test_context, path, i); });
 
-    for (int i = 0; i < READERS1; ++i) {
-        bool reader_has_thrown = read_threads[i].join();
-        CHECK(!reader_has_thrown);
-    }
+    for (int i = 0; i < READERS1; ++i)
+        read_threads[i].join();
 
-    for (int i = 0; i < WRITERS1; ++i) {
-        bool writer_has_thrown = write_threads[i].join();
-        CHECK(!writer_has_thrown);
-    }
+    for (int i = 0; i < WRITERS1; ++i)
+        write_threads[i].join();
 }
 
 
@@ -241,10 +237,8 @@ TEST_IF(Transactions_Stress2, TEST_DURATION >= 3)
     for (int i = 0; i < THREADS2; ++i)
         threads[i].start(std::bind(&create_groups, std::string(path)));
 
-    for (int i = 0; i < THREADS2; ++i) {
-        bool thread_has_thrown = threads[i].join();
-        CHECK(!thread_has_thrown);
-    }
+    for (int i = 0; i < THREADS2; ++i)
+        threads[i].join();
 }
 
 
@@ -349,17 +343,13 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
     for (int i = 0; i < READERS; ++i)
         read_threads[i].start(read_thread);
 
-    for (int i = 0; i < WRITERS; ++i) {
-        bool writer_has_thrown = write_threads[i].join();
-        CHECK(!writer_has_thrown);
-    }
+    for (int i = 0; i < WRITERS; ++i)
+        write_threads[i].join();
 
     // Terminate reader threads cleanly
-    terminate = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
-    for (int i = 0; i < READERS; ++i) {
-        bool reader_has_thrown = read_threads[i].join();
-        CHECK(!reader_has_thrown);
-    }
+    terminate = true;
+    for (int i = 0; i < READERS; ++i)
+        read_threads[i].join();
 }
 
 
@@ -437,16 +427,12 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
     for (int i = 0; i < WRITERS; ++i)
         write_threads[i].start([=] { write_thread(i); });
 
-    for (int i = 0; i < WRITERS; ++i) {
-        bool writer_has_thrown = write_threads[i].join();
-        CHECK(!writer_has_thrown);
-    }
+    for (int i = 0; i < WRITERS; ++i)
+        write_threads[i].join();
 
-    terminate = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
-    for (int i = 0; i < READERS; ++i) {
-        bool reader_has_thrown = read_threads[i].join();
-        CHECK(!reader_has_thrown);
-    }
+    terminate = true;
+    for (int i = 0; i < READERS; ++i)
+        read_threads[i].join();
 }
 
 #endif // TEST_TRANSACTIONS_LASSE

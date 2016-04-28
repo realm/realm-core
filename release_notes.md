@@ -42,6 +42,8 @@
 
 * Opening a Realm file which already has a management directory no longer throws
   and catches an exception.
+* In `test_util::ThreadWrapper` transport uncaught exception in thread to caller
+  of `TreadWrapper::join()`.
 
 ----------------------------------------------
 
@@ -58,7 +60,7 @@
 * S: Misbehavior of empty asynchronous write in POSIX networking API.
 * S: Access dangling pointer while handling canceled asynchronous accept
   in POSIX networking API.
-* Changed group operator== to take table names into account.  
+* Changed group operator== to take table names into account.
 
 ### Enhancements:
 

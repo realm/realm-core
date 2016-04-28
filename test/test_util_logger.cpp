@@ -170,7 +170,7 @@ TEST(Util_Logger_ThreadSafe)
     for (int i = 0; i < num_threads; ++i)
         threads[i].start([&func, i] { func(i); });
     for (int i = 0; i < num_threads; ++i)
-        CHECK_NOT(threads[i].join());
+        threads[i].join();
 
     std::vector<std::string> messages_1(std::move(base_logger.messages)), messages_2;
     for (int i = 0; i < num_threads; ++i) {

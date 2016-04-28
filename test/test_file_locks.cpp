@@ -143,7 +143,7 @@ TEST(File_NoSpuriousTryLockFailures)
     }
     master();
     for (int i = 0; i != num_slaves; ++i)
-        CHECK(!slaves[i].join());
+        slaves[i].join();
 
 /*
     typedef std::map<int, int>::const_iterator iter;
