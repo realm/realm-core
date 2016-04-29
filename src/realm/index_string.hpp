@@ -293,27 +293,22 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) noexcept
 {
     key_type key = 0;
 
-    if (str.size() >= 4) goto four;
-    if (str.size() < 2) {
-        if (str.size() == 0) goto none;
-        goto one;
+    // we use a switch with fallthrough. The lack of "break" is on purpose
+    switch (str.size()) {
+        // Create 4 byte index key
+        // (encoded like this to allow literal comparisons
+        // independently of endianness)
+        default:
+            key |= (key_type(static_cast<unsigned char>(str[3])) <<  0);
+        case 3:
+            key |= (key_type(static_cast<unsigned char>(str[2])) <<  8);
+        case 2:
+            key |= (key_type(static_cast<unsigned char>(str[1])) <<  16);
+        case 1:
+            key |= (key_type(static_cast<unsigned char>(str[0])) <<  24);
+        case 0:
+            return key;
     }
-    if (str.size() == 2) goto two;
-    goto three;
-
-    // Create 4 byte index key
-    // (encoded like this to allow literal comparisons
-    // independently of endianness)
-  four:
-    key |= (key_type(static_cast<unsigned char>(str[3])) <<  0);
-  three:
-    key |= (key_type(static_cast<unsigned char>(str[2])) <<  8);
-  two:
-    key |= (key_type(static_cast<unsigned char>(str[1])) << 16);
-  one:
-    key |= (key_type(static_cast<unsigned char>(str[0])) << 24);
-  none:
-    return key;
 }
 
 // Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So
