@@ -1327,7 +1327,7 @@ TEST(StringIndex_MaxStringLength)
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, true);
 
-    std::string std_max(StringIndex::max_string_index_length, 'a');
+    std::string std_max(StringIndex::max_indexed_string_length, 'a');
     std::string std_over_max(std_max + "a");
 
     StringData max(std_max);

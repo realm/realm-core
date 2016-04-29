@@ -17,14 +17,14 @@
 * `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
   and will also return true if the target row of a `TableView` that represents backlinks
   is deleted. (Issue #1710)
-* StringIndex now does not accept inputs with length greater than
-  `StringIndex::max_string_index_length`. If you try to input a string with a longer length,
+* StringIndex no longer supports strings with lengths greater than
+  `Table::max_indexed_string_length`. If you try to add a string with a longer length,
   a `realm::LogicError` will be thrown with type `string_too_long_for_index`. Calling
   `create_search_index()` will now fail with this exception if attempting to create it on
   a column which already stores strings that exceed the maximum. If `create_search_index()`
   fails for this reason, the StringIndex will not be created on the column and the data
   in the underlying column remains unaffected. This is so that bindings can attempt to
-  create a search index on a column without knowing what lengths of data the column stores.
+  create a search index on a column without knowing the lengths of the strings in the column.
   Putting data into a StringIndex (add/set/insert) will throw the same exception if the length
   exceeds the maximum. In this case the data is not inserted into the underlying column.
   If the exception is thrown and you still want to insert the data, turn off the StringIndex

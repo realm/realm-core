@@ -205,21 +205,21 @@ public:
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
 
-    // StringIndex is highly optimized for methods like find/count etc. Strings
-    // are stored in chunks of 4 bytes in an unbalanced tree structure. If two
+    // StringIndex is highly optimized for methods like find() and count(). Strings
+    // are stored in chunks of 4 bytes in an unbalanced prefix tree structure. If two
     // strings have a common prefix, more levels are added to the tree, storing
-    // more of the strings until they differ (fully equivilent strings are stored
-    // in a list though). If two strings are not equivilent but have a very long
-    // common prefix, then the tree structure will be very deeply nested to a depth
+    // more of the strings until they differ (fully equivalent strings are stored
+    // in a list though). If two strings are not equivalent but have a long
+    // common prefix, then the tree structure will be deeply nested to a depth
     // of (common_prefix_length / 4). The recursive nature of many functions in
-    // StringIndex (and in realm generally such as array::destroy_deep and group::write)
+    // StringIndex (and in Realm generally such as Array::destroy_deep and Group::write)
     // assume that array nesting is to a reasonable depth, which is certainly true for
-    // a balanced tree structure but not for StringIndex. In practice we observe a
-    // stack overflow in StringIndex for strings with long common prefixes. (Reproducible
-    // on a mac with lengths of 9408 == tree depth of 2352). Rather than removing recursion
-    // we limit the input length to StringIndex here. Stack size may differ across devices
-    // so we use a conservative number here.
-    static const size_t max_string_index_length = 2000;
+    // a balanced tree structure but not for StringIndex. In practice, we observe a
+    // stack overflow in StringIndex for strings with long common prefixes (reproducible
+    // on a Mac with lengths of 9408 == tree depth of 9408/4 = 2352). Rather than removing
+    // recursion, we limit the length on input strings.
+    // Since stack size may differ across devices, a conservative number is used.
+    static const size_t max_indexed_string_length = 2000;
 
 private:
 
@@ -235,7 +235,7 @@ private:
     // StringColumn::insert(target_row_ndx=42, value="test_string") would result with
     // get_array_from_ref(m_array[0])[0] == create_key("test") and
     // m_array[1] == 42
-    // In this way, m_array which store one child has a size of two.
+    // In this way, m_array which stores one child has a size of two.
     // Children are type 1 (row number) if the LSB of the value is set.
     // To get the actual row value, shift value down by one.
     // If the LSB of the value is 0 then the value is a reference and can be either
@@ -385,7 +385,7 @@ void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_appen
 {
     REALM_ASSERT_3(row_ndx, !=, npos);
 
-    if (REALM_UNLIKELY(to_str(value).size() > max_string_index_length))
+    if (REALM_UNLIKELY(to_str(value).size() > max_indexed_string_length))
         throw LogicError(LogicError::string_too_long_for_index);
 
     // If the new row is inserted after the last row in the table, we don't need
@@ -422,7 +422,7 @@ void StringIndex::set(size_t row_ndx, T new_value)
     StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value);
 
-    if (REALM_UNLIKELY(to_str(new_value).size() > max_string_index_length))
+    if (REALM_UNLIKELY(to_str(new_value).size() > max_indexed_string_length))
         throw LogicError(LogicError::string_too_long_for_index);
 
     // Note that insert_with_offset() throws UniqueConstraintViolation.

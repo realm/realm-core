@@ -191,8 +191,8 @@ public:
         /// session.
         mixed_history_type,
 
-        /// StringIndex does not support indexing on inputs more than
-        /// StringIndex::max_string_index_length
+        /// StringIndex does not support indexing on inputs longer than
+        /// Table::max_indexed_string_length
         string_too_long_for_index
     };
 

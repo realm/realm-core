@@ -6818,7 +6818,7 @@ TEST_TYPES(Table_MaxStringLengthInStringAndEnum, StringColumnType, StringEnumCol
 {
     constexpr bool force_string_enum_col = TEST_TYPE::value;
 
-    std::string std_max(StringIndex::max_string_index_length, 'a');
+    std::string std_max(Table::max_indexed_string_length, 'a');
     std::string std_over_max(std_max + "a");
     StringData max(std_max);
     StringData over_max(std_over_max);

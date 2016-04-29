@@ -466,6 +466,7 @@ public:
 
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
+    static const size_t max_indexed_string_length = StringIndex::max_indexed_string_length;
 
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
