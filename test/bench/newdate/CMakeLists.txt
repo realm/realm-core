@@ -8,7 +8,19 @@ add_definitions(-Werror -Wextra -Wall -pedantic -std=c++11)
 ## Core Build ##
 ################
 
-set(REF "ea31080482ba3aa7820a22deff8ab47b6c9e9a5f")
+set(REF "master")
+# set(REF "ea310804")
+# Somewhere on the newdate branch
+# $ git show ea310804
+# commit ea31080482ba3aa7820a22deff8ab47b6c9e9a5f
+# Merge: 6dd9059 2737c8f
+# Author: Daniel Povlsen <daniel.povlsen@gmail.com>
+# Date:   Thu Apr 28 13:36:27 2016 +0200
+#
+#    Merge pull request #1737 from realm/dp/newdate/negative_nanoseconds
+#    
+#    Allow negative nanoseconds
+
 
 add_custom_target(
   core-build
