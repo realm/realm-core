@@ -220,6 +220,9 @@ void Results::finish(const std::string& ident,
         else {
             out << "  ";
         }
+
+        out << std::endl << "  ";
+
         out << "min "
             << std::setw(time_width)
             << format_elapsed_time(r.min)
@@ -240,6 +243,8 @@ void Results::finish(const std::string& ident,
             out << "  ";
         }
 
+        out << std::endl << "  ";
+
         out << "med "
             << std::setw(time_width)
             << format_elapsed_time(r.median)
@@ -253,6 +258,10 @@ void Results::finish(const std::string& ident,
         else {
             out << "  ";
         }
+
+
+        out << std::endl << "  ";
+
         out << "avg "
             << std::setw(time_width) << format_elapsed_time(avg)
             << " "
@@ -267,6 +276,8 @@ void Results::finish(const std::string& ident,
     }
     else {
 
+        out << std::endl << "  ";
+
         out << "min "
             << std::setw(time_width)
             << format_elapsed_time(r.min)
@@ -277,10 +288,14 @@ void Results::finish(const std::string& ident,
             << format_elapsed_time(r.max)
             << "     ";
 
-        out << "median "
+        out << std::endl << "  ";
+
+        out << "med "
             << std::setw(time_width)
             << format_elapsed_time(r.median)
             << "     ";
+
+        out << std::endl << "  ";
 
         out << "avg "
             << std::setw(time_width)

@@ -3,6 +3,8 @@
 #include "results.hpp"      // Results
 #include "timer.hpp"        // Timer
 
+#include <iostream>
+
 using namespace realm;
 using namespace realm::test_util;
 
@@ -75,6 +77,9 @@ void Benchmark::run(Results& results)
     reps = size_t(this->min_time() / warmup_secs_per_rep);
     reps = std::max(reps, this->min_reps());
     reps = std::min(reps, this->max_reps());
+
+//    reps = 10000;
+    std::cout << "Repeating: " << reps << std::endl;
 
     for (size_t i = 0; i < reps; i++) {
         Timer t;
