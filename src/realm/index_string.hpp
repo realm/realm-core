@@ -422,7 +422,7 @@ void StringIndex::set(size_t row_ndx, T new_value)
     StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value);
 
-    if (REALM_UNLIKELY(to_str(new_value).size() > max_indexed_string_length))
+    if (REALM_UNLIKELY(new_value2.size() > max_indexed_string_length))
         throw LogicError(LogicError::string_too_long_for_index);
 
     // Note that insert_with_offset() throws UniqueConstraintViolation.
