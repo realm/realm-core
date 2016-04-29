@@ -23,6 +23,7 @@
 #include <realm/util/terminate.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/to_string.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
 #include "fuzz_group.hpp"
@@ -2669,9 +2670,8 @@ TEST(Shared_MovingSearchIndex)
         table->add_column(type_String, "enum");
         table->add_empty_row(64);
         for (int i = 0; i < 64; ++i) {
-            std::ostringstream out;
-            out << "foo" << i;
-            table->set_string(0, i, out.str());
+            std::string out(std::string("foo") + util::to_string(i));
+            table->set_string(0, i, out);
             table->set_string(1, i, "bar");
         }
         table->set_string(1, 63, "bar63");

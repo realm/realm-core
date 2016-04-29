@@ -1164,7 +1164,8 @@ TEST(StringIndex_Duplicate_Values)
     const size_t num_rows = 100;
 
     for (size_t i = 0; i < num_rows; ++i) {
-        col.add(util::to_string(i));
+        std::string to_insert(util::to_string(i));
+        col.add(to_insert);
     }
     CHECK(!ndx.has_duplicate_values());
 
@@ -1173,6 +1174,7 @@ TEST(StringIndex_Duplicate_Values)
         col.add(a_string);
         a_string += "a";
     }
+    std::string str_num_rows(util::to_string(num_rows));
     CHECK(!ndx.has_duplicate_values());
     col.add(a_string);
     col.add(a_string);
@@ -1181,12 +1183,12 @@ TEST(StringIndex_Duplicate_Values)
     CHECK(!ndx.has_duplicate_values());
 
     // Insert into the middle unique value of num_rows
-    col.insert(num_rows/2, util::to_string(num_rows));
+    col.insert(num_rows / 2, str_num_rows);
 
     CHECK(!ndx.has_duplicate_values());
 
     // Set the next element to be num_rows too
-    col.set(num_rows/2 + 1, util::to_string(num_rows));
+    col.set(num_rows / 2 + 1, str_num_rows);
 
     CHECK(ndx.has_duplicate_values());
 
@@ -1218,7 +1220,8 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     // create subindex of repeated elements on a leaf
     size_t num_initial_repeats = 100;
     for (size_t i = 0; i < num_initial_repeats; ++i) {
-        col.add(util::to_string(i));
+        std::string str_i(util::to_string(i));
+        col.add(str_i);
     }
 
     // common test strings
@@ -1235,7 +1238,8 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     const size_t num_new_rand = 256;
     Random random(random_int<unsigned long>());
     for (size_t i = 0; i < num_new_rand; ++i) {
-        col.add(util::to_string(random.draw_int<size_t>()));
+        std::string str_rand(util::to_string(random.draw_int<size_t>()));
+        col.add(str_rand);
     }
 
     // Add a bunch of repeated data
@@ -1243,7 +1247,8 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     const size_t num_repeated = 25;
     for (size_t i = 0; i < num_repeats; ++i) {
         for (size_t j = 0; j < num_repeated; ++j) {
-            col.add(util::to_string(i));
+            std::string str_i(util::to_string(i));
+            col.add(str_i);
         }
     }
 

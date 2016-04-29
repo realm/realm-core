@@ -110,8 +110,10 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     }
     for (size_t i = 0; i < rows; ++i)
         table.set_string(5, i, strings[i]);
-    for (size_t i = 0; i < rows; ++i)
-        table.set_string(6, i, strings[i] + " very long string.........");
+    for (size_t i = 0; i < rows; ++i) {
+        std::string long_str = strings[i] + " very long string.........";
+        table.set_string(6, i, long_str);
+    }
     for (size_t i = 0; i < rows; ++i) {
         switch (i % 2) {
         case 0: {

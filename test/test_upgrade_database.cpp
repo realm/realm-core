@@ -309,26 +309,29 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
         size_t f;
 
         for (int i = 0; i < 9; i++) {
-            f = t->find_first_string(0, std::string(""));
+            f = t->find_first_string(0, "");
             CHECK_EQUAL(f, 0);
             f = t->where().equal(0, "").find();
             CHECK_EQUAL(f, 0);
             CHECK(t->get_string(0, 0) == "");
 
             f = t->where().equal(0, "").find();
-            f = t->find_first_string(1, std::string(5, char(i + 'a')));
+            std::string s5ia(5, char(i + 'a'));
+            f = t->find_first_string(1, s5ia);
             CHECK_EQUAL(f, i);
-            f = t->where().equal(1, std::string(5, char(i + 'a'))).find();
-            CHECK_EQUAL(f, i);
-
-            f = t->find_first_string(2, std::string(40, char(i + 'a')));
-            CHECK_EQUAL(f, i);
-            f = t->where().equal(2, std::string(40, char(i + 'a'))).find();
+            f = t->where().equal(1, s5ia).find();
             CHECK_EQUAL(f, i);
 
-            f = t->find_first_string(3, std::string(200, char(i + 'a')));
+            std::string s40ia(40, char(i + 'a'));
+            f = t->find_first_string(2, s40ia);
             CHECK_EQUAL(f, i);
-            f = t->where().equal(3, std::string(200, char(i + 'a'))).find();
+            f = t->where().equal(2, s40ia).find();
+            CHECK_EQUAL(f, i);
+
+            std::string s200ia(200, char(i + 'a'));
+            f = t->find_first_string(3, s200ia);
+            CHECK_EQUAL(f, i);
+            f = t->where().equal(3, s200ia).find();
             CHECK_EQUAL(f, i);
         }
 
@@ -460,25 +463,28 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
             }
 
             for (int i = 0; i < 9; i++) {
-                f = t->find_first_string(0, std::string(""));
+                f = t->find_first_string(0, "");
                 CHECK_EQUAL(f, 0);
                 f = (t->column<String>(0) == "").find();
                 CHECK_EQUAL(f, 0);
                 CHECK(t->get_string(0, 0) == "");
 
-                f = t->find_first_string(1, std::string(5, char(i + 'a')));
+                std::string s5ia(5, char(i + 'a'));
+                f = t->find_first_string(1, s5ia);
                 CHECK_EQUAL(f, i);
-                f = (t->column<String>(1) == std::string(5, char(i + 'a'))).find();
-                CHECK_EQUAL(f, i);
-
-                f = t->find_first_string(2, std::string(40, char(i + 'a')));
-                CHECK_EQUAL(f, i);
-                f = (t->column<String>(2) == std::string(40, char(i + 'a'))).find();
+                f = (t->column<String>(1) == s5ia).find();
                 CHECK_EQUAL(f, i);
 
-                f = t->find_first_string(3, std::string(200, char(i + 'a')));
+                std::string s40ia(40, char(i + 'a'));
+                f = t->find_first_string(2, s40ia);
                 CHECK_EQUAL(f, i);
-                f = (t->column<String>(3) == std::string(200, char(i + 'a'))).find();
+                f = (t->column<String>(2) == s40ia).find();
+                CHECK_EQUAL(f, i);
+
+                std::string s200ia(200, char(i + 'a'));
+                f = t->find_first_string(3, s200ia);
+                CHECK_EQUAL(f, i);
+                f = (t->column<String>(3) == s200ia).find();
                 CHECK_EQUAL(f, i);
             }
 

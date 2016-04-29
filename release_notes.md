@@ -46,6 +46,8 @@
 
 * Opening a Realm file which already has a management directory no longer throws
   and catches an exception.
+* The r-value constructor for StringData has been removed because StringIndex does not
+  store any data. This prevents incorrect useage which can lead to strange results.
 
 ----------------------------------------------
 
