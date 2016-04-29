@@ -7,6 +7,8 @@
 using namespace realm;
 using namespace realm::test_util;
 
+#define DEF_N 100000
+
 template<class WithClass, size_t N,
     int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
     int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
@@ -72,8 +74,9 @@ class QueryEqualsZeroT : public WithClass {
     {
         ReadTransaction tr(sg);
         ConstTableRef t = tr.get_table(0);
-        (t->where().get_table()->column<Timestamp>(0) ==
-            Timestamp(0, 0)).find_all();
+        size_t count = (t->where().get_table()->column<Timestamp>(0) ==
+            Timestamp(0, 0)).count();
+        this->expected = count == 1;
     }
 };
 
@@ -83,8 +86,9 @@ class QueryEqualsZeroDT : public WithClass {
     {
         ReadTransaction tr(sg);
         ConstTableRef t = tr.get_table(0);
-        (t->where().get_table()->column<OldDateTime>(0) ==
-            OldDateTime(0)).find_all();
+        size_t count = (t->where().get_table()->column<OldDateTime>(0) ==
+            OldDateTime(0)).count();
+        this->expected = count == 1;
     }
 };
 
@@ -94,8 +98,9 @@ class QueryGreaterThanZeroT : public WithClass {
     {
         ReadTransaction tr(sg);
         ConstTableRef t = tr.get_table(0);
-        (t->where().get_table()->column<Timestamp>(0) >
-            Timestamp(0, 0)).find_all();
+        size_t count = (t->where().get_table()->column<Timestamp>(0) >
+            Timestamp(0, 0)).count();
+        this->expected = count == DEF_N;
     }
 };
 
@@ -105,8 +110,9 @@ class QueryGreaterThanZeroDT : public WithClass {
     {
         ReadTransaction tr(sg);
         ConstTableRef t = tr.get_table(0);
-        (t->where().get_table()->column<OldDateTime>(0) >
-            OldDateTime(0)).find_all();
+        size_t count = (t->where().get_table()->column<OldDateTime>(0) >
+            OldDateTime(0)).count();
+        this->expected = count == DEF_N;
     }
 };
 
@@ -116,7 +122,7 @@ class EqualsZeroT :
             WithRandomTRows<
                 WithOneColumn<
                     type_Timestamp, true>,
-                10000,
+                DEF_N,
                 946684800,  // 2000-01-01T00:00:00Z
                 1893455999, // 2029-12-31T23:59:59Z
                 1337        // A deterministic seed
@@ -134,7 +140,7 @@ class EqualsZeroDT :
             WithRandomDTRows<
                 WithOneColumn<
                     type_OldDateTime, true>,
-                10000,
+                DEF_N,
                 946684800,  // 2000-01-01T00:00:00Z
                 1893455999, // 2029-12-31T23:59:59Z
                 1337        // A deterministic seed
@@ -152,7 +158,7 @@ class GreaterThanZeroT :
             WithRandomTRows<
                 WithOneColumn<
                     type_Timestamp, true>,
-                10000,
+                DEF_N,
                 946684800,  // 2000-01-01T00:00:00Z
                 1893455999, // 2029-12-31T23:59:59Z
                 1337        // A deterministic seed
@@ -170,7 +176,7 @@ class GreaterThanZeroDT :
             WithRandomDTRows<
                 WithOneColumn<
                     type_OldDateTime, true>,
-                10000,
+                DEF_N,
                 946684800,  // 2000-01-01T00:00:00Z
                 1893455999, // 2029-12-31T23:59:59Z
                 1337        // A deterministic seed

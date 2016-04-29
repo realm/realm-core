@@ -18,6 +18,7 @@ class Benchmark
     double warmup(SharedGroup&);
 
 public:
+    bool expected = false;
     virtual const char* name() const = 0;
     virtual void before_all(SharedGroup&) {}
     virtual void after_all(SharedGroup&) {}

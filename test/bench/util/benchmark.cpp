@@ -85,6 +85,9 @@ void Benchmark::run(Results& results)
         Timer t;
         run_once(this, *sg, t);
         results.submit(ident.c_str(), t.get_elapsed_time());
+        if (!this->expected) {
+            std::cout << "Unexpected!" << std::endl;
+        }
     }
 
     this->after_all(*sg);
