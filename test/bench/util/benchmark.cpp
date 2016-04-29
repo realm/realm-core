@@ -28,7 +28,7 @@ run_once(Benchmark *bench, SharedGroup& sg, Timer& timer)
     timer.unpause();
 }
 
-}
+} // Anonumous namespace
 
 std::string Benchmark::lead_text()
 {
