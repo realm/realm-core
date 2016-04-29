@@ -316,7 +316,8 @@ TEST(Thread_CriticalSection)
 
 TEST(Thread_EmulatedMutex_CriticalSection)
 {
-    SharedWithEmulated shared("EmulatedMutex_CriticalSection");
+    TEST_PATH(path);
+    SharedWithEmulated shared(path);
     shared.m_value = 0;
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
