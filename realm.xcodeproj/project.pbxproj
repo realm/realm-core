@@ -323,6 +323,8 @@
 		6579EEBA1B4E89B7004DE3D8 /* disable_sync_to_disk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */; };
 		6589FF2D1B4D6806001B6239 /* test_upgrade_database_4_4.realm in Resources */ = {isa = PBXBuildFile; fileRef = 65BC7FA01B4D63E70070E98D /* test_upgrade_database_4_4.realm */; };
 		6589FF2E1B4D6806001B6239 /* test_upgrade_database_1000_4.realm in Resources */ = {isa = PBXBuildFile; fileRef = 65BC7FA11B4D63E70070E98D /* test_upgrade_database_1000_4.realm */; };
+		659A0F3B1CD327C100A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 659A0F391CD3276B00A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm */; };
+		659A0F3C1CD327C500A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 659A0F3A1CD3276B00A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm */; };
 		65BB23001AD80EA30097170F /* test_upgrade_database.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65BB22FF1AD80E870097170F /* test_upgrade_database.cpp */; };
 		65D3F7A51AA7549600F27CBD /* test_array_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65D3F7A41AA7549100F27CBD /* test_array_integer.cpp */; };
 		65D3F7A71AA75E3A00F27CBD /* array_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65D3F7A61AA75E3400F27CBD /* array_integer.cpp */; };
@@ -963,6 +965,8 @@
 		6546AB4A1BDE41E700F74CF1 /* query_expression.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = query_expression.hpp; path = realm/query_expression.hpp; sourceTree = "<group>"; };
 		6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = disable_sync_to_disk.cpp; path = realm/disable_sync_to_disk.cpp; sourceTree = "<group>"; };
 		6579EEB81B4E898B004DE3D8 /* disable_sync_to_disk.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = disable_sync_to_disk.hpp; path = realm/disable_sync_to_disk.hpp; sourceTree = "<group>"; };
+		659A0F391CD3276B00A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_4_to_5_datetime1.realm; sourceTree = "<group>"; };
+		659A0F3A1CD3276B00A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_4_to_5_datetime1.realm; sourceTree = "<group>"; };
 		65BB22FF1AD80E870097170F /* test_upgrade_database.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_upgrade_database.cpp; sourceTree = "<group>"; };
 		65BC7FA01B4D63E70070E98D /* test_upgrade_database_4_4.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_4.realm; sourceTree = "<group>"; };
 		65BC7FA11B4D63E70070E98D /* test_upgrade_database_1000_4.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_4.realm; sourceTree = "<group>"; };
@@ -1557,10 +1561,12 @@
 				651AEE9E1B31945F0048C8EE /* test_upgrade_database_4_2.realm */,
 				651AEE9F1B31945F0048C8EE /* test_upgrade_database_4_3.realm */,
 				65BC7FA01B4D63E70070E98D /* test_upgrade_database_4_4.realm */,
+				659A0F391CD3276B00A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm */,
 				651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */,
 				651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */,
 				651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */,
 				65BC7FA11B4D63E70070E98D /* test_upgrade_database_1000_4.realm */,
+				659A0F3A1CD3276B00A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm */,
 			);
 			name = test_files;
 			path = test;
@@ -2173,10 +2179,12 @@
 				651AEEA41B31945F0048C8EE /* test_upgrade_database_4_2.realm in Resources */,
 				651AEEA51B31945F0048C8EE /* test_upgrade_database_4_3.realm in Resources */,
 				6589FF2D1B4D6806001B6239 /* test_upgrade_database_4_4.realm in Resources */,
+				659A0F3B1CD327C100A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm in Resources */,
 				651AEEA61B31945F0048C8EE /* test_upgrade_database_1000_1.realm in Resources */,
 				651AEEA71B31945F0048C8EE /* test_upgrade_database_1000_2.realm in Resources */,
 				651AEEA81B31945F0048C8EE /* test_upgrade_database_1000_3.realm in Resources */,
 				6589FF2E1B4D6806001B6239 /* test_upgrade_database_1000_4.realm in Resources */,
+				659A0F3C1CD327C500A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
