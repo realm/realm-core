@@ -6,6 +6,27 @@
 using namespace realm;
 using namespace realm::test_util;
 
+const double min_warmup_time = 0.05;
+const size_t max_warmup_reps = 100;
+
+namespace {
+
+inline void
+run_once(Benchmark *bench, SharedGroup& sg, Timer& timer)
+{
+    timer.pause();
+    bench->before_each(sg);
+    timer.unpause();
+
+    bench->operator()(sg);
+
+    timer.pause();
+    bench->after_each(sg);
+    timer.unpause();
+}
+
+}
+
 std::string Benchmark::lead_text()
 {
     std::stringstream stream;
@@ -20,17 +41,22 @@ std::string Benchmark::ident()
     return stream.str();
 }
 
-void Benchmark::run_once(SharedGroup& sg, Timer& timer)
+double Benchmark::warmup(SharedGroup& sg)
 {
+    double warmup_time = 0.0;
+    size_t warmup_reps = 0;
+    Timer timer(Timer::type_UserTime);
     timer.pause();
-    this->before_each(sg);
-    timer.unpause();
+    while(warmup_time < /* this-> */ min_warmup_time &&
+          warmup_reps < /* this-> */ max_warmup_reps) {
+        timer.unpause();
+        run_once(this, sg, timer);
+        timer.pause();
+        warmup_time = timer.get_elapsed_time();
+        warmup_reps++;
+    }
 
-    this->operator()(sg);
-
-    timer.pause();
-    this->after_each(sg);
-    timer.unpause();
+    return wamup_time / warmup_reps;
 }
 
 void Benchmark::run(Results& results)
@@ -45,8 +71,10 @@ void Benchmark::run(Results& results)
 
     this->before_all(*sg);
 
+    this->warmup(*sg);
+
     Timer t;
-    this->run_once(*sg, t);
+    run_once(this, *sg, t);
     results.submit(ident.c_str(), t.get_elapsed_time());
 
     this->after_all(*sg);

@@ -11,20 +11,20 @@ namespace test_util {
 
 class Benchmark
 {
-    virtual void operator()(SharedGroup&) = 0;
 
     std::string lead_text();
     std::string ident();
 
-    void run_once(SharedGroup&, Timer&);
+    double warmup(SharedGroup&);
 
-protected:
+public:
     virtual const char* name() const = 0;
     virtual void before_all(SharedGroup&) {}
     virtual void after_all(SharedGroup&) {}
     virtual void before_each(SharedGroup&) {}
     virtual void after_each(SharedGroup&) {}
-public:
+    virtual void operator()(SharedGroup&) = 0;
+
     void run(Results& results);
 };
 
