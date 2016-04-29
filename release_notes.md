@@ -9,6 +9,8 @@
   reference to the restricting view if the query owns the view. Dangling references
   may still occur if the `Query` does not own the restricting `TableView`.
 * Fixed #1747 (valgrind report of unitialized variable).
+* Fixed issue with creation of `ArrayIntNull` with certain default values that would
+  result in an all-null array. (Pull request #1721)
 
 ### API breaking changes:
 
@@ -27,8 +29,10 @@
 * `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
   and will also return true if the target row of a `TableView` that represents backlinks
   is deleted. (Issue #1710)
-* New nanosecond precision `Timestamp` data type and column replace our
-  current `DateTime` data type. (Issue #1476)
+* New nanosecond precision `Timestamp` data and column type replace our current `DateTime`
+  data and column type. (Issue #1476)
+* Notice: Due to the new `Timestamp` data and column type a file upgrade will take place.
+  Read-only Realm files in apps will have to be updated manually.
 
 ### Enhancements:
 
