@@ -5,6 +5,7 @@
 
 #include "results.hpp"  // Results
 #include "timer.hpp"    // Timer
+#include "random.hpp"   // Random
 
 namespace realm {
 namespace test_util {
@@ -47,7 +48,7 @@ public:
 
 template<DataType data_type, bool nullable = false>
 class WithOneColumn : public Benchmark {
-protected:
+public:
     void before_all(SharedGroup& sg)
     {
         WriteTransaction tr(sg);
@@ -67,7 +68,7 @@ protected:
 
 template<class WithClass, size_t N>
 class AddEmptyRows : public WithClass {
-
+public:
     void operator()(SharedGroup& sg)
     {
         WriteTransaction tr(sg);
@@ -79,7 +80,7 @@ class AddEmptyRows : public WithClass {
 
 template<class WithClass, size_t N>
 class WithEmptyRows : public WithClass {
-
+public:
     void before_all(SharedGroup& sg)
     {
         WithClass::before_all(sg);
@@ -88,6 +89,27 @@ class WithEmptyRows : public WithClass {
         TableRef t = tr.get_table(0);
         t->add_empty_row(N);
         tr.commit();
+    }
+};
+
+template<class WithClass, size_t N,
+    typename T,
+    T min = std::numeric_limits<T>::min(),
+    T max = std::numeric_limits<T>::max(),
+    unsigned long seed = std::mt19937::default_seed>
+class WithRandomTs : public WithClass {
+public:
+    T values[N];
+
+    void before_all(SharedGroup& sg)
+    {
+        WithClass::before_all(sg);
+
+        Random random(seed);
+        size_t i;
+        for (i = 0; i < N; i++) {
+            this->values[i] = random.draw_int<T>(min, max);
+        }
     }
 };
 

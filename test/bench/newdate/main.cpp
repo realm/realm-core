@@ -7,19 +7,17 @@
 using namespace realm;
 using namespace realm::test_util;
 
-#define DEF_N 100000
+#define DEF_N 10000
 
+#define base WithRandomTs<WithClass, N, int_fast64_t, min, max, seed>
 template<class WithClass, size_t N,
     int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
     int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
     unsigned long seed = std::mt19937::default_seed>
-class WithRandomTRows : public WithClass {
+class WithRandomTimedates : public base {
     void before_all(SharedGroup& sg)
     {
-        WithClass::before_all(sg);
-
-        Random random(seed);
-        int_fast64_t sinceEpoch;
+        base::before_all(sg);
 
         WriteTransaction tr(sg);
         TableRef t = tr.get_table(0);
@@ -27,8 +25,7 @@ class WithRandomTRows : public WithClass {
         size_t i;
         for (i = 0; i < N; i++) {
             t->add_empty_row();
-            sinceEpoch = random.draw_int<int_fast64_t>(min, max);
-            t->set_timestamp(0, i, Timestamp(sinceEpoch, 0));
+            t->set_timestamp(0, i, Timestamp(this->values[i], 0));
         }
 
         t->add_empty_row();
@@ -37,18 +34,17 @@ class WithRandomTRows : public WithClass {
         tr.commit();
     }
 };
+#undef base
 
+#define base WithRandomTs<WithClass, N, int_fast64_t, min, max, seed>
 template<class WithClass, size_t N,
     int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
     int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
     unsigned long seed = std::mt19937::default_seed>
-class WithRandomDTRows : public WithClass {
+class WithRandomOldDateTimes : public base {
     void before_all(SharedGroup& sg)
     {
-        WithClass::before_all(sg);
-
-        Random random(seed);
-        int_fast64_t sinceEpoch;
+        base::before_all(sg);
 
         WriteTransaction tr(sg);
         TableRef t = tr.get_table(0);
@@ -56,8 +52,7 @@ class WithRandomDTRows : public WithClass {
         size_t i;
         for (i = 0; i < N; i++) {
             t->add_empty_row();
-            sinceEpoch = random.draw_int<int_fast64_t>(min, max);
-            t->set_olddatetime(0, i, OldDateTime(sinceEpoch));
+            t->set_olddatetime(0, i, OldDateTime(this->values[i]));
         }
 
         t->add_empty_row();
@@ -66,18 +61,17 @@ class WithRandomDTRows : public WithClass {
         tr.commit();
     }
 };
+#undef base
 
+#define base WithRandomTs<WithClass, N, int_fast64_t, min, max, seed>
 template<class WithClass, size_t N,
     int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
     int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
     unsigned long seed = std::mt19937::default_seed>
-class WithRandomIntegerRows : public WithClass {
+class WithRandomIntegers : public base {
     void before_all(SharedGroup& sg)
     {
-        WithClass::before_all(sg);
-
-        Random random(seed);
-        int_fast64_t value;
+        base::before_all(sg);
 
         WriteTransaction tr(sg);
         TableRef t = tr.get_table(0);
@@ -85,8 +79,7 @@ class WithRandomIntegerRows : public WithClass {
         size_t i;
         for (i = 0; i < N; i++) {
             t->add_empty_row();
-            value = random.draw_int<int_fast64_t>(min, max);
-            t->set_int(0, i, value);
+            t->set_int(0, i, this->values[i]);
         }
 
         t->add_empty_row();
@@ -95,9 +88,10 @@ class WithRandomIntegerRows : public WithClass {
         tr.commit();
     }
 };
+#undef base
 
 template<class WithClass>
-class QueryEqualsZeroT : public WithClass {
+class QueryEqualsZeroTimestamp : public WithClass {
     void operator()(SharedGroup& sg)
     {
         ReadTransaction tr(sg);
@@ -109,7 +103,7 @@ class QueryEqualsZeroT : public WithClass {
 };
 
 template<class WithClass>
-class QueryEqualsZeroDT : public WithClass {
+class QueryEqualsZeroOldDateTime : public WithClass {
     void operator()(SharedGroup& sg)
     {
         ReadTransaction tr(sg);
@@ -132,7 +126,7 @@ class QueryEqualsZeroInteger : public WithClass {
 };
 
 template<class WithClass>
-class QueryGreaterThanZeroT : public WithClass {
+class QueryGreaterThanZeroTimestamp : public WithClass {
     void operator()(SharedGroup& sg)
     {
         ReadTransaction tr(sg);
@@ -144,7 +138,7 @@ class QueryGreaterThanZeroT : public WithClass {
 };
 
 template<class WithClass>
-class QueryGreaterThanZeroDT : public WithClass {
+class QueryGreaterThanZeroOldDateTime : public WithClass {
     void operator()(SharedGroup& sg)
     {
         ReadTransaction tr(sg);
@@ -166,10 +160,10 @@ class QueryGreaterThanZeroInteger : public WithClass {
     }
 };
 
-class EqualsZeroT :
+class EqualsZeroTimestamp :
     public
-        QueryEqualsZeroT<
-            WithRandomTRows<
+        QueryEqualsZeroTimestamp<
+            WithRandomTimedates<
                 WithOneColumn<
                     type_Timestamp, true>,
                 DEF_N,
@@ -184,10 +178,10 @@ class EqualsZeroT :
     }
 };
 
-class EqualsZeroDT :
+class EqualsZeroOldDateTime :
     public
-        QueryEqualsZeroDT<
-            WithRandomDTRows<
+        QueryEqualsZeroOldDateTime<
+            WithRandomOldDateTimes<
                 WithOneColumn<
                     type_OldDateTime, true>,
                 DEF_N,
@@ -205,7 +199,7 @@ class EqualsZeroDT :
 class EqualsZeroInteger :
     public
         QueryEqualsZeroInteger<
-            WithRandomIntegerRows<
+            WithRandomIntegers<
                 WithOneColumn<
                     type_Int, true>,
                 DEF_N,
@@ -220,10 +214,10 @@ class EqualsZeroInteger :
     }
 };
 
-class GreaterThanZeroT :
+class GreaterThanZeroTimestamp :
     public
-        QueryGreaterThanZeroT<
-            WithRandomTRows<
+        QueryGreaterThanZeroTimestamp<
+            WithRandomTimedates<
                 WithOneColumn<
                     type_Timestamp, true>,
                 DEF_N,
@@ -238,10 +232,10 @@ class GreaterThanZeroT :
     }
 };
 
-class GreaterThanZeroDT :
+class GreaterThanZeroOldDateTime :
     public
-        QueryGreaterThanZeroDT<
-            WithRandomDTRows<
+        QueryGreaterThanZeroOldDateTime<
+            WithRandomOldDateTimes<
                 WithOneColumn<
                     type_OldDateTime, true>,
                 DEF_N,
@@ -259,7 +253,7 @@ class GreaterThanZeroDT :
 class GreaterThanZeroInteger :
     public
         QueryGreaterThanZeroInteger<
-            WithRandomIntegerRows<
+            WithRandomIntegers<
                 WithOneColumn<
                     type_Int, true>,
                 DEF_N,
@@ -276,10 +270,10 @@ class GreaterThanZeroInteger :
 
 int main() {
     Results results(10);
-    bench<EqualsZeroT>(results);
-    bench<EqualsZeroDT>(results);
+    bench<EqualsZeroTimestamp>(results);
+    bench<EqualsZeroOldDateTime>(results);
     bench<EqualsZeroInteger>(results);
-    bench<GreaterThanZeroT>(results);
-    bench<GreaterThanZeroDT>(results);
+    bench<GreaterThanZeroTimestamp>(results);
+    bench<GreaterThanZeroOldDateTime>(results);
     bench<GreaterThanZeroInteger>(results);
 }
