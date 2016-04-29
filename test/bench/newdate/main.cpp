@@ -9,11 +9,26 @@ using namespace realm::test_util;
 
 #define DEF_N 10000
 
-#define base WithRandomTs<WithClass, N, int_fast64_t, min, max, seed>
-template<class WithClass, size_t N,
-    int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
-    int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
-    unsigned long seed = std::mt19937::default_seed>
+
+#define base WithRandomTs<WithClass, N, int_fast64_t, \
+                946684800, \
+                1893455999, \
+                1337>
+                // 2029-12-31T23:59:59Z
+                // 2000-01-01T00:00:00Z
+                // A deterministic seed
+template<class WithClass, size_t N>
+class WithRandomUnixTimes : public base {
+public:
+    void before_all(SharedGroup& sg)
+    {
+        base::before_all(sg);
+    }
+};
+#undef base
+
+#define base WithRandomUnixTimes<WithClass, N>
+template<class WithClass, size_t N>
 class WithRandomTimedates : public base {
     void before_all(SharedGroup& sg)
     {
@@ -36,11 +51,8 @@ class WithRandomTimedates : public base {
 };
 #undef base
 
-#define base WithRandomTs<WithClass, N, int_fast64_t, min, max, seed>
-template<class WithClass, size_t N,
-    int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
-    int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
-    unsigned long seed = std::mt19937::default_seed>
+#define base WithRandomUnixTimes<WithClass, N>
+template<class WithClass, size_t N>
 class WithRandomOldDateTimes : public base {
     void before_all(SharedGroup& sg)
     {
@@ -63,11 +75,8 @@ class WithRandomOldDateTimes : public base {
 };
 #undef base
 
-#define base WithRandomTs<WithClass, N, int_fast64_t, min, max, seed>
-template<class WithClass, size_t N,
-    int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
-    int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
-    unsigned long seed = std::mt19937::default_seed>
+#define base WithRandomUnixTimes<WithClass, N>
+template<class WithClass, size_t N>
 class WithRandomIntegers : public base {
     void before_all(SharedGroup& sg)
     {
@@ -164,13 +173,8 @@ class EqualsZeroTimestamp :
     public
         QueryEqualsZeroTimestamp<
             WithRandomTimedates<
-                WithOneColumn<
-                    type_Timestamp, true>,
-                DEF_N,
-                946684800,  // 2000-01-01T00:00:00Z
-                1893455999, // 2029-12-31T23:59:59Z
-                1337        // A deterministic seed
-                >
+                WithOneColumn<type_Timestamp, true>,
+                DEF_N>
             > {
 
     const char *name() const {
@@ -182,13 +186,8 @@ class EqualsZeroOldDateTime :
     public
         QueryEqualsZeroOldDateTime<
             WithRandomOldDateTimes<
-                WithOneColumn<
-                    type_OldDateTime, true>,
-                DEF_N,
-                946684800,  // 2000-01-01T00:00:00Z
-                1893455999, // 2029-12-31T23:59:59Z
-                1337        // A deterministic seed
-                >
+                WithOneColumn<type_OldDateTime, true>,
+                DEF_N>
             > {
 
     const char *name() const {
@@ -200,13 +199,8 @@ class EqualsZeroInteger :
     public
         QueryEqualsZeroInteger<
             WithRandomIntegers<
-                WithOneColumn<
-                    type_Int, true>,
-                DEF_N,
-                946684800,  // 2000-01-01T00:00:00Z
-                1893455999, // 2029-12-31T23:59:59Z
-                1337        // A deterministic seed
-                >
+                WithOneColumn<type_Int, true>,
+                DEF_N>
             > {
 
     const char *name() const {
@@ -218,13 +212,8 @@ class GreaterThanZeroTimestamp :
     public
         QueryGreaterThanZeroTimestamp<
             WithRandomTimedates<
-                WithOneColumn<
-                    type_Timestamp, true>,
-                DEF_N,
-                946684800,  // 2000-01-01T00:00:00Z
-                1893455999, // 2029-12-31T23:59:59Z
-                1337        // A deterministic seed
-                >
+                WithOneColumn<type_Timestamp, true>,
+                DEF_N>
             > {
 
     const char *name() const {
@@ -236,13 +225,8 @@ class GreaterThanZeroOldDateTime :
     public
         QueryGreaterThanZeroOldDateTime<
             WithRandomOldDateTimes<
-                WithOneColumn<
-                    type_OldDateTime, true>,
-                DEF_N,
-                946684800,  // 2000-01-01T00:00:00Z
-                1893455999, // 2029-12-31T23:59:59Z
-                1337        // A deterministic seed
-                >
+                WithOneColumn<type_OldDateTime, true>,
+                DEF_N>
             > {
 
     const char *name() const {
@@ -254,13 +238,8 @@ class GreaterThanZeroInteger :
     public
         QueryGreaterThanZeroInteger<
             WithRandomIntegers<
-                WithOneColumn<
-                    type_Int, true>,
-                DEF_N,
-                946684800,  // 2000-01-01T00:00:00Z
-                1893455999, // 2029-12-31T23:59:59Z
-                1337        // A deterministic seed
-                >
+                WithOneColumn<type_Int, true>,
+                DEF_N>
             > {
 
     const char *name() const {
