@@ -29,6 +29,8 @@
   is deleted. (Issue #1710)
 * New nanosecond precision `Timestamp` data type and column replace our
   current `DateTime` data type. (Issue #1476)
+* Notice: Due to the new `Timestamp` data type and column a file upgrade will take place.
+  Read-only Realm files in apps will have to be updated manually.
 
 ### Enhancements:
 
