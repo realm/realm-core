@@ -38,7 +38,6 @@ class WithRandomTRows : public WithClass {
     }
 };
 
-
 template<class WithClass, size_t N,
     int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
     int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
@@ -63,6 +62,35 @@ class WithRandomDTRows : public WithClass {
 
         t->add_empty_row();
         t->set_olddatetime(0, i, OldDateTime(0));
+
+        tr.commit();
+    }
+};
+
+template<class WithClass, size_t N,
+    int_fast64_t min = std::numeric_limits<int_fast64_t>::min(),
+    int_fast64_t max = std::numeric_limits<int_fast64_t>::max(),
+    unsigned long seed = std::mt19937::default_seed>
+class WithRandomIntegerRows : public WithClass {
+    void before_all(SharedGroup& sg)
+    {
+        WithClass::before_all(sg);
+
+        Random random(seed);
+        int_fast64_t value;
+
+        WriteTransaction tr(sg);
+        TableRef t = tr.get_table(0);
+
+        size_t i;
+        for (i = 0; i < N; i++) {
+            t->add_empty_row();
+            value = random.draw_int<int_fast64_t>(min, max);
+            t->set_int(0, i, value);
+        }
+
+        t->add_empty_row();
+        t->set_int(0, i, 0);
 
         tr.commit();
     }
@@ -93,6 +121,17 @@ class QueryEqualsZeroDT : public WithClass {
 };
 
 template<class WithClass>
+class QueryEqualsZeroInteger : public WithClass {
+    void operator()(SharedGroup& sg)
+    {
+        ReadTransaction tr(sg);
+        ConstTableRef t = tr.get_table(0);
+        size_t count = (t->where().get_table()->column<Int>(0) == 0).count();
+        this->expected = count == 1;
+    }
+};
+
+template<class WithClass>
 class QueryGreaterThanZeroT : public WithClass {
     void operator()(SharedGroup& sg)
     {
@@ -112,6 +151,17 @@ class QueryGreaterThanZeroDT : public WithClass {
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<OldDateTime>(0) >
             OldDateTime(0)).count();
+        this->expected = count == DEF_N;
+    }
+};
+
+template<class WithClass>
+class QueryGreaterThanZeroInteger : public WithClass {
+    void operator()(SharedGroup& sg)
+    {
+        ReadTransaction tr(sg);
+        ConstTableRef t = tr.get_table(0);
+        size_t count = (t->where().get_table()->column<Int>(0) > 0).count();
         this->expected = count == DEF_N;
     }
 };
@@ -152,6 +202,24 @@ class EqualsZeroDT :
     }
 };
 
+class EqualsZeroInteger :
+    public
+        QueryEqualsZeroInteger<
+            WithRandomIntegerRows<
+                WithOneColumn<
+                    type_Int, true>,
+                DEF_N,
+                946684800,  // 2000-01-01T00:00:00Z
+                1893455999, // 2029-12-31T23:59:59Z
+                1337        // A deterministic seed
+                >
+            > {
+
+    const char *name() const {
+        return "EqualsZero_Integer";
+    }
+};
+
 class GreaterThanZeroT :
     public
         QueryGreaterThanZeroT<
@@ -188,10 +256,30 @@ class GreaterThanZeroDT :
     }
 };
 
+class GreaterThanZeroInteger :
+    public
+        QueryGreaterThanZeroInteger<
+            WithRandomIntegerRows<
+                WithOneColumn<
+                    type_Int, true>,
+                DEF_N,
+                946684800,  // 2000-01-01T00:00:00Z
+                1893455999, // 2029-12-31T23:59:59Z
+                1337        // A deterministic seed
+                >
+            > {
+
+    const char *name() const {
+        return "GreaterThanZero_Integer";
+    }
+};
+
 int main() {
     Results results(10);
     bench<EqualsZeroT>(results);
     bench<EqualsZeroDT>(results);
+    bench<EqualsZeroInteger>(results);
     bench<GreaterThanZeroT>(results);
     bench<GreaterThanZeroDT>(results);
+    bench<GreaterThanZeroInteger>(results);
 }
