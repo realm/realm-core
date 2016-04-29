@@ -198,10 +198,11 @@ void StringColumn::populate_search_index()
             bool is_append = true;
             m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
         }
-    } catch (LogicError& e) {
+    } catch (...) {
+        // Fail atomically by wiping the whole index rather than continuing with incomplete data
         m_search_index->destroy();
         m_search_index.reset(nullptr);
-        throw e;
+        throw;
     }
 }
 
@@ -1053,12 +1054,13 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
         try {
             m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
-        } catch (LogicError& e) {
+        } catch (...) {
+            // Fail atomically; having data in the array but not the index could produce inconsistant results
             std::unique_ptr<StringIndex> tmp_owner(std::move(m_search_index));
             // Erase without touching the StringIndex
             erase_rows(row_ndx_2, num_rows, size(), false);
             tmp_owner.swap(m_search_index);
-            throw e;
+            throw;
         }
     }
 }
@@ -1072,12 +1074,13 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, 
     if (m_search_index) {
         try {
             m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
-        } catch (LogicError& e) {
+        } catch (...) {
+            // Fail atomically; having data in the array but not the index could produce inconsistant results
             std::unique_ptr<StringIndex> tmp_owner(std::move(m_search_index));
             // Erase without touching the StringIndex
             erase_rows(row_ndx, num_rows, size(), false);
             tmp_owner.swap(m_search_index);
-            throw e;
+            throw;
         }
     }
 }

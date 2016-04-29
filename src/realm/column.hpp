@@ -861,10 +861,10 @@ void Column<T>::populate_search_index()
                 m_search_index->insert(row_ndx, value, 1, is_append); // Throws
             }
         }
-    } catch (LogicError& e) {
+    } catch (...) { // Fail atomically
         m_search_index->destroy();
         m_search_index.reset(nullptr);
-        throw e;
+        throw;
     }
 }
 
@@ -1144,11 +1144,11 @@ void Column<T>::insert(size_t row_ndx, T value, size_t num_rows)
         row_ndx = is_append ? size : row_ndx;
         try {
             m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
-        } catch (...) {
-            for (size_t i = num_rows; i > 0; --i) {
-                size_t row_ndx_2 = row_ndx + i - 1;
-                erase_without_updating_index(row_ndx_2, is_append); // Throws
-            }
+        } catch (...) { // Fail atomically
+            std::unique_ptr<StringIndex> temp_ptr(std::move(m_search_index));
+            // Erase without touching StringIndex
+            erase_rows(row_ndx, num_rows, m_tree.size(), false);
+            temp_ptr.swap(m_search_index);
             throw;
         }
     }

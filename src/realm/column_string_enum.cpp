@@ -97,12 +97,13 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
         try {
             m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
-        } catch (LogicError& e) {
+        } catch (...) {
+            // Fail atomically; having data in the array but not the index could produce inconsistant results
             std::unique_ptr<StringIndex> tmp(std::move(m_search_index));
             // Erase inserted rows without touching StringIndex
             erase_rows(row_ndx_2, num_rows, size(), false);
             tmp.swap(m_search_index);
-            throw e;
+            throw;
         }
     }
 }
@@ -118,12 +119,13 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
     if (m_search_index) {
         try {
             m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
-        } catch (LogicError& e) {
+        } catch (...) {
+            // Fail atomically; having data in the array but not the index could produce inconsistant results
             std::unique_ptr<StringIndex> tmp(std::move(m_search_index));
             // Erase inserted rows without touching StringIndex
             erase_rows(row_ndx_2, num_rows, size(), false);
             tmp.swap(m_search_index);
-            throw e;
+            throw;
         }
     }
 }
@@ -298,10 +300,11 @@ StringIndex* StringEnumColumn::create_search_index()
             bool is_append = true;
             index->insert(row_ndx, value, num_rows, is_append); // Throws
         }
-    } catch (LogicError& e) {
+    } catch (...) { // Fail atomically
         index->destroy();
-        throw e;
+        throw;
     }
+
     m_search_index = std::move(index);
     return m_search_index.get();
 }
