@@ -9,6 +9,8 @@
   reference to the restricting view if the query owns the view. Dangling references
   may still occur if the `Query` does not own the restricting `TableView`.
 * Fixed #1747 (valgrind report of unitialized variable).
+* Fixed issue with creation of ArrayIntNull with certain default values that would
+  result in an all-null array. (Pull request #1721)
 
 ### API breaking changes:
 
