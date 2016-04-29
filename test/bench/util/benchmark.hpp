@@ -25,6 +25,22 @@ public:
     virtual void after_each(SharedGroup&) {}
     virtual void operator()(SharedGroup&) = 0;
 
+    virtual double min_warmup_time() {
+        return 0.05;
+    }
+    virtual size_t max_warmup_reps() {
+        return 100;
+    }
+    virtual double min_time() {
+        return 0.1;
+    }
+    virtual size_t min_reps() {
+        return 1000;
+    }
+    virtual size_t max_reps() {
+        return 10000;
+    }
+
     void run(Results& results);
 };
 

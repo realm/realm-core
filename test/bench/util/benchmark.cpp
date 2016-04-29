@@ -6,12 +6,6 @@
 using namespace realm;
 using namespace realm::test_util;
 
-const double min_warmup_time = 0.05;
-const size_t max_warmup_reps = 100;
-const double min_time = 0.1;
-const size_t min_reps = 1000;
-const size_t max_reps = 10000;
-
 namespace {
 
 inline void
@@ -50,8 +44,8 @@ double Benchmark::warmup(SharedGroup& sg)
     size_t warmup_reps = 0;
     Timer timer(Timer::type_UserTime);
     timer.pause();
-    while(warmup_time < /* this-> */ min_warmup_time &&
-          warmup_reps < /* this-> */ max_warmup_reps) {
+    while(warmup_time < this->min_warmup_time() &&
+          warmup_reps < this->max_warmup_reps()) {
         timer.unpause();
         run_once(this, sg, timer);
         timer.pause();
@@ -78,9 +72,9 @@ void Benchmark::run(Results& results)
     this->before_all(*sg);
 
     warmup_secs_per_rep = this->warmup(*sg);
-    reps = size_t(min_time / warmup_secs_per_rep);
-    reps = std::max(reps, min_reps);
-    reps = std::min(reps, max_reps);
+    reps = size_t(this->min_time() / warmup_secs_per_rep);
+    reps = std::max(reps, this->min_reps());
+    reps = std::min(reps, this->max_reps());
 
     for (size_t i = 0; i < reps; i++) {
         Timer t;
