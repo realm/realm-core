@@ -1183,12 +1183,12 @@ TEST(StringIndex_Duplicate_Values)
     CHECK(!ndx.has_duplicate_values());
 
     // Insert into the middle unique value of num_rows
-    col.insert(num_rows/2, str_num_rows);
+    col.insert(num_rows / 2, str_num_rows);
 
     CHECK(!ndx.has_duplicate_values());
 
     // Set the next element to be num_rows too
-    col.set(num_rows/2 + 1, str_num_rows);
+    col.set(num_rows / 2 + 1, str_num_rows);
 
     CHECK(ndx.has_duplicate_values());
 

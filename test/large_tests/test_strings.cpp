@@ -86,14 +86,15 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
         }
 
         if (random.draw_int_mod(10) > trend && a.size() < ITER / 100) {
-            std::string rstr(randstring(random));
             if (random.draw_bool()) {
                 // Insert
                 size_t pos = random.draw_int_max(a.size());
+                std::string rstr(randstring(random));
                 a.insert(pos, rstr);
             }
             else {
                 // Add
+                std::string rstr(randstring(random));
                 a.add(rstr);
             }
         }
