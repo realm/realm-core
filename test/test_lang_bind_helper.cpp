@@ -12006,5 +12006,25 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
     t->insert_empty_row(0, 1);
 }
 
+// Another bug found by AFL
+TEST_TYPES(LangBindHelper_TimestapMultipleInserts, std::true_type, std::false_type)
+{
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    SHARED_GROUP_TEST_PATH(shared_path)
+    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    Group& g = const_cast<Group&>(sg_w.begin_read());
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.add_table("");
+    //g.get_table(0)->add_column(DataType(6), "", false);
+    g.get_table(0)->insert_empty_row(0, 48);
+    g.get_table(0)->insert_empty_row(48, 234);
+    g.get_table(0)->insert_empty_row(48, 234);
+    g.get_table(0)->insert_empty_row(48, 234);
+    g.get_table(0)->insert_empty_row(48, 253);
+    g.get_table(0)->add_column(DataType(8), "", nullable_toggle);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+}
 
 #endif
