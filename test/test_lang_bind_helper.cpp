@@ -12010,20 +12010,16 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
 TEST_TYPES(LangBindHelper_TimestapMultipleInserts, std::true_type, std::false_type)
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
-    SHARED_GROUP_TEST_PATH(shared_path)
-    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    SHARED_GROUP_TEST_PATH(path)
+    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
-    g.add_table("");
-    //g.get_table(0)->add_column(DataType(6), "", false);
-    g.get_table(0)->insert_empty_row(0, 48);
-    g.get_table(0)->insert_empty_row(48, 234);
-    g.get_table(0)->insert_empty_row(48, 234);
-    g.get_table(0)->insert_empty_row(48, 234);
-    g.get_table(0)->insert_empty_row(48, 253);
-    g.get_table(0)->add_column(DataType(8), "", nullable_toggle);
+    TableRef t = g.add_table("");
+    t->add_column(type_Int, "1");
+    t->add_empty_row(REALM_MAX_BPNODE_SIZE + 1); // Works with REALM_MAX_BPNODE_SIZE == 1000, but not 4?!?!
+    t->add_column(type_Timestamp, "2", nullable_toggle);
     LangBindHelper::commit_and_continue_as_read(sg_w);
 }
 
