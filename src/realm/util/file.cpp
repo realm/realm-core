@@ -248,7 +248,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string msg = get_last_error_msg("CreateFile() failed: ", err);
+    std::string error_prefix = "CreateFile(\"" + path + "\") failed: ";
+    std::string msg = get_last_error_msg(error_prefix.c_str(), err);
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
@@ -303,7 +304,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string msg = get_errno_msg("open() failed: ", err);
+    std::string error_prefix = "open(\"" + path + "\") failed: ";
+    std::string msg = get_errno_msg(error_prefix.c_str(), err);
     switch (err) {
         case EACCES:
         case EROFS:
