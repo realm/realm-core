@@ -89,6 +89,9 @@ public:
     /// The default implementation does nothing.
     virtual void terminate_session() noexcept = 0;
 
+    /// Called by the associated SharedGroup to close any open files
+    /// or release similar system resources.
+    virtual void close() noexcept;
 
     //@{
 
