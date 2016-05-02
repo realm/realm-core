@@ -8908,10 +8908,10 @@ ONLY(Query_TimestampBenchmark)
 
 
     timer.reset();
-    for (size_t u = 0; u < 100; u++)
+    for (size_t u = 0; u < 10000; u++)
         match = (table.column<Int>(2) == 0).find();
     CHECK(match == npos);
-    std::cerr << timer.get_elapsed_time() << "\n\n";
+    std::cerr << timer.get_elapsed_time() / 100 << "\n\n";
 
 
     timer.reset();
@@ -8929,10 +8929,10 @@ ONLY(Query_TimestampBenchmark)
 
 
     timer.reset();
-    for (size_t u = 0; u < 100; u++)
+    for (size_t u = 0; u < 10000; u++)
         match = (table.column<Int>(5) == 0).find();
     CHECK(match == npos);
-    std::cerr << timer.get_elapsed_time() << "\n";
+    std::cerr << timer.get_elapsed_time() / 100 << "\n";
 
 
 
