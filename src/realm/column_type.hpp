@@ -34,8 +34,8 @@ enum ColumnType {
     col_type_Binary      =  4,
     col_type_Table       =  5,
     col_type_Mixed       =  6,
-    col_type_DateTime    =  7,
-    col_type_Reserved1   =  8, // new date
+    col_type_OldDateTime =  7,
+    col_type_Timestamp   =  8,
     col_type_Float       =  9,
     col_type_Double      = 10,
     col_type_Reserved4   = 11, // Decimal

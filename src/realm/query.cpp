@@ -63,18 +63,22 @@ void Query::create()
         fetch_descriptor();
 }
 
-Query::Query(const Query& copy)
+Query::Query(const Query& source): error_code(source.error_code), m_groups(source.m_groups),
+    m_current_descriptor(source.m_current_descriptor), m_table(source.m_table)
 {
-    m_table = copy.m_table;
-    m_groups = copy.m_groups;
-    error_code = copy.error_code;
-    m_view = copy.m_view;
-    m_source_link_view = copy.m_source_link_view;
-    m_current_descriptor = copy.m_current_descriptor;
+    if (source.m_owned_source_table_view) {
+        m_owned_source_table_view = source.m_owned_source_table_view->clone();
+        m_source_table_view = m_owned_source_table_view.get();
+        m_view = m_source_table_view;
+    }
+    else {
+        // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
+        // turn `m_source_table_view` into a dangling reference.
+        m_source_table_view = source.m_source_table_view;
 
-    // FIXME: The lifetime of `m_source_table_view` may be tied to that of `copy`, which can easily
-    // turn `m_source_table_view` into a dangling reference.
-    m_source_table_view = copy.m_source_table_view;
+        m_source_link_view = source.m_source_link_view;
+        m_view = source.m_view;
+    }
 }
 
 Query& Query::operator = (const Query& source)
@@ -82,13 +86,23 @@ Query& Query::operator = (const Query& source)
     if (this != &source) {
         m_groups = source.m_groups;
         m_table = source.m_table;
-        m_view = source.m_view;
-        m_source_link_view = source.m_source_link_view;
 
-        // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
-        // turn `m_source_table_view` into a dangling reference.
-        m_source_table_view = source.m_source_table_view;
-        m_owned_source_table_view = nullptr;
+        if (source.m_owned_source_table_view) {
+            m_owned_source_table_view = source.m_owned_source_table_view->clone();
+            m_source_table_view = m_owned_source_table_view.get();
+            m_view = m_source_table_view;
+
+            m_source_link_view.reset();
+        }
+        else {
+            // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
+            // turn `m_source_table_view` into a dangling reference.
+            m_source_table_view = source.m_source_table_view;
+            m_owned_source_table_view = nullptr;
+
+            m_source_link_view = source.m_source_link_view;
+            m_view = source.m_view;
+        }
 
         if (m_table)
             fetch_descriptor();
@@ -292,7 +306,7 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
     switch (type) {
         case type_Int:
         case type_Bool:
-        case type_DateTime: {
+        case type_OldDateTime: {
             if (is_nullable) {
                 return MakeConditionNode<IntegerNode<IntNullColumn, Cond>>::make(column_ndx, value);
             }
@@ -311,6 +325,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
         }
         case type_Binary: {
             return MakeConditionNode<BinaryNode<Cond>>::make(column_ndx, value);
+        }
+        case type_Timestamp: {
+            return MakeConditionNode<TimestampNode<Cond>>::make(column_ndx, value);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};
@@ -647,6 +664,33 @@ Query& Query::between(size_t column_ndx, double from, double to)
 }
 
 
+// ------------- Timestamp
+Query& Query::greater(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Greater>(column_ndx, value);
+}
+Query& Query::equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Equal>(column_ndx, value);
+}
+Query& Query::not_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<NotEqual>(column_ndx, value);
+}
+Query& Query::greater_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<GreaterEqual>(column_ndx, value);
+}
+Query& Query::less_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<LessEqual>(column_ndx, value);
+}
+Query& Query::less(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Less>(column_ndx, value);
+}
+
+
 // Strings, StringData()
 
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
@@ -854,7 +898,7 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
-DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
+OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
                                  size_t limit, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
@@ -898,13 +942,28 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
                                       return_ndx);
 }
 
-DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                                  size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
     return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+}
+
+Timestamp Query::minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
+{
+    ConstTableView tv;
+    tv = find_all(start, end, limit);
+    Timestamp ts = tv.minimum_timestamp(column_ndx, return_ndx);
+    return ts;
+}
+
+Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
+{
+    ConstTableView tv = find_all(start, end, limit);
+    Timestamp ts = tv.maximum_timestamp(column_ndx, return_ndx);
+    return ts;
 }
 
 
@@ -1491,6 +1550,17 @@ Query Query::operator!()
     q.Not();
     q.and_query(*this);
     return q;
+}
+
+util::Optional<uint_fast64_t> Query::sync_view_if_needed() const
+{
+    if (m_view)
+        return m_view->sync_if_needed();
+
+    if (m_table)
+        return m_table->get_version_counter();
+
+    return util::none;
 }
 
 QueryGroup::QueryGroup(const QueryGroup& other) :

@@ -101,6 +101,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/column_string.hpp>
 #include <realm/column_string_enum.hpp>
 #include <realm/column_binary.hpp>
+#include <realm/column_timestamp.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/array_basic.hpp>
@@ -896,6 +897,60 @@ private:
     ColumnType m_column_type;
 };
 
+
+template<class TConditionFunction>
+class TimestampNode : public ParentNode {
+public:
+    using TConditionValue = Timestamp;
+    static const bool special_null_node = false;
+
+    template<Action TAction>
+    int64_t find_all(IntegerColumn* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) { REALM_ASSERT(false); return 0; }
+
+    TimestampNode(Timestamp v, size_t column) : m_value(v)
+    {
+        m_dT = 100.0;
+        m_condition_column_idx = column;
+    }
+
+    TimestampNode(null, size_t column) : TimestampNode(Timestamp(null{}), column)
+    {
+    }
+
+    void init(const Table& table) override
+    {
+        m_dD = 100.0;
+        m_table = &table;
+        m_condition_column = static_cast<const TimestampColumn*>(&get_column_base(table, m_condition_column_idx));
+        REALM_ASSERT(dynamic_cast<const TimestampColumn*>(&get_column_base(table, m_condition_column_idx)));
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
+        REALM_ASSERT_3(m_column_type, == , col_type_Timestamp);
+
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        size_t ret = m_condition_column->find<TConditionFunction>(m_value, start, end);
+        return ret;
+    }
+
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<ParentNode>(new TimestampNode(*this, patches));
+    }
+
+    TimestampNode(const TimestampNode& from, QueryNodeHandoverPatches* patches) : ParentNode(from, patches),
+        m_value(from.m_value), m_condition_column(from.m_condition_column), m_column_type(from.m_column_type)
+    {
+    }
+
+private:
+    Timestamp m_value;
+    const TimestampColumn* m_condition_column;
+    ColumnType m_column_type;
+};
 
 class StringNodeBase : public ParentNode {
 public:
