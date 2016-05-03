@@ -1597,7 +1597,7 @@ public:
     }
     void orphan() noexcept override
     {
-        m_socket = 0;
+        m_socket = nullptr;
     }
 protected:
     socket* m_socket;
@@ -1615,7 +1615,7 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         bool orphaned = !m_socket;
         std::error_code ec = m_error_code;
         if (is_canceled())
@@ -1673,9 +1673,9 @@ public:
     }
 protected:
     socket* m_socket;
-    const char* const m_begin;
-    const char* const m_end;
-    const char* m_curr;
+    const char* const m_begin; // May be dangling after cancellation
+    const char* const m_end;   // May be dangling after cancellation
+    const char* m_curr;        // May be dangling after cancellation
     std::error_code m_error_code;
 };
 
@@ -1843,8 +1843,8 @@ public:
     }
 protected:
     acceptor* m_acceptor;
-    socket& m_socket; // Invalid after cancelation
-    endpoint* const m_endpoint; // Invalid after cancelation
+    socket& m_socket;           // May be dangling after cancellation
+    endpoint* const m_endpoint; // May be dangling after cancellation
     std::error_code m_error_code;
 };
 
@@ -1859,8 +1859,8 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
-        REALM_ASSERT(is_canceled() || m_socket.is_open() || m_error_code);
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
+        REALM_ASSERT(is_canceled() || m_error_code || m_socket.is_open());
         bool orphaned = !m_acceptor;
         std::error_code ec = m_error_code;
         if (is_canceled())
@@ -1995,9 +1995,9 @@ public:
     }
 protected:
     buffered_input_stream* m_stream;
-    char* const m_out_begin;
-    char* const m_out_end;
-    char* m_out_curr;
+    char* const m_out_begin; // May be dangling after cancellation
+    char* const m_out_end;   // May be dangling after cancellation
+    char* m_out_curr;        // May be dangling after cancellation
     const int m_delim;
     std::error_code m_error_code;
 };
@@ -2014,12 +2014,12 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
-        REALM_ASSERT(is_complete() ==
-                     (m_error_code || (m_delim != std::char_traits<char>::eof() ?
-                                       m_out_curr > m_out_begin && m_out_curr[-1] ==
-                                       std::char_traits<char>::to_char_type(m_delim) :
-                                       m_out_curr == m_out_end)));
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
+        REALM_ASSERT(is_canceled() || m_error_code ||
+                     (m_delim != std::char_traits<char>::eof() ?
+                      m_out_curr > m_out_begin && m_out_curr[-1] ==
+                      std::char_traits<char>::to_char_type(m_delim) :
+                      m_out_curr == m_out_end));
         REALM_ASSERT(m_out_curr >= m_out_begin);
         bool orphaned = !m_stream;
         std::error_code ec = m_error_code;
