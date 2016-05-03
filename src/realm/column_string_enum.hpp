@@ -114,6 +114,7 @@ public:
     // Search index
     StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     void set_search_index_allow_duplicate_values(bool) noexcept override;
+    bool supports_search_index() const noexcept final { return true; }
     StringIndex* create_search_index() override;
     void install_search_index(std::unique_ptr<StringIndex>) noexcept;
     void destroy_search_index() noexcept override;

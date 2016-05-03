@@ -99,6 +99,7 @@ public:
     StringIndex* get_search_index() noexcept override;
     const StringIndex* get_search_index() const noexcept override;
     std::unique_ptr<StringIndex> release_search_index() noexcept;
+    bool supports_search_index() const noexcept final { return true; }
     StringIndex* create_search_index() override;
 
     // Simply inserts all column values in the index in a loop

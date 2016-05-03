@@ -57,14 +57,10 @@ namespace {
 
 struct StringColumnType {
     static constexpr bool value = false;
-    StringColumn* col = nullptr;
-    void set_col(ColumnBase* c) { col = dynamic_cast<StringColumn*>(c); }
 };
 
 struct StringEnumColumnType {
     static constexpr bool value = true;
-    StringEnumColumn* col = nullptr;
-    void set_col(ColumnBase* c) { col = dynamic_cast<StringEnumColumn*>(c); }
 };
 
 REALM_TABLE_2(TupleTableType,
@@ -6885,6 +6881,70 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     _CHECK_VER_BUMP();
 }
 
+TEST(Table_ColumnsSupportStringIndex)
+{
+    std::vector<DataType> all_types {
+        type_Int,
+        type_Bool,
+        type_Float,
+        type_Double,
+        type_String,
+        type_Binary,
+        type_OldDateTime,
+        type_Timestamp,
+        type_Table,
+        type_Mixed
+    };
+
+    std::vector<DataType> supports_index {
+        type_Int,
+        type_Bool,
+        type_Float,
+        type_Double,
+        type_String,
+        type_OldDateTime,
+        type_Timestamp
+    };
+
+    Group g; // type_Link must be part of a group
+    TableRef t = g.add_table("t1");
+    for (auto it = all_types.begin(); it != all_types.end(); ++it) {
+        t->add_column(*it, "");
+        ColumnBase& col = _impl::TableFriend::get_column(*t, 0);
+        bool does_support_index = col.supports_search_index();
+        auto found_pos = std::find(supports_index.begin(), supports_index.end(), *it);
+        CHECK(does_support_index == (found_pos != supports_index.end()));
+        CHECK(does_support_index == (col.create_search_index() != nullptr));
+        CHECK(does_support_index == col.has_search_index());
+        t->remove_column(0);
+    }
+
+    // Check type_Link
+    t->add_column_link(type_Link, "", *t);
+    ColumnBase& link_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(!link_col.supports_search_index());
+    CHECK(link_col.create_search_index() == nullptr);
+    CHECK(!link_col.has_search_index());
+    t->remove_column(0);
+
+    // Check type_LinkList
+    t->add_column_link(type_LinkList, "", *t);
+    ColumnBase& linklist_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(!linklist_col.supports_search_index());
+    CHECK(linklist_col.create_search_index() == nullptr);
+    CHECK(!linklist_col.has_search_index());
+    t->remove_column(0);
+
+    // Check StringEnum
+    t->add_column(type_String, "");
+    bool force = true;
+    t->optimize(force);
+    ColumnBase& enum_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(enum_col.supports_search_index());
+    CHECK(enum_col.create_search_index() != nullptr);
+    CHECK(enum_col.has_search_index());
+    t->remove_column(0);
+}
 
 TEST_TYPES(Table_MaxStringLengthInStringAndEnum, StringColumnType, StringEnumColumnType)
 {
@@ -6930,34 +6990,23 @@ TEST_TYPES(Table_MaxStringLengthInStringAndEnum, StringColumnType, StringEnumCol
     CHECK_THROW(t.set_string(col_ndx, 1, over_max), realm::LogicError);
     validate_table();
 
+    CHECK_THROW(t.set_string_unique(col_ndx, 1, over_max), realm::LogicError);
+    validate_table();
+
     CHECK_THROW(t.insert_substring(col_ndx, 1, 0, over_max), realm::LogicError);
     validate_table();
 
-    // StringColumn and StringEnumColumn share methods but they are not in a common base class
-    TEST_TYPE wrapper;
-    wrapper.set_col(&_impl::TableFriend::get_column(t, col_ndx));
-    CHECK(wrapper.col != nullptr);
-    CHECK(wrapper.col->has_search_index());
-
-    CHECK_THROW(wrapper.col->insert(1, over_max), realm::LogicError);
-    validate_table();
-
-    CHECK_THROW(wrapper.col->set(1, over_max), realm::LogicError);
-    validate_table();
-
-    CHECK_THROW(wrapper.col->add(over_max), realm::LogicError);
-    validate_table();
-
     t.remove_search_index(col_ndx);
-    CHECK(!wrapper.col->has_search_index());
+
+    CHECK(!t.has_search_index(col_ndx));
 
     t.set_string(col_ndx, 1, over_max);
     CHECK_EQUAL(t.get_string(col_ndx, 1), over_max);
     CHECK_EQUAL(t.count_string(col_ndx, over_max), 1);
     CHECK_EQUAL(t.find_first_string(col_ndx, over_max), 1);
 
-    CHECK_THROW(t.add_search_index(col_ndx), realm::LogicError);
-    CHECK(!wrapper.col->has_search_index());
+    CHECK(t.add_search_index(col_ndx) == false);
+    CHECK(!t.has_search_index(col_ndx));
     CHECK_EQUAL(t.get_string(col_ndx, 1), over_max);
     CHECK_EQUAL(t.count_string(col_ndx, over_max), 1);
     CHECK_EQUAL(t.find_first_string(col_ndx, over_max), 1);

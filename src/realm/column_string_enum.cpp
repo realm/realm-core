@@ -73,10 +73,6 @@ void StringEnumColumn::set(size_t ndx, StringData value)
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
-
-    // Additionally, if StringIndex::set throws, it is important that
-    // this function returns without actually adding the value to the column.
-
     if (m_search_index) {
         m_search_index->set(ndx, value);
     }
@@ -95,16 +91,7 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
     if (m_search_index) {
         bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        try {
-            m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
-        } catch (...) {
-            // Fail atomically; having data in the array but not the index could produce inconsistant results
-            std::unique_ptr<StringIndex> tmp(std::move(m_search_index));
-            // Erase inserted rows without touching StringIndex
-            erase_rows(row_ndx_2, num_rows, size(), false);
-            tmp.swap(m_search_index);
-            throw;
-        }
+        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
 }
 
@@ -117,16 +104,7 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
     insert_without_updating_index(row_ndx_2, value_2, num_rows); // Throws
 
     if (m_search_index) {
-        try {
-            m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
-        } catch (...) {
-            // Fail atomically; having data in the array but not the index could produce inconsistant results
-            std::unique_ptr<StringIndex> tmp(std::move(m_search_index));
-            // Erase inserted rows without touching StringIndex
-            erase_rows(row_ndx_2, num_rows, size(), false);
-            tmp.swap(m_search_index);
-            throw;
-        }
+        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 }
 
@@ -291,18 +269,18 @@ StringIndex* StringEnumColumn::create_search_index()
     std::unique_ptr<StringIndex> index;
     index.reset(new StringIndex(this, get_alloc())); // Throws
 
-    try {
-        // Populate the index
-        size_t num_rows = size();
-        for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-            StringData value = get(row_ndx);
-            size_t num_rows = 1;
-            bool is_append = true;
-            index->insert(row_ndx, value, num_rows, is_append); // Throws
+    // Populate the index
+    size_t num_rows = size();
+    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+        StringData value = get(row_ndx);
+        size_t num_rows = 1;
+        bool is_append = true;
+        if (REALM_UNLIKELY(!index->is_valid_input(value))) {
+            index->destroy();
+            index.reset(nullptr);
+            break;
         }
-    } catch (...) { // Fail atomically
-        index->destroy();
-        throw;
+        index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 
     m_search_index = std::move(index);

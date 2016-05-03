@@ -7,17 +7,19 @@
 ### API breaking changes:
 
 * StringIndex no longer supports strings with lengths greater than
-  `Table::max_indexed_string_length`. If you try to add a string with a longer length,
-  a `realm::LogicError` will be thrown with type `string_too_long_for_index`. Calling
-  `create_search_index()` will now fail with this exception if attempting to create it on
-  a column which already stores strings that exceed the maximum. If `create_search_index()`
-  fails for this reason, the StringIndex will not be created on the column and the data
-  in the underlying column remains unaffected. This is so that bindings can attempt to
+  `Table::max_indexed_string_length`. If you try to add a string with a longer length
+  (through the Table interface), then a `realm::LogicError` will be thrown with type 
+  `string_too_long_for_index`. Calling `create_search_index()` will now return a
+  boolean value indicating whether or not the index could be created on the column. If
+  the column contains strings that exceed the maximum allowed length, then
+  `create_search_index()` will return false and the index will not be created, but the data
+  in the underlying column will remain unaffected. This is so that bindings can attempt to
   create a search index on a column without knowing the lengths of the strings in the column.
-  Putting data into a StringIndex (add/set/insert) will throw the same exception if the length
-  exceeds the maximum. In this case the data is not inserted into the underlying column.
-  If the exception is thrown and you still want to insert the data, turn off the StringIndex
-  optimization for the column and insert again.
+  Realm will continue to operate as before on any StringIndex that already stores strings longer
+  than the maximum allowed length meaning that this change is not file breaking (no upgrade is
+  required). However, as stated above, any new strings that exceed the maximum length will
+  not be allowed into the StringIndex, to insert long strings just turn off the StringIndex
+  (although this could be left up to the user).
 
 ### Enhancements:
 

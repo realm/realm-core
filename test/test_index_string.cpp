@@ -1333,8 +1333,7 @@ TEST(StringIndex_MaxStringLength)
     StringColumn col(Allocator::get_default(), ref, true);
 
     std::string std_max(StringIndex::max_indexed_string_length, 'a');
-    std::string std_over_max(std_max + "a");
-
+    std::string std_over_max = std_max + "a";
     StringData max(std_max);
     StringData over_max(std_over_max);
 
@@ -1342,7 +1341,7 @@ TEST(StringIndex_MaxStringLength)
     CHECK_EQUAL(col.size(), 1);
     CHECK_EQUAL(col.get(0), over_max);
     CHECK_EQUAL(col.count(over_max), 1);
-    CHECK_THROW(col.create_search_index(), realm::LogicError);
+    CHECK(col.create_search_index() == nullptr);
     CHECK(!col.has_search_index());
     CHECK_EQUAL(col.get(0), over_max);
     CHECK_EQUAL(col.find_first(over_max), 0);   // linear search
@@ -1358,25 +1357,32 @@ TEST(StringIndex_MaxStringLength)
     CHECK_EQUAL(col.find_first(max), 0);    // string index search
 
     auto validate = [&]() {
-        CHECK_EQUAL(col.size(), 1);
+        CHECK_EQUAL(col.size(), 2);
         CHECK(col.has_search_index());
         CHECK_EQUAL(col.get(0), max);
         CHECK_EQUAL(col.find_first(max), 0);
-        CHECK_EQUAL(col.find_first(over_max), realm::npos);
+        CHECK_EQUAL(col.find_first(over_max), 1);
         CHECK_EQUAL(col.count(max), 1);
-        CHECK_EQUAL(col.count(over_max), 0);
+        CHECK_EQUAL(col.count(over_max), 1);
     };
 
-    CHECK_THROW(col.add(over_max), realm::LogicError);
+    // Adding over_max from the column level is ok for now
+    // This has a common prefix with `max` creating a deep unbalanced tree in StringIndex
+    col.add(over_max);
     validate();
+    col.erase(1);
 
-    CHECK_THROW(col.insert(1, over_max), realm::LogicError);
+    col.insert(1, over_max);
     validate();
+    col.erase(1);
 
-    CHECK_THROW(col.insert(0, over_max), realm::LogicError);
+    col.insert(0, over_max);
+    col.swap_rows(0, 1);
     validate();
+    col.erase(1);
 
-    CHECK_THROW(col.set(0, over_max), realm::LogicError);
+    col.insert_rows(1, 1, 1, true);
+    col.set(1, over_max);
     validate();
 
     col.destroy();

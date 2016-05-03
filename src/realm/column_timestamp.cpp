@@ -250,6 +250,11 @@ void TimestampColumn::populate_search_index()
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         bool is_append = true;
         auto value = get(row_ndx);
+        if (REALM_UNLIKELY(!m_search_index->is_valid_input(value))) {
+            m_search_index->destroy();
+            m_search_index.reset(nullptr);
+            break;
+        }
         m_search_index->insert(row_ndx, value, 1, is_append); // Throws
     }
 }

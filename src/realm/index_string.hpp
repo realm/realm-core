@@ -92,6 +92,8 @@ public:
     bool is_empty() const;
 
     template<class T>
+    bool is_valid_input(T value);
+    template<class T>
     void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
     template<class T>
     void insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append);
@@ -150,7 +152,7 @@ public:
     // on a Mac with lengths of 9408 == tree depth of 9408/4 = 2352). Rather than removing
     // recursion, we limit the length on input strings.
     // Since stack size may differ across devices, a conservative number is used.
-    static const size_t max_indexed_string_length = 2000;
+    static const size_t max_indexed_string_length = 500;
 
 private:
 
@@ -376,14 +378,23 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 }
 
 template<class T>
+inline bool StringIndex::is_valid_input(T)
+{
+    return true; // Assumes other types have length less than maximum
+}
+
+template<>
+inline bool StringIndex::is_valid_input(StringData value)
+{
+    return value.size() <= StringIndex::max_indexed_string_length;
+}
+
+template<class T>
 void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
 {
     REALM_ASSERT_3(row_ndx, !=, npos);
     StringConversionBuffer buffer;
     StringData str_to_insert = to_str(value, buffer);
-
-    if (REALM_UNLIKELY(str_to_insert.size() > max_indexed_string_length))
-        throw LogicError(LogicError::string_too_long_for_index);
 
     // If the new row is inserted after the last row in the table, we don't need
     // to adjust any row indexes.
@@ -419,9 +430,6 @@ void StringIndex::set(size_t row_ndx, T new_value)
     StringConversionBuffer buffer2;
     StringData old_value = get(row_ndx, buffer);
     StringData new_value2 = to_str(new_value, buffer2);
-
-    if (REALM_UNLIKELY(new_value2.size() > max_indexed_string_length))
-        throw LogicError(LogicError::string_too_long_for_index);
 
     // Note that insert_with_offset() throws UniqueConstraintViolation.
 

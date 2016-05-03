@@ -190,19 +190,17 @@ void StringColumn::populate_search_index()
 {
     REALM_ASSERT(m_search_index);
 
-    try {
-        size_t num_rows = size();
-        for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
-            StringData value = get(row_ndx);
-            size_t num_rows = 1;
-            bool is_append = true;
-            m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    size_t num_rows = size();
+    for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
+        StringData value = get(row_ndx);
+        size_t num_rows = 1;
+        bool is_append = true;
+        if (REALM_UNLIKELY(!m_search_index->is_valid_input(value))) {
+            m_search_index->destroy();
+            m_search_index.reset(nullptr);
+            return;
         }
-    } catch (...) {
-        // Fail atomically by wiping the whole index rather than continuing with incomplete data
-        m_search_index->destroy();
-        m_search_index.reset(nullptr);
-        throw;
+        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 }
 
@@ -363,10 +361,6 @@ void StringColumn::set(size_t ndx, StringData value)
     // (it is important here that we do it before actually setting
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
-
-    // Additionally, if StringIndex::set throws, it is important that
-    // this function returns without actually adding the value to the column.
-
     if (m_search_index) {
         m_search_index->set(ndx, value); // Throws
     }
@@ -1052,16 +1046,7 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows)
     if (m_search_index) {
         bool is_append = row_ndx == realm::npos;
         size_t row_ndx_2 = is_append ? size() - num_rows : row_ndx;
-        try {
-            m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
-        } catch (...) {
-            // Fail atomically; having data in the array but not the index could produce inconsistant results
-            std::unique_ptr<StringIndex> tmp_owner(std::move(m_search_index));
-            // Erase without touching the StringIndex
-            erase_rows(row_ndx_2, num_rows, size(), false);
-            tmp_owner.swap(m_search_index);
-            throw;
-        }
+        m_search_index->insert(row_ndx_2, value, num_rows, is_append); // Throws
     }
 }
 
@@ -1072,16 +1057,7 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, 
     bptree_insert(row_ndx_2, value, num_rows); // Throws
 
     if (m_search_index) {
-        try {
-            m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
-        } catch (...) {
-            // Fail atomically; having data in the array but not the index could produce inconsistant results
-            std::unique_ptr<StringIndex> tmp_owner(std::move(m_search_index));
-            // Erase without touching the StringIndex
-            erase_rows(row_ndx, num_rows, size(), false);
-            tmp_owner.swap(m_search_index);
-            throw;
-        }
+        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 }
 
