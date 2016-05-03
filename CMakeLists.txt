@@ -82,7 +82,7 @@ configure_file(src/realm/util/config.h.in src/realm/util/config.h)
 # Configure source code to use right version number
 configure_file(src/realm/version.hpp.in src/realm/version.hpp)
 
-if(EXISTS "${CMAKE_PROJECT_DIR}/src/realm/util/config.h")
+if(EXISTS "${CMAKE_SOURCE_DIR}/src/realm/util/config.h")
     message(FATAL_ERROR "config.h exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove it before continuing.")
 endif()
 
