@@ -10,7 +10,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* S: `util::bind_ptr<>` extended with capability to adopt and release naked
+  pointers.
 
 -----------
 
