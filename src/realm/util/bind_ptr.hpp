@@ -55,8 +55,8 @@ public:
     explicit bind_ptr(T* p) noexcept { bind(p); }
     template<class U> explicit bind_ptr(U* p) noexcept { bind(p); }
 
-    explicit bind_ptr(T* p, adopt_tag) noexcept { m_ptr = p; }
-    template<class U> explicit bind_ptr(U* p, adopt_tag) noexcept { m_ptr = p; }
+    bind_ptr(T* p, adopt_tag) noexcept { m_ptr = p; }
+    template<class U> bind_ptr(U* p, adopt_tag) noexcept { m_ptr = p; }
 
     // Copy construct
     bind_ptr(const bind_ptr& p) noexcept { bind(p.m_ptr); }
