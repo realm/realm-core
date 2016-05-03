@@ -316,7 +316,8 @@ TEST(Thread_CriticalSection)
 
 TEST(Thread_EmulatedMutex_CriticalSection)
 {
-    SharedWithEmulated shared("EmulatedMutex_CriticalSection");
+    TEST_PATH(path);
+    SharedWithEmulated shared(path);
     shared.m_value = 0;
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
@@ -548,6 +549,8 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
     cv->notify_all();
 }
 
+/* FIXME: Disabled because of sporadic failures on Android, which makes CI results non-deterministic
+
 void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, 
                        InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
@@ -558,6 +561,8 @@ void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter,
     -- *wait_counter;
     feedback->add_stone();
 }
+
+*/
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
@@ -686,6 +691,8 @@ TEST(Thread_CondvarNotifyAllWakeup)
 }
 
 
+/* FIXME: Disabled because of sporadic failures on Android, which makes CI results non-deterministic
+
 // test that notify will wake up only a single thread, even if there
 // are many waiters:
 TEST(Thread_CondvarNotifyWakeup)
@@ -720,6 +727,7 @@ TEST(Thread_CondvarNotifyWakeup)
     changed.release_shared_part();
     mutex.release_shared_part();
 }
+*/
 
 #endif // _WIN32
 

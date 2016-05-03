@@ -31,6 +31,7 @@ set(REALM_SOURCES
     column_mixed.cpp
     column_string.cpp
     column_string_enum.cpp
+    column_timestamp.cpp
     column_table.cpp
     descriptor.cpp
     exceptions.cpp
@@ -124,6 +125,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_string_enum.hpp
     column_string.hpp
     column_table.hpp
+    column_timestamp.hpp
     column_link.hpp
     column_linklist.hpp
     column_linkbase.hpp

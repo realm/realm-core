@@ -737,10 +737,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     m_db_path = path;
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
-    try {
-        make_dir(m_coordination_dir);
-    } catch (File::Exists&) {
-    }
+    try_make_dir(m_coordination_dir);
     m_key = encryption_key;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_group.m_alloc;
@@ -1005,7 +1002,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                 r_info->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
-                REALM_ASSERT(top_ref == 0);
                 // Durability setting must be consistent across a session. An
                 // inconsistency is a logic error, as the user is required to
                 // make sure that all possible concurrent session participants

@@ -840,26 +840,24 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
     else if (is_shared) {
         // In shared mode (Realm file opened via a SharedGroup instance) this
         // version of the core library is able to open Realms using file format
-        // versions 2, 3, and 4. Versoin 2 files always need to be
-        // upgraded. Version 3 files only need to be upgraded when using an
-        // in-Realm history (see Replication::get_history_type()).
+        // versions 2, 3, 4, and 5. Version 2, 3, and 4 files need to be
+        // upgraded.
         switch (file_format_version) {
             case 2:
             case 3:
             case 4:
+            case 5:
                 bad_file_format = false;
         }
     }
     else {
         // In non-shared mode (Realm file opened via a Group instance) this
-        // version of the core library is able to open Realms using file format
-        // versions 3 and 4. Since a Realm file cannot be upgraded when opened
-        // in this mode (we may be unable to write to the file), versoin 2 files
-        // cannot be opened. In-Realm histories require file format 4, but this
-        // is not a problem, as no history is used non-shared mode.
+        // version of the core library is only able to open Realms using file
+        // format version 5. Since a Realm file cannot be upgraded when opened
+        // in this mode (we may be unable to write to the file), no earlier
+        // versions can be opened.
         switch (file_format_version) {
-            case 3:
-            case 4:
+            case 5:
                 bad_file_format = false;
         }
     }

@@ -79,20 +79,23 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
 
         if (random.draw_int_mod(ITER / 100) == 0) {
             trend = random.draw_int_mod(10);
-
-            a.find_first(randstring(random));
-            a.find_all(res, randstring(random));
+            std::string rand1(randstring(random));
+            std::string rand2(randstring(random));
+            a.find_first(rand1);
+            a.find_all(res, rand2);
         }
 
         if (random.draw_int_mod(10) > trend && a.size() < ITER / 100) {
             if (random.draw_bool()) {
                 // Insert
                 size_t pos = random.draw_int_max(a.size());
-                a.insert(pos, randstring(random));
+                std::string rstr(randstring(random));
+                a.insert(pos, rstr);
             }
             else {
                 // Add
-                a.add(randstring(random));
+                std::string rstr(randstring(random));
+                a.add(rstr);
             }
         }
         else if (a.size() > 0) {

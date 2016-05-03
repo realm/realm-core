@@ -72,7 +72,7 @@ REALM_TABLE_2(TupleTableType,
 REALM_TABLE_5(DateIntStringFloatDouble,
               first, Int,
               second, String,
-              third, DateTime,
+              third, OldDateTime,
               fourth, Float,
               fifth, Double)
 
@@ -88,7 +88,7 @@ REALM_TABLE_5(PeopleTable,
               name, String,
               age, Int,
               male, Bool,
-              hired, DateTime,
+              hired, OldDateTime,
               photo, Binary)
 
 REALM_TABLE_2(FloatTable,
@@ -1651,6 +1651,7 @@ TEST(Query_LimitUntyped2)
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "second1");
+    table.add_column(type_Timestamp, "date");
 
     table.add_empty_row(3);
     table.set_int(0, 0, 10000);
@@ -1665,11 +1666,15 @@ TEST(Query_LimitUntyped2)
     table.set_double(2, 1, 30000.);
     table.set_double(2, 2, 40000.);
 
+    table.set_timestamp(3, 0, Timestamp(10000, 10000));
+    table.set_timestamp(3, 1, Timestamp(30000, 30000));
+    table.set_timestamp(3, 2, Timestamp(40000, 40000));
 
     Query q = table.where();
     int64_t sum;
     float sumf;
     double sumd;
+    Timestamp ts;
 
     // sum, limited by 'limit'
     sum = q.sum_int(0, nullptr, 0, -1, 1);
@@ -1712,6 +1717,8 @@ TEST(Query_LimitUntyped2)
     size_t ndx = not_found;
 
     // max, limited by 'limit'
+
+    // int
     sum = q.maximum_int(0, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
     q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
@@ -1727,6 +1734,24 @@ TEST(Query_LimitUntyped2)
     q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
 
+    // Timestamp
+/*
+    ts = q.maximum_timestamp(3, nullptr, 0, -1, 1);
+    CHECK_EQUAL(Timestamp(10000, 10000), ts);
+    q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
+    CHECK_EQUAL(0, ndx);
+
+    ts = q.maximum_timestamp(3, nullptr, 0, -1, 2);
+    CHECK_EQUAL(Timestamp(30000, 30000), ts);
+    q.maximum_int(0, nullptr, 0, -1, 2, &ndx);
+    CHECK_EQUAL(1, ndx);
+
+    ts = q.maximum_timestamp(3, nullptr, 0, -1);
+    CHECK_EQUAL(Timestamp(40000, 40000), ts);
+    q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
+    CHECK_EQUAL(2, ndx);
+*/
+    // float
     sumf = q.maximum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
     q.maximum_float(1, nullptr, 0, -1, 1, &ndx);
@@ -2051,37 +2076,37 @@ TEST(Query_TwoSameCols)
     Table table;
     table.add_column(type_Bool, "first1");
     table.add_column(type_Bool, "first2");
-    table.add_column(type_DateTime, "second1");
-    table.add_column(type_DateTime, "second2");
+    table.add_column(type_OldDateTime, "second1");
+    table.add_column(type_OldDateTime, "second2");
     table.add_column(type_String, "third1");
     table.add_column(type_String, "third2");
 
     table.add_empty_row();
     table.set_bool(0, 0, false);
     table.set_bool(1, 0, true);
-    table.set_datetime(2, 0, DateTime(0));
-    table.set_datetime(3, 0, DateTime(1));
+    table.set_olddatetime(2, 0, OldDateTime(0));
+    table.set_olddatetime(3, 0, OldDateTime(1));
     table.set_string(4, 0, StringData("a"));
     table.set_string(5, 0, StringData("b"));
 
     table.add_empty_row();
     table.set_bool(0, 1, true);
     table.set_bool(1, 1, true);
-    table.set_datetime(2, 1, DateTime(1));
-    table.set_datetime(3, 1, DateTime(1));
+    table.set_olddatetime(2, 1, OldDateTime(1));
+    table.set_olddatetime(3, 1, OldDateTime(1));
     table.set_string(4, 1, StringData("b"));
     table.set_string(5, 1, StringData("b"));
 
     table.add_empty_row();
     table.set_bool(0, 2, false);
     table.set_bool(1, 2, true);
-    table.set_datetime(2, 2, DateTime(0));
-    table.set_datetime(3, 2, DateTime(1));
+    table.set_olddatetime(2, 2, OldDateTime(0));
+    table.set_olddatetime(3, 2, OldDateTime(1));
     table.set_string(4, 2, StringData("a"));
     table.set_string(5, 2, StringData("b"));
 
     Query q1 = table.column<Bool>(0) == table.column<Bool>(1);
-    Query q2 = table.column<DateTime>(2) == table.column<DateTime>(3);
+    Query q2 = table.column<OldDateTime>(2) == table.column<OldDateTime>(3);
     Query q3 = table.column<String>(4) == table.column<String>(5);
 
     CHECK_EQUAL(1, q1.find());
@@ -2092,7 +2117,7 @@ TEST(Query_TwoSameCols)
     CHECK_EQUAL(1, q3.count());
 
     Query q4 = table.column<Bool>(0) != table.column<Bool>(1);
-    Query q5 = table.column<DateTime>(2) != table.column<DateTime>(3);
+    Query q5 = table.column<OldDateTime>(2) != table.column<OldDateTime>(3);
     Query q6 = table.column<String>(4) != table.column<String>(5);
 
     CHECK_EQUAL(0, q5.find());
@@ -2106,14 +2131,14 @@ TEST(Query_TwoSameCols)
 TEST(Query_DateTest)
 {
     Table table;
-    table.add_column(type_DateTime, "second1");
+    table.add_column(type_OldDateTime, "second1");
 
     for (int i = 1; i < 10; i++) {
         table.add_empty_row();
-        table.set_datetime(0, i - 1, DateTime(i * 1000));
+        table.set_olddatetime(0, i - 1, OldDateTime(i * 1000));
     }
 
-    Query q = table.where().equal_datetime(0, DateTime(5000));
+    Query q = table.where().equal_olddatetime(0, OldDateTime(5000));
     CHECK_EQUAL(1, q.count());
     TableView tv = q.find_all();
     CHECK_EQUAL(1, tv.size());
@@ -2894,13 +2919,13 @@ TEST(Query_DateQuery)
 {
     PeopleTable table;
 
-    table.add("Mary", 28, false, realm::DateTime(2012, 1, 24), realm::BinaryData("bin \0\n data 1", 13));
-    table.add("Frank", 56, true, realm::DateTime(2008, 4, 15), realm::BinaryData("bin \0\n data 2", 13));
-    table.add("Bob", 24, true, realm::DateTime(2010, 12, 1), realm::BinaryData("bin \0\n data 3", 13));
+    table.add("Mary", 28, false, realm::OldDateTime(2012, 1, 24), realm::BinaryData("bin \0\n data 1", 13));
+    table.add("Frank", 56, true, realm::OldDateTime(2008, 4, 15), realm::BinaryData("bin \0\n data 2", 13));
+    table.add("Bob", 24, true, realm::OldDateTime(2010, 12, 1), realm::BinaryData("bin \0\n data 3", 13));
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
-    PeopleTable::View view5 = table.where().hired.greater_equal(realm::DateTime(2012, 1, 1).get_datetime())
-        .hired.less(realm::DateTime(2013, 1, 1).get_datetime()).find_all();
+    PeopleTable::View view5 = table.where().hired.greater_equal(realm::OldDateTime(2012, 1, 1).get_olddatetime())
+        .hired.less(realm::OldDateTime(2013, 1, 1).get_olddatetime()).find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
 }
@@ -3597,14 +3622,14 @@ TEST(Query_SortDescending)
 TEST(Query_SortDates)
 {
     Table table;
-    table.add_column(type_DateTime, "first");
+    table.add_column(type_OldDateTime, "first");
 
     table.insert_empty_row(0);
-    table.set_datetime(0, 0, 1000);
+    table.set_olddatetime(0, 0, 1000);
     table.insert_empty_row(1);
-    table.set_datetime(0, 1, 3000);
+    table.set_olddatetime(0, 1, 3000);
     table.insert_empty_row(2);
-    table.set_datetime(0, 2, 2000);
+    table.set_olddatetime(0, 2, 2000);
 
     TableView tv = table.where().find_all();
     CHECK(tv.size() == 3);
@@ -3615,9 +3640,9 @@ TEST(Query_SortDates)
     tv.sort(0);
 
     CHECK(tv.size() == 3);
-    CHECK(tv.get_datetime(0, 0) == DateTime(1000));
-    CHECK(tv.get_datetime(0, 1) == DateTime(2000));
-    CHECK(tv.get_datetime(0, 2) == DateTime(3000));
+    CHECK(tv.get_olddatetime(0, 0) == OldDateTime(1000));
+    CHECK(tv.get_olddatetime(0, 1) == OldDateTime(2000));
+    CHECK(tv.get_olddatetime(0, 2) == OldDateTime(3000));
 }
 
 
@@ -5080,15 +5105,15 @@ TEST(Query_SumMinMaxAvg)
 {
     DateIntStringFloatDouble t;
 
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(2, "b", DateTime(300), 3.0f, 3.0);
-    t.add(3, "c", DateTime(50), 5.0f, 5.0);
-    t.add(0, "a", DateTime(100), 1.0f, 1.0);
-    t.add(0, "b", DateTime(3000), 30.0f, 30.0);
-    t.add(0, "c", DateTime(5), 0.5f, 0.5);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(2, "b", OldDateTime(300), 3.0f, 3.0);
+    t.add(3, "c", OldDateTime(50), 5.0f, 5.0);
+    t.add(0, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(0, "b", OldDateTime(3000), 30.0f, 30.0);
+    t.add(0, "c", OldDateTime(5), 0.5f, 0.5);
 
     CHECK_EQUAL(9, t.where().first.sum());
 
@@ -5136,8 +5161,8 @@ TEST(Query_SumMinMaxAvg)
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where().first.average(), 0.001);
 
-    CHECK_EQUAL(DateTime(3000), t.where().third.maximum());
-    CHECK_EQUAL(DateTime(5), t.where().third.minimum());
+    CHECK_EQUAL(OldDateTime(3000), t.where().third.maximum());
+    CHECK_EQUAL(OldDateTime(5), t.where().third.minimum());
 
     size_t cnt;
     CHECK_EQUAL(0, t.where().first.sum(&cnt, 0, 0));
@@ -5169,15 +5194,15 @@ TEST(Query_SumMinMaxAvg_where)
 {
     DateIntStringFloatDouble t;
 
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(1, "a", DateTime(100), 1.0f, 1.0);
-    t.add(2, "b", DateTime(300), 3.0f, 3.0);
-    t.add(3, "c", DateTime(50), 5.0f, 5.0);
-    t.add(0, "a", DateTime(100), 1.0f, 1.0);
-    t.add(0, "b", DateTime(3000), 30.0f, 30.0);
-    t.add(0, "c", DateTime(5), 0.5f, 0.5);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(2, "b", OldDateTime(300), 3.0f, 3.0);
+    t.add(3, "c", OldDateTime(50), 5.0f, 5.0);
+    t.add(0, "a", OldDateTime(100), 1.0f, 1.0);
+    t.add(0, "b", OldDateTime(3000), 30.0f, 30.0);
+    t.add(0, "c", OldDateTime(5), 0.5f, 0.5);
 
     DateIntStringFloatDouble::View v = t.where().find_all();
 
@@ -5214,8 +5239,8 @@ TEST(Query_SumMinMaxAvg_where)
 
     CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).first.average(), 0.001);
 
-    CHECK_EQUAL(DateTime(3000), t.where(&v).third.maximum());
-    CHECK_EQUAL(DateTime(5), t.where(&v).third.minimum());
+    CHECK_EQUAL(OldDateTime(3000), t.where(&v).third.maximum());
+    CHECK_EQUAL(OldDateTime(5), t.where(&v).third.minimum());
 
     size_t cnt;
     CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 0, 0));
@@ -5404,7 +5429,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         table.add_column(type_Double, "dbl", n);
         table.add_column(type_String, "str", n);
         table.add_column(type_Binary, "bin", n);
-        table.add_column(type_DateTime, "dat", n);
+        table.add_column(type_OldDateTime, "dat", n);
         table.add_column(type_Table, "tab", &sub1);
         table.add_column(type_Mixed, "mix");
         sub1->add_column(type_Int, "sub_int");
@@ -5424,7 +5449,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         table.set_double(3, 0, 0.8);
         table.set_string(4, 0, "foo");
         table.set_binary(5, 0, bin1);
-        table.set_datetime(6, 0, 0);
+        table.set_olddatetime(6, 0, 0);
         table.set_mixed(8, 0, mix_int);
 
         table.add_empty_row();
@@ -5434,7 +5459,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         table.set_double(3, 1, 8.8);
         table.set_string(4, 1, "banach");
         table.set_binary(5, 1, bin2);
-        table.set_datetime(6, 1, time_now);
+        table.set_olddatetime(6, 1, time_now);
         TableRef subtab = table.get_subtable(7, 1);
         subtab->add_empty_row();
         subtab->set_int(0, 0, 100);
@@ -5446,7 +5471,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
         CHECK_EQUAL(1, table.where().equal(4, "foo").count());
         CHECK_EQUAL(1, table.where().equal(5, bin1).count());
-        CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
+        CHECK_EQUAL(1, table.where().equal_olddatetime(6, 0).count());
         //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
         //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
 
@@ -5520,7 +5545,7 @@ REALM_TABLE_9(TestQueryAllTypes,
               double_col, Double,
               string_col, String,
               binary_col, Binary,
-              date_col, DateTime,
+              date_col, OldDateTime,
               table_col, Subtable<TestQuerySub>,
               mixed_col, Mixed)
 
@@ -6219,8 +6244,9 @@ void create_columns(TableRef table, bool nullable = true)
     table->insert_column(2, type_String, "Description", nullable);
     table->insert_column(3, type_Double, "Rating", nullable);
     table->insert_column(4, type_Bool, "Stock", nullable);
-    table->insert_column(5, type_DateTime, "Delivery date", nullable);
+    table->insert_column(5, type_OldDateTime, "Delivery date", nullable);
     table->insert_column(6, type_Binary, "Photo", nullable);
+    table->insert_column(7, type_Timestamp, "ts", nullable);
 }
 
 bool equals(TableView& tv, std::vector<size_t> indexes)
@@ -6261,9 +6287,9 @@ void fill_data(TableRef table) {
     table->set_null(4, 1);
     table->set_bool(4, 2, false);
 
-    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_olddatetime(5, 0, OldDateTime(2016, 2, 2));
     table->set_null(5, 1);
-    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+    table->set_olddatetime(5, 2, OldDateTime(2016, 6, 6));
 }
 
 } // unnamed namespace
@@ -6289,7 +6315,7 @@ TEST(Query_NullShowcase)
 
     NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
-        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>   Photo<BinaryData>
+        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<OldDateTime>   Photo<BinaryData>
         -------------------------------------------------------------------------------------------------------------------------------------
     0   null            null                null                    1.1                 true          2016-2-2             "foo"
     1   10              null                "foo"                   2.2                 null          null                 zero-lenght non-null
@@ -6331,9 +6357,9 @@ TEST(Query_NullShowcase)
     table->set_null(4, 1);
     table->set_bool(4, 2, false);
 
-    table->set_datetime(5, 0, DateTime(2016, 2, 2));
+    table->set_olddatetime(5, 0, OldDateTime(2016, 2, 2));
     table->set_null(5, 1);
-    table->set_datetime(5, 2, DateTime(2016, 6, 6));
+    table->set_olddatetime(5, 2, OldDateTime(2016, 6, 6));
 
     table->set_binary(6, 0, BinaryData("foo"));
     table->set_binary(6, 1, BinaryData("", 0)); // remember 0, else it will have length of 1 due to 0 termination of c++
@@ -6343,7 +6369,7 @@ TEST(Query_NullShowcase)
     Columns<Float> shipping = table->column<Float>(1);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
-    Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
     Columns<BinaryData> photo = table->column<BinaryData>(6);
 
     // check int/double type mismatch error handling
@@ -6417,10 +6443,10 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, { 0, 2 }));
 
     // Dates
-    tv = (delivery == DateTime(2016, 6, 6)).find_all();
+    tv = (delivery == OldDateTime(2016, 6, 6)).find_all();
     CHECK(equals(tv, { 2 }));
 
-    tv = (delivery != DateTime(2016, 6, 6)).find_all();
+    tv = (delivery != OldDateTime(2016, 6, 6)).find_all();
     CHECK(equals(tv, { 0, 1 }));
 
     tv = (delivery == null()).find_all();
@@ -6458,8 +6484,9 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, { }));
 
     // As stated above, if you want to use `> null()`, you cannot do it in the old syntax. This is for source
-    // code simplicity (would need tons of new method overloads that also need unit test testing, etc).
-    CHECK_THROW_ANY(tv = table->where().greater(0, null()).find_all());
+    // code simplicity (would need tons of new method overloads that also need unit test testing, etc). So
+    // following is not possible and will not compile
+    // (tv = table->where().greater(0, null()).find_all());
 
     // Nullable floats in old syntax
     tv = table->where().equal(1, null()).find_all();
@@ -6478,7 +6505,7 @@ TEST(Query_NullShowcase)
     size_t count;
     int64_t i;
     double d;
-    DateTime dt;
+    OldDateTime dt;
     tv = table->where().find_all();
 
     // Integer column
@@ -6522,11 +6549,11 @@ TEST(Query_NullShowcase)
     d = tv.sum_double(3);
     CHECK_APPROXIMATELY_EQUAL(d, 1.1 + 2.2 + 3.3, 0.001);
 
-    // DateTime column
-    dt = tv.maximum_datetime(5);
-    CHECK_EQUAL(dt, DateTime(2016, 6, 6));
-    dt = tv.minimum_datetime(5);
-    CHECK_EQUAL(dt, DateTime(2016, 2, 2));
+    // OldDateTime column
+    dt = tv.maximum_olddatetime(5);
+    CHECK_EQUAL(dt, OldDateTime(2016, 6, 6));
+    dt = tv.minimum_olddatetime(5);
+    CHECK_EQUAL(dt, OldDateTime(2016, 2, 2));
 
     // NaN
     // null converts to 0 when calling get_float() on it. We intentionally do not return the bit pattern
@@ -6652,7 +6679,7 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         CHECK_EQUAL(table->get_float(1, 0), 0.0f);
         CHECK_EQUAL(table->get_double(3, 0), 0.0);
         CHECK_EQUAL(table->get_bool(4, 0), false);
-        CHECK_EQUAL(table->get_datetime(5, 0), DateTime(0));
+        CHECK_EQUAL(table->get_olddatetime(5, 0), OldDateTime(0));
 
         // Set everything to non-null values
         table->set_int(0, 0, 0);
@@ -6660,7 +6687,7 @@ TEST(Query_Null_DefaultsAndErrorhandling)
         table->set_string(2, 0, StringData("", 0));
         table->set_double(3, 0, 0.);
         table->set_bool(4, 0, false);
-        table->set_datetime(5, 0, DateTime(0));
+        table->set_olddatetime(5, 0, OldDateTime(0));
 
         CHECK(!table->is_null(0, 0));
         CHECK(!table->is_null(1, 0));
@@ -6699,12 +6726,12 @@ TEST(Query_Null_Two_Columns)
     Columns<String> description = table->column<String>(2);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
-    Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
 
     TableView tv;
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<DateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<OldDateTime>
     ----------------------------------------------------------------------------------------------------------------
     0   1           null                null                    1.1                 true          2016-2-2
     1   null        null                "foo"                   2.2                 null          null
@@ -6863,9 +6890,9 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     table->add_empty_row();
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<DateTime>
-    ----------------------------------------------------------------------------------------------------------------
-    null            null                null                    null                null            null
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<OldDateTime>     ts<Timestamp>
+    --------------------------------------------------------------------------------------------------------------------------------------
+    null            null                null                    null                null            null                      null
     */
 
     TableView tv;
@@ -6919,12 +6946,22 @@ TEST(Query_Null_BetweenMinMax_Nullable)
 
         // date
         match = 123;
-        tv.maximum_datetime(5, &match);
+        tv.maximum_olddatetime(5, &match);
         CHECK_EQUAL(match, npos);
 
         match = 123;
-        tv.minimum_datetime(5, &match);
+        tv.minimum_olddatetime(5, &match);
         CHECK_EQUAL(match, npos);
+
+        // timestamp
+        match = 123;
+        tv.maximum_timestamp(7, &match);
+        CHECK_EQUAL(match, npos);
+
+        match = 123;
+        tv.minimum_timestamp(7, &match);
+        CHECK_EQUAL(match, npos);
+
     };
 
     // There are rows in TableView but they all point to null
@@ -6937,7 +6974,7 @@ TEST(Query_Null_BetweenMinMax_Nullable)
 
     // Now we test that average does not include nulls in row count:
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<DateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<OldDateTime>
     ----------------------------------------------------------------------------------------------------------------
     null            null                null                    null                null            null
     10              10.f                null                    10.                 null            null
@@ -6975,7 +7012,7 @@ TEST(Query_Null_ManyRows)
     Columns<String> description = table->column<String>(2);
     Columns<Double> rating = table->column<Double>(3);
     Columns<Bool> stock = table->column<Bool>(4);
-    Columns<DateTime> delivery = table->column<DateTime>(5);
+    Columns<OldDateTime> delivery = table->column<OldDateTime>(5);
 
     // Create lots of non-null rows
     for (size_t t = 0; t < 2000; t++) {
@@ -6985,7 +7022,7 @@ TEST(Query_Null_ManyRows)
         table->set_string(2, t, "foo");
         table->set_double(3, t, 12.3);
         table->set_bool(4, t, true);
-        table->set_datetime(5, t, DateTime(2016, 2, 2));
+        table->set_olddatetime(5, t, OldDateTime(2016, 2, 2));
     }
 
     // Reference lists used to verify query results
@@ -7071,14 +7108,14 @@ TEST(Query_Null_Sort)
     table->set_string(2, 0, "0");
     table->set_double(3, 0, 0.0);
     table->set_bool(4, 0, false);
-    table->set_datetime(5, 0, DateTime(0));
+    table->set_olddatetime(5, 0, OldDateTime(0));
 
     table->set_int(0, 2, 2);
     table->set_float(1, 2, 2.f);
     table->set_string(2, 2, "2");
     table->set_double(3, 2, 2.0);
     table->set_bool(4, 2, true);
-    table->set_datetime(5, 2, DateTime(2000));
+    table->set_olddatetime(5, 2, OldDateTime(2000));
 
     for (int i = 0; i <= 5; i++) {
         TableView tv = table->where().find_all();
@@ -8405,15 +8442,15 @@ TEST(Query_ReferDeletedLinkView)
     // TableView that depends on LinkView soon to be deleted
     TableView tv_sorted = links->get_sorted_view(1);
 
-    // First test depends_on_deleted_linklist()
-    CHECK(!tv_sorted.depends_on_deleted_linklist());
+    // First test depends_on_deleted_object()
+    CHECK(!tv_sorted.depends_on_deleted_object());
     TableView tv2 = table->where(&tv).find_all();
-    CHECK(!tv2.depends_on_deleted_linklist());
+    CHECK(!tv2.depends_on_deleted_object());
 
     // Delete LinkList so LinkView gets detached
     table->move_last_over(0);
     CHECK(!links->is_attached());
-    CHECK(tv_sorted.depends_on_deleted_linklist());
+    CHECK(tv_sorted.depends_on_deleted_object());
 
     // See if "Query that depends on LinkView" returns sane "empty"-like values
     CHECK_EQUAL(q.find_all().size(), 0);
@@ -8548,4 +8585,280 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(not_found, match);
 }
 
+// Ensure that Query's move constructor and move assignment operator don't result in
+// a TableView owned by the query being double-deleted when the queries are destroyed.
+TEST(Query_MoveDoesntDoubleDelete)
+{
+    Table table;
+
+    {
+        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q2 = std::move(q1);
+    }
+
+    {
+        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q2;
+        q2 = std::move(q1);
+    }
+}
+
+TEST(Query_Timestamp)
+{
+    size_t match;
+    Table table;
+    table.add_column(type_Timestamp, "first", true);
+    table.add_column(type_Timestamp, "second", true);
+    Columns<Timestamp> first = table.column<Timestamp>(0);
+    Columns<Timestamp> second = table.column<Timestamp>(1);
+
+    table.add_empty_row(6);
+    table.set_timestamp(0, 0, Timestamp(111, 222));
+    table.set_timestamp(0, 1, Timestamp(111, 333));
+    table.set_timestamp(0, 2, Timestamp(333, 444));
+    table.set_timestamp(0, 3, Timestamp(null{}));
+    table.set_timestamp(0, 4, Timestamp(0, 0));
+    table.set_timestamp(0, 5, Timestamp(-1000, 0));
+
+    table.set_timestamp(1, 2, Timestamp(222, 222));
+
+    CHECK(table.get_timestamp(0, 0) == Timestamp(111, 222));
+
+    match = (first == Timestamp(111, 222)).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first != Timestamp(111, 222)).find();
+    CHECK_EQUAL(match, 1);
+
+    match = (first > Timestamp(111, 222)).find();
+    CHECK_EQUAL(match, 1);
+
+    match = (first < Timestamp(111, 333)).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first == Timestamp(0, 0)).find();
+    CHECK_EQUAL(match, 4);
+
+    match = (first < Timestamp(111, 333)).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first < Timestamp(0, 0)).find();
+    CHECK_EQUAL(match, 5);
+
+    // Note: .count(), not find()
+    match = (first < Timestamp(0, 0)).count();
+    CHECK_EQUAL(match, 1);
+
+    match = (first != Timestamp(null{})).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first != null{}).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first != Timestamp(0, 0)).count();
+    CHECK_EQUAL(match, 5);
+
+    match = (first < Timestamp(-100, 0)).find();
+    CHECK_EQUAL(match, 5);
+
+    // Left-hand-side being Timestamp() constant, right being column
+    match = (Timestamp(111, 222) == first).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (Timestamp(null{}) == first).find();
+    CHECK_EQUAL(match, 3);
+
+    match = (Timestamp(111, 222) > first).find();
+    CHECK_EQUAL(match, 4);
+
+    match = (Timestamp(111, 333) < first).find();
+    CHECK_EQUAL(match, 2);
+
+    match = (Timestamp(111, 222) >= first).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (Timestamp(111, 111) >= first).find();
+    CHECK_EQUAL(match, 4);
+
+    match = (Timestamp(333, 444) <= first).find();
+    CHECK_EQUAL(match, 2);
+
+    match = (Timestamp(111, 300) <= first).find();
+    CHECK_EQUAL(match, 1);
+
+    match = (Timestamp(111, 222) != first).find();
+    CHECK_EQUAL(match, 1);
+
+    // Compare column with self
+    match = (first == first).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first != first).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (first > first).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (first < first).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (first >= first).find();
+    CHECK_EQUAL(match, 0);
+
+    match = (first <= first).find();
+    CHECK_EQUAL(match, 0); 
+
+    // Two different columns
+    match = (first == second).find();
+    CHECK_EQUAL(match, 3); // null == null
+
+    match = (first > second).find();
+    CHECK_EQUAL(match, 2); // Timestamp(333, 444) > Timestamp(111, 222)
+
+    match = (first < second).find();
+    CHECK_EQUAL(match, npos); // Note that (null < null) == false
+
+}
+
+TEST(Query_Timestamp_Null)
+{
+    // Test that querying for null on non-nullable column (with default value being non-null value) is
+    // possible (i.e. does not throw or fail) and also gives no search matches.
+    Table table;
+    size_t match;
+
+    table.add_column(type_Timestamp, "first", false);
+    table.add_column(type_Timestamp, "second", true);
+    table.add_empty_row();
+
+    Columns<Timestamp> first = table.column<Timestamp>(0);
+    Columns<Timestamp> second = table.column<Timestamp>(1);
+
+    match = (first == Timestamp(null{})).find();
+    CHECK_EQUAL(match, npos);
+
+    match = (second == Timestamp(null{})).find();
+    CHECK_EQUAL(match, 0);
+}
+
+// Ensure that coyping a Query copies a restricting TableView if the query owns the view.
+TEST(Query_CopyRestrictingTableViewWhenOwned)
+{
+    Table table;
+
+    {
+        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q2(q1);
+
+        // Reset the source query, destroying the original TableView.
+        q1 = {};
+
+        // Operations on the copied query that touch the restricting view should not crash.
+        CHECK_EQUAL(0, q2.count());
+    }
+
+    {
+        Query q1(table, std::unique_ptr<TableViewBase>(new TableView()));
+        Query q2;
+        q2 = q1;
+
+        // Reset the source query, destroying the original TableView.
+        q1 = {};
+
+        // Operations on the copied query that touch the restricting view should not crash.
+        CHECK_EQUAL(0, q2.count());
+    }
+}
+
+TEST(Query_SyncViewIfNeeded)
+{
+    Group group;
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    size_t col_links = source->add_column_link(type_LinkList, "link", *target);
+    size_t col_id = target->add_column(type_Int, "id");
+
+    auto reset_table_contents = [&]{
+        source->clear();
+        target->clear();
+
+        for (size_t i = 0; i < 15; ++i) {
+            target->add_empty_row();
+            target->set_int(col_id, i, i);
+        }
+
+        source->add_empty_row();
+        LinkViewRef ll = source->get_linklist(col_links, 0);
+        for (size_t i = 6; i < 15; ++i) {
+            ll->add(i);
+        }
+    };
+
+    // Restricting TableView. Query::sync_view_if_needed() syncs the TableView if needed.
+    {
+        reset_table_contents();
+        TableView restricting_view = target->where().greater(col_id, 5).find_all();
+        Query q = target->where(&restricting_view).less(col_id, 10);
+
+        // Bring the view out of sync with the table.
+        target->set_int(col_id, 7, -7);
+        target->set_int(col_id, 8, -8);
+
+        // Verify that the query uses the view as-is.
+        CHECK_EQUAL(4, q.count());
+        CHECK_EQUAL(false, restricting_view.is_in_sync());
+
+        // And that syncing the query brings the view back into sync.
+        auto version = q.sync_view_if_needed();
+        CHECK_EQUAL(true, restricting_view.is_in_sync());
+        CHECK_EQUAL(2, q.count());
+        CHECK_EQUAL(version, target->get_version_counter());
+    }
+
+    // Restricting LinkView. Query::sync_view_if_needed() does nothing as LinkViews are always in sync.
+    {
+        reset_table_contents();
+        LinkViewRef restricting_view = source->get_linklist(col_links, 0);
+        Query q = target->where(restricting_view).less(col_id, 10);
+
+        // Modify the underlying table to remove rows from the LinkView.
+        target->move_last_over(7);
+        target->move_last_over(8);
+
+        // Verify that the view has remained in sync.
+        CHECK_EQUAL(true, restricting_view->is_in_sync());
+        CHECK_EQUAL(2, q.count());
+
+        // And that syncing the query does nothing.
+        auto version = q.sync_view_if_needed();
+        CHECK_EQUAL(true, restricting_view->is_in_sync());
+        CHECK_EQUAL(version, target->get_version_counter());
+        CHECK_EQUAL(2, q.count());
+    }
+
+    // No restricting view. Query::sync_view_if_needed() does nothing.
+    {
+        reset_table_contents();
+        Query q = target->where().greater(col_id, 5).less(col_id, 10);
+
+        target->set_int(col_id, 7, -7);
+        target->set_int(col_id, 8, -8);
+
+        CHECK_EQUAL(2, q.count());
+
+        auto version = q.sync_view_if_needed();
+        CHECK_EQUAL(version, target->get_version_counter());
+        CHECK_EQUAL(2, q.count());
+    }
+
+    // Query that is not associated with a Table. Query::sync_view_if_needed() does nothing.
+    {
+        reset_table_contents();
+        Query q;
+
+        auto version = q.sync_view_if_needed();
+        CHECK_EQUAL(bool(version), false);
+    }
+}
 #endif // TEST_QUERY
