@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* Fix a potential crash in SharedGroup::advance_read() due to faulty
+  management of commitlog files (#1762)
 
 ### API breaking changes:
 
