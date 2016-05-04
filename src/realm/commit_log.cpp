@@ -418,6 +418,10 @@ void WriteLogCollector::close() noexcept
     m_log_a.file.close();
     m_log_b.map.unmap();
     m_log_b.file.close();
+    // ensure we do not accidentally have a counter matching
+    // a later mmap.
+    m_log_a.last_seen_mmap_counter = 0;
+    m_log_b.last_seen_mmap_counter = 0;
 }
 
 
