@@ -168,11 +168,15 @@ protected:
         CommitLogPreamble preamble_a;
         CommitLogPreamble preamble_b;
 
+        // memory mapping counter, increased whenever a log is resized
+        uint64_t mmap_counter;
+
         CommitLogHeader(uint_fast64_t version):
             preamble_a(version),
             preamble_b(version)
         {
             use_preamble_a = true;
+            mmap_counter = 1;
         }
     };
 
@@ -189,7 +193,7 @@ protected:
         mutable util::File file;
         std::string name;
         mutable util::File::Map<CommitLogHeader> map;
-        mutable util::File::SizeType last_seen_size;
+        mutable uint64_t last_seen_mmap_counter = 0;
         CommitLogMetadata(std::string name): name(name) {}
     };
 
@@ -369,15 +373,13 @@ void WriteLogCollector::remap_if_needed(const CommitLogMetadata& log) const
 {
     if (log.map.is_attached() == false) {
         open_if_needed(log);
-        log.last_seen_size = log.file.get_size();
-        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(log.last_seen_size));
-        log.map.map(log.file, File::access_ReadWrite, size_t(log.last_seen_size));
+        log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
+        log.map.map(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
         return;
     }
-    if (log.last_seen_size != log.file.get_size()) {
-        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(log.last_seen_size));
+    if (log.last_seen_mmap_counter != m_header.get_addr()->mmap_counter) {
+        log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
         log.map.remap(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
-        log.last_seen_size = log.file.get_size();
     }
 }
 
@@ -391,8 +393,8 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         log.file.sync(); // Throws
+    log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
     log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
-    log.last_seen_size = minimal_pages * page_size;
 }
 
 void WriteLogCollector::reset_header()
@@ -416,6 +418,10 @@ void WriteLogCollector::commit_log_close() noexcept
     m_log_a.file.close();
     m_log_b.map.unmap();
     m_log_b.file.close();
+    // ensure we do not accidentally have a counter matching
+    // a later mmap.
+    m_log_a.last_seen_mmap_counter = 0;
+    m_log_b.last_seen_mmap_counter = 0;
 }
 
 
@@ -446,6 +452,8 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         if (size > 4) {
             size -= size/4;
             size *= page_size * minimal_pages;
+            // indicate change of log size, forcing readers to remap to new size
+            m_header.get_addr()->mmap_counter++;
             active_log->map.unmap();
             active_log->file.resize(size); // Throws
             bool disable_sync = get_disable_sync_to_disk();
@@ -473,6 +481,7 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
         aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof(EntryHeader) + entry.changeset.size());
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size()) {
+        m_header.get_addr()->mmap_counter++;
         active_log->file.resize(size_needed); // Throws
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
