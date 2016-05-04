@@ -19,7 +19,6 @@ void Replication::set_replication(Group& group, Replication* repl) noexcept
     gf::set_replication(group, repl);
 }
 
-void Replication::close() noexcept {}
 
 class Replication::TransactLogApplier {
 public:

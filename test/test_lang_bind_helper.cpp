@@ -140,6 +140,11 @@ public:
     {
     }
 
+    void close() noexcept override
+    {
+        // No-op
+    }
+
     void initiate_session(version_type) override
     {
         // No-op

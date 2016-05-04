@@ -91,7 +91,7 @@ public:
 
     /// Called by the associated SharedGroup to close any open files
     /// or release similar system resources.
-    virtual void close() noexcept;
+    virtual void close() noexcept = 0;
 
     //@{
 
