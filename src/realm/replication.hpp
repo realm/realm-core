@@ -91,7 +91,13 @@ public:
 
     /// Called by the associated SharedGroup to close any open files
     /// or release similar system resources.
-    virtual void close() noexcept = 0;
+    ///
+    /// This is a special purpose function that solves a problem that is
+    /// specific to the implementation available through <commit_log.hpp>. At
+    /// least for now, it is not to be considered a genuine part of the
+    /// Replication interface. The default implementation does nothing and other
+    /// implementations should not override this function.
+    virtual void commit_log_close() noexcept {}
 
     //@{
 
