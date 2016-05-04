@@ -744,7 +744,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
     Replication::HistoryType history_type = Replication::hist_None;
     if (Replication* repl = m_group.get_replication()) {
-        repl->close();
+        repl->commit_log_close();
         history_type = repl->get_history_type();
     }
 
@@ -1226,7 +1226,7 @@ void SharedGroup::close() noexcept
     m_group.detach();
     using gf = _impl::GroupFriend;
     if (Replication* repl = gf::get_replication(m_group))
-        repl->close();
+        repl->commit_log_close();
 
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();

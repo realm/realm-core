@@ -18,7 +18,7 @@
 
 ### API breaking changes:
 
-* Classes inheriting from class Replication must now provide an implementation of close().
+* Lorem ipsum.
 
 ### Enhancements:
 
