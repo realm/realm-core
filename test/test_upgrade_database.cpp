@@ -809,6 +809,79 @@ TEST(Upgrade_InRealmHistory)
     }
 }
 
+struct TestCallbackException : public std::exception {
+    const char* what() const noexcept override { return "The callback worked!"; }
+};
+
+void standalone_function(int, int) {
+    throw TestCallbackException();
+}
+
+struct TestCallbackHandler
+{
+    TestCallbackHandler()
+    : m_old_version(-1), m_new_version(-1) {}
+    int m_old_version;
+    int m_new_version;
+    void handle_upgrade(int old_version, int new_version) {
+        m_old_version = old_version;
+        m_new_version = new_version;
+    }
+};
+
+TEST(Upgrade_DatabaseWithCallback)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+    util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+
+    // Try method attached to object
+    {
+        CHECK_OR_RETURN(File::exists(path));
+        SHARED_GROUP_TEST_PATH(temp_copy);
+
+        // Make a copy of the version 4 database so that we keep the original file intact and unmodified
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+        // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
+        // in version 4
+        bool no_create = false;
+        SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
+        const char* encryption_key = nullptr;
+        bool allow_file_format_upgrade = true;
+        TestCallbackHandler handler;
+        std::function<void(int,int)> upgrade_callback =
+            std::bind(&TestCallbackHandler::handle_upgrade, &handler, std::placeholders::_1, std::placeholders::_2);
+
+        SharedGroup sg(temp_copy, no_create, durability, encryption_key, allow_file_format_upgrade, upgrade_callback);
+        CHECK_EQUAL(handler.m_old_version, 3);
+        CHECK_EQUAL(handler.m_new_version, 5);
+    }
+
+    // Try standalone function
+    {
+        CHECK_OR_RETURN(File::exists(path));
+        SHARED_GROUP_TEST_PATH(temp_copy);
+
+        // Make a copy of the version 4 database so that we keep the original file intact and unmodified
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+        // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
+        // in version 4
+        bool no_create = false;
+        SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
+        const char* encryption_key = nullptr;
+        bool allow_file_format_upgrade = true;
+        std::function<void(int,int)> upgrade_callback =
+        std::bind(&standalone_function, std::placeholders::_1, std::placeholders::_2);
+
+        try {
+            SharedGroup sg(temp_copy, no_create, durability, encryption_key, allow_file_format_upgrade, upgrade_callback);
+        } catch (TestCallbackException e) {
+            return;
+        }
+        REALM_ASSERT(false); // Shouldn't get here
+    }
+}
 
 // Open an existing database-file-format-version 4 file and check that it automatically upgrades to version 5.
 // The upgrade will change all OldDateTime columns into TimeStamp columns.

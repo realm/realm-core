@@ -24,6 +24,7 @@
     #include <time.h> // usleep()
 #endif
 
+#include <functional>
 #include <limits>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -144,14 +145,16 @@ public:
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,
-                         bool allow_file_format_upgrade = true);
+                         bool allow_file_format_upgrade = true,
+                         std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>());
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,
-                         bool allow_file_format_upgrade = true);
+                         bool allow_file_format_upgrade = true,
+                         std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>());
 
     struct unattached_tag {};
 
@@ -546,6 +549,7 @@ private:
     util::InterprocessCondVar m_daemon_becomes_ready;
     util::InterprocessCondVar m_new_commit_available;
 #endif
+    std::function<void(int,int)> m_upgrade_callback;
 
     void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
                  const char* encryption_key, bool allow_file_format_upgrade);
@@ -768,8 +772,9 @@ struct SharedGroup::BadVersion: std::exception {};
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
                                 DurabilityLevel durability, const char* encryption_key,
-                                bool allow_file_format_upgrade):
-    m_group(Group::shared_tag())
+                                bool allow_file_format_upgrade, std::function<void(int,int)> upgrade_callback):
+    m_group(Group::shared_tag()),
+    m_upgrade_callback(upgrade_callback)
 {
     open(file, no_create, durability, encryption_key, allow_file_format_upgrade); // Throws
 }
@@ -780,8 +785,10 @@ inline SharedGroup::SharedGroup(unattached_tag) noexcept:
 }
 
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
-                                const char* encryption_key, bool allow_file_format_upgrade):
-    m_group(Group::shared_tag())
+                                const char* encryption_key, bool allow_file_format_upgrade,
+                                std::function<void(int,int)> upgrade_callback):
+    m_group(Group::shared_tag()),
+    m_upgrade_callback(upgrade_callback)
 {
     open(repl, durability, encryption_key, allow_file_format_upgrade); // Throws
 }
