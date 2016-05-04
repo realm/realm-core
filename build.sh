@@ -1018,6 +1018,13 @@ EOF
         exit 0
         ;;
 
+    "build-node")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+        exit 0
+        ;;
+
     "test"|"test-debug"|\
     "check"|"check-debug"|\
     "memcheck"|"memcheck-debug"|\
