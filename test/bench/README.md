@@ -10,4 +10,5 @@ Include `util` in your project. Include `benchmark.hpp`.
 
 ### How do I force exactly one repetition?
 
-Override the `max_reps` method of the `Benchmark` base class:
+Override the `max_warmup_reps` and `max_reps` methods of the `Benchmark` base
+class.
