@@ -142,8 +142,8 @@ public:
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
-    /// `upgrade_callback` throws, then the file will be closed properly since
-    /// it is invoked from the `SharedGroup` constructor.
+    /// `upgrade_callback` throws, then the file will be closed properly and the
+    /// upgrade will be aborted.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,
@@ -152,8 +152,8 @@ public:
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
-    /// `upgrade_callback` throws, then the file will be closed properly since
-    /// it is invoked from the `SharedGroup` constructor.
+    /// `upgrade_callback` throws, then the file will be closed properly and
+    /// the upgrade will be aborted.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,
