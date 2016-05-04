@@ -809,6 +809,119 @@ TEST(Upgrade_InRealmHistory)
     }
 }
 
+TEST(Upgrade_DatabaseWithCallback)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+    util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+
+    CHECK_OR_RETURN(File::exists(path));
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 4 database so that we keep the original file intact and unmodified
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+    // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
+    // in version 3
+    bool no_create = false;
+    SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
+    const char* encryption_key = nullptr;
+    bool allow_file_format_upgrade = true;
+    std::function<void(int,int)> upgrade_callback;
+
+    bool did_upgrade = false;
+    int old_version, new_version;
+    auto callback = [&](int from, int to)
+    {
+        did_upgrade = true;
+        old_version = from;
+        new_version = to;
+    };
+
+    upgrade_callback = callback;
+
+    SharedGroup sg(temp_copy,
+                   no_create,
+                   durability,
+                   encryption_key,
+                   allow_file_format_upgrade,
+                   upgrade_callback);
+
+    CHECK(did_upgrade);
+    CHECK_EQUAL(old_version, 3);
+    CHECK(new_version >= 5);
+}
+
+TEST(Upgrade_DatabaseWithCallbackWithException)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+    util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+
+    CHECK_OR_RETURN(File::exists(path));
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 4 database so that we keep the original file intact and unmodified
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+    // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
+    // in version 3
+    bool no_create = false;
+    SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
+    const char* encryption_key = nullptr;
+    bool allow_file_format_upgrade = true;
+    std::function<void(int,int)> upgrade_callback;
+
+    bool did_upgrade = false;
+    int old_version, new_version;
+    auto exception_callback = [&](int, int)
+    {
+        throw std::exception();
+    };
+    auto successful_callback = [&](int from, int to)
+    {
+        did_upgrade = true;
+        old_version = from;
+        new_version = to;
+    };
+
+    // Callback that throws should revert the upgrade
+    upgrade_callback = exception_callback;
+    bool exception_thrown = false;
+    try {
+        SharedGroup sg1(temp_copy,
+                        no_create,
+                        durability,
+                        encryption_key,
+                        allow_file_format_upgrade,
+                        upgrade_callback);
+    }
+    catch(...) {
+        exception_thrown = true;
+    }
+    CHECK(exception_thrown);
+    CHECK(!did_upgrade);
+
+    // Callback should be triggered here because the file still needs to be upgraded
+    upgrade_callback = successful_callback;
+    SharedGroup sg2(temp_copy,
+                   no_create,
+                   durability,
+                   encryption_key,
+                   allow_file_format_upgrade,
+                   upgrade_callback);
+    CHECK(did_upgrade);
+    CHECK_EQUAL(old_version, 3);
+    CHECK(new_version >= 5);
+
+    // Callback should not be triggered here because the file is already upgraded
+    did_upgrade = false;
+    SharedGroup sg3(temp_copy,
+                    no_create,
+                    durability,
+                    encryption_key,
+                    allow_file_format_upgrade,
+                    upgrade_callback);
+    CHECK(!did_upgrade);
+}
 
 // Open an existing database-file-format-version 4 file and check that it automatically upgrades to version 5.
 // The upgrade will change all OldDateTime columns into TimeStamp columns.

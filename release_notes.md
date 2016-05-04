@@ -34,6 +34,8 @@
 
 * S: `util::bind_ptr<>` extended with capability to adopt and release naked
   pointers.
+* The `SharedGroup` constructor now takes an optional callback function so bindings can
+  be notified when a Realm is upgraded.
 
 -----------
 
