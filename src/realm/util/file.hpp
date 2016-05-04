@@ -50,6 +50,11 @@ class EncryptedFileMapping;
 /// to unambiguously distinguish that particular reason).
 void make_dir(const std::string& path);
 
+/// Same as make_dir() except that this one returns false, rather than throwing
+/// an exception, if the specified directory already existed. If the directory
+// did not already exist and was newly created, this returns true.
+bool try_make_dir(const std::string& path);
+
 /// Remove the specified directory path from the file system. If the
 /// specified path is a directory, this function is equivalent to
 /// std::remove(const char*).
@@ -107,6 +112,9 @@ public:
     File() noexcept;
 
     ~File() noexcept;
+
+    File(File&&) noexcept;
+    File& operator=(File&&) noexcept;
 
     /// Calling this function on an instance that is already attached
     /// to an open file has undefined behavior.
@@ -346,7 +354,7 @@ public:
                 int map_flags = 0, size_t file_offset = 0) const;
 
 #if REALM_ENABLE_ENCRYPTION
-    void* map(AccessMode, size_t size, EncryptedFileMapping*& mapping, 
+    void* map(AccessMode, size_t size, EncryptedFileMapping*& mapping,
               int map_flags = 0, size_t offset = 0) const;
 #endif
     /// Unmap the specified address range which must have been
@@ -425,16 +433,17 @@ public:
     ///
     /// Examples (assuming POSIX):
     ///
-    ///    resolve("/foo/bar", "../baz") -> "/foo/baz"
-    ///    resolve(".", "foo")           -> "./foo"
-    ///    resolve("/foo/", ".")         -> "/foo"
-    ///    resolve("foo", "..")          -> "."
-    ///    resolve("foo", "../..")       -> ".."
+    ///    resolve("file", "dir")        -> "dir/file"
+    ///    resolve("../baz", "/foo/bar") -> "/foo/baz"
+    ///    resolve("foo", ".")           -> "./foo"
+    ///    resolve(".", "/foo/")         -> "/foo"
+    ///    resolve("..", "foo")          -> "."
+    ///    resolve("../..", "foo")       -> ".."
     ///    resolve("..", "..")           -> "../.."
     ///    resolve("", "")               -> "."
-    ///    resolve("/", "")              -> "/."
-    ///    resolve("/", "..")            -> "/."
-    ///    resolve("foo//bar", "..")     -> "foo"
+    ///    resolve("", "/")              -> "/."
+    ///    resolve("..", "/")            -> "/."
+    ///    resolve("..", "foo//bar")     -> "foo"
     ///
     /// This function does not access the file system.
     ///
@@ -673,7 +682,7 @@ private:
 class File::Streambuf: public std::streambuf {
 public:
     explicit Streambuf(File*);
-    ~Streambuf();
+    ~Streambuf() noexcept;
 
 private:
     static const size_t buffer_size = 4096;
@@ -773,6 +782,34 @@ inline File::File() noexcept
 inline File::~File() noexcept
 {
     close();
+}
+
+inline File::File(File&& f) noexcept
+{
+#ifdef _WIN32
+    m_handle = f.m_handle;
+    m_have_lock = f.m_have_lock;
+    f.m_handle = nullptr;
+#else
+    m_fd = f.m_fd;
+    f.m_fd = -1;
+#endif
+    m_encryption_key = std::move(f.m_encryption_key);
+}
+
+inline File& File::operator=(File&& f) noexcept
+{
+    close();
+#ifdef _WIN32
+    m_handle = f.m_handle;
+    m_have_lock = f.m_have_lock;
+    f.m_handle = nullptr;
+#else
+    m_fd = f.m_fd;
+    f.m_fd = -1;
+#endif
+    m_encryption_key = std::move(f.m_encryption_key);
+    return *this;
 }
 
 inline void File::open(const std::string& path, Mode m)
@@ -964,7 +1001,7 @@ inline File::Streambuf::Streambuf(File* f): m_file(*f), m_buffer(new char[buffer
     setp(b, b + buffer_size);
 }
 
-inline File::Streambuf::~Streambuf()
+inline File::Streambuf::~Streambuf() noexcept
 {
     try {
         if (m_file.is_attached()) flush();

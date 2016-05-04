@@ -1,13 +1,14 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-# Enable tracing if REALM_SCRIPT_DEBUG is set
+# Loads a .realm file in the user home directory if present
 if [ -e $HOME/.realm ]; then
     . $HOME/.realm
 fi
+
+# Enable tracing if REALM_SCRIPT_DEBUG is set
 if [ "$REALM_SCRIPT_DEBUG" ]; then
     set -x
 fi
-
 
 if ! [ "$REALM_ORIG_CWD" ]; then
     REALM_ORIG_CWD="$(pwd)" || exit 1
@@ -28,6 +29,7 @@ if ! [ -x "$PRE_PUSH_HOOK_DESTINATION" ] || ! diff "$PRE_PUSH_HOOK_DESTINATION" 
     chmod +x "$PRE_PUSH_HOOK_DESTINATION"
 fi
 
+# Set mode to first argument and shift the argument array 
 MODE="$1"
 [ $# -gt 0 ] && shift
 
@@ -66,6 +68,7 @@ Available modes are:
     config:                             
     clean:                              
     build:                              
+    build-m32:                          build in 32-bit mode
     build-arm-benchmark:
     build-config-progs:                 
     build-osx:                          
@@ -342,7 +345,7 @@ find_apple_sdks()
             elif [ "$x" = "appletvos" ]; then
                 archs="arm64"
             elif [ "$x" = "macosx" ]; then
-                archs="i386,x86_64"
+                archs="x86_64"
             else
                 continue
             fi
@@ -688,6 +691,14 @@ EOF
         exit 0
         ;;
 
+    "build-m32")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        $MAKE EXTRA_CFLAGS="-m32" BASE_DENOM="m32" debug || exit 1
+        echo "Done building"
+        exit 0
+        ;;
+    
     "build-config-progs")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
@@ -1249,6 +1260,9 @@ EOF
         printf ",s/#define REALM_VER_MAJOR .*/#define REALM_VER_MAJOR $realm_ver_major/\nw\nq" | ed -s "$version_file" || exit 1
         printf ",s/#define REALM_VER_MINOR .*/#define REALM_VER_MINOR $realm_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
         printf ",s/#define REALM_VER_PATCH .*/#define REALM_VER_PATCH $realm_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
+
+        # update dependencies.list
+        sed -i.bck "s/^VERSION.*/VERSION=$realm_version/" dependencies.list && rm -f dependencies.list.bck
 
         sh tools/add-deb-changelog.sh "$realm_version" "$(pwd)/debian/changelog.in" librealm || exit 1
         sh build.sh release-notes-prerelease || exit 1

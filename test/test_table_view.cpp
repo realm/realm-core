@@ -49,19 +49,19 @@ using namespace test_util;
 namespace {
 
 REALM_TABLE_1(TestTableInt,
-                first, Int)
+              first, Int)
 
 REALM_TABLE_2(TestTableInt2,
-                first,  Int,
-                second, Int)
+              first,  Int,
+              second, Int)
 
 REALM_TABLE_2(TestTableDate,
-                first, DateTime,
-                second, Int)
+              first, OldDateTime,
+              second, Int)
 
 REALM_TABLE_2(TestTableFloatDouble,
-                first, Float,
-                second, Double)
+              first, Float,
+              second, Double)
 
 
 } // anonymous namespace
@@ -92,19 +92,79 @@ TEST(TableView_DateMaxMin)
 {
     TestTableDate ttd;
 
-    ttd.add(DateTime(2014, 7, 10), 1);
-    ttd.add(DateTime(2013, 7, 10), 1);
-    ttd.add(DateTime(2015, 8, 10), 1);
-    ttd.add(DateTime(2015, 7, 10), 1);
+    ttd.add(OldDateTime(2014, 7, 10), 1);
+    ttd.add(OldDateTime(2013, 7, 10), 1);
+    ttd.add(OldDateTime(2015, 8, 10), 1);
+    ttd.add(OldDateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
     size_t ndx = not_found;
 
-    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum(&ndx));
+    CHECK_EQUAL(OldDateTime(2015, 8, 10), v.column().first.maximum(&ndx));
     CHECK_EQUAL(2, ndx);
 
-    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum(&ndx));
+    CHECK_EQUAL(OldDateTime(2013, 7, 10), v.column().first.minimum(&ndx));
     CHECK_EQUAL(1, ndx);
+}
+
+TEST(TableView_TimestampMaxMinCount)
+{
+    Table t;
+    t.add_column(type_Timestamp, "ts", true);
+    t.add_empty_row();
+    t.set_timestamp(0, 0, Timestamp(300, 300));
+
+    t.add_empty_row();
+    t.set_timestamp(0, 1, Timestamp(100, 100));
+
+    t.add_empty_row();
+    t.set_timestamp(0, 2, Timestamp(200, 200));
+
+    // Add row with null. For max(), any non-null is greater, and for min() any non-null is less
+    t.add_empty_row();
+
+    TableView tv = t.where().find_all();
+    Timestamp ts;
+
+    ts = tv.maximum_timestamp(0, nullptr);
+    CHECK_EQUAL(ts, Timestamp(300, 300));
+    ts = tv.minimum_timestamp(0, nullptr);
+    CHECK_EQUAL(ts, Timestamp(100, 100));
+
+    size_t index;
+    ts = tv.maximum_timestamp(0, &index);
+    CHECK_EQUAL(index, 0);
+    ts = tv.minimum_timestamp(0, &index);
+    CHECK_EQUAL(index, 1);
+
+    size_t cnt;
+    cnt = tv.count_timestamp(0, Timestamp(100, 100));
+    CHECK_EQUAL(cnt, 1);
+
+    cnt = tv.count_timestamp(0, Timestamp(null{}));
+    CHECK_EQUAL(cnt, 1);
+}
+
+TEST(TableView_TimestampGetSet)
+{
+    Table t;
+    t.add_column(type_Timestamp, "ts", true);
+    t.add_empty_row(3);
+    t.set_timestamp(0, 0, Timestamp(000, 010));
+    t.set_timestamp(0, 1, Timestamp(100, 110));
+    t.set_timestamp(0, 2, Timestamp(200, 210));
+
+    TableView tv = t.where().find_all();
+    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(000,010));
+    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(100,110));
+    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(200,210));
+
+    tv.set_timestamp(0, 0, Timestamp(1000, 1010));
+    tv.set_timestamp(0, 1, Timestamp(1100, 1110));
+    tv.set_timestamp(0, 2, Timestamp(1200, 1210));
+    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(1000,1010));
+    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(1100,1110));
+    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(1200,1210));
 }
 
 TEST(TableView_GetSetInteger)
@@ -135,9 +195,9 @@ TEST(TableView_GetSetInteger)
 
 namespace {
 REALM_TABLE_3(TableFloats,
-                col_float, Float,
-                col_double, Double,
-                col_int, Int)
+              col_float, Float,
+              col_double, Double,
+              col_int, Int)
 }
 
 TEST(TableView_FloatsGetSet)
@@ -581,7 +641,7 @@ TEST(TableView_FindAll)
 namespace {
 
 REALM_TABLE_1(TestTableString,
-                first, String)
+              first, String)
 
 } // anonymous namespace
 
@@ -1098,15 +1158,15 @@ TEST(TableView_LowLevelSubtables)
 namespace {
 
 REALM_TABLE_1(MyTable1,
-                val, Int)
+              val, Int)
 
 REALM_TABLE_2(MyTable2,
-                val, Int,
-                subtab, Subtable<MyTable1>)
+              val, Int,
+              subtab, Subtable<MyTable1>)
 
 REALM_TABLE_2(MyTable3,
-                val, Int,
-                subtab, Subtable<MyTable2>)
+              val, Int,
+              subtab, Subtable<MyTable2>)
 
 } // anonymous namespace
 
@@ -1669,6 +1729,120 @@ TEST(TableView_Backlinks)
     }
 }
 
+// Verify that a TableView that represents backlinks to a row functions correctly
+// after being move-assigned.
+TEST(TableView_BacklinksAfterMoveAssign)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    source->add_column(type_Int, "int");
+
+    TableRef links = group.add_table("links");
+    links->add_column_link(type_Link, "link", *source);
+    links->add_column_link(type_LinkList, "link_list", *source);
+
+    source->add_empty_row(3);
+
+    { // Links
+        TableView tv_source = source->get_backlink_view(2, links.get(), 0);
+        TableView tv;
+        tv = std::move(tv_source);
+
+        CHECK_EQUAL(tv.size(), 0);
+
+        links->add_empty_row();
+        links->set_link(0, 0, 2);
+
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), 1);
+        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+    }
+    { // LinkViews
+        TableView tv_source = source->get_backlink_view(2, links.get(), 1);
+        TableView tv;
+        tv = std::move(tv_source);
+
+        CHECK_EQUAL(tv.size(), 0);
+
+        auto ll = links->get_linklist(1, 0);
+        ll->add(2);
+        ll->add(0);
+        ll->add(2);
+
+        tv.sync_if_needed();
+        CHECK_EQUAL(tv.size(), 2);
+        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+    }
+}
+
+// Verify that a TableView that represents backlinks continues to track the correct row
+// when it moves within a table or is deleted.
+TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    source->add_column(type_Int, "int");
+
+    TableRef links = group.add_table("links");
+    size_t col_link = links->add_column_link(type_Link, "link", *source);
+    size_t col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
+
+    source->add_empty_row(3);
+
+    links->add_empty_row(3);
+    links->set_link(col_link, 0, 1);
+    LinkViewRef ll = links->get_linklist(col_linklist, 0);
+    ll->add(1);
+    ll->add(0);
+
+    links->set_link(col_link, 1, 1);
+    ll = links->get_linklist(col_linklist, 1);
+    ll->add(1);
+
+    links->set_link(col_link, 2, 0);
+
+    TableView tv_link = source->get_backlink_view(1, links.get(), col_link);
+    TableView tv_linklist = source->get_backlink_view(1, links.get(), col_linklist);
+
+    CHECK_EQUAL(tv_link.size(), 2);
+    CHECK_EQUAL(tv_linklist.size(), 2);
+
+    source->swap_rows(1, 0);
+    tv_link.sync_if_needed();
+    tv_linklist.sync_if_needed();
+
+    CHECK_EQUAL(tv_link.size(), 2);
+    CHECK_EQUAL(tv_linklist.size(), 2);
+
+    CHECK(!tv_link.depends_on_deleted_object());
+    CHECK(!tv_linklist.depends_on_deleted_object());
+
+    source->move_last_over(0);
+    
+    CHECK(tv_link.depends_on_deleted_object());
+    CHECK(tv_linklist.depends_on_deleted_object());
+
+    CHECK(!tv_link.is_in_sync());
+    CHECK(!tv_linklist.is_in_sync());
+
+    tv_link.sync_if_needed();
+    tv_linklist.sync_if_needed();
+
+    CHECK(tv_link.is_in_sync());
+    CHECK(tv_linklist.is_in_sync());
+
+    CHECK_EQUAL(tv_link.size(), 0);
+    CHECK_EQUAL(tv_linklist.size(), 0);
+
+    source->add_empty_row();
+
+    // TableViews that depend on a deleted row will stay in sync despite modifications to their table.
+    CHECK(tv_link.is_in_sync());
+    CHECK(tv_linklist.is_in_sync());
+}
+
 
 TEST(TableView_Distinct)
 {
@@ -1773,6 +1947,62 @@ TEST(TableView_Distinct)
     CHECK_EQUAL(tv.get_source_ndx(0), 0);
     CHECK_EQUAL(tv.get_source_ndx(1), 1);
     CHECK_EQUAL(tv.get_source_ndx(2), 2);
+}
+
+TEST(TableView_IsInTableOrder)
+{
+    Group g;
+
+    TableRef source = g.add_table("source");
+    TableRef target = g.add_table("target");
+
+    size_t col_link = source->add_column_link(type_LinkList, "link", *target);
+    size_t col_name = source->add_column(type_String, "name");
+    size_t col_id = target->add_column(type_Int, "id");
+    target->add_search_index(col_id);
+
+    source->add_empty_row();
+    target->add_empty_row();
+
+    // Detached views are in table order.
+    TableView tv;
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Queries not restricted by views are in table order.
+    tv = target->where().find_all();
+    CHECK_EQUAL(true, tv.is_in_table_order());
+
+    // Views that have a distinct filter remain in table order.
+    tv.distinct(col_id);
+    CHECK_EQUAL(true, tv.is_in_table_order());
+
+    // Views that are sorted are not guaranteed to be in table order.
+    tv.sort(col_id, true);
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Queries restricted by views are not guaranteed to be in table order.
+    TableView restricting_view = target->where().equal(col_id, 0).find_all();
+    tv = target->where(&restricting_view).find_all();
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Backlinks are not guaranteed to be in table order.
+    tv = target->get_backlink_view(0, source.get(), col_link);
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Views derived from a LinkView are not guaranteed to be in table order.
+    LinkViewRef ll = source->get_linklist(col_link, 0);
+    tv = ll->get_sorted_view(col_name);
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Views based directly on a table are in table order.
+    tv = target->get_range_view(0, 1);
+    CHECK_EQUAL(true, tv.is_in_table_order());
+    tv = target->get_distinct_view(col_id);
+    CHECK_EQUAL(true, tv.is_in_table_order());
+
+    // … unless sorted.
+    tv = target->get_sorted_view(col_id);
+    CHECK_EQUAL(false, tv.is_in_table_order());
 }
 
 #endif // TEST_TABLE_VIEW

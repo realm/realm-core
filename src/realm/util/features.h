@@ -78,10 +78,39 @@
 #define REALM_HAVE_AT_LEAST_GCC(maj, min) \
     (__GNUC__ > (maj) || __GNUC__ == (maj) && __GNUC_MINOR__ >= (min))
 
-#if __clang__
+#if defined(__clang__)
 #  define REALM_HAVE_CLANG_FEATURE(feature) __has_feature(feature)
+#  define REALM_HAVE_CLANG_WARNING(warning) __has_warning(warning)
 #else
 #  define REALM_HAVE_CLANG_FEATURE(feature) 0
+#  define REALM_HAVE_CLANG_WARNING(warning) 0
+#endif
+
+#if defined(__GNUC__) // clang or GCC
+#  define REALM_PRAGMA(v) _Pragma(REALM_QUOTE2(v))
+#elif defined(_MSC_VER) // VS
+#  define REALM_PRAGMA(v) __pragma(v)
+#else
+#  define REALM_PRAGMA(v)
+#endif
+
+#if defined(__clang__)
+#  define  REALM_DIAG(v) REALM_PRAGMA(clang diagnostic v)
+#elif defined(__GNUC__)
+#  define REALM_DIAG(v) REALM_PRAGMA(GCC diagnostic v)
+#else
+#  define REALM_DIAG(v)
+#endif
+
+#define REALM_DIAG_PUSH() REALM_DIAG(push)
+#define REALM_DIAG_POP() REALM_DIAG(pop)
+
+#if REALM_HAVE_CLANG_WARNING("-Wtautological-compare") \
+    || REALM_HAVE_AT_LEAST_GCC(6, 0)
+#  define REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE() \
+    REALM_DIAG(ignored "-Wtautological-compare")
+#else
+#  define REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE()
 #endif
 
 /* Compiler is MSVC (Microsoft Visual C++) */

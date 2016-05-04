@@ -103,8 +103,8 @@ public:
     static void set_mixed_subtable(Table& parent, size_t col_ndx, size_t row_ndx,
                                    const Table& source);
 
-    static LinkView* get_linklist_ptr(Row&, size_t col_ndx);
-    static void unbind_linklist_ptr(LinkView*);
+    static const LinkViewRef& get_linklist_ptr(Row&, size_t col_ndx);
+    static void unbind_linklist_ptr(const LinkViewRef&);
 
     using VersionID = SharedGroup::VersionID;
 
@@ -132,7 +132,8 @@ public:
     /// transaction, which is bound to the snapshot produced by the write
     /// transaction (SharedGroup::begin_read()), except that all subordinate
     /// accessors (Table, Row, Descriptor) will remain attached to the
-    /// underlying objects.
+    /// underlying objects. commit_and_continue_as_read() returns the version
+    /// produced by the committed transaction.
     ///
     /// rollback_and_continue_as_read() is equivalent to rolling back the
     /// current write transaction (SharedGroup::rollback()) and initiating a new
@@ -173,25 +174,20 @@ public:
     template<class O> static void advance_read(SharedGroup&, O&& observer, VersionID = VersionID());
     static void promote_to_write(SharedGroup&);
     template<class O> static void promote_to_write(SharedGroup&, O&& observer);
-    static void commit_and_continue_as_read(SharedGroup&);
+    static SharedGroup::version_type commit_and_continue_as_read(SharedGroup&);
     static void rollback_and_continue_as_read(SharedGroup&);
     template<class O> static void rollback_and_continue_as_read(SharedGroup&, O&& observer);
 
     //@}
 
-    /// Returns the name of the specified data type as follows:
+    /// Returns the name of the specified data type. Examples:
     ///
     /// <pre>
     ///
-    ///   type_Int       ->  "int"
-    ///   type_Bool      ->  "bool"
-    ///   type_Float     ->  "float"
-    ///   type_Double    ->  "double"
-    ///   type_String    ->  "string"
-    ///   type_Binary    ->  "binary"
-    ///   type_DateTime  ->  "date"
-    ///   type_Table     ->  "table"
-    ///   type_Mixed     ->  "mixed"
+    ///   type_Int          ->  "int"
+    ///   type_Bool         ->  "bool"
+    ///   type_Float        ->  "float"
+    ///   ...
     ///
     /// </pre>
     static const char* get_data_type_name(DataType) noexcept;
@@ -328,16 +324,15 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, size_t col_ndx,
     parent.set_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
-inline LinkView* LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)
+inline const LinkViewRef& LangBindHelper::get_linklist_ptr(Row& row, size_t col_ndx)
 {
-    LinkViewRef link_view = row.get_linklist(col_ndx);
-    link_view->bind_ptr();
-    return &*link_view;
+    LinkViewRef* link_view = new LinkViewRef(row.get_linklist(col_ndx));
+    return *link_view;
 }
 
-inline void LangBindHelper::unbind_linklist_ptr(LinkView* link_view)
+inline void LangBindHelper::unbind_linklist_ptr(const LinkViewRef& link_view)
 {
-   link_view->unbind_ptr();
+    delete (&link_view);
 }
 
 inline void LangBindHelper::advance_read(SharedGroup& sg, VersionID version)
@@ -368,10 +363,10 @@ inline void LangBindHelper::promote_to_write(SharedGroup& sg, O&& observer)
     sgf::promote_to_write(sg, &observer); // Throws
 }
 
-inline void LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
+inline SharedGroup::version_type LangBindHelper::commit_and_continue_as_read(SharedGroup& sg)
 {
     using sgf = _impl::SharedGroupFriend;
-    sgf::commit_and_continue_as_read(sg); // Throws
+    return sgf::commit_and_continue_as_read(sg); // Throws
 }
 
 inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)

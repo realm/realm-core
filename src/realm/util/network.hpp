@@ -25,6 +25,7 @@
 #include <chrono>
 #include <tuple>
 #include <string>
+#include <system_error>
 #include <ostream>
 
 #include <sys/types.h>
@@ -278,6 +279,9 @@ private:
     using LendersOperPtr     = std::unique_ptr<async_oper, LendersOperDeleter>;
     using LendersWaitOperPtr = std::unique_ptr<wait_oper_base, LendersOperDeleter>;
 
+    class impl;
+    const std::unique_ptr<impl> m_impl;
+
     template<class Oper, class... Args>
     static std::unique_ptr<Oper, LendersOperDeleter> alloc(OwnersOperPtr&, Args&&...);
 
@@ -288,15 +292,13 @@ private:
     void add_wait_oper(LendersWaitOperPtr);
     void add_completed_oper(LendersOperPtr) noexcept;
 
-    using PostOperConstr = async_oper*(void* addr, size_t size, const void* cookie);
+    using PostOperConstr = post_oper_base*(void* addr, size_t size, impl&, const void* cookie);
     void do_post(PostOperConstr, size_t size, const void* cookie);
     template<class H>
-    static async_oper* post_oper_constr(void* addr, size_t size, const void* cookie);
+    static post_oper_base* post_oper_constr(void* addr, size_t size, impl&, const void* cookie);
+    static void recycle_post_oper(impl&, post_oper_base*) noexcept;
 
     using clock = std::chrono::steady_clock;
-
-    class impl;
-    const std::unique_ptr<impl> m_impl;
 
     friend class socket_base;
     friend class socket;
@@ -326,10 +328,10 @@ private:
 class resolver::query {
 public:
     enum {
-        ///< Locally bound socket endpoint (server side)
+        /// Locally bound socket endpoint (server side)
         passive = AI_PASSIVE,
 
-        ///< Ignore families without a configured non-loopback address
+        /// Ignore families without a configured non-loopback address
         address_configured = AI_ADDRCONFIG
     };
 
@@ -409,13 +411,18 @@ public:
 
 private:
     enum opt_enum {
-        opt_ReuseAddr ///< `SOL_SOCKET`, `SO_REUSEADDR`
+        opt_ReuseAddr, ///< `SOL_SOCKET`, `SO_REUSEADDR`
+        opt_Linger,    ///< `SOL_SOCKET`, `SO_LINGER`
     };
 
     template<class, int, class> class option;
 
 public:
     typedef option<bool, opt_ReuseAddr, int> reuse_address;
+
+    // linger struct defined by POSIX sys/socket.h.
+    struct linger_opt;
+    typedef option<linger_opt, opt_Linger, struct linger> linger;
 
 private:
     int m_sock_fd;
@@ -463,6 +470,21 @@ private:
     friend class socket_base;
 };
 
+struct socket_base::linger_opt {
+    linger_opt(bool enabled, int timeout_seconds = 0)
+    {
+        m_linger.l_onoff = enabled ? 1 : 0;
+        m_linger.l_linger = timeout_seconds;
+    }
+
+    ::linger m_linger;
+
+    operator ::linger() const { return m_linger; }
+
+    bool enabled() const { return m_linger.l_onoff != 0; }
+    int  timeout() const { return m_linger.l_linger; }
+};
+
 
 class socket: public socket_base {
 public:
@@ -499,30 +521,122 @@ public:
     void write(const char* data, size_t size);
     std::error_code write(const char* data, size_t size, std::error_code&) noexcept;
 
+    /// \brief Perform an asynchronous write operation.
+    ///
+    /// Initiate an asynchronous write operation. The completion handler is
+    /// called when the operation completes. The operation completes when all
+    /// the specified bytes have been written to the socket, or an error occurs.
+    ///
+    /// The specified handler object will be copied as necessary, and will be
+    /// executed by an expression on the form `handler(ec, n)` where `ec` is the
+    /// error code, and `n` is the number of bytes written (of type `size_t`).
+    ///
+    /// It is an error to start an asynchronous write operation before the
+    /// socket is connected.
+    ///
+    /// It is an error to start a new write operation (synchronous or
+    /// asynchronous) while an asynchronous write operation is in progress. An
+    /// asynchronous write operation is considered complete as soon as the
+    /// completion handler starts executing. This means that a new write
+    /// operation can be started from the completion handler of another
+    /// asynchronous write operation.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the socket is closed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The completion
+    /// handler will always be called, as long as the event loop is running.
     template<class H>
     void async_write(const char* data, size_t size, const H& handler);
 
     /// @{ \brief Read at least one byte from this socket.
     ///
-    /// If \a size is greater than zero, block the calling thread until at least
-    /// one byte becomes available, or an error occurs. In this context, end of
-    /// input counts as an error (see `network::end_of_input`). If an error
-    /// occurs, the two-argument version will throw `std::system_error`, while
-    /// the three-argument version will set `ec` appropriately, and return
-    /// zero. If no error occurs, or if \a size is zero, both versions will read
-    /// as many available bytes as will fit into the specified buffer, and then
-    /// return the number of bytes placed in the buffer. The three-argument
-    /// version will also set `ec` to indicate success in this case.
+    /// If \a size is zero, both versions of read_some() will return zero
+    /// without blocking. Read errors may or may not be detected in this case.
     ///
-    /// The two argument version always return a value greater than zero, and
-    /// the three argument version returns a value greather than zero if, and
-    /// only if `ec` is set to indicate success (no error, and no end of input).
+    /// Otherwise, if \a size is greater than zero, and at least one byte is
+    /// immediately available, that is, without blocking, then both versions
+    /// will read at least one byte (but generally as many immediately available
+    /// bytes as will fit into the specified buffer), and return without
+    /// blocking.
+    ///
+    /// Otherwise, both versions will block the calling thread until at least one
+    /// byte becomes available, or an error occurs.
+    ///
+    /// In this context, it counts as an error, if the end of input is reached
+    /// before at least one byte becomes available (see
+    /// `network::end_of_input`).
+    ///
+    /// If no error occurs, both versions will return the number of bytes placed
+    /// in the specified buffer, which is generally as many as are immediately
+    /// available at the time when the first byte becomes available, although
+    /// never more than \a size.
+    ///
+    /// If no error occurs, the three-argument version will set \a ec to
+    /// indicate success.
+    ///
+    /// If an error occurs, the two-argument version will throw
+    /// `std::system_error`, while the three-argument version will set \a ec to
+    /// indicate the error, and return zero.
+    ///
+    /// As long as \a size is greater than zero, the two argument version will
+    /// always return a value that is greater than zero, while the three
+    /// argument version will return a value greater than zero when, and only
+    /// when \a ec is set to indicate success (no error, and no end of input).
     size_t read_some(char* buffer, size_t size);
     size_t read_some(char* buffer, size_t size, std::error_code& ec) noexcept;
     /// @}
 
+    /// @{ \brief Write at least one byte to this socket.
+    ///
+    /// If \a size is zero, both versions of write_some() will return zero
+    /// without blocking. Write errors may or may not be detected in this case.
+    ///
+    /// Otherwise, if \a size is greater than zero, and at least one byte can be
+    /// written immediately, that is, without blocking, then both versions will
+    /// write at least one byte (but generally as many as can be written
+    /// immediately), and return without blocking.
+    ///
+    /// Otherwise, both versions will block the calling thread until at least one
+    /// byte can be written, or an error occurs.
+    ///
+    /// If no error occurs, both versions will return the number of bytes
+    /// written, which is generally as many as can be written immediately at the
+    /// time when the first byte can be written.
+    ///
+    /// If no error occurs, the three-argument version will set \a ec to
+    /// indicate success.
+    ///
+    /// If an error occurs, the two-argument version will throw
+    /// `std::system_error`, while the three-argument version will set \a ec to
+    /// indicate the error, and return zero.
+    ///
+    /// As long as \a size is greater than zero, the two argument version will
+    /// always return a value that is greater than zero, while the three
+    /// argument version will return a value greater than zero when, and only
+    /// when \a ec is set to indicate success.
     size_t write_some(const char* data, size_t size);
     size_t write_some(const char* data, size_t size, std::error_code&) noexcept;
+    /// @}
+
+    enum shutdown_type {
+        /// Shutdown the receive side of the socket.
+        shutdown_receive = SHUT_RD,
+
+        /// Shutdown the send side of the socket.
+        shutdown_send = SHUT_WR,
+
+        /// Shutdown both send and receive on the socket.
+        shutdown_both = SHUT_RDWR
+    };
+
+    /// @{ \brief Shut down the connected sockets sending and/or receiving
+    /// side.
+    ///
+    /// It is an error to call this function when the socket is not both open
+    /// and connected.
+    void shutdown(shutdown_type);
+    std::error_code shutdown(shutdown_type, std::error_code&) noexcept;
+    /// @}
 
 private:
     class connect_oper_base;
@@ -631,7 +745,7 @@ public:
     ///
     /// Initiate an asynchronous buffered read operation on the associated
     /// socket. The completion handler will be called when the operation
-    /// completes.
+    /// completes, or an error occurs.
     ///
     /// async_read() will continue reading until the specified buffer is full,
     /// or an error occurs. If the end of input is reached before the buffer is
@@ -654,7 +768,8 @@ public:
     /// asynchronous) while an asynchronous read operation is in progress. An
     /// asynchronous read operation is considered complete as soon as the
     /// completion handler starts executing. This means that a new read
-    /// operation can be started from the completion handler.
+    /// operation can be started from the completion handler of another
+    /// asynchronous buffered read operation.
     ///
     /// The operation can be canceled by calling socket::cancel(), and will be
     /// automatically canceled if the associated socket is closed. If the
@@ -675,6 +790,9 @@ public:
     template<class H>
     void async_read_until(char* buffer, size_t size, char delim, const H& handler);
     /// @}
+
+    /// Discard any buffered input.
+    void reset() noexcept;
 
 private:
     class read_oper_base;
@@ -992,8 +1110,9 @@ protected:
 class io_service::post_oper_base:
         public async_oper {
 public:
-    post_oper_base(size_t size):
-        async_oper(size, true) // Second argument is `in_use`
+    post_oper_base(size_t size, impl& serv):
+        async_oper(size, true), // Second argument is `in_use`
+        m_service(serv)
     {
     }
     void proceed() noexcept override
@@ -1002,32 +1121,46 @@ public:
     }
     void recycle() noexcept override
     {
-        bool orphaned = m_orphaned;
-        // Note: do_recycle() commits suicide.
-        do_recycle(orphaned);
+        // io_service::recycle_post_oper() destroys this operation object
+        io_service::recycle_post_oper(m_service, this);
     }
     void orphan() noexcept override
     {
-        m_orphaned = true;
+        REALM_ASSERT(false); // Never called
     }
 protected:
-    bool m_orphaned = false;
+    impl& m_service;
 };
 
 template<class H>
 class io_service::post_oper:
         public post_oper_base {
 public:
-    post_oper(size_t size, const H& handler):
-        post_oper_base(size),
+    post_oper(size_t size, impl& serv, const H& handler):
+        post_oper_base(size, serv),
         m_handler(handler)
     {
     }
     void recycle_and_execute() override
     {
-        bool orphaned = m_orphaned;
-        // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute(orphaned, m_handler); // Throws
+        // Recycle the operation object before the handler is exceuted, such
+        // that the memory is available for a new post operation that might be
+        // initiated during the execution of the handler.
+        bool was_recycled = false;
+        try {
+            H handler = std::move(m_handler); // Throws
+            // io_service::recycle_post_oper() destroys this operation object
+            io_service::recycle_post_oper(m_service, this);
+            was_recycled = true;
+            handler(); // Throws
+        }
+        catch (...) {
+            if (!was_recycled) {
+                // io_service::recycle_post_oper() destroys this operation object
+                io_service::recycle_post_oper(m_service, this);
+            }
+            throw;
+        }
     }
 private:
     const H m_handler;
@@ -1124,16 +1257,16 @@ inline void io_service::execute(std::unique_ptr<Oper, LendersOperDeleter>& lende
     lenders_ptr.release()->recycle_and_execute(); // Throws
 }
 
-template<class H> inline io_service::async_oper*
-io_service::post_oper_constr(void* addr, size_t size, const void* cookie)
+template<class H> inline io_service::post_oper_base*
+io_service::post_oper_constr(void* addr, size_t size, impl& serv, const void* cookie)
 {
     const H& handler = *static_cast<const H*>(cookie);
-    return new (addr) post_oper<H>(size, handler); // Throws
+    return new (addr) post_oper<H>(size, serv, handler); // Throws
 }
 
 inline bool io_service::async_oper::in_use() const noexcept
 {
-    return m_in_use != 0;
+    return m_in_use;
 }
 
 inline bool io_service::async_oper::is_complete() const noexcept
@@ -1167,8 +1300,7 @@ inline bool io_service::async_oper::is_canceled() const noexcept
 inline void io_service::async_oper::set_is_complete(bool value) noexcept
 {
     REALM_ASSERT(!m_complete);
-    if (value)
-        REALM_ASSERT(m_in_use);
+    REALM_ASSERT(!value || m_in_use);
     m_complete = value;
 }
 
@@ -1176,8 +1308,9 @@ template<class H, class... Args>
 inline void io_service::async_oper::do_recycle_and_execute(bool orphaned, H& handler,
                                                            Args&&... args)
 {
-    // Recycle the operation object before the handler is exceuted, such that it
-    // is available for reuse during the execution of the handler.
+    // Recycle the operation object before the handler is exceuted, such that
+    // the memory is available for a new post operation that might be initiated
+    // during the execution of the handler.
     bool was_recycled = false;
     try {
         H handler_2 = std::move(handler); // Throws
@@ -1189,7 +1322,7 @@ inline void io_service::async_oper::do_recycle_and_execute(bool orphaned, H& han
         // `std::decay`, the following tuple will introduce a copy of all
         // nonconst lvalue reference arguments, preventing such references from
         // being passed through.
-        std::tuple<typename std::decay<Args>::type...> copy_of_args(args...);
+        std::tuple<typename std::decay<Args>::type...> copy_of_args(args...); // Throws
         do_recycle(orphaned);
         was_recycled = true;
         util::call_with_tuple(handler_2, std::move(copy_of_args)); // Throws
@@ -1464,7 +1597,7 @@ public:
     }
     void orphan() noexcept override
     {
-        m_socket = 0;
+        m_socket = nullptr;
     }
 protected:
     socket* m_socket;
@@ -1482,7 +1615,7 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         bool orphaned = !m_socket;
         std::error_code ec = m_error_code;
         if (is_canceled())
@@ -1508,8 +1641,13 @@ public:
     void initiate() noexcept
     {
         REALM_ASSERT(!is_complete());
-        if (m_socket->ensure_nonblocking_mode(m_error_code))
+        REALM_ASSERT(m_curr <= m_end);
+        if (m_curr == m_end) {
+            set_is_complete(true); // Success
+        }
+        else if (m_socket->ensure_nonblocking_mode(m_error_code)) {
             set_is_complete(true); // Failure
+        }
     }
     void proceed() noexcept override
     {
@@ -1535,9 +1673,9 @@ public:
     }
 protected:
     socket* m_socket;
-    const char* const m_begin;
-    const char* const m_end;
-    const char* m_curr;
+    const char* const m_begin; // May be dangling after cancellation
+    const char* const m_end;   // May be dangling after cancellation
+    const char* m_curr;        // May be dangling after cancellation
     std::error_code m_error_code;
 };
 
@@ -1638,6 +1776,13 @@ inline size_t socket::write_some(const char* data, size_t size, std::error_code&
     return do_write_some(data, size, ec);
 }
 
+inline void socket::shutdown(shutdown_type what)
+{
+    std::error_code ec;
+    if (shutdown(what, ec))
+        throw std::system_error(ec);
+}
+
 inline void socket::do_async_connect(LendersConnectOperPtr op)
 {
     if (op->is_complete()) {
@@ -1698,8 +1843,8 @@ public:
     }
 protected:
     acceptor* m_acceptor;
-    socket& m_socket;
-    endpoint* const m_endpoint;
+    socket& m_socket;           // May be dangling after cancellation
+    endpoint* const m_endpoint; // May be dangling after cancellation
     std::error_code m_error_code;
 };
 
@@ -1714,8 +1859,8 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
-        REALM_ASSERT(is_complete() == (m_socket.is_open() || m_error_code));
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
+        REALM_ASSERT(is_canceled() || m_error_code || m_socket.is_open());
         bool orphaned = !m_acceptor;
         std::error_code ec = m_error_code;
         if (is_canceled())
@@ -1850,9 +1995,9 @@ public:
     }
 protected:
     buffered_input_stream* m_stream;
-    char* const m_out_begin;
-    char* const m_out_end;
-    char* m_out_curr;
+    char* const m_out_begin; // May be dangling after cancellation
+    char* const m_out_end;   // May be dangling after cancellation
+    char* m_out_curr;        // May be dangling after cancellation
     const int m_delim;
     std::error_code m_error_code;
 };
@@ -1869,12 +2014,12 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
-        REALM_ASSERT(is_complete() ==
-                     (m_error_code || (m_delim != std::char_traits<char>::eof() ?
-                                       m_out_curr > m_out_begin && m_out_curr[-1] ==
-                                       std::char_traits<char>::to_char_type(m_delim) :
-                                       m_out_curr == m_out_end)));
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
+        REALM_ASSERT(is_canceled() || m_error_code ||
+                     (m_delim != std::char_traits<char>::eof() ?
+                      m_out_curr > m_out_begin && m_out_curr[-1] ==
+                      std::char_traits<char>::to_char_type(m_delim) :
+                      m_out_curr == m_out_end));
         REALM_ASSERT(m_out_curr >= m_out_begin);
         bool orphaned = !m_stream;
         std::error_code ec = m_error_code;
@@ -1890,10 +2035,9 @@ private:
 
 inline buffered_input_stream::buffered_input_stream(socket& sock):
     m_socket(sock),
-    m_buffer(new char[s_buffer_size]), // Throws
-    m_begin(m_buffer.get()),
-    m_end(m_buffer.get())
+    m_buffer(new char[s_buffer_size]) // Throws
 {
+    reset();
 }
 
 inline buffered_input_stream::~buffered_input_stream() noexcept
@@ -1940,6 +2084,12 @@ inline void buffered_input_stream::async_read_until(char* buffer, size_t size, c
                                                     const H& handler)
 {
     async_read(buffer, size, std::char_traits<char>::to_int_type(delim), handler);
+}
+
+inline void buffered_input_stream::reset() noexcept
+{
+    m_begin = m_buffer.get();
+    m_end   = m_buffer.get();
 }
 
 template<class H>

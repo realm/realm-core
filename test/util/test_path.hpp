@@ -69,7 +69,7 @@ std::string get_test_path(const unit_test::TestContext&, const std::string& suff
 void set_test_path_prefix(const std::string&);
 
 
-/// This function is thread-safe as long as tehre are no concurrent invocations
+/// This function is thread-safe as long as there are no concurrent invocations
 /// of set_test_resource_path().
 std::string get_test_resource_path();
 
@@ -125,7 +125,7 @@ public:
     SharedGroupTestPathGuard(const std::string& path);
     std::string get_lock_path() const
     {
-        return m_path + ".management/access_control";
+        return m_path + ".lock"; // ".management/access_control";
     }
     ~SharedGroupTestPathGuard() noexcept;
 };

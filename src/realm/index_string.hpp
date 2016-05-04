@@ -29,8 +29,8 @@
 #include <realm/column_fwd.hpp>
 
  /*
-The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_DateTime and 
-type_Int. When used for integral types, the 64-bit integer is simply casted to a string of 8 bytes through a 
+The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_OldDateTime and
+type_Int. When used for integral types, the 64-bit integer is simply casted to a string of 8 bytes through a
 pretty simple "wrapper layer" in all public methods.
 
 The StringIndex data structure is like an "inversed" B+ tree where the leafs contain row indexes and the non-leafs
@@ -39,7 +39,7 @@ contain 4-byte chunks of payload. Imagine a table with following strings:
         hello, kitty, kitten, foobar, kitty, foobar
 
 The topmost level of the index tree contains prefixes of the payload strings of length <= 4. The next level contains
-prefixes of the remaining parts of the strings. Unnecessary levels of the tree are optimized away; the prefix "foob" 
+prefixes of the remaining parts of the strings. Unnecessary levels of the tree are optimized away; the prefix "foob"
 is shared only by rows that are identical ("foobar"), so "ar" is not needed to be stored in the tree.
 
         hell   kitt      foob
@@ -51,64 +51,18 @@ is shared only by rows that are identical ("foobar"), so "ar" is not needed to b
 Each non-leafs consists of two integer arrays of the same length, one containing payload and the other containing
 references to the sublevel nodes.
 
-The leafs can be either a single value or a Column. If the reference in its parent node has its least significant 
-bit set, then the remaining upper bits specify the row index at which the string is stored. If the bit is clear, 
+The leafs can be either a single value or a Column. If the reference in its parent node has its least significant
+bit set, then the remaining upper bits specify the row index at which the string is stored. If the bit is clear,
 it must be interpreted as a reference to a Column that stores the row indexes at which the string is stored.
 
-If a Column is used, then all row indexes are guaranteed to be sorted increasingly, which means you an search in it 
+If a Column is used, then all row indexes are guaranteed to be sorted increasingly, which means you an search in it
 using our binary search functions such as upper_bound() and lower_bound().
 */
 
 namespace realm {
 
 class Spec;
-
-// to_str() is used by the integer index. The existing StringIndex is re-used for this
-// by making IntegerColumn convert its integers to strings by calling to_str().
-template<class T>
-inline StringData to_str(const T& value)
-{
-    static_assert((std::is_same<T, int64_t>::value), "");
-    const char* c = reinterpret_cast<const char*>(&value);
-    return StringData(c, sizeof(T));
-}
-
-inline StringData to_str(const StringData& input)
-{
-    return input;
-}
-
-inline StringData to_str(null input)
-{
-    return input;
-}
-
-inline StringData to_str(float)
-{
-    REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
-}
-
-inline StringData to_str(double)
-{
-    REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on double not supported
-}
-
-template<class T>
-inline StringData to_str(const util::Optional<T>& value)
-{
-    if (value) {
-        return to_str(*value);
-    }
-    else {
-        return to_str(null{});
-    }
-}
-
-// todo, should be removed
-inline StringData to_str(const char* value)
-{
-    return StringData(value);
-}
+class Timestamp;
 
 class StringIndex {
 public:
@@ -132,7 +86,7 @@ public:
 
     // StringIndex interface:
 
-    static const size_t string_conversion_buffer_size = 8; // 8 is the biggest element size of any non-string/binary Realm type
+    static const size_t string_conversion_buffer_size = 12; // 12 is the biggest element size of any non-string/binary Realm type
     using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 
     bool is_empty() const;
@@ -151,38 +105,15 @@ public:
     void erase(size_t row_ndx, bool is_last);
 
     template<class T>
-    size_t find_first(T value) const
-    {
-        // Use direct access method
-        return m_array->index_string_find_first(to_str(value), m_target_column);
-    }
-
+    size_t find_first(T value) const;
     template<class T>
-    void find_all(IntegerColumn& result, T value) const
-    {
-        // Use direct access method
-        return m_array->index_string_find_all(result, to_str(value), m_target_column);
-    }
-
+    void find_all(IntegerColumn& result, T value) const;
     template<class T>
-    FindRes find_all(T value, ref_type& ref) const
-    {
-        // Use direct access method
-        return m_array->index_string_find_all_no_copy(to_str(value), ref, m_target_column);
-    }
-
+    FindRes find_all(T value, ref_type& ref) const;
     template<class T>
-    size_t count(T value) const
-    {
-        // Use direct access method
-        return m_array->index_string_count(to_str(value), m_target_column);
-    }
-
+    size_t count(T value) const;
     template<class T>
-    void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
-    {
-        do_update_ref(to_str(value), old_row_ndx, new_row_ndx, 0);
-    }
+    void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx);
 
     void clear();
 
@@ -258,6 +189,70 @@ private:
 
 // Implementation:
 
+template<class T> struct GetIndexData;
+
+template<> struct GetIndexData<int64_t> {
+    static StringData get_index_data(const int64_t& value, StringIndex::StringConversionBuffer& buffer)
+    {
+        const char* c = reinterpret_cast<const char*>(&value);
+        std::copy(c, c + sizeof(int64_t), buffer.data());
+        return StringData{buffer.data(), sizeof(int64_t)};
+    }
+};
+
+template<> struct GetIndexData<StringData> {
+    static StringData get_index_data(StringData data, StringIndex::StringConversionBuffer&)
+    {
+        return data;
+    }
+};
+
+template<> struct GetIndexData<null> {
+    static StringData get_index_data(null, StringIndex::StringConversionBuffer&)
+    {
+        return null{};
+    }
+};
+
+template<> struct GetIndexData<Timestamp> {
+    static StringData get_index_data(const Timestamp&, StringIndex::StringConversionBuffer&);
+};
+
+template<class T> struct GetIndexData<util::Optional<T>> {
+    static StringData get_index_data(const util::Optional<T>& value, StringIndex::StringConversionBuffer& buffer)
+    {
+        if (value)
+            return GetIndexData<T>::get_index_data(*value, buffer);
+        return null{};
+    }
+};
+
+template<> struct GetIndexData<float> {
+    static StringData get_index_data(float, StringIndex::StringConversionBuffer&)
+    {
+        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
+    }
+};
+
+template<> struct GetIndexData<double> {
+    static StringData get_index_data(double, StringIndex::StringConversionBuffer&)
+    {
+        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
+    }
+};
+
+template<> struct GetIndexData<const char*>: GetIndexData<StringData> {};
+
+// to_str() is used by the integer index. The existing StringIndex is re-used for this
+// by making IntegerColumn convert its integers to strings by calling to_str().
+
+template<class T>
+inline StringData to_str(T&& value, StringIndex::StringConversionBuffer& buffer)
+{
+    return GetIndexData<typename std::remove_reference<T>::type>::get_index_data(value, buffer);
+}
+
+
 inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc):
     m_array(create_node(alloc, true)), // Throws
     m_target_column(target_column),
@@ -272,7 +267,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
     m_target_column(target_column),
     m_deny_duplicate_values(deny_duplicate_values)
 {
-    REALM_ASSERT(Array::get_context_flag_from_header(alloc.translate(ref)));
+    REALM_ASSERT_EX(Array::get_context_flag_from_header(alloc.translate(ref)), ref, size_t(alloc.translate(ref)));
     m_array->init_from_ref(ref);
     set_parent(parent, ndx_in_parent);
 }
@@ -358,10 +353,12 @@ void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_appen
         }
     }
 
+    StringConversionBuffer buffer;
+
     for (size_t i = 0; i < num_rows; ++i) {
         size_t row_ndx_2 = row_ndx + i;
         size_t offset = 0; // First key from beginning of string
-        insert_with_offset(row_ndx_2, to_str(value), offset); // Throws
+        insert_with_offset(row_ndx_2, to_str(value, buffer), offset); // Throws
     }
 }
 
@@ -380,8 +377,9 @@ template<class T>
 void StringIndex::set(size_t row_ndx, T new_value)
 {
     StringConversionBuffer buffer;
+    StringConversionBuffer buffer2;
     StringData old_value = get(row_ndx, buffer);
-    StringData new_value2 = to_str(new_value);
+    StringData new_value2 = to_str(new_value, buffer2);
 
     // Note that insert_with_offset() throws UniqueConstraintViolation.
 
@@ -429,6 +427,45 @@ void StringIndex::erase(size_t row_ndx, bool is_last)
     // If it is last item in column, we don't have to update refs
     if (!is_last)
         adjust_row_indexes(row_ndx, -1);
+}
+
+template<class T>
+size_t StringIndex::find_first(T value) const
+{
+    // Use direct access method
+    StringConversionBuffer buffer;
+    return m_array->index_string_find_first(to_str(value, buffer), m_target_column);
+}
+
+template<class T>
+void StringIndex::find_all(IntegerColumn& result, T value) const
+{
+    // Use direct access method
+    StringConversionBuffer buffer;
+    return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column);
+}
+
+template<class T>
+FindRes StringIndex::find_all(T value, ref_type& ref) const
+{
+    // Use direct access method
+    StringConversionBuffer buffer;
+    return m_array->index_string_find_all_no_copy(to_str(value, buffer), ref, m_target_column);
+}
+
+template<class T>
+size_t StringIndex::count(T value) const
+{
+    // Use direct access method
+    StringConversionBuffer buffer;
+    return m_array->index_string_count(to_str(value, buffer), m_target_column);
+}
+
+template<class T>
+void StringIndex::update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
+{
+    StringConversionBuffer buffer;
+    do_update_ref(to_str(value, buffer), old_row_ndx, new_row_ndx, 0);
 }
 
 inline

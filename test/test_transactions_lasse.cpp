@@ -18,8 +18,6 @@
 #include <realm/utilities.hpp>
 #include <realm/util/file.hpp>
 
-#include "util/thread_wrapper.hpp"
-
 #include "test.hpp"
 
 using namespace realm;

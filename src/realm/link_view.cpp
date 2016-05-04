@@ -309,7 +309,7 @@ TableView LinkView::get_sorted_view(std::vector<size_t> column_indexes, std::vec
     TableView v(m_origin_column.get_target_table()); // sets m_table
     v.m_last_seen_version = m_origin_table->m_version;
     // sets m_linkview_source to indicate that this TableView was generated from a LinkView
-    v.m_linkview_source = ConstLinkViewRef(this);
+    v.m_linkview_source = shared_from_this();
     if (m_row_indexes.is_attached()) {
         for (size_t t = 0; t < m_row_indexes.size(); t++) // todo, simpler way?
             v.m_row_indexes.add(get(t).get_index());
@@ -398,7 +398,10 @@ void LinkView::do_swap_link(size_t target_row_ndx_1, size_t target_row_ndx_2)
     // FIXME: Optimize this.
     size_t len = m_row_indexes.size();
     for (size_t i = 0; i < len; ++i) {
-        size_t value = m_row_indexes.get(i);
+        int64_t value_64 = m_row_indexes.get(i);
+        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(value_64));
+        size_t value = size_t(value_64);
+
         if (value == target_row_ndx_1) {
             m_row_indexes.set(i, target_row_ndx_2);
         }
@@ -413,6 +416,14 @@ void LinkView::repl_unselect() noexcept
 {
     if (Replication* repl = get_repl())
         repl->on_link_list_destroyed(*this);
+}
+
+uint_fast64_t LinkView::sync_if_needed() const
+{
+    if (m_origin_table)
+        return m_origin_table->m_version;
+
+    return std::numeric_limits<uint_fast64_t>::max();
 }
 
 

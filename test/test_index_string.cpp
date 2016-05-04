@@ -1031,8 +1031,8 @@ TEST(StringIndex_Zero_Crash2)
                 table.add_search_index(0);
             }
             else if (action > 48 && table.size() < 10) {
-                // Generate string with equal probability of being empty, null, short, medium and long, and with 
-                // their contents having equal proability of being either random or a duplicate of a previous 
+                // Generate string with equal probability of being empty, null, short, medium and long, and with
+                // their contents having equal proability of being either random or a duplicate of a previous
                 // string. When it's random, each char must have equal probability of being 0 or non-0e
                 char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
                 char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
@@ -1062,7 +1062,7 @@ TEST(StringIndex_Zero_Crash2)
                         else
                             buf2[t] = static_cast<char>(random.draw_int<int>());  // random byte
                     }
-                    // no generated string can equal "null" (our vector magic value for null) because 
+                    // no generated string can equal "null" (our vector magic value for null) because
                     // len == 4 is not possible
                     sd = StringData(buf2, len);
                 }
@@ -1115,7 +1115,7 @@ TEST(StringIndex_Integer_Increasing)
     for (size_t row = 0; row < rows; row++) {
         int64_t v = table.get_int(0, row);
         size_t c = table.count_int(0, v);
-        
+
         size_t start = std::lower_bound(reference.begin(), reference.end(), v) - reference.begin();
         size_t ref_count = 0;
         for (size_t t = start; t < reference.size(); t++) {
@@ -1164,7 +1164,8 @@ TEST(StringIndex_Duplicate_Values)
     const size_t num_rows = 100;
 
     for (size_t i = 0; i < num_rows; ++i) {
-        col.add(util::to_string(i));
+        std::string to_insert(util::to_string(i));
+        col.add(to_insert);
     }
     CHECK(!ndx.has_duplicate_values());
 
@@ -1173,6 +1174,7 @@ TEST(StringIndex_Duplicate_Values)
         col.add(a_string);
         a_string += "a";
     }
+    std::string str_num_rows(util::to_string(num_rows));
     CHECK(!ndx.has_duplicate_values());
     col.add(a_string);
     col.add(a_string);
@@ -1181,12 +1183,12 @@ TEST(StringIndex_Duplicate_Values)
     CHECK(!ndx.has_duplicate_values());
 
     // Insert into the middle unique value of num_rows
-    col.insert(num_rows/2, util::to_string(num_rows));
+    col.insert(num_rows / 2, str_num_rows);
 
     CHECK(!ndx.has_duplicate_values());
 
     // Set the next element to be num_rows too
-    col.set(num_rows/2 + 1, util::to_string(num_rows));
+    col.set(num_rows / 2 + 1, str_num_rows);
 
     CHECK(ndx.has_duplicate_values());
 
@@ -1218,7 +1220,8 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     // create subindex of repeated elements on a leaf
     size_t num_initial_repeats = 100;
     for (size_t i = 0; i < num_initial_repeats; ++i) {
-        col.add(util::to_string(i));
+        std::string str_i(util::to_string(i));
+        col.add(str_i);
     }
 
     // common test strings
@@ -1235,7 +1238,8 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     const size_t num_new_rand = 256;
     Random random(random_int<unsigned long>());
     for (size_t i = 0; i < num_new_rand; ++i) {
-        col.add(util::to_string(random.draw_int<size_t>()));
+        std::string str_rand(util::to_string(random.draw_int<size_t>()));
+        col.add(str_rand);
     }
 
     // Add a bunch of repeated data
@@ -1243,7 +1247,8 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     const size_t num_repeated = 25;
     for (size_t i = 0; i < num_repeats; ++i) {
         for (size_t j = 0; j < num_repeated; ++j) {
-            col.add(util::to_string(i));
+            std::string str_i(util::to_string(i));
+            col.add(str_i);
         }
     }
 

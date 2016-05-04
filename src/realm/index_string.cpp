@@ -5,6 +5,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column.hpp>
 #include <realm/column_string.hpp>
+#include <realm/column_timestamp.hpp> // Timestamp
 
 using namespace realm;
 using namespace realm::util;
@@ -20,6 +21,22 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 }
 
 } // anonymous namespace
+
+namespace realm {
+StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIndex::StringConversionBuffer& buffer)
+{
+    if (dt.is_null())
+        return null{};
+    
+    int64_t s = dt.get_seconds();
+    uint32_t ns = dt.get_nanoseconds();
+    const char* s_buf = reinterpret_cast<const char*>(&s);
+    const char* ns_buf = reinterpret_cast<const char*>(&ns);
+    std::copy(s_buf, s_buf + sizeof(int64_t), buffer.data());
+    std::copy(ns_buf, ns_buf + sizeof(uint32_t), buffer.data() + sizeof(int64_t));
+    return StringData{buffer.data(), 12};
+}
+} // namespace realm
 
 
 Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
@@ -260,9 +277,6 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
 
         return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
     }
-
-    REALM_ASSERT(false); // never reach here
-    return NodeChange::none;
 }
 
 
@@ -661,8 +675,8 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 REALM_ASSERT(old_pos != not_found);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
 
-                // The payload-value exists in multiple rows, and these rows indexes are stored in an IntegerColumn. 
-                // They must be in increasing order, so we cannot just use "set()". We must delete the old row index 
+                // The payload-value exists in multiple rows, and these rows indexes are stored in an IntegerColumn.
+                // They must be in increasing order, so we cannot just use "set()". We must delete the old row index
                 // and insert the new at the correct position computed above.
                 if (new_pos < old_pos) {
                     sub.insert_without_updating_index(new_pos, new_row_ndx, 1);

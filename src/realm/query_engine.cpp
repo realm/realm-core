@@ -47,7 +47,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
     }
     else if (TAction == act_Count) {
         // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
-        // from any column upon each query match (just matchcount++ is performed), and we pass nullable = false simply 
+        // from any column upon each query match (just matchcount++ is performed), and we pass nullable = false simply
         // by convention. FIXME: Clean up all this.
         if (nullable)
             REALM_ASSERT(false);
@@ -65,7 +65,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
     }
     else if (TAction == act_Sum && col_id == type_Double) {
         m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, DoubleColumn>;
-    }    
+    }
     else if (TAction == act_Max && col_id == type_Int) {
         if (nullable)
             m_column_action_specializer = &ThisType::column_action_specialization<act_Max, IntNullColumn>;
@@ -92,7 +92,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
     }
     else if (TAction == act_FindAll) {
         // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
-        // from any column upon each query match (just a TableView.add(size_t index) is performed), and we pass 
+        // from any column upon each query match (just a TableView.add(size_t index) is performed), and we pass
         // nullable = false simply by convention. FIXME: Clean up all this.
         if (nullable)
             REALM_ASSERT(false);

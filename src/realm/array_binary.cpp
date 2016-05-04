@@ -110,7 +110,7 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
     // See comment in legacy_array_type() and also in array_binary.hpp.
     size_t siz = Array::get_size_from_header(header);
     REALM_ASSERT_7(siz, ==, 2, ||, siz, ==, 3);
-    
+
     if (siz == 3) {
         std::pair<int64_t, int64_t> p = get_two(header, 1);
         const char* nulls_header = alloc.translate(to_ref(p.second));
@@ -119,9 +119,9 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
         REALM_ASSERT_3(n == 1, ||, n == 0);
         bool null = (n != 0);
         if (null)
-            return BinaryData(0, 0);        
+            return BinaryData(0, 0);
     }
-    
+
     std::pair<int64_t, int64_t> p = get_two(header, 0);
     const char* offsets_header = alloc.translate(to_ref(p.first));
     const char* blob_header = alloc.translate(to_ref(p.second));
@@ -200,7 +200,7 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
     {
         // Always create a m_nulls array, regardless if its column is marked as nullable or not. NOTE: This is new
         // - existing binary arrays from earier versions of core will not have this third array. All methods on ArrayBinary
-        // must thus check if this array exists before trying to access it. If it doesn't, it must be interpreted as if its 
+        // must thus check if this array exists before trying to access it. If it doesn't, it must be interpreted as if its
         // column isn't nullable.
         bool context_flag = false;
         int64_t value = values.is_null() ? 1 : 0;

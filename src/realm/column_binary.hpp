@@ -306,7 +306,6 @@ inline void BinaryColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
     REALM_ASSERT(!insert_nulls || m_nullable);
-    static_cast<void>(insert_nulls);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     BinaryData value = m_nullable ? BinaryData() : BinaryData("", 0);

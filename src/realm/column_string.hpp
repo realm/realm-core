@@ -44,8 +44,6 @@ class StringIndex;
 /// it is, then the root ref of the index is stored in
 /// Table::m_columns immediately after the root ref of the string
 /// column.
-///
-/// FIXME: Rename StringColumn to StringColumn
 class StringColumn: public ColumnBaseSimple, public ColumnTemplate<StringData> {
 public:
     typedef StringData value_type;
@@ -351,7 +349,6 @@ inline void StringColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
     REALM_ASSERT(!insert_nulls || m_nullable);
-    static_cast<void>(insert_nulls);
 
     StringData value = m_nullable ? realm::null() : StringData("");
     bool is_append = (row_ndx == prior_num_rows);

@@ -8,6 +8,7 @@ tags
 /cover_html
 /gcovr.xml
 /tmp
+doc/html
 
 # Ignore all user files except one which includes execution path for test
 *.user

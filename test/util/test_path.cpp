@@ -44,7 +44,8 @@ std::string get_test_path(const TestContext& context, const std::string& suffix)
     int recurrence_index = context.recurrence_index;
     std::ostringstream out;
     out.imbue(std::locale::classic());
-    out << path_prefix << sanitize_for_file_name(test_name) << '.' << recurrence_index << suffix;
+    out << path_prefix << sanitize_for_file_name(test_name) << '.' << (recurrence_index+1) <<
+        suffix;
     return out.str();
 }
 
@@ -90,10 +91,7 @@ TestPathGuard::~TestPathGuard() noexcept
 TestDirGuard::TestDirGuard(const std::string& path):
     m_path(path)
 {
-    if (!File::exists(path)) {
-        make_dir(path);
-    }
-    else {
+    if (!try_make_dir(path)) {
         clean_dir(path);
     }
 }
@@ -145,6 +143,7 @@ SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
     try {
         do_clean_dir(path+ ".management", ".management");
         remove_dir(path+ ".management");
+        File::try_remove(get_lock_path());
     } catch (...) {
         // exception ignored
     }
@@ -158,6 +157,7 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
     try {
         do_clean_dir(m_path+ ".management", ".management");
         remove_dir(m_path+ ".management");
+        File::try_remove(get_lock_path());
     }
     catch (...) {
         // Exception deliberately ignored

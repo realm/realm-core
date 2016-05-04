@@ -87,7 +87,7 @@ GroupWriter::GroupWriter(Group& group):
         }
     }
 
-    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_baseline()); // Throws
+    m_file_map.map(m_alloc.get_file(), File::access_ReadWrite, m_alloc.get_baseline()); // Throws
 }
 
 
@@ -487,7 +487,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
 
-    m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size); // Throws
+    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws
 
     size_t chunk_ndx  = m_free_positions.size();
     size_t chunk_size = new_file_size - logical_file_size;

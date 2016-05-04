@@ -10,7 +10,6 @@
 #include <realm/util/network.hpp>
 
 #include "test.hpp"
-#include "../test/util/thread_wrapper.hpp"
 
 using namespace realm::util;
 using namespace realm::test_util;
@@ -97,14 +96,24 @@ void connect_socket(network::socket& socket, std::string port)
 
 void connect_sockets(network::socket& socket_1, network::socket& socket_2)
 {
-    network::io_service& service = socket_1.service();
-    network::acceptor acceptor(service);
+    network::io_service& service_1 = socket_1.service();
+    network::io_service& service_2 = socket_2.service();
+    network::acceptor acceptor(service_1);
     network::endpoint ep = bind_acceptor(acceptor);
     acceptor.listen();
     std::error_code ec_1, ec_2;
     acceptor.async_accept(socket_1, [&](std::error_code ec) { ec_1 = ec; });
     socket_2.async_connect(ep, [&](std::error_code ec) { ec_2 = ec; });
-    service.run();
+    if (&service_1 == &service_2) {
+        service_1.run();
+    }
+    else {
+        ThreadWrapper thread;
+        thread.start([&] { service_1.run(); });
+        service_2.run();
+        bool exception_in_thread = thread.join(); // FIXME: Transport exception instead
+        REALM_ASSERT(!exception_in_thread);
+    }
     if (ec_1)
         throw std::system_error(ec_1);
     if (ec_2)
@@ -429,20 +438,9 @@ TEST(Network_CancelEmptyRead)
     // cancelable
 
     network::io_service service;
-    network::acceptor acceptor(service);
-    acceptor.open(network::protocol::ip_v4());
-    acceptor.listen();
-    network::socket socket_1(service);
-    bool was_accepted = false;
-    auto accept_handler = [&](std::error_code ec) {
-        if (!ec)
-            was_accepted = true;
-    };
-    acceptor.async_accept(socket_1, accept_handler);
-    network::socket socket_2(service);
-    socket_2.connect(acceptor.local_endpoint());
-    service.run();
-    CHECK(was_accepted);
+    network::socket socket_1(service), socket_2(service);
+    connect_sockets(socket_1, socket_2);
+    network::buffered_input_stream stream(socket_2);
     const size_t size = 1;
     char data[size] = { 'a' };
     bool write_was_canceled = false;
@@ -451,18 +449,93 @@ TEST(Network_CancelEmptyRead)
             write_was_canceled = true;
     };
     socket_2.async_write(data, size, write_handler);
-    network::buffered_input_stream input(socket_2);
     char buffer[size];
     bool read_was_canceled = false;
     auto read_handler = [&](std::error_code ec, size_t) {
         if (ec == error::operation_aborted)
             read_was_canceled = true;
     };
-    input.async_read(buffer, 0, read_handler);
+    stream.async_read(buffer, 0, read_handler);
     socket_2.close();
     service.run();
     CHECK(read_was_canceled);
     CHECK(write_was_canceled);
+}
+
+
+TEST(Network_CancelEmptyWrite)
+{
+    // Make sure that an immediately completable write operation is still
+    // cancelable
+
+    network::io_service service;
+    network::socket socket_1(service), socket_2(service);
+    connect_sockets(socket_1, socket_2);
+    network::buffered_input_stream stream(socket_2);
+    char buffer[1];
+    bool read_was_canceled = false;
+    auto read_handler = [&](std::error_code ec, size_t) {
+        if (ec == error::operation_aborted)
+            read_was_canceled = true;
+    };
+    stream.async_read(buffer, 1, read_handler);
+    char data[1] = { 'a' };
+    bool write_was_canceled = false;
+    auto write_handler = [&](std::error_code ec, size_t) {
+        if (ec == error::operation_aborted)
+            write_was_canceled = true;
+    };
+    socket_2.async_write(data, 0, write_handler);
+    socket_2.close();
+    service.run();
+    CHECK(read_was_canceled);
+    CHECK(write_was_canceled);
+}
+
+
+TEST(Network_CancelReadByDestroy)
+{
+    // Check that canceled read operations never try to access socket, stream,
+    // or input buffer objects, even if they were partially completed.
+
+    const int num_connections = 16;
+    network::io_service service;
+    std::unique_ptr<std::unique_ptr<network::socket>[]> write_sockets;
+    std::unique_ptr<std::unique_ptr<network::socket>[]> read_sockets;
+    std::unique_ptr<std::unique_ptr<network::buffered_input_stream>[]> input_streams;
+    write_sockets.reset(new std::unique_ptr<network::socket>[num_connections]);
+    read_sockets.reset(new std::unique_ptr<network::socket>[num_connections]);
+    input_streams.reset(new std::unique_ptr<network::buffered_input_stream>[num_connections]);
+    char output_buffer[2] = { 'x', '\n' };
+    std::unique_ptr<char[][2]> input_buffers(new char[num_connections][2]);
+    for (int i = 0; i < num_connections; ++i) {
+        write_sockets[i].reset(new network::socket(service));
+        read_sockets[i].reset(new network::socket(service));
+        connect_sockets(*write_sockets[i], *read_sockets[i]);
+        input_streams[i].reset(new network::buffered_input_stream(*read_sockets[i]));
+    }
+    for (int i = 0; i < num_connections; ++i) {
+        auto read_handler = [&](std::error_code ec, size_t n) {
+            CHECK(n == 0 || n == 1 || n == 2);
+            if (n == 2) {
+                CHECK_NOT(ec);
+                for (int j = 0; j < num_connections; ++j)
+                    read_sockets[j]->cancel();
+                input_streams.reset(); // Destroy all input streams
+                read_sockets.reset();  // Destroy all read sockets
+                input_buffers.reset(); // Destroy all input buffers
+                return;
+            }
+            CHECK_EQUAL(error::operation_aborted, ec);
+        };
+        input_streams[i]->async_read_until(input_buffers[i], 2, '\n', read_handler);
+        auto write_handler = [&](std::error_code ec, size_t) {
+            CHECK_NOT(ec);
+        };
+        int n = (i == num_connections / 2 ? 2 : 1);
+        write_sockets[i]->async_write(output_buffer, n, write_handler);
+    }
+    service.run();
 }
 
 
@@ -604,6 +677,26 @@ TEST(Network_SocketMixedAsyncSync)
 }
 
 
+TEST(Network_SocketShutdown)
+{
+    network::io_service service;
+    network::socket socket_1(service), socket_2(service);
+    connect_sockets(socket_1, socket_2);
+    network::buffered_input_stream stream(socket_2);
+
+    bool end_of_input_seen = false;
+    auto handler = [&](std::error_code ec, size_t) {
+        if (ec == network::end_of_input)
+            end_of_input_seen = true;
+    };
+    char ch;
+    stream.async_read(&ch, 1, std::move(handler));
+    socket_1.shutdown(network::socket::shutdown_send);
+    service.run();
+    CHECK(end_of_input_seen);
+}
+
+
 TEST(Network_DeadlineTimer)
 {
     network::io_service service;
@@ -670,6 +763,68 @@ TEST(Network_DeadlineTimer_Special)
     service.run();
 }
 */
+
+
+TEST(Network_ThrowFromHandlers)
+{
+    // Check that exceptions can propagate correctly out from any type of
+    // completion handler
+    network::io_service service;
+    struct TestException1 {};
+    service.post([] { throw TestException1(); });
+    CHECK_THROW(service.run(), TestException1);
+
+    {
+        network::acceptor acceptor(service);
+        network::endpoint ep = bind_acceptor(acceptor);
+        acceptor.listen();
+        network::socket socket_1(service);
+        struct TestException2 {};
+        acceptor.async_accept(socket_1, [](std::error_code) { throw TestException2(); });
+        network::socket socket_2(service);
+        socket_2.async_connect(ep, [](std::error_code) {});
+        CHECK_THROW(service.run(), TestException2);
+    }
+    {
+        network::acceptor acceptor(service);
+        network::endpoint ep = bind_acceptor(acceptor);
+        acceptor.listen();
+        network::socket socket_1(service);
+        acceptor.async_accept(socket_1, [](std::error_code) {});
+        network::socket socket_2(service);
+        struct TestException3 {};
+        socket_2.async_connect(ep, [](std::error_code) { throw TestException3(); });
+        CHECK_THROW(service.run(), TestException3);
+    }
+    {
+        network::socket socket_1(service), socket_2(service);
+        connect_sockets(socket_1, socket_2);
+        network::buffered_input_stream stream(socket_1);
+        char ch_1;
+        struct TestException4 {};
+        stream.async_read(&ch_1, 1, [](std::error_code, size_t) { throw TestException4(); });
+        char ch_2 = 0;
+        socket_2.async_write(&ch_2, 1, [](std::error_code, size_t) {});
+        CHECK_THROW(service.run(), TestException4);
+    }
+    {
+        network::socket socket_1(service), socket_2(service);
+        connect_sockets(socket_1, socket_2);
+        network::buffered_input_stream stream(socket_1);
+        char ch_1;
+        stream.async_read(&ch_1, 1, [](std::error_code, size_t) {});
+        char ch_2 = 0;
+        struct TestException5 {};
+        socket_2.async_write(&ch_2, 1, [](std::error_code, size_t) { throw TestException5(); });
+        CHECK_THROW(service.run(), TestException5);
+    }
+    {
+        network::deadline_timer timer(service);
+        struct TestException6 {};
+        timer.async_wait(std::chrono::seconds(0), [](std::error_code) { throw TestException6(); });
+        CHECK_THROW(service.run(), TestException6);
+    }
+}
 
 
 TEST(Network_HandlerDealloc)
@@ -1249,5 +1404,112 @@ TEST(Network_Async)
     client_thread.join();
     server_thread.join();
 }
+
+
+TEST(Network_HeavyAsyncPost)
+{
+    network::io_service service;
+    network::deadline_timer dummy_timer(service);
+    dummy_timer.async_wait(std::chrono::hours(10000), [](std::error_code) {});
+
+    ThreadWrapper looper_thread;
+    looper_thread.start([&] { service.run(); });
+
+    std::vector<std::pair<int, long>> entries;
+    const long num_iterations = 10000L;
+    auto func = [&](int thread_index) {
+        for (long i = 0; i < num_iterations; ++i)
+            service.post([&entries, thread_index, i] { entries.emplace_back(thread_index, i); });
+    };
+
+    const int num_threads = 8;
+    std::unique_ptr<ThreadWrapper[]> threads(new ThreadWrapper[num_threads]);
+    for (int i = 0; i < num_threads; ++i)
+        threads[i].start([&func, i] { func(i); });
+    for (int i = 0; i < num_threads; ++i)
+        CHECK_NOT(threads[i].join());
+
+    service.post([&] { dummy_timer.cancel(); });
+    CHECK_NOT(looper_thread.join());
+
+    // Check that every post operation ran exactly once
+    using longlong = long long;
+    if (CHECK_EQUAL(num_threads * longlong(num_iterations), entries.size())) {
+        bool every_post_operation_ran_exactly_once = true;
+        std::sort(entries.begin(), entries.end());
+        auto i = entries.begin();
+        for (int i_1 = 0; i_1 < num_threads; ++i_1) {
+            for (long i_2 = 0; i_2 < num_iterations; ++i_2) {
+                int thread_index     = i->first;
+                long iteration_index = i->second;
+                if (i_1 != thread_index || i_2 != iteration_index) {
+                    every_post_operation_ran_exactly_once = false;
+                    break;
+                }
+                ++i;
+            }
+        }
+        CHECK(every_post_operation_ran_exactly_once);
+    }
+}
+
+
+TEST(Network_RepeatedCancelAndRestartRead)
+{
+    Random random{random_int<unsigned long>()}; // Seed from slow global generator
+    for (int i = 0; i < 1; ++i) {
+        network::io_service service_1, service_2;
+        network::socket socket_1(service_1), socket_2(service_2);
+        connect_sockets(socket_1, socket_2);
+        network::buffered_input_stream stream(socket_2);
+
+        const size_t read_buffer_size = 1024;
+        char read_buffer[read_buffer_size];
+        size_t num_bytes_read = 0;
+        bool end_of_input_seen = false;
+        std::function<void()> initiate_read = [&] {
+            auto handler = [&](std::error_code ec, size_t n) {
+                num_bytes_read += n;
+                if (ec == network::errors::end_of_input) {
+                    end_of_input_seen = true;
+                    return;
+                }
+                CHECK(!ec || ec == error::operation_aborted);
+                initiate_read();
+            };
+            stream.async_read(read_buffer, read_buffer_size, handler);
+        };
+        initiate_read();
+
+        auto thread_func = [&] {
+            try {
+                service_2.run();
+            }
+            catch (...) {
+                socket_2.close();
+                throw;
+            }
+        };
+        ThreadWrapper thread;
+        thread.start(thread_func);
+
+        const size_t write_buffer_size = 1024;
+        const char write_buffer[write_buffer_size] = { '\0' };
+        size_t num_bytes_to_write = 0x4000000; // 64 MiB
+        size_t num_bytes_written = 0;
+        while (num_bytes_written < num_bytes_to_write) {
+            size_t n = std::min(random.draw_int<size_t>(1, write_buffer_size),
+                                num_bytes_to_write-num_bytes_written);
+            socket_1.write(write_buffer, n);
+            num_bytes_written += n;
+            service_2.post([&] { socket_2.cancel(); });
+        }
+        socket_1.close();
+
+        CHECK_NOT(thread.join());
+        CHECK_EQUAL(num_bytes_written, num_bytes_read);
+    }
+}
+
 
 #endif // TEST_UTIL_NETWORK

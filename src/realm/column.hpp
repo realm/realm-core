@@ -365,7 +365,7 @@ public:
     bool is_attached() const noexcept final { return m_array->is_attached(); }
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept final { m_array->set_parent(parent, ndx_in_parent); }
     size_t get_ndx_in_parent() const noexcept final { return m_array->get_ndx_in_parent(); }
-    void set_ndx_in_parent(size_t ndx_in_parent) noexcept final { m_array->set_ndx_in_parent(ndx_in_parent); }
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept override { m_array->set_ndx_in_parent(ndx_in_parent); }
     void update_from_parent(size_t old_baseline) noexcept override { m_array->update_from_parent(old_baseline); }
     MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
 
@@ -539,7 +539,7 @@ public:
     bool compare(const Column&) const noexcept;
 
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
-                           size_t size = 0, T value = 0);
+                           size_t size = 0, T value = T{});
 
     // Overriding method in ColumnBase
     ref_type write(size_t, size_t, size_t,
@@ -831,17 +831,7 @@ template<class T>
 StringData Column<T>::get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
 {
     T x = get(ndx);
-    StringData str = to_str(x); // takes x by reference, returns StringData pointing to memory in
-                                // this stack frame.
-    // Copy bytes into buffer:
-    REALM_ASSERT(str.size() <= StringIndex::string_conversion_buffer_size);
-    if (str.data() != nullptr) {
-        std::copy(str.data(), str.data() + str.size(), buffer.data());
-        return StringData{buffer.data(), str.size()};
-    }
-    else {
-        return str; // "null"
-    }
+    return to_str(x, buffer);
 }
 
 template<class T>
@@ -1264,7 +1254,6 @@ template<class T> struct NullOrDefaultValue<T, typename std::enable_if<!Implicit
     static T null_or_default_value(bool is_null)
     {
         REALM_ASSERT(!is_null);
-        static_cast<void>(is_null);
         return T{};
     }
 };

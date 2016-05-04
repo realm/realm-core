@@ -15,6 +15,14 @@
 #include <realm/util/features.h>
 
 
+// Note: Linux specific accept4() is not available on Android.
+#if defined _GNU_SOURCE && defined SOCK_NONBLOCK
+#  define HAVE_LINUX_ACCEPT4 1
+#else
+#  define HAVE_LINUX_ACCEPT4 0
+#endif
+
+
 using namespace realm::util;
 using namespace realm::util::network;
 
@@ -94,6 +102,7 @@ struct getaddrinfo_result_owner {
 
 
 class network_error_category: public std::error_category {
+public:
     const char* name() const noexcept override;
     std::string message(int) const override;
 };
@@ -174,13 +183,18 @@ public:
         }
         return LendersOperPtr(op);
     }
-    ~oper_queue() noexcept
+    void clear() noexcept
     {
         if (m_back) {
             LendersOperPtr op(m_back);
             while (op->m_next != m_back)
                 op.reset(op->m_next);
+            m_back = nullptr;
         }
+    }
+    ~oper_queue() noexcept
+    {
+        clear();
     }
 private:
     async_oper* m_back = nullptr;
@@ -216,8 +230,12 @@ public:
 
     ~impl()
     {
+        // Avoid calls to recycle_post_oper() after destruction has begun.
+        m_completed_operations.clear();
+
         ::close(m_wakeup_pipe_read_fd);
         ::close(m_wakeup_pipe_write_fd);
+
 #if REALM_ASSERTIONS_ENABLED
         size_t n = 0;
         for (size_t i = 0; i < m_io_operations.size(); ++i) {
@@ -378,57 +396,39 @@ public:
     {
         {
             LockGuard l(m_mutex);
-            LendersOperPtr op = alloc_post(m_post_oper, constr, size, cookie); // Throws
+            std::unique_ptr<char[]> mem;
+            if (m_post_oper && m_post_oper->m_size >= size) {
+                // Reuse old memory
+                async_oper* op = m_post_oper.release();
+                REALM_ASSERT(dynamic_cast<UnusedOper*>(op));
+                static_cast<UnusedOper*>(op)->UnusedOper::~UnusedOper(); // Static dispatch
+                mem.reset(static_cast<char*>(static_cast<void*>(op)));
+            }
+            else {
+                // Allocate new memory
+                mem.reset(new char[size]); // Throws
+            }
+
+            LendersOperPtr op;
+            op.reset((*constr)(mem.get(), size, *this, cookie)); // Throws
+            mem.release();
             m_post_operations.push_back(std::move(op));
         }
         wake_up_poll_thread();
     }
 
-    static LendersOperPtr alloc_post(OwnersOperPtr& owners_ptr, PostOperConstr constr, size_t size,
-                                     const void* cookie)
+    void recycle_post_oper(post_oper_base* op) noexcept
     {
-        // Special version of io_service::alloc() for post operations. See
-        // io_service::alloc() for more information.
+        size_t size = op->m_size;
+        op->~post_oper_base(); // Dynamic dispatch
+        OwnersOperPtr op_2(new (op) UnusedOper(size)); // Does not throw
 
-        OwnersOperPtr temp_owners_ptr;
-        OwnersOperPtr* owners_ptr_ptr = &owners_ptr;
-        void* addr = owners_ptr.get();
-        size_t size_2; // The number of allocated bytes
-        if (REALM_LIKELY(addr)) {
-            // Two operations of a single type are generally not allowed to
-            // overlap in time, but in the case of post operations, they
-            // are. This is handled by creating additional operations in the
-            // orphaned (unowned) state if the owned instance is already in use.
-            if (owners_ptr->in_use()) {
-                owners_ptr_ptr = &temp_owners_ptr;
-                goto no_object;
-            }
-            size_2 = owners_ptr->m_size;
-            // We can use static dispatch in the destructor call here, since an
-            // object, that is not in use, is always an instance of UnusedOper.
-            REALM_ASSERT(dynamic_cast<UnusedOper*>(owners_ptr.get()));
-            static_cast<UnusedOper*>(owners_ptr.get())->UnusedOper::~UnusedOper();
-            if (REALM_UNLIKELY(size_2 < size)) {
-                owners_ptr.release();
-                delete[] static_cast<char*>(addr);
-                goto no_object;
-            }
+        // Keep the larger memory chunk (`op_2` or m_post_oper)
+        {
+            LockGuard l(m_mutex);
+            if (!m_post_oper || m_post_oper->m_size < size)
+                swap(op_2, m_post_oper);
         }
-        else {
-          no_object:
-            addr = new char[size]; // Throws
-            size_2 = size;
-            owners_ptr_ptr->reset(static_cast<async_oper*>(addr));
-        }
-        LendersOperPtr lenders_ptr;
-        try {
-            lenders_ptr.reset((*constr)(addr, size_2, cookie)); // Throws
-        }
-        catch (...) {
-            new (addr) UnusedOper(size); // Does not throw
-            throw;
-        }
-        return lenders_ptr;
     }
 
     void cancel_incomplete_io_ops(int fd) noexcept
@@ -482,7 +482,7 @@ private:
 
     Mutex m_mutex;
     OwnersOperPtr m_post_oper; // Protected by `m_mutex`
-    oper_queue m_post_operations; // Protected by `m_mutex` (including the enqueued operations).
+    oper_queue m_post_operations; // Protected by `m_mutex`
     bool m_stopped = false; // Protected by `m_mutex`
 
     bool process_timers(clock::time_point now)
@@ -711,6 +711,11 @@ void io_service::do_post(PostOperConstr constr, size_t size, const void* cookie)
     m_impl->post(constr, size, cookie); // Throws
 }
 
+void io_service::recycle_post_oper(impl& impl, post_oper_base* op) noexcept
+{
+    impl.recycle_post_oper(op);
+}
+
 
 std::error_code resolver::resolve(const query& query, endpoint::list& list, std::error_code& ec)
 {
@@ -728,7 +733,12 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
     if (REALM_UNLIKELY(ret != 0)) {
 #ifdef EAI_SYSTEM
         if (ret == EAI_SYSTEM) {
-            ec = make_basic_system_error_code(errno);
+            if (errno != 0) {
+                ec = make_basic_system_error_code(errno);
+            }
+            else {
+                ec = error::unknown;
+            }
             return ec;
         }
 #endif
@@ -750,6 +760,7 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
             curr = curr->ai_next;
         }
     }
+    REALM_ASSERT(num_endpoints > 0);
 
     // Copy the IPv4/IPv6 endpoints
     list.m_endpoints.set_size(num_endpoints); // Throws
@@ -886,7 +897,6 @@ void socket_base::do_close() noexcept
     // POSIX, but we shall assume it anyway). `EBADF`, however, would indicate
     // an implementation bug, so we don't want to ignore that.
     REALM_ASSERT(ret != -1 || errno != EBADF);
-    static_cast<void>(ret);
     m_sock_fd = -1;
 }
 
@@ -931,6 +941,16 @@ void socket_base::map_option(opt_enum opt, int& level, int& option_name) const
         case opt_ReuseAddr:
             level       = SOL_SOCKET;
             option_name = SO_REUSEADDR;
+            return;
+        case opt_Linger:
+            level       = SOL_SOCKET;
+#if REALM_PLATFORM_APPLE
+            // By default, SO_LINGER on Darwin uses "ticks" instead of
+            // seconds for better accuracy, but we want to be cross-platform.
+            option_name = SO_LINGER_SEC;
+#else
+            option_name = SO_LINGER;
+#endif // REALM_PLATFORM_APPLE
             return;
     }
     REALM_ASSERT(false);
@@ -982,6 +1002,19 @@ std::error_code socket::write(const char* data, size_t size, std::error_code& ec
         REALM_ASSERT(n > 0);
         REALM_ASSERT(n <= size_t(end-begin));
         begin += n;
+    }
+    ec = std::error_code(); // Success
+    return ec;
+}
+
+
+std::error_code socket::shutdown(shutdown_type what, std::error_code& ec) noexcept
+{
+    int how = what;
+    int ret = ::shutdown(get_sock_fd(), how);
+    if (REALM_UNLIKELY(ret == -1)) {
+        ec = make_basic_system_error_code(errno);
+        return ec;
     }
     ec = std::error_code(); // Success
     return ec;
@@ -1110,7 +1143,20 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     socklen_t addr_len = sizeof buffer;
     int sock_fd;
     for (;;) {
+#if HAVE_LINUX_ACCEPT4
+        // On Linux (HAVE_LINUX_ACCEPT4), make the accepted socket inherit the
+        // O_NONBLOCK status flag from the accepting socket to avoid an extra
+        // call to fcntl(). Note, it is deemed most likely that the accepted
+        // socket is going to be used in nonblocking when, and only when the
+        // accepting socket is used in nonblocking mode. Other platforms are
+        // handled below.
+        int flags = 0;
+        if (!m_in_blocking_mode)
+            flags |= SOCK_NONBLOCK;
+        sock_fd = ::accept4(get_sock_fd(), addr, &addr_len, flags);
+#else
         sock_fd = ::accept(get_sock_fd(), addr, &addr_len);
+#endif
         if (sock_fd != -1)
             break;
         if (REALM_UNLIKELY(errno != EINTR)) {
@@ -1124,6 +1170,27 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
     if (REALM_UNLIKELY(addr_len != expected_addr_len))
         REALM_TERMINATE("Unexpected peer address length");
 
+    // On some platforms (such as Mac OS X), the accepted socket inherits file
+    // status flags from the accepting socket, but on other systems, this is not
+    // the case. In the case of Linux (_GNU_SOURCE), the inheriting behaviour is
+    // obtained by using the Linux specific accept4() system call.
+    //
+    // For other platforms, we need to be sure that m_in_blocking_mode for the
+    // new socket is initialized to reflect the actual state of O_NONBLOCK on
+    // the new socket.
+    //
+    // Note: This implementation currently never modifies status flags other
+    // than O_NONBLOCK, so we only need to consider that flag.
+#if !REALM_PLATFORM_APPLE && !HAVE_LINUX_ACCEPT4
+    // Make the accepted socket inherit the state of O_NONBLOCK from the
+    // accepting socket.
+    if (set_nonblocking(sock_fd, !m_in_blocking_mode, ec)) {
+        ec = make_basic_system_error_code(errno);
+        ::close(sock_fd);
+        return ec;
+    }
+#endif
+
 #if REALM_PLATFORM_APPLE
     int optval = 1;
     int ret = ::setsockopt(sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
@@ -1135,7 +1202,7 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
 #endif
 
     sock.m_sock_fd = sock_fd;
-    sock.m_in_blocking_mode = true;
+    sock.m_in_blocking_mode = m_in_blocking_mode; // Inherit
     if (ep) {
         ep->m_protocol = m_protocol;
         ep->m_sockaddr_union = buffer.m_sockaddr_union;

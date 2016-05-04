@@ -78,26 +78,23 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     Replication::HistoryType requested_history_type_2 =
         Replication::HistoryType(requested_history_type);
 
+    // Note: This function is responsible for choosing the target file format
+    // for a sessions. If it selects a file format that is different from
+    // `current_file_format_version`, it will trigger a file format upgrade
+    // process.
+
+    // Note: Previously it was necessary to base the decision on the current
+    // (original) file format and the selected type of history (of
+    // changesets). At the present time, however (since the introduction of file
+    // format version 5), all files need to use the latest file format.
+
     // Note: `current_file_format_version` may be zero at this time, which means
     // that the file format it is not yet decided (only possible for empty
     // Realms where top-ref is zero).
 
-    // Stay on file format 3 (no support of in-Realm histories) if the format of
-    // the opened Realm file is less than 4 and the required history type is not
-    // in in-Realm history type (Replication::hist_InRealm or
-    // Replication::hist_OutOfRealm). File format 2 needs upgrade in any case
-    // (to 3 or 4 depending on history type).
-    if (current_file_format_version >= 4)
-        return current_file_format_version;
-    switch (requested_history_type_2) {
-        case Replication::hist_None:
-        case Replication::hist_OutOfRealm:
-            return 3;
-        case Replication::hist_InRealm:
-        case Replication::hist_Sync:
-            break;
-    }
-    return 4;
+    static_cast<void>(current_file_format_version);
+    static_cast<void>(requested_history_type_2);
+    return 5;
 }
 
 
@@ -108,7 +105,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file foprmat
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT(target_file_format_version == 3 || target_file_format_version == 4);
+    REALM_ASSERT_EX(target_file_format_version == 5, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -131,6 +128,14 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Upgrade from 3 to 4
     if (current_file_format_version <= 3 && target_file_format_version >= 4) {
         // No-op
+    }
+
+    // Upgrade from 4 to 5 (datetime -> timestamp)
+    if (current_file_format_version <= 4 && target_file_format_version >= 5) {
+        for (size_t t = 0; t < m_tables.size(); t++) {
+            TableRef table = get_table(t);
+            table->upgrade_olddatetime();
+        }
     }
 
     // NOTE: Additional future upgrade steps go here.
@@ -585,7 +590,9 @@ void Group::remove_table(size_t table_ndx)
     for (size_t i = n; i > 0; --i)
         table->remove_column(i-1);
 
-    ref_type ref = m_tables.get(table_ndx);
+    int64_t ref_64 = m_tables.get(table_ndx);
+    REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
+    ref_type ref = ref_type(ref_64);
 
     // Remove table and move all successive tables
     m_tables.erase(table_ndx); // Throws
@@ -981,6 +988,11 @@ bool Group::operator==(const Group& g) const
     if (n != g.size())
         return false;
     for (size_t i = 0; i < n; ++i) {
+        const StringData& table_name_1 = get_table_name(i); // Throws
+        const StringData& table_name_2 = g.get_table_name(i); // Throws
+        if (table_name_1 != table_name_2)
+            return false;
+
         ConstTableRef table_1 = get_table(i); // Throws
         ConstTableRef table_2 = g.get_table(i); // Throws
         if (*table_1 != *table_2)
@@ -1153,7 +1165,6 @@ public:
     {
         REALM_ASSERT_3(table_ndx, <=, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
-        static_cast<void>(num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
             m_group.m_table_accessors.insert(m_group.m_table_accessors.begin() + table_ndx, nullptr);
@@ -1175,7 +1186,6 @@ public:
     {
         REALM_ASSERT_3(table_ndx, <, num_tables);
         REALM_ASSERT(m_group.m_table_accessors.empty() || m_group.m_table_accessors.size() == num_tables);
-        static_cast<void>(num_tables);
 
         if (!m_group.m_table_accessors.empty()) {
             // Link target tables do not need to be considered here, since all
@@ -1283,19 +1293,12 @@ public:
         typedef _impl::TableFriend tf;
         if (m_table) {
             if (unordered) {
-                // FIXME: Explain what the `num_rows_to_insert == 0` case is all
-                // about (Thomas Goyne).
-                if (num_rows_to_insert == 0) {
-                    tf::mark_opposite_link_tables(*m_table);
-                }
-                else {
-                    // Unordered insertion of multiple rows is not yet supported (and not
-                    // yet needed).
-                    REALM_ASSERT(num_rows_to_insert == 1);
-                    size_t from_row_ndx = row_ndx;
-                    size_t to_row_ndx = prior_num_rows;
-                    tf::adj_acc_move_over(*m_table, from_row_ndx, to_row_ndx);
-                }
+                // Unordered insertion of multiple rows is not yet supported (and not
+                // yet needed).
+                REALM_ASSERT_EX((num_rows_to_insert == 1) || (num_rows_to_insert == 0), num_rows_to_insert);
+                size_t from_row_ndx = row_ndx;
+                size_t to_row_ndx = prior_num_rows;
+                tf::adj_acc_move_over(*m_table, from_row_ndx, to_row_ndx);
             }
             else {
                 tf::adj_acc_insert_rows(*m_table, row_ndx, num_rows_to_insert);
@@ -1310,7 +1313,7 @@ public:
         if (unordered) {
             // Unordered removal of multiple rows is not yet supported (and not
             // yet needed).
-            REALM_ASSERT_3(num_rows_to_erase, ==, 1);
+            REALM_ASSERT_EX((num_rows_to_erase == 1) || (num_rows_to_erase == 0), num_rows_to_erase);
             typedef _impl::TableFriend tf;
             if (m_table) {
                 size_t prior_last_row_ndx = prior_num_rows - 1;
@@ -1320,8 +1323,16 @@ public:
         else {
             typedef _impl::TableFriend tf;
             if (m_table) {
-                for (size_t i = 0; i < num_rows_to_erase; ++i)
-                    tf::adj_acc_erase_row(*m_table, row_ndx + num_rows_to_erase - 1 - i);
+                // Linked tables must still be marked for accessor updates in the case
+                // where num_rows_to_erase == 0. Without doing this here it wouldn't be done
+                // at all because the contents of the for loop do not get executed.
+                if (num_rows_to_erase == 0) {
+                    tf::mark_opposite_link_tables(*m_table);
+                }
+                else {
+                    for (size_t i = 0; i < num_rows_to_erase; ++i)
+                        tf::adj_acc_erase_row(*m_table, row_ndx + num_rows_to_erase - 1 - i);
+                }
             }
         }
         return true;
@@ -1391,7 +1402,12 @@ public:
         return true; // No-op
     }
 
-    bool set_date_time(size_t, size_t, DateTime) noexcept
+    bool set_olddatetime(size_t, size_t, OldDateTime) noexcept
+    {
+        return true; // No-op
+    }
+
+    bool set_timestamp(size_t, size_t, Timestamp) noexcept
     {
         return true; // No-op
     }

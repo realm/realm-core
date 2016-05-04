@@ -26,24 +26,24 @@
 namespace realm {
 
 
-class DateTime {
+class OldDateTime {
 public:
-    DateTime() noexcept: m_time(0) {}
+    OldDateTime() noexcept: m_time(0) {}
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
     /// FIXME: See if we can make this private again. Required by query_expression.hpp
-    DateTime(int_fast64_t d) noexcept : m_time(d) {}
+    OldDateTime(int_fast64_t d) noexcept : m_time(d) {}
 
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
-    int_fast64_t get_datetime() const noexcept { return m_time; }
+    int_fast64_t get_olddatetime() const noexcept { return m_time; }
 
-    friend bool operator==(const DateTime&, const DateTime&) noexcept;
-    friend bool operator!=(const DateTime&, const DateTime&) noexcept;
-    friend bool operator< (const DateTime&, const DateTime&) noexcept;
-    friend bool operator<= (const DateTime&, const DateTime&) noexcept;
-    friend bool operator> (const DateTime&, const DateTime&) noexcept;
-    friend bool operator>= (const DateTime&, const DateTime&) noexcept;
+    friend bool operator==(const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator!=(const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator< (const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator<= (const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator> (const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator>= (const OldDateTime&, const OldDateTime&) noexcept;
 
     /// Construct from broken down local time.
     ///
@@ -64,13 +64,13 @@ public:
     ///
     /// \param seconds Seconds after the minute in the range [0,
     /// 60]. Note that the range allows for leap seconds.
-    DateTime(int year, int month, int day, int hours = 0, int minutes = 0, int seconds = 0);
+    OldDateTime(int year, int month, int day, int hours = 0, int minutes = 0, int seconds = 0);
 
     template<class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
+    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const OldDateTime&);
 
-    // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed 
-    // because DateTime is internally stored in an int64_t column.
+    // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed
+    // because OldDateTime is internally stored in an int64_t column.
     operator int_fast64_t() noexcept;
 
 private:
@@ -83,52 +83,52 @@ private:
 
 // Implementation:
 
-inline bool operator==(const DateTime& a, const DateTime& b) noexcept
+inline bool operator==(const OldDateTime& a, const OldDateTime& b) noexcept
 {
     return a.m_time == b.m_time;
 }
 
-inline bool operator!=(const DateTime& a, const DateTime& b) noexcept
+inline bool operator!=(const OldDateTime& a, const OldDateTime& b) noexcept
 {
     return a.m_time != b.m_time;
 }
 
-inline bool operator<(const DateTime& a, const DateTime& b) noexcept
+inline bool operator<(const OldDateTime& a, const OldDateTime& b) noexcept
 {
     return a.m_time < b.m_time;
 }
 
-inline bool operator<=(const DateTime& a, const DateTime& b) noexcept
+inline bool operator<=(const OldDateTime& a, const OldDateTime& b) noexcept
 {
     return a.m_time <= b.m_time;
 }
 
-inline bool operator>(const DateTime& a, const DateTime& b) noexcept
+inline bool operator>(const OldDateTime& a, const OldDateTime& b) noexcept
 {
     return a.m_time > b.m_time;
 }
 
-inline bool operator>=(const DateTime& a, const DateTime& b) noexcept
+inline bool operator>=(const OldDateTime& a, const OldDateTime& b) noexcept
 {
     return a.m_time >= b.m_time;
 }
 
-inline DateTime::operator int_fast64_t() noexcept
+inline OldDateTime::operator int_fast64_t() noexcept
 {
     return m_time;
 }
 
-inline DateTime::DateTime(int year, int month, int day, int hours, int minutes, int seconds):
+inline OldDateTime::OldDateTime(int year, int month, int day, int hours, int minutes, int seconds):
     m_time(assemble(year, month, day, hours, minutes, seconds)) {}
 
 template<class Ch, class Tr>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime& d)
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const OldDateTime& d)
 {
-    out << "DateTime("<<d.m_time<<")";
+    out << "OldDateTime("<<d.m_time<<")";
     return out;
 }
 
-inline std::time_t DateTime::assemble(int year, int month, int day, int hours, int minutes, int seconds)
+inline std::time_t OldDateTime::assemble(int year, int month, int day, int hours, int minutes, int seconds)
 {
     std::tm local_time;
     local_time.tm_year  = year  - 1900;

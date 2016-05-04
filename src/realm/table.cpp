@@ -416,7 +416,7 @@ DescriptorRef Table::get_descriptor()
     else {
         desc.reset(m_descriptor);
     }
-    return move(desc);
+    return desc;
 }
 
 
@@ -1388,14 +1388,15 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
                                   col_type != col_type_Int &&
                                   col_type != col_type_Float &&
                                   col_type != col_type_Double &&
-                                  col_type != col_type_DateTime &&
+                                  col_type != col_type_OldDateTime &&
+                                  col_type != col_type_Timestamp &&
                                   col_type != col_type_Bool &&
                                   col_type != col_type_Link)));
 
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
-        case col_type_DateTime:
+        case col_type_OldDateTime:
             if (nullable) {
                 col = new IntNullColumn(alloc, ref); // Throws
             }
@@ -1443,7 +1444,10 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             // Origin table will be set by group after entire table has been created
             col = new BacklinkColumn(alloc, ref); // Throws
             break;
-        case col_type_Reserved1:
+        case col_type_Timestamp:
+            // Origin table will be set by group after entire table has been created
+            col = new TimestampColumn(alloc, ref); // Throws
+            break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
             break;
@@ -1476,7 +1480,7 @@ Table::~Table() noexcept
 
     if (!is_attached()) {
         // This table has been detached.
-        REALM_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT_3(m_ref_count.load(), ==, 0);
         return;
     }
 
@@ -1490,7 +1494,7 @@ Table::~Table() noexcept
         // of this subtable.
         ArrayParent* parent = m_columns.get_parent();
         REALM_ASSERT(parent);
-        REALM_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT_3(m_ref_count.load(), ==, 0);
         REALM_ASSERT(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
@@ -1502,7 +1506,7 @@ Table::~Table() noexcept
     if (ArrayParent* parent = m_top.get_parent()) {
         // This is a table whose lifetime is managed by reference
         // counting, so we must let our parent know about our demise.
-        REALM_ASSERT_3(m_ref_count, ==, 0);
+        REALM_ASSERT_3(m_ref_count.load(), ==, 0);
         REALM_ASSERT(dynamic_cast<Parent*>(parent));
         static_cast<Parent*>(parent)->child_accessor_destroyed(this);
         destroy_column_accessors();
@@ -1557,7 +1561,8 @@ void Table::upgrade_file_format()
             }
             case col_type_Bool:
             case col_type_Int:
-            case col_type_DateTime: {
+            case col_type_OldDateTime: {
+                // FIXME: Do upgrade of col_type_OldDateTime
                 IntegerColumn& col = get_column(col_ndx);
                 col.get_search_index()->clear();
                 col.populate_search_index();
@@ -1572,7 +1577,6 @@ void Table::upgrade_file_format()
             case col_type_Binary:
             case col_type_Table:
             case col_type_Mixed:
-            case col_type_Reserved1:
             case col_type_Float:
             case col_type_Double:
             case col_type_Reserved4:
@@ -1581,10 +1585,62 @@ void Table::upgrade_file_format()
             case col_type_BackLink:
                 // Indices are not support on these column types
                 break;
+            case col_type_Timestamp:
+                // Introduced after latest file format upgrade
+                break;
         }
         REALM_ASSERT(false);
     }
 }
+
+
+void Table::upgrade_olddatetime()
+{
+    const size_t old_column_count = get_column_count();
+
+    for (size_t col = 0; col < get_column_count(); col++) {
+        ColumnType col_type = get_real_column_type(col);
+
+        if (col_type == col_type_OldDateTime) {
+            bool nullable = is_nullable(col);
+            StringData name = get_column_name(col);
+
+            // Insert new Timestamp column at same position as old column
+            const size_t old_col = col + 1;
+            const size_t new_col = col;
+            insert_column(new_col, type_Timestamp, name, nullable);
+
+            // Copy payload to new column
+            for (size_t row = 0; row < size(); row++) {
+                if (is_null(old_col, row)) {
+                    set_null(new_col, row);
+                }
+                else {
+                    OldDateTime dt = get_olddatetime(old_col, row);
+                    Timestamp ts = Timestamp(dt.get_olddatetime(), 0);
+                    set_timestamp(new_col, row, ts);
+                }
+            }
+
+            // If old OldDateTime column had search index, then create one for the new Timestamp column too
+            if (has_search_index(old_col)) {
+                add_search_index(new_col);
+            }
+
+            // Remove old column
+            remove_column(old_col);
+        }
+    }
+
+    REALM_ASSERT_3(old_column_count, ==, get_column_count());
+    static_cast<void>(old_column_count);
+    for (size_t col = 0; col < get_column_count(); col++) {
+        ColumnType col_type = get_real_column_type(col);
+        static_cast<void>(col_type);
+        REALM_ASSERT(col_type != col_type_OldDateTime);
+    }
+}
+
 
 void Table::add_search_index(size_t col_ndx)
 {
@@ -1824,6 +1880,16 @@ MixedColumn& Table::get_column_mixed(size_t ndx)
     return get_column<MixedColumn, col_type_Mixed>(ndx);
 }
 
+const TimestampColumn& Table::get_column_timestamp(size_t ndx) const noexcept
+{
+    return get_column<TimestampColumn, col_type_Timestamp>(ndx);
+}
+
+TimestampColumn& Table::get_column_timestamp(size_t ndx)
+{
+    return get_column<TimestampColumn, col_type_Timestamp>(ndx);
+}
+
 const LinkColumnBase& Table::get_column_link_base(size_t ndx) const noexcept
 {
     const ColumnBase& col_base = get_column_base(ndx);
@@ -1878,14 +1944,12 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, 
     ColumnType real_col_type = get_real_column_type(ndx);
     if (col_type == col_type_Int) {
         REALM_ASSERT(real_col_type == col_type_Int || real_col_type == col_type_Bool ||
-                       real_col_type == col_type_DateTime);
+                       real_col_type == col_type_OldDateTime);
     }
     else {
         REALM_ASSERT_3(col_type, ==, real_col_type);
     }
     static_cast<void>(column);
-    static_cast<void>(ndx);
-    static_cast<void>(real_col_type);
 }
 
 
@@ -1936,13 +2000,15 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
     switch (col_type) {
         case col_type_Int:
         case col_type_Bool:
-        case col_type_DateTime:
+        case col_type_OldDateTime:
             if (nullable) {
                 return IntNullColumn::create(alloc, Array::type_Normal, size); // Throws
             }
             else {
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
+        case col_type_Timestamp:
+            return TimestampColumn::create(alloc, size, nullable); // Throws
         case col_type_Float:
             return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
         case col_type_Double:
@@ -1962,7 +2028,6 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_BackLink:
             return BacklinkColumn::create(alloc, size); // Throws
         case col_type_StringEnum:
-        case col_type_Reserved1:
         case col_type_Reserved4:
             break;
     }
@@ -2592,10 +2657,10 @@ int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
 }
 
 template<>
-DateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
+OldDateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_DateTime);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_OldDateTime);
     REALM_ASSERT_3(ndx, <, m_size);
 
     if (is_nullable(col_ndx)) {
@@ -2671,6 +2736,18 @@ BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
     const BinaryColumn& column = get_column<BinaryColumn, col_type_Binary>(col_ndx);
     return column.get(ndx);
 }
+
+template<>
+Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Timestamp);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    return column.get(ndx);
+}
+
 
 } // namespace realm;
 
@@ -2767,6 +2844,34 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
         repl->set_int(this, col_ndx, ndx, value); // Throws
 }
 
+Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept
+{
+    return get<Timestamp>(col_ndx, ndx);
+}
+
+
+void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Timestamp);
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    if (!is_nullable(col_ndx) && value.is_null())
+        throw LogicError(LogicError::column_not_nullable);
+
+    TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    column.set(ndx, value);
+
+    if (Replication* repl = get_repl()) {
+        if (value.is_null())
+            repl->set_null(this, col_ndx, ndx); // Throws
+        else
+            repl->set_timestamp(this, col_ndx, ndx, value); // Throws
+    }
+}
+
+
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<bool>(col_ndx, ndx);
@@ -2794,30 +2899,30 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
 }
 
 
-DateTime Table::get_datetime(size_t col_ndx, size_t ndx) const noexcept
+OldDateTime Table::get_olddatetime(size_t col_ndx, size_t ndx) const noexcept
 {
-    return get<DateTime>(col_ndx, ndx);
+    return get<OldDateTime>(col_ndx, ndx);
 }
 
 
-void Table::set_datetime(size_t col_ndx, size_t ndx, DateTime value)
+void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_DateTime);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_OldDateTime);
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     if (is_nullable(col_ndx)) {
         IntNullColumn& column = get_column_int_null(col_ndx);
-        column.set(ndx, value.get_datetime());
+        column.set(ndx, value.get_olddatetime());
     }
     else {
         IntegerColumn& column = get_column(col_ndx);
-        column.set(ndx, value.get_datetime());
+        column.set(ndx, value.get_olddatetime());
     }
 
     if (Replication* repl = get_repl())
-        repl->set_date_time(this, col_ndx, ndx, value); // Throws
+        repl->set_olddatetime(this, col_ndx, ndx, value); // Throws
 }
 
 
@@ -3032,8 +3137,10 @@ Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const noexcept
             return Mixed(column.get_int(ndx));
         case type_Bool:
             return Mixed(column.get_bool(ndx));
-        case type_DateTime:
-            return Mixed(DateTime(column.get_datetime(ndx)));
+        case type_OldDateTime:
+            return Mixed(OldDateTime(column.get_olddatetime(ndx)));
+        case type_Timestamp:
+            return Mixed(column.get_timestamp(ndx));
         case type_Float:
             return Mixed(column.get_float(ndx));
         case type_Double:
@@ -3080,8 +3187,11 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
         case type_Bool:
             column.set_bool(ndx, value.get_bool()); // Throws
             break;
-        case type_DateTime:
-            column.set_datetime(ndx, value.get_datetime()); // Throws
+        case type_OldDateTime:
+            column.set_olddatetime(ndx, value.get_olddatetime()); // Throws
+            break;
+        case type_Timestamp:
+            column.set_timestamp(ndx, value.get_timestamp()); // Throws
             break;
         case type_Float:
             column.set_float(ndx, value.get_float()); // Throws
@@ -3243,6 +3353,7 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
     if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
     }
+    REALM_ASSERT(!is_link_type(m_spec.get_column_type(col_ndx))); // Use nullify_link().
 
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
@@ -3415,19 +3526,28 @@ double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
     return column.minimum(0, npos, npos, return_ndx);
 }
 
-DateTime Table::minimum_datetime(size_t col_ndx, size_t* return_ndx) const
+OldDateTime Table::minimum_olddatetime(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
         return 0;
 
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
         return column.minimum(0, npos, npos, return_ndx);
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_OldDateTime>(col_ndx);
         return column.minimum(0, npos, npos, return_ndx);
     }
+}
+
+Timestamp Table::minimum_timestamp(size_t col_ndx, size_t* return_ndx) const
+{
+    if (!m_columns.is_attached())
+        return Timestamp(null{});
+
+    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    return column.minimum(return_ndx);
 }
 
 // maximum ----------------------------------------------
@@ -3480,20 +3600,31 @@ double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
     return column.maximum(0, npos, npos, return_ndx);
 }
 
-DateTime Table::maximum_datetime(size_t col_ndx, size_t* return_ndx) const
+OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
         return 0.;
 
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_DateTime>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
         return column.maximum(0, npos, npos, return_ndx);
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_DateTime>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, col_type_OldDateTime>(col_ndx);
         return column.maximum(0, npos, npos, return_ndx);
     }
 }
+
+
+Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
+{
+    if (!m_columns.is_attached())
+        return Timestamp(null{});
+
+    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    return column.maximum(return_ndx);
+}
+
 
 namespace {
 
@@ -3502,9 +3633,9 @@ util::Optional<int64_t> upgrade_optional_int(util::Optional<bool> value)
     return value ? some<int64_t>(*value ? 1 : 0) : none;
 }
 
-util::Optional<int64_t> upgrade_optional_int(util::Optional<DateTime> value)
+util::Optional<int64_t> upgrade_optional_int(util::Optional<OldDateTime> value)
 {
-    return value ? some<int64_t>(value->get_datetime()) : none;
+    return value ? some<int64_t>(value->get_olddatetime()) : none;
 }
 
 template<class T>
@@ -3556,12 +3687,24 @@ size_t Table::find_first_bool(size_t col_ndx, bool value) const
         return find_first<bool>(col_ndx, value);
 }
 
-size_t Table::find_first_datetime(size_t col_ndx, DateTime value) const
+size_t Table::find_first_olddatetime(size_t col_ndx, OldDateTime value) const
 {
     if (is_nullable(col_ndx))
-        return find_first<util::Optional<DateTime>>(col_ndx, value);
+        return find_first<util::Optional<OldDateTime>>(col_ndx, value);
     else
-        return find_first<DateTime>(col_ndx, value);
+        return find_first<OldDateTime>(col_ndx, value);
+}
+
+size_t Table::find_first_timestamp(size_t col_ndx, Timestamp value) const
+{
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
+
+    if (!m_columns.is_attached())
+        return not_found;
+
+    const TimestampColumn& column = get_column_timestamp(col_ndx);
+    return column.find<realm::Equal>(value, 0, column.size());
 }
 
 size_t Table::find_first_float(size_t col_ndx, float value) const
@@ -3660,14 +3803,14 @@ ConstTableView Table::find_all_double(size_t col_ndx, double value) const
     return const_cast<Table*>(this)->find_all<double>(col_ndx, value);
 }
 
-TableView Table::find_all_datetime(size_t col_ndx, DateTime value)
+TableView Table::find_all_olddatetime(size_t col_ndx, OldDateTime value)
 {
-    return find_all<int64_t>(col_ndx, int64_t(value.get_datetime()));
+    return find_all<int64_t>(col_ndx, int64_t(value.get_olddatetime()));
 }
 
-ConstTableView Table::find_all_datetime(size_t col_ndx, DateTime value) const
+ConstTableView Table::find_all_olddatetime(size_t col_ndx, OldDateTime value) const
 {
-    return const_cast<Table*>(this)->find_all<int64_t>(col_ndx, int64_t(value.get_datetime()));
+    return const_cast<Table*>(this)->find_all<int64_t>(col_ndx, int64_t(value.get_olddatetime()));
 }
 
 TableView Table::find_all_string(size_t col_ndx, StringData value)
@@ -3744,7 +3887,7 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
 {
     const Table* table = this;
     for (size_t t = 0; t < link_chain.size(); t++) {
-        // Link column can be either LinkList or single Link
+        // Link column can be a single Link, LinkList, or BackLink.
         ColumnType type = table->get_real_column_type(link_chain[t]);
         if (type == col_type_LinkList) {
             const LinkListColumn& cll = table->get_column_link_list(link_chain[t]);
@@ -3753,6 +3896,10 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
         else if (type == col_type_Link) {
             const LinkColumn& cl = table->get_column_link(link_chain[t]);
             table = &cl.get_target_table();
+        }
+        else if (type == col_type_BackLink) {
+            const BacklinkColumn& bl = table->get_column_backlink(link_chain[t]);
+            table = &bl.get_origin_table();
         }
         else {
             // Only last column in link chain is allowed to be non-link
@@ -4073,7 +4220,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
 TableView Table::get_range_view(size_t begin, size_t end)
 {
-    REALM_ASSERT(!m_columns.is_attached() || end < size());
+    REALM_ASSERT(!m_columns.is_attached() || end <= size());
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
@@ -4092,7 +4239,7 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 
 TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_col_ndx)
 {
-    TableView tv(src_table, this, src_col_ndx, row_ndx);
+    TableView tv(src_table, this, src_col_ndx, get(row_ndx));
     tv.do_sync();
     return tv;
 }
@@ -4404,9 +4551,24 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth, st
 
 namespace {
 
-inline void out_datetime(std::ostream& out, DateTime value)
+inline void out_olddatetime(std::ostream& out, OldDateTime value)
 {
-    time_t rawtime = value.get_datetime();
+    time_t rawtime = time_t(value.get_olddatetime());
+    struct tm* t = gmtime(&rawtime);
+    if (t) {
+        // We need a buffer for formatting dates (and binary to hex). Max
+        // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
+        char buffer[30];
+        size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
+        if (res)
+            out << buffer;
+    }
+}
+
+inline void out_timestamp(std::ostream& out, Timestamp value)
+{
+    // FIXME: Do we want to output the full precision to json?
+    time_t rawtime = value.get_seconds();
     struct tm* t = gmtime(&rawtime);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
@@ -4485,11 +4647,14 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
         case type_String:
             out << "\"" << get_string(i, row_ndx) << "\"";
             break;
-        case type_DateTime:
-            out << "\""; out_datetime(out, get_datetime(i, row_ndx)); out << "\"";
+        case type_OldDateTime:
+            out << "\""; out_olddatetime(out, get_olddatetime(i, row_ndx)); out << "\"";
             break;
         case type_Binary:
             out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
+            break;
+        case type_Timestamp:
+            out << "\""; out_timestamp(out, get_timestamp(i, row_ndx)); out << "\"";
             break;
         case type_Table:
             get_subtable(i, row_ndx)->to_json(out);
@@ -4518,11 +4683,14 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
                 case type_String:
                     out << "\"" << m.get_string() << "\"";
                     break;
-                case type_DateTime:
-                    out << "\""; out_datetime(out, m.get_datetime()); out << "\"";
+                case type_OldDateTime:
+                    out << "\""; out_olddatetime(out, m.get_olddatetime()); out << "\"";
                     break;
                 case type_Binary:
                     out << "\""; out_binary(out, m.get_binary()); out << "\"";
+                    break;
+                case type_Timestamp:
+                    out << "\""; out_timestamp(out, m.get_timestamp()); out << "\"";
                     break;
                 case type_Table:
                 case type_Mixed:
@@ -4668,7 +4836,9 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
             case type_Bool:
                 width = 5;
                 break;
-            case type_DateTime:
+            case type_OldDateTime:
+            case type_Timestamp:
+                // FIXME: Probably not correct if we output the full precision
                 width = 19;
                 break;
             case type_Int:
@@ -4720,7 +4890,9 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                         case type_Bool:
                             width = std::max(width, size_t(5));
                             break;
-                        case type_DateTime:
+                        case type_OldDateTime:
+                        case type_Timestamp:
+                            // FIXME: Probably not correct if we output the full precision
                             width = std::max(width, size_t(19));
                             break;
                         case type_Int:
@@ -4828,8 +5000,11 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
             case type_String:
                 out_string(out, get_string(col, row_ndx), 20);
                 break;
-            case type_DateTime:
-                out_datetime(out, get_datetime(col, row_ndx));
+            case type_OldDateTime:
+                out_olddatetime(out, get_olddatetime(col, row_ndx));
+                break;
+            case type_Timestamp:
+                out_timestamp(out, get_timestamp(col, row_ndx));
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
@@ -4862,8 +5037,11 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                         case type_String:
                             out_string(out, m.get_string(), 20);
                             break;
-                        case type_DateTime:
-                            out_datetime(out, m.get_datetime());
+                        case type_OldDateTime:
+                            out_olddatetime(out, m.get_olddatetime());
+                            break;
+                        case type_Timestamp:
+                            out_timestamp(out, m.get_timestamp());
                             break;
                         case type_Binary:
                             out.width(widths[col+1]-6); // adjust for " bytes" text
@@ -4917,7 +5095,7 @@ bool Table::compare_rows(const Table& t) const
         switch (type) {
             case col_type_Int:
             case col_type_Bool:
-            case col_type_DateTime: {
+            case col_type_OldDateTime: {
                 if (nullable) {
                     const IntNullColumn& c1 = get_column_int_null(i);
                     const IntNullColumn& c2 = t.get_column_int_null(i);
@@ -4931,6 +5109,13 @@ bool Table::compare_rows(const Table& t) const
                     if (!c1.compare(c2))
                         return false;
                 }
+                continue;
+            }
+            case col_type_Timestamp: {
+                const TimestampColumn& c1 = get_column_timestamp(i);
+                const TimestampColumn& c2 = t.get_column_timestamp(i);
+                if (!c1.compare(c2))
+                    return false;
                 continue;
             }
             case col_type_Float: {
@@ -5015,7 +5200,6 @@ bool Table::compare_rows(const Table& t) const
                 continue;
             }
             case col_type_BackLink:
-            case col_type_Reserved1:
             case col_type_Reserved4:
                 break;
         }

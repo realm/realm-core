@@ -238,7 +238,7 @@ protected:
     //
     //     [ preamble->begin_newest_commit_range .. preamble->end_commit_range [
     void get_maps_in_order(const CommitLogPreamble* preamble,
-                           const util::File::Map<CommitLogHeader>*& first, 
+                           const util::File::Map<CommitLogHeader>*& first,
                            const util::File::Map<CommitLogHeader>*& second) const;
 
     // Ensure the file is open so that it can be resized or mapped
@@ -325,8 +325,8 @@ inline void WriteLogCollector::map_header_if_needed() const
     if (m_header.is_attached() == false) {
         File header_file(m_header_name, File::mode_Update);
         m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
+        m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
     }
-    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, m_header_name, "0");
 }
 
 
@@ -369,11 +369,13 @@ void WriteLogCollector::remap_if_needed(const CommitLogMetadata& log) const
     if (log.map.is_attached() == false) {
         open_if_needed(log);
         log.last_seen_size = log.file.get_size();
-        log.map.map(log.file, File::access_ReadWrite, log.last_seen_size);
+        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(log.last_seen_size));
+        log.map.map(log.file, File::access_ReadWrite, size_t(log.last_seen_size));
         return;
     }
     if (log.last_seen_size != log.file.get_size()) {
-        log.map.remap(log.file, File::access_ReadWrite, log.file.get_size());
+        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(log.last_seen_size));
+        log.map.remap(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
         log.last_seen_size = log.file.get_size();
     }
 }
@@ -403,7 +405,7 @@ void WriteLogCollector::reset_header()
     if (!disable_sync)
         header_file.sync(); // Throws
     m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
-    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, m_header_name, "0");
+    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
 }
 
 
@@ -555,13 +557,15 @@ void WriteLogCollector::terminate_session() noexcept
 void WriteLogCollector::set_log_entry_internal(HistoryEntry* entry,
                                                const EntryHeader* hdr, const char* log)
 {
-    entry->changeset = BinaryData(log, hdr->size);
+    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(hdr->size));
+    entry->changeset = BinaryData(log, size_t(hdr->size));
 }
+
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
                                                const EntryHeader* hdr, const char* log)
 {
-    *entry = BinaryData(log, hdr->size);
+    *entry = BinaryData(log, size_t(hdr->size));
 }
 
 
@@ -630,7 +634,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
         uint_fast64_t tmp_offset = m_read_offset + sizeof(EntryHeader);
         if (m_read_version >= from_version) {
             // std::cerr << "  --at: " << m_read_offset << ", " << size << "\n";
-            realm::util::encryption_read_barrier(hdr, size + sizeof(EntryHeader),
+            realm::util::encryption_read_barrier(hdr, size_t(size + sizeof(EntryHeader)),
                                                  first_map->get_encrypted_mapping());
             set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
             ++logs_buffer;

@@ -402,7 +402,6 @@ inline void Mutex::unlock() noexcept
 {
     int r = pthread_mutex_unlock(&m_impl);
     REALM_ASSERT(r == 0);
-    static_cast<void>(r);
 }
 
 
@@ -574,14 +573,12 @@ inline void CondVar::notify() noexcept
 {
     int r = pthread_cond_signal(&m_impl);
     REALM_ASSERT(r == 0);
-    static_cast<void>(r);
 }
 
 inline void CondVar::notify_all() noexcept
 {
     int r = pthread_cond_broadcast(&m_impl);
     REALM_ASSERT(r == 0);
-    static_cast<void>(r);
 }
 
 

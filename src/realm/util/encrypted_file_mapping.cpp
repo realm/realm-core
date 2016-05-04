@@ -114,7 +114,6 @@ void check_write(int fd, off_t pos, const void *data, size_t len)
 {
     ssize_t ret = pwrite(fd, data, len, pos);
     REALM_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
-    static_cast<void>(ret);
 }
 
 size_t check_read(int fd, off_t pos, void *dst, size_t len)
@@ -148,14 +147,17 @@ AESCryptor::~AESCryptor() noexcept {
 
 void AESCryptor::set_file_size(off_t new_size)
 {
-    REALM_ASSERT(new_size >= 0);
-    size_t block_count = (new_size + block_size - 1) / block_size;
+    REALM_ASSERT(new_size >= 0 && !int_cast_has_overflow<size_t>(new_size));
+    size_t new_size_casted = size_t(new_size);
+    size_t block_count = (new_size_casted + block_size - 1) / block_size;
     m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
 iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
 {
-    size_t idx = data_pos / block_size;
+    REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
+    size_t data_pos_casted = size_t(data_pos);
+    size_t idx = data_pos_casted / block_size;
     if (idx < m_iv_buffer.size())
         return m_iv_buffer[idx];
 
@@ -281,8 +283,6 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
     CCCryptorStatus err = CCCryptorUpdate(cryptor, src, block_size, dst, block_size, &bytesEncrypted);
     REALM_ASSERT(err == kCCSuccess);
     REALM_ASSERT(bytesEncrypted == block_size);
-    static_cast<void>(bytesEncrypted);
-    static_cast<void>(err);
 #else
     AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst),
                     block_size, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
@@ -319,7 +319,7 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 #endif
 }
 
-EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, 
+EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size,
                                            File::AccessMode access)
 : m_file(file)
 , m_page_shift(log2(realm::util::page_size()))

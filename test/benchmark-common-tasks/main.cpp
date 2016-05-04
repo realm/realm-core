@@ -15,6 +15,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+using namespace realm::test_util::unit_test;
 
 namespace {
 #define BASE_SIZE 3600
@@ -81,7 +82,7 @@ struct AddTable : Benchmark {
         TableRef t = tr.add_table(name());
         t->add_column(type_String, "first");
         t->add_column(type_Int, "second");
-        t->add_column(type_DateTime, "third");
+        t->add_column(type_OldDateTime, "third");
         tr.commit();
     }
 
@@ -120,7 +121,8 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << rand();
-            t->set_string(0, i, ss.str());
+            auto s = ss.str();
+            t->set_string(0, i, s);
         }
         tr.commit();
     }
@@ -358,7 +360,8 @@ struct BenchmarkGetLinkList : Benchmark {
     void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
-        TableRef destination_table = tr.add_table(std::string(name()) + "_Destination");
+        std::string n = std::string(name()) + "_Destination";
+        TableRef destination_table = tr.add_table(n);
         TableRef table = tr.add_table(name());
         table->add_column_link(type_LinkList, "linklist", *destination_table);
         table->add_empty_row(rows);
@@ -385,18 +388,31 @@ struct BenchmarkGetLinkList : Benchmark {
     {
         Group& g = group.begin_write();
         g.remove_table(name());
-        g.remove_table(std::string(name()) + "_Destination");
+        auto n = std::string(name()) + "_Destination";
+        g.remove_table(n);
         group.commit();
     }
 };
 
-const char* durability_level_to_cstr(SharedGroup::DurabilityLevel level)
+const char* to_lead_cstr(SharedGroup::DurabilityLevel level)
 {
     switch (level) {
         case SharedGroup::durability_Full:    return "Full   ";
         case SharedGroup::durability_MemOnly: return "MemOnly";
 #ifndef _WIN32
         case SharedGroup::durability_Async:   return "Async  ";
+#endif
+    }
+    return nullptr;
+}
+
+const char* to_ident_cstr(SharedGroup::DurabilityLevel level)
+{
+    switch (level) {
+        case SharedGroup::durability_Full:    return "Full";
+        case SharedGroup::durability_MemOnly: return "MemOnly";
+#ifndef _WIN32
+        case SharedGroup::durability_Async:   return "Async";
 #endif
     }
     return nullptr;
@@ -415,11 +431,10 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
     timer.unpause();
 }
 
-
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
 template<typename B>
-void run_benchmark(BenchmarkResults& results)
+void run_benchmark(TestContext& test_context, BenchmarkResults& results)
 {
     typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
     std::vector<config_pair> configs;
@@ -435,7 +450,6 @@ void run_benchmark(BenchmarkResults& results)
     configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
 #endif
 
-    static long test_counter = 0;
     Timer timer(Timer::type_UserTime);
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
@@ -446,18 +460,11 @@ void run_benchmark(BenchmarkResults& results)
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
-        lead_text_ss << benchmark.name() << " (" << durability_level_to_cstr(level) <<
+        lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level) <<
             ", " << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
-        ident_ss << benchmark.name() << "_" << durability_level_to_cstr(level) <<
+        ident_ss << benchmark.name() << "_" << to_ident_cstr(level) <<
             (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
-
-        realm::test_util::unit_test::TestDetails test_details;
-        test_details.test_index = test_counter++;
-        test_details.suite_name = "BenchmarkCommonTasks";
-        test_details.test_name = ident.c_str();
-        test_details.file_name = __FILE__;
-        test_details.line_number = __LINE__;
 
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
@@ -505,35 +512,40 @@ void run_benchmark(BenchmarkResults& results)
 
 extern "C" int benchmark_common_tasks_main();
 
-int benchmark_common_tasks_main()
+TEST(benchmark_common_tasks_main)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
-    
-    run_benchmark<BenchmarkUnorderedTableViewClear>(results);
-    run_benchmark<BenchmarkEmptyCommit>(results);
-    run_benchmark<AddTable>(results);
-    run_benchmark<BenchmarkQuery>(results);
-    run_benchmark<BenchmarkQueryNot>(results);
-    run_benchmark<BenchmarkSize>(results);
-    run_benchmark<BenchmarkSort>(results);
-    run_benchmark<BenchmarkSortInt>(results);
-    run_benchmark<BenchmarkInsert>(results);
-    run_benchmark<BenchmarkGetString>(results);
 
-    run_benchmark<BenchmarkSetString>(results);
+#define BENCH(B) \
+    run_benchmark<B>(test_context, results)
 
-    run_benchmark<BenchmarkCreateIndex>(results);
-    run_benchmark<BenchmarkGetLongString>(results);
-    run_benchmark<BenchmarkSetLongString>(results);
-    run_benchmark<BenchmarkGetLinkList>(results);
+    BENCH(BenchmarkUnorderedTableViewClear);
+    BENCH(BenchmarkEmptyCommit);
+    BENCH(AddTable);
+    BENCH(BenchmarkQuery);
+    BENCH(BenchmarkQueryNot);
+    BENCH(BenchmarkSize);
+    BENCH(BenchmarkSort);
+    BENCH(BenchmarkSortInt);
+    BENCH(BenchmarkInsert);
+    BENCH(BenchmarkGetString);
+    BENCH(BenchmarkSetString);
+    BENCH(BenchmarkCreateIndex);
+    BENCH(BenchmarkGetLongString);
+    BENCH(BenchmarkSetLongString);
+    BENCH(BenchmarkGetLinkList);
 
-    return 0;
+#undef BENCH
 }
 
 #if !defined(REALM_IOS)
 int main(int, const char**)
 {
-    return benchmark_common_tasks_main();
+    bool success;
+
+    success = get_default_test_list().run();
+
+    return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 #endif

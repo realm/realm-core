@@ -79,23 +79,23 @@ namespace realm {
 namespace util {
 
 
-void make_dir(const std::string& path)
+bool try_make_dir(const std::string& path)
 {
 #ifdef _WIN32
     if (_mkdir(path.c_str()) == 0)
-        return;
+        return true;
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) == 0)
-        return;
+        return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("make_dir() failed: ", err);
     switch (err) {
+        case EEXIST:
+            return false;
         case EACCES:
         case EROFS:
             throw File::PermissionDenied(msg, path);
-        case EEXIST:
-            throw File::Exists(msg, path);
         case ELOOP:
         case EMLINK:
         case ENAMETOOLONG:
@@ -105,6 +105,15 @@ void make_dir(const std::string& path)
         default:
             throw std::runtime_error(msg);
     }
+}
+
+
+void make_dir(const std::string& path)
+{
+    if (try_make_dir(path))
+        return;
+    std::string msg = get_errno_msg("make_dir() failed: ", EEXIST);
+    throw File::Exists(msg, path);
 }
 
 
@@ -239,7 +248,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string msg = get_last_error_msg("CreateFile() failed: ", err);
+    std::string error_prefix = "CreateFile(\"" + path + "\") failed: ";
+    std::string msg = get_last_error_msg(error_prefix.c_str(), err);
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
@@ -294,7 +304,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string msg = get_errno_msg("open() failed: ", err);
+    std::string error_prefix = "open(\"" + path + "\") failed: ";
+    std::string msg = get_errno_msg(error_prefix.c_str(), err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -373,7 +384,9 @@ error:
 #else // POSIX version
 
     if (m_encryption_key) {
-        off_t pos = lseek(m_fd, 0, SEEK_CUR);
+        off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
+        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
+        size_t pos = size_t(pos_original);
         Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
         realm::util::encryption_read_barrier(map, pos, size);
         memcpy(data, map.get_addr() + pos, size);
@@ -432,9 +445,11 @@ void File::write(const char* data, size_t size)
 #else // POSIX version
 
     if (m_encryption_key) {
-        off_t pos = lseek(m_fd, 0, SEEK_CUR);
+        off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
+        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
+        size_t pos = size_t(pos_original);
         Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        // FIXME: Expect this to fail du to assert asking for a read first!
+        // FIXME: Expect this to fail due to assert asking for a read first! This FIXME seems to be made by Finn who does not remember it. 
         realm::util::encryption_read_barrier(map, pos, size);
         memcpy(map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(map, pos, size);
