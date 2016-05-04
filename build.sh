@@ -59,6 +59,7 @@ ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
 CONFIG_VERSION=1
 
+
 usage()
 {
     cat 1>&2 << EOF
@@ -1014,11 +1015,6 @@ EOF
 
         zip -r -q realm-core-osx-$realm_version.zip $FRAMEWORK || exit 1
         echo "Core framework for OS X can be found under $FRAMEWORK and realm-core-osx-$realm_version.zip."
-        exit 0
-        ;;
-
-    "build-node")
-        $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
         exit 0
         ;;
 
