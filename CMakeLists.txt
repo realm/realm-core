@@ -47,7 +47,7 @@ endif()
 # Platform-specific build configuration
 if(APPLE)
     set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
-    set(CMAKE_EXE_LINKER_FLAGS "-framework Foundation")
+    find_library(Foundation Foundation)
 
     # Enable Apple-specific platforms on Xcode
     if(CMAKE_GENERATOR STREQUAL Xcode)
@@ -62,7 +62,7 @@ if(APPLE)
         set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "7.0")
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Os") # FIXME: CMake does not recognize -Oz
     endif()
-endif()
+endif(APPLE)
 
 # Find dependencies
 # Note: OpenSSL was already found through the `FindOpenSSL` CMake module

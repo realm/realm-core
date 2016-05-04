@@ -212,9 +212,15 @@ end
 
 ### Apple-specific tasks
 
-REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx ios watchos tvos)
+REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx iphone watchos tvos)
 if ENV['REALM_COCOA_PLATFORMS']
-    REALM_COCOA_PLATFORMS = ENV['REALM_COCOA_PLATFORMS'].split.select {|p| REALM_COCOA_SUPPORTED_PLATFORMS.include?(p) }
+    REALM_COCOA_PLATFORMS = ENV['REALM_COCOA_PLATFORMS'].split
+    REALM_COCOA_PLATFORMS.each do|p|
+        unless REALM_COCOA_SUPPORTED_PLATFORMS.include?(p)
+            $stderr.puts("Supported platforms are: #{REALM_COCOA_SUPPORTED_PLATFORMS.join(' ')}")
+            exit 1
+        end
+    end
 else
     REALM_COCOA_PLATFORMS = REALM_COCOA_SUPPORTED_PLATFORMS
 end
@@ -255,7 +261,7 @@ def build_apple(sdk, configuration, enable_bitcode, configuration_build_dir)
         sh <<-EOS.gsub(/\s+/, ' ')
             xcodebuild
             -sdk #{sdk}
-            -target realm
+            -target realm-static
             -configuration #{configuration}
             ARCHS=\"#{archs}\"
             ONLY_ACTIVE_ARCH=NO
@@ -312,7 +318,7 @@ end
 
 
 apple_static_library_targets = (['-dbg', ''].map do |dbg|
-    REALM_COCOA_PLATFORMS.map {|p| p == 'ios' ? ['ios-bitcode', 'ios-no-bitcode'] : p}.
+    REALM_COCOA_PLATFORMS.map {|p| p == 'iphone' ? ['ios-bitcode', 'ios-no-bitcode'] : p}.
         flatten.map {|c| "#{c}#{dbg}" }
 end.flatten.map {|c| "librealm-#{c}.a" })
 

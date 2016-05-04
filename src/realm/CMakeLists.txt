@@ -185,9 +185,10 @@ set_target_properties(
 set_target_properties(
     realm-static PROPERTIES
     VERSION ${PROJECT_VERSION}
-# This should only be activated if we want the static library to be built with
-# -fPIC (to be included in a `.so`, for example)
-#    POSITION_INDEPENDENT_CODE true
+    OUTPUT_NAME realm
+    # The static library may get included in a dynamic library
+    # (the bindings), so build as position independent code.
+    POSITION_INDEPENDENT_CODE true
 )
 
 target_link_libraries(
@@ -196,16 +197,13 @@ target_link_libraries(
     Threads::Threads
 )
 
-target_link_libraries(
-    realm-static
-    ${REALM_EXTRA_LIBS}
-    Threads::Threads
-)
-
 if(REALM_ENABLE_ENCRYPTION)
     target_link_libraries(realm ${OPENSSL_LIBRARIES})
-    target_link_libraries(realm-static ${OPENSSL_LIBRARIES})
 endif(REALM_ENABLE_ENCRYPTION)
+
+if(APPLE)
+    target_link_libraries(realm ${Foundation})
+endif(APPLE)
 
 install(TARGETS realm
         DESTINATION ${CMAKE_INSTALL_LIBDIR})
