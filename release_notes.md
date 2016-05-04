@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.100.1 Release notes
 
 ### Bugfixes:
 
@@ -26,22 +26,12 @@
 * S: Assertion was sometimes dereferencing a dangling pointer in
   `util::network::buffered_input_stream::read_oper<H>::recycle_and_execute()`.
 
-### API breaking changes:
-
-* Lorem ipsum.
-
 ### Enhancements:
 
 * S: `util::bind_ptr<>` extended with capability to adopt and release naked
   pointers.
 * The `SharedGroup` constructor now takes an optional callback function so bindings can
-  be notified when a Realm is upgraded.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+  be notified when a Realm is upgraded. (#1740)
 
 ----------------------------------------------
 
