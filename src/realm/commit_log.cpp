@@ -97,6 +97,7 @@ public:
     void do_abort_transact() noexcept override;
     void do_interrupt() noexcept override {};
     void do_clear_interrupt() noexcept override {};
+    void close() noexcept override;
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
     HistoryType get_history_type() const noexcept override;
@@ -410,6 +411,14 @@ void WriteLogCollector::reset_header()
     m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
 }
 
+void WriteLogCollector::close() noexcept
+{
+    m_header.unmap();
+    m_log_a.map.unmap();
+    m_log_a.file.close();
+    m_log_b.map.unmap();
+    m_log_b.file.close();
+}
 
 
 // Helper methods for adding and cleaning up commit log entries:

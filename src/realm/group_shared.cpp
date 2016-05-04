@@ -743,8 +743,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     SlabAlloc& alloc = m_group.m_alloc;
 
     Replication::HistoryType history_type = Replication::hist_None;
-    if (Replication* repl = m_group.get_replication())
+    if (Replication* repl = m_group.get_replication()) {
+        repl->close();
         history_type = repl->get_history_type();
+    }
 
     int target_file_format_version;
 
@@ -1222,6 +1224,10 @@ void SharedGroup::close() noexcept
             break;
     }
     m_group.detach();
+    using gf = _impl::GroupFriend;
+    if (Replication* repl = gf::get_replication(m_group))
+        repl->close();
+
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {

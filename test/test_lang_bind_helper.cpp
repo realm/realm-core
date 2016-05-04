@@ -140,6 +140,11 @@ public:
     {
     }
 
+    void close() noexcept override
+    {
+        // No-op
+    }
+
     void initiate_session(version_type) override
     {
         // No-op
@@ -11468,6 +11473,62 @@ TEST(LangBindHelper_SessionHistoryConsistency)
     }
 }
 
+TEST(LangBindHelper_CommitlogSplitWorld)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w = realm::make_client_history(path, crypt_key());
+    SharedGroup::unattached_tag tag;
+    SharedGroup sg_w(tag);
+    sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+    {
+        // Change the db so that we get the log files mapped
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("foo");
+        foo_w->add_column(type_Int, "i");
+        foo_w->add_empty_row();
+        foo_w->set_int(0,0,0);
+        wt.commit();
+    }
+    // terminate the session, so that the log files are removed
+    sg_w.close();
+    // initiate a new session, creating new log files on demand
+    std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    {
+        // Actually do something, to get the new log files created
+        // These changes are not used for anything, except forcing use
+        // of the commitlogs.
+        WriteTransaction wt(sg);
+        TableRef foo_w = wt.add_table("bar");
+        foo_w->add_column(type_Int, "i");
+        wt.commit();
+    }
+    // reopen the first one, now with stale mmappings bound to the
+    // deleted log files
+    sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+    // try to commit something in one sg and advance_read in the other
+    // to trigger an error updating the accessors, because the commitlogs
+    // are now different commitlogs, so communication of accessor updates
+    // no longer match the data in the database.
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    ConstTableRef foo = group.get_table("foo");
+    ConstRow r = foo->get(0);
+    CHECK_EQUAL(r.get_int(0), 0);
+    for (int i=0; i<10; ++i) {
+        {
+            WriteTransaction wt(sg_w);
+            TableRef foo_w = wt.get_table("foo");
+            // it depends on the operations done here, which error can
+            // be triggered during advance read:
+            foo_w->insert_empty_row(0);
+            foo_w->set_int(0,0,1+i);
+            wt.commit();
+        }
+        LangBindHelper::advance_read(sg);
+        CHECK_EQUAL(r.get_int(0), 0);
+    }
+}
 
 TEST(LangBindHelper_InRealmHistory_Basics)
 {
