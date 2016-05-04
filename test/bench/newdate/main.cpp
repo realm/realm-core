@@ -237,9 +237,59 @@ class GreaterThanZeroInt :
     }
 };
 
+template<DataType data_type, size_t N>
+class SizeEmptyRows :
+    public
+        Size<
+            WithEmptyRows<
+                WithOneColumn<data_type, true>,
+                N
+            >,
+            N
+        > {
+    const char *name() const {
+        return typeid(this).name();
+    }
+};
+
+template<size_t N>
+class SizeRandomInts :
+    public
+        Size<WithRandomInts<N>, N + 1> {
+    const char *name() const {
+        return typeid(this).name();
+    }
+};
+
+template<size_t N>
+class SizeRandomTimestamps :
+    public
+        Size<WithRandomTimestamps<N>, N + 1> {
+    const char *name() const {
+        return typeid(this).name();
+    }
+};
+
+template<size_t N>
+class SizeRandomOldDateTimes :
+    public
+        Size<WithRandomOldDateTimes<N>, N + 1> {
+    const char *name() const {
+        return typeid(this).name();
+    }
+};
+
 int main()
 {
     Results results(10);
+
+    bench<SizeEmptyRows<type_Int, DEF_N> >(results);
+    bench<SizeEmptyRows<type_Timestamp, DEF_N> >(results);
+    bench<SizeEmptyRows<type_OldDateTime, DEF_N> >(results);
+    bench<SizeRandomInts<DEF_N> >(results);
+    bench<SizeRandomTimestamps<DEF_N> >(results);
+    bench<SizeRandomOldDateTimes<DEF_N> >(results);
+
     bench<EqualsZeroTimestamp>(results);
     bench<EqualsZeroOldDateTime>(results);
     bench<EqualsZeroInt>(results);

@@ -78,7 +78,6 @@ void Benchmark::run(Results& results)
     reps = std::max(reps, this->min_reps());
     reps = std::min(reps, this->max_reps());
 
-//    reps = 10000;
     std::cout << "Repeating: " << reps << std::endl;
 
     for (size_t i = 0; i < reps; i++) {

@@ -18,26 +18,36 @@ class Benchmark {
 
 public:
     bool asExpected = false;
-    virtual const char* name() const = 0;
+
+    virtual const char *name() const = 0;
     virtual void before_all(SharedGroup&) {}
     virtual void after_all(SharedGroup&) {}
     virtual void before_each(SharedGroup&) {}
     virtual void after_each(SharedGroup&) {}
     virtual void operator()(SharedGroup&) = 0;
 
-    virtual double min_warmup_time() {
+    virtual double min_warmup_time()
+    {
         return 0.05;
     }
-    virtual size_t max_warmup_reps() {
+
+    virtual size_t max_warmup_reps()
+    {
         return 100;
     }
-    virtual double min_time() {
+
+    virtual double min_time()
+    {
         return 0.1;
     }
-    virtual size_t min_reps() {
+
+    virtual size_t min_reps()
+    {
         return 1000;
     }
-    virtual size_t max_reps() {
+
+    virtual size_t max_reps()
+    {
         return 10000;
     }
 
@@ -108,6 +118,16 @@ public:
         for (i = 0; i < N; i++) {
             this->values[i] = random.draw_int<T>(min, max);
         }
+    }
+};
+
+template<class WithClass, size_t expected>
+class Size : public WithClass {
+    void operator()(SharedGroup& sg)
+    {
+        ReadTransaction tr(sg);
+        ConstTableRef t = tr.get_table(0);
+        this->asExpected = t->size() == expected;
     }
 };
 
