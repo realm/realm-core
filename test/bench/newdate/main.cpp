@@ -19,17 +19,14 @@ using namespace realm::test_util;
                 // A deterministic seed
 template<class WithClass, size_t N>
 class WithRandomUnixTimes : public base {
-public:
-    void before_all(SharedGroup& sg)
-    {
-        base::before_all(sg);
-    }
+  // Intentionally left blank; template paremeters do all the work.
 };
 #undef base
 
-#define base WithRandomUnixTimes<WithClass, N>
-template<class WithClass, size_t N>
-class WithRandomTimedates : public base {
+#define basebase WithOneColumn<type_Timestamp, true>
+#define base WithRandomUnixTimes<basebase, N>
+template<size_t N>
+class WithRandomTimestamps : public base {
     void before_all(SharedGroup& sg)
     {
         base::before_all(sg);
@@ -50,9 +47,11 @@ class WithRandomTimedates : public base {
     }
 };
 #undef base
+#undef basebase
 
-#define base WithRandomUnixTimes<WithClass, N>
-template<class WithClass, size_t N>
+#define basebase WithOneColumn<type_OldDateTime, true>
+#define base WithRandomUnixTimes<basebase, N>
+template<size_t N>
 class WithRandomOldDateTimes : public base {
     void before_all(SharedGroup& sg)
     {
@@ -74,10 +73,12 @@ class WithRandomOldDateTimes : public base {
     }
 };
 #undef base
+#undef basebase
 
-#define base WithRandomUnixTimes<WithClass, N>
-template<class WithClass, size_t N>
-class WithRandomIntegers : public base {
+#define basebase WithOneColumn<type_Int, true>
+#define base WithRandomUnixTimes<basebase, N>
+template<size_t N>
+class WithRandomInts : public base {
     void before_all(SharedGroup& sg)
     {
         base::before_all(sg);
@@ -98,6 +99,7 @@ class WithRandomIntegers : public base {
     }
 };
 #undef base
+#undef basebase
 
 template<class WithClass>
 class QueryEqualsZeroTimestamp : public WithClass {
@@ -107,7 +109,7 @@ class QueryEqualsZeroTimestamp : public WithClass {
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<Timestamp>(0) ==
             Timestamp(0, 0)).count();
-        this->expected = count == 1;
+        this->asExpected = count == 1;
     }
 };
 
@@ -119,22 +121,22 @@ class QueryEqualsZeroOldDateTime : public WithClass {
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<OldDateTime>(0) ==
             OldDateTime(0)).count();
-        this->expected = count == 1;
+        this->asExpected = count == 1;
     }
 };
 
 template<class WithClass>
-class QueryEqualsZeroInteger : public WithClass {
+class QueryEqualsZeroInt : public WithClass {
     void operator()(SharedGroup& sg)
     {
         ReadTransaction tr(sg);
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<Int>(0) == 0).count();
-        this->expected = count == 1;
+        this->asExpected = count == 1;
     }
 };
 
-template<class WithClass>
+template<class WithClass, size_t expected>
 class QueryGreaterThanZeroTimestamp : public WithClass {
     void operator()(SharedGroup& sg)
     {
@@ -142,11 +144,11 @@ class QueryGreaterThanZeroTimestamp : public WithClass {
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<Timestamp>(0) >
             Timestamp(0, 0)).count();
-        this->expected = count == DEF_N;
+        this->asExpected = count == expected;
     }
 };
 
-template<class WithClass>
+template<class WithClass, size_t expected>
 class QueryGreaterThanZeroOldDateTime : public WithClass {
     void operator()(SharedGroup& sg)
     {
@@ -154,27 +156,25 @@ class QueryGreaterThanZeroOldDateTime : public WithClass {
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<OldDateTime>(0) >
             OldDateTime(0)).count();
-        this->expected = count == DEF_N;
+        this->asExpected = count == expected;
     }
 };
 
-template<class WithClass>
-class QueryGreaterThanZeroInteger : public WithClass {
+template<class WithClass, size_t expected>
+class QueryGreaterThanZeroInt : public WithClass {
     void operator()(SharedGroup& sg)
     {
         ReadTransaction tr(sg);
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<Int>(0) > 0).count();
-        this->expected = count == DEF_N;
+        this->asExpected = count == expected;
     }
 };
 
 class EqualsZeroTimestamp :
     public
         QueryEqualsZeroTimestamp<
-            WithRandomTimedates<
-                WithOneColumn<type_Timestamp, true>,
-                DEF_N>
+            WithRandomTimestamps<DEF_N>
             > {
 
     const char *name() const {
@@ -185,9 +185,7 @@ class EqualsZeroTimestamp :
 class EqualsZeroOldDateTime :
     public
         QueryEqualsZeroOldDateTime<
-            WithRandomOldDateTimes<
-                WithOneColumn<type_OldDateTime, true>,
-                DEF_N>
+            WithRandomOldDateTimes<DEF_N>
             > {
 
     const char *name() const {
@@ -195,12 +193,10 @@ class EqualsZeroOldDateTime :
     }
 };
 
-class EqualsZeroInteger :
+class EqualsZeroInt :
     public
-        QueryEqualsZeroInteger<
-            WithRandomIntegers<
-                WithOneColumn<type_Int, true>,
-                DEF_N>
+        QueryEqualsZeroInt<
+            WithRandomInts<DEF_N>
             > {
 
     const char *name() const {
@@ -211,10 +207,8 @@ class EqualsZeroInteger :
 class GreaterThanZeroTimestamp :
     public
         QueryGreaterThanZeroTimestamp<
-            WithRandomTimedates<
-                WithOneColumn<type_Timestamp, true>,
-                DEF_N>
-            > {
+            WithRandomTimestamps<DEF_N>,
+            DEF_N> {
 
     const char *name() const {
         return "GreaterThanZero_Timestamp";
@@ -224,35 +218,32 @@ class GreaterThanZeroTimestamp :
 class GreaterThanZeroOldDateTime :
     public
         QueryGreaterThanZeroOldDateTime<
-            WithRandomOldDateTimes<
-                WithOneColumn<type_OldDateTime, true>,
-                DEF_N>
-            > {
+            WithRandomOldDateTimes<DEF_N>,
+            DEF_N> {
 
     const char *name() const {
         return "GreaterThanZero_OldDateTime";
     }
 };
 
-class GreaterThanZeroInteger :
+class GreaterThanZeroInt :
     public
-        QueryGreaterThanZeroInteger<
-            WithRandomIntegers<
-                WithOneColumn<type_Int, true>,
-                DEF_N>
-            > {
+        QueryGreaterThanZeroInt<
+            WithRandomInts<DEF_N>,
+            DEF_N> {
 
     const char *name() const {
         return "GreaterThanZero_Integer";
     }
 };
 
-int main() {
+int main()
+{
     Results results(10);
     bench<EqualsZeroTimestamp>(results);
     bench<EqualsZeroOldDateTime>(results);
-    bench<EqualsZeroInteger>(results);
+    bench<EqualsZeroInt>(results);
     bench<GreaterThanZeroTimestamp>(results);
     bench<GreaterThanZeroOldDateTime>(results);
-    bench<GreaterThanZeroInteger>(results);
+    bench<GreaterThanZeroInt>(results);
 }

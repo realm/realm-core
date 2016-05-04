@@ -10,16 +10,14 @@
 namespace realm {
 namespace test_util {
 
-class Benchmark
-{
-
+class Benchmark {
     std::string lead_text();
     std::string ident();
 
     double warmup(SharedGroup&);
 
 public:
-    bool expected = false;
+    bool asExpected = false;
     virtual const char* name() const = 0;
     virtual void before_all(SharedGroup&) {}
     virtual void after_all(SharedGroup&) {}
