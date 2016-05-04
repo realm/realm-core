@@ -2,7 +2,6 @@
 
 ### Bugfixes:
 
-
 * Fix for: The commit logs were not properly unmapped and closed when a SharedGroup
   was closed. If one thread closed and reopened a SharedGroup which was the sole
   session participant at the time it was closed, while a different SharedGroup opened
@@ -13,6 +12,17 @@
   advance_read(), promote_to_write() and possibly commit_and_continue_as_read().
   Worse, It could also silently lead to accessors pointing to wrong objects which might
   later open for changes to the database that would be percieved as corrupting. (#1762)
+* Fix for: When commitlogs change in size, all readers (and writers) must update their
+  memory mmapings accordingly. The old mechanism was based on comparing the size of
+  the log file with the previous size and remapping if they differ. Unfortunately, this
+  is not good enough, as the commitlog may first be shrunk, then expanded back to the
+  original size and in this case, the existing mechanism will not trigger remapping.
+  Without remapping in such situations, POSIX considers accesses to the part of the
+  mapping corresponding to deleted/added sections of the file to be undefined. Consequences
+  of this bug could be crashes in advance_read(), promote_to_write() or
+  commit_and_continue_as_read(). Conceivably it could also cause wrong accessor updates
+  leading to accessors pointing to wrong database objects. This, in turn, could lead
+  to what would be percieved as database corruption. (#1764)
 * S: Assertion was sometimes dereferencing a dangling pointer in
   `util::network::buffered_input_stream::read_oper<H>::recycle_and_execute()`.
 
