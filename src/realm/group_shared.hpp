@@ -774,7 +774,7 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
                                 DurabilityLevel durability, const char* encryption_key,
                                 bool allow_file_format_upgrade, std::function<void(int,int)> upgrade_callback):
     m_group(Group::shared_tag()),
-    m_upgrade_callback(upgrade_callback)
+    m_upgrade_callback(std::move(upgrade_callback))
 {
     open(file, no_create, durability, encryption_key, allow_file_format_upgrade); // Throws
 }
@@ -788,7 +788,7 @@ inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
                                 const char* encryption_key, bool allow_file_format_upgrade,
                                 std::function<void(int,int)> upgrade_callback):
     m_group(Group::shared_tag()),
-    m_upgrade_callback(upgrade_callback)
+    m_upgrade_callback(std::move(upgrade_callback))
 {
     open(repl, durability, encryption_key, allow_file_format_upgrade); // Throws
 }
