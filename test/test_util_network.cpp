@@ -472,15 +472,14 @@ TEST(Network_CancelEmptyWrite)
     network::socket socket_1(service), socket_2(service);
     connect_sockets(socket_1, socket_2);
     network::buffered_input_stream stream(socket_2);
-    const size_t size = 1;
-    char buffer[size];
+    char buffer[1];
     bool read_was_canceled = false;
     auto read_handler = [&](std::error_code ec, size_t) {
         if (ec == error::operation_aborted)
             read_was_canceled = true;
     };
     stream.async_read(buffer, 1, read_handler);
-    char data[size] = { 'a' };
+    char data[1] = { 'a' };
     bool write_was_canceled = false;
     auto write_handler = [&](std::error_code ec, size_t) {
         if (ec == error::operation_aborted)
@@ -491,6 +490,52 @@ TEST(Network_CancelEmptyWrite)
     service.run();
     CHECK(read_was_canceled);
     CHECK(write_was_canceled);
+}
+
+
+TEST(Network_CancelReadByDestroy)
+{
+    // Check that canceled read operations never try to access socket, stream,
+    // or input buffer objects, even if they were partially completed.
+
+    const int num_connections = 16;
+    network::io_service service;
+    std::unique_ptr<std::unique_ptr<network::socket>[]> write_sockets;
+    std::unique_ptr<std::unique_ptr<network::socket>[]> read_sockets;
+    std::unique_ptr<std::unique_ptr<network::buffered_input_stream>[]> input_streams;
+    write_sockets.reset(new std::unique_ptr<network::socket>[num_connections]);
+    read_sockets.reset(new std::unique_ptr<network::socket>[num_connections]);
+    input_streams.reset(new std::unique_ptr<network::buffered_input_stream>[num_connections]);
+    char output_buffer[2] = { 'x', '\n' };
+    std::unique_ptr<char[][2]> input_buffers(new char[num_connections][2]);
+    for (int i = 0; i < num_connections; ++i) {
+        write_sockets[i].reset(new network::socket(service));
+        read_sockets[i].reset(new network::socket(service));
+        connect_sockets(*write_sockets[i], *read_sockets[i]);
+        input_streams[i].reset(new network::buffered_input_stream(*read_sockets[i]));
+    }
+    for (int i = 0; i < num_connections; ++i) {
+        auto read_handler = [&](std::error_code ec, size_t n) {
+            CHECK(n == 0 || n == 1 || n == 2);
+            if (n == 2) {
+                CHECK_NOT(ec);
+                for (int j = 0; j < num_connections; ++j)
+                    read_sockets[j]->cancel();
+                input_streams.reset(); // Destroy all input streams
+                read_sockets.reset();  // Destroy all read sockets
+                input_buffers.reset(); // Destroy all input buffers
+                return;
+            }
+            CHECK_EQUAL(error::operation_aborted, ec);
+        };
+        input_streams[i]->async_read_until(input_buffers[i], 2, '\n', read_handler);
+        auto write_handler = [&](std::error_code ec, size_t) {
+            CHECK_NOT(ec);
+        };
+        int n = (i == num_connections / 2 ? 2 : 1);
+        write_sockets[i]->async_write(output_buffer, n, write_handler);
+    }
+    service.run();
 }
 
 

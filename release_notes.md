@@ -2,7 +2,8 @@
 
 ### Bugfixes:
 
-* Lorem ipsum.
+* S: Assertion was sometimes dereferencing a dangling pointer in
+  `util::network::buffered_input_stream::read_oper<H>::recycle_and_execute()`.
 
 ### API breaking changes:
 
@@ -10,7 +11,8 @@
 
 ### Enhancements:
 
-* Lorem ipsum.
+* S: `util::bind_ptr<>` extended with capability to adopt and release naked
+  pointers.
 
 -----------
 
