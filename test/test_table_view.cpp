@@ -2005,4 +2005,60 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 }
 
+TEST(TableView_IsInTableOrder)
+{
+    Group g;
+
+    TableRef source = g.add_table("source");
+    TableRef target = g.add_table("target");
+
+    size_t col_link = source->add_column_link(type_LinkList, "link", *target);
+    size_t col_name = source->add_column(type_String, "name");
+    size_t col_id = target->add_column(type_Int, "id");
+    target->add_search_index(col_id);
+
+    source->add_empty_row();
+    target->add_empty_row();
+
+    // Detached views are in table order.
+    TableView tv;
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Queries not restricted by views are in table order.
+    tv = target->where().find_all();
+    CHECK_EQUAL(true, tv.is_in_table_order());
+
+    // Views that have a distinct filter remain in table order.
+    tv.distinct(col_id);
+    CHECK_EQUAL(true, tv.is_in_table_order());
+
+    // Views that are sorted are not guaranteed to be in table order.
+    tv.sort(col_id, true);
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Queries restricted by views are not guaranteed to be in table order.
+    TableView restricting_view = target->where().equal(col_id, 0).find_all();
+    tv = target->where(&restricting_view).find_all();
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Backlinks are not guaranteed to be in table order.
+    tv = target->get_backlink_view(0, source.get(), col_link);
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Views derived from a LinkView are not guaranteed to be in table order.
+    LinkViewRef ll = source->get_linklist(col_link, 0);
+    tv = ll->get_sorted_view(col_name);
+    CHECK_EQUAL(false, tv.is_in_table_order());
+
+    // Views based directly on a table are in table order.
+    tv = target->get_range_view(0, 1);
+    CHECK_EQUAL(true, tv.is_in_table_order());
+    tv = target->get_distinct_view(col_id);
+    CHECK_EQUAL(true, tv.is_in_table_order());
+
+    // … unless sorted.
+    tv = target->get_sorted_view(col_id);
+    CHECK_EQUAL(false, tv.is_in_table_order());
+}
+
 #endif // TEST_TABLE_VIEW
