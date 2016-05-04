@@ -173,12 +173,21 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/to_string.hpp
 ) # REALM_INSTALL_UTIL_HEADERS
 
-add_library(realm ${REALM_SOURCES})
+add_library(realm SHARED ${REALM_SOURCES})
+add_library(realm-static STATIC ${REALM_SOURCES})
 
 set_target_properties(
     realm PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${REALM_SOVERSION}
+)
+
+set_target_properties(
+    realm-static PROPERTIES
+    VERSION ${PROJECT_VERSION}
+# This should only be activated if we want the static library to be built with
+# -fPIC (to be included in a `.so`, for example)
+#    POSITION_INDEPENDENT_CODE true
 )
 
 target_link_libraries(
@@ -187,11 +196,20 @@ target_link_libraries(
     Threads::Threads
 )
 
+target_link_libraries(
+    realm-static
+    ${REALM_EXTRA_LIBS}
+    Threads::Threads
+)
+
 if(REALM_ENABLE_ENCRYPTION)
     target_link_libraries(realm ${OPENSSL_LIBRARIES})
+    target_link_libraries(realm-static ${OPENSSL_LIBRARIES})
 endif(REALM_ENABLE_ENCRYPTION)
 
 install(TARGETS realm
+        DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS realm-static
         DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm)
