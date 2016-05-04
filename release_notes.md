@@ -2,12 +2,20 @@
 
 ### Bugfixes:
 
-* Fix a potential crash in SharedGroup::advance_read() due to faulty
-  management of commitlog files (#1762)
+* Fix for: The commit logs were not properly unmapped and closed when a SharedGroup
+  was closed. If one thread closed and reopened a SharedGroup which was the sole
+  session participant at the time it was closed, while a different SharedGroup opened
+  and closed the database in between, the first SharedGroup could end up reusing it's
+  memory mappings for the commit logs, while the later accesses through a different
+  SharedGroup would operate on a different set of files. This could cause inconsistency
+  between the commit log and the database. In turn, this could lead to crashes 
+  during advance_read(), promote_to_write() and possibly commit_and_continue_as_read(). 
+  Worse, It could also silently lead to accessors pointing to wrong objects which might 
+  later open for changes to the database that would be percieved as corrupting. (#1762)
 
 ### API breaking changes:
 
-* Lorem ipsum.
+* Classes inheriting from class Replication must now provide an implementation of close().
 
 ### Enhancements:
 
