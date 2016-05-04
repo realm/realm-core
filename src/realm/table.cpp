@@ -2994,13 +2994,13 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::column_not_nullable);
     if (REALM_UNLIKELY(value.size() > max_string_size))
         throw LogicError(LogicError::string_too_big);
+
+    ColumnBase& col = get_column_base(col_ndx);
     if (REALM_UNLIKELY(value.size() > Table::max_indexed_string_length
-                       && has_search_index(col_ndx)))
+                       && col.has_search_index()))
         throw LogicError(LogicError::string_too_long_for_index);
 
-
     bump_version();
-    ColumnBase& col = get_column_base(col_ndx);
     col.set_string(ndx, value); // Throws
 
     if (Replication* repl = get_repl())
@@ -3024,15 +3024,16 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
 
-    if (!has_search_index(col_ndx))
+    bool has_search_index = this->has_search_index(col_ndx);
+
+    if (!has_search_index)
         throw LogicError(LogicError::no_search_index);
 
     if (REALM_UNLIKELY(value.size() > Table::max_indexed_string_length
-                       && has_search_index(col_ndx)))
+                       && has_search_index))
         throw LogicError(LogicError::string_too_long_for_index);
 
     bump_version();
-
     StringColumn& col = get_column_string(col_ndx);
     do_set_unique(col, ndx, value); // Throws
 
@@ -3059,15 +3060,16 @@ void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringD
         throw LogicError(LogicError::string_position_out_of_range);
     if (REALM_UNLIKELY(value.size() > max_string_size - old_value.size()))
         throw LogicError(LogicError::string_too_big);
+
+    ColumnBase& col = get_column_base(col_ndx);
     if (REALM_UNLIKELY(value.size() > Table::max_indexed_string_length
-                       && has_search_index(col_ndx)))
+                       && col.has_search_index()))
         throw LogicError(LogicError::string_too_long_for_index);
 
     std::string copy_of_value = old_value; // Throws
     copy_of_value.insert(pos, value.data(), value.size()); // Throws
 
     bump_version();
-    ColumnBase& col = get_column_base(col_ndx);
     col.set_string(row_ndx, copy_of_value); // Throws
 
     if (Replication* repl = get_repl())
