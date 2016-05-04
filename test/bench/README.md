@@ -11,4 +11,16 @@ Include `util` in your project. Include `benchmark.hpp`.
 ### How do I force exactly one repetition?
 
 Override the `max_warmup_reps` and `max_reps` methods of the `Benchmark` base
-class.
+class. For instance, to do one, measured repetition:
+
+~~~~
+// Subclass of Benchmark
+    size_t max_reps()
+    {
+        return 1;
+    }
+    size_t max_warmup_reps()
+    {
+        return 0;
+    }
+~~~~
