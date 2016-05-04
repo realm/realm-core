@@ -1474,8 +1474,7 @@ TEST(Table_SetIntUnique)
     CHECK_EQUAL(table.size(), 8);
 }
 
-
-TEST(Table_SetStringUnique)
+TEST_TYPES(Table_SetStringUnique, StringColumnType, StringEnumColumnType)
 {
     Table table;
     table.add_column(type_Int, "ints");
@@ -1487,6 +1486,11 @@ TEST(Table_SetStringUnique)
     CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, "foo"), LogicError::no_search_index);
     table.add_search_index(1);
     table.add_search_index(2);
+
+    if (TEST_TYPE::value) {
+        bool force = true;
+        table.optimize(force);
+    }
 
     table.set_string_unique(1, 0, "bar");
 

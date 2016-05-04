@@ -3034,8 +3034,20 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
         throw LogicError(LogicError::string_too_long_for_index);
 
     bump_version();
-    StringColumn& col = get_column_string(col_ndx);
-    do_set_unique(col, ndx, value); // Throws
+
+    ColumnType actual_type = get_real_column_type(col_ndx);
+    REALM_ASSERT(actual_type == ColumnType::col_type_String
+                 || actual_type == ColumnType::col_type_StringEnum);
+
+    //FIXME: String and StringEnum columns should have a common base class
+    if (actual_type == ColumnType::col_type_String) {
+        StringColumn& col = get_column_string(col_ndx);
+        do_set_unique(col, ndx, value); // Throws
+    }
+    else {
+        StringEnumColumn& col = get_column_string_enum(col_ndx);
+        do_set_unique(col, ndx, value); // Throws
+    }
 
     if (Replication* repl = get_repl())
         repl->set_string_unique(this, col_ndx, ndx, value); // Throws
