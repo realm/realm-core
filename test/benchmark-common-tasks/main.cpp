@@ -82,7 +82,7 @@ struct AddTable : Benchmark {
         TableRef t = tr.add_table(name());
         t->add_column(type_String, "first");
         t->add_column(type_Int, "second");
-        t->add_column(type_DateTime, "third");
+        t->add_column(type_OldDateTime, "third");
         tr.commit();
     }
 
@@ -121,7 +121,8 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             std::stringstream ss;
             ss << rand();
-            t->set_string(0, i, ss.str());
+            auto s = ss.str();
+            t->set_string(0, i, s);
         }
         tr.commit();
     }
@@ -359,7 +360,8 @@ struct BenchmarkGetLinkList : Benchmark {
     void before_all(SharedGroup& group)
     {
         WriteTransaction tr(group);
-        TableRef destination_table = tr.add_table(std::string(name()) + "_Destination");
+        std::string n = std::string(name()) + "_Destination";
+        TableRef destination_table = tr.add_table(n);
         TableRef table = tr.add_table(name());
         table->add_column_link(type_LinkList, "linklist", *destination_table);
         table->add_empty_row(rows);
@@ -386,7 +388,8 @@ struct BenchmarkGetLinkList : Benchmark {
     {
         Group& g = group.begin_write();
         g.remove_table(name());
-        g.remove_table(std::string(name()) + "_Destination");
+        auto n = std::string(name()) + "_Destination";
+        g.remove_table(n);
         group.commit();
     }
 };

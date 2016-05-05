@@ -1018,6 +1018,13 @@ EOF
         exit 0
         ;;
 
+    "build-node")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+        exit 0
+        ;;
+
     "test"|"test-debug"|\
     "check"|"check-debug"|\
     "memcheck"|"memcheck-debug"|\
@@ -1261,8 +1268,8 @@ EOF
         printf ",s/#define REALM_VER_MINOR .*/#define REALM_VER_MINOR $realm_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
         printf ",s/#define REALM_VER_PATCH .*/#define REALM_VER_PATCH $realm_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
 
-        # update packaging/env.list
-        sed -i.bck "s/^VERSION.*/VERSION=$realm_version/" packaging/env.list && rm -f packaging/env.list.bck
+        # update dependencies.list
+        sed -i.bck "s/^VERSION.*/VERSION=$realm_version/" dependencies.list && rm -f dependencies.list.bck
 
         sh tools/add-deb-changelog.sh "$realm_version" "$(pwd)/debian/changelog.in" librealm || exit 1
         sh build.sh release-notes-prerelease || exit 1

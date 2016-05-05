@@ -733,7 +733,12 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
     if (REALM_UNLIKELY(ret != 0)) {
 #ifdef EAI_SYSTEM
         if (ret == EAI_SYSTEM) {
-            ec = make_basic_system_error_code(errno);
+            if (errno != 0) {
+                ec = make_basic_system_error_code(errno);
+            }
+            else {
+                ec = error::unknown;
+            }
             return ec;
         }
 #endif
@@ -755,6 +760,7 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
             curr = curr->ai_next;
         }
     }
+    REALM_ASSERT(num_endpoints > 0);
 
     // Copy the IPv4/IPv6 endpoints
     list.m_endpoints.resize(num_endpoints); // Throws

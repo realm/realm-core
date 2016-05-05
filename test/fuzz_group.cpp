@@ -40,7 +40,7 @@ std::string create_string(unsigned char byte)
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
-            COMMIT, ROLLBACK, ADVANCE,
+            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER,
 
             COUNT};
 
@@ -53,9 +53,10 @@ DataType get_type(unsigned char c)
         type_Double,
         type_String,
         type_Binary,
-        type_DateTime,
+        type_OldDateTime,
         type_Table,
-        type_Mixed
+        type_Mixed,
+        type_Timestamp
     };
 
     unsigned char mod = c % (sizeof(types) / sizeof(DataType));
@@ -80,6 +81,15 @@ unsigned char get_next(State& s)
 int64_t get_int64(State& s) {
     int64_t v = 0;
     for (size_t t = 0; t < 8; t++) {
+        unsigned char c = get_next(s);
+        *(reinterpret_cast<signed char*>(&v) + t) = c;
+    }
+    return v;
+}
+
+int32_t get_int32(State& s) {
+    int32_t v = 0;
+    for (size_t t = 0; t < 4; t++) {
         unsigned char c = get_next(s);
         *(reinterpret_cast<signed char*>(&v) + t) = c;
     }
@@ -354,12 +364,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                             t->set_int(col_ndx, row_ndx, get_next(s));
                         }
-                        else if (type == type_DateTime) {
-                            DateTime value{ get_next(s) };
+                        else if (type == type_OldDateTime) {
+                            OldDateTime value{ get_next(s) };
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_datetime(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_olddatetime(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
-                            t->set_datetime(col_ndx, row_ndx, value);
+                            t->set_olddatetime(col_ndx, row_ndx, value);
                         }
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
@@ -416,6 +426,22 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 }
                             }
                         }
+                        else if (type == type_Timestamp) {
+                            int64_t seconds = get_int64(s);
+                            int32_t nanoseconds = get_int32(s) % 1000000000;
+                            // Make sure the values form a sensible Timestamp
+                            const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+                            const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+                            const bool correct_timestamp = both_non_negative || both_non_positive;
+                            if (!correct_timestamp) {
+                                nanoseconds = -nanoseconds;
+                            }
+                            Timestamp value{ seconds, nanoseconds };
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                            }
+                            t->set_timestamp(col_ndx, row_ndx, value);
+                        }
                     }
                 }
             }
@@ -428,6 +454,17 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove(" << row_ndx << ");\n";
                     }
                     t->remove(row_ndx);
+                }
+            }
+            else if (instr == MOVE_LAST_OVER && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    int32_t row_ndx = get_int32(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->move_last_over(" << row_ndx << ");\n";
+                    }
+                    t->move_last_over(row_ndx);
                 }
             }
             else if (instr == COMMIT) {

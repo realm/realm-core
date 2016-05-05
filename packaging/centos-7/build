@@ -24,7 +24,7 @@ rm -rf out && mkdir out
 # but you can choose to forward additional variables with the --env switch. It's quite common to forward
 # things like BUILD_NUMBER or GIT_COMMIT from a CI server to use them within the package.
 docker run \
-    --env-file ../env.list \
+    --env-file ../../dependencies.list \
     --rm \
     -v $(pwd)/build-inside:/build-inside:ro,z \
     -v ${SRC_DIR}:/source:ro,z \
@@ -45,7 +45,7 @@ rm -rf test-logs && mkdir test-logs
 # container if we want to add test logs.
 # you can omit the PUBLIC_KEY_FILE part if you don't need verifying the signature of your packages.
 docker run \
-    --env-file ../env.list \
+    --env-file ../../dependencies.list \
     --rm \
     -v $(pwd)/test-inside:/test-inside:ro,z \
     -v $(pwd)/out:/out:ro,z \
