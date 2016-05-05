@@ -1,20 +1,20 @@
 # NEXT RELEASE
 
-### Bugfixes:
+### Bugfixes
 
 * Lorem ipsum.
 
-### API breaking changes:
+### Breaking changes
 
 * Lorem ipsum.
 
-### Enhancements:
+### Enhancements
 
 * Lorem ipsum.
 
 -----------
 
-### Internals:
+### Internals
 
 * Lorem ipsum.
 
