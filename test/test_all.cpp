@@ -30,6 +30,11 @@
 #include "test.hpp"
 #include "test_all.hpp"
 
+#ifndef _WIN32
+#  include <unistd.h>
+#  include <fcntl.h>
+#endif
+
 using namespace realm;
 using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
@@ -105,6 +110,31 @@ void fix_max_open_files()
             }
         }
     }
+}
+
+
+long get_num_open_files()
+{
+#ifndef _WIN32
+    if (system_has_rlimit(resource_NumOpenFiles)) {
+        long soft_limit = get_soft_rlimit(resource_NumOpenFiles);
+        if (soft_limit >= 0) {
+            long num_open_files = 0;
+            for (long i = 0; i < soft_limit; ++i) {
+                int fildes = int(i);
+                int ret = fcntl(fildes, F_GETFD);
+                if (ret != -1) {
+                    ++num_open_files;
+                    continue;
+                }
+                if (errno != EBADF)
+                    throw std::runtime_error("fcntl() failed");
+            }
+            return num_open_files;
+        }
+    }
+#endif
+    return -1;
 }
 
 
@@ -459,7 +489,19 @@ int test_all(int argc, char* argv[], util::Logger* logger)
 
     display_build_config();
 
+    long num_open_files = get_num_open_files();
+
     bool success = run_tests(logger);
+
+    if (num_open_files >= 0) {
+        long num_open_files_2 = get_num_open_files();
+        REALM_ASSERT(num_open_files >= 0);
+        if (num_open_files_2 > num_open_files) {
+            long n = num_open_files_2 - num_open_files;
+            std::cerr << "ERROR: "<<n<<" file descriptors were leaked\n";
+            success = false;
+        }
+    }
 
 #ifdef _MSC_VER
     getchar(); // wait for key
