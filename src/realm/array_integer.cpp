@@ -88,7 +88,7 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, val
         }
     }
     dg.release();
-    return r;
+    return arr.get_mem();
 }
 
 
