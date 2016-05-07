@@ -495,7 +495,7 @@ int test_all(int argc, char* argv[], util::Logger* logger)
 
     if (num_open_files >= 0) {
         long num_open_files_2 = get_num_open_files();
-        REALM_ASSERT(num_open_files >= 0);
+        REALM_ASSERT(num_open_files_2 >= 0);
         if (num_open_files_2 > num_open_files) {
             long n = num_open_files_2 - num_open_files;
             std::cerr << "ERROR: "<<n<<" file descriptors were leaked\n";
