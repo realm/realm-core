@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 0.100.2 Release notes
 
 ### Bugfixes
 
@@ -8,20 +8,6 @@
   with rows in the same transaction as it was added, which resulted in the
   automatic migration from DateTime to Timestamp crashing with a stack overflow
   in some circumstances.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
