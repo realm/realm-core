@@ -45,7 +45,7 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
     Row::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
-    src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
+    src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
     m_sorting_predicate = src.m_sorting_predicate;
@@ -96,7 +96,7 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
     if (patch.was_in_sync)
         m_last_seen_version = outside_version();
     else
-        m_last_seen_version = -1;
+        m_last_seen_version = util::none;
 }
 
 // Searching
@@ -554,7 +554,7 @@ uint_fast64_t TableViewBase::sync_if_needed() const
         // FIXME: Is this a reasonable handling of constness?
         const_cast<TableViewBase*>(this)->do_sync();
     }
-    return m_last_seen_version;
+    return *m_last_seen_version;
 }
 
 
