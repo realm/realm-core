@@ -137,9 +137,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << printable_key << ");\n";
             *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << printable_key << ");\n";
 
-            *log << "Group& g = const_cast<Group&>(sg_w.begin_read());\n";
+            *log << "Group& g = const_cast<Group&>(sg_w.begin_write());\n";
             *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
-            *log << "LangBindHelper::promote_to_write(sg_w);\n";
 
             *log << "\n";
         }
@@ -149,9 +148,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
         SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
-        Group& g = const_cast<Group&>(sg_w.begin_read());
+        Group& g = const_cast<Group&>(sg_w.begin_write());
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
-        LangBindHelper::promote_to_write(sg_w);
 
         for (;;) {
             char instr = get_next(s) % COUNT;
