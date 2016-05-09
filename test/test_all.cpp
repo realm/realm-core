@@ -30,7 +30,14 @@
 #include "test.hpp"
 #include "test_all.hpp"
 
-#ifndef _WIN32
+// Need to disable file descriptor leak checks on Apple platforms, as it seems
+// like an unknown number of file descriptors can be left behind, presumably due
+// the way asynchronous DNS lookup is implemented.
+#if !defined _WIN32 && !REALM_PLATFORM_APPLE
+#  define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+#endif
+
+#ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
 #  include <unistd.h>
 #  include <fcntl.h>
 #endif
@@ -115,7 +122,7 @@ void fix_max_open_files()
 
 long get_num_open_files()
 {
-#ifndef _WIN32
+#ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
     if (system_has_rlimit(resource_NumOpenFiles)) {
         long soft_limit = get_soft_rlimit(resource_NumOpenFiles);
         if (soft_limit >= 0) {
@@ -133,7 +140,7 @@ long get_num_open_files()
             return num_open_files;
         }
     }
-#endif
+#  endif
     return -1;
 }
 
@@ -497,18 +504,9 @@ int test_all(int argc, char* argv[], util::Logger* logger)
         long num_open_files_2 = get_num_open_files();
         REALM_ASSERT(num_open_files_2 >= 0);
         if (num_open_files_2 > num_open_files) {
-            long num_leaks = num_open_files_2 - num_open_files;
-            long allowed_leaks = 0;
-#ifdef REALM_PLATFORM_APPLE
-            // It seems that on Apple platforms, up to two file descriptors are
-            // allocated on demand to implement asynchronous DNS lookup
-            // (test_util_event_loop.cpp).
-            allowed_leaks = 2;
-#endif
-            if (num_leaks > allowed_leaks) {
-                std::cerr << "ERROR: "<<num_leaks<<" file descriptors were leaked\n";
-                success = false;
-            }
+            long n = num_open_files_2 - num_open_files;
+            std::cerr << "ERROR: "<<n<<" file descriptors were leaked\n";
+            success = false;
         }
     }
 
