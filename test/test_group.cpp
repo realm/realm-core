@@ -2537,4 +2537,18 @@ TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::
     CHECK_EQUAL(table->size(), 5);
 }
 
+
+// Another bug found by AFL
+TEST_TYPES(Group_TimestapMultipleInserts, std::true_type, std::false_type)
+{
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    Group g;
+    TableRef t = g.add_table("");
+    t->add_column(type_Int, "1");
+    t->add_empty_row(1000 + 1); // Breaks with REALM_MAX_BPNODE_SIZE == 1000, but not 4?!?!
+    t->add_column(type_Timestamp, "2", nullable_toggle);
+    g.verify();
+}
+
+
 #endif // TEST_GROUP
