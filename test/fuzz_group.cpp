@@ -495,7 +495,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 REALM_DO_IF_VERIFY(log, g_r.verify());
             }
             else if (instr == CLOSE_AND_REOPEN) {
-                bool read_group = (get_next(s) % 1) == 0;
+                bool read_group = get_next(s) % 2 == 0;
                 if (read_group) {
                     if (log) {
                         *log << "sg_r.close();\n";
