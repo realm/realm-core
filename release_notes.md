@@ -1,21 +1,25 @@
 # NEXT RELEASE
 
-### Bugfixes:
+### Bugfixes
 
 * Fix handing over an out of sync TableView that depends on a deleted link list or
   row so that it doesn't remain perpetually out of sync (#1770).
+* Fix a use-after-free when using a column which was added to an existing table
+  with rows in the same transaction as it was added, which resulted in the
+  automatic migration from DateTime to Timestamp crashing with a stack overflow
+  in some circumstances.
 
-### API breaking changes:
+### Breaking changes
 
 * Lorem ipsum.
 
-### Enhancements:
+### Enhancements
 
 * Lorem ipsum.
 
 -----------
 
-### Internals:
+### Internals
 
 * Lorem ipsum.
 
