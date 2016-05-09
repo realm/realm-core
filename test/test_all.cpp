@@ -140,7 +140,7 @@ long get_num_open_files()
             return num_open_files;
         }
     }
-#  endif
+#endif
     return -1;
 }
 
