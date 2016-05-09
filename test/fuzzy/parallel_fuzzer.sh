@@ -1,6 +1,6 @@
 #!/bin/sh
 if [ "$#" -ne 2 ]; then
-    echo "Usage sh $0 num_cores ./executable_path (e.g. ./fuzz-group-dbg)"
+    echo "Usage sh $0 num_cores executable_path (e.g. ./fuzz-group-dbg)"
     exit 1
 fi
 NUM_CORES=$1
