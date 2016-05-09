@@ -497,9 +497,18 @@ int test_all(int argc, char* argv[], util::Logger* logger)
         long num_open_files_2 = get_num_open_files();
         REALM_ASSERT(num_open_files_2 >= 0);
         if (num_open_files_2 > num_open_files) {
-            long n = num_open_files_2 - num_open_files;
-            std::cerr << "ERROR: "<<n<<" file descriptors were leaked\n";
-            success = false;
+            long num_leaks = num_open_files_2 - num_open_files;
+            long allowed_leaks = 0;
+#ifdef REALM_PLATFORM_APPLE
+            // It seems that on Apple platforms, up to two file descriptors are
+            // allocated on demand to implement asynchronous DNS lookup
+            // (test_util_event_loop.cpp).
+            allowed_leaks = 2;
+#endif
+            if (num_leaks > allowed_leaks) {
+                std::cerr << "ERROR: "<<num_leaks<<" file descriptors were leaked\n";
+                success = false;
+            }
         }
     }
 
