@@ -141,9 +141,9 @@ public:
     };
 
     /// \brief Same as calling the corresponding version of open() on a instance
-    /// constructed in the unattached state. Exception safety note: if the
-    /// `upgrade_callback` throws, then the file will be closed properly and the
-    /// upgrade will be aborted.
+    /// constructed in the unattached state. Exception safety note: the
+    /// `upgrade_callback` should not throw, but if it does, the upgraded Realm
+    /// will be closed properly.
     explicit SharedGroup(const std::string& file, bool no_create = false,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,
@@ -151,9 +151,9 @@ public:
                          std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>());
 
     /// \brief Same as calling the corresponding version of open() on a instance
-    /// constructed in the unattached state. Exception safety note: if the
-    /// `upgrade_callback` throws, then the file will be closed properly and
-    /// the upgrade will be aborted.
+    /// constructed in the unattached state. Exception safety note: the
+    /// `upgrade_callback` should not throw, but if it does, the upgraded Realm
+    /// will be closed properly.
     explicit SharedGroup(Replication& repl,
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,

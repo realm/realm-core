@@ -1454,16 +1454,10 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
             // Note: The file format version stored in the Realm file will be
             // updated to the new file format version as part of the following
             // commit operation. This happens in GroupWriter::commit().
-            if (m_upgrade_callback) {
-                try {
-                    m_upgrade_callback(current_file_format_version_2, target_file_format_version); // Throws
-                }
-                catch(...) {
-                    rollback();
-                    throw;
-                }
-            }
             commit(); // Throws
+            if (m_upgrade_callback) {
+                m_upgrade_callback(current_file_format_version_2, target_file_format_version); // Should not throw
+            }
         }
         else {
             // If somebody else has already performed the upgrade, we still need
