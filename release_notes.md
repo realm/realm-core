@@ -1,3 +1,26 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* Fix initialization of read-only Groups which are sharing file mappings with
+  other read-only Groups for the same path.
+
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
 # 0.100.2 Release notes
 
 ### Bugfixes
