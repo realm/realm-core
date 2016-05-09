@@ -40,7 +40,7 @@ std::string create_string(unsigned char byte)
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
-            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER,
+            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN,
 
             COUNT};
 
@@ -495,6 +495,39 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 LangBindHelper::advance_read(sg_r);
                 REALM_DO_IF_VERIFY(log, g_r.verify());
+            }
+            else if (instr == CLOSE_AND_REOPEN) {
+                bool read_group = (get_next(s) % 1) == 0;
+                if (read_group) {
+                    if (log) {
+                        *log << "sg_r.close();\n";
+                    }
+                    sg_r.close();
+                    if (log) {
+                        *log << "sg_r.open(path);\n";
+                    }
+                    sg_r.open(path);
+                    if (log) {
+                        *log << "sg_r.begin_read();\n";
+                    }
+                    sg_r.begin_read();
+                    REALM_DO_IF_VERIFY(log, g_r.verify());
+                }
+                else {
+                    if (log) {
+                        *log << "sg_w.close();\n";
+                    }
+                    sg_w.close();
+                    if (log) {
+                        *log << "sg_w.open(path);\n";
+                    }
+                    sg_w.open(path);
+                    if (log) {
+                        *log << "sg_w.begin_write();\n";
+                    }
+                    sg_w.begin_write();
+                    REALM_DO_IF_VERIFY(log, g.verify());
+                }
             }
         }
     }
