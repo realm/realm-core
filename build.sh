@@ -55,8 +55,7 @@ TVOS_DIR="tvos-lib"
 : ${REALM_COCOA_PLATFORMS:="osx iphone watchos tvos"}
 
 ANDROID_DIR="android-lib"
-#ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
-ANDROID_PLATFORMS="x86"
+ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
 CONFIG_VERSION=1
 
