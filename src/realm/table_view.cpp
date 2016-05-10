@@ -670,11 +670,56 @@ void TableViewBase::sync_distinct_view(size_t column)
     m_distinct_column_source = column;
     if (m_distinct_column_source != npos) {
         REALM_ASSERT(m_table);
-        REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
         if (!m_table->is_degenerate()) {
             const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-            col.get_search_index()->distinct(m_row_indexes);
+            if (m_table->has_search_index(m_distinct_column_source)) {
+                col.get_search_index()->distinct(m_row_indexes);
+            }
+            else {
+                get_distinct_from_column(m_distinct_column_source, m_row_indexes);
+            }
         }
+    }
+}
+
+void TableViewBase::get_distinct_from_column(size_t column_ndx, IntegerColumn& result)
+{
+    const ColumnBase& col = m_table->get_column_base(column_ndx);
+    std::vector<size_t> original;
+    original.resize(col.size());
+    for (size_t r = 0; r < col.size(); r++) {
+        original[r] = r;
+    }
+
+    std::vector<size_t>::iterator distinct_end = original.end();
+    const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&col);
+    REALM_ASSERT(ctb);
+    if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&col)) {
+        auto sorting_predicate = [cse](size_t left, size_t right) {
+            return cse->compare_values(left, right) > 0;
+        };
+        std::stable_sort(original.begin(), original.end(), sorting_predicate);
+
+        auto unique_predicate = [cse](size_t left, size_t right) {
+            return (cse->compare_values(left, right) == 0);
+        };
+        distinct_end = std::unique(original.begin(), original.end(), unique_predicate);
+    }
+    else {
+        auto sorting_predicate = [ctb](size_t left, size_t right) {
+            return ctb->compare_values(left, right) > 0;
+        };
+        std::stable_sort(original.begin(), original.end(), sorting_predicate);
+
+        auto unique_predicate = [ctb](size_t left, size_t right) {
+            return (ctb->compare_values(left, right) == 0);
+        };
+        distinct_end = std::unique(original.begin(), original.end(), unique_predicate);
+    }
+
+    result.clear();
+    for (auto it = original.begin(); it != distinct_end; ++it) {
+        result.add(*it);
     }
 }
 

@@ -1490,9 +1490,50 @@ TEST(Table_SetStringUnique)
     CHECK_EQUAL(table.size(), 1);
 }
 
-
-TEST(Table_Distinct)
+TEST_TYPES(Table_DistinctOnEmptyCol, std::true_type, std::false_type)
 {
+    constexpr bool add_search_index = TEST_TYPE::value;
+
+    Table table;
+    table.add_column(type_Int, "first");
+
+    if (add_search_index) {
+        table.add_search_index(0);
+    }
+    CHECK_EQUAL(table.has_search_index(0), add_search_index);
+
+    TableView view = table.get_distinct_view(0);
+
+    CHECK_EQUAL(0, view.size());
+    CHECK_EQUAL(0, table.size());
+}
+
+TEST_TYPES(Table_DistinctWithOneRow, std::true_type, std::false_type)
+{
+    constexpr bool add_search_index = TEST_TYPE::value;
+
+    Table table;
+    table.add_column(type_Int, "first");
+
+    if (add_search_index) {
+        table.add_search_index(0);
+    }
+    CHECK_EQUAL(table.has_search_index(0), add_search_index);
+    table.add_empty_row();
+    CHECK_EQUAL(1, table.size());
+    table.set_int(0, 0, 42);
+    CHECK_EQUAL(42, table.get_int(0, 0));
+
+    TableView view = table.get_distinct_view(0);
+
+    CHECK_EQUAL(1, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+}
+
+TEST_TYPES(Table_Distinct, std::true_type, std::false_type)
+{
+    constexpr bool add_search_index = TEST_TYPE::value;
+
     TestTableEnum table;
 
     table.add(Mon, "A");
@@ -1504,8 +1545,11 @@ TEST(Table_Distinct)
     table.add(Sun, "D");
     table.add(Mon, "D");
 
-    table.column().second.add_search_index();
-    CHECK(table.column().second.has_search_index());
+    if (add_search_index) {
+        table.column().second.add_search_index();
+    }
+    CHECK_EQUAL(table.column().second.has_search_index(), add_search_index);
+
 
     TestTableEnum::View view = table.column().second.get_distinct_view();
 
@@ -1517,8 +1561,10 @@ TEST(Table_Distinct)
 }
 
 
-TEST(Table_DistinctEnums)
+TEST_TYPES(Table_DistinctEnums, std::true_type, std::false_type)
 {
+    constexpr bool add_search_index = TEST_TYPE::value;
+
     TestTableEnum table;
     table.add(Mon, "A");
     table.add(Tue, "B");
@@ -1529,8 +1575,10 @@ TEST(Table_DistinctEnums)
     table.add(Sun, "D");
     table.add(Mon, "D");
 
-    table.column().first.add_search_index();
-    CHECK(table.column().first.has_search_index());
+    if (add_search_index) {
+        table.column().first.add_search_index();
+    }
+    CHECK_EQUAL(table.column().first.has_search_index(), add_search_index);
 
     TestTableEnum::View view = table.column().first.get_distinct_view();
 
@@ -1545,8 +1593,10 @@ TEST(Table_DistinctEnums)
 }
 
 
-TEST(Table_DistinctIntegers)
+TEST_TYPES(Table_DistinctIntegers, std::true_type, std::false_type)
 {
+    constexpr bool add_search_index = TEST_TYPE::value;
+
     Table table;
     table.add_column(type_Int, "first");
     table.add_empty_row(4);
@@ -1555,8 +1605,10 @@ TEST(Table_DistinctIntegers)
     table.set_int(0, 2, 3);
     table.set_int(0, 3, 3);
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
+    if (add_search_index) {
+        table.add_search_index(0);
+    }
+    CHECK_EQUAL(table.has_search_index(0), add_search_index);
 
     TableView view = table.get_distinct_view(0);
 
@@ -1567,8 +1619,10 @@ TEST(Table_DistinctIntegers)
 }
 
 
-TEST(Table_DistinctBool)
+TEST_TYPES(Table_DistinctBool, std::true_type, std::false_type)
 {
+    constexpr bool add_search_index = TEST_TYPE::value;
+
     Table table;
     table.add_column(type_Bool, "first");
     table.add_empty_row(4);
@@ -1577,8 +1631,10 @@ TEST(Table_DistinctBool)
     table.set_bool(0, 2, true);
     table.set_bool(0, 3, false);
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
+    if (add_search_index) {
+        table.add_search_index(0);
+    }
+    CHECK_EQUAL(table.has_search_index(0), add_search_index);
 
     TableView view = table.get_distinct_view(0);
 
@@ -1587,9 +1643,6 @@ TEST(Table_DistinctBool)
     CHECK_EQUAL(1, view.get_source_ndx(0));
 }
 
-
-/*
-// FIXME Commented out because indexes on floats and doubles are not supported (yet).
 
 TEST(Table_DistinctFloat)
 {
@@ -1602,8 +1655,9 @@ TEST(Table_DistinctFloat)
     table.set_float(0, 10, 0.5f);
     table.set_float(0, 11, 1.5f);
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
+    // Search index not supported for float
+    //table.add_search_index(0);
+    //CHECK(table.has_search_index(0));
 
     TableView view = table.get_distinct_view(0);
     CHECK_EQUAL(10, view.size());
@@ -1621,17 +1675,19 @@ TEST(Table_DistinctDouble)
     table.set_double(0, 10, 0.5);
     table.set_double(0, 11, 1.5);
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
+    // Search index not supported for double
+    //table.add_search_index(0);
+    //CHECK(table.has_search_index(0));
 
     TableView view = table.get_distinct_view(0);
     CHECK_EQUAL(10, view.size());
 }
-*/
 
 
-TEST(Table_DistinctDateTime)
+TEST_TYPES(Table_DistinctDateTime, std::true_type, std::false_type)
 {
+    constexpr bool add_search_index = TEST_TYPE::value;
+
     Table table;
     table.add_column(type_OldDateTime, "first");
     table.add_empty_row(4);
@@ -1640,16 +1696,20 @@ TEST(Table_DistinctDateTime)
     table.set_olddatetime(0, 2, OldDateTime(3));
     table.set_olddatetime(0, 3, OldDateTime(3));
 
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
+    if (add_search_index) {
+        table.add_search_index(0);
+    }
+    CHECK_EQUAL(table.has_search_index(0), add_search_index);
 
     TableView view = table.get_distinct_view(0);
     CHECK_EQUAL(3, view.size());
 }
 
 
-TEST(Table_DistinctFromPersistedTable)
+TEST_TYPES(Table_DistinctFromPersistedTable, std::true_type, std::false_type)
 {
+    constexpr bool add_search_index = TEST_TYPE::value;
+
     GROUP_TEST_PATH(path);
 
     {
@@ -1662,8 +1722,10 @@ TEST(Table_DistinctFromPersistedTable)
         table->set_int(0, 2, 3);
         table->set_int(0, 3, 3);
 
-        table->add_search_index(0);
-        CHECK(table->has_search_index(0));
+        if (add_search_index) {
+            table->add_search_index(0);
+        }
+        CHECK_EQUAL(table->has_search_index(0), add_search_index);
         group.write(path);
     }
 
