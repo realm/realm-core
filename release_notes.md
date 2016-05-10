@@ -17,11 +17,7 @@
 
 ### Internals
 
-<<<<<<< HEAD
-* Lorem ipsum.
-=======
 * Upgrading to OpenSSL 1.0.1t.
->>>>>>> 6488cc3db25df963cba976a58951ef0915be1a43
 
 ----------------------------------------------
 
