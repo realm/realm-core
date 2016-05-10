@@ -1508,6 +1508,7 @@ TEST_TYPES(Table_DistinctOnEmptyCol, std::true_type, std::false_type)
     CHECK_EQUAL(0, table.size());
 }
 
+
 TEST_TYPES(Table_DistinctWithOneRow, std::true_type, std::false_type)
 {
     constexpr bool add_search_index = TEST_TYPE::value;
@@ -1529,6 +1530,7 @@ TEST_TYPES(Table_DistinctWithOneRow, std::true_type, std::false_type)
     CHECK_EQUAL(1, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));
 }
+
 
 TEST_TYPES(Table_Distinct, std::true_type, std::false_type)
 {
@@ -1647,20 +1649,22 @@ TEST_TYPES(Table_DistinctBool, std::true_type, std::false_type)
 TEST(Table_DistinctFloat)
 {
     Table table;
-    table.add_column(type_Float, "first");
-    table.add_empty_row(12);
+    table.add_column(type_Float, "first", true);
+    table.add_empty_row(14);
     for (size_t i = 0; i < 10; ++i) {
         table.set_float(0, i, static_cast<float>(i) + 0.5f);
     }
     table.set_float(0, 10, 0.5f);
     table.set_float(0, 11, 1.5f);
+    table.set_null(0, 12);
+    table.set_null(0, 13);
 
     // Search index not supported for float
     //table.add_search_index(0);
     //CHECK(table.has_search_index(0));
 
     TableView view = table.get_distinct_view(0);
-    CHECK_EQUAL(10, view.size());
+    CHECK_EQUAL(11, view.size());
 }
 
 
@@ -1684,6 +1688,26 @@ TEST(Table_DistinctDouble)
 }
 
 
+TEST(Table_DistinctBinary)
+{
+    Table table;
+    table.add_column(type_Binary, "first");
+    table.add_empty_row(5);
+    table.set_binary(0, 0, BinaryData("aaa"));
+    table.set_binary(0, 1, BinaryData("bbb"));
+    table.set_binary(0, 2, BinaryData("ccc"));
+    table.set_binary(0, 3, BinaryData("aaa"));
+    table.set_binary(0, 4, BinaryData("zzz"));
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(4, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
+    CHECK_EQUAL(2, view.get_source_ndx(2));
+    CHECK_EQUAL(4, view.get_source_ndx(3));
+}
+
+
 TEST_TYPES(Table_DistinctDateTime, std::true_type, std::false_type)
 {
     constexpr bool add_search_index = TEST_TYPE::value;
@@ -1703,6 +1727,97 @@ TEST_TYPES(Table_DistinctDateTime, std::true_type, std::false_type)
 
     TableView view = table.get_distinct_view(0);
     CHECK_EQUAL(3, view.size());
+}
+
+TEST_TYPES(Table_DistinctTimestamp, std::true_type, std::false_type)
+{
+    constexpr bool add_search_index = TEST_TYPE::value;
+
+    Table table;
+    table.add_column(type_Timestamp, "first");
+    table.add_empty_row(4);
+    table.set_timestamp(0, 0, Timestamp(3, 3));
+    table.set_timestamp(0, 1, Timestamp(0, 0));
+    table.set_timestamp(0, 2, Timestamp(1, 1));
+    table.set_timestamp(0, 3, Timestamp(3, 3));
+
+    if (add_search_index) {
+        table.add_search_index(0);
+    }
+    CHECK_EQUAL(table.has_search_index(0), add_search_index);
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(3, view.size());
+    CHECK_EQUAL(1, view.get_source_ndx(0));
+    CHECK_EQUAL(2, view.get_source_ndx(1));
+    CHECK_EQUAL(0, view.get_source_ndx(2));
+}
+
+TEST_TYPES(Table_DistinctStringEnum, std::true_type, std::false_type)
+{
+    constexpr bool add_search_index = TEST_TYPE::value;
+
+    Table table;
+    table.add_column(type_String, "first");
+    table.add_empty_row(4);
+    table.set_string(0, 0, "a");
+    table.set_string(0, 1, "b");
+    table.set_string(0, 2, "c");
+    table.set_string(0, 3, "c");
+
+    if (add_search_index) {
+        table.add_search_index(0);
+    }
+    CHECK_EQUAL(table.has_search_index(0), add_search_index);
+    table.optimize(true);   // Force create string enum column
+
+    TableView view = table.get_distinct_view(0);
+    CHECK_EQUAL(3, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
+    CHECK_EQUAL(2, view.get_source_ndx(2));
+}
+
+
+TEST(Table_DistinctNull)
+{
+    std::vector<DataType> nullable_column_types {
+        type_Int,
+        type_Bool,
+        type_Float,
+        type_Double,
+        type_String,
+        type_Binary,
+        type_OldDateTime,
+        type_Timestamp
+    };
+
+    Table table;
+    bool nullable = true;
+    size_t num_rows = 5;
+
+    for (DataType t : nullable_column_types) {
+        table.add_column(t, "", nullable);
+    }
+
+    table.add_empty_row(num_rows);
+
+    for (size_t col_ndx = 0; col_ndx < table.get_column_count(); ++ col_ndx) {
+        for (size_t row_ndx = 0; row_ndx < num_rows; ++row_ndx) {
+            table.set_null(col_ndx, row_ndx);
+        }
+        TableView view = table.get_distinct_view(col_ndx);
+        CHECK_EQUAL(1, view.size());
+        CHECK_EQUAL(0, view.get_source_ndx(0));
+    }
+
+    // Test string enum column with null
+    table.optimize(true);
+    auto string_col_pos = 4; // Index of StringColumn in nullable_column_types array
+    CHECK_EQUAL(type_String, table.get_column_type(string_col_pos)); // Hidden StringEnum type
+    TableView view = table.get_distinct_view(string_col_pos);
+    CHECK_EQUAL(1, view.size());
+    CHECK_EQUAL(0, view.get_source_ndx(0));
 }
 
 

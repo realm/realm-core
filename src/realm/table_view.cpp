@@ -686,36 +686,24 @@ void TableViewBase::get_distinct_from_column(size_t column_ndx, IntegerColumn& r
 {
     const ColumnBase& col = m_table->get_column_base(column_ndx);
     std::vector<size_t> original;
-    original.resize(col.size());
-    for (size_t r = 0; r < col.size(); r++) {
+    size_t col_size = col.size();
+    original.resize(col_size);
+    for (size_t r = 0; r < col_size; r++) {
         original[r] = r;
     }
 
     std::vector<size_t>::iterator distinct_end = original.end();
     const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&col);
     REALM_ASSERT(ctb);
-    if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&col)) {
-        auto sorting_predicate = [cse](size_t left, size_t right) {
-            return cse->compare_values(left, right) > 0;
-        };
-        std::stable_sort(original.begin(), original.end(), sorting_predicate);
+    auto sorting_predicate = [&ctb](size_t left, size_t right) {
+        return ctb->compare_values(left, right) > 0;
+    };
+    std::stable_sort(original.begin(), original.end(), sorting_predicate);
 
-        auto unique_predicate = [cse](size_t left, size_t right) {
-            return (cse->compare_values(left, right) == 0);
-        };
-        distinct_end = std::unique(original.begin(), original.end(), unique_predicate);
-    }
-    else {
-        auto sorting_predicate = [ctb](size_t left, size_t right) {
-            return ctb->compare_values(left, right) > 0;
-        };
-        std::stable_sort(original.begin(), original.end(), sorting_predicate);
-
-        auto unique_predicate = [ctb](size_t left, size_t right) {
-            return (ctb->compare_values(left, right) == 0);
-        };
-        distinct_end = std::unique(original.begin(), original.end(), unique_predicate);
-    }
+    auto unique_predicate = [&ctb](size_t left, size_t right) {
+        return (ctb->compare_values(left, right) == 0);
+    };
+    distinct_end = std::unique(original.begin(), original.end(), unique_predicate);
 
     result.clear();
     for (auto it = original.begin(); it != distinct_end; ++it) {

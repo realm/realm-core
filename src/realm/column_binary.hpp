@@ -31,7 +31,7 @@ namespace realm {
 /// of the column is the root of the B+-tree. Leaf nodes are either of
 /// type ArrayBinary (array of small blobs) or ArrayBigBlobs (array of
 /// big blobs).
-class BinaryColumn: public ColumnBaseSimple {
+class BinaryColumn: public ColumnBaseSimple, public ColumnTemplate<BinaryData>  {
 public:
     typedef BinaryData value_type;
 
@@ -42,6 +42,7 @@ public:
     bool is_nullable() const noexcept override;
 
     BinaryData get(size_t ndx) const noexcept;
+    BinaryData get_val(size_t row_ndx) const noexcept override { return get(row_ndx); }
     bool is_null(size_t ndx) const noexcept override;
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer& ) const noexcept final;
 
