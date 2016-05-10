@@ -1212,14 +1212,15 @@ std::error_code acceptor::do_accept(socket& sock, endpoint* ep, std::error_code&
 }
 
 
-size_t buffered_input_stream::do_read(char* buffer, size_t size, int delim,
-                                      std::error_code& ec) noexcept
+size_t buffered_input_stream::do_read(size_t at_least, char* buffer, size_t size,
+                                      int delim, std::error_code& ec) noexcept
 {
     REALM_ASSERT(!m_socket.m_read_oper || !m_socket.m_read_oper->in_use());
     if (m_socket.ensure_blocking_mode(ec))
         return 0;
     char* out_begin = buffer;
     char* out_end = buffer + size;
+    char* out_min = buffer + std::min(at_least, size);
     for (;;) {
         size_t in_avail = m_end - m_begin;
         size_t out_avail = out_end - out_begin;
@@ -1229,7 +1230,7 @@ size_t buffered_input_stream::do_read(char* buffer, size_t size, int delim,
             std::find(m_begin, m_begin + n, std::char_traits<char>::to_char_type(delim));
         out_begin = std::copy(m_begin, i, out_begin);
         m_begin = i;
-        if (out_begin == out_end) {
+        if (out_begin >= out_min) {
             if (delim_mode) {
                 ec = network::delim_not_found;
                 return out_begin - buffer;
@@ -1267,7 +1268,7 @@ void buffered_input_stream::read_oper_base::process_buffered_input() noexcept
                   std::char_traits<char>::to_char_type(m_delim));
     m_out_curr = std::copy(m_stream->m_begin, i, m_out_curr);
     m_stream->m_begin = i;
-    if (m_out_curr == m_out_end) {
+    if (m_out_curr >= m_out_min) {
         if (delim_mode)
             m_error_code = network::delim_not_found;
     }
@@ -1288,8 +1289,8 @@ void buffered_input_stream::read_oper_base::proceed() noexcept
     REALM_ASSERT(!m_error_code);
     REALM_ASSERT(m_stream->m_begin == m_stream->m_end);
     REALM_ASSERT(m_out_curr < m_out_end);
-    size_t n = m_stream->m_socket.do_read_some(m_stream->m_buffer.get(), s_buffer_size,
-                                              m_error_code);
+    size_t n = m_stream->m_socket.do_read_some(m_stream->m_buffer.get(),
+                                               s_buffer_size, m_error_code);
     if (REALM_UNLIKELY(m_error_code)) {
         set_is_complete(true);
         return;
