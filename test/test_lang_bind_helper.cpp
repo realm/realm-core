@@ -10545,6 +10545,68 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     }
 }
 
+// Verify that handing over an out-of-sync TableView that represents backlinks
+// to a deleted row results in a TableView that can be brought back into sync.
+TEST(LangBindHelper_HandoverOutOfSyncTableViewFromBacklinksToDeletedRow)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    LangBindHelper::promote_to_write(sg_w);
+
+    TableRef target = group_w.add_table("target");
+    target->add_column(type_Int, "int");
+
+    TableRef links = group_w.add_table("links");
+    links->add_column_link(type_Link, "link", *target);
+
+    target->add_empty_row();
+    target->set_int(0, 0, 0);
+
+    links->add_empty_row();
+    links->set_link(0, 0, 0);
+
+    TableView tv = target->get_backlink_view(0, links.get(), 0);
+    CHECK_EQUAL(true, tv.is_attached());
+    CHECK_EQUAL(true, tv.is_in_sync());
+    CHECK_EQUAL(false, tv.depends_on_deleted_object());
+    CHECK_EQUAL(1, tv.size());
+
+    // Bring the view out of sync, and have it depend on a deleted row.
+    target->move_last_over(0);
+    CHECK_EQUAL(true, tv.is_attached());
+    CHECK_EQUAL(false, tv.is_in_sync());
+    CHECK_EQUAL(true, tv.depends_on_deleted_object());
+    CHECK_EQUAL(1, tv.size());
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    SharedGroup::VersionID vid = sg_w.get_version_of_current_transaction();
+
+    auto handover = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
+    CHECK(tv.is_attached());
+    sg.begin_read(vid);
+
+    // The imported TableView should have the same state as the exported one.
+    auto tv2 = sg.import_from_handover(std::move(handover));
+    CHECK_EQUAL(true, tv2->is_attached());
+    CHECK_EQUAL(false, tv2->is_in_sync());
+    CHECK_EQUAL(true, tv.depends_on_deleted_object());
+    CHECK_EQUAL(1, tv2->size());
+
+    // Syncing the TableView should bring it into sync, and cause it to reflect
+    // that its source row was deleted.
+    tv2->sync_if_needed();
+    CHECK_EQUAL(true, tv2->is_attached());
+    CHECK_EQUAL(true, tv2->is_in_sync());
+    CHECK_EQUAL(true, tv.depends_on_deleted_object());
+    CHECK_EQUAL(0, tv2->size());
+}
+
 // Test that we can handover a query involving links, and that after the
 // handover export, the handover is completely decoupled from later changes
 // done on accessors belonging to the exporting shared group
@@ -11464,6 +11526,62 @@ TEST(LangBindHelper_SessionHistoryConsistency)
     }
 }
 
+TEST(LangBindHelper_CommitlogSplitWorld)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w = realm::make_client_history(path, crypt_key());
+    SharedGroup::unattached_tag tag;
+    SharedGroup sg_w(tag);
+    sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+    {
+        // Change the db so that we get the log files mapped
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("foo");
+        foo_w->add_column(type_Int, "i");
+        foo_w->add_empty_row();
+        foo_w->set_int(0,0,0);
+        wt.commit();
+    }
+    // terminate the session, so that the log files are removed
+    sg_w.close();
+    // initiate a new session, creating new log files on demand
+    std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    {
+        // Actually do something, to get the new log files created
+        // These changes are not used for anything, except forcing use
+        // of the commitlogs.
+        WriteTransaction wt(sg);
+        TableRef foo_w = wt.add_table("bar");
+        foo_w->add_column(type_Int, "i");
+        wt.commit();
+    }
+    // reopen the first one, now with stale mmappings bound to the
+    // deleted log files
+    sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+    // try to commit something in one sg and advance_read in the other
+    // to trigger an error updating the accessors, because the commitlogs
+    // are now different commitlogs, so communication of accessor updates
+    // no longer match the data in the database.
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    ConstTableRef foo = group.get_table("foo");
+    ConstRow r = foo->get(0);
+    CHECK_EQUAL(r.get_int(0), 0);
+    for (int i=0; i<10; ++i) {
+        {
+            WriteTransaction wt(sg_w);
+            TableRef foo_w = wt.get_table("foo");
+            // it depends on the operations done here, which error can
+            // be triggered during advance read:
+            foo_w->insert_empty_row(0);
+            foo_w->set_int(0,0,1+i);
+            wt.commit();
+        }
+        LangBindHelper::advance_read(sg);
+        CHECK_EQUAL(r.get_int(0), 0);
+    }
+}
 
 TEST(LangBindHelper_InRealmHistory_Basics)
 {

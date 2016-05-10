@@ -1,24 +1,77 @@
 # NEXT RELEASE
 
-### Bugfixes:
+### Bugfixes
 
-* S: Assertion was sometimes dereferencing a dangling pointer in
-  `util::network::buffered_input_stream::read_oper<H>::recycle_and_execute()`.
+* Fix initialization of read-only Groups which are sharing file mappings with
+  other read-only Groups for the same path.
 
-### API breaking changes:
+### Breaking changes
 
 * Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+<<<<<<< HEAD
+* Lorem ipsum.
+=======
+* Upgrading to OpenSSL 1.0.1t.
+>>>>>>> 6488cc3db25df963cba976a58951ef0915be1a43
+
+----------------------------------------------
+
+# 0.100.2 Release notes
+
+### Bugfixes
+
+* Fix handing over an out of sync TableView that depends on a deleted link list or
+  row so that it doesn't remain perpetually out of sync (#1770).
+* Fix a use-after-free when using a column which was added to an existing table
+  with rows in the same transaction as it was added, which resulted in the
+  automatic migration from DateTime to Timestamp crashing with a stack overflow
+  in some circumstances.
+
+----------------------------------------------
+
+# 0.100.1 Release notes
+
+### Bugfixes:
+
+* Fix for: The commit logs were not properly unmapped and closed when a SharedGroup
+  was closed. If one thread closed and reopened a SharedGroup which was the sole
+  session participant at the time it was closed, while a different SharedGroup opened
+  and closed the database in between, the first SharedGroup could end up reusing it's
+  memory mappings for the commit logs, while the later accesses through a different
+  SharedGroup would operate on a different set of files. This could cause inconsistency
+  between the commit log and the database. In turn, this could lead to crashes during
+  advance_read(), promote_to_write() and possibly commit_and_continue_as_read().
+  Worse, It could also silently lead to accessors pointing to wrong objects which might
+  later open for changes to the database that would be percieved as corrupting. (#1762)
+* Fix for: When commitlogs change in size, all readers (and writers) must update their
+  memory mmapings accordingly. The old mechanism was based on comparing the size of
+  the log file with the previous size and remapping if they differ. Unfortunately, this
+  is not good enough, as the commitlog may first be shrunk, then expanded back to the
+  original size and in this case, the existing mechanism will not trigger remapping.
+  Without remapping in such situations, POSIX considers accesses to the part of the
+  mapping corresponding to deleted/added sections of the file to be undefined. Consequences
+  of this bug could be crashes in advance_read(), promote_to_write() or
+  commit_and_continue_as_read(). Conceivably it could also cause wrong accessor updates
+  leading to accessors pointing to wrong database objects. This, in turn, could lead
+  to what would be percieved as database corruption. (#1764)
+* S: Assertion was sometimes dereferencing a dangling pointer in
+  `util::network::buffered_input_stream::read_oper<H>::recycle_and_execute()`.
 
 ### Enhancements:
 
 * S: `util::bind_ptr<>` extended with capability to adopt and release naked
   pointers.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* The `SharedGroup` constructor now takes an optional callback function so bindings can
+  be notified when a Realm is upgraded. (#1740)
 
 ----------------------------------------------
 
@@ -26,7 +79,7 @@
 
 ### Bugfixes:
 
-* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most 
+* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most
   likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
   possibly also #1164 (crash in SharedGroup destructor on OS X).
 * Copying a `Query` restricted by a `TableView` will now avoid creating a dangling

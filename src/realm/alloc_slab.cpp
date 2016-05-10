@@ -484,6 +484,22 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
     return file_format_version;
 }
 
+ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
+{
+    const Header& header = reinterpret_cast<const Header&>(*buffer);
+    int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+    m_file_format_version = header.m_file_format[slot_selector];
+    uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+    m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+    if (m_file_on_streaming_form) {
+        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(buffer + len) - 1);
+        return ref_type(footer.m_top_ref);
+    }
+    else {
+        return ref_type(ref);
+    }
+}
+
 namespace {
 
 std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>> all_files;
@@ -547,7 +563,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         else {
             m_baseline = m_file_mappings->m_initial_mapping.get_size();
         }
-        return 0;
+        ref_type top_ref = 0;
+        if (cfg.read_only)
+            top_ref = get_top_ref(m_data, m_file_mappings->m_file.get_size());
+        return top_ref;
     }
     // Even though we're the first to map the file, we cannot assume that we're
     // the session initiator. Another process may have the session initiator.
@@ -602,21 +621,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             validate_buffer(map.get_addr(), size, path, cfg.is_shared); // Throws
         }
 
-        {
-            const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
-            int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-            m_file_format_version = header.m_file_format[slot_selector];
-            uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
-            m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
-            if (m_file_on_streaming_form) {
-                const StreamingFooter& footer =
-                    *(reinterpret_cast<StreamingFooter*>(map.get_addr()+size) - 1);
-                top_ref = ref_type(footer.m_top_ref);
-            }
-            else {
-                top_ref = ref_type(ref);
-            }
-        }
+        top_ref = get_top_ref(map.get_addr(), size);
 
         m_data = map.get_addr();
         m_file_mappings->m_initial_mapping = std::move(map);
@@ -747,21 +752,7 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     bool is_shared = false;
     validate_buffer(data, size, path, is_shared); // Throws
 
-    ref_type top_ref;
-    {
-        const Header& header = reinterpret_cast<const Header&>(*data);
-        int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-        m_file_format_version = header.m_file_format[slot_selector];
-        uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
-        m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
-        if (m_file_on_streaming_form) {
-            const StreamingFooter& footer = *(reinterpret_cast<StreamingFooter*>(data+size) - 1);
-            top_ref = ref_type(footer.m_top_ref);
-        }
-        else {
-            top_ref = ref_type(ref);
-        }
-    }
+    ref_type top_ref = get_top_ref(data, size);
 
     m_data        = data;
     m_baseline    = size;

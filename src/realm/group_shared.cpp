@@ -743,8 +743,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     SlabAlloc& alloc = m_group.m_alloc;
 
     Replication::HistoryType history_type = Replication::hist_None;
-    if (Replication* repl = m_group.get_replication())
+    if (Replication* repl = m_group.get_replication()) {
+        repl->commit_log_close();
         history_type = repl->get_history_type();
+    }
 
     int target_file_format_version;
 
@@ -1222,6 +1224,10 @@ void SharedGroup::close() noexcept
             break;
     }
     m_group.detach();
+    using gf = _impl::GroupFriend;
+    if (Replication* repl = gf::get_replication(m_group))
+        repl->commit_log_close();
+
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
@@ -1445,9 +1451,18 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
             if (!allow_file_format_upgrade)
                 throw FileFormatUpgradeRequired();
             gf::upgrade_file_format(m_group, target_file_format_version); // Throws
-            // Note: The file format version stored in in the Realm file will be
+            // Note: The file format version stored in the Realm file will be
             // updated to the new file format version as part of the following
             // commit operation. This happens in GroupWriter::commit().
+            if (m_upgrade_callback) {
+                try {
+                    m_upgrade_callback(current_file_format_version_2, target_file_format_version); // Throws
+                }
+                catch(...) {
+                    rollback();
+                    throw;
+                }
+            }
             commit(); // Throws
         }
         else {
