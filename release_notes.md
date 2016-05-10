@@ -17,7 +17,11 @@
 
 ### Internals
 
+<<<<<<< HEAD
 * Lorem ipsum.
+=======
+* Upgrading to OpenSSL 1.0.1t.
+>>>>>>> 6488cc3db25df963cba976a58951ef0915be1a43
 
 ----------------------------------------------
 
@@ -75,7 +79,7 @@
 
 ### Bugfixes:
 
-* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most 
+* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most
   likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
   possibly also #1164 (crash in SharedGroup destructor on OS X).
 * Copying a `Query` restricted by a `TableView` will now avoid creating a dangling
