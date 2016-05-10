@@ -12125,4 +12125,20 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
 }
 
 
+// Found by AFL
+TEST(LangBindHelpder_AdvanceReadAtStart)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, nullptr));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, nullptr);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    sg_w.begin_write(); // Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+}
+
+
 #endif
