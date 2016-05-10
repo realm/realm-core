@@ -939,7 +939,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
         m_table->move_registered_view(&tv, this);
 
     m_row_indexes.move_assign(tv.m_row_indexes);
-    m_query = tv.m_query;
+    m_query = std::move(tv.m_query);
     m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_version = tv.m_last_seen_version;
     m_auto_sort = tv.m_auto_sort;
