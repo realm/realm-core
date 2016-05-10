@@ -1,6 +1,9 @@
-#
+# NEXT RELEASE
 
-* Lorem ipsum.
+### Bugfixes
+
+* Fix initialization of read-only Groups which are sharing file mappings with
+  other read-only Groups for the same path.
 
 ### Breaking changes
 
@@ -14,7 +17,11 @@
 
 ### Internals
 
+<<<<<<< HEAD
+* Lorem ipsum.
+=======
 * Upgrading to OpenSSL 1.0.1t.
+>>>>>>> 6488cc3db25df963cba976a58951ef0915be1a43
 
 ----------------------------------------------
 
