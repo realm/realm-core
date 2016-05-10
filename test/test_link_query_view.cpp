@@ -1874,4 +1874,47 @@ TEST(BackLink_Query_MultipleLevels)
     CHECK_TABLE_VIEW(q15.find_all(), {hannah, elijah, mark, jason, diane, carol});
 }
 
+// Test queries involving the multiple levels of backlinks across multiple tables.
+TEST(BackLink_Query_MultipleLevelsAndTables)
+{
+    Group group;
+
+    TableRef a = group.add_table("a");
+    TableRef b = group.add_table("b");
+    TableRef c = group.add_table("c");
+    TableRef d = group.add_table("d");
+
+    size_t col_id = a->add_column(type_Int, "id");
+    size_t col_a_to_b = a->add_column_link(type_Link, "link", *b);
+
+    size_t col_b_to_c = b->add_column_link(type_Link, "link", *c);
+    size_t col_c_to_d = c->add_column_link(type_Link, "link", *d);
+
+    d->add_column(type_Int, "id");
+
+    auto add_row = [&](Table& table, std::vector<size_t> values, util::Optional<size_t> link) {
+        size_t row = table.add_empty_row();
+        size_t i = 0;
+        for (; i < values.size(); ++i)
+            table.set_int(i, row, values[i]);
+        if (link)
+            table.set_link(i, row, *link);
+    };
+
+    add_row(*d, {0}, util::none);
+    add_row(*d, {1}, util::none);
+
+    add_row(*c, {}, 0);
+    add_row(*c, {}, 1);
+
+    add_row(*b, {}, 0);
+    add_row(*b, {}, 1);
+
+    add_row(*a, {0}, 0);
+    add_row(*a, {1}, 1);
+
+    Query q = d->backlink(*c, col_c_to_d).backlink(*b, col_b_to_c).backlink(*a, col_a_to_b).column<Int>(col_id) == 1;
+    CHECK_TABLE_VIEW(q.find_all(), {1});
+}
+
 #endif

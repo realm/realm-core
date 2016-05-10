@@ -7,6 +7,8 @@
 * Fixed issue with Timestamps before the UNIX epoch not being read correctly in
   the `TransactLogParser`. Rollbacks and advances with such Timestamps would
   throw a `BadTransactLog` exception. (#1802)
+* Fix queries over multiple levels of backlinks to work when the tables involved have
+  their backlink columns at different indices.
 
 ### Breaking changes
 
