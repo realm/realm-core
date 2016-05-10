@@ -588,7 +588,9 @@ TEST(TimestampColumn_AddColumnAfterRows)
 
     Table t;
     t.add_column(type_Int, "1", non_nullable);
-    t.add_empty_row();
+    t.add_empty_row(REALM_MAX_BPNODE_SIZE * 2 + 1);
+    t.set_int(0, 0, 100);
+
     t.add_column(type_Timestamp, "2", non_nullable);
     t.add_column(type_Timestamp, "3", nullable);
     CHECK_EQUAL(t.get_timestamp(1, 0).get_seconds(), 0);

@@ -387,7 +387,7 @@ protected:
     size_t m_end;
     size_t m_limit;
 
-    mutable uint_fast64_t m_last_seen_version = 0;
+    mutable util::Optional<uint_fast64_t> m_last_seen_version;
 
     size_t m_num_detached_refs = 0;
     /// Construct null view (no memory allocated).
@@ -818,7 +818,7 @@ inline TableViewBase::TableViewBase():
 inline TableViewBase::TableViewBase(Table* parent):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
-    m_last_seen_version(m_table ? m_table->m_version : 0)
+    m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
     // a free-standing container, and beause `IntegerColumn` does not conform to the
@@ -855,7 +855,7 @@ inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t c
     m_linked_table(linked_table->get_table_ref()), // Throws
     m_linked_column(column),
     m_linked_row(row),
-    m_last_seen_version(m_table ? m_table->m_version : 0)
+    m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
     // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
     // a free-standing container, and beause `IntegerColumn` does not conform to the
