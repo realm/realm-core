@@ -858,7 +858,7 @@ void TableViewBase::do_sync()
         re_sort();
 
     if (m_distinct_columns.size() > 0)
-        distinct(m_distinct_columns);
+        distinct_internal(std::vector<size_t>{m_distinct_columns});
 
     m_last_seen_version = outside_version();
 }

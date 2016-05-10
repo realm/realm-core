@@ -1940,13 +1940,12 @@ TEST(TableView_Distinct)
     CHECK_EQUAL(tv.get_source_ndx(1), 2);
     CHECK_EQUAL(tv.get_source_ndx(2), 3);
 
-    t.remove(0);
+    t.remove(3);
     // access to tv is now undefined; may crash. So we do a sync_if_needed()
     tv.sync_if_needed();
-    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_source_ndx(0), 0);
-    CHECK_EQUAL(tv.get_source_ndx(1), 1);
-    CHECK_EQUAL(tv.get_source_ndx(2), 2);
+    CHECK_EQUAL(tv.get_source_ndx(1), 2);
 }
 
 
