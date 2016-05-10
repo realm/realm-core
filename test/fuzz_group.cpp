@@ -131,8 +131,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 printable_key = std::string("\"") + key + "\"";
             }
 
-            *log << "std::unique_ptr<Replication> hist_r(make_client_history(\"" << path << "\", " << printable_key << "));\n";
-            *log << "std::unique_ptr<Replication> hist_w(make_client_history(\"" << path << "\", " << printable_key << "));\n";
+            *log << "SHARED_GROUP_TEST_PATH(path);\n";
+
+            *log << "std::unique_ptr<Replication> hist_r(make_client_history(path, " << printable_key << "));\n";
+            *log << "std::unique_ptr<Replication> hist_w(make_client_history(path, " << printable_key << "));\n";
 
             *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << printable_key << ");\n";
             *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << printable_key << ");\n";
