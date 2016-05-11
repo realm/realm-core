@@ -11,7 +11,8 @@
 
 ### Enhancements
 
-* Distinct is now supported for columns without a search index. (#1739)
+* Distinct is now supported for columns without a search index. Bindings no longer
+  need to ensure that a column has a search index before calling distinct. (#1739)
 
 -----------
 

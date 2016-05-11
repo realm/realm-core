@@ -1490,6 +1490,7 @@ TEST(Table_SetStringUnique)
     CHECK_EQUAL(table.size(), 1);
 }
 
+
 TEST_TYPES(Table_DistinctOnEmptyCol, std::true_type, std::false_type)
 {
     constexpr bool add_search_index = TEST_TYPE::value;

@@ -676,38 +676,18 @@ void TableViewBase::sync_distinct_view(size_t column)
                 col.get_search_index()->distinct(m_row_indexes);
             }
             else {
-                get_distinct_from_column(m_distinct_column_source, m_row_indexes);
+                m_row_indexes.clear();
+                for (size_t i = 0; i < m_table->size(); i++)
+                    m_row_indexes.add(i);
+
+                // Returns results in sorted order, to be consistent with StringIndex::distinct().
+                // Note that TableViewBase::distinct() guaruantees that results will be returned in
+                // the original column order (not necessarily sorted), but Table::get_distinct_view()
+                // makes no promise about the order of results and is currently returning sorted results.
+                sort(column);
+                do_get_distinct(std::vector<size_t> {column});
             }
         }
-    }
-}
-
-void TableViewBase::get_distinct_from_column(size_t column_ndx, IntegerColumn& result)
-{
-    const ColumnBase& col = m_table->get_column_base(column_ndx);
-    std::vector<size_t> original;
-    size_t col_size = col.size();
-    original.resize(col_size);
-    for (size_t r = 0; r < col_size; r++) {
-        original[r] = r;
-    }
-
-    std::vector<size_t>::iterator distinct_end = original.end();
-    const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&col);
-    REALM_ASSERT(ctb);
-    auto sorting_predicate = [&ctb](size_t left, size_t right) {
-        return ctb->compare_values(left, right) > 0;
-    };
-    std::stable_sort(original.begin(), original.end(), sorting_predicate);
-
-    auto unique_predicate = [&ctb](size_t left, size_t right) {
-        return (ctb->compare_values(left, right) == 0);
-    };
-    distinct_end = std::unique(original.begin(), original.end(), unique_predicate);
-
-    result.clear();
-    for (auto it = original.begin(); it != distinct_end; ++it) {
-        result.add(*it);
     }
 }
 
@@ -727,6 +707,11 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     if (m_distinct_columns.size() == 0)
         return;
 
+    do_get_distinct(m_distinct_columns);
+}
+
+void TableViewBase::do_get_distinct(std::vector<size_t> columns)
+{
     // Step 1: First copy original TableView into a vector
     std::vector<size_t> original;
     original.resize(size());
@@ -749,7 +734,7 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     m_columns_enum.resize(columns.size());
 
     for (size_t i = 0; i < columns.size(); i++) {
-        const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
+        const ColumnBase& cb = m_table->get_column_base(columns[i]);
         // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting
         // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used
         // in a couple of other places in Core too.
@@ -767,7 +752,7 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     std::unordered_set<size_t> remove;
     for (size_t r = 1; r < size(); r++) {
         bool identical = true;
-        for (size_t c = 0; c < m_distinct_columns.size(); c++) {
+        for (size_t c = 0; c < columns.size(); c++) {
 
             int cmp;
             int64_t r1_64 = m_row_indexes.get(r);
@@ -800,7 +785,6 @@ void TableViewBase::distinct(std::vector<size_t> columns)
         }
     }
 }
-
 
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
