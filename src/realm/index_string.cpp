@@ -34,8 +34,8 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
     static_assert(index_size <= StringIndex::string_conversion_buffer_size, "Index string conversion buffer too small");
     const char* s_buf = reinterpret_cast<const char*>(&s);
     const char* ns_buf = reinterpret_cast<const char*>(&ns);
-    std::copy(s_buf, s_buf + sizeof(int64_t), buffer.data());
-    std::copy(ns_buf, ns_buf + sizeof(int32_t), buffer.data() + sizeof(int64_t));
+    std::copy(s_buf, s_buf + sizeof(s), buffer.data());
+    std::copy(ns_buf, ns_buf + sizeof(ns), buffer.data() + sizeof(s));
     return StringData{buffer.data(), index_size};
 }
 } // namespace realm
