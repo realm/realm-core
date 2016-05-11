@@ -12125,4 +12125,45 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
 }
 
 
+// Found by AFL
+TEST_TYPES(LangBindHelper_SetTimestampRollback, std::true_type, std::false_type)
+{
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef t = g.add_table("");
+    t->add_column(type_Timestamp, "", nullable_toggle);
+    t->add_empty_row();
+    t->set_timestamp(0, 0, Timestamp(-1, -1));
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+}
+
+
+// Found by AFL, probably related to the rollback version above
+TEST_TYPES(LangBindHelper_SetTimestampAdvanceRead, std::true_type, std::false_type)
+{
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, nullptr));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, nullptr);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    TableRef t = g.add_table("");
+    t->insert_column(0, type_Timestamp, "", nullable_toggle);
+    t->add_empty_row();
+    t->set_timestamp(0, 0, Timestamp(-1, -1));
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+}
+
+
 #endif
