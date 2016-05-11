@@ -8861,4 +8861,80 @@ TEST(Query_SyncViewIfNeeded)
         CHECK_EQUAL(bool(version), false);
     }
 }
+
+
+#include "util/timer.hpp"
+ONLY(Query_TimestampBenchmark)
+{
+    size_t match;
+    Table table;
+
+    table.add_column(type_Timestamp, "a", true);
+    table.add_column(type_OldDateTime, "c", true);
+    table.add_column(type_Int, "e", true);
+
+    table.add_column(type_Timestamp, "b", false);
+    table.add_column(type_OldDateTime, "d", false);
+    table.add_column(type_Int, "f", false);
+
+
+    for (size_t t = 0; t < 100000; t++) {
+        table.add_empty_row();
+        table.set_timestamp(0, t, Timestamp(t + 1, t + 1));
+        table.set_olddatetime(1, t, OldDateTime(t + 1));
+        table.set_int(2, t, t + 1);
+
+        table.set_timestamp(3, t, Timestamp(t + 1, t + 1));
+        table.set_olddatetime(4, t, OldDateTime(t + 1));
+        table.set_int(5, t, t + 1);
+    }
+
+
+
+    test_util::Timer timer;
+
+    timer.reset();
+    for (size_t u = 0; u < 100; u++)
+        match = (table.column<Timestamp>(0) == Timestamp(0, 0)).find();
+    CHECK(match == npos);
+    std::cerr << timer.get_elapsed_time() << "\n";
+
+
+    timer.reset();
+    for (size_t u = 0; u < 100; u++)
+        match = (table.column<OldDateTime>(1) == OldDateTime(0)).find();
+    CHECK(match == npos);
+    std::cerr << timer.get_elapsed_time() << "\n";
+
+
+    timer.reset();
+    for (size_t u = 0; u < 10000; u++)
+        match = (table.column<Int>(2) == 0).find();
+    CHECK(match == npos);
+    std::cerr << timer.get_elapsed_time() / 100 << "\n\n";
+
+
+    timer.reset();
+    for (size_t u = 0; u < 100; u++)
+        match = (table.column<Timestamp>(3) == Timestamp(0, 0)).find();
+    CHECK(match == npos);
+    std::cerr << timer.get_elapsed_time() << "\n";
+
+
+    timer.reset();
+    for (size_t u = 0; u < 100; u++)
+        match = (table.column<OldDateTime>(4) == OldDateTime(0)).find();
+    CHECK(match == npos);
+    std::cerr << timer.get_elapsed_time() << "\n";
+
+
+    timer.reset();
+    for (size_t u = 0; u < 10000; u++)
+        match = (table.column<Int>(5) == 0).find();
+    CHECK(match == npos);
+    std::cerr << timer.get_elapsed_time() / 100 << "\n";
+
+
+
+}
 #endif // TEST_QUERY
