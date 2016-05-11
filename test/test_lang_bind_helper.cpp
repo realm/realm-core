@@ -12134,10 +12134,10 @@ TEST_TYPES(LangBindHelper_SetTimestampRollback, std::true_type, std::false_type)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
-    g.add_table("");
-    g.get_table(0)->add_column(type_Timestamp, "", nullable_toggle);
-    g.get_table(0)->add_empty_row();
-    g.get_table(0)->set_timestamp(0, 0, Timestamp(-1, -1));
+    TableRef t = g.add_table("");
+    t->add_column(type_Timestamp, "", nullable_toggle);
+    t->add_empty_row();
+    t->set_timestamp(0, 0, Timestamp(-1, -1));
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     g.verify();
 }
