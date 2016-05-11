@@ -103,8 +103,9 @@ void StringEnumColumn::do_insert(size_t row_ndx, StringData value, size_t num_ro
     int64_t value_2 = int64_t(key_ndx);
     insert_without_updating_index(row_ndx_2, value_2, num_rows); // Throws
 
-    if (m_search_index)
+    if (m_search_index) {
         m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    }
 }
 
 
@@ -274,6 +275,11 @@ StringIndex* StringEnumColumn::create_search_index()
         StringData value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
+        if (REALM_UNLIKELY(!index->is_valid_input(value))) {
+            index->destroy();
+            index.reset(nullptr);
+            break;
+        }
         index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 

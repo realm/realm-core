@@ -56,6 +56,8 @@ public:
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
+    bool supports_search_index() const noexcept override { return false; }
+    StringIndex* create_search_index() override { return nullptr; }
 
 #ifdef REALM_DEBUG
     void verify() const override;

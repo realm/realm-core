@@ -195,6 +195,11 @@ void StringColumn::populate_search_index()
         StringData value = get(row_ndx);
         size_t num_rows = 1;
         bool is_append = true;
+        if (REALM_UNLIKELY(!m_search_index->is_valid_input(value))) {
+            m_search_index->destroy();
+            m_search_index.reset(nullptr);
+            return;
+        }
         m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
     }
 }
@@ -1051,8 +1056,9 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, 
     size_t row_ndx_2 = is_append ? realm::npos : row_ndx;
     bptree_insert(row_ndx_2, value, num_rows); // Throws
 
-    if (m_search_index)
+    if (m_search_index) {
         m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+    }
 }
 
 

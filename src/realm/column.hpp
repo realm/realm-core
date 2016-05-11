@@ -179,6 +179,7 @@ public:
     virtual StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
 
     // Search index
+    virtual bool supports_search_index() const noexcept;
     virtual bool has_search_index() const noexcept;
     virtual StringIndex* create_search_index();
     virtual void destroy_search_index() noexcept;
@@ -399,6 +400,7 @@ public:
     void move_assign(ColumnBaseWithIndex& col) noexcept;
     void destroy() noexcept override;
 
+    bool supports_search_index() const noexcept override { return true; }
     bool has_search_index() const noexcept final { return bool(m_search_index); }
     StringIndex* get_search_index() noexcept final { return m_search_index.get(); }
     const StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
@@ -620,6 +622,12 @@ private:
 };
 
 // Implementation:
+
+inline bool ColumnBase::supports_search_index() const noexcept
+{
+    REALM_ASSERT(!has_search_index());
+    return false;
+}
 
 inline bool ColumnBase::has_search_index() const noexcept
 {
@@ -843,10 +851,20 @@ void Column<T>::populate_search_index()
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         bool is_append = true;
         if (is_null(row_ndx)) {
+            if (REALM_UNLIKELY(!m_search_index->is_valid_input(null{}))) {
+                m_search_index->destroy();
+                m_search_index.reset(nullptr);
+                return;
+            }
             m_search_index->insert(row_ndx, null{}, 1, is_append); // Throws
         }
         else {
             T value = get(row_ndx);
+            if (REALM_UNLIKELY(!m_search_index->is_valid_input(value))) {
+                m_search_index->destroy();
+                m_search_index.reset(nullptr);
+                return;
+            }
             m_search_index->insert(row_ndx, value, 1, is_append); // Throws
         }
     }

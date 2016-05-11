@@ -189,7 +189,11 @@ public:
         /// History type (as specified by the Replication implementation passed
         /// to the SharedGroup constructor) was not consistent across the
         /// session.
-        mixed_history_type
+        mixed_history_type,
+
+        /// StringIndex does not support indexing on inputs longer than
+        /// Table::max_indexed_string_length
+        string_too_long_for_index
     };
 
     LogicError(ErrorKind message);
