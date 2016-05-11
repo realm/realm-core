@@ -9,6 +9,9 @@ UNIT_TESTS_PATH="findings/generated_unit_tests/"
 # Kill all running fuzzers
 pkill afl-fuzz
 
+# Clean up the queues (many files, inodes)
+rm -rf findings/*/queue
+
 mkdir -p $UNIT_TESTS_PATH
 
 # Find all interesting cases
