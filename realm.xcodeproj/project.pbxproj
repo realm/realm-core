@@ -1025,6 +1025,7 @@
 		C008FF991B67F02F0042669E /* liblibrealm watchos.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibrealm watchos.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C08FE2B61B45BD750037AFCE /* simulated_failure.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simulated_failure.cpp; sourceTree = "<group>"; };
 		C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = simulated_failure.hpp; sourceTree = "<group>"; };
+		F412E0601CE32D3500652F39 /* ring_buffer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ring_buffer.hpp; sourceTree = "<group>"; };
 		F43098B01B021C04000A2333 /* bptree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bptree.cpp; path = realm/bptree.cpp; sourceTree = "<group>"; };
 		F43098B11B021C04000A2333 /* bptree.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = bptree.hpp; path = realm/bptree.hpp; sourceTree = "<group>"; };
 		F44D4CE51B381D27009ADAB9 /* input_stream.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = input_stream.hpp; sourceTree = "<group>"; };
@@ -1472,6 +1473,7 @@
 		52D7C4661852A01700633748 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				F412E0601CE32D3500652F39 /* ring_buffer.hpp */,
 				65F666FD1BFD01DC00749FA2 /* aes_cryptor.hpp */,
 				52D7C4671852A01700633748 /* assert.hpp */,
 				485231171B2E918F003C72AF /* basic_system_errors.cpp */,
