@@ -29,12 +29,12 @@ using namespace realm::util;
 
 struct EndOfFile {};
 
-std::string create_string(unsigned char byte)
+std::string create_string(unsigned char length)
 {
     char buf[256] = {0};
-    for (size_t i = 0; i < sizeof(buf); i++)
+    for (size_t i = 0; i < length; i++)
         buf[i] = 'a' + (rand() % 20);
-    return std::string{buf, byte};
+    return std::string{buf, length};
 }
 
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
