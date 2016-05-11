@@ -120,7 +120,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         s.pos = 0;
 
         if (log) {
-            *log << "\n\n// Test case generated in "  REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
+            *log << "// Test case generated in "  REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
             *log << "// ----------------------------------------------------------------------\n";
             const char* key = crypt_key();
             std::string printable_key;
