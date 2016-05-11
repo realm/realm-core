@@ -725,8 +725,8 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
         }
         case type_Timestamp: {
             Timestamp ts= value.get_timestamp();
-            auto seconds = ts.get_seconds();
-            auto nano_seconds = ts.get_nanoseconds();
+            int64_t seconds = ts.get_seconds();
+            int32_t nano_seconds = ts.get_nanoseconds();
             auto numbers_3 = append(numbers_2, seconds);
             append_simple_instr(instr, append(numbers_3, nano_seconds)); // Throws
             return;
