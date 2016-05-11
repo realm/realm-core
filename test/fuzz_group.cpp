@@ -173,7 +173,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (log) {
                     *log << "g.insert_table(" << table_ndx << ", \"" << name << "\");\n";
                 }
-                g.insert_table(table_ndx, name);
+                try {
+                    g.insert_table(table_ndx, name);
+                }
+                catch (const TableNameInUse&) {
+                }
             }
             else if (instr == REMOVE_TABLE && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
