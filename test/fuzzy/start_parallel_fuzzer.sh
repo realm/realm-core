@@ -1,9 +1,9 @@
 #!/bin/sh
 if [ "$#" -ne 2 ]; then
-    echo "Usage sh $0 num_cores executable_path (e.g. ./fuzz-group-dbg)"
+    echo "Usage sh $0 num_fuzzers executable_path (e.g. ./fuzz-group-dbg)"
     exit 1
 fi
-NUM_CORES=$1
+NUM_FUZZERS=$1
 EXECUTABLE_PATH=$2
 
 COMPILER="afl-g++"
@@ -33,24 +33,28 @@ else
     fi
 fi
 
-# build core
+echo "Building core"
+
 cd ../../
 CXX=$COMPILER make -j check-debug-norun $FLAGS
 
-# build fuzz target
+echo "Building fuzz target"
+
 cd -
 CXX=$COMPILER make -j check-debug-norun $FLAGS
 
-# clean the findings directory
 echo "Cleaning up the findings directory"
+
 pkill afl-fuzz
 rm -rf findings/* &> /dev/null
 
 TIME_OUT="100" # ms
 MEMORY="100" # MB
 
+echo "Starting ${NUM_FUZZERS} fuzzers in parallel"
+
 # if we have only one fuzzer
-if [ $NUM_CORES -eq 1 ]; then
+if [ $NUM_FUZZERS -eq 1 ]; then
     afl-fuzz  -t $TIME_OUT -m $MEMORY -i testcases -o findings $EXECUTABLE_PATH @@
     exit 0
 fi
@@ -58,12 +62,11 @@ fi
 # start the fuzzers in parallel
 afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -M fuzzer1 $EXECUTABLE_PATH @@ --name fuzzer1 >/dev/null 2>&1 &
 
-for i in `seq 2 $NUM_CORES`;
+for i in `seq 2 $NUM_FUZZERS`;
 do
     afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -S fuzzer$i $EXECUTABLE_PATH @@ --name fuzzer$i >/dev/null 2>&1 &
 done
 
 echo
 echo "Use afl-whatsup findings/ to check progress"
-echo "Use pkill afl-fuzz to kill the fuzzers"
 echo
