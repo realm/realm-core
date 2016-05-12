@@ -182,7 +182,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             else if (instr == REMOVE_TABLE && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 if (log) {
-                    *log << "try { g.remove_table(" << table_ndx << "); } catch (...) { }\n";
+                    *log << "try { g.remove_table(" << table_ndx << "); } catch (const CrossTableLinkTarget&) { }\n";
                 }
                 try {
                     g.remove_table(table_ndx);
