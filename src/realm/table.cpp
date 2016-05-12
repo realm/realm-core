@@ -2202,7 +2202,7 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
         std::vector<size_t> rows;
         rows.reserve(size);
         for (size_t i = 0; i < size; ++i) {
-            size_t v = row_indexes.get(i);
+            int64_t v = row_indexes.get(i);
             if (v != detached_ref) {
                 size_t row_ndx = to_size_t(v);
                 rows.push_back(row_ndx);
@@ -2242,7 +2242,7 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
     size_t size = row_indexes.size();
     state.rows.reserve(size);
     for (size_t i = 0; i < size; ++i) {
-        size_t v = row_indexes.get(i);
+        int64_t v = row_indexes.get(i);
         if (v != detached_ref) {
             size_t row_ndx = to_size_t(v);
             CascadeState::row row;
