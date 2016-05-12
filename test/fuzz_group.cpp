@@ -542,10 +542,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
 void usage(const char* argv[])
 {
-    fprintf(stderr, "Usage: %s <LOGFILE> [--log] [--name testName]\n(where <LOGFILE> is a instruction file that will "
-            "be replayed.)\nPass --log to have code printed to stdout producing the same instructions.\nPass --name "
-            "testName with distinct values when running on multiple threads, to make sure the test don't use the same"
-            " file", argv[0]);
+    fprintf(stderr,
+            "Usage: %s <LOGFILE> [--log] [--name testName]\n"
+            "Where <LOGFILE> is a instruction file that will be replayed.\n"
+            "Pass --log to have code printed to stdout producing the same instructions.\n"
+            "Pass --name testName with distinct values when running on multiple threads,\n"
+            "                     to make sure the test don't use the same Realm file\n", argv[0]);
     exit(1);
 }
 
