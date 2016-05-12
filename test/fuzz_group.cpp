@@ -584,31 +584,8 @@ int run_fuzzy(int argc, const char* argv[])
     disable_sync_to_disk();
     realm::test_util::SharedGroupTestPathGuard path(name + ".realm");
 
-    try {
-        std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-        parse_and_apply_instructions(contents, path, log);
-    }
-    catch (const EndOfFile&) {
-        return 0;
-    }
-    catch (const LogicError&) {
-        return 0;
-    }
-    catch (const TableNameInUse&) {
-        return 0;
-    }
-    catch (const NoSuchTable&) {
-        return 0;
-    }
-    catch (const CrossTableLinkTarget&) {
-        return 0;
-    }
-    catch (const DescriptorMismatch&) {
-        return 0;
-    }
-    catch (const FileFormatUpgradeRequired&) {
-        return 0;
-    }
+    std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
+    parse_and_apply_instructions(contents, path, log);
 
     return 0;
 }
