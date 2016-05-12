@@ -646,7 +646,7 @@ TEST(TimestampColumn_AggregateBug)
 
 }
 
-TEST(Table_DistinctTimestamp)
+TEST(TimestampColumn_DistinctTimestamp)
 {
     Table table;
     table.add_column(type_Timestamp, "first");

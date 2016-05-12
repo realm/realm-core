@@ -1642,7 +1642,7 @@ void Table::upgrade_olddatetime()
 }
 
 
-void Table::add_search_index(size_t col_ndx)
+bool Table::add_search_index(size_t col_ndx)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -1660,13 +1660,17 @@ void Table::add_search_index(size_t col_ndx)
         throw LogicError(LogicError::illegal_combination);
 
     if (has_search_index(col_ndx))
-        return;
+        return true;
+
+    ColumnBase& col = get_column_base(col_ndx);
+    if (!col.supports_search_index()) {
+        throw LogicError(LogicError::illegal_combination);
+    }
 
     // Create the index
-    ColumnBase& col = get_column_base(col_ndx);
     StringIndex* index = col.create_search_index(); // Throws
     if (!index) {
-        throw LogicError(LogicError::illegal_combination);
+        return false;
     }
 
     // The index goes in the list of column refs immediate after the owning column
@@ -1685,6 +1689,8 @@ void Table::add_search_index(size_t col_ndx)
 
     if (Replication* repl = get_repl())
         repl->add_search_index(this, col_ndx); // Throws
+
+    return true;
 }
 
 
@@ -2995,8 +3001,12 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     if (REALM_UNLIKELY(value.size() > max_string_size))
         throw LogicError(LogicError::string_too_big);
 
-    bump_version();
     ColumnBase& col = get_column_base(col_ndx);
+    if (REALM_UNLIKELY(value.size() > Table::max_indexed_string_length
+                       && col.has_search_index()))
+        throw LogicError(LogicError::string_too_long_for_index);
+
+    bump_version();
     col.set_string(ndx, value); // Throws
 
     if (Replication* repl = get_repl())
@@ -3020,13 +3030,30 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
 
-    if (!has_search_index(col_ndx))
+    bool has_search_index = this->has_search_index(col_ndx);
+
+    if (!has_search_index)
         throw LogicError(LogicError::no_search_index);
+
+    if (REALM_UNLIKELY(value.size() > Table::max_indexed_string_length
+                       && has_search_index))
+        throw LogicError(LogicError::string_too_long_for_index);
 
     bump_version();
 
-    StringColumn& col = get_column_string(col_ndx);
-    do_set_unique(col, ndx, value); // Throws
+    ColumnType actual_type = get_real_column_type(col_ndx);
+    REALM_ASSERT(actual_type == ColumnType::col_type_String
+                 || actual_type == ColumnType::col_type_StringEnum);
+
+    //FIXME: String and StringEnum columns should have a common base class
+    if (actual_type == ColumnType::col_type_String) {
+        StringColumn& col = get_column_string(col_ndx);
+        do_set_unique(col, ndx, value); // Throws
+    }
+    else {
+        StringEnumColumn& col = get_column_string_enum(col_ndx);
+        do_set_unique(col, ndx, value); // Throws
+    }
 
     if (Replication* repl = get_repl())
         repl->set_string_unique(this, col_ndx, ndx, value); // Throws
@@ -3052,11 +3079,15 @@ void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringD
     if (REALM_UNLIKELY(value.size() > max_string_size - old_value.size()))
         throw LogicError(LogicError::string_too_big);
 
+    ColumnBase& col = get_column_base(col_ndx);
+    if (REALM_UNLIKELY(value.size() > Table::max_indexed_string_length
+                       && col.has_search_index()))
+        throw LogicError(LogicError::string_too_long_for_index);
+
     std::string copy_of_value = old_value; // Throws
     copy_of_value.insert(pos, value.data(), value.size()); // Throws
 
     bump_version();
-    ColumnBase& col = get_column_base(col_ndx);
     col.set_string(row_ndx, copy_of_value); // Throws
 
     if (Replication* repl = get_repl())

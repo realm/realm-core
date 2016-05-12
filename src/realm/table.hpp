@@ -227,7 +227,10 @@ public:
     ///
     /// add_search_index() adds a search index to the specified column of this
     /// table. It has no effect if a search index has already been added to the
-    /// specified column (idempotency).
+    /// specified column (idempotency). add_search_index() returns false if there
+    /// was some problem when creating the search index, for example if there is data
+    /// in the column that exceeds the length limit Table::max_indexed_string_length.
+    /// Otherwise it returns true.
     ///
     /// remove_search_index() removes the search index from the specified column
     /// of this table. It has no effect if the specified column has no search
@@ -242,8 +245,7 @@ public:
     /// \param column_ndx The index of a column of this table.
 
     bool has_search_index(size_t column_ndx) const noexcept;
-//    void remove_search_index(size_t col_ndx);
-    void add_search_index(size_t column_ndx);
+    bool add_search_index(size_t column_ndx);
     void remove_search_index(size_t column_ndx);
 
     //@}
@@ -469,6 +471,7 @@ public:
 
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
+    static const size_t max_indexed_string_length = StringIndex::max_indexed_string_length;
 
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
