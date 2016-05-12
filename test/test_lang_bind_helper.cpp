@@ -3525,7 +3525,7 @@ namespace {
 template<typename T>
 class ConcurrentQueue {
 public:
-    ConcurrentQueue(uint64_t sz) : sz(sz)
+    ConcurrentQueue(size_t sz) : sz(sz)
     {
         data.reset(new T[sz]);
     }
@@ -3570,10 +3570,10 @@ private:
     std::mutex mutex;
     std::condition_variable not_full;
     std::condition_variable not_empty_or_closed;
-    uint64_t reader = 0;
-    uint64_t writer = 0;
+    size_t reader = 0;
+    size_t writer = 0;
     bool closed = false;
-    uint64_t sz;
+    size_t sz;
     std::unique_ptr<T[]> data;
 };
 
@@ -7794,7 +7794,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool set_int(size_t, size_t, size_t) const
+            bool set_int(size_t, size_t, int_fast64_t) const
             {
                 throw ObserverError();
             }

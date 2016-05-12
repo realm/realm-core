@@ -30,7 +30,7 @@
 
 #include "test.hpp"
 
-extern uint64_t unit_test_random_seed;
+extern unsigned long unit_test_random_seed;
 
 using namespace realm;
 using namespace realm::util;
