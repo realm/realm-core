@@ -12,6 +12,9 @@ pkill afl-fuzz
 echo "Cleaning up the queues to free disk space, inodes"
 rm -rf findings/*/queue
 
+echo "Removing any leftover Realm files"
+rm -rf fuzzer*.realm*
+
 # Find all interesting cases
 FILES=(`find findings \( -path "*hang/id:s*" -or -path "*crashes/id:*" \)`)
 
