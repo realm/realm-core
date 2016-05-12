@@ -6,7 +6,20 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Search indexes no longer support strings with lengths greater than
+  `Table::max_indexed_string_length`. If you try to add a string with a longer length
+  (through the Table interface), then a `realm::LogicError` will be thrown with type 
+  `string_too_long_for_index`. Calling `Table::add_search_index()` will now return a
+  boolean value indicating whether or not the index could be created on the column. If
+  the column contains strings that exceed the maximum allowed length, then
+  `Table::add_search_index()` will return false and the index will not be created, but the data
+  in the underlying column will remain unaffected. This is so that bindings can attempt to
+  create a search index on a column without knowing the lengths of the strings in the column.
+  Realm will continue to operate as before on any search index that already stores strings longer
+  than the maximum allowed length meaning that this change is not file breaking (no upgrade is
+  required). However, as stated above, any new strings that exceed the maximum length will
+  not be allowed into a search index, to insert long strings just turn off the search index
+  (although this could be left up to the user).
 
 ### Enhancements
 
@@ -20,7 +33,30 @@
 
 ----------------------------------------------
 
-# 0.100.3 Release notes
+# 0.100.4 Release notes
+
+### Bugfixes
+
+* Fix initialization of read-only Groups which are sharing file mappings with
+  other read-only Groups for the same path.
+* Fix TableView::clear() to work in imperative mode (issue #1803, #827)
+* Fixed issue with Timestamps before the UNIX epoch not being read correctly in
+  the `TransactLogParser`. Rollbacks and advances with such Timestamps would
+  throw a `BadTransactLog` exception. (#1802)
+* Fix queries over multiple levels of backlinks to work when the tables involved have
+  their backlink columns at different indices.
+
+### Enhancements
+
+* Distinct is now supported for columns without a search index. Bindings no longer
+  need to ensure that a column has a search index before calling distinct. (#1739)
+
+**Note: This is a hotfix release built on top of 0.100.2**
+
+
+----------------------------------------------
+
+# 0.100.3 Release notes (This is a faulty release and should not be used)
 
 ### Bugfixes
 
