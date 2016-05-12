@@ -30,7 +30,7 @@ echo "Converting ${NUM_FILES} found crashes and hangs into .cpp unit tests in ${
 mkdir -p $UNIT_TESTS_PATH
 
 # Run executable for each and capture the output
-for FILE in $FILES
+for FILE in ${FILES[@]}
 do
     CPP_FILE=$UNIT_TESTS_PATH$(basename $FILE).cpp
     $EXECUTABLE_PATH $FILE --log > $CPP_FILE
