@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Throws AccessError instead of runtime_error for adding path information.
 
 -----------
 
