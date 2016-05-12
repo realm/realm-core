@@ -159,7 +159,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             if (instr == ADD_TABLE && g.size() < max_tables) {
                 std::string name = create_string(get_next(s) % Group::max_table_name_length);
                 if (log) {
-                    *log << "try { g.add_table(\"" << name << "\"); } catch(const TableNameInUse&) { }\n";
+                    *log << "try { g.add_table(\"" << name << "\"); } catch (const TableNameInUse&) { }\n";
                 }
                 try {
                     g.add_table(name);
@@ -171,7 +171,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx = get_next(s) % (g.size() + 1);
                 std::string name = create_string(get_next(s) % (Group::max_table_name_length - 10) + 5);
                 if (log) {
-                    *log << "try { g.insert_table(" << table_ndx << ", \"" << name << "\"); } catch(const TableNameInUse&) { }\n";
+                    *log << "try { g.insert_table(" << table_ndx << ", \"" << name << "\"); } catch (const TableNameInUse&) { }\n";
                 }
                 try {
                     g.insert_table(table_ndx, name);
@@ -182,7 +182,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             else if (instr == REMOVE_TABLE && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 if (log) {
-                    *log << "try { g.remove_table(" << table_ndx << "); } catch(...) { }\n";
+                    *log << "try { g.remove_table(" << table_ndx << "); } catch (...) { }\n";
                 }
                 try {
                     g.remove_table(table_ndx);
