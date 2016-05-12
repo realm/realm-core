@@ -4,6 +4,7 @@
 
 * Fix initialization of read-only Groups which are sharing file mappings with
   other read-only Groups for the same path.
+* Fix TableView::clear() to work in imperative mode (issue #1803, #827)
 * Fixed issue with Timestamps before the UNIX epoch not being read correctly in
   the `TransactLogParser`. Rollbacks and advances with such Timestamps would
   throw a `BadTransactLog` exception. (#1802)

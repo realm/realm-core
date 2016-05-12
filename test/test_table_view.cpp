@@ -898,6 +898,30 @@ TEST(TableView_Clear)
 }
 
 
+// Verify that TableView::clear() can handle a detached ref,
+// so that it can be used in an imperative setting
+TEST(TableView_Imperative_Clear)
+{
+    Table t;
+    t.add_column(type_Int,"i1");
+    t.add_empty_row(3);
+    t.set_int(0,0,7);
+    t.set_int(0,1,13);
+    t.set_int(0,2,29);
+
+    TableView v = t.where().less(0,20).find_all();
+    CHECK_EQUAL(2, v.size());
+    // remove the underlying entry in the table, introducing a detached ref
+    t.move_last_over(v.get_source_ndx(0));
+    // the detached ref still counts as an entry when calling size()
+    CHECK_EQUAL(2, v.size());
+    // but is does not count as attached anymore:
+    CHECK_EQUAL(1, v.num_attached_rows());
+    v.clear();
+    CHECK_EQUAL(0, v.size());
+    CHECK_EQUAL(1, t.size());
+}
+
 //exposes a bug in stacked tableview:
 //view V1 selects a subset of rows from Table T1
 //View V2 selects rows from  view V1
