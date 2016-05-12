@@ -1,10 +1,10 @@
 #!/bin/sh
-if [ "$#" -ne 1 ]; then
-    echo "Usage sh $0 executable_path (e.g. ./fuzz-group-dbg)"
+if [ "$#" -ne 2 ]; then
+    echo "Usage sh $0 executable_path (e.g. ./fuzz-group-dbg) output_directory"
     exit 1
 fi
 EXECUTABLE_PATH=$1
-UNIT_TESTS_PATH="findings/generated_unit_tests/"
+UNIT_TESTS_PATH=$2
 
 # Kill all running fuzzers
 pkill afl-fuzz
