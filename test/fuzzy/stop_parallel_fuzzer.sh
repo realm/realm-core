@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 if [ "$#" -ne 2 ]; then
     echo "Usage sh $0 executable_path (e.g. ./fuzz-group-dbg) output_directory"
     exit 1
