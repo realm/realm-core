@@ -5,4 +5,4 @@
 num_fuzzers=$(getconf _NPROCESSORS_ONLN)
 executable_path="./fuzz-group-dbg"
 
-sh start_parallel_fuzzer.sh ${num_fuzzers} "${executable_path}"
+sh start_parallel_fuzzer.sh ${num_fuzzers} "$executable_path"

@@ -5,4 +5,4 @@
 executable_path="./fuzz-group-dbg"
 unit_tests_path="findings/cpp_unit_tests/"
 
-bash stop_parallel_fuzzer.sh "${executable_path}" "${unit_tests_path}"
+bash stop_parallel_fuzzer.sh "$executable_path" "$unit_tests_path"
