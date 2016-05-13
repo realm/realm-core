@@ -1493,11 +1493,13 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 
 Query& Query::and_query(const Query& q)
 {
-    add_node(q.root_node()->clone());
+    if (auto root_node = q.root_node()) {
+        add_node(root_node->clone());
 
-    if (q.m_source_link_view) {
-        REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
-        m_source_link_view = q.m_source_link_view;
+        if (q.m_source_link_view) {
+            REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
+            m_source_link_view = q.m_source_link_view;
+        }
     }
 
     return *this;
@@ -1505,11 +1507,13 @@ Query& Query::and_query(const Query& q)
 
 Query& Query::and_query(Query&& q)
 {
-    add_node(std::move(q.m_groups[0].m_root_node));
+    if (q.root_node()) {
+        add_node(std::move(q.m_groups[0].m_root_node));
 
-    if (q.m_source_link_view) {
-        REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
-        m_source_link_view = q.m_source_link_view;
+        if (q.m_source_link_view) {
+            REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
+            m_source_link_view = q.m_source_link_view;
+        }
     }
 
     return *this;
