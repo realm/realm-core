@@ -179,6 +179,7 @@ public:
     virtual StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
 
     // Search index
+    virtual bool supports_search_index() const noexcept;
     virtual bool has_search_index() const noexcept;
     virtual StringIndex* create_search_index();
     virtual void destroy_search_index() noexcept;
@@ -399,6 +400,7 @@ public:
     void move_assign(ColumnBaseWithIndex& col) noexcept;
     void destroy() noexcept override;
 
+    virtual bool supports_search_index() const noexcept override { return true; }
     bool has_search_index() const noexcept final { return bool(m_search_index); }
     StringIndex* get_search_index() noexcept final { return m_search_index.get(); }
     const StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
@@ -525,6 +527,8 @@ public:
 
     void populate_search_index();
     StringIndex* create_search_index() override;
+    inline bool supports_search_index() const noexcept override { return true; }
+
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -620,6 +624,12 @@ private:
 };
 
 // Implementation:
+
+inline bool ColumnBase::supports_search_index() const noexcept
+{
+    REALM_ASSERT(!has_search_index());
+    return false;
+}
 
 inline bool ColumnBase::has_search_index() const noexcept
 {
@@ -834,6 +844,18 @@ StringData Column<T>::get_index_data(size_t ndx, StringIndex::StringConversionBu
     return to_str(x, buffer);
 }
 
+template<>
+inline bool Column<float>::supports_search_index() const noexcept
+{
+    return false;
+}
+
+template<>
+inline bool Column<double>::supports_search_index() const noexcept
+{
+    return false;
+}
+
 template<class T>
 void Column<T>::populate_search_index()
 {
@@ -856,9 +878,22 @@ template<class T>
 StringIndex* Column<T>::create_search_index()
 {
     REALM_ASSERT(!has_search_index());
+    REALM_ASSERT(supports_search_index());
     m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
     populate_search_index();
     return m_search_index.get();
+}
+
+template<>
+inline StringIndex* Column<float>::create_search_index()
+{
+    return nullptr;
+}
+
+template<>
+inline StringIndex* Column<double>::create_search_index()
+{
+    return nullptr;
 }
 
 template<class T>

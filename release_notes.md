@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a crash when `Table::set_string_unique()` is called but the underlying column
+  is actually a StringEnumColumn.
 
 ### Breaking changes
 
@@ -23,7 +24,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Strictly enforce not allowing search indexes to be created on unsupported column types.
 
 -----------
 
