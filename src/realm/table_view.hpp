@@ -457,7 +457,6 @@ private:
     size_t find_first_integer(size_t column_ndx, int64_t value) const;
     template<class oper>
     Timestamp minmax_timestamp(size_t column_ndx, size_t* return_ndx) const;
-    void do_get_distinct(std::vector<size_t> columns);
 
     friend class Table;
     friend class Query;
