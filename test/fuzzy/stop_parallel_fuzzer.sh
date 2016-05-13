@@ -3,8 +3,8 @@ if [ "$#" -ne 2 ]; then
     echo "Usage sh $0 executable_path (e.g. ./fuzz-group-dbg) output_directory"
     exit 1
 fi
-executable_path=$1
-unit_tests_path=$2
+executable_path="$1"
+unit_tests_path="$2"
 
 echo "Killing all running fuzzers"
 pkill afl-fuzz
@@ -16,7 +16,7 @@ echo "Removing any leftover Realm files"
 rm -rf fuzzer*.realm*
 
 # Find all interesting cases
-files=(`find findings \( -path "*hang/id:s*" -or -path "*crashes/id:*" \)`)
+files=($(find findings \( -path "*hang/id:s*" -or -path "*crashes/id:*" \)))
 
 num_files=${#files[@]}
 
@@ -27,11 +27,11 @@ fi
 
 echo "Converting ${num_files} found crashes and hangs into .cpp unit tests in ${unit_tests_path}"
 
-mkdir -p $unit_tests_path
+mkdir -p "${unit_tests_path}"
 
 # Run executable for each and capture the output
 for file in ${files[@]}
 do
-    cpp_file=$unit_tests_path$(basename $file).cpp
-    $executable_path $file --log > $cpp_file
+    cpp_file="${unit_tests_path}$(basename ${file}).cpp"
+    "${executable_path}" "${file}" --log > "${cpp_file}"
 done
