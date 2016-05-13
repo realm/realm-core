@@ -2,7 +2,27 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix queries over multiple levels of backlinks to work when the tables involved have
+  their backlink columns at different indices.
+
+### Breaking changes
+
+* Reverting the breaking changes wrongly introduced by 0.100.3, so that
+  this release does NOT have breaking changes with respect to 0.100.2
+
+
+----------------------------------------------
+
+# 0.100.3 Release notes (This is a faulty release and should not be used)
+
+### Bugfixes
+
+* Fix initialization of read-only Groups which are sharing file mappings with
+  other read-only Groups for the same path.
+* Fix TableView::clear() to work in imperative mode (issue #1803, #827)
+* Fixed issue with Timestamps before the UNIX epoch not being read correctly in
+  the `TransactLogParser`. Rollbacks and advances with such Timestamps would
+  throw a `BadTransactLog` exception. (#1802)
 
 ### Breaking changes
 
@@ -23,59 +43,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
-
-----------------------------------------------
-
-# 0.100.4 Release notes
-
-### Bugfixes
-
-* Fix initialization of read-only Groups which are sharing file mappings with
-  other read-only Groups for the same path.
-* Fix TableView::clear() to work in imperative mode (issue #1803, #827)
-* Fixed issue with Timestamps before the UNIX epoch not being read correctly in
-  the `TransactLogParser`. Rollbacks and advances with such Timestamps would
-  throw a `BadTransactLog` exception. (#1802)
-* Fix queries over multiple levels of backlinks to work when the tables involved have
-  their backlink columns at different indices.
-
-### Enhancements
-
 * Distinct is now supported for columns without a search index. Bindings no longer
   need to ensure that a column has a search index before calling distinct. (#1739)
-
-**Note: This is a hotfix release built on top of 0.100.2**
-
-
-----------------------------------------------
-
-# 0.100.3 Release notes (This is a faulty release and should not be used)
-
-### Bugfixes
-
-* Fix initialization of read-only Groups which are sharing file mappings with
-  other read-only Groups for the same path.
-* Fix TableView::clear() to work in imperative mode (issue #1803, #827)
-* Fixed issue with Timestamps before the UNIX epoch not being read correctly in
-  the `TransactLogParser`. Rollbacks and advances with such Timestamps would
-  throw a `BadTransactLog` exception. (#1802)
-* Fix queries over multiple levels of backlinks to work when the tables involved have
-  their backlink columns at different indices.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
 
 -----------
 
