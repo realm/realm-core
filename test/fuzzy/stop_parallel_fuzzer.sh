@@ -9,7 +9,7 @@ unit_tests_path="$2"
 echo "Killing all running fuzzers"
 pkill afl-fuzz
 
-echo "Cleaning up the queues to free disk space, inodes"
+echo "Cleaning up the queues to free disk space, inodes (this may take a while)"
 rm -rf findings/*/queue
 
 echo "Removing any leftover Realm files"
