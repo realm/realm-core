@@ -2,7 +2,7 @@
 
 # Start as many fuzzers as we have CPU logical processors. Use the default executable
 
-NUM_FUZZERS=`getconf _NPROCESSORS_ONLN`
-EXECUTABLE_PATH="./fuzz-group-dbg"
+num_fuzzers=`getconf _NPROCESSORS_ONLN`
+executable_path="./fuzz-group-dbg"
 
-sh start_parallel_fuzzer.sh $NUM_FUZZERS $EXECUTABLE_PATH
+sh start_parallel_fuzzer.sh $num_fuzzers $executable_path

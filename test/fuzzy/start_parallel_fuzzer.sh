@@ -3,14 +3,14 @@ if [ "$#" -ne 2 ]; then
     echo "Usage sh $0 num_fuzzers executable_path (e.g. ./fuzz-group-dbg)"
     exit 1
 fi
-NUM_FUZZERS=$1
-EXECUTABLE_PATH=$2
+num_fuzzers=$1
+executable_path=$2
 
-COMPILER="afl-g++"
-FLAGS="COMPILER_IS_GCC_LIKE=yes"
+compiler="afl-g++"
+flags="COMPILER_IS_GCC_LIKE=yes"
 
 if [ "`uname`" = "Darwin" ]; then
-    COMPILER="afl-clang++"
+    compiler="afl-clang++"
 
     # FIXME: Consider detecting if ReportCrash was already unloaded and skip this message
     #        or print and don't try to run AFL.
@@ -36,35 +36,35 @@ fi
 echo "Building core"
 
 cd ../../
-CXX=$COMPILER make -j check-debug-norun $FLAGS
+CXX=$compiler make -j check-debug-norun $flags
 
 echo "Building fuzz target"
 
 cd -
-CXX=$COMPILER make -j check-debug-norun $FLAGS
+CXX=$compiler make -j check-debug-norun $flags
 
 echo "Cleaning up the findings directory"
 
 pkill afl-fuzz
 rm -rf findings/* &> /dev/null
 
-TIME_OUT="100" # ms
-MEMORY="100" # MB
+time_out="100" # ms
+memory="100" # MB
 
-echo "Starting ${NUM_FUZZERS} fuzzers in parallel"
+echo "Starting ${num_fuzzers} fuzzers in parallel"
 
 # if we have only one fuzzer
-if [ $NUM_FUZZERS -eq 1 ]; then
-    afl-fuzz  -t $TIME_OUT -m $MEMORY -i testcases -o findings $EXECUTABLE_PATH @@
+if [ $num_fuzzers -eq 1 ]; then
+    afl-fuzz  -t $time_out -m $memory -i testcases -o findings $executable_path @@
     exit 0
 fi
 
 # start the fuzzers in parallel
-afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -M fuzzer1 $EXECUTABLE_PATH @@ --name fuzzer1 >/dev/null 2>&1 &
+afl-fuzz -t $time_out -m $memory -i testcases -o findings -M fuzzer1 $executable_path @@ --name fuzzer1 >/dev/null 2>&1 &
 
-for i in `seq 2 $NUM_FUZZERS`;
+for i in `seq 2 $num_fuzzers`;
 do
-    afl-fuzz -t $TIME_OUT -m $MEMORY -i testcases -o findings -S fuzzer$i $EXECUTABLE_PATH @@ --name fuzzer$i >/dev/null 2>&1 &
+    afl-fuzz -t $time_out -m $memory -i testcases -o findings -S fuzzer$i $executable_path @@ --name fuzzer$i >/dev/null 2>&1 &
 done
 
 echo
