@@ -55,14 +55,6 @@ using unit_test::TestContext;
 
 namespace {
 
-struct StringColumnType {
-    static constexpr bool value = false;
-};
-
-struct StringEnumColumnType {
-    static constexpr bool value = true;
-};
-
 REALM_TABLE_2(TupleTableType,
               first,  Int,
               second, String)
@@ -1474,7 +1466,8 @@ TEST(Table_SetIntUnique)
     CHECK_EQUAL(table.size(), 8);
 }
 
-TEST_TYPES(Table_SetStringUnique, StringColumnType, StringEnumColumnType)
+
+TEST(Table_SetStringUnique)
 {
     Table table;
     table.add_column(type_Int, "ints");
@@ -1486,11 +1479,6 @@ TEST_TYPES(Table_SetStringUnique, StringColumnType, StringEnumColumnType)
     CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, "foo"), LogicError::no_search_index);
     table.add_search_index(1);
     table.add_search_index(2);
-
-    if (TEST_TYPE::value) {
-        bool force = true;
-        table.optimize(force);
-    }
 
     table.set_string_unique(1, 0, "bar");
 
@@ -6884,137 +6872,5 @@ TEST(Table_getVersionCounterAfterRowAccessor) {
     t.set_null(0, 0);
     _CHECK_VER_BUMP();
 }
-
-TEST(Table_ColumnsSupportStringIndex)
-{
-    std::vector<DataType> all_types {
-        type_Int,
-        type_Bool,
-        type_Float,
-        type_Double,
-        type_String,
-        type_Binary,
-        type_OldDateTime,
-        type_Timestamp,
-        type_Table,
-        type_Mixed
-    };
-
-    std::vector<DataType> supports_index {
-        type_Int,
-        type_Bool,
-        type_Float,
-        type_Double,
-        type_String,
-        type_OldDateTime,
-        type_Timestamp
-    };
-
-    Group g; // type_Link must be part of a group
-    TableRef t = g.add_table("t1");
-    for (auto it = all_types.begin(); it != all_types.end(); ++it) {
-        t->add_column(*it, "");
-        ColumnBase& col = _impl::TableFriend::get_column(*t, 0);
-        bool does_support_index = col.supports_search_index();
-        auto found_pos = std::find(supports_index.begin(), supports_index.end(), *it);
-        CHECK(does_support_index == (found_pos != supports_index.end()));
-        CHECK(does_support_index == (col.create_search_index() != nullptr));
-        CHECK(does_support_index == col.has_search_index());
-        t->remove_column(0);
-    }
-
-    // Check type_Link
-    t->add_column_link(type_Link, "", *t);
-    ColumnBase& link_col = _impl::TableFriend::get_column(*t, 0);
-    CHECK(!link_col.supports_search_index());
-    CHECK(link_col.create_search_index() == nullptr);
-    CHECK(!link_col.has_search_index());
-    t->remove_column(0);
-
-    // Check type_LinkList
-    t->add_column_link(type_LinkList, "", *t);
-    ColumnBase& linklist_col = _impl::TableFriend::get_column(*t, 0);
-    CHECK(!linklist_col.supports_search_index());
-    CHECK(linklist_col.create_search_index() == nullptr);
-    CHECK(!linklist_col.has_search_index());
-    t->remove_column(0);
-
-    // Check StringEnum
-    t->add_column(type_String, "");
-    bool force = true;
-    t->optimize(force);
-    ColumnBase& enum_col = _impl::TableFriend::get_column(*t, 0);
-    CHECK(enum_col.supports_search_index());
-    CHECK(enum_col.create_search_index() != nullptr);
-    CHECK(enum_col.has_search_index());
-    t->remove_column(0);
-}
-
-TEST_TYPES(Table_MaxStringLengthInStringAndEnum, StringColumnType, StringEnumColumnType)
-{
-    constexpr bool force_string_enum_col = TEST_TYPE::value;
-
-    std::string std_max(Table::max_indexed_string_length, 'a');
-    std::string std_over_max(std_max + "a");
-    StringData max(std_max);
-    StringData over_max(std_over_max);
-
-    Table t;
-    t.add_column(type_String, "str_col");
-    t.add_search_index(0);
-
-    if (force_string_enum_col) {
-        bool force = true;
-        t.optimize(force);
-    }
-
-    CHECK_EQUAL(t.get_column_count(), 1);
-    CHECK_EQUAL(t.get_column_type(0), type_String); // actually an enum type
-    size_t col_ndx = 0;
-
-    CHECK(t.has_search_index(col_ndx));
-    CHECK_EQUAL(t.size(), 0);
-    t.insert_empty_row(0, 2);
-    CHECK_EQUAL(t.size(), 2);
-
-    auto validate_table = [&]() {
-        CHECK(t.has_search_index(col_ndx));
-        CHECK_EQUAL(t.size(), 2);
-        CHECK_EQUAL(t.get_string(col_ndx, 0), max);
-        CHECK_EQUAL(t.get_string(col_ndx, 1), "");
-        CHECK_EQUAL(t.count_string(col_ndx, max), 1);
-        CHECK_EQUAL(t.count_string(col_ndx, over_max), 0);
-        CHECK_EQUAL(t.find_first_string(col_ndx, max), 0);
-        CHECK_EQUAL(t.find_first_string(col_ndx, over_max), realm::npos);
-    };
-
-    t.set_string(col_ndx, 0, max);
-    validate_table();
-
-    CHECK_THROW(t.set_string(col_ndx, 1, over_max), realm::LogicError);
-    validate_table();
-
-    CHECK_THROW(t.set_string_unique(col_ndx, 1, over_max), realm::LogicError);
-    validate_table();
-
-    CHECK_THROW(t.insert_substring(col_ndx, 1, 0, over_max), realm::LogicError);
-    validate_table();
-
-    t.remove_search_index(col_ndx);
-
-    CHECK(!t.has_search_index(col_ndx));
-
-    t.set_string(col_ndx, 1, over_max);
-    CHECK_EQUAL(t.get_string(col_ndx, 1), over_max);
-    CHECK_EQUAL(t.count_string(col_ndx, over_max), 1);
-    CHECK_EQUAL(t.find_first_string(col_ndx, over_max), 1);
-
-    CHECK(t.add_search_index(col_ndx) == false);
-    CHECK(!t.has_search_index(col_ndx));
-    CHECK_EQUAL(t.get_string(col_ndx, 1), over_max);
-    CHECK_EQUAL(t.count_string(col_ndx, over_max), 1);
-    CHECK_EQUAL(t.find_first_string(col_ndx, over_max), 1);
-}
-
 
 #endif // TEST_TABLE
