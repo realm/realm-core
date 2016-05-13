@@ -25,13 +25,13 @@ if [ $num_files -eq 0 ]; then
     exit 0
 fi
 
-echo "Converting ${num_files} found crashes and hangs into .cpp unit tests in ${unit_tests_path}"
+echo "Converting $num_files found crashes and hangs into .cpp unit tests in \"$unit_tests_path\""
 
 mkdir -p "$unit_tests_path"
 
 # Run executable for each and capture the output
 for file in ${files[@]}
 do
-    cpp_file="${unit_tests_path}$(basename ${file}).cpp"
+    cpp_file="$unit_tests_path$(basename $file).cpp"
     "$executable_path" "$file" --log > "$cpp_file"
 done

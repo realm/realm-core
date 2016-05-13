@@ -36,12 +36,12 @@ fi
 echo "Building core"
 
 cd ../../
-CXX=${compiler} make -j check-debug-norun ${flags}
+CXX=$compiler make -j check-debug-norun $flags
 
 echo "Building fuzz target"
 
 cd -
-CXX=${compiler} make -j check-debug-norun ${flags}
+CXX=$compiler make -j check-debug-norun $flags
 
 echo "Cleaning up the findings directory"
 
@@ -51,20 +51,20 @@ rm -rf findings/* &> /dev/null
 time_out="100" # ms
 memory="100" # MB
 
-echo "Starting ${num_fuzzers} fuzzers in parallel"
+echo "Starting $num_fuzzers fuzzers in parallel"
 
 # if we have only one fuzzer
-if [ ${num_fuzzers} -eq 1 ]; then
-    afl-fuzz  -t ${time_out} -m ${memory} -i testcases -o findings "$executable_path" @@
+if [ $num_fuzzers -eq 1 ]; then
+    afl-fuzz  -t $time_out -m $memory -i testcases -o findings "$executable_path" @@
     exit 0
 fi
 
 # start the fuzzers in parallel
-afl-fuzz -t ${time_out} -m ${memory} -i testcases -o findings -M fuzzer1 "$executable_path" @@ --name fuzzer1 >/dev/null 2>&1 &
+afl-fuzz -t $time_out -m $memory -i testcases -o findings -M fuzzer1 "$executable_path" @@ --name fuzzer1 >/dev/null 2>&1 &
 
-for i in $(seq 2 ${num_fuzzers});
+for i in $(seq 2 $num_fuzzers);
 do
-    afl-fuzz -t ${time_out} -m ${memory} -i testcases -o findings -S fuzzer$i "$executable_path" @@ --name fuzzer$i >/dev/null 2>&1 &
+    afl-fuzz -t $time_out -m $memory -i testcases -o findings -S fuzzer$i "$executable_path" @@ --name fuzzer$i >/dev/null 2>&1 &
 done
 
 echo
