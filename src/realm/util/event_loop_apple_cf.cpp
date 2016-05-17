@@ -1014,6 +1014,8 @@ std::unique_ptr<Socket> EventLoopImpl::make_socket()
 {
     std::unique_ptr<SocketImpl> socket(new SocketImpl(*this)); // Throws
     m_sockets.insert(socket.get()); // Throws
+    if (m_cf_run_loop)
+        socket->attach_to_cf_run_loop(m_cf_run_loop);
     return std::move(socket);
 }
 
@@ -1022,6 +1024,8 @@ std::unique_ptr<DeadlineTimer> EventLoopImpl::make_timer()
 {
     std::unique_ptr<DeadlineTimerImpl> timer(new DeadlineTimerImpl(*this)); // Throws
     m_timers.insert(timer.get()); // Throws
+    if (m_cf_run_loop)
+        timer->attach_to_cf_run_loop(m_cf_run_loop);
     return std::move(timer);
 }
 
