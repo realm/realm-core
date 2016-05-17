@@ -371,7 +371,8 @@ TEST(Network_CancelAsyncAccept)
 {
     network::io_service service;
     network::acceptor acceptor(service);
-    acceptor.open(network::protocol::ip_v4());
+    bind_acceptor(acceptor);
+    acceptor.listen();
     network::socket socket(service);
 
     bool accept_was_canceled = false;
@@ -389,6 +390,32 @@ TEST(Network_CancelAsyncAccept)
     acceptor.close();
     service.run();
     CHECK(accept_was_canceled);
+}
+
+
+TEST(Network_CancelAsyncConnect)
+{
+    network::io_service service;
+    network::acceptor acceptor(service);
+    network::endpoint ep = bind_acceptor(acceptor);
+    acceptor.listen();
+    network::socket socket(service);
+
+    bool connect_was_canceled = false;
+    auto handler = [&](std::error_code ec) {
+        if (ec == error::operation_aborted)
+            connect_was_canceled = true;
+    };
+    socket.async_connect(ep, handler);
+    socket.cancel();
+    service.run();
+    CHECK(connect_was_canceled);
+
+    connect_was_canceled = false;
+    socket.async_connect(ep, handler);
+    socket.close();
+    service.run();
+    CHECK(connect_was_canceled);
 }
 
 
@@ -1401,8 +1428,8 @@ TEST(Network_Async)
     ThreadWrapper server_thread, client_thread;
     server_thread.start([&] { server.run(); });
     client_thread.start([&] { client.run(); });
-    client_thread.join();
-    server_thread.join();
+    CHECK_NOT(client_thread.join());
+    CHECK_NOT(server_thread.join());
 }
 
 
