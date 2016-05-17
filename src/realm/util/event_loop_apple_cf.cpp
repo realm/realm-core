@@ -619,8 +619,14 @@ private:
             case kCFStreamEventHasBytesAvailable: {
                 std::error_code ec; // Success
                 size_t n = read_some(m_read_buffer.get(), s_read_buffer_size, ec); // Throws
+                if (REALM_UNLIKELY(n == 0)) {
+                    // Read error
+                    REALM_ASSERT(ec);
+                    on_read_complete(ec);
+                    m_event_loop.process_completed_operations(); // Throws
+                    return;
+                }
                 REALM_ASSERT(!ec);
-                REALM_ASSERT(n > 0);
                 m_read_buffer_begin = m_read_buffer.get();
                 m_read_buffer_end = m_read_buffer_begin + n;
                 bool did_complete = process_buffered_input();
@@ -657,8 +663,14 @@ private:
             case kCFStreamEventCanAcceptBytes: {
                 std::error_code ec; // Success
                 size_t n = write_some(m_write_curr, m_write_end - m_write_curr, ec); // Throws
+                if (REALM_UNLIKELY(n == 0)) {
+                    // Write error
+                    REALM_ASSERT(ec);
+                    on_write_complete(ec);
+                    m_event_loop.process_completed_operations(); // Throws
+                    return;
+                }
                 REALM_ASSERT(!ec);
-                REALM_ASSERT(n > 0);
                 REALM_ASSERT(n <= size_t(m_write_end - m_write_curr));
                 m_write_curr += n;
                 bool is_complete = (m_write_curr == m_write_end);
