@@ -428,6 +428,10 @@ private:
     /// function will not detect all forms of corruption, though.
     void validate_buffer(const char* data, size_t len, const std::string& path, bool is_shared);
 
+    /// Read the top_ref from the given buffer and set m_file_on_streaming_form
+    /// if the buffer contains a file in streaming form
+    ref_type get_top_ref(const char* data, size_t len);
+
     class ChunkRefEq;
     class ChunkRefEndEq;
     class SlabRefEndEq;

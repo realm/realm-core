@@ -725,8 +725,8 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
         }
         case type_Timestamp: {
             Timestamp ts= value.get_timestamp();
-            auto seconds = ts.get_seconds();
-            auto nano_seconds = ts.get_nanoseconds();
+            int64_t seconds = ts.get_seconds();
+            int32_t nano_seconds = ts.get_nanoseconds();
             auto numbers_3 = append(numbers_2, seconds);
             append_simple_instr(instr, append(numbers_3, nano_seconds)); // Throws
             return;
@@ -1616,7 +1616,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
             int64_t seconds = read_int<int64_t>(); // Throws
-            uint32_t nanoseconds = read_int<uint32_t>(); // Throws
+            int32_t nanoseconds = read_int<int32_t>(); // Throws
             Timestamp value = Timestamp(seconds, nanoseconds);
             if (!handler.set_timestamp(col_ndx, row_ndx, value)) // Throws
                 parser_error();

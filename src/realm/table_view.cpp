@@ -45,7 +45,7 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
     Row::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
-    src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
+    src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
     m_sorting_predicate = src.m_sorting_predicate;
@@ -96,7 +96,7 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
     if (patch.was_in_sync)
         m_last_seen_version = outside_version();
     else
-        m_last_seen_version = -1;
+        m_last_seen_version = util::none;
 }
 
 // Searching
@@ -216,10 +216,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     }
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
-        row_ndx = to_size_t(m_row_indexes.get(ss));
+
+        int64_t signed_row_ndx = m_row_indexes.get(ss);
 
         // skip detached references:
-        if (row_ndx == detached_ref) continue;
+        if (signed_row_ndx == detached_ref) continue;
+
+        row_ndx = to_size_t(signed_row_ndx);
 
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
@@ -422,7 +425,7 @@ void TableViewBase::to_json(std::ostream& out) const
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        const size_t real_row_index = get_source_ndx(r);
+        const int64_t real_row_index = get_source_ndx(r);
         if (real_row_index != detached_ref) {
             if (r > 0)
                 out << ",";
@@ -451,7 +454,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     size_t i = 0;
     size_t count = out_count;
     while (count) {
-        const size_t real_row_index = get_source_ndx(i);
+        const int64_t real_row_index = get_source_ndx(i);
         if (real_row_index != detached_ref) {
             m_table->to_string_row(real_row_index, out, widths);
             --count;
@@ -476,7 +479,7 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     m_table->to_string_header(out, widths);
 
     // Print row contents
-    size_t real_ndx = get_source_ndx(row_ndx);
+    int64_t real_ndx = get_source_ndx(row_ndx);
     REALM_ASSERT(real_ndx != detached_ref);
     m_table->to_string_row(real_ndx, out, widths);
 }
@@ -554,7 +557,7 @@ uint_fast64_t TableViewBase::sync_if_needed() const
         // FIXME: Is this a reasonable handling of constness?
         const_cast<TableViewBase*>(this)->do_sync();
     }
-    return m_last_seen_version;
+    return *m_last_seen_version;
 }
 
 

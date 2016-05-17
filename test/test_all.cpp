@@ -30,12 +30,24 @@
 #include "test.hpp"
 #include "test_all.hpp"
 
+// Need to disable file descriptor leak checks on Apple platforms, as it seems
+// like an unknown number of file descriptors can be left behind, presumably due
+// the way asynchronous DNS lookup is implemented.
+#if !defined _WIN32 && !REALM_PLATFORM_APPLE
+#  define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+#endif
+
+#ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+#  include <unistd.h>
+#  include <fcntl.h>
+#endif
+
 using namespace realm;
 using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
 // Random seed for various random number generators used by fuzzying unit tests.
-uint64_t unit_test_random_seed;
+unsigned long unit_test_random_seed;
 
 namespace {
 
@@ -105,6 +117,31 @@ void fix_max_open_files()
             }
         }
     }
+}
+
+
+long get_num_open_files()
+{
+#ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+    if (system_has_rlimit(resource_NumOpenFiles)) {
+        long soft_limit = get_soft_rlimit(resource_NumOpenFiles);
+        if (soft_limit >= 0) {
+            long num_open_files = 0;
+            for (long i = 0; i < soft_limit; ++i) {
+                int fildes = int(i);
+                int ret = fcntl(fildes, F_GETFD);
+                if (ret != -1) {
+                    ++num_open_files;
+                    continue;
+                }
+                if (errno != EBADF)
+                    throw std::runtime_error("fcntl() failed");
+            }
+            return num_open_files;
+        }
+    }
+#endif
+    return -1;
 }
 
 
@@ -459,7 +496,19 @@ int test_all(int argc, char* argv[], util::Logger* logger)
 
     display_build_config();
 
+    long num_open_files = get_num_open_files();
+
     bool success = run_tests(logger);
+
+    if (num_open_files >= 0) {
+        long num_open_files_2 = get_num_open_files();
+        REALM_ASSERT(num_open_files_2 >= 0);
+        if (num_open_files_2 > num_open_files) {
+            long n = num_open_files_2 - num_open_files;
+            std::cerr << "ERROR: "<<n<<" file descriptors were leaked\n";
+            success = false;
+        }
+    }
 
 #ifdef _MSC_VER
     getchar(); // wait for key

@@ -1,22 +1,91 @@
 # NEXT RELEASE
 
-### Bugfixes:
+### Bugfixes
 
 * Lorem ipsum.
 
-### API breaking changes:
+### Breaking changes
 
 * Lorem ipsum.
 
-### Enhancements:
+### Enhancements
 
 * Lorem ipsum.
 
 -----------
 
-### Internals:
+### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 0.100.4 Release notes
+
+### Bugfixes
+
+* Fix queries over multiple levels of backlinks to work when the tables involved have
+  their backlink columns at different indices.
+
+### Breaking changes
+
+* Reverting the breaking changes wrongly introduced by 0.100.3, so that
+  this release does NOT have breaking changes with respect to 0.100.2
+
+
+----------------------------------------------
+
+# 0.100.3 Release notes (This is a faulty release and should not be used)
+
+### Bugfixes
+
+* Fix initialization of read-only Groups which are sharing file mappings with
+  other read-only Groups for the same path.
+* Fix TableView::clear() to work in imperative mode (issue #1803, #827)
+* Fixed issue with Timestamps before the UNIX epoch not being read correctly in
+  the `TransactLogParser`. Rollbacks and advances with such Timestamps would
+  throw a `BadTransactLog` exception. (#1802)
+
+### Breaking changes
+
+* Search indexes no longer support strings with lengths greater than
+  `Table::max_indexed_string_length`. If you try to add a string with a longer length
+  (through the Table interface), then a `realm::LogicError` will be thrown with type 
+  `string_too_long_for_index`. Calling `Table::add_search_index()` will now return a
+  boolean value indicating whether or not the index could be created on the column. If
+  the column contains strings that exceed the maximum allowed length, then
+  `Table::add_search_index()` will return false and the index will not be created, but the data
+  in the underlying column will remain unaffected. This is so that bindings can attempt to
+  create a search index on a column without knowing the lengths of the strings in the column.
+  Realm will continue to operate as before on any search index that already stores strings longer
+  than the maximum allowed length meaning that this change is not file breaking (no upgrade is
+  required). However, as stated above, any new strings that exceed the maximum length will
+  not be allowed into a search index, to insert long strings just turn off the search index
+  (although this could be left up to the user).
+
+### Enhancements
+
+* Distinct is now supported for columns without a search index. Bindings no longer
+  need to ensure that a column has a search index before calling distinct. (#1739)
+
+-----------
+
+### Internals
+
+* Upgrading to OpenSSL 1.0.1t.
+
+----------------------------------------------
+
+# 0.100.2 Release notes
+
+### Bugfixes
+
+* Fix handing over an out of sync TableView that depends on a deleted link list or
+  row so that it doesn't remain perpetually out of sync (#1770).
+* Fix a use-after-free when using a column which was added to an existing table
+  with rows in the same transaction as it was added, which resulted in the
+  automatic migration from DateTime to Timestamp crashing with a stack overflow
+  in some circumstances.
 
 ----------------------------------------------
 
@@ -61,7 +130,7 @@
 
 ### Bugfixes:
 
-* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most 
+* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most
   likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
   possibly also #1164 (crash in SharedGroup destructor on OS X).
 * Copying a `Query` restricted by a `TableView` will now avoid creating a dangling

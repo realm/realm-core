@@ -2196,8 +2196,11 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
         std::vector<size_t> rows;
         rows.reserve(size);
         for (size_t i = 0; i < size; ++i) {
-            size_t row_ndx = to_size_t(row_indexes.get(i));
-            rows.push_back(row_ndx);
+            int64_t v = row_indexes.get(i);
+            if (v != detached_ref) {
+                size_t row_ndx = to_size_t(v);
+                rows.push_back(row_ndx);
+            }
         }
         sort(rows.begin(), rows.end());
         rows.erase(unique(rows.begin(), rows.end()), rows.end());
@@ -2233,12 +2236,15 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
     size_t size = row_indexes.size();
     state.rows.reserve(size);
     for (size_t i = 0; i < size; ++i) {
-        size_t row_ndx = to_size_t(row_indexes.get(i));
-        CascadeState::row row;
-        row.is_ordered_removal = (is_move_last_over ? 0 : 1);
-        row.table_ndx = table_ndx;
-        row.row_ndx   = row_ndx;
-        state.rows.push_back(row); // Throws
+        int64_t v = row_indexes.get(i);
+        if (v != detached_ref) {
+            size_t row_ndx = to_size_t(v);
+            CascadeState::row row;
+            row.is_ordered_removal = (is_move_last_over ? 0 : 1);
+            row.table_ndx = table_ndx;
+            row.row_ndx   = row_ndx;
+            state.rows.push_back(row); // Throws
+        }
     }
     sort(begin(state.rows), end(state.rows));
     state.rows.erase(unique(begin(state.rows), end(state.rows)), end(state.rows));

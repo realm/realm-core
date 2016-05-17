@@ -2537,4 +2537,26 @@ TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::
     CHECK_EQUAL(table->size(), 5);
 }
 
+TEST(Group_SharedMappingsForReadOnlyStreamingForm)
+{
+    GROUP_TEST_PATH(path);
+    {
+        Group g;
+        auto table = g.add_table("table");
+        table->add_column(type_Int, "col");
+        table->add_empty_row();
+        g.write(path, crypt_key());
+    }
+
+    {
+        Group g1(path, crypt_key(), Group::mode_ReadOnly);
+        auto table1 = g1.get_table("table");
+        CHECK(table1 && table1->size() == 1);
+
+        Group g2(path, crypt_key(), Group::mode_ReadOnly);
+        auto table2 = g2.get_table("table");
+        CHECK(table2 && table2->size() == 1);
+    }
+}
+
 #endif // TEST_GROUP
