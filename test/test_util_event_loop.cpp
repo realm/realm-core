@@ -1,26 +1,115 @@
 #include "test.hpp"
 
+#include <realm/util/features.h>
 #include <realm/util/memory_stream.hpp>
+#include <realm/util/network.hpp>
 #include <realm/util/event_loop.hpp>
 
 using namespace realm::util;
 using namespace realm::test_util;
 
-TEST_TYPES(EventLoop_Timer, ASIO)
+namespace {
+
+template<class Implementation> struct MakeEventLoop;
+
+struct Posix {};
+struct AppleCoreFoundation {};
+
+template<> struct MakeEventLoop<Posix> {
+    std::unique_ptr<EventLoop> operator()() const
+    {
+        return EventLoop::Implementation::get_posix()->make_event_loop();
+    }
+};
+
+template<> struct MakeEventLoop<AppleCoreFoundation> {
+    std::unique_ptr<EventLoop> operator()() const
+    {
+        return EventLoop::Implementation::get_apple_cf()->make_event_loop();
+    }
+};
+
+
+#if REALM_PLATFORM_APPLE
+#  define IMPLEMENTATIONS Posix, AppleCoreFoundation
+#else
+#  define IMPLEMENTATIONS Posix
+#endif
+
+
+TEST_TYPES(EventLoop_Timer, IMPLEMENTATIONS)
 {
-    EventLoop<TEST_TYPE> loop;
+    std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
     bool ran = false;
-    auto timer = loop.async_timer(std::chrono::milliseconds(1), [&](std::error_code ec) {
+    std::unique_ptr<DeadlineTimer> timer = event_loop->make_timer();
+    auto handler = [&](std::error_code ec) {
         CHECK(!ec);
         ran = true;
-    });
+    };
+    timer->async_wait(std::chrono::milliseconds(1), std::move(handler));
     CHECK(!ran);
-    loop.run();
+    event_loop->run();
     CHECK(ran);
 }
 
 
-namespace {
+TEST_TYPES(EventLoop_DeadlineTimer, IMPLEMENTATIONS)
+{
+    std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
+
+    // Check that the completion handler is executed
+    std::unique_ptr<DeadlineTimer> timer = event_loop->make_timer();
+    bool completed = false;
+    bool canceled = false;
+    auto wait_handler = [&](std::error_code ec) {
+        if (!ec)
+            completed = true;
+        if (ec == error::operation_aborted)
+            canceled = true;
+    };
+    timer->async_wait(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop->run();
+    CHECK(completed);
+    CHECK(!canceled);
+    completed = false;
+
+    // Check that an immediately completed wait operation can be canceled
+    timer->async_wait(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer->cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop->run();
+    CHECK(!completed);
+    CHECK(canceled);
+    canceled = false;
+
+    // Check that a long running wait operation can be canceled
+    timer->async_wait(std::chrono::hours(10000), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer->cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop->run();
+    CHECK(!completed);
+    CHECK(canceled);
+}
+
+
+TEST_TYPES(EventLoop_PostPropagatesExceptions, IMPLEMENTATIONS)
+{
+    // Check that throwing an exception propagates to the point of invocation
+    // of the runloop.
+    std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
+    struct TestException: std::exception {};
+    event_loop->post([]{ throw TestException(); });
+    CHECK_THROW(event_loop->run(), TestException);
+}
+
 
 network::endpoint bind_acceptor(network::acceptor& acceptor)
 {
@@ -183,51 +272,51 @@ private:
 };
 
 
-template<class Provider>
 class AsyncClient {
 public:
-    AsyncClient(unsigned short listen_port, unit_test::TestContext& test_context):
+    AsyncClient(EventLoop& event_loop, unsigned short listen_port, unit_test::TestContext& test_context):
+        m_event_loop(event_loop),
+        m_socket(event_loop.make_socket()),
         m_listen_port(listen_port),
         m_test_context(test_context)
     {
-
     }
 
     void run()
     {
-        m_socket = m_loop.async_connect("localhost", m_listen_port, [=](std::error_code ec) {
-            auto& test_context = this->m_test_context;
-            CHECK(!ec);
-            this->connection_established();
-        });
-
-        m_loop.run();
-        if (m_socket) {
-            m_socket->close();
-        }
-    }
-
-    void connection_established()
-    {
-        MemoryOutputStream out;
-        out.set_buffer(m_header_buffer, m_header_buffer+s_max_header_size);
-        out << "echo " << sizeof echo_body << '\n';
-        auto handler = [=](std::error_code ec, size_t) {
-            this->handle_write_header(ec);
+        auto handler = [=](std::error_code ec) {
+            handle_connect(ec);
         };
-        m_socket->async_write(m_header_buffer, out.size(), handler);
+        m_socket->async_connect("localhost", m_listen_port, SocketSecurity::None, handler);
+
+        m_event_loop.run();
+
+        m_socket->close();
     }
 
 private:
+    EventLoop& m_event_loop;
+    std::unique_ptr<Socket> m_socket;
     unsigned short m_listen_port;
-    EventLoop<Provider> m_loop;
-    std::unique_ptr<SocketBase> m_socket;
 
     static const size_t s_max_header_size = 32;
     char m_header_buffer[s_max_header_size];
     size_t m_body_size;
     std::unique_ptr<char[]> m_body_buffer;
     unit_test::TestContext& m_test_context;
+
+    void handle_connect(std::error_code ec)
+    {
+        if (ec)
+            throw std::system_error(ec);
+        MemoryOutputStream out;
+        out.set_buffer(m_header_buffer, m_header_buffer+s_max_header_size);
+        out << "echo " << sizeof echo_body << '\n';
+        auto handler = [=](std::error_code ec, size_t) {
+            handle_write_header(ec);
+        };
+        m_socket->async_write(m_header_buffer, out.size(), handler);
+    }
 
     void handle_write_header(std::error_code ec)
     {
@@ -291,17 +380,20 @@ private:
     }
 };
 
-} // anonymous namespace
 
-TEST_TYPES(EventLoop_AsyncCommunication, ASIO)
+TEST_TYPES(EventLoop_AsyncCommunication, IMPLEMENTATIONS)
 {
     AsyncServer server(test_context);
     unsigned short listen_port = server.init();
-    AsyncClient<TEST_TYPE> client(listen_port, test_context);
+
+    std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
+    AsyncClient client(*event_loop, listen_port, test_context);
 
     ThreadWrapper server_thread, client_thread;
     server_thread.start([&] { server.run(); });
     client_thread.start([&] { client.run(); });
-    client_thread.join();
-    server_thread.join();
+    CHECK_NOT(client_thread.join());
+    CHECK_NOT(server_thread.join());
 }
+
+} // unnamed namespace

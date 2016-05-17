@@ -10,7 +10,12 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Event loop API reworked to more closely align with the `util::network` API,
+  and to better provide for multiple alternative implementations (not considered
+  breaking because the event loop API was not yet in use).
+* Bugs fixed in the POSIX based implementation (not listed under bug fixes
+  because the event loop API was not yet in use).
+* A new Apple CoreFoundation implementation of event loop API was added.
 
 -----------
 
