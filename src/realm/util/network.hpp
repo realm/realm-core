@@ -27,6 +27,7 @@
 #include <string>
 #include <system_error>
 #include <ostream>
+#include <vector>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -35,7 +36,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
-#include <realm/util/buffer.hpp>
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/util/call_with_tuple.hpp>
 
@@ -180,11 +180,12 @@ public:
     iterator begin() const;
     iterator end() const;
     size_t size() const;
+    void push_back(endpoint);
 
     ~list() noexcept {}
 
 private:
-    Buffer<endpoint> m_endpoints;
+    std::vector<endpoint> m_endpoints;
 
     friend class resolver;
 };
@@ -1039,6 +1040,11 @@ inline endpoint::list::iterator endpoint::list::end() const
 inline size_t endpoint::list::size() const
 {
     return m_endpoints.size();
+}
+
+inline void endpoint::list::push_back(endpoint e)
+{
+    m_endpoints.push_back(std::move(e));
 }
 
 // ---------------- io_service ----------------

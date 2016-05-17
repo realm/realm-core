@@ -6,6 +6,7 @@ ENABLE_INSTALL_DEBUG_PROGS = 1
 ifeq ($(OS),Darwin)
   CFLAGS_ARCH += -mmacosx-version-min=10.8 -stdlib=libc++ -Wno-nested-anon-types
   VALGRIND_FLAGS += --dsymutil=yes --suppressions=$(GENERIC_MK_DIR)/../test/corefoundation-yosemite.suppress
+  CFLAGS_OBJC += -fobjc-arc
 endif
 
 CFLAGS_DEBUG += -fno-elide-constructors
@@ -35,7 +36,7 @@ endif
 
 # CoreFoundation is required for logging
 ifeq ($(OS),Darwin)
-  PROJECT_LDFLAGS += -framework CoreFoundation
+  PROJECT_LDFLAGS += -framework Foundation -lobjc
 endif
 
 # Android logging

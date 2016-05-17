@@ -763,7 +763,7 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
     REALM_ASSERT(num_endpoints > 0);
 
     // Copy the IPv4/IPv6 endpoints
-    list.m_endpoints.set_size(num_endpoints); // Throws
+    list.m_endpoints.resize(num_endpoints); // Throws
     struct addrinfo* curr = first;
     size_t endpoint_ndx = 0;
     while (curr) {

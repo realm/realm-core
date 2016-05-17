@@ -6,9 +6,27 @@
 using namespace realm::util;
 using namespace realm::test_util;
 
-TEST_TYPES(EventLoop_Timer, ASIO)
+template <class T> struct GetEventLoop;
+struct POSIX {};
+struct PlatformLocal {};
+
+template <> struct GetEventLoop<POSIX> {
+    GetEventLoop(): m_loop(get_posix_event_loop()), loop(*m_loop)
+    {}
+    std::unique_ptr<EventLoop> m_loop;
+    EventLoop& loop;
+};
+
+template <> struct GetEventLoop<PlatformLocal> {
+    GetEventLoop(): loop(get_native_event_loop())
+    {}
+    EventLoop& loop;
+};
+
+TEST_TYPES(EventLoop_Timer, POSIX, PlatformLocal)
 {
-    EventLoop<TEST_TYPE> loop;
+    GetEventLoop<TEST_TYPE> get_loop;
+    EventLoop& loop = get_loop.loop;
     bool ran = false;
     auto timer = loop.async_timer(std::chrono::milliseconds(1), [&](std::error_code ec) {
         CHECK(!ec);
@@ -187,6 +205,8 @@ template<class Provider>
 class AsyncClient {
 public:
     AsyncClient(unsigned short listen_port, unit_test::TestContext& test_context):
+        m_get_loop(),
+        m_loop(m_get_loop.loop),
         m_listen_port(listen_port),
         m_test_context(test_context)
     {
@@ -195,13 +215,15 @@ public:
 
     void run()
     {
-        m_socket = m_loop.async_connect("localhost", m_listen_port, [=](std::error_code ec) {
+        m_socket = m_loop.async_connect("localhost", m_listen_port, SocketSecurity::None,
+                                          [=](std::error_code ec) {
             auto& test_context = this->m_test_context;
             CHECK(!ec);
             this->connection_established();
         });
 
         m_loop.run();
+
         if (m_socket) {
             m_socket->close();
         }
@@ -219,9 +241,10 @@ public:
     }
 
 private:
+    GetEventLoop<Provider> m_get_loop;
+    EventLoop& m_loop;
     unsigned short m_listen_port;
-    EventLoop<Provider> m_loop;
-    std::unique_ptr<SocketBase> m_socket;
+    std::unique_ptr<Socket> m_socket;
 
     static const size_t s_max_header_size = 32;
     char m_header_buffer[s_max_header_size];
@@ -293,15 +316,75 @@ private:
 
 } // anonymous namespace
 
-TEST_TYPES(EventLoop_AsyncCommunication, ASIO)
+TEST_TYPES(EventLoop_AsyncCommunication, POSIX, PlatformLocal)
 {
     AsyncServer server(test_context);
     unsigned short listen_port = server.init();
-    AsyncClient<TEST_TYPE> client(listen_port, test_context);
 
     ThreadWrapper server_thread, client_thread;
     server_thread.start([&] { server.run(); });
-    client_thread.start([&] { client.run(); });
+    client_thread.start([&] {
+        AsyncClient<TEST_TYPE> client(listen_port, test_context);
+        client.run();
+    });
     client_thread.join();
     server_thread.join();
 }
+
+TEST_TYPES(EventLoop_DeadlineTimer, POSIX, PlatformLocal)
+{
+    GetEventLoop<TEST_TYPE> get_event_loop;
+    EventLoop& event_loop = get_event_loop.loop;
+
+    std::unique_ptr<DeadlineTimer> timer;
+
+    // Check that the completion handler is executed
+    bool completed = false;
+    bool canceled = false;
+    auto wait_handler = [&](std::error_code ec) {
+        if (!ec)
+            completed = true;
+        if (ec == error::operation_aborted)
+            canceled = true;
+    };
+    timer = event_loop.async_timer(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop.run();
+    CHECK(completed);
+    CHECK(!canceled);
+    completed = false;
+
+    // Check that an immediately completed wait operation can be canceled
+    timer->async_wait(std::chrono::seconds(0), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer->cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop.run();
+    CHECK(!completed);
+    CHECK(canceled);
+    canceled = false;
+
+    // Check that a long running wait operation can be canceled
+    timer->async_wait(std::chrono::hours(10000), wait_handler);
+    CHECK(!completed);
+    CHECK(!canceled);
+    timer->cancel();
+    CHECK(!completed);
+    CHECK(!canceled);
+    event_loop.run();
+    CHECK(!completed);
+    CHECK(canceled);
+}
+
+TEST_TYPES(EventLoop_PostPropagatesExceptions, POSIX, PlatformLocal)
+{
+    // Check that throwing an exception propagates to the point of invocation
+    // of the runloop.
+    GetEventLoop<TEST_TYPE> service;
+    service.loop.post([&]{ throw std::runtime_error(""); });
+    CHECK_THROW(service.loop.run(), std::runtime_error);
+}
+
