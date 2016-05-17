@@ -56,7 +56,7 @@ void set_nonblocking(int fd, bool enable)
 }
 
 
-std::error_code translate_addrinfo_error(int err)
+std::error_code translate_addrinfo_error(int err) noexcept
 {
     switch (err) {
         case EAI_AGAIN:
@@ -760,7 +760,7 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
             curr = curr->ai_next;
         }
     }
-    REALM_ASSERT(num_endpoints > 0);
+    REALM_ASSERT(num_endpoints >= 1);
 
     // Copy the IPv4/IPv6 endpoints
     list.m_endpoints.set_size(num_endpoints); // Throws

@@ -212,8 +212,8 @@ public:
     /// Exceptions thrown by completion handlers will always propagate back
     /// through run().
     ///
-    /// Syncronous operations (e.g., socket::connect()) executes independently
-    /// of the event loop, and does not require that any thread calls run().
+    /// Syncronous operations (e.g., socket::connect()) execute independently of
+    /// the event loop, and do not require that any thread calls run().
     void run();
 
     /// @{ \brief Stop event loop execution.
@@ -236,7 +236,7 @@ public:
     void reset() noexcept;
     /// @}
 
-    /// \brief Submit a handler to the event loop.
+    /// \brief Submit a handler to be executed by the event loop thread.
     ///
     /// Register the sepcified completion handler for immediate asynchronous
     /// execution. The specified handler object will be copied as necessary, and
@@ -247,19 +247,18 @@ public:
     ///
     /// The handler will never be called as part of the execution of post(). It
     /// will always be called by a thread that is executing run(). If no thread
-    /// is executing run(), the handler will not be executed. If post() is
-    /// called while another thread is executing run(), the handler may be
-    /// called before post() returns. If post() is called from another
-    /// completion handler, the submitted handler is guaranteed to not be called
-    /// during the execution of post().
+    /// is currently executing run(), the handler will not be executed until a
+    /// thread starts executing run(). If post() is called while another thread
+    /// is executing run(), the handler may be called before post() returns. If
+    /// post() is called from another completion handler, the submitted handler
+    /// is guaranteed to not be called during the execution of post().
     ///
     /// Completion handlers added through post() will be executed in the order
     /// that they are added. More precisely, if post() is called twice to add
-    /// two handlers, A and B, and the execution of post(A) ands before the
+    /// two handlers, A and B, and the execution of post(A) ends before the
     /// beginning of the execution of post(B), then A is guaranteed to execute
     /// before B.
-    template<class H>
-    void post(const H& handler);
+    template<class H> void post(const H& handler);
 
 private:
     class async_oper;
@@ -317,8 +316,10 @@ public:
 
     io_service& service() noexcept;
 
+    /// @{ \brief Resolve the specified query to one or more endpoints.
     void resolve(const query&, endpoint::list&);
     std::error_code resolve(const query&, endpoint::list&, std::error_code&);
+    /// @}
 
 private:
     io_service& m_service;
@@ -365,8 +366,12 @@ public:
 
     bool is_open() const noexcept;
 
+    /// @{ \brief Open the socket for use with the specified protocol.
+    ///
+    /// It is an error to call open() on a socket that is already open.
     void open(const protocol&);
     std::error_code open(const protocol&, std::error_code&);
+    /// @}
 
     /// \brief Close this socket.
     ///
@@ -500,6 +505,11 @@ public:
     /// called when the operation completes. The operation completes when the
     /// connection is established, or an error occurs.
     ///
+    /// If the socket is not already open, it will be opened as part of the
+    /// connect operation as if by calling `open(ep.protocol())`. If the opening
+    /// operation succeeds, but the connect operation fails, the socket will be
+    /// left in the opened state.
+    ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec)` where `ec` is the
     /// error code.
@@ -507,7 +517,7 @@ public:
     /// It is an error to start a new connect operation (synchronous or
     /// asynchronous) while an asynchronous connect operation is in progress. An
     /// asynchronous connect operation is considered complete as soon as the
-    /// completion handler starts executing.
+    /// completion handler starts to execute.
     ///
     /// The operation can be canceled by calling cancel(), and will be
     /// automatically canceled if the socket is closed. If the operation is
@@ -537,7 +547,7 @@ public:
     /// It is an error to start a new write operation (synchronous or
     /// asynchronous) while an asynchronous write operation is in progress. An
     /// asynchronous write operation is considered complete as soon as the
-    /// completion handler starts executing. This means that a new write
+    /// completion handler starts to execute. This means that a new write
     /// operation can be started from the completion handler of another
     /// asynchronous write operation.
     ///
@@ -764,6 +774,9 @@ public:
     /// error code, and `n` is the number of bytes placed in the buffer. `n` is
     /// guaranteed to be less than, or equal to \a size.
     ///
+    /// It is an error to start a read operation before the associated socket is
+    /// connected.
+    ///
     /// It is an error to start a new read operation (synchronous or
     /// asynchronous) while an asynchronous read operation is in progress. An
     /// asynchronous read operation is considered complete as soon as the
@@ -826,7 +839,8 @@ public:
     ///
     /// Initiate an asynchronous wait operation. The completion handler becomes
     /// ready to execute when the expiration time is reached, or an error occurs
-    /// (cancellation counts as an error here). The completion handler will
+    /// (cancellation counts as an error here). The expiration time is the time
+    /// of initiation plus the specified delay. The completion handler will
     /// **always** be executed, as long as a thread is executing the event
     /// loop. The error code passed to the complition handler will **never**
     /// indicate success, unless the expiration time was reached. The completion
@@ -845,8 +859,6 @@ public:
     /// It is an error to start a new asynchronous wait operation while an
     /// another one is in progress. An asynchronous wait operation is in
     /// progress until its completion handler starts executing.
-    ///
-    /// \param ep The remote endpoint of the connection to be established.
     template<class R, class P, class H>
     void async_wait(std::chrono::duration<R,P> delay, const H& handler) noexcept;
 
