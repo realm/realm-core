@@ -314,7 +314,7 @@ private:
         if (m_returning)
             return;
         {
-            Mutex m_mutex;
+            LockGuard lg(m_mutex);
             if (m_stopped) {
                 CFRunLoopStop(m_cf_run_loop);
                 m_returning = true;
