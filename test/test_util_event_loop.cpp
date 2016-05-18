@@ -18,14 +18,14 @@ struct AppleCoreFoundation {};
 template<> struct MakeEventLoop<Posix> {
     std::unique_ptr<EventLoop> operator()() const
     {
-        return EventLoop::Implementation::get_posix()->make_event_loop();
+        return EventLoop::Implementation::get_posix().make_event_loop();
     }
 };
 
 template<> struct MakeEventLoop<AppleCoreFoundation> {
     std::unique_ptr<EventLoop> operator()() const
     {
-        return EventLoop::Implementation::get_apple_cf()->make_event_loop();
+        return EventLoop::Implementation::get_apple_cf().make_event_loop();
     }
 };
 

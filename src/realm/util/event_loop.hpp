@@ -22,6 +22,7 @@
 #include <memory>
 #include <functional>
 #include <chrono>
+#include <exception>
 #include <string>
 #include <vector>
 #include <system_error>
@@ -321,6 +322,8 @@ public:
 
 class EventLoop::Implementation {
 public:
+    class NotAvailable;
+
     /// \brief Get the default event loop implementation.
     ///
     /// In general, the best implementation is chosen when several are
@@ -328,17 +331,19 @@ public:
     /// get_apple_cf(). On most other platforms (including Linux), it will be
     /// the implementation returned by get_posix().
     ///
-    /// If no implementation is available on the platform, this function returns
-    /// null.
-    static Implementation* get_default();
+    /// \throw NotAvailable if no implementation is available on this platform.
+    static Implementation& get_default();
 
     /// \brief Get an implementations by name.
     ///
-    /// This function returns null if the specified implementation does not
-    /// exist, or is unavailable on this platform.
-    static Implementation* get(std::string name);
+    /// \throw NotAvailable if no implementation is available with the specified
+    /// name on this platform.
+    static Implementation& get(const std::string& name);
 
     /// \brief Get all the available implementations on this platform.
+    ///
+    /// If no implementations are available on this platform, this function
+    /// returns an empty vector.
     static std::vector<Implementation*> get_all();
 
     /// \brief Get an implementation base on the POSIX level networking API.
@@ -350,21 +355,24 @@ public:
     ///
     /// This implementation is guaranteed to be available on Linux, Android, Mac
     /// OS X, and iOS.
-    static Implementation* get_posix();
+    ///
+    /// \throw NotAvailable if this implementation is not available on this
+    /// platform.
+    static Implementation& get_posix();
 
     /// \brief Get an implementation base on the networking API provided by the
     /// Apple Core Foundation library (`CFRunLoop`).
     ///
     /// The name of this implementation is `apple-cf`.
     ///
-    /// This function returns null on platforms where this implementation is not
-    /// available.
-    ///
     /// This implementation is guaranteed to be available on Mac OS X and
     /// iOS. This is the default implementation on iOS, because according to
     /// Apple's documentaion, POSIX level socket operations are not guaranteed
     /// to properly activate the radio antenna.
-    static Implementation* get_apple_cf();
+    ///
+    /// \throw NotAvailable if this implementation is not available on this
+    /// platform.
+    static Implementation& get_apple_cf();
 
     /// \brief Get the name of this implementation.
     virtual std::string name() const = 0;
@@ -382,8 +390,15 @@ public:
 
 inline std::unique_ptr<EventLoop> make_event_loop()
 {
-    return EventLoop::Implementation::get_default()->make_event_loop(); // Throws
+    return EventLoop::Implementation::get_default().make_event_loop(); // Throws
 }
+
+class EventLoop::Implementation::NotAvailable: public std::exception {
+    const char* what() const noexcept override
+    {
+        return "No such event loop implementation on this platform";
+    }
+};
 
 } // namespace util
 } // namespace realm
