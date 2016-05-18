@@ -1225,6 +1225,7 @@ private:
 public:
     // FIXME: Should not be public
     char* m_data = nullptr; // Points to first byte after header
+    bool m_ignore_relocation_trigger = false;
 
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
@@ -1238,6 +1239,7 @@ private:
     size_t m_ref;
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
+
 protected:
     uint_least8_t m_width = 0;  // Size of an element (meaning depend on type of array).
     bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.

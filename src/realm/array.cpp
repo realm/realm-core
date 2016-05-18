@@ -2127,6 +2127,9 @@ void Array::print() const
 
 void Array::debug_relocate()
 {
+    if (m_ignore_relocation_trigger)
+        return;
+
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t size = calc_byte_len(m_size, m_width);
     size_t rest = (~size & 0x7) + 1;
