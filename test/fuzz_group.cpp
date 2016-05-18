@@ -29,8 +29,9 @@ using namespace realm::util;
 
 struct EndOfFile {};
 
-std::string create_string(unsigned char length)
+std::string create_string(size_t length)
 {
+    REALM_ASSERT_3(length, <, 256);
     char buf[256] = {0};
     for (size_t i = 0; i < length; i++)
         buf[i] = 'a' + (rand() % 20);
@@ -96,6 +97,16 @@ int32_t get_int32(State& s) {
     return v;
 }
 
+std::string create_column_name(State& s) {
+    const size_t length = get_next(s) % (Descriptor::max_column_name_length + 1);
+    return create_string(length);
+}
+
+std::string create_table_name(State& s) {
+    const size_t length = get_next(s) % (Group::max_table_name_length + 1);
+    return create_string(length);
+}
+
 std::string get_current_time_stamp() {
     std::time_t t = std::time(nullptr);
     const int str_size = 100;
@@ -157,7 +168,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             char instr = get_next(s) % COUNT;
 
             if (instr == ADD_TABLE && g.size() < max_tables) {
-                std::string name = create_string(get_next(s) % Group::max_table_name_length);
+                std::string name = create_table_name(s);
                 if (log) {
                     *log << "try { g.add_table(\"" << name << "\"); } catch (const TableNameInUse&) { }\n";
                 }
@@ -169,7 +180,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             }
             else if (instr == INSERT_TABLE && g.size() < max_tables) {
                 size_t table_ndx = get_next(s) % (g.size() + 1);
-                std::string name = create_string(get_next(s) % (Group::max_table_name_length - 10) + 5);
+                std::string name = create_table_name(s);
                 if (log) {
                     *log << "try { g.insert_table(" << table_ndx << ", \"" << name << "\"); } catch (const TableNameInUse&) { }\n";
                 }
@@ -229,7 +240,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             else if (instr == ADD_COLUMN && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 DataType type = get_type(get_next(s));
-                std::string name = create_string(get_next(s) % Group::max_table_name_length);
+                std::string name = create_column_name(s);
                 // Mixed and Subtable cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
@@ -241,7 +252,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx = get_next(s) % g.size();
                 size_t col_ndx = get_next(s) % (g.get_table(table_ndx)->get_column_count() + 1);
                 DataType type = get_type(get_next(s));
-                std::string name = create_string(get_next(s) % Group::max_table_name_length);
+                std::string name = create_column_name(s);
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
                     *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
@@ -292,7 +303,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx_2 = get_next(s) % g.size();
                 TableRef t1 = g.get_table(table_ndx_1);
                 TableRef t2 = g.get_table(table_ndx_2);
-                std::string name = create_string(get_next(s) % Group::max_table_name_length);
+                std::string name = create_column_name(s);
                 if (log) {
                     *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_Link, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
@@ -304,7 +315,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t col_ndx = get_next(s) % (g.get_table(table_ndx_1)->get_column_count() + 1);
                 TableRef t1 = g.get_table(table_ndx_1);
                 TableRef t2 = g.get_table(table_ndx_2);
-                std::string name = create_string(get_next(s) % Group::max_table_name_length);
+                std::string name = create_column_name(s);
                 if (log) {
                     *log << "g.get_table(" << table_ndx_1 << ")->insert_column_link(" << col_ndx << ", type_Link, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
@@ -315,7 +326,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx_2 = get_next(s) % g.size();
                 TableRef t1 = g.get_table(table_ndx_1);
                 TableRef t2 = g.get_table(table_ndx_2);
-                std::string name = create_string(get_next(s) % Group::max_table_name_length);
+                std::string name = create_column_name(s);
                 if (log) {
                     *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_LinkList, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
