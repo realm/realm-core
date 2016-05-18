@@ -41,7 +41,7 @@ std::string create_string(size_t length)
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
-            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN,
+            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
 
             COUNT};
 
@@ -542,6 +542,16 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     sg_w.begin_write();
                     REALM_DO_IF_VERIFY(log, g.verify());
+                }
+            }
+            else if (instr == GET_ALL_COLUMN_NAMES && g.size() > 0) {
+                // try to fuzz find this: https://github.com/realm/realm-core/issues/1769
+                for (size_t table_ndx = 0; table_ndx < g.size(); ++table_ndx) {
+                    TableRef t = g.get_table(table_ndx);
+                    for (size_t col_ndx = 0; col_ndx < t->get_column_count(); ++col_ndx) {
+                        StringData col_name = t->get_column_name(col_ndx);
+                        static_cast<void>(col_name);
+                    }
                 }
             }
         }

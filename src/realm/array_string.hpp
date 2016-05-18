@@ -152,7 +152,7 @@ inline StringData ArrayString::get(size_t ndx) const noexcept
     if (size == static_cast<size_t>(-1))
         return m_nullable ? realm::null() : StringData("");
 
-    REALM_ASSERT(data[size] == 0); // Realm guarantees 0 terminated return strings
+    REALM_ASSERT_EX(data[size] == 0, data[size], size); // Realm guarantees 0 terminated return strings
     return StringData(data, size);
 }
 
