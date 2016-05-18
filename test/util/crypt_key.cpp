@@ -21,7 +21,7 @@ const char* crypt_key(bool always)
 #else
     static_cast<void>(always);
 #endif
-    return 0;
+    return nullptr;
 }
 
 

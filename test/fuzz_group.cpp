@@ -130,10 +130,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         s.str = in;
         s.pos = 0;
 
+        const bool use_encryption = get_next(s) % 2 == 0;
+        const char* key = crypt_key(use_encryption);
+
         if (log) {
             *log << "// Test case generated in "  REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
             *log << "// ----------------------------------------------------------------------\n";
-            const char* key = crypt_key();
             std::string printable_key;
             if (key == nullptr) {
                 printable_key = "nullptr";
@@ -156,11 +158,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "\n";
         }
 
-        std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
-        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_r(make_client_history(path, key));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, key));
 
-        SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
         Group& g = const_cast<Group&>(sg_w.begin_write());
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
 

@@ -36,7 +36,8 @@ fi
 echo "Building core"
 
 cd ../../
-CXX=$compiler make -j check-debug-norun $flags
+REALM_ENABLE_ENCRYPTION=yes sh build.sh config
+CXX=$compiler REALM_HAVE_CONFIG=yes make -j check-debug-norun $flags
 
 echo "Building fuzz target"
 
