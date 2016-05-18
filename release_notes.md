@@ -16,7 +16,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Fixed an error in Query_Sort_And_Requery_Untyped_Monkey2 test which would cause
+  this test to fail sometimes.
 
 ----------------------------------------------
 
