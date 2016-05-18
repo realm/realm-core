@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Improve performance of opening Realm files and making commits when using
+  external writelogs by eliminating some unneeded `fsync()`s.
 
 -----------
 
