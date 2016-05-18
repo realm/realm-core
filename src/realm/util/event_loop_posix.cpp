@@ -44,6 +44,11 @@ public:
         m_io_service.reset();
     }
 
+    network::io_service& get_service() noexcept
+    {
+        return m_io_service;
+    }
+
 private:
     network::io_service m_io_service;
 };
@@ -52,8 +57,9 @@ private:
 
 class SocketImpl: public Socket {
 public:
-    SocketImpl(network::io_service& service):
-        m_socket(service), // Throws
+    SocketImpl(EventLoopImpl& event_loop):
+        m_event_loop(event_loop),
+        m_socket(event_loop.get_service()), // Throws
         m_input_stream(m_socket) // Throws
     {
     }
@@ -134,7 +140,13 @@ public:
         }
     }
 
+    EventLoop& get_event_loop() noexcept final
+    {
+        return m_event_loop;
+    }
+
 private:
+    EventLoopImpl& m_event_loop;
     network::socket m_socket;
     network::buffered_input_stream m_input_stream;
     network::endpoint::list m_endpoints;
@@ -171,8 +183,9 @@ private:
 
 class DeadlineTimerImpl: public DeadlineTimer {
 public:
-    DeadlineTimerImpl(network::io_service& service):
-        m_timer(service)
+    DeadlineTimerImpl(EventLoopImpl& event_loop):
+        m_event_loop(event_loop),
+        m_timer(event_loop.get_service()) // Throws
     {
     }
 
@@ -186,19 +199,25 @@ public:
         m_timer.cancel();
     }
 
+    EventLoop& get_event_loop() noexcept final
+    {
+        return m_event_loop;
+    }
+
 private:
+    EventLoopImpl& m_event_loop;
     network::deadline_timer m_timer;
 };
 
 
 inline std::unique_ptr<Socket> EventLoopImpl::make_socket()
 {
-    return std::unique_ptr<Socket>(new SocketImpl(m_io_service));
+    return std::unique_ptr<Socket>(new SocketImpl(*this));
 }
 
 inline std::unique_ptr<DeadlineTimer> EventLoopImpl::make_timer()
 {
-    return std::unique_ptr<DeadlineTimer>(new DeadlineTimerImpl(m_io_service));
+    return std::unique_ptr<DeadlineTimer>(new DeadlineTimerImpl(*this));
 }
 
 

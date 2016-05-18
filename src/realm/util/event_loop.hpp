@@ -265,6 +265,8 @@ public:
     /// of cancel().
     virtual void cancel() noexcept = 0;
 
+    virtual EventLoop& get_event_loop() noexcept = 0;
+
     virtual ~Socket() {}
 };
 
@@ -315,6 +317,8 @@ public:
     /// to execute, but will never be executed directly as part of the execution
     /// of cancel().
     virtual void cancel() noexcept = 0;
+
+    virtual EventLoop& get_event_loop() noexcept = 0;
 
     virtual ~DeadlineTimer() {}
 };

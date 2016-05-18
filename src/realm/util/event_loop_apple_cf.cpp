@@ -389,6 +389,11 @@ public:
             on_write_complete(error::operation_aborted);
     }
 
+    EventLoop& get_event_loop() noexcept final
+    {
+        return m_event_loop;
+    }
+
     void attach_to_cf_run_loop(CFRunLoopRef cf_run_loop) noexcept
     {
         m_cf_run_loop = cf_run_loop;
@@ -946,6 +951,11 @@ public:
     {
         if (m_wait_oper)
             on_wait_complete(error::operation_aborted);
+    }
+
+    EventLoop& get_event_loop() noexcept final
+    {
+        return m_event_loop;
     }
 
     void attach_to_cf_run_loop(CFRunLoopRef cf_run_loop) noexcept
