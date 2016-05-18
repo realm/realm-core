@@ -583,7 +583,8 @@ private:
                                     kCFStreamEventEndEncountered |
                                     kCFStreamEventHasBytesAvailable);
 
-        CFOptionFlags write_flags = (kCFStreamEventErrorOccurred |
+        CFOptionFlags write_flags = (kCFStreamEventErrorOccurred  |
+                                     kCFStreamEventEndEncountered |
                                      kCFStreamEventCanAcceptBytes);
 
         Boolean success_1 = CFReadStreamSetClient(read_stream, read_flags,
@@ -687,9 +688,15 @@ private:
                 m_event_loop.process_completed_operations(); // Throws
                 return;
             }
+            case kCFStreamEventEndEncountered: {
+                on_write_complete(error::connection_reset);
+                m_event_loop.process_completed_operations(); // Throws
+                return;
+            }
         }
         REALM_ASSERT(false);
     }
+
 
     // Equivalent to network::socket::read_some(). `ec` untouched on success.
     size_t read_some(char* buffer, size_t size, std::error_code& ec)
