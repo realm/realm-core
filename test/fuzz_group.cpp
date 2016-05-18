@@ -40,7 +40,7 @@ std::string create_string(unsigned char byte)
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
-            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER,
+            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, OPTIMIZE_TABLE,
 
             COUNT};
 
@@ -466,6 +466,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     t->move_last_over(row_ndx);
                 }
+            }
+            else if (instr == OPTIMIZE_TABLE && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                // Force creation of a string enum column
+                if (log) {
+                    *log << "g.get_table(" << table_ndx << ")->optimize(true);\n";
+                }
+                g.get_table(table_ndx)->optimize(true);
             }
             else if (instr == COMMIT) {
                 if (log) {
