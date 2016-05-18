@@ -98,7 +98,7 @@ ref_type GroupWriter::write_group()
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
 
-    REALM_ASSERT_3(m_free_positions.size(), == , m_free_lengths.size());
+    REALM_ASSERT_3(m_free_positions.size(), ==, m_free_lengths.size());
     REALM_ASSERT(!is_shared || m_free_versions.size() == m_free_lengths.size());
 
     // Recursively write all changed arrays (but not 'top' and free-lists yet,
@@ -108,7 +108,7 @@ ref_type GroupWriter::write_group()
     // commit), as that would lead to clobbering of the previous database
     // version.
     bool deep = true, only_if_modified = true;
-    ref_type names_ref = m_group.m_table_names.write(*this, deep, only_if_modified); // Throws
+    ref_type names_ref  = m_group.m_table_names.write(*this, deep, only_if_modified); // Throws
     ref_type tables_ref = m_group.m_tables.write(*this, deep, only_if_modified); // Throws
 
     int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
