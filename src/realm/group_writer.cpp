@@ -98,7 +98,7 @@ ref_type GroupWriter::write_group()
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
 
-    REALM_ASSERT_3(m_free_positions.size(), ==, m_free_lengths.size());
+    REALM_ASSERT_3(m_free_positions.size(), == , m_free_lengths.size());
     REALM_ASSERT(!is_shared || m_free_versions.size() == m_free_lengths.size());
 
     // Recursively write all changed arrays (but not 'top' and free-lists yet,
@@ -108,7 +108,7 @@ ref_type GroupWriter::write_group()
     // commit), as that would lead to clobbering of the previous database
     // version.
     bool deep = true, only_if_modified = true;
-    ref_type names_ref  = m_group.m_table_names.write(*this, deep, only_if_modified); // Throws
+    ref_type names_ref = m_group.m_table_names.write(*this, deep, only_if_modified); // Throws
     ref_type tables_ref = m_group.m_tables.write(*this, deep, only_if_modified); // Throws
 
     int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
@@ -210,7 +210,10 @@ ref_type GroupWriter::write_group()
     size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
     int_fast64_t value_4 = int_fast64_t(reserve_pos + max_free_space_needed); // FIXME: Problematic unsigned -> signed conversion
+
+    // Ensure that these two arrays do not reposition themselves
     m_free_positions.ensure_minimum_width(value_4); // Throws
+    m_free_lengths.ensure_minimum_width(std::numeric_limits<int64_t>::max()); // Must contain future `value_9`
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();
@@ -254,6 +257,10 @@ ref_type GroupWriter::write_group()
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = int_fast64_t(end_ref); // FIXME: Problematic unsigned -> signed conversion
     int_fast64_t value_9 = int_fast64_t(rest); // FIXME: Problematic unsigned -> signed conversion
+
+    REALM_ASSERT_3(value_8, <= , Array::ubound_for_width(m_free_positions.get_width()));
+    REALM_ASSERT_3(value_9, <= , Array::ubound_for_width(m_free_lengths.get_width()));
+
     m_free_positions.set(reserve_ndx, value_8); // Throws
     m_free_lengths.set(reserve_ndx, value_9); // Throws
 
