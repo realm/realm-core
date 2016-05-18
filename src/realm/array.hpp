@@ -1034,6 +1034,10 @@ public:
 
 #ifdef REALM_DEBUG
     void print() const;
+
+    /// This method 
+    void debug_relocate();
+
     void verify() const;
     typedef size_t (*LeafVerifier)(MemRef, Allocator&);
     void verify_bptree(LeafVerifier) const;

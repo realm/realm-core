@@ -530,6 +530,11 @@ void Array::set(size_t ndx, int64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
+    // See declaration of debug_relocate() in array.hpp for description on this flag and method.
+#ifdef REALM_TRIGGER_RELOCATIONS
+    debug_relocate();
+#endif
+
     // Grow the array if needed to store this value
     ensure_minimum_width(value); // Throws
 
@@ -569,6 +574,11 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
+
+    // See declaration of debug_relocate() in array.hpp for description on this flag and method.
+#ifdef REALM_TRIGGER_RELOCATIONS
+    debug_relocate();
+#endif
 
     Getter old_getter = m_getter; // Save old getter before potential width expansion
 
@@ -2113,6 +2123,41 @@ void Array::print() const
         std::cout << get(i);
     }
     std::cout << "\n";
+}
+
+void Array::debug_relocate()
+{
+    // Calculate size in bytes (plus a bit of matchcount room for expansion)
+    size_t size = calc_byte_len(m_size, m_width);
+    size_t rest = (~size & 0x7) + 1;
+    if (rest < 8)
+        size += rest; // 64bit blocks
+    size_t new_size = size + 64;
+
+    // Create new copy of array
+    MemRef mref = m_alloc.alloc(new_size); // Throws
+    const char* old_begin = get_header_from_data(m_data);
+    const char* old_end = get_header_from_data(m_data) + size;
+    char* new_begin = mref.m_addr;
+    std::copy(old_begin, old_end, new_begin);
+
+    ref_type old_ref = m_ref;
+
+    // Update internal data
+    m_ref = mref.m_ref;
+    m_data = get_data_from_header(new_begin);
+    m_capacity = calc_item_count(new_size, m_width);
+    REALM_ASSERT_DEBUG(m_capacity > 0);
+
+    // Update capacity in header. Uses m_data to find header, so
+    // m_data must be initialized correctly first.
+    set_header_capacity(new_size);
+
+    update_parent();
+
+    // Mark original as deleted, so that the space can be reclaimed in
+    // future commits, when no versions are using it anymore
+    m_alloc.free_(old_ref, old_begin);
 }
 
 void Array::verify() const
