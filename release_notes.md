@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed a potential bug in `GroupWriter::write_group()` that could cause corrupted database files
 
 ### Breaking changes
 
