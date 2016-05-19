@@ -171,10 +171,11 @@ class QueryGreaterThanZeroInt : public WithClass {
     }
 };
 
+template<size_t N>
 class EqualsZeroTimestamp :
     public
         QueryEqualsZeroTimestamp<
-            WithRandomTimestamps<DEF_N>
+            WithRandomTimestamps<N>
             > {
 
     const char *name() const {
@@ -182,10 +183,11 @@ class EqualsZeroTimestamp :
     }
 };
 
+template<size_t N>
 class EqualsZeroOldDateTime :
     public
         QueryEqualsZeroOldDateTime<
-            WithRandomOldDateTimes<DEF_N>
+            WithRandomOldDateTimes<N>
             > {
 
     const char *name() const {
@@ -193,10 +195,11 @@ class EqualsZeroOldDateTime :
     }
 };
 
+template<size_t N>
 class EqualsZeroInt :
     public
         QueryEqualsZeroInt<
-            WithRandomInts<DEF_N>
+            WithRandomInts<N>
             > {
 
     const char *name() const {
@@ -204,33 +207,36 @@ class EqualsZeroInt :
     }
 };
 
+template<size_t N>
 class GreaterThanZeroTimestamp :
     public
         QueryGreaterThanZeroTimestamp<
-            WithRandomTimestamps<DEF_N>,
-            DEF_N> {
+            WithRandomTimestamps<N>,
+            N> {
 
     const char *name() const {
         return "GreaterThanZero_Timestamp";
     }
 };
 
+template<size_t N>
 class GreaterThanZeroOldDateTime :
     public
         QueryGreaterThanZeroOldDateTime<
-            WithRandomOldDateTimes<DEF_N>,
-            DEF_N> {
+            WithRandomOldDateTimes<N>,
+            N> {
 
     const char *name() const {
         return "GreaterThanZero_OldDateTime";
     }
 };
 
+template<size_t N>
 class GreaterThanZeroInt :
     public
         QueryGreaterThanZeroInt<
-            WithRandomInts<DEF_N>,
-            DEF_N> {
+            WithRandomInts<N>,
+            N> {
 
     const char *name() const {
         return "GreaterThanZero_Integer";
@@ -283,17 +289,19 @@ int main()
 {
     Results results(10);
 
-    bench<SizeEmptyRows<type_Int, DEF_N> >(results);
-    bench<SizeEmptyRows<type_Timestamp, DEF_N> >(results);
-    bench<SizeEmptyRows<type_OldDateTime, DEF_N> >(results);
-    bench<SizeRandomInts<DEF_N> >(results);
-    bench<SizeRandomTimestamps<DEF_N> >(results);
-    bench<SizeRandomOldDateTimes<DEF_N> >(results);
+    bench< SizeEmptyRows<type_Int, DEF_N> >(results);
+    bench< SizeEmptyRows<type_Timestamp, DEF_N> >(results);
+    bench< SizeEmptyRows<type_OldDateTime, DEF_N> >(results);
 
-    bench<EqualsZeroTimestamp>(results);
-    bench<EqualsZeroOldDateTime>(results);
-    bench<EqualsZeroInt>(results);
-    bench<GreaterThanZeroTimestamp>(results);
-    bench<GreaterThanZeroOldDateTime>(results);
-    bench<GreaterThanZeroInt>(results);
+    bench< SizeRandomInts<DEF_N> >(results);
+    bench< SizeRandomTimestamps<DEF_N> >(results);
+    bench< SizeRandomOldDateTimes<DEF_N> >(results);
+
+    bench< EqualsZeroTimestamp<DEF_N> >(results);
+    bench< EqualsZeroOldDateTime<DEF_N> >(results);
+    bench< EqualsZeroInt<DEF_N> >(results);
+
+    bench< GreaterThanZeroTimestamp<DEF_N> >(results);
+    bench< GreaterThanZeroOldDateTime<DEF_N> >(results);
+    bench< GreaterThanZeroInt<DEF_N> >(results);
 }
