@@ -1,13 +1,9 @@
-# NEXT RELEASE
+# 1.0.0 Release notes
 
 ### Bugfixes
 
 * Fixed move_last_over() replacing null values for binary columns in the moved
   row with zero-length values.
-
-### Breaking changes
-
-* Lorem ipsum.
 
 ### Enhancements
 
