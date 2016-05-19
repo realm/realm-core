@@ -62,6 +62,7 @@ private:
         double total;
         double stddev;
         double median;
+        double mode;
         size_t rep;
 
         double avg() const;

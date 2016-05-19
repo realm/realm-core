@@ -2,6 +2,7 @@
 #include <cstring>
 #include <algorithm>
 #include <locale>
+#include <limits>       // quiet_NaN
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -88,6 +89,47 @@ std::string pad_right(std::string str, int width, char padding = ' ')
     return ss.str();
 }
 
+bool almost_equal(double x, double y)
+{
+    // Specialized the example in
+    // http://en.cppreference.com/w/cpp/types/numeric_limits/epsilon
+
+    return std::abs(x-y) < std::numeric_limits<double>::epsilon() * std::abs(x+y)
+           || std::abs(x-y) < std::numeric_limits<double>::min();
+}
+
+// Assumes samples is sorted and samples.size() >= 1.
+double findMode(std::vector<double>& samples)
+{
+    size_t count, better_count;
+    double mode, better_mode;
+
+    mode = better_mode = samples[0];
+    count = better_count = 1;
+    for (double sample : samples) {
+        if (almost_equal(sample, mode)) {
+            count++;
+            if (count > better_count) {
+                better_mode = mode;
+                better_count = count;
+            }
+        } else {
+            mode = sample;
+            count = 1;
+        }
+    }
+
+    return better_mode;
+}
+
+// Assumes samples is sorted.
+double tryFindMode(std::vector<double>& samples)
+{
+    return samples.size() ?
+        findMode(samples) :
+        std::numeric_limits<double>::quiet_NaN();
+}
+
 } // anonymous namespace
 
 Results::Result::Result():
@@ -122,7 +164,7 @@ Results::Result Results::Measurement::finish() const
     Result r;
 
     std::vector<double> samples = this->samples;
-    // Sort to simplify calculating min/max/median.
+    // Sort to simplify calculating min/max/median/mode.
     std::sort(samples.begin(), samples.end());
 
     // Compute total:
@@ -168,6 +210,8 @@ Results::Result Results::Measurement::finish() const
     else {
         r.stddev = 0;
     }
+
+    r.mode = tryFindMode(samples);
 
     return r;
 }
@@ -252,15 +296,21 @@ void Results::finish(const std::string& ident,
             << pad_right(format_change(br.median, r.median, change_type), 15)
             << "   ";
 
+        out << "mode "
+            << std::setw(time_width)
+            << format_elapsed_time(r.mode)
+            << " "
+            << pad_right(format_change(br.mode, r.mode, change_type), 15)
+            << "     ";
+
+        out << std::endl << "  ";
+
         if ((avg - baseline_avg) > r.stddev*2) {
             out << "* ";
         }
         else {
             out << "  ";
         }
-
-
-        out << std::endl << "  ";
 
         out << "avg "
             << std::setw(time_width) << format_elapsed_time(avg)
@@ -295,6 +345,11 @@ void Results::finish(const std::string& ident,
             << format_elapsed_time(r.median)
             << "     ";
 
+        out << "mode "
+            << std::setw(time_width)
+            << format_elapsed_time(r.mode)
+            << "     ";
+
         out << std::endl << "  ";
 
         out << "avg "
@@ -326,8 +381,8 @@ void Results::try_load_baseline_results()
             std::string ident;
             Result r;
             if (line_in >> ident) {
-                double* numbers[] = {&r.min, &r.max, &r.median, &r.stddev, &r.total};
-                for (size_t i = 0; i < 5; ++i) {
+                double* numbers[] = {&r.min, &r.max, &r.median, &r.mode, &r.stddev, &r.total};
+                for (size_t i = 0, length = sizeof(numbers) / sizeof(double); i < length; ++i) {
                     if (!(line_in >> *numbers[i])) {
                         std::cerr << "Expected number: line " << lineno << "\n";
                         error = true;
@@ -386,7 +441,7 @@ void Results::save_results()
         std::ofstream out(name.c_str());
         std::ofstream csv_out(csv_name.c_str());
 
-        csv_out << "ident,min,max,median,avg,stddev,reps,total" << '\n';
+        csv_out << "ident,min,max,median,mode,avg,stddev,reps,total" << '\n';
         csv_out.setf(std::ios_base::fixed, std::ios_base::floatfield);
 
         typedef Measurements::const_iterator iter;
@@ -394,10 +449,10 @@ void Results::save_results()
             Result r = it->second.finish();
 
             out << it->first << ' ';
-            out << r.min << " " << r.max << " " << r.median << " " << r.stddev << " " << r.total << " " << r.rep << '\n';
+            out << r.min << " " << r.max << " " << r.median << " " << r.mode << " " << r.stddev << " " << r.total << " " << r.rep << '\n';
 
             csv_out << '"' << it->first << "\",";
-            csv_out << r.min << ',' << r.max << ',' << r.median << ',' << r.avg() << ',' << r.stddev << ',' << r.rep << ',' << r.total << '\n';
+            csv_out << r.min << ',' << r.max << ',' << r.median << ',' << r.mode << ',' << r.avg() << ',' << r.stddev << ',' << r.rep << ',' << r.total << '\n';
         }
     }
 
