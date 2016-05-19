@@ -64,6 +64,8 @@ const char* LogicError::what() const noexcept
         case mixed_history_type:
             return "History type (as specified by the Replication implementation passed to "
                 "the SharedGroup constructor) was not consistent across the session";
+        case stale_db_mmap:
+            return "A stale memory mapping was encountered in the mmap cache";
     }
     return "Unknown error";
     // LCOV_EXCL_STOP (LogicError messages)
