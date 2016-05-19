@@ -24,10 +24,10 @@ To make life easier, there is currently a one-size-fits-all bin for common
 benchmark derivatives of `Benchmark` for testing Realm in
 `util/realmbm.[ch]pp`. For instance,
 
-* `WithSharedGroup` — Has a SharedGroup,
+* `WithSharedGroup` — Has a SharedGroup.
 * `WithOneColumn` — Has a column of the given type.
 * `WithEmptyRows` — Has a column filled with `N` empty rows.
-* `WithRandomTs` — Has `N` random (numeric) `T`s,
+* `WithRandomTs` — Has `N` random (numeric) `T`s.
 
 These can be quite extensively parametrized by their template parameters.
 
