@@ -466,6 +466,8 @@ TEST(BinaryColumn_MoveLastOver)
     c.move_last_over(0);
     CHECK(c.get(0).is_null());
     CHECK(c.get(1).is_null());
+
+    c.destroy();
 }
 
 #endif // TEST_COLUMN_BINARY
