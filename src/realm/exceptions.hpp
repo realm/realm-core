@@ -189,10 +189,7 @@ public:
         /// History type (as specified by the Replication implementation passed
         /// to the SharedGroup constructor) was not consistent across the
         /// session.
-        mixed_history_type,
-
-        /// Potentially stale memory mapping detected
-        stale_db_mmap
+        mixed_history_type
     };
 
     LogicError(ErrorKind message);
