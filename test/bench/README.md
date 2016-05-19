@@ -18,6 +18,19 @@ These functions (just like `measure()`), take no parameters. If you need
 parameters, you should pass these using the instance variables of your
 `Benchmark` derivative.
 
+## Realm Benchmark
+
+To make life easier, there is currently a one-size-fits-all bin for common
+benchmark derivatives of `Benchmark` for testing Realm in
+`util/realmbm.[ch]pp`. For instance,
+
+* `WithSharedGroup` — Has a SharedGroup,
+* `WithOneColumn` — Has a column of the given type.
+* `WithEmptyRows` — Has a column filled with `N` empty rows.
+* `WithRandomTs` — Has `N` random (numeric) `T`s,
+
+These can be quite extensively parametrized by their template parameters.
+
 ## Getting Started
 
 Include `util` in your project. Include `benchmark.hpp` and `realmbm.hpp`.
