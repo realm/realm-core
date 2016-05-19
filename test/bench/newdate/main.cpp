@@ -178,9 +178,8 @@ class EqualsZeroTimestamp :
         QueryEqualsZeroTimestamp<
             WithRandomTimestamps<N>
             > {
-
     const char *name() const {
-        return "EqualsZero_Timestamp";
+        return typeid(this).name();
     }
 };
 
@@ -190,9 +189,8 @@ class EqualsZeroOldDateTime :
         QueryEqualsZeroOldDateTime<
             WithRandomOldDateTimes<N>
             > {
-
     const char *name() const {
-        return "EqualsZero_OldDateTime";
+        return typeid(this).name();
     }
 };
 
@@ -202,9 +200,8 @@ class EqualsZeroInt :
         QueryEqualsZeroInt<
             WithRandomInts<N>
             > {
-
     const char *name() const {
-        return "EqualsZero_Integer";
+        return typeid(this).name();
     }
 };
 
@@ -214,9 +211,8 @@ class GreaterThanZeroTimestamp :
         QueryGreaterThanZeroTimestamp<
             WithRandomTimestamps<N>,
             N> {
-
     const char *name() const {
-        return "GreaterThanZero_Timestamp";
+        return typeid(this).name();
     }
 };
 
@@ -226,9 +222,8 @@ class GreaterThanZeroOldDateTime :
         QueryGreaterThanZeroOldDateTime<
             WithRandomOldDateTimes<N>,
             N> {
-
     const char *name() const {
-        return "GreaterThanZero_OldDateTime";
+        return typeid(this).name();
     }
 };
 
@@ -238,9 +233,8 @@ class GreaterThanZeroInt :
         QueryGreaterThanZeroInt<
             WithRandomInts<N>,
             N> {
-
     const char *name() const {
-        return "GreaterThanZero_Integer";
+        return typeid(this).name();
     }
 };
 
