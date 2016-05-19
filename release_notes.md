@@ -94,6 +94,7 @@
 ### Internals
 
 * Upgrading to OpenSSL 1.0.1t.
+* Added `util::RingBuffer<T>` container.
 
 ----------------------------------------------
 

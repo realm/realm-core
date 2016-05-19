@@ -33,6 +33,7 @@ util/to_string.hpp \
 util/scope_exit.hpp \
 util/call_with_tuple.hpp \
 util/hex_dump.hpp \
+util/ring_buffer.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
