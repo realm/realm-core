@@ -543,7 +543,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // If the file has already been mapped by another thread, reuse all relevant data
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
-        REALM_ASSERT(!cfg.session_initiator);
+
+        if (cfg.session_initiator)
+            throw LogicError(LogicError::stale_db_mmap);
+
         m_data = m_file_mappings->m_initial_mapping.get_addr();
         m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
