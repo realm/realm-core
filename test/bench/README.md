@@ -20,7 +20,7 @@ parameters, you should pass these using the instance variables of your
 
 ## Getting Started
 
-Include `util` in your project. Include `benchmark.hpp`.
+Include `util` in your project. Include `benchmark.hpp` and `realmbench.hpp`.
 
 ## FAQ
 
