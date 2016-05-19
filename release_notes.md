@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a situation where a failure during SharedGroup::open() could cause stale
+  memory mappings to become accessible for later. May fix issue #1782.
 
 ### Breaking changes
 
