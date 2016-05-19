@@ -759,6 +759,13 @@ public:
     /// `network::end_of_input`. Otherwise, if the operation succeeds, the last
     /// byte placed in the buffer is the delimiter.
     ///
+    /// async_read_at_least() will continue reading until at least the specified
+    /// buffer contains \a at_least bytes, or is full. If the end of input is
+    /// reached before the buffer contains the specified number of bytes, the
+    /// operation fails with `network::end_of_input`. Otherwise, if the operation
+    /// succeeds, the buffer contains between \a at_least and \a size bytes. If
+    /// \a at_least is greater than \a size, it has no effect.
+    ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec, n)` where `ec` is the
     /// error code, and `n` is the number of bytes placed in the buffer. `n` is
@@ -789,6 +796,9 @@ public:
 
     template<class H>
     void async_read_until(char* buffer, size_t size, char delim, const H& handler);
+
+    template<class H>
+    void async_read_at_least(size_t at_least, char* buffer, size_t size, const H& handler);
     /// @}
 
     /// Discard any buffered input.
@@ -797,6 +807,7 @@ public:
 private:
     class read_oper_base;
     template<class H> class read_oper;
+    template<class H> class read_until_oper;
 
     using LendersReadOperPtr = std::unique_ptr<read_oper_base, io_service::LendersOperDeleter>;
 
@@ -806,10 +817,10 @@ private:
     char* m_begin;
     char* m_end;
 
-    size_t do_read(char* buffer, size_t size, int delim, std::error_code&) noexcept;
+    size_t do_read(size_t at_least, char* buffer, size_t size, int delim, std::error_code&) noexcept;
 
     template<class H>
-    void async_read(char* buffer, size_t size, int delim, const H& handler);
+    void async_read(size_t at_least, char* buffer, size_t size, int delim, const H& handler);
     void do_async_read(LendersReadOperPtr);
 };
 
@@ -1962,11 +1973,12 @@ inline void acceptor::do_async_accept(LendersAcceptOperPtr op)
 class buffered_input_stream::read_oper_base:
         public io_service::async_oper {
 public:
-    read_oper_base(size_t size_1, buffered_input_stream& s, char* buffer, size_t size_2,
-                   int delim):
+    read_oper_base(size_t size_1, buffered_input_stream& s, size_t at_least,
+                   char* buffer, size_t size_2, int delim):
         async_oper(size_1, true), // Second argument is `in_use`
         m_stream(&s),
         m_out_begin(buffer),
+        m_out_min(buffer + at_least),
         m_out_end(buffer + size_2),
         m_out_curr(buffer),
         m_delim(delim)
@@ -1996,6 +2008,7 @@ public:
 protected:
     buffered_input_stream* m_stream;
     char* const m_out_begin; // May be dangling after cancellation
+    char* const m_out_min;   // May be dangling after cancellation
     char* const m_out_end;   // May be dangling after cancellation
     char* m_out_curr;        // May be dangling after cancellation
     const int m_delim;
@@ -2006,9 +2019,9 @@ template<class H>
 class buffered_input_stream::read_oper:
         public read_oper_base {
 public:
-    read_oper(size_t size_1, buffered_input_stream& stream, char* buffer, size_t size_2, int delim,
-              const H& h):
-        read_oper_base(size_1, stream, buffer, size_2, delim),
+    read_oper(size_t size_1, buffered_input_stream& stream, size_t at_least,
+              char* buffer, size_t size_2, int delim, const H& h):
+        read_oper_base(size_1, stream, at_least, buffer, size_2, delim),
         m_handler(h)
     {
     }
@@ -2019,7 +2032,7 @@ public:
                      (m_delim != std::char_traits<char>::eof() ?
                       m_out_curr > m_out_begin && m_out_curr[-1] ==
                       std::char_traits<char>::to_char_type(m_delim) :
-                      m_out_curr == m_out_end));
+                      m_out_curr >= m_out_min));
         REALM_ASSERT(m_out_curr >= m_out_begin);
         bool orphaned = !m_stream;
         std::error_code ec = m_error_code;
@@ -2055,7 +2068,7 @@ inline size_t buffered_input_stream::read(char* buffer, size_t size)
 
 inline size_t buffered_input_stream::read(char* buffer, size_t size, std::error_code& ec) noexcept
 {
-    return do_read(buffer, size, std::char_traits<char>::eof(), ec);
+    return do_read(size, buffer, size, std::char_traits<char>::eof(), ec);
 }
 
 inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim)
@@ -2070,20 +2083,27 @@ inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char 
 inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char delim,
                                                 std::error_code& ec) noexcept
 {
-    return do_read(buffer, size, std::char_traits<char>::to_int_type(delim), ec);
+    return do_read(size, buffer, size, std::char_traits<char>::to_int_type(delim), ec);
 }
 
 template<class H>
 inline void buffered_input_stream::async_read(char* buffer, size_t size, const H& handler)
 {
-    async_read(buffer, size, std::char_traits<char>::eof(), handler);
+    async_read(size, buffer, size, std::char_traits<char>::eof(), handler);
 }
 
 template<class H>
 inline void buffered_input_stream::async_read_until(char* buffer, size_t size, char delim,
                                                     const H& handler)
 {
-    async_read(buffer, size, std::char_traits<char>::to_int_type(delim), handler);
+    async_read(size, buffer, size, std::char_traits<char>::to_int_type(delim), handler);
+}
+
+template<class H>
+inline void buffered_input_stream::async_read_at_least(size_t at_least, char* buffer, size_t size,
+                                                       const H& handler)
+{
+    async_read(at_least, buffer, size, std::char_traits<char>::eof(), handler);
 }
 
 inline void buffered_input_stream::reset() noexcept
@@ -2093,12 +2113,13 @@ inline void buffered_input_stream::reset() noexcept
 }
 
 template<class H>
-inline void buffered_input_stream::async_read(char* buffer, size_t size, int delim,
-                                              const H& handler)
+inline void buffered_input_stream::async_read(size_t at_least, char* buffer,
+                                              size_t size, int delim, const H& handler)
 {
     LendersReadOperPtr op =
-        io_service::alloc<read_oper<H>>(m_socket.m_read_oper, *this, buffer, size, delim,
-                                       handler); // Throws
+        io_service::alloc<read_oper<H>>(m_socket.m_read_oper, *this,
+                                        std::min(at_least, size), buffer, size,
+                                        delim, handler); // Throws
     do_async_read(std::move(op)); // Throws
 }
 

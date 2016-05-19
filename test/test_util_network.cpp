@@ -326,6 +326,46 @@ TEST(Network_ReadWrite)
 }
 
 
+TEST(Network_BufferedAsyncReadAtLeast)
+{
+    network::io_service reader_service;
+    network::io_service writer_service;
+    network::acceptor acceptor(reader_service);
+    network::endpoint listening_endpoint = bind_acceptor(acceptor);
+    acceptor.listen();
+
+    const char data[64] =
+        "abcdefghijklmnopqrstuvwxyz12345abcdefghijklmnopqrstuvwxyz12345";
+
+    auto reader = [&] {
+        network::socket reader(reader_service);
+        acceptor.accept(reader);
+        network::buffered_input_stream input(reader);
+        // Internal buffer size of network::socket is 1024.
+        // To see the buffered_input_stream being filled while
+        // the socket is at end of input, we need to write >1024
+        // bytes to the socket while requesting <1024 bytes.
+        char buffer[128];
+        auto handler1 = [&] (std::error_code ec, size_t n) {
+            CHECK(!ec);
+            CHECK_GREATER_EQUAL(n, 32);
+        };
+        input.async_read_at_least(32, buffer, sizeof(buffer), handler1);
+        reader_service.run();
+    };
+
+    network::socket writer_socket(writer_service);
+    writer_socket.connect(listening_endpoint);
+
+    ThreadWrapper reader_thread;
+    reader_thread.start(reader);
+
+    writer_socket.write(data, sizeof data);
+    writer_socket.close();
+    CHECK_NOT(reader_thread.join());
+}
+
+
 TEST(Network_SocketAndAcceptorOpen)
 {
     network::io_service service_1;
