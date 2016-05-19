@@ -1019,8 +1019,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                     throw LogicError(LogicError::mixed_history_type);
 
 #ifndef _WIN32
-                if (encryption_key && info->session_initiator_pid != uint64_t(getpid()))
-                    throw std::runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
+                if (encryption_key && info->session_initiator_pid != uint64_t(getpid())) {
+                    std::stringstream ss;
+                    ss << path << ": Encrypted interprocess sharing is currently unsupported." <<
+                        "SharedGroup has been opened by pid: " << info->session_initiator_pid <<
+                        ". Current pid is " << getpid() << ".";
+                    throw std::runtime_error(ss.str());
+                }
 #endif
 
                 // We need per session agreement among all participants on the
