@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Throws AccessError instead of runtime_error for adding path information.
+* File operations would previously throw runtime_error for less know errorcases (the `default` cases). They now throws AccessError instead and include path information.
 
 -----------
 
