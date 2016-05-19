@@ -521,9 +521,13 @@ private:
         m_read_oper  = std::move(oper);
         ++m_event_loop.num_operations_in_progress;
 
-        bool did_complete = process_buffered_input();
-
-        if (!did_complete && m_cf_run_loop) {
+        std::error_code ec; // Success
+        bool is_complete = process_buffered_input(ec);
+        if (is_complete) {
+            bool not_yet_attached_to_cf_run_loop = true;
+            on_read_complete(ec, not_yet_attached_to_cf_run_loop);
+        }
+        else if (m_cf_run_loop) {
             CFReadStreamScheduleWithRunLoop(m_read_stream.get(), m_cf_run_loop,
                                             kCFRunLoopDefaultMode);
         }
@@ -545,9 +549,11 @@ private:
         m_write_oper  = std::move(oper);
         ++m_event_loop.num_operations_in_progress;
 
+        std::error_code ec; // Success
         bool is_complete = (m_write_curr == m_write_end);
         if (is_complete) {
-            on_write_complete();
+            bool not_yet_attached_to_cf_run_loop = true;
+            on_write_complete(ec, not_yet_attached_to_cf_run_loop);
         }
         else if (m_cf_run_loop) {
             CFWriteStreamScheduleWithRunLoop(m_write_stream.get(), m_cf_run_loop,
@@ -638,13 +644,18 @@ private:
                 REALM_ASSERT(!ec);
                 m_read_buffer_begin = m_read_buffer.get();
                 m_read_buffer_end = m_read_buffer_begin + n;
-                bool did_complete = process_buffered_input();
-                if (did_complete)
+                bool is_complete = process_buffered_input(ec);
+                if (is_complete) {
+                    on_read_complete(ec);
                     m_event_loop.process_completed_operations(); // Throws
+                }
                 return;
             }
             case kCFStreamEventErrorOccurred: {
                 // FIXME: It seems this this event never happens. Why is that?
+                // (I have seen it happening once now, but it is still a mystery
+                // why it happens so rarelygiven that we do simulate read errors
+                // by closing the connection on the remote side)
                 REALM_ASSERT(m_connect_oper || m_read_oper);
                 bool is_write_error = false;
                 std::error_code ec = get_error(is_write_error); // Throws
@@ -750,7 +761,9 @@ private:
         return 0;
     }
 
-    bool process_buffered_input() noexcept
+    // Returns true on completion of read operation. Leaves `ec` untouched if
+    // incomplete and if complete with success.
+    bool process_buffered_input(std::error_code& ec) noexcept
     {
         size_t in_avail = m_read_buffer_end - m_read_buffer_begin;
         size_t out_avail = m_read_end - m_read_curr;
@@ -759,7 +772,6 @@ private:
             std::find(m_read_buffer_begin, m_read_buffer_begin + n, *m_read_delim);
         m_read_curr = std::copy(m_read_buffer_begin, i, m_read_curr);
         m_read_buffer_begin = i;
-        std::error_code ec; // Success
         if (m_read_curr == m_read_end) {
             if (m_read_delim)
                 ec = network::delim_not_found;
@@ -770,7 +782,6 @@ private:
             REALM_ASSERT(m_read_delim);
             *m_read_curr++ = *m_read_buffer_begin++; // Transfer delimiter
         }
-        on_read_complete(ec);
         return true; // Complete
     }
 
@@ -787,7 +798,8 @@ private:
         }
     }
 
-    void on_read_complete(std::error_code ec = std::error_code()) noexcept
+    void on_read_complete(std::error_code ec = std::error_code(),
+                          bool not_yet_attached_to_cf_run_loop = false) noexcept
     {
         REALM_ASSERT(m_read_oper);
         m_read_oper->ec = ec;
@@ -795,20 +807,21 @@ private:
         m_event_loop.add_completed_operation(std::move(m_read_oper));
         m_read_oper.reset();
         --m_event_loop.num_operations_in_progress;
-        if (m_cf_run_loop) {
+        if (!not_yet_attached_to_cf_run_loop && m_cf_run_loop) {
             CFReadStreamUnscheduleFromRunLoop(m_read_stream.get(), m_cf_run_loop,
                                               kCFRunLoopDefaultMode);
         }
     }
 
-    void on_write_complete(std::error_code ec = std::error_code()) noexcept
+    void on_write_complete(std::error_code ec = std::error_code(),
+                           bool not_yet_attached_to_cf_run_loop = false) noexcept
     {
         REALM_ASSERT(m_write_oper);
         m_write_oper->ec = ec;
         m_event_loop.add_completed_operation(std::move(m_write_oper));
         m_write_oper.reset();
         --m_event_loop.num_operations_in_progress;
-        if (m_cf_run_loop) {
+        if (!not_yet_attached_to_cf_run_loop && m_cf_run_loop) {
             CFWriteStreamUnscheduleFromRunLoop(m_write_stream.get(), m_cf_run_loop,
                                                kCFRunLoopDefaultMode);
         }
