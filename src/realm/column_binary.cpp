@@ -321,7 +321,7 @@ void BinaryColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
         // Copying binary data from a column to itself requires an
         // intermediate copy of the data (constr:bptree-copy-to-self).
         std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-        std::copy(value.data(), value.data()+value.size(), buffer.get());
+        std::copy(value.data(), value.data() + value.size(), buffer.get());
         BinaryData copy_of_value(buffer.get(), value.size());
         set(row_ndx, copy_of_value); // Throws
     }
