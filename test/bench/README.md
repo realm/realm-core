@@ -3,8 +3,8 @@
 A benchmark is a subclass of the `Benchmark` base class.
 
 The meat of a `Benchmark` base class is the `bench()` function. This is what
-will actually be measured by the framework. `bench()` is declared pure virtual
-in `Benchmark`, and so you must (eventually) be override it.
+will actually get measured. `bench()` is declared pure virtual in `Benchmark`,
+and so you must (eventually) be override it.
 
 The `Benchmark` base class also has a couple other virtual functions, which
 do nothing in the base class:
