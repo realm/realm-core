@@ -396,6 +396,7 @@ public:
 
     void attach_to_cf_run_loop(CFRunLoopRef cf_run_loop) noexcept
     {
+        REALM_ASSERT(!m_cf_run_loop);
         m_cf_run_loop = cf_run_loop;
         if (m_connect_oper || m_read_oper) {
             CFReadStreamScheduleWithRunLoop(m_read_stream.get(), m_cf_run_loop,
@@ -409,6 +410,7 @@ public:
 
     void detach_from_cf_run_loop() noexcept
     {
+        REALM_ASSERT(m_cf_run_loop);
         if (m_connect_oper || m_read_oper) {
             CFReadStreamUnscheduleFromRunLoop(m_read_stream.get(), m_cf_run_loop,
                                               kCFRunLoopDefaultMode);
@@ -623,6 +625,7 @@ private:
                 return;
             }
             case kCFStreamEventHasBytesAvailable: {
+                REALM_ASSERT(m_read_oper);
                 std::error_code ec; // Success
                 size_t n = read_some(m_read_buffer.get(), s_read_buffer_size, ec); // Throws
                 if (REALM_UNLIKELY(n == 0)) {
@@ -641,9 +644,10 @@ private:
                 return;
             }
             case kCFStreamEventErrorOccurred: {
+                // FIXME: It seems this this event never happens. Why is that?
+                REALM_ASSERT(m_connect_oper || m_read_oper);
                 bool is_write_error = false;
                 std::error_code ec = get_error(is_write_error); // Throws
-                REALM_ASSERT(m_connect_oper || m_read_oper);
                 if (m_connect_oper) {
                     on_connect_complete(ec);
                 }
@@ -654,6 +658,7 @@ private:
                 return;
             }
             case kCFStreamEventEndEncountered: {
+                // FIXME: It seems this this event never happens. Why is that?
                 on_read_complete(network::end_of_input);
                 m_event_loop.process_completed_operations(); // Throws
                 return;
@@ -667,6 +672,7 @@ private:
         REALM_ASSERT(stream == m_write_stream.get());
         switch (event_type) {
             case kCFStreamEventCanAcceptBytes: {
+                REALM_ASSERT(m_write_oper);
                 std::error_code ec; // Success
                 size_t n = write_some(m_write_curr, m_write_end - m_write_curr, ec); // Throws
                 if (REALM_UNLIKELY(n == 0)) {
@@ -687,6 +693,8 @@ private:
                 return;
             }
             case kCFStreamEventErrorOccurred: {
+                // FIXME: It seems this this event never happens. Why is that?
+                REALM_ASSERT(m_write_oper);
                 bool is_write_error = true;
                 std::error_code ec = get_error(is_write_error); // Throws
                 on_write_complete(ec);
@@ -694,6 +702,7 @@ private:
                 return;
             }
             case kCFStreamEventEndEncountered: {
+                // FIXME: It seems this this event never happens. Why is that?
                 on_write_complete(error::connection_reset);
                 m_event_loop.process_completed_operations(); // Throws
                 return;
@@ -960,6 +969,7 @@ public:
 
     void attach_to_cf_run_loop(CFRunLoopRef cf_run_loop) noexcept
     {
+        REALM_ASSERT(!m_cf_run_loop);
         m_cf_run_loop = cf_run_loop;
         if (m_wait_oper)
             CFRunLoopAddTimer(m_cf_run_loop, m_cf_timer.get(), kCFRunLoopDefaultMode);
@@ -967,6 +977,7 @@ public:
 
     void detach_from_cf_run_loop() noexcept
     {
+        REALM_ASSERT(m_cf_run_loop);
         if (m_wait_oper)
             CFRunLoopRemoveTimer(m_cf_run_loop, m_cf_timer.get(), kCFRunLoopDefaultMode);
         m_cf_run_loop = nullptr;
@@ -1124,6 +1135,7 @@ void EventLoopImpl::reset() noexcept
 // Caller must hold a lock on `m_mutex`.
 void EventLoopImpl::attach_to_cf_run_loop() noexcept
 {
+    REALM_ASSERT(!m_cf_run_loop);
     m_cf_run_loop = CFRunLoopGetCurrent();
 
     CFRunLoopAddSource(m_cf_run_loop, m_wake_up_source.get(), kCFRunLoopDefaultMode);
@@ -1138,6 +1150,7 @@ void EventLoopImpl::attach_to_cf_run_loop() noexcept
 // Caller must hold a lock on `m_mutex`.
 void EventLoopImpl::detach_from_cf_run_loop() noexcept
 {
+    REALM_ASSERT(m_cf_run_loop);
     CFRunLoopRemoveSource(m_cf_run_loop, m_wake_up_source.get(), kCFRunLoopDefaultMode);
 
     for (SocketImpl* s: m_sockets)
