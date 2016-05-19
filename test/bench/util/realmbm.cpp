@@ -1,4 +1,4 @@
-#include "realmbench.hpp"
+#include "realmbm.hpp"
 
 #include "results.hpp"      // Results
 #include "timer.hpp"        // Timer

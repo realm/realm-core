@@ -21,7 +21,7 @@ public:
 
     virtual void before_all() {}
     virtual void before_each() {}
-    virtual void bench() = 0;
+    virtual void measure() = 0;
     virtual void after_each() {}
     virtual void after_all() {}
 
@@ -54,9 +54,9 @@ public:
 };
 
 template<class Benchmark>
-void bench(Results& results) {
-    Benchmark benchmark;
-    benchmark.run(results);
+void benchmark(Results& r) {
+    Benchmark bm;
+    bm.run(r);
 }
 
 } // namespace test_util

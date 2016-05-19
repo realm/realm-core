@@ -1,7 +1,7 @@
 #include <realm.hpp>
 
 #include "benchmark.hpp"
-#include "realmbench.hpp"
+#include "realmbm.hpp"
 #include "results.hpp"
 #include "random.hpp"
 
@@ -104,7 +104,7 @@ class WithRandomInts : public base {
 
 template<class WithClass>
 class QueryEqualsZeroTimestamp : public WithClass {
-    void bench()
+    void measure()
     {
         ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
@@ -116,7 +116,7 @@ class QueryEqualsZeroTimestamp : public WithClass {
 
 template<class WithClass>
 class QueryEqualsZeroOldDateTime : public WithClass {
-    void bench()
+    void measure()
     {
         ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
@@ -128,7 +128,7 @@ class QueryEqualsZeroOldDateTime : public WithClass {
 
 template<class WithClass>
 class QueryEqualsZeroInt : public WithClass {
-    void bench()
+    void measure()
     {
         ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
@@ -139,7 +139,7 @@ class QueryEqualsZeroInt : public WithClass {
 
 template<class WithClass, size_t expected>
 class QueryGreaterThanZeroTimestamp : public WithClass {
-    void bench()
+    void measure()
     {
         ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
@@ -151,7 +151,7 @@ class QueryGreaterThanZeroTimestamp : public WithClass {
 
 template<class WithClass, size_t expected>
 class QueryGreaterThanZeroOldDateTime : public WithClass {
-    void bench()
+    void measure()
     {
         ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
@@ -163,7 +163,7 @@ class QueryGreaterThanZeroOldDateTime : public WithClass {
 
 template<class WithClass, size_t expected>
 class QueryGreaterThanZeroInt : public WithClass {
-    void bench()
+    void measure()
     {
         ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
@@ -284,19 +284,19 @@ int main()
 {
     Results results(10);
 
-    bench< SizeEmptyRows<type_Int, DEF_N> >(results);
-    bench< SizeEmptyRows<type_Timestamp, DEF_N> >(results);
-    bench< SizeEmptyRows<type_OldDateTime, DEF_N> >(results);
+    benchmark< SizeEmptyRows<type_Int, DEF_N> >(results);
+    benchmark< SizeEmptyRows<type_Timestamp, DEF_N> >(results);
+    benchmark< SizeEmptyRows<type_OldDateTime, DEF_N> >(results);
 
-    bench< SizeRandomInts<DEF_N> >(results);
-    bench< SizeRandomTimestamps<DEF_N> >(results);
-    bench< SizeRandomOldDateTimes<DEF_N> >(results);
+    benchmark< SizeRandomInts<DEF_N> >(results);
+    benchmark< SizeRandomTimestamps<DEF_N> >(results);
+    benchmark< SizeRandomOldDateTimes<DEF_N> >(results);
 
-    bench< EqualsZeroTimestamp<DEF_N> >(results);
-    bench< EqualsZeroOldDateTime<DEF_N> >(results);
-    bench< EqualsZeroInt<DEF_N> >(results);
+    benchmark< EqualsZeroTimestamp<DEF_N> >(results);
+    benchmark< EqualsZeroOldDateTime<DEF_N> >(results);
+    benchmark< EqualsZeroInt<DEF_N> >(results);
 
-    bench< GreaterThanZeroTimestamp<DEF_N> >(results);
-    bench< GreaterThanZeroOldDateTime<DEF_N> >(results);
-    bench< GreaterThanZeroInt<DEF_N> >(results);
+    benchmark< GreaterThanZeroTimestamp<DEF_N> >(results);
+    benchmark< GreaterThanZeroOldDateTime<DEF_N> >(results);
+    benchmark< GreaterThanZeroInt<DEF_N> >(results);
 }

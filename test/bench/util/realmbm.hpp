@@ -1,5 +1,5 @@
-#ifndef REALM_REALMBENCH_HPP
-#define REALM_REALMBENCH_HPP
+#ifndef REALM_REALMBM_HPP
+#define REALM_REALMBM_HPP
 
 #include <realm.hpp>
 #include "benchmark.hpp"
@@ -41,7 +41,7 @@ public:
 template<class WithClass, size_t N>
 class AddEmptyRows : public WithClass {
 public:
-    void bench()
+    void measure()
     {
         WriteTransaction tr(*(this->sg));
         TableRef t = tr.get_table(0);
@@ -87,7 +87,7 @@ public:
 
 template<class WithClass, size_t expected>
 class Size : public WithClass {
-    void bench()
+    void measure()
     {
         ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
@@ -98,4 +98,4 @@ class Size : public WithClass {
 } // namespace test_util
 } // namespace realm
 
-#endif // REALM_REALMBENCH_HPP
+#endif // REALM_REALMBM_HPP

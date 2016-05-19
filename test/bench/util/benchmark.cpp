@@ -18,7 +18,7 @@ run_once(Benchmark *bm, Timer& timer)
     bm->before_each();
     timer.unpause();
 
-    bm->bench();
+    bm->measure();
 
     timer.pause();
     bm->after_each();

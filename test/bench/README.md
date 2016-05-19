@@ -2,8 +2,8 @@
 
 A benchmark is a subclass of the `Benchmark` base class.
 
-The meat of a `Benchmark` derivative is the `bench()` function. This is what
-will actually get measured. `bench()` is declared pure virtual in `Benchmark`:
+The meat of a `Benchmark` derivative is the `measure()` function. This is what
+actually gets measured. `measure()` is declared pure virtual in `Benchmark`:
 you must (eventually) be override this method.
 
 The `Benchmark` base class also has a couple other virtual functions, which
@@ -14,13 +14,13 @@ do nothing by default:
 * `after_each()`
 * `after_all()`
 
-These functions (just like `bench()`), take no parameters. If you need
+These functions (just like `measure()`), take no parameters. If you need
 parameters, you should pass these using the instance variables of your
 `Benchmark` derivative.
 
 ## Getting Started
 
-Include `util` in your project. Include `benchmark.hpp` and `realmbench.hpp`.
+Include `util` in your project. Include `benchmark.hpp` and `realmbm.hpp`.
 
 ## FAQ
 
