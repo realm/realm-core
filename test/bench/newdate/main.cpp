@@ -1,6 +1,7 @@
 #include <realm.hpp>
 
 #include "benchmark.hpp"
+#include "realmbench.hpp"
 #include "results.hpp"
 #include "random.hpp"
 

@@ -3,7 +3,8 @@
 #include "results.hpp"      // Results
 #include "timer.hpp"        // Timer
 
-#include <iostream>
+#include <sstream>          // stringstream
+#include <iostream>         // cout, endl
 
 using namespace realm;
 using namespace realm::test_util;
@@ -87,11 +88,4 @@ void Benchmark::run(Results& results)
     this->after_all();
 
     results.finish(ident, lead_text);
-}
-
-WithSharedGroup::WithSharedGroup()
-{
-    std::string realm_path = "results.realm";
-    this->sg.reset(new SharedGroup(realm_path, false,
-        SharedGroup::durability_MemOnly, nullptr));
 }
