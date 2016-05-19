@@ -210,6 +210,8 @@ ref_type GroupWriter::write_group()
     size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
     int_fast64_t value_4 = int_fast64_t(reserve_pos + max_free_space_needed); // FIXME: Problematic unsigned -> signed conversion
+
+    // Ensure that this arrays does not reposition itself
     m_free_positions.ensure_minimum_width(value_4); // Throws
 
     // Get final sizes of free-list arrays
@@ -254,6 +256,11 @@ ref_type GroupWriter::write_group()
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = int_fast64_t(end_ref); // FIXME: Problematic unsigned -> signed conversion
     int_fast64_t value_9 = int_fast64_t(rest); // FIXME: Problematic unsigned -> signed conversion
+
+    // value_9 is guaranteed to be smaller than the existing entry in the array and hence will not cause bit expansion
+    REALM_ASSERT_3(value_8, <= , Array::ubound_for_width(m_free_positions.get_width()));
+    REALM_ASSERT_3(value_9, <= , Array::ubound_for_width(m_free_lengths.get_width()));
+
     m_free_positions.set(reserve_ndx, value_8); // Throws
     m_free_lengths.set(reserve_ndx, value_9); // Throws
 
