@@ -42,6 +42,7 @@ enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, IN
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
             COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
+            CREATE_TABLE_VIEW,
 
             COUNT};
 
@@ -165,6 +166,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
         Group& g = const_cast<Group&>(sg_w.begin_write());
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
+        std::vector<TableView> table_views;
 
         for (;;) {
             char instr = get_next(s) % COUNT;
@@ -555,6 +557,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         static_cast<void>(col_name);
                     }
                 }
+            }
+            else if (instr == CREATE_TABLE_VIEW && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (log) {
+                    *log << "table_views.push_back(g.get_table(" << table_ndx << ")->where().find_all());\n";
+                }
+                TableView tv = t->where().find_all();
+                table_views.push_back(tv);
             }
         }
     }
