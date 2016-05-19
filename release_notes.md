@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* File operations would previously throw runtime_error for less know errorcases (the `default` cases). They now throws AccessError instead and include path information.
+* File operations would previously throw `std::runtime_error` for error cases without a
+  specialized exception. They now throw `AccessError` instead and include path information.
 
 -----------
 
