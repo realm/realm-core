@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed move_last_over() replacing null values for binary columns in the moved
+  row with zero-length values.
 
 ### Breaking changes
 
