@@ -11,7 +11,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* File operations would previously throw `std::runtime_error` for error cases without a
+  specialized exception. They now throw `AccessError` instead and include path information.
 
 -----------
 
