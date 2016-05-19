@@ -27,11 +27,11 @@ class WithRandomUnixTimes : public base {
 #define base WithRandomUnixTimes<basebase, N>
 template<size_t N>
 class WithRandomTimestamps : public base {
-    void before_all(SharedGroup& sg)
+    void before_all()
     {
-        base::before_all(sg);
+        base::before_all();
 
-        WriteTransaction tr(sg);
+        WriteTransaction tr(*(this->sg));
         TableRef t = tr.get_table(0);
 
         size_t i;
@@ -53,11 +53,11 @@ class WithRandomTimestamps : public base {
 #define base WithRandomUnixTimes<basebase, N>
 template<size_t N>
 class WithRandomOldDateTimes : public base {
-    void before_all(SharedGroup& sg)
+    void before_all()
     {
-        base::before_all(sg);
+        base::before_all();
 
-        WriteTransaction tr(sg);
+        WriteTransaction tr(*(this->sg));
         TableRef t = tr.get_table(0);
 
         size_t i;
@@ -79,11 +79,11 @@ class WithRandomOldDateTimes : public base {
 #define base WithRandomUnixTimes<basebase, N>
 template<size_t N>
 class WithRandomInts : public base {
-    void before_all(SharedGroup& sg)
+    void before_all()
     {
-        base::before_all(sg);
+        base::before_all();
 
-        WriteTransaction tr(sg);
+        WriteTransaction tr(*(this->sg));
         TableRef t = tr.get_table(0);
 
         size_t i;
@@ -103,9 +103,9 @@ class WithRandomInts : public base {
 
 template<class WithClass>
 class QueryEqualsZeroTimestamp : public WithClass {
-    void operator()(SharedGroup& sg)
+    void bench()
     {
-        ReadTransaction tr(sg);
+        ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<Timestamp>(0) ==
             Timestamp(0, 0)).count();
@@ -115,9 +115,9 @@ class QueryEqualsZeroTimestamp : public WithClass {
 
 template<class WithClass>
 class QueryEqualsZeroOldDateTime : public WithClass {
-    void operator()(SharedGroup& sg)
+    void bench()
     {
-        ReadTransaction tr(sg);
+        ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<OldDateTime>(0) ==
             OldDateTime(0)).count();
@@ -127,9 +127,9 @@ class QueryEqualsZeroOldDateTime : public WithClass {
 
 template<class WithClass>
 class QueryEqualsZeroInt : public WithClass {
-    void operator()(SharedGroup& sg)
+    void bench()
     {
-        ReadTransaction tr(sg);
+        ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<Int>(0) == 0).count();
         this->asExpected = count == 1;
@@ -138,9 +138,9 @@ class QueryEqualsZeroInt : public WithClass {
 
 template<class WithClass, size_t expected>
 class QueryGreaterThanZeroTimestamp : public WithClass {
-    void operator()(SharedGroup& sg)
+    void bench()
     {
-        ReadTransaction tr(sg);
+        ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<Timestamp>(0) >
             Timestamp(0, 0)).count();
@@ -150,9 +150,9 @@ class QueryGreaterThanZeroTimestamp : public WithClass {
 
 template<class WithClass, size_t expected>
 class QueryGreaterThanZeroOldDateTime : public WithClass {
-    void operator()(SharedGroup& sg)
+    void bench()
     {
-        ReadTransaction tr(sg);
+        ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<OldDateTime>(0) >
             OldDateTime(0)).count();
@@ -162,9 +162,9 @@ class QueryGreaterThanZeroOldDateTime : public WithClass {
 
 template<class WithClass, size_t expected>
 class QueryGreaterThanZeroInt : public WithClass {
-    void operator()(SharedGroup& sg)
+    void bench()
     {
-        ReadTransaction tr(sg);
+        ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
         size_t count = (t->where().get_table()->column<Int>(0) > 0).count();
         this->asExpected = count == expected;

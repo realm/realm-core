@@ -11,16 +11,16 @@ using namespace realm::test_util;
 namespace {
 
 inline void
-run_once(Benchmark *bench, SharedGroup& sg, Timer& timer)
+run_once(Benchmark *bm, Timer& timer)
 {
     timer.pause();
-    bench->before_each(sg);
+    bm->before_each();
     timer.unpause();
 
-    bench->operator()(sg);
+    bm->bench();
 
     timer.pause();
-    bench->after_each(sg);
+    bm->after_each();
     timer.unpause();
 }
 
@@ -40,7 +40,7 @@ std::string Benchmark::ident()
     return stream.str();
 }
 
-double Benchmark::warmup(SharedGroup& sg)
+double Benchmark::warmup()
 {
     double warmup_time = 0.0;
     size_t warmup_reps = 0;
@@ -49,7 +49,7 @@ double Benchmark::warmup(SharedGroup& sg)
     while(warmup_time < this->min_warmup_time() &&
           warmup_reps < this->max_warmup_reps()) {
         timer.unpause();
-        run_once(this, sg, timer);
+        run_once(this, timer);
         timer.pause();
         warmup_time = timer.get_elapsed_time();
         warmup_reps++;
@@ -66,14 +66,9 @@ void Benchmark::run(Results& results)
     std::string lead_text = this->lead_text();
     std::string ident = this->ident();
 
-    std::string realm_path = "results.realm";
-    std::unique_ptr<SharedGroup> sg;
-    sg.reset(new SharedGroup(realm_path, false,
-                             SharedGroup::durability_MemOnly, nullptr));
+    this->before_all();
 
-    this->before_all(*sg);
-
-    warmup_secs_per_rep = this->warmup(*sg);
+    warmup_secs_per_rep = this->warmup();
     reps = size_t(this->min_time() / warmup_secs_per_rep);
     reps = std::max(reps, this->min_reps());
     reps = std::min(reps, this->max_reps());
@@ -82,14 +77,21 @@ void Benchmark::run(Results& results)
 
     for (size_t i = 0; i < reps; i++) {
         Timer t;
-        run_once(this, *sg, t);
+        run_once(this, t);
         results.submit(ident.c_str(), t.get_elapsed_time());
         if (!this->asExpected) {
             std::cout << "Unexpected!" << std::endl;
         }
     }
 
-    this->after_all(*sg);
+    this->after_all();
 
     results.finish(ident, lead_text);
+}
+
+WithSharedGroup::WithSharedGroup()
+{
+    std::string realm_path = "results.realm";
+    this->sg.reset(new SharedGroup(realm_path, false,
+        SharedGroup::durability_MemOnly, nullptr));
 }

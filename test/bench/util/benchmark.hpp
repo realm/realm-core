@@ -7,6 +7,9 @@
 #include "timer.hpp"    // Timer
 #include "random.hpp"   // Random
 
+#include <sstream>
+#include <iostream>
+
 namespace realm {
 namespace test_util {
 
@@ -14,17 +17,18 @@ class Benchmark {
     std::string lead_text();
     std::string ident();
 
-    double warmup(SharedGroup&);
+    double warmup();
 
 public:
     bool asExpected = false;
 
     virtual const char *name() const = 0;
-    virtual void before_all(SharedGroup&) {}
-    virtual void after_all(SharedGroup&) {}
-    virtual void before_each(SharedGroup&) {}
-    virtual void after_each(SharedGroup&) {}
-    virtual void operator()(SharedGroup&) = 0;
+
+    virtual void before_all() {}
+    virtual void before_each() {}
+    virtual void bench() = 0;
+    virtual void after_each() {}
+    virtual void after_all() {}
 
     virtual double min_warmup_time()
     {
@@ -54,32 +58,41 @@ public:
     void run(Results& results);
 };
 
-template<DataType data_type, bool nullable = false>
-class WithOneColumn : public Benchmark {
+class WithSharedGroup : public Benchmark {
 public:
-    void before_all(SharedGroup& sg)
+    std::unique_ptr<SharedGroup> sg;
+
+    WithSharedGroup();
+};
+
+template<
+    DataType data_type, bool nullable = false,
+    class WithClass = WithSharedGroup>
+class WithOneColumn : public WithClass {
+public:
+    void before_all()
     {
-        WriteTransaction tr(sg);
+        WriteTransaction tr(*(this->sg));
         TableRef t = tr.add_table("table");
         t->add_column(data_type, "first", nullable);
         tr.commit();
     }
 
-    void after_all(SharedGroup& sg)
+    void after_all()
     {
         // WriteTransaction doesn't have remove_table :-/
-        Group& g = sg.begin_write();
+        Group& g = this->sg->begin_write();
         g.remove_table("table");
-        sg.commit();
+        this->sg->commit();
     }
 };
 
 template<class WithClass, size_t N>
 class AddEmptyRows : public WithClass {
 public:
-    void operator()(SharedGroup& sg)
+    void bench()
     {
-        WriteTransaction tr(sg);
+        WriteTransaction tr(*(this->sg));
         TableRef t = tr.get_table(0);
         t->add_empty_row(N);
         tr.commit();
@@ -89,11 +102,11 @@ public:
 template<class WithClass, size_t N>
 class WithEmptyRows : public WithClass {
 public:
-    void before_all(SharedGroup& sg)
+    void before_all()
     {
-        WithClass::before_all(sg);
+        WithClass::before_all();
 
-        WriteTransaction tr(sg);
+        WriteTransaction tr(*(this->sg));
         TableRef t = tr.get_table(0);
         t->add_empty_row(N);
         tr.commit();
@@ -109,9 +122,9 @@ class WithRandomTs : public WithClass {
 public:
     T values[N];
 
-    void before_all(SharedGroup& sg)
+    void before_all()
     {
-        WithClass::before_all(sg);
+        WithClass::before_all();
 
         Random random(seed);
         size_t i;
@@ -123,9 +136,9 @@ public:
 
 template<class WithClass, size_t expected>
 class Size : public WithClass {
-    void operator()(SharedGroup& sg)
+    void bench()
     {
-        ReadTransaction tr(sg);
+        ReadTransaction tr(*(this->sg));
         ConstTableRef t = tr.get_table(0);
         this->asExpected = t->size() == expected;
     }
