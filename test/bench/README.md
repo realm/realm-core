@@ -7,7 +7,7 @@ will actually get measured. `bench()` is declared pure virtual in `Benchmark`:
 you must (eventually) be override this method.
 
 The `Benchmark` base class also has a couple other virtual functions, which
-do nothing in the base class:
+do nothing by default:
 
 * `before_all()`
 * `before_each()`
