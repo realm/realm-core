@@ -5,6 +5,7 @@
 #include <iostream>
 #include <mutex>
 #include <map>
+#include <sys/stat.h>
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
 #  include <cstdlib>
@@ -14,6 +15,7 @@
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/errno.hpp>
 #include <realm/array.hpp>
 #include <realm/alloc_slab.hpp>
 
@@ -502,7 +504,9 @@ ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
 
 namespace {
 
-std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>> all_files;
+using file_id_t = util::File::file_id_t;
+
+std::map<File::file_id_t, std::weak_ptr<SlabAlloc::MappedFile>> all_files;
 util::Mutex all_files_mutex;
 
 }
@@ -529,12 +533,17 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     using namespace realm::util;
     File::AccessMode access = cfg.read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
+    File db_file;
+    db_file.open(path.c_str(), access, create, 0); // Throws
     {
+        file_id_t key;
+        db_file.get_id(key);
+
         std::lock_guard<Mutex> lock(all_files_mutex);
-        std::shared_ptr<SlabAlloc::MappedFile> p = all_files[path].lock();
+        std::shared_ptr<SlabAlloc::MappedFile> p = all_files[key].lock();
         if (!bool(p)) {
             p = std::make_shared<MappedFile>();
-            all_files[path] = p;
+            all_files[key] = p;
         }
         m_file_mappings = p;
     }
@@ -544,6 +553,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
         REALM_ASSERT(!cfg.session_initiator);
+        db_file.close();
         m_data = m_file_mappings->m_initial_mapping.get_addr();
         m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
@@ -571,7 +581,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // Even though we're the first to map the file, we cannot assume that we're
     // the session initiator. Another process may have the session initiator.
 
-    m_file_mappings->m_file.open(path.c_str(), access, create, 0); // Throws
+    m_file_mappings->m_file = std::move(db_file);
     if (cfg.encryption_key)
         m_file_mappings->m_file.set_encryption_key(cfg.encryption_key);
     File::CloseGuard fcg(m_file_mappings->m_file);
