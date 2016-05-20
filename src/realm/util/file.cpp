@@ -510,6 +510,28 @@ File::SizeType File::get_size() const
 #endif
 }
 
+void File::get_id(file_id_t& id) const
+{
+    REALM_ASSERT_RELEASE(is_attached());
+
+#ifdef _WIN32 // Windows version
+
+    // Don't know how to do this....
+    throw std::runtime_error("Get File ID failed");
+
+#else // POSIX version
+
+    struct stat statbuf;
+    if (::fstat(m_fd, &statbuf) == 0) {
+        id.dev = statbuf.st_dev;
+        id.ino = statbuf.st_ino;
+        return;
+    }
+    throw std::runtime_error("fstat() failed");
+
+#endif
+}
+
 
 void File::resize(SizeType size)
 {
