@@ -15,7 +15,7 @@ RUN touch /var/lib/rpm/* \
 # /var/lib/rpm/* in order to work around this issue.
 # Link: https://github.com/docker/docker/issues/10180
 RUN touch /var/lib/rpm/* \
-    && yum -y install python-cheetah which chrpath devtoolset-3-gcc devtoolset-3-gcc-c++ \
+    && yum -y install python-cheetah which chrpath devtoolset-3-gcc devtoolset-3-gcc-c++ openssl-devel \
     && yum -y remove gcc gcc-c++ \
     && yum clean all
 
