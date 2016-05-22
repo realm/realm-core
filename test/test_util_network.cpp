@@ -10,6 +10,7 @@
 #include <realm/util/network.hpp>
 
 #include "test.hpp"
+#include "util/semaphore.hpp"
 
 using namespace realm::util;
 using namespace realm::test_util;
@@ -120,31 +121,6 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
         throw std::system_error(ec_2);
 }
 
-class bowl_of_stones_semaphore {
-public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
-        m_num_stones(initial_number_of_stones)
-    {
-    }
-    void get_stone()
-    {
-        LockGuard lock(m_mutex);
-        while (m_num_stones == 0)
-            m_cond_var.wait(lock);
-        --m_num_stones;
-    }
-    void add_stone()
-    {
-        LockGuard lock(m_mutex);
-        ++m_num_stones;
-        m_cond_var.notify();
-    }
-private:
-    Mutex m_mutex;
-    int m_num_stones;
-    CondVar m_cond_var;
-};
-
 } // anonymous namespace
 
 
@@ -217,7 +193,7 @@ TEST(Network_EventLoopStopAndReset_2)
     thread_1.start([&] { service.run(); });
 
     // Check that the event loop is actually running
-    bowl_of_stones_semaphore bowl_1; // Empty
+    BowlOfStonesSemaphore bowl_1; // Empty
     service.post([&] { bowl_1.add_stone(); });
     bowl_1.get_stone(); // Block until the stone is added
 
@@ -239,7 +215,7 @@ TEST(Network_EventLoopStopAndReset_2)
     thread_2.start([&] { service.run(); });
 
     // Check that the event loop is actually running
-    bowl_of_stones_semaphore bowl_2; // Empty
+    BowlOfStonesSemaphore bowl_2; // Empty
     service.post([&] { bowl_2.add_stone(); });
     bowl_2.get_stone(); // Block until the stone is added
 
