@@ -285,9 +285,22 @@ private:
 
     Mutex m_mutex;
 
+    // Refers to the CFRunLoop of the thread that is currently executing
+    // run(). It is null when no thread is executing run(). It may refer to
+    // different CFRunLoop objects at different times, if different threads call
+    // run(), but run may only be executed by one thread at a time.
+    //
+    // If there are streams and timers attached to the CFRunLoop object when
+    // run() returns, those streams and timers will be detached from the run
+    // loop at that time. When the same thread, or another thread later calls
+    // run() again, those streams and timers will be reattached to the CFRunLoop
+    // of that thread, which may be a different thread than the one that called
+    // run() previously.
+    //
     // `m_cf_run_loop` is protected by `m_mutex` because wake_up() needs to
     // access it. Note that wake_up() generally executes asynchronously with
-    // respect to the event loop thread.
+    // respect to the event loop thread. This is so, because wake_up() is called
+    // from post() and stop() which both need to be thread-safe.
     CFRunLoopRef m_cf_run_loop = nullptr; // Protected by m_mutex
 
     bool m_stopped = false; // Protected by m_mutex
