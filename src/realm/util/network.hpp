@@ -1099,17 +1099,17 @@ public:
         m_expiration_time(expiration_time)
     {
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(false); // Never called
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         bool orphaned = !m_timer;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_timer = 0;
     }
@@ -1127,16 +1127,16 @@ public:
         m_service(serv)
     {
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(false); // Never called
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         // io_service::recycle_post_oper() destroys this operation object
         io_service::recycle_post_oper(m_service, this);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         REALM_ASSERT(false); // Never called
     }
@@ -1153,7 +1153,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         // Recycle the operation object before the handler is exceuted, such
         // that the memory is available for a new post operation that might be
@@ -1185,21 +1185,21 @@ public:
         async_oper(size, false) // Second argument is `in_use`
     {
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(false); // Never called
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         // Must never be called
         REALM_ASSERT(false);
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         // Must never be called
         REALM_ASSERT(false);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         // Must never be called
         REALM_ASSERT(false);
@@ -1593,7 +1593,7 @@ public:
         if (m_socket->initiate_async_connect(ep, m_error_code))
             set_is_complete(true); // Failure, or immediate completion
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -1601,13 +1601,13 @@ public:
         m_socket->finalize_async_connect(m_error_code);
         set_is_complete(true);
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         bool orphaned = !m_socket;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_socket = nullptr;
     }
@@ -1625,7 +1625,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         bool orphaned = !m_socket;
@@ -1661,7 +1661,7 @@ public:
             set_is_complete(true); // Failure
         }
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -1673,13 +1673,13 @@ public:
         m_curr += n_2;
         set_is_complete(m_error_code || m_curr == m_end);
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         bool orphaned = !m_socket;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_socket = 0;
     }
@@ -1700,7 +1700,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         REALM_ASSERT(is_complete() || is_canceled());
         REALM_ASSERT(is_complete() == (m_error_code || m_curr == m_end));
@@ -1834,7 +1834,7 @@ public:
         if (m_acceptor->ensure_nonblocking_mode(m_error_code))
             set_is_complete(true); // Failure
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -1843,13 +1843,13 @@ public:
         m_acceptor->do_accept(m_socket, m_endpoint, m_error_code);
         set_is_complete(true);
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         bool orphaned = !m_acceptor;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_acceptor = 0;
     }
@@ -1869,7 +1869,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         REALM_ASSERT(is_canceled() || m_error_code || m_socket.is_open());
@@ -1994,14 +1994,14 @@ public:
         }
     }
     void process_buffered_input() noexcept;
-    void proceed() noexcept override;
-    void recycle() noexcept override
+    void proceed() noexcept override final;
+    void recycle() noexcept override final
     {
         bool orphaned = !m_stream;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_stream = 0;
     }
@@ -2024,7 +2024,7 @@ public:
         m_handler(h)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         REALM_ASSERT(is_canceled() || m_error_code ||
@@ -2137,7 +2137,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         bool orphaned = !m_timer;
         std::error_code ec;

@@ -17,29 +17,29 @@ public:
     {
     }
 
-    ~EventLoopImpl() noexcept override
+    ~EventLoopImpl() noexcept override final
     {
     }
 
-    std::unique_ptr<Socket> make_socket() override;
-    std::unique_ptr<DeadlineTimer> make_timer() override;
+    std::unique_ptr<Socket> make_socket() override final;
+    std::unique_ptr<DeadlineTimer> make_timer() override final;
 
-    void post(PostCompletionHandler handler) override
+    void post(PostCompletionHandler handler) override final
     {
         m_io_service.post(std::move(handler)); // Throws
     }
 
-    void run() override
+    void run() override final
     {
         m_io_service.run(); // Throws
     }
 
-    void stop() noexcept override
+    void stop() noexcept override final
     {
         m_io_service.stop();
     }
 
-    void reset() noexcept override
+    void reset() noexcept override final
     {
         m_io_service.reset();
     }
@@ -64,12 +64,12 @@ public:
     {
     }
 
-    ~SocketImpl() noexcept override
+    ~SocketImpl() noexcept override final
     {
     }
 
     void async_connect(std::string host, port_type port, SocketSecurity security,
-                       ConnectCompletionHandler handler) override
+                       ConnectCompletionHandler handler) override final
     {
         if (security != SocketSecurity::None)
             throw std::runtime_error("Unsupported socket security");
@@ -102,7 +102,7 @@ public:
         m_connect_in_progress = true;
     }
 
-    void async_read(char* data, size_t size, ReadCompletionHandler handler) override
+    void async_read(char* data, size_t size, ReadCompletionHandler handler) override final
     {
         if (m_connect_in_progress || !m_socket.is_open())
             throw std::runtime_error("Not connected");
@@ -110,26 +110,26 @@ public:
     }
 
     void async_read_until(char* data, size_t size, char delim,
-                          ReadCompletionHandler handler) override
+                          ReadCompletionHandler handler) override final
     {
         if (m_connect_in_progress || !m_socket.is_open())
             throw std::runtime_error("Not connected");
         m_input_stream.async_read_until(data, size, delim, std::move(handler));
     }
 
-    void async_write(const char* data, size_t size, WriteCompletionHandler handler) override
+    void async_write(const char* data, size_t size, WriteCompletionHandler handler) override final
     {
         if (m_connect_in_progress || !m_socket.is_open())
             throw std::runtime_error("Not connected");
         m_socket.async_write(data, size, std::move(handler));
     }
 
-    void close() noexcept override
+    void close() noexcept override final
     {
         m_socket.close();
     }
 
-    void cancel() noexcept override
+    void cancel() noexcept override final
     {
         if (m_connect_in_progress) {
             m_socket.close();
@@ -140,7 +140,7 @@ public:
         }
     }
 
-    EventLoop& get_event_loop() noexcept final
+    EventLoop& get_event_loop() noexcept override final
     {
         return m_event_loop;
     }
@@ -189,17 +189,17 @@ public:
     {
     }
 
-    void async_wait(Duration delay, WaitCompletionHandler handler) override
+    void async_wait(Duration delay, WaitCompletionHandler handler) override final
     {
         m_timer.async_wait(delay, std::move(handler));
     }
 
-    void cancel() noexcept override
+    void cancel() noexcept override final
     {
         m_timer.cancel();
     }
 
-    EventLoop& get_event_loop() noexcept final
+    EventLoop& get_event_loop() noexcept override final
     {
         return m_event_loop;
     }

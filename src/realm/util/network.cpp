@@ -103,8 +103,8 @@ struct getaddrinfo_result_owner {
 
 class network_error_category: public std::error_category {
 public:
-    const char* name() const noexcept override;
-    std::string message(int) const override;
+    const char* name() const noexcept override final;
+    std::string message(int) const override final;
 };
 
 network_error_category g_network_error_category;

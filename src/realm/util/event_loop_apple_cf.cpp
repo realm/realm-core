@@ -114,7 +114,7 @@ class PostOper: public Oper {
 public:
     EventLoop::PostCompletionHandler handler;
 
-    void execute() override
+    void execute() override final
     {
         handler(); // Throws
     }
@@ -125,7 +125,7 @@ public:
     Socket::ConnectCompletionHandler handler;
     std::error_code ec;
 
-    void execute() override
+    void execute() override final
     {
         handler(ec); // Throws
     }
@@ -137,7 +137,7 @@ public:
     std::error_code ec;
     size_t n = 0;
 
-    void execute() override
+    void execute() override final
     {
         handler(ec, n); // Throws
     }
@@ -149,7 +149,7 @@ public:
     std::error_code ec;
     size_t n = 0;
 
-    void execute() override
+    void execute() override final
     {
         handler(ec, n); // Throws
     }
@@ -160,7 +160,7 @@ public:
     DeadlineTimer::WaitCompletionHandler handler;
     std::error_code ec;
 
-    void execute() override
+    void execute() override final
     {
         handler(ec); // Throws
     }
@@ -240,14 +240,14 @@ public:
     int_fast64_t num_operations_in_progress = 0;
 
     EventLoopImpl();
-    ~EventLoopImpl() noexcept override;
+    ~EventLoopImpl() noexcept override final;
 
-    std::unique_ptr<Socket> make_socket() override;
-    std::unique_ptr<DeadlineTimer> make_timer() override;
-    void post(PostCompletionHandler) override;
-    void run() override;
-    void stop() noexcept override;
-    void reset() noexcept override;
+    std::unique_ptr<Socket> make_socket() override final;
+    std::unique_ptr<DeadlineTimer> make_timer() override final;
+    void post(PostCompletionHandler) override final;
+    void run() override final;
+    void stop() noexcept override final;
+    void reset() noexcept override final;
 
     void remove_socket(SocketImpl* socket) noexcept
     {
@@ -336,7 +336,7 @@ public:
     {
     }
 
-    ~SocketImpl() noexcept override
+    ~SocketImpl() noexcept override final
     {
         close(); // close() is virtual, but final
 
@@ -344,24 +344,24 @@ public:
     }
 
     void async_connect(std::string host, port_type port, SocketSecurity security,
-                       ConnectCompletionHandler handler) override
+                       ConnectCompletionHandler handler) override final
     {
         do_async_connect(std::move(host), port, security, std::move(handler)); // Throws
     }
 
-    void async_read(char* buffer, size_t size, ReadCompletionHandler handler) override
+    void async_read(char* buffer, size_t size, ReadCompletionHandler handler) override final
     {
         Optional<char> delim;
         do_async_read(buffer, size, delim, std::move(handler)); // Throws
     }
 
     void async_read_until(char* buffer, size_t size, char delim,
-                          ReadCompletionHandler handler) override
+                          ReadCompletionHandler handler) override final
     {
         do_async_read(buffer, size, delim, std::move(handler)); // Throws
     }
 
-    void async_write(const char* data, size_t size, WriteCompletionHandler handler) override
+    void async_write(const char* data, size_t size, WriteCompletionHandler handler) override final
     {
         do_async_write(data, size, std::move(handler)); // Throws
     }
@@ -389,7 +389,7 @@ public:
             on_write_complete(error::operation_aborted);
     }
 
-    EventLoop& get_event_loop() noexcept final
+    EventLoop& get_event_loop() noexcept override final
     {
         return m_event_loop;
     }
@@ -944,14 +944,14 @@ public:
         m_cf_timer = std::move(cf_timer);
     }
 
-    ~DeadlineTimerImpl() noexcept override
+    ~DeadlineTimerImpl() noexcept override final
     {
-        cancel(); // cancel() is virtual, but final
+        cancel();
 
         m_event_loop.remove_timer(this);
     }
 
-    void async_wait(Duration duration, WaitCompletionHandler handler) override
+    void async_wait(Duration duration, WaitCompletionHandler handler) override final
     {
         // A wait operation must not be in progress
         REALM_ASSERT(!m_wait_oper);
@@ -975,7 +975,7 @@ public:
             on_wait_complete(error::operation_aborted);
     }
 
-    EventLoop& get_event_loop() noexcept final
+    EventLoop& get_event_loop() noexcept override final
     {
         return m_event_loop;
     }
