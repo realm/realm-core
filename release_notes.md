@@ -6,16 +6,22 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* S: Type of completion handler arguments changed from `const H&` to `H` for all
+  asynchronous operations offered by the networking API (namespace
+  `util::network`).
+* S: `util::network::deadline_timer::async_wait()` no longer declared `noexcept`
+  (it never should have been).
 
 ### Enhancements
 
-* Event loop API reworked to more closely align with the `util::network` API,
+* S: Event loop API reworked to more closely align with the `util::network` API,
   and to better provide for multiple alternative implementations (not considered
   breaking because the event loop API was not yet in use).
-* Bugs fixed in the POSIX based implementation (not listed under bug fixes
+* S: Bugs fixed in the POSIX based implementation (not listed under bug fixes
   because the event loop API was not yet in use).
-* A new Apple CoreFoundation implementation of event loop API was added.
+* S: A new Apple CoreFoundation implementation of event loop API was added.
+* S: Movable completion handler objects are no longer copied by the networking
+  API (namespace `util::network`).
 
 -----------
 

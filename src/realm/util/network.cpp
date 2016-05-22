@@ -392,7 +392,7 @@ public:
         m_completed_operations.push_back(std::move(op));
     }
 
-    void post(PostOperConstr constr, size_t size, const void* cookie)
+    void post(PostOperConstr constr, size_t size, void* cookie)
     {
         {
             LockGuard l(m_mutex);
@@ -706,7 +706,7 @@ void io_service::add_completed_oper(LendersOperPtr op) noexcept
     m_impl->add_completed_oper(std::move(op));
 }
 
-void io_service::do_post(PostOperConstr constr, size_t size, const void* cookie)
+void io_service::do_post(PostOperConstr constr, size_t size, void* cookie)
 {
     m_impl->post(constr, size, cookie); // Throws
 }
