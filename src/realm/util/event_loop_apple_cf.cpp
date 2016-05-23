@@ -237,6 +237,8 @@ class DeadlineTimerImpl;
 
 class EventLoopImpl: public EventLoop {
 public:
+    // Number of asynchronous operations in progress (connect, read, write,
+    // wait)
     int_fast64_t num_operations_in_progress = 0;
 
     EventLoopImpl();
@@ -271,9 +273,19 @@ public:
         while (std::unique_ptr<Oper> op = m_completed_operations.pop_front())
             op->execute(); // Throws
 
+        // Stop event loop if there are no asynchronous operations in progress
+        // and no post handlers waiting to be transferred from m_post_operations
+        // to m_completed_operations
         if (num_operations_in_progress == 0) {
-            CFRunLoopStop(m_cf_run_loop); // Out of work
-            m_returning = true;
+            bool no_pending_post_operations;
+            {
+                LockGuard lg(m_mutex);
+                no_pending_post_operations = m_post_operations.empty();
+            }
+            if (no_pending_post_operations) {
+                CFRunLoopStop(m_cf_run_loop); // Out of work
+                m_returning = true;
+            }
         }
     }
 
