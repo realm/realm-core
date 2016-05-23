@@ -396,31 +396,47 @@ TEST_TYPES(EventLoop_DeadlineTimer, IMPLEMENTATIONS)
 }
 
 
+struct ServerFixture {
+    unit_test::TestContext& test_context;
+    network::io_service service;
+    network::acceptor acceptor{service};
+    network::endpoint ep;
+    network::socket socket{service};
+    network::buffered_input_stream input_stream{socket};
+    ThreadWrapper thread;
+    ServerFixture(unit_test::TestContext& tc):
+        test_context(tc)
+    {
+        ep = bind_acceptor(acceptor);
+        acceptor.listen();
+    }
+    ~ServerFixture()
+    {
+        service.stop();
+        if (thread.joinable())
+            CHECK_NOT(thread.join());
+    }
+    void start()
+    {
+        thread.start([&] { service.run(); });
+        // Wait for the event loop thread to become active
+        BowlOfStonesSemaphore bowl;
+        service.post([&] { bowl.add_stone(); });
+        bowl.get_stone();
+    }
+};
+
+
 TEST_TYPES(EventLoop_Cancellation_Basics, IMPLEMENTATIONS)
 {
-    struct Server {
-        network::io_service service;
-        network::acceptor acceptor{service};
-        network::endpoint ep;
-        network::socket socket{service};
-        ThreadWrapper thread;
-        Server()
-        {
-            ep = bind_acceptor(acceptor);
-            acceptor.listen();
-        }
-    };
 
     std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
 
     // Connect -> cancel
     {
-        Server server;
-        auto thread = [&] {
-            std::error_code ec;
-            server.acceptor.accept(server.socket, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
+        server.acceptor.async_accept(server.socket, [](std::error_code) {});
+        server.start();
         std::unique_ptr<Socket> socket = event_loop->make_socket();
         std::error_code ec;
         socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
@@ -428,124 +444,84 @@ TEST_TYPES(EventLoop_Cancellation_Basics, IMPLEMENTATIONS)
         socket->cancel();
         event_loop->run();
         CHECK_EQUAL(error::operation_aborted, ec);
-        socket.reset();
-        CHECK_NOT(server.thread.join());
     }
 
-    // Connect -> close
+    // Connect -> destroy
     {
-        Server server;
-        auto thread = [&] {
-            std::error_code ec;
-            server.acceptor.accept(server.socket, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
+        server.acceptor.async_accept(server.socket, [](std::error_code) {});
+        server.start();
         std::unique_ptr<Socket> socket = event_loop->make_socket();
         std::error_code ec;
         socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
                               [&](std::error_code ec_2) { ec = ec_2; });
-        socket.reset(); // Close
+        socket.reset(); // Implicit close -> cancel
         event_loop->run();
         CHECK_EQUAL(error::operation_aborted, ec);
-        CHECK_NOT(server.thread.join());
     }
 
     // Read -> cancel
     {
-        Server server;
-        auto thread = [&] {
-            server.acceptor.accept(server.socket);
-            std::error_code ec;
-            char ch = 0;
-            server.socket.write_some(&ch, 1, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
         std::unique_ptr<Socket> socket = event_loop->make_socket();
+        connect_sockets(server.socket, *socket);
+        char ch = 0;
+        server.socket.async_write(&ch, 1, [](std::error_code, size_t) {});
+        server.start();
+        char ch_2;
         std::error_code ec;
-        socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
-                              [&](std::error_code ec_2) { ec = ec_2; });
-        event_loop->run();
-        CHECK_NOT(ec);
-        char ch;
-        socket->async_read(&ch, 1, [&](std::error_code ec_2, size_t) { ec = ec_2; });
+        socket->async_read(&ch_2, 1, [&](std::error_code ec_2, size_t) { ec = ec_2; });
         socket->cancel();
         event_loop->run();
         CHECK_EQUAL(error::operation_aborted, ec);
-        socket.reset();
-        CHECK_NOT(server.thread.join());
     }
 
-    // Read -> close
+    // Read -> destroy
     {
-        Server server;
-        auto thread = [&] {
-            server.acceptor.accept(server.socket);
-            std::error_code ec;
-            char ch = 0;
-            server.socket.write_some(&ch, 1, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
         std::unique_ptr<Socket> socket = event_loop->make_socket();
+        connect_sockets(server.socket, *socket);
+        char ch = 0;
+        server.socket.async_write(&ch, 1, [](std::error_code, size_t) {});
+        server.start();
+        char ch_2;
         std::error_code ec;
-        socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
-                              [&](std::error_code ec_2) { ec = ec_2; });
-        event_loop->run();
-        CHECK_NOT(ec);
-        char ch;
-        socket->async_read(&ch, 1, [&](std::error_code ec_2, size_t) { ec = ec_2; });
-        socket.reset(); // Close
+        socket->async_read(&ch_2, 1, [&](std::error_code ec_2, size_t) { ec = ec_2; });
+        socket.reset(); // Implicit close -> cancel
         event_loop->run();
         CHECK_EQUAL(error::operation_aborted, ec);
-        CHECK_NOT(server.thread.join());
     }
 
     // Write -> cancel
     {
-        Server server;
-        auto thread = [&] {
-            server.acceptor.accept(server.socket);
-            std::error_code ec;
-            char ch;
-            server.socket.read_some(&ch, 1, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
         std::unique_ptr<Socket> socket = event_loop->make_socket();
+        connect_sockets(server.socket, *socket);
+        char ch;
+        server.input_stream.async_read(&ch, 1, [](std::error_code, size_t) {});
+        server.start();
+        char ch_2 = 0;
         std::error_code ec;
-        socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
-                              [&](std::error_code ec_2) { ec = ec_2; });
-        event_loop->run();
-        CHECK_NOT(ec);
-        char ch = 0;
-        socket->async_write(&ch, 1, [&](std::error_code ec_2, size_t) { ec = ec_2; });
+        socket->async_write(&ch_2, 1, [&](std::error_code ec_2, size_t) { ec = ec_2; });
         socket->cancel();
         event_loop->run();
         CHECK_EQUAL(error::operation_aborted, ec);
-        socket.reset();
-        CHECK_NOT(server.thread.join());
     }
 
-    // Write -> close
+    // Write -> destroy
     {
-        Server server;
-        auto thread = [&] {
-            server.acceptor.accept(server.socket);
-            std::error_code ec;
-            char ch;
-            server.socket.read_some(&ch, 1, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
         std::unique_ptr<Socket> socket = event_loop->make_socket();
+        connect_sockets(server.socket, *socket);
+        char ch;
+        server.input_stream.async_read(&ch, 1, [](std::error_code, size_t) {});
+        server.start();
+        char ch_2 = 0;
         std::error_code ec;
-        socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
-                              [&](std::error_code ec_2) { ec = ec_2; });
-        event_loop->run();
-        CHECK_NOT(ec);
-        char ch = 0;
-        socket->async_write(&ch, 1, [&](std::error_code ec_2, size_t) { ec = ec_2; });
-        socket.reset(); // Close
+        socket->async_write(&ch_2, 1, [&](std::error_code ec_2, size_t) { ec = ec_2; });
+        socket.reset(); // Implicit close -> cancel
         event_loop->run();
         CHECK_EQUAL(error::operation_aborted, ec);
-        CHECK_NOT(server.thread.join());
     }
 
     // Wait -> cancel
@@ -558,12 +534,12 @@ TEST_TYPES(EventLoop_Cancellation_Basics, IMPLEMENTATIONS)
         CHECK_EQUAL(error::operation_aborted, ec);
     }
 
-    // Wait -> close
+    // Wait -> destroy
     {
         std::unique_ptr<DeadlineTimer> timer = event_loop->make_timer();
         std::error_code ec;
         timer->async_wait(std::chrono::hours(1000000), [&](std::error_code ec_2) { ec = ec_2; });
-        timer.reset(); // Close
+        timer.reset(); // Implicit cancel
         event_loop->run();
         CHECK_EQUAL(error::operation_aborted, ec);
     }
@@ -717,18 +693,6 @@ TEST_TYPES(EventLoop_ThrowFromHandlers, IMPLEMENTATIONS)
 {
     // Check that exceptions can propagate correctly out from any type of
     // completion handler
-    struct Server {
-        network::io_service service;
-        network::acceptor acceptor{service};
-        network::endpoint ep;
-        network::socket socket{service};
-        ThreadWrapper thread;
-        Server()
-        {
-            ep = bind_acceptor(acceptor);
-            acceptor.listen();
-        }
-    };
 
     std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
 
@@ -741,64 +705,42 @@ TEST_TYPES(EventLoop_ThrowFromHandlers, IMPLEMENTATIONS)
 
     // Connect
     {
-        Server server;
-        auto thread = [&] {
-            std::error_code ec;
-            server.acceptor.accept(server.socket, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
+        server.acceptor.async_accept(server.socket, [](std::error_code) {});
+        server.start();
         std::unique_ptr<Socket> socket = event_loop->make_socket();
         struct TestException {};
         socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
                               [](std::error_code) { throw TestException(); });
         CHECK_THROW(event_loop->run(), TestException);
-        CHECK_NOT(server.thread.join());
     }
 
     // Read
     {
-        Server server;
-        auto thread = [&] {
-            server.acceptor.accept(server.socket);
-            std::error_code ec;
-            char ch = 0;
-            server.socket.write_some(&ch, 1, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
         std::unique_ptr<Socket> socket = event_loop->make_socket();
-        bool connected = false;
-        socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
-                              [&](std::error_code) { connected = true; });
-        event_loop->run();
-        CHECK(connected);
-        char ch;
+        connect_sockets(server.socket, *socket);
+        char ch = 0;
+        server.socket.async_write(&ch, 1, [](std::error_code, size_t) {});
+        server.start();
+        char ch_2;
         struct TestException {};
-        socket->async_read(&ch, 1, [](std::error_code, size_t) { throw TestException(); });
+        socket->async_read(&ch_2, 1, [](std::error_code, size_t) { throw TestException(); });
         CHECK_THROW(event_loop->run(), TestException);
-        CHECK_NOT(server.thread.join());
     }
 
     // Write
     {
-        Server server;
-        auto thread = [&] {
-            server.acceptor.accept(server.socket);
-            std::error_code ec;
-            char ch;
-            server.socket.read_some(&ch, 1, ec);
-        };
-        server.thread.start(std::move(thread));
+        ServerFixture server{test_context};
         std::unique_ptr<Socket> socket = event_loop->make_socket();
-        bool connected = false;
-        socket->async_connect("localhost", server.ep.port(), SocketSecurity::None,
-                              [&](std::error_code) { connected = true; });
-        event_loop->run();
-        CHECK(connected);
-        char ch = 0;
+        connect_sockets(server.socket, *socket);
+        char ch;
+        server.input_stream.async_read(&ch, 1, [](std::error_code, size_t) {});
+        server.start();
+        char ch_2 = 0;
         struct TestException {};
-        socket->async_write(&ch, 1, [](std::error_code, size_t) { throw TestException(); });
+        socket->async_write(&ch_2, 1, [](std::error_code, size_t) { throw TestException(); });
         CHECK_THROW(event_loop->run(), TestException);
-        CHECK_NOT(server.thread.join());
     }
 
     // Wait
