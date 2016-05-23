@@ -475,8 +475,6 @@ public:
     class NotFound;
     class Exists;
 
-    struct file_id_t { dev_t dev; ino_t ino; };
-    void get_id(file_id_t& id) const;
 private:
 #ifdef _WIN32
     void* m_handle;
@@ -515,14 +513,6 @@ private:
 #endif
     };
 };
-
-inline int operator<(const File::file_id_t& a, const File::file_id_t& b) {
-    if (a.dev < b.dev) return -1;
-    if (a.dev > b.dev) return 1;
-    if (a.ino < b.ino) return -1;
-    if (a.ino > b.ino) return 1;
-    return 0;
-}
 
 
 
