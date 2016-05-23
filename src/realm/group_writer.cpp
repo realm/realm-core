@@ -213,6 +213,8 @@ ref_type GroupWriter::write_group()
 
     // Ensure that this arrays does not reposition itself
     m_free_positions.ensure_minimum_width(value_4); // Throws
+    m_free_positions.m_ignore_relocation_trigger = true;
+    m_free_lengths.m_ignore_relocation_trigger = true;
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();

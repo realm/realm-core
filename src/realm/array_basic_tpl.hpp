@@ -76,6 +76,7 @@ inline MemRef BasicArray<T>::create_array(Array::Type type, bool context_flag, s
         for (size_t i = 0; i < size; ++i) {
             tmp.set(i, value);
         }
+        return tmp.get_mem();
     }
     return mem;
 }
@@ -163,6 +164,10 @@ inline void BasicArray<T>::set(size_t ndx, T value)
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
+
+#ifdef REALM_TRIGGER_RELOCATIONS
+  debug_relocate();
+#endif
 
     // Set the value
     T* data = reinterpret_cast<T*>(m_data) + ndx;

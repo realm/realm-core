@@ -1579,7 +1579,45 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
 void Array::copy_on_write()
 {
-    if (!m_alloc.is_read_only(m_ref))
+    if (m_alloc.is_read_only(m_ref)) {
+        // Calculate size in bytes (plus a bit of matchcount room for expansion)
+        size_t size = calc_byte_len(m_size, m_width);
+        size_t rest = (~size & 0x7) + 1;
+        if (rest < 8)
+            size += rest; // 64bit blocks
+        size_t new_size = size;// +64;
+
+        // Create new copy of array
+        MemRef mref = m_alloc.alloc(new_size); // Throws
+        const char* old_begin = get_header_from_data(m_data);
+        const char* old_end = get_header_from_data(m_data) + size;
+        char* new_begin = mref.m_addr;
+        std::copy(old_begin, old_end, new_begin);
+
+        ref_type old_ref = m_ref;
+
+        // Update internal data
+        m_ref = mref.m_ref;
+        m_data = get_data_from_header(new_begin);
+        m_capacity = calc_item_count(new_size, m_width);
+        //REALM_ASSERT_DEBUG(m_capacity > 0);
+
+        // Update capacity in header. Uses m_data to find header, so
+        // m_data must be initialized correctly first.
+        set_header_capacity(new_size);
+
+        update_parent();
+
+        // Mark original as deleted, so that the space can be reclaimed in
+        // future commits, when no versions are using it anymore
+        m_alloc.free_(old_ref, old_begin);
+    }
+
+
+
+
+
+    if (m_ignore_relocation_trigger)
         return;
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
@@ -1587,14 +1625,17 @@ void Array::copy_on_write()
     size_t rest = (~size & 0x7) + 1;
     if (rest < 8)
         size += rest; // 64bit blocks
-    size_t new_size = size + 64;
+    size_t new_size = size; // +64;
 
-    // Create new copy of array
+                            // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws
-    const char* old_begin = get_header_from_data(m_data);
-    const char* old_end   = get_header_from_data(m_data) + size;
+    char* old_begin = get_header_from_data(m_data);
+    char* old_end = get_header_from_data(m_data) + size;
     char* new_begin = mref.m_addr;
     std::copy(old_begin, old_end, new_begin);
+
+    if (m_size > 0 && m_width > 0)
+        m_data[0] = 0xff;
 
     ref_type old_ref = m_ref;
 
@@ -1602,7 +1643,7 @@ void Array::copy_on_write()
     m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
     m_capacity = calc_item_count(new_size, m_width);
-    REALM_ASSERT_DEBUG(m_capacity > 0);
+    //   REALM_ASSERT_DEBUG(m_capacity > 0);
 
     // Update capacity in header. Uses m_data to find header, so
     // m_data must be initialized correctly first.
@@ -1610,9 +1651,18 @@ void Array::copy_on_write()
 
     update_parent();
 
+    memset(old_begin + header_size, 0xff, old_end - old_begin - header_size);
+
     // Mark original as deleted, so that the space can be reclaimed in
     // future commits, when no versions are using it anymore
     m_alloc.free_(old_ref, old_begin);
+
+
+
+
+
+
+
 }
 
 
@@ -1741,7 +1791,7 @@ void Array::alloc(size_t size, size_t width)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
-    REALM_ASSERT_3(m_capacity, >, 0);
+  //  REALM_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < size || width != m_width) {
         size_t needed_bytes   = calc_byte_len(size, width);
 
@@ -2112,6 +2162,53 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
 }
 
 
+void Array::debug_relocate()
+{
+    return;
+
+
+    if (m_ignore_relocation_trigger)
+        return;
+
+    // Calculate size in bytes (plus a bit of matchcount room for expansion)
+    size_t size = calc_byte_len(m_size, m_width);
+    size_t rest = (~size & 0x7) + 1;
+    if (rest < 8)
+        size += rest; // 64bit blocks
+    size_t new_size = size; // +64;
+
+                            // Create new copy of array
+    MemRef mref = m_alloc.alloc(new_size); // Throws
+    char* old_begin = get_header_from_data(m_data);
+    char* old_end = get_header_from_data(m_data) + size;
+    char* new_begin = mref.m_addr;
+    std::copy(old_begin, old_end, new_begin);
+
+    if (m_size > 0 && m_width > 0)
+        m_data[0] = 0xff;
+
+    ref_type old_ref = m_ref;
+
+    // Update internal data
+    m_ref = mref.m_ref;
+    m_data = get_data_from_header(new_begin);
+    m_capacity = calc_item_count(new_size, m_width);
+    //   REALM_ASSERT_DEBUG(m_capacity > 0);
+
+    // Update capacity in header. Uses m_data to find header, so
+    // m_data must be initialized correctly first.
+    set_header_capacity(new_size);
+
+    update_parent();
+
+    //  memset(old_begin + header_size, 0xff, old_end - old_begin - header_size);
+
+    // Mark original as deleted, so that the space can be reclaimed in
+    // future commits, when no versions are using it anymore
+    m_alloc.free_(old_ref, old_begin);
+
+}
+
 #ifdef REALM_DEBUG
 
 void Array::print() const
@@ -2123,44 +2220,6 @@ void Array::print() const
         std::cout << get(i);
     }
     std::cout << "\n";
-}
-
-void Array::debug_relocate()
-{
-    if (m_ignore_relocation_trigger)
-        return;
-
-    // Calculate size in bytes (plus a bit of matchcount room for expansion)
-    size_t size = calc_byte_len(m_size, m_width);
-    size_t rest = (~size & 0x7) + 1;
-    if (rest < 8)
-        size += rest; // 64bit blocks
-    size_t new_size = size + 64;
-
-    // Create new copy of array
-    MemRef mref = m_alloc.alloc(new_size); // Throws
-    const char* old_begin = get_header_from_data(m_data);
-    const char* old_end = get_header_from_data(m_data) + size;
-    char* new_begin = mref.m_addr;
-    std::copy(old_begin, old_end, new_begin);
-
-    ref_type old_ref = m_ref;
-
-    // Update internal data
-    m_ref = mref.m_ref;
-    m_data = get_data_from_header(new_begin);
-    m_capacity = calc_item_count(new_size, m_width);
-    REALM_ASSERT_DEBUG(m_capacity > 0);
-
-    // Update capacity in header. Uses m_data to find header, so
-    // m_data must be initialized correctly first.
-    set_header_capacity(new_size);
-
-    update_parent();
-
-    // Mark original as deleted, so that the space can be reclaimed in
-    // future commits, when no versions are using it anymore
-    m_alloc.free_(old_ref, old_begin);
 }
 
 void Array::verify() const
