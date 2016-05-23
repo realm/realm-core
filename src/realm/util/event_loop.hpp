@@ -162,6 +162,27 @@ public:
     /// called when the operation completes. The operation completes when the
     /// connection is established, or an error occurs.
     ///
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing EventLoop::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing EventLoop::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_connect(), even when
+    /// async_connect() is executed by the event loop thread. The completion
+    /// handler is guaranteed to be called eventually, as long as there is time
+    /// enough for the operation to complete or fail, and a thread is executing
+    /// EventLoop::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the socket is closed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// remains cancelable up until the point in time where the completion
+    /// handler starts to execute. This means that if cancel() is called before
+    /// the completion handler starts to execute, then the completion handler is
+    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// regardless of whether cancel() is called explicitly or implicitly, such
+    /// as when the socket is destroyed.
+    ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec)` where `ec` is the
     /// error code.
@@ -169,11 +190,6 @@ public:
     /// It is an error to start a new connect operation while another connect
     /// operation is in progress. A connect operation is considered complete as
     /// soon as the completion handler starts to execute.
-    ///
-    /// The operation can be canceled by calling cancel(), and will be
-    /// automatically canceled if the socket is closed. If the operation is
-    /// canceled, it will fail with `error::operation_aborted`. The completion
-    /// handler will always be called, as long as the event loop is running.
     virtual void async_connect(std::string host, port_type port, SocketSecurity security,
                                ConnectCompletionHandler handler) = 0;
 
@@ -194,6 +210,28 @@ public:
     /// `network::end_of_input`. Otherwise, if the operation succeeds, the last
     /// byte placed in the buffer is the delimiter.
     ///
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing EventLoop::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing EventLoop::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_read() or
+    /// async_read_until(), even when async_read() or async_read_until() is
+    /// executed by the event loop thread. The completion handler is guaranteed
+    /// to be called eventually, as long as there is time enough for the
+    /// operation to complete or fail, and a thread is executing
+    /// EventLoop::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the socket is closed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// remains cancelable up until the point in time where the completion
+    /// handler starts to execute. This means that if cancel() is called before
+    /// the completion handler starts to execute, then the completion handler is
+    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// regardless of whether cancel() is called explicitly or implicitly, such
+    /// as when the socket is destroyed.
+    ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec, n)` where `ec` is the
     /// error code, and `n` is the number of bytes placed in the buffer. `n` is
@@ -206,11 +244,6 @@ public:
     /// soon as the completion handler starts executing. This means that a new
     /// read operation can be started from the completion handler of another
     /// read operation.
-    ///
-    /// The operation can be canceled by calling cancel(), and will be
-    /// automatically canceled if the socket is closed. If the operation is
-    /// canceled, it will fail with `error::operation_aborted`. The completion
-    /// handler will always be called, as long as the event loop is running.
     virtual void async_read(char* buffer, size_t size, ReadCompletionHandler handler) = 0;
     virtual void async_read_until(char* buffer, size_t size, char delim,
                                   ReadCompletionHandler handler) = 0;
@@ -221,6 +254,27 @@ public:
     /// Initiate an asynchronous write operation. The completion handler is
     /// called when the operation completes. The operation completes when all
     /// the specified bytes have been written to the socket, or an error occurs.
+    ///
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing EventLoop::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing EventLoop::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_write(), even when
+    /// async_write() is executed by the event loop thread. The completion
+    /// handler is guaranteed to be called eventually, as long as there is time
+    /// enough for the operation to complete or fail, and a thread is executing
+    /// EventLoop::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the socket is closed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// remains cancelable up until the point in time where the completion
+    /// handler starts to execute. This means that if cancel() is called before
+    /// the completion handler starts to execute, then the completion handler is
+    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// regardless of whether cancel() is called explicitly or implicitly, such
+    /// as when the socket is destroyed.
     ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec, n)` where `ec` is the
@@ -234,11 +288,6 @@ public:
     /// soon as the completion handler starts to execute. This means that a new
     /// write operation can be started from the completion handler of another
     /// write operation.
-    ///
-    /// The operation can be canceled by calling cancel(), and will be
-    /// automatically canceled if the socket is closed. If the operation is
-    /// canceled, it will fail with `error::operation_aborted`. The completion
-    /// handler will always be called, as long as the event loop is running.
     virtual void async_write(const char* data, size_t size, WriteCompletionHandler handler) = 0;
 
     /// \brief Close this socket.
@@ -281,17 +330,30 @@ public:
     /// Initiate an asynchronous wait operation. The completion handler becomes
     /// ready to execute when the expiration time is reached, or an error occurs
     /// (cancellation counts as an error here). The expiration time is the time
-    /// of initiation plus the specified delay. The completion handler will
-    /// **always** be executed, as long as a thread is executing the event
-    /// loop. The error code passed to the complition handler will **never**
-    /// indicate success, unless the expiration time was reached. The completion
-    /// handler will never be called directly as part of the execution of
-    /// async_wait().
+    /// of initiation plus the specified delay. The error code passed to the
+    /// complition handler will **never** indicate success, unless the
+    /// expiration time was reached.
     ///
-    /// An asynchronous wait operation in progress can be canceled by calling
-    /// cancel(), and will be automatically canceled if the deadline timer is
-    /// destroyed. If the operation is canceled, its completion handler will be
-    /// called with `error::operation_aborted`.
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing EventLoop::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing EventLoop::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_wait(), even when
+    /// async_wait() is executed by the event loop thread. The completion
+    /// handler is guaranteed to be called eventually, as long as there is time
+    /// enough for the operation to complete or fail, and a thread is executing
+    /// EventLoop::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the timer is destroyed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// remains cancelable up until the point in time where the completion
+    /// handler starts to execute. This means that if cancel() is called before
+    /// the completion handler starts to execute, then the completion handler is
+    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// regardless of whether cancel() is called explicitly or implicitly, such
+    /// as when the timer is destroyed.
     ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec)` where `ec` is the
