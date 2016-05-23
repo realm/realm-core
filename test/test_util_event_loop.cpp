@@ -330,6 +330,25 @@ TEST_TYPES(EventLoop_Connect_Failure, IMPLEMENTATIONS)
 }
 
 
+TEST_TYPES(EventLoop_Connect_EarlyFailureAndCancel, IMPLEMENTATIONS)
+{
+    // Check that an early failure (during DNS lookup) does not make the
+    // operation uncancaleable.
+
+    std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
+    std::unique_ptr<Socket> socket = event_loop->make_socket();
+
+    std::string bad_host_name = "G6iHvNo9dEVPfL3EcWHWSChQU3GD8cjEGuy92eeTeaVWGPt71kJa5MykiYHGlg3M";
+
+    std::error_code ec;
+    socket->async_connect(std::move(bad_host_name), 0, SocketSecurity::None,
+                          [&](std::error_code ec_2) { ec = ec_2; });
+    socket->cancel();
+    event_loop->run();
+    CHECK_EQUAL(error::operation_aborted, ec);
+}
+
+
 TEST_TYPES(EventLoop_DeadlineTimer, IMPLEMENTATIONS)
 {
     std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
