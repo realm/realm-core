@@ -418,10 +418,10 @@ struct ServerFixture {
     }
     void start()
     {
-        thread.start([&] { service.run(); });
-        // Wait for the event loop thread to become active
         BowlOfStonesSemaphore bowl;
         service.post([&] { bowl.add_stone(); });
+        thread.start([&] { service.run(); });
+        // Wait for the event loop thread to become active
         bowl.get_stone();
     }
 };
