@@ -102,9 +102,10 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
     network::acceptor acceptor(service_1);
     network::endpoint ep = bind_acceptor(acceptor);
     acceptor.listen();
+    bool connect_completed = false;
     std::error_code ec_1, ec_2;
     acceptor.async_accept(socket_1, [&](std::error_code ec) { ec_1 = ec; });
-    socket_2.async_connect(ep, [&](std::error_code ec) { ec_2 = ec; });
+    socket_2.async_connect(ep, [&](std::error_code ec) { ec_2 = ec; connect_completed = true; });
     if (&service_1 == &service_2) {
         service_1.run();
     }
@@ -115,6 +116,7 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
         bool exception_in_thread = thread.join(); // FIXME: Transport exception instead
         REALM_ASSERT(!exception_in_thread);
     }
+    REALM_ASSERT(connect_completed);
     if (ec_1)
         throw std::system_error(ec_1);
     if (ec_2)

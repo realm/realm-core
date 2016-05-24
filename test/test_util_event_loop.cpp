@@ -71,20 +71,173 @@ void connect_sockets(network::socket& socket_1, Socket& socket_2)
     network::acceptor acceptor(service);
     network::endpoint ep = bind_acceptor(acceptor);
     acceptor.listen();
+    bool connect_completed = false;
     std::error_code ec_1, ec_2;
     acceptor.async_accept(socket_1, [&](std::error_code ec) { ec_1 = ec; });
     socket_2.async_connect("localhost", ep.port(), SocketSecurity::None,
-                           [&](std::error_code ec) { ec_2 = ec; });
+                           [&](std::error_code ec) { ec_2 = ec; connect_completed = true; });
     ThreadWrapper thread;
     thread.start([&] { service.run(); });
     EventLoop& event_loop = socket_2.get_event_loop();
     event_loop.run();
     bool exception_in_thread = thread.join(); // FIXME: Transport exception instead
     REALM_ASSERT(!exception_in_thread);
+    REALM_ASSERT(connect_completed);
     if (ec_1)
         throw std::system_error(ec_1);
     if (ec_2)
         throw std::system_error(ec_2);
+}
+
+
+class PingPongFixture {
+public:
+    PingPongFixture(network::io_service& service, EventLoop& event_loop):
+        m_server_socket(service),
+        m_client_socket(event_loop.make_socket())
+    {
+        connect_sockets(m_server_socket, *m_client_socket);
+    }
+
+    void start()
+    {
+        initiate_server_read();
+    }
+
+    void delay(int n, std::function<void()> handler)
+    {
+        m_handler = std::move(handler);
+        m_num = n;
+        initiate_client_write();
+    }
+
+private:
+    network::socket m_server_socket;
+    network::buffered_input_stream m_server_input_stream{m_server_socket};
+    const std::unique_ptr<Socket> m_client_socket;
+    char m_server_char = 0, m_client_char = 0;
+    int m_num;
+    std::function<void()> m_handler;
+
+    void initiate_server_read()
+    {
+        auto handler = [this](std::error_code ec, size_t) {
+            if (ec != error::operation_aborted)
+                handle_server_read(ec);
+        };
+        m_server_input_stream.async_read(&m_server_char, 1, std::move(handler));
+    }
+
+    void handle_server_read(std::error_code ec)
+    {
+        if (ec)
+            throw std::system_error(ec);
+        initiate_server_write();
+    }
+
+    void initiate_server_write()
+    {
+        auto handler = [this](std::error_code ec, size_t) {
+            if (ec != error::operation_aborted)
+                handle_server_write(ec);
+        };
+        m_server_socket.async_write(&m_server_char, 1, std::move(handler));
+    }
+
+    void handle_server_write(std::error_code ec)
+    {
+        if (ec)
+            throw std::system_error(ec);
+        initiate_server_read();
+    }
+
+    void initiate_client_write()
+    {
+        if (m_num <= 0) {
+            std::function<void()> handler = std::move(m_handler);
+            m_handler = std::function<void()>();
+            handler();
+            return;
+        }
+        --m_num;
+
+        auto handler = [this](std::error_code ec, size_t) {
+            if (ec != error::operation_aborted)
+                handle_client_write(ec);
+        };
+        m_client_socket->async_write(&m_client_char, 1, std::move(handler));
+    }
+
+    void handle_client_write(std::error_code ec)
+    {
+        if (ec)
+            throw std::system_error(ec);
+        initiate_client_read();
+    }
+
+    void initiate_client_read()
+    {
+        auto handler = [this](std::error_code ec, size_t) {
+            if (ec != error::operation_aborted)
+                handle_client_read(ec);
+        };
+        m_client_socket->async_read(&m_client_char, 1, std::move(handler));
+    }
+
+    void handle_client_read(std::error_code ec)
+    {
+        if (ec)
+            throw std::system_error(ec);
+        initiate_client_write();
+    }
+};
+
+
+// Try to fill the kernel level write buffer of a socket under the assumption
+// the no one is reading from the remote side. It may fail to fill the buffer,
+// but it should be exepcted to succeed often.
+void fill_kernel_write_buffer(Socket& socket, network::io_service& service)
+{
+    EventLoop& event_loop = socket.get_event_loop();
+    PingPongFixture ping_pong(service, event_loop);
+    ping_pong.start();
+    int num_successive_no_bytes_written = 0;
+    char data[40967];
+    std::function<void()> initiate_write = [&] {
+        auto handler = [&](std::error_code ec, size_t n) {
+            if (ec && ec != error::operation_aborted)
+                throw std::runtime_error("fill_kernel_write_buffer: Bad write");
+            if (n > 0) {
+                num_successive_no_bytes_written = 0;
+            }
+            else {
+                ++num_successive_no_bytes_written;
+                if (num_successive_no_bytes_written == 16) {
+                    event_loop.stop();
+                    return;
+                }
+            }
+            initiate_write();
+        };
+        socket.async_write(data, sizeof data, std::move(handler));
+    };
+    std::function<void()> initiate_ping_pong = [&] {
+        auto handler = [&] {
+            socket.cancel();
+            initiate_ping_pong();
+        };
+        ping_pong.delay(5, std::move(handler));
+    };
+    initiate_write();
+    initiate_ping_pong();
+    ThreadWrapper thread;
+    thread.start([&] { service.run(); });
+    event_loop.run();
+    service.stop();
+    if (thread.join())
+        throw std::runtime_error("fill_kernel_write_buffer: Exception in thread");
+    service.reset();
+    event_loop.reset();
 }
 
 
@@ -342,6 +495,128 @@ TEST_TYPES(EventLoop_Connect_EarlyFailureAndCancel, IMPLEMENTATIONS)
     socket->cancel();
     event_loop->run();
     CHECK_EQUAL(error::operation_aborted, ec);
+}
+
+
+TEST_TYPES(EventLoop_Read_NoBytesAvailable, IMPLEMENTATIONS)
+{
+    network::io_service service;
+    std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
+
+    const int num_sockets = 16;
+    std::unique_ptr<network::socket> remote_sockets[num_sockets];
+    std::unique_ptr<Socket> sockets[num_sockets];
+
+    for (int i = 0; i < num_sockets; ++i) {
+        remote_sockets[i].reset(new network::socket(service));
+        sockets[i] = event_loop->make_socket();
+        connect_sockets(*remote_sockets[i], *sockets[i]);
+    }
+
+    // Empty reads must never block
+    {
+        int remaining_reads[num_sockets];
+        for (int i = 0; i < num_sockets; ++i)
+            remaining_reads[i] = 256;
+        bool error = false;
+        std::function<void(int)> initiate_read = [&](int i) {
+            if (remaining_reads[i] == 0)
+                return;
+            --remaining_reads[i];
+            auto handler = [&error, &initiate_read, i](std::error_code ec, size_t) {
+                if (ec) {
+                    error = true;
+                    return;
+                }
+                initiate_read(i);
+            };
+            sockets[i]->async_read(nullptr, 0, std::move(handler));
+        };
+        for (int i = 0; i < num_sockets; ++i)
+            initiate_read(i);
+        event_loop->run();
+        CHECK_NOT(error);
+    }
+
+    // Nonempty reads must always block
+    {
+        int remaining_reads[num_sockets];
+        for (int i = 0; i < num_sockets; ++i)
+            remaining_reads[i] = 64;
+        std::unique_ptr<PingPongFixture> ping_pongs[num_sockets];
+        for (int i = 0; i < num_sockets; ++i)
+            ping_pongs[i].reset(new PingPongFixture(service, *event_loop));
+        for (int i = 0; i < num_sockets; ++i)
+            ping_pongs[i]->start();
+        char ch;
+        bool error = false;
+        std::function<void(int)> initiate_read = [&](int i) {
+            if (remaining_reads[i] == 0)
+                return;
+            --remaining_reads[i];
+            auto handler = [&error, &initiate_read, i](std::error_code ec, size_t) {
+                if (ec != error::operation_aborted) {
+                    error = true;
+                    return;
+                }
+                initiate_read(i);
+            };
+            sockets[i]->async_read(&ch, 1, std::move(handler));
+            ping_pongs[i]->delay(3, [&sockets, i] { sockets[i]->cancel(); });
+        };
+        for (int i = 0; i < num_sockets; ++i)
+            initiate_read(i);
+        ThreadWrapper thread;
+        thread.start([&] { service.run(); });
+        event_loop->run();
+        service.stop();
+        CHECK_NOT(thread.join());
+        service.reset();
+        CHECK_NOT(error);
+    }
+}
+
+
+TEST_TYPES(EventLoop_Write_NoBytesAccepted, IMPLEMENTATIONS)
+{
+    network::io_service service;
+    std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
+
+    const int num_sockets = 16;
+    std::unique_ptr<network::socket> remote_sockets[num_sockets];
+    std::unique_ptr<Socket> sockets[num_sockets];
+
+    for (int i = 0; i < num_sockets; ++i) {
+        remote_sockets[i].reset(new network::socket(service));
+        sockets[i] = event_loop->make_socket();
+        connect_sockets(*remote_sockets[i], *sockets[i]);
+        fill_kernel_write_buffer(*sockets[i], service);
+    }
+
+    // Empty writes must never block
+    {
+        int remaining_writes[num_sockets];
+        for (int i = 0; i < num_sockets; ++i)
+            remaining_writes[i] = 256;
+        bool error = false;
+        std::function<void(int)> initiate_write = [&](int i) {
+            if (remaining_writes[i] == 0)
+                return;
+            --remaining_writes[i];
+            auto handler = [&error, &initiate_write, i](std::error_code ec, size_t) {
+                if (ec) {
+                    error = true;
+                    return;
+                }
+                initiate_write(i);
+            };
+            sockets[i]->async_write(nullptr, 0, std::move(handler));
+        };
+        for (int i = 0; i < num_sockets; ++i)
+            initiate_write(i);
+        event_loop->run();
+        CHECK_NOT(error);
+    }
 }
 
 
