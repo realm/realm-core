@@ -68,7 +68,7 @@ void nslog(const char *message) noexcept
 
 void(*termination_notification_callback)(const char*) noexcept = nslog;
 
-#elif REALM_PLATFORM_ANDROID
+#elif REALM_ANDROID
 
 void android_log(const char* message) noexcept
 {
