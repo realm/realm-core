@@ -321,11 +321,7 @@ TEST_TYPES(EventLoop_Connect_Failure, IMPLEMENTATIONS)
     std::error_code ec;
     socket_3->async_connect("localhost", ep.port(), SocketSecurity::None,
                             [&](std::error_code ec_2) { ec = ec_2; });
-    ThreadWrapper thread;
-    thread.start([&] { service.run(); });
     event_loop->run();
-    service.stop();
-    CHECK_NOT(thread.join());
     CHECK(ec);
 }
 
