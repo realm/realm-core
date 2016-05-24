@@ -16,7 +16,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Upgrade build scripts to build as C++14 by default.
 
 ----------------------------------------------
 
