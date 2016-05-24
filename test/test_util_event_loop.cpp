@@ -345,6 +345,45 @@ TEST_TYPES(EventLoop_Connect_EarlyFailureAndCancel, IMPLEMENTATIONS)
 }
 
 
+TEST_TYPES(EventLoop_Write_AfterCloseByRemotePeer, IMPLEMENTATIONS)
+{
+    network::io_service service;
+    network::socket socket_1(service);
+
+    std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
+    std::unique_ptr<Socket> socket_2 = event_loop->make_socket();
+
+    connect_sockets(socket_1, *socket_2);
+
+    auto run = [&] {
+        for (int i = 0; i < 10000; ++i) {
+            char ch;
+            socket_1.read_some(&ch, 1);
+        }
+        socket_1.close();
+    };
+    ThreadWrapper thread;
+    thread.start(std::move(run));
+
+    std::error_code ec;
+    for (int i = 0; i < 16384; ++i) {
+        const char data[4096] = { '\0' };
+        auto handler = [&](std::error_code ec_2, size_t) {
+            if (ec_2)
+                ec = ec_2;
+        };
+        socket_2->async_write(data, sizeof data, std::move(handler));
+        event_loop->run();
+        if (ec)
+            break;
+    }
+
+    CHECK_NOT(thread.join());
+
+    CHECK(ec);
+}
+
+
 TEST_TYPES(EventLoop_DeadlineTimer, IMPLEMENTATIONS)
 {
     std::unique_ptr<EventLoop> event_loop = MakeEventLoop<TEST_TYPE>()();
