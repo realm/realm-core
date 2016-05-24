@@ -2,23 +2,7 @@
 
 ### Bugfixes
 
-* Fix a situation where a failure during SharedGroup::open() could cause stale
-  memory mappings to become accessible for later:
-  In case one of the following exceptions are thrown from SharedGroup::open():
-  - "Bad or incompatible history type",
-  - LogicError::mixed_durability,
-  - LogicError::mixed_history_type,
-  - "File format version deosn't match: "
-  - "Encrypted interprocess sharing is currently unsupported"
-  Then:
-  a) In a single process setting a later attempt to open the file would
-     hit the assert "!cfg.session_initiator" reported in issue #1782.
-  b) In a multiprocess setting, another process would be allowed to run
-     compact(), but the current process would retain its mapping of the
-     old file and attempt to reuse those mappings when a new SharedGroup
-     is opened, which would likely lead to a crash later. In that case, the
-     !cfg.session_initiator would not be triggered.
-  May fix issue #1782.
+* Lorem ipsum.
 
 ### Breaking changes
 
