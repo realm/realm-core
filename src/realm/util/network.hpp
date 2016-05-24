@@ -25,6 +25,7 @@
 #include <chrono>
 #include <tuple>
 #include <string>
+#include <system_error>
 #include <ostream>
 
 #include <sys/types.h>
@@ -327,10 +328,10 @@ private:
 class resolver::query {
 public:
     enum {
-        ///< Locally bound socket endpoint (server side)
+        /// Locally bound socket endpoint (server side)
         passive = AI_PASSIVE,
 
-        ///< Ignore families without a configured non-loopback address
+        /// Ignore families without a configured non-loopback address
         address_configured = AI_ADDRCONFIG
     };
 
@@ -410,13 +411,18 @@ public:
 
 private:
     enum opt_enum {
-        opt_ReuseAddr ///< `SOL_SOCKET`, `SO_REUSEADDR`
+        opt_ReuseAddr, ///< `SOL_SOCKET`, `SO_REUSEADDR`
+        opt_Linger,    ///< `SOL_SOCKET`, `SO_LINGER`
     };
 
     template<class, int, class> class option;
 
 public:
     typedef option<bool, opt_ReuseAddr, int> reuse_address;
+
+    // linger struct defined by POSIX sys/socket.h.
+    struct linger_opt;
+    typedef option<linger_opt, opt_Linger, struct linger> linger;
 
 private:
     int m_sock_fd;
@@ -462,6 +468,21 @@ private:
     void set(socket_base&, std::error_code&) const;
 
     friend class socket_base;
+};
+
+struct socket_base::linger_opt {
+    linger_opt(bool enabled, int timeout_seconds = 0)
+    {
+        m_linger.l_onoff = enabled ? 1 : 0;
+        m_linger.l_linger = timeout_seconds;
+    }
+
+    ::linger m_linger;
+
+    operator ::linger() const { return m_linger; }
+
+    bool enabled() const { return m_linger.l_onoff != 0; }
+    int  timeout() const { return m_linger.l_linger; }
 };
 
 
@@ -595,6 +616,26 @@ public:
     /// when \a ec is set to indicate success.
     size_t write_some(const char* data, size_t size);
     size_t write_some(const char* data, size_t size, std::error_code&) noexcept;
+    /// @}
+
+    enum shutdown_type {
+        /// Shutdown the receive side of the socket.
+        shutdown_receive = SHUT_RD,
+
+        /// Shutdown the send side of the socket.
+        shutdown_send = SHUT_WR,
+
+        /// Shutdown both send and receive on the socket.
+        shutdown_both = SHUT_RDWR
+    };
+
+    /// @{ \brief Shut down the connected sockets sending and/or receiving
+    /// side.
+    ///
+    /// It is an error to call this function when the socket is not both open
+    /// and connected.
+    void shutdown(shutdown_type);
+    std::error_code shutdown(shutdown_type, std::error_code&) noexcept;
     /// @}
 
 private:
@@ -749,6 +790,9 @@ public:
     template<class H>
     void async_read_until(char* buffer, size_t size, char delim, const H& handler);
     /// @}
+
+    /// Discard any buffered input.
+    void reset() noexcept;
 
 private:
     class read_oper_base;
@@ -1256,8 +1300,7 @@ inline bool io_service::async_oper::is_canceled() const noexcept
 inline void io_service::async_oper::set_is_complete(bool value) noexcept
 {
     REALM_ASSERT(!m_complete);
-    if (value)
-        REALM_ASSERT(m_in_use);
+    REALM_ASSERT(!value || m_in_use);
     m_complete = value;
 }
 
@@ -1554,7 +1597,7 @@ public:
     }
     void orphan() noexcept override
     {
-        m_socket = 0;
+        m_socket = nullptr;
     }
 protected:
     socket* m_socket;
@@ -1572,7 +1615,7 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         bool orphaned = !m_socket;
         std::error_code ec = m_error_code;
         if (is_canceled())
@@ -1630,9 +1673,9 @@ public:
     }
 protected:
     socket* m_socket;
-    const char* const m_begin;
-    const char* const m_end;
-    const char* m_curr;
+    const char* const m_begin; // May be dangling after cancellation
+    const char* const m_end;   // May be dangling after cancellation
+    const char* m_curr;        // May be dangling after cancellation
     std::error_code m_error_code;
 };
 
@@ -1733,6 +1776,13 @@ inline size_t socket::write_some(const char* data, size_t size, std::error_code&
     return do_write_some(data, size, ec);
 }
 
+inline void socket::shutdown(shutdown_type what)
+{
+    std::error_code ec;
+    if (shutdown(what, ec))
+        throw std::system_error(ec);
+}
+
 inline void socket::do_async_connect(LendersConnectOperPtr op)
 {
     if (op->is_complete()) {
@@ -1793,8 +1843,8 @@ public:
     }
 protected:
     acceptor* m_acceptor;
-    socket& m_socket; // Invalid after cancelation
-    endpoint* const m_endpoint; // Invalid after cancelation
+    socket& m_socket;           // May be dangling after cancellation
+    endpoint* const m_endpoint; // May be dangling after cancellation
     std::error_code m_error_code;
 };
 
@@ -1809,8 +1859,8 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
-        REALM_ASSERT(is_canceled() || m_socket.is_open() || m_error_code);
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
+        REALM_ASSERT(is_canceled() || m_error_code || m_socket.is_open());
         bool orphaned = !m_acceptor;
         std::error_code ec = m_error_code;
         if (is_canceled())
@@ -1945,9 +1995,9 @@ public:
     }
 protected:
     buffered_input_stream* m_stream;
-    char* const m_out_begin;
-    char* const m_out_end;
-    char* m_out_curr;
+    char* const m_out_begin; // May be dangling after cancellation
+    char* const m_out_end;   // May be dangling after cancellation
+    char* m_out_curr;        // May be dangling after cancellation
     const int m_delim;
     std::error_code m_error_code;
 };
@@ -1964,12 +2014,12 @@ public:
     }
     void recycle_and_execute() override
     {
-        REALM_ASSERT(is_complete() || is_canceled());
-        REALM_ASSERT(is_complete() ==
-                     (m_error_code || (m_delim != std::char_traits<char>::eof() ?
-                                       m_out_curr > m_out_begin && m_out_curr[-1] ==
-                                       std::char_traits<char>::to_char_type(m_delim) :
-                                       m_out_curr == m_out_end)));
+        REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
+        REALM_ASSERT(is_canceled() || m_error_code ||
+                     (m_delim != std::char_traits<char>::eof() ?
+                      m_out_curr > m_out_begin && m_out_curr[-1] ==
+                      std::char_traits<char>::to_char_type(m_delim) :
+                      m_out_curr == m_out_end));
         REALM_ASSERT(m_out_curr >= m_out_begin);
         bool orphaned = !m_stream;
         std::error_code ec = m_error_code;
@@ -1985,10 +2035,9 @@ private:
 
 inline buffered_input_stream::buffered_input_stream(socket& sock):
     m_socket(sock),
-    m_buffer(new char[s_buffer_size]), // Throws
-    m_begin(m_buffer.get()),
-    m_end(m_buffer.get())
+    m_buffer(new char[s_buffer_size]) // Throws
 {
+    reset();
 }
 
 inline buffered_input_stream::~buffered_input_stream() noexcept
@@ -2035,6 +2084,12 @@ inline void buffered_input_stream::async_read_until(char* buffer, size_t size, c
                                                     const H& handler)
 {
     async_read(buffer, size, std::char_traits<char>::to_int_type(delim), handler);
+}
+
+inline void buffered_input_stream::reset() noexcept
+{
+    m_begin = m_buffer.get();
+    m_end   = m_buffer.get();
 }
 
 template<class H>

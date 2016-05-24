@@ -1,3 +1,52 @@
+librealm (1.0.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Daniel Povlsen <daniel.povlsen@gmail.com>  Thu, 19 May 2016 14:38:26 +0200
+
+
+librealm (0.100.4~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Fri, 13 May 2016 13:52:59 +0200
+
+
+librealm (0.100.3~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Thu, 12 May 2016 14:19:22 +0200
+
+
+librealm (0.100.2~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Mon, 09 May 2016 12:57:51 +0200
+
+
+librealm (0.100.1~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- James Stone <js@realm.io>  Thu, 05 May 2016 00:05:52 +0200
+
+
+librealm (0.100.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- James Stone <js@realm.io>  Fri, 29 Apr 2016 16:21:11 +0200
+
+
+librealm (0.99.0~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Finn Schiermer Andersen <fsa@realm.io>  Wed, 20 Apr 2016 14:21:28 +0200
+
+
 librealm (0.97.0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

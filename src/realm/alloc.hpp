@@ -176,6 +176,10 @@ public:
     ///     implemented in a way that achieves backwards compatibility with
     ///     version 3 (and in turn with version 2).
     ///
+    ///   5 Introduced the new Timestamp column type that replaces DateTime.
+    ///     When opening an older database file, all DateTime columns will be
+    ///     automatically upgraded Timestamp columns.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in AllocSlab::validate_buffer(), the file
     /// format selection loginc in

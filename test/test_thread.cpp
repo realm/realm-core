@@ -19,6 +19,7 @@
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 
+#include <iostream>
 #include "test.hpp"
 
 using namespace realm;
@@ -220,6 +221,34 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
     }
 }
 
+
+class bowl_of_stones_semaphore {
+public:
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
+        m_num_stones(initial_number_of_stones)
+    {
+    }
+    void get_stone(int num_to_get)
+    {
+        LockGuard lock(m_mutex);
+        while (m_num_stones < num_to_get)
+            m_cond_var.wait(lock);
+        m_num_stones -= num_to_get;
+    }
+    void add_stone()
+    {
+        LockGuard lock(m_mutex);
+        ++m_num_stones;
+        m_cond_var.notify_all();
+    }
+private:
+    Mutex m_mutex;
+    int m_num_stones;
+    CondVar m_cond_var;
+};
+
+
+
 } // anonymous namespace
 
 
@@ -287,7 +316,8 @@ TEST(Thread_CriticalSection)
 
 TEST(Thread_EmulatedMutex_CriticalSection)
 {
-    SharedWithEmulated shared("EmulatedMutex_CriticalSection");
+    TEST_PATH(path);
+    SharedWithEmulated shared(path);
     shared.m_value = 0;
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
@@ -483,12 +513,10 @@ TEST(Thread_CondVar)
 // Detect and flag trivial implementations of condvars.
 namespace {
 
-static int signals;
-
-void signaller(InterprocessMutex* mutex, InterprocessCondVar* cv)
+void signaller(int* signals, InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
     millisleep(1000);
-    signals = 1;
+    *signals = 1;
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
         // wakeup any waiters
@@ -496,41 +524,45 @@ void signaller(InterprocessMutex* mutex, InterprocessCondVar* cv)
     }
     // exit scope to allow waiters to get lock
     millisleep(1000);
-    signals = 2;
+    *signals = 2;
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
     millisleep(1000);
-    signals = 3;
+    *signals = 3;
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
     millisleep(1000);
-    signals = 4;
+    *signals = 4;
 }
 
-static int signal_state;
-void wakeup_signaller(InterprocessMutex* mutex, InterprocessCondVar* cv)
+void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
     millisleep(1000);
-    signal_state = 2;
+    *signal_state = 2;
     std::lock_guard<InterprocessMutex> l(*mutex);
     cv->notify_all();
 }
 
-static int wait_counter;
+/* FIXME: Disabled because of sporadic failures on Android, which makes CI results non-deterministic
 
-void waiter_with_count(InterprocessMutex* mutex, InterprocessCondVar* cv)
+void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, 
+                       InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
-    ++wait_counter;
+    ++ *wait_counter;
+    feedback->add_stone();
     cv->wait(*mutex, nullptr);
-    --wait_counter;
+    -- *wait_counter;
+    feedback->add_stone();
 }
+
+*/
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
@@ -545,16 +577,18 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
 //   may not hold on a heavily loaded system.
 TEST(Thread_CondvarWaits)
 {
+    int signals = 0;
     InterprocessMutex mutex;
     InterprocessMutex::SharedPart mutex_part;
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
-    mutex.set_shared_part(mutex_part, "Thread_CondvarWaits", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarWaits", "");
+    TEST_PATH(path);
+    mutex.set_shared_part(mutex_part, path, "");
+    changed.set_shared_part(condvar_part, path, "");
     changed.init_shared_part(condvar_part);
     Thread signal_thread;
     signals = 0;
-    signal_thread.start(std::bind(signaller, &mutex, &changed));
+    signal_thread.start(std::bind(signaller, &signals, &mutex, &changed));
     {
         std::lock_guard<InterprocessMutex> l(mutex);
         changed.wait(mutex, nullptr);
@@ -565,6 +599,7 @@ TEST(Thread_CondvarWaits)
         CHECK_EQUAL(signals, 3);
     }
     signal_thread.join();
+    changed.release_shared_part();
     mutex.release_shared_part();
 }
 
@@ -572,13 +607,15 @@ TEST(Thread_CondvarWaits)
 // is waiting on it
 TEST(Thread_CondvarIsStateless)
 {
+    int signal_state = 0;
     InterprocessMutex mutex;
     InterprocessMutex::SharedPart mutex_part;
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
-    mutex.set_shared_part(mutex_part, "Thread_CondvarIsStateless", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarIsStateless", "");
+    TEST_PATH(path);
+    mutex.set_shared_part(mutex_part, path, "");
+    changed.set_shared_part(condvar_part, path, "");
     Thread signal_thread;
     signal_state = 1;
     // send some signals:
@@ -589,7 +626,7 @@ TEST(Thread_CondvarIsStateless)
     }
     // spawn a thread which will later do one more signal in order
     // to wake us up.
-    signal_thread.start(std::bind(wakeup_signaller, &mutex, &changed));
+    signal_thread.start(std::bind(wakeup_signaller, &signal_state, &mutex, &changed));
     // Wait for a signal - the signals sent above should be lost, so
     // that this wait will actually wait for the thread to signal.
     {
@@ -598,6 +635,7 @@ TEST(Thread_CondvarIsStateless)
         CHECK_EQUAL(signal_state, 2);
     }
     signal_thread.join();
+    changed.release_shared_part();
     mutex.release_shared_part();
 }
 
@@ -610,8 +648,9 @@ TEST(Thread_CondvarTimeout)
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
-    mutex.set_shared_part(mutex_part, "Thread_CondvarTimeout", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarTimeout", "");
+    TEST_PATH(path);
+    mutex.set_shared_part(mutex_part, path, "");
+    changed.set_shared_part(condvar_part, path, "");
     struct timespec time;
     time.tv_sec = 0;
     time.tv_nsec = 100000000; // 0.1 sec
@@ -620,6 +659,7 @@ TEST(Thread_CondvarTimeout)
         for (int i=0; i<5; ++i)
             changed.wait(mutex, &time);
     }
+    changed.release_shared_part();
     mutex.release_shared_part();
 }
 
@@ -633,8 +673,9 @@ TEST(Thread_CondvarNotifyAllWakeup)
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
-    mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyAllWakeup", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyAllWakeup", "");
+    TEST_PATH(path);
+    mutex.set_shared_part(mutex_part, path, "");
+    changed.set_shared_part(condvar_part, path, "");
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i=0; i<num_waiters; ++i) {
@@ -645,41 +686,48 @@ TEST(Thread_CondvarNotifyAllWakeup)
     for (int i=0; i<num_waiters; ++i) {
         waiters[i].join();
     }
+    changed.release_shared_part();
     mutex.release_shared_part();
 }
 
+
+/* FIXME: Disabled because of sporadic failures on Android, which makes CI results non-deterministic
 
 // test that notify will wake up only a single thread, even if there
 // are many waiters:
 TEST(Thread_CondvarNotifyWakeup)
 {
-    wait_counter = 0;
+    int wait_counter = 0;
     InterprocessMutex mutex;
     InterprocessMutex::SharedPart mutex_part;
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
-    mutex.set_shared_part(mutex_part, "Thread_CondvarNotifyWakeup", "");
-    changed.set_shared_part(condvar_part, "Thread_CondvarNotifyWakeup", "");
+    bowl_of_stones_semaphore feedback(0);
+    SHARED_GROUP_TEST_PATH(path);
+    mutex.set_shared_part(mutex_part, path, "");
+    changed.set_shared_part(condvar_part, path, "");
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i=0; i<num_waiters; ++i) {
-        waiters[i].start(std::bind(waiter_with_count, &mutex, &changed));
+        waiters[i].start(std::bind(waiter_with_count, &feedback, &wait_counter, &mutex, &changed));
     }
-    millisleep(1000); // allow time for all waiters to wait
-    CHECK(wait_counter == 10);
+    feedback.get_stone(num_waiters);
+    CHECK_EQUAL(wait_counter, num_waiters);
     changed.notify();
-    millisleep(1000);
-    CHECK(wait_counter == 9);
+    feedback.get_stone(1);
+    CHECK_EQUAL(wait_counter, num_waiters-1);
     changed.notify();
-    millisleep(1000);
-    CHECK(wait_counter == 8);
+    feedback.get_stone(1);
+    CHECK_EQUAL(wait_counter, num_waiters-2);
     changed.notify_all();
     for (int i=0; i<num_waiters; ++i) {
         waiters[i].join();
     }
+    changed.release_shared_part();
     mutex.release_shared_part();
 }
+*/
 
 #endif // _WIN32
 

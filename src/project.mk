@@ -28,6 +28,11 @@ ifeq ($(COMPILER_IS),clang)
   CFLAGS_GENERAL += -Wunreachable-code
 endif
 
+# The shorten-64-to-32 flag is only defined for clang.
+ifeq ($(COMPILER_IS),clang)
+  CFLAGS_GENERAL += -Wshorten-64-to-32
+endif
+
 # CoreFoundation is required for logging
 ifeq ($(OS),Darwin)
   PROJECT_LDFLAGS += -framework CoreFoundation

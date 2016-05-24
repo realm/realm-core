@@ -5,6 +5,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column.hpp>
 #include <realm/column_string.hpp>
+#include <realm/column_timestamp.hpp> // Timestamp
 
 using namespace realm;
 using namespace realm::util;
@@ -20,6 +21,24 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 }
 
 } // anonymous namespace
+
+namespace realm {
+StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIndex::StringConversionBuffer& buffer)
+{
+    if (dt.is_null())
+        return null{};
+    
+    int64_t s = dt.get_seconds();
+    int32_t ns = dt.get_nanoseconds();
+    constexpr size_t index_size = sizeof(s) + sizeof(ns);
+    static_assert(index_size <= StringIndex::string_conversion_buffer_size, "Index string conversion buffer too small");
+    const char* s_buf = reinterpret_cast<const char*>(&s);
+    const char* ns_buf = reinterpret_cast<const char*>(&ns);
+    std::copy(s_buf, s_buf + sizeof(s), buffer.data());
+    std::copy(ns_buf, ns_buf + sizeof(ns), buffer.data() + sizeof(s));
+    return StringData{buffer.data(), index_size};
+}
+} // namespace realm
 
 
 Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)

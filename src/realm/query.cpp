@@ -11,40 +11,48 @@
 
 using namespace realm;
 
-Query::Query() : m_view(nullptr), m_source_table_view(nullptr), m_owns_source_table_view(false)
+Query::Query()
 {
     create();
 }
 
 Query::Query(Table& table, TableViewBase* tv)
-    : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
+    : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv)
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
+#endif
     create();
 }
 
 Query::Query(const Table& table, const LinkViewRef& lv):
     m_table((const_cast<Table&>(table)).get_table_ref()),
     m_view(lv.get()),
-    m_source_link_view(lv), m_source_table_view(nullptr), m_owns_source_table_view(false)
+    m_source_link_view(lv)
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
+#endif
+    REALM_ASSERT_DEBUG(&lv->get_target_table() == m_table);
     create();
 }
 
 Query::Query(const Table& table, TableViewBase* tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv), m_owns_source_table_view(false)
+    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv)
 {
-    REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
+#ifdef REALM_DEBUG
+    REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
+#endif
     create();
 }
 
 Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv.get()), m_source_table_view(tv.get()), m_owns_source_table_view(true)
+    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv.get()), m_source_table_view(tv.get()),
+    m_owned_source_table_view(std::move(tv))
 {
-    tv.release();
-
-    REALM_ASSERT_DEBUG(m_view == nullptr ||m_view->cookie == m_view->cookie_expected);
+#ifdef REALM_DEBUG
+    REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
+#endif
     create();
 }
 
@@ -55,16 +63,22 @@ void Query::create()
         fetch_descriptor();
 }
 
-Query::Query(const Query& copy)
+Query::Query(const Query& source): error_code(source.error_code), m_groups(source.m_groups),
+    m_current_descriptor(source.m_current_descriptor), m_table(source.m_table)
 {
-    m_table = copy.m_table;
-    m_groups = copy.m_groups;
-    error_code = copy.error_code;
-    m_view = copy.m_view;
-    m_source_link_view = copy.m_source_link_view;
-    m_source_table_view = copy.m_source_table_view;
-    m_owns_source_table_view = false;
-    m_current_descriptor = copy.m_current_descriptor;
+    if (source.m_owned_source_table_view) {
+        m_owned_source_table_view = source.m_owned_source_table_view->clone();
+        m_source_table_view = m_owned_source_table_view.get();
+        m_view = m_source_table_view;
+    }
+    else {
+        // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
+        // turn `m_source_table_view` into a dangling reference.
+        m_source_table_view = source.m_source_table_view;
+
+        m_source_link_view = source.m_source_link_view;
+        m_view = source.m_view;
+    }
 }
 
 Query& Query::operator = (const Query& source)
@@ -72,9 +86,23 @@ Query& Query::operator = (const Query& source)
     if (this != &source) {
         m_groups = source.m_groups;
         m_table = source.m_table;
-        m_view = source.m_view;
-        m_source_link_view = source.m_source_link_view;
-        m_source_table_view = source.m_source_table_view;
+
+        if (source.m_owned_source_table_view) {
+            m_owned_source_table_view = source.m_owned_source_table_view->clone();
+            m_source_table_view = m_owned_source_table_view.get();
+            m_view = m_source_table_view;
+
+            m_source_link_view.reset();
+        }
+        else {
+            // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
+            // turn `m_source_table_view` into a dangling reference.
+            m_source_table_view = source.m_source_table_view;
+            m_owned_source_table_view = nullptr;
+
+            m_source_link_view = source.m_source_link_view;
+            m_view = source.m_view;
+        }
 
         if (m_table)
             fetch_descriptor();
@@ -85,24 +113,19 @@ Query& Query::operator = (const Query& source)
 Query::Query(Query&&) = default;
 Query& Query::operator=(Query&&) = default;
 
-Query::~Query() noexcept
-{
-    if (m_owns_source_table_view)
-        delete m_source_table_view;
-}
+Query::~Query() noexcept = default;
 
 Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table, patch.m_table);
     if (source.m_source_table_view) {
-        m_source_table_view =
-            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
-        m_owns_source_table_view = true;
+        m_owned_source_table_view =
+            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_source_table_view = m_owned_source_table_view.get();
     }
     else {
         patch.table_view_data = nullptr;
-        m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
@@ -113,17 +136,16 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
 }
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef()), m_source_table_view(nullptr)
+    : m_table(TableRef()), m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table, patch.m_table);
     if (source.m_source_table_view) {
-        m_source_table_view =
-            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode).release();
-        m_owns_source_table_view = true;
+        m_owned_source_table_view =
+            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_source_table_view = m_owned_source_table_view.get();
     }
     else {
         patch.table_view_data = nullptr;
-        m_owns_source_table_view = false;
     }
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
@@ -284,7 +306,7 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
     switch (type) {
         case type_Int:
         case type_Bool:
-        case type_DateTime: {
+        case type_OldDateTime: {
             if (is_nullable) {
                 return MakeConditionNode<IntegerNode<IntNullColumn, Cond>>::make(column_ndx, value);
             }
@@ -303,6 +325,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
         }
         case type_Binary: {
             return MakeConditionNode<BinaryNode<Cond>>::make(column_ndx, value);
+        }
+        case type_Timestamp: {
+            return MakeConditionNode<TimestampNode<Cond>>::make(column_ndx, value);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};
@@ -639,6 +664,33 @@ Query& Query::between(size_t column_ndx, double from, double to)
 }
 
 
+// ------------- Timestamp
+Query& Query::greater(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Greater>(column_ndx, value);
+}
+Query& Query::equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Equal>(column_ndx, value);
+}
+Query& Query::not_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<NotEqual>(column_ndx, value);
+}
+Query& Query::greater_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<GreaterEqual>(column_ndx, value);
+}
+Query& Query::less_equal(size_t column_ndx, Timestamp value)
+{
+    return add_condition<LessEqual>(column_ndx, value);
+}
+Query& Query::less(size_t column_ndx, Timestamp value)
+{
+    return add_condition<Less>(column_ndx, value);
+}
+
+
 // Strings, StringData()
 
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
@@ -688,7 +740,9 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 size_t Query::peek_tableview(size_t tv_index) const
 {
     REALM_ASSERT(m_view);
+#ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view->cookie == m_view->cookie_expected);
+#endif
     REALM_ASSERT_3(tv_index, <, m_view->size());
 
     // Cannot use to_size_t() because the get() may return -1
@@ -743,8 +797,11 @@ template<Action action, typename T, typename R, class ColType>
         else {
             for (size_t t = start; t < end && st.m_match_count < limit; t++) {
                 size_t r = peek_tableview(t);
-                if (r != not_found)
-                    st.template match<action, false>(r, 0, source_column.get_next(m_view->m_row_indexes.get(t)));
+                if (r != not_found) {
+                    int64_t view_row_index = m_view->m_row_indexes.get(t);
+                    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(view_row_index));
+                    st.template match<action, false>(r, 0, source_column.get_next(size_t(view_row_index))); //       m_view->m_row_indexes.get(t)));
+                }
             }
         }
 
@@ -841,7 +898,7 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
     return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
-DateTime Query::maximum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
+OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
                                  size_t limit, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
@@ -885,13 +942,28 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
                                       return_ndx);
 }
 
-DateTime Query::minimum_datetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                                  size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
     }
     return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+}
+
+Timestamp Query::minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
+{
+    ConstTableView tv;
+    tv = find_all(start, end, limit);
+    Timestamp ts = tv.minimum_timestamp(column_ndx, return_ndx);
+    return ts;
+}
+
+Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
+{
+    ConstTableView tv = find_all(start, end, limit);
+    Timestamp ts = tv.maximum_timestamp(column_ndx, return_ndx);
+    return ts;
 }
 
 
@@ -1478,6 +1550,17 @@ Query Query::operator!()
     q.Not();
     q.and_query(*this);
     return q;
+}
+
+util::Optional<uint_fast64_t> Query::sync_view_if_needed() const
+{
+    if (m_view)
+        return m_view->sync_if_needed();
+
+    if (m_table)
+        return m_table->get_version_counter();
+
+    return util::none;
 }
 
 QueryGroup::QueryGroup(const QueryGroup& other) :

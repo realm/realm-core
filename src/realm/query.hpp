@@ -38,7 +38,7 @@
 #include <realm/views.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/datetime.hpp>
+#include <realm/olddatetime.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/descriptor_fwd.hpp>
@@ -164,17 +164,24 @@ public:
     Query& less_double(size_t column_ndx1, size_t column_ndx2);
     Query& less_equal_double(size_t column_ndx1, size_t column_ndx2);
 
+    Query& equal(size_t column_ndx, Timestamp value);
+    Query& not_equal(size_t column_ndx, Timestamp value);
+    Query& greater(size_t column_ndx, Timestamp value);
+    Query& greater_equal(size_t column_ndx, Timestamp value);
+    Query& less_equal(size_t column_ndx, Timestamp value);
+    Query& less(size_t column_ndx, Timestamp value);
+
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
 
     // Conditions: date
-    Query& equal_datetime(size_t column_ndx, DateTime value) { return equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& not_equal_datetime(size_t column_ndx, DateTime value) { return not_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& greater_datetime(size_t column_ndx, DateTime value) { return greater(column_ndx, int64_t(value.get_datetime())); }
-    Query& greater_equal_datetime(size_t column_ndx, DateTime value) { return greater_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& less_datetime(size_t column_ndx, DateTime value) { return less(column_ndx, int64_t(value.get_datetime())); }
-    Query& less_equal_datetime(size_t column_ndx, DateTime value) { return less_equal(column_ndx, int64_t(value.get_datetime())); }
-    Query& between_datetime(size_t column_ndx, DateTime from, DateTime to) { return between(column_ndx, int64_t(from.get_datetime()), int64_t(to.get_datetime())); }
+    Query& equal_olddatetime(size_t column_ndx, OldDateTime value) { return equal(column_ndx, int64_t(value.get_olddatetime())); }
+    Query& not_equal_olddatetime(size_t column_ndx, OldDateTime value) { return not_equal(column_ndx, int64_t(value.get_olddatetime())); }
+    Query& greater_olddatetime(size_t column_ndx, OldDateTime value) { return greater(column_ndx, int64_t(value.get_olddatetime())); }
+    Query& greater_equal_olddatetime(size_t column_ndx, OldDateTime value) { return greater_equal(column_ndx, int64_t(value.get_olddatetime())); }
+    Query& less_olddatetime(size_t column_ndx, OldDateTime value) { return less(column_ndx, int64_t(value.get_olddatetime())); }
+    Query& less_equal_olddatetime(size_t column_ndx, OldDateTime value) { return less_equal(column_ndx, int64_t(value.get_olddatetime())); }
+    Query& between_olddatetime(size_t column_ndx, OldDateTime from, OldDateTime to) { return between(column_ndx, int64_t(from.get_olddatetime()), int64_t(to.get_olddatetime())); }
 
     // Conditions: strings
     Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
@@ -257,11 +264,17 @@ public:
     double minimum_double(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
                           size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    DateTime maximum_datetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+    OldDateTime maximum_olddatetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
                               size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
-    DateTime minimum_datetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+    OldDateTime minimum_olddatetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
                               size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
+
+    Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start = 0, size_t end = size_t(-1),
+                                size_t limit = size_t(-1));
+
+    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start = 0, size_t end = size_t(-1), 
+                                size_t limit = size_t(-1));
 
     // Deletion
     size_t  remove(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
@@ -274,6 +287,14 @@ public:
 #endif
 
     TableRef& get_table() {return m_table;}
+
+    // True if matching rows are guaranteed to be returned in table order.
+    bool produces_results_in_table_order() const { return !m_view; }
+
+    // Calls sync_if_needed on the restricting view, if present.
+    // Returns the current version of the table(s) this query depends on,
+    // or util::none if the query is not associated with a table.
+    util::Optional<uint_fast64_t> sync_view_if_needed() const;
 
     std::string validate();
 
@@ -385,12 +406,12 @@ private:
     // points to the base class of the restricting view. If the restricting
     // view is a link view, m_source_link_view is non-zero. If it is a table view,
     // m_source_table_view is non-zero.
-    RowIndexes* m_view;
+    RowIndexes* m_view = nullptr;
 
     // At most one of these can be non-zero, and if so the non-zero one indicates the restricting view.
     LinkViewRef m_source_link_view; // link views are refcounted and shared.
-    TableViewBase* m_source_table_view; // table views are not refcounted, and not owned by the query.
-    bool m_owns_source_table_view; // <--- except when indicated here
+    TableViewBase* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
+    std::unique_ptr<TableViewBase> m_owned_source_table_view; // <--- except when indicated here
 };
 
 // Implementation:

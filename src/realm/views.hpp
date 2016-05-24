@@ -8,7 +8,7 @@
 
 namespace realm {
 
-const size_t detached_ref = size_t(-1);
+const int64_t detached_ref = -1;
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting.
@@ -45,8 +45,8 @@ public:
 
     virtual size_t size() const = 0;
 
-    // These two methods are overridden by TableView. They are no-ops for LinkView because sync'ed automatically
-    virtual uint_fast64_t sync_if_needed() const { return 0; }
+    // These two methods are overridden by TableView and LinkView.
+    virtual uint_fast64_t sync_if_needed() const = 0;
     virtual bool is_in_sync() const { return true; }
 
     void check_cookie() const
@@ -97,6 +97,8 @@ public:
                     m_columns[i] = ctb;
             }
         }
+
+        explicit operator bool() const { return !m_column_indexes.empty(); }
 
         std::vector<size_t> m_column_indexes;
         std::vector<bool> m_ascending;

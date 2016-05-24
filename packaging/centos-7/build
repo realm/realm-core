@@ -1,0 +1,56 @@
+#!/bin/bash -ex
+# enter the directory where the build script is located
+cd "${0%/*}"
+
+# some useful variables
+SRC_DIR="$(pwd)/../../"
+CURRENT_DISTRO=$(basename $(pwd))
+BUILD_IMAGE="realm-core-${CURRENT_DISTRO}-build"
+TEST_IMAGE="realm-core-${CURRENT_DISTRO}-test"
+
+# create the build image from the provided directory
+docker build --pull -t ${BUILD_IMAGE} build-image
+
+#clean previous packages. you may want to omit this if
+#you want to preserve them all and have got other means of removing them.
+rm -rf out && mkdir out
+
+# run the build-package script from the build-inside directory inside a container
+# started from the above build image. The script will access the source directory of
+# the application in /source (read-only), can access the build-inside directory from /build-inside (read-only),
+# and should write the packages in /out.
+#
+# the env.list file is a good shortcut for sharing env variable that may be reused from various packages,
+# but you can choose to forward additional variables with the --env switch. It's quite common to forward
+# things like BUILD_NUMBER or GIT_COMMIT from a CI server to use them within the package.
+docker run \
+    --env-file ../../dependencies.list \
+    --rm \
+    -v $(pwd)/build-inside:/build-inside:ro,z \
+    -v ${SRC_DIR}:/source:ro,z \
+    -v $(pwd)/out:/out:z \
+    -w /build-inside ${BUILD_IMAGE} /build-inside/build-package
+
+# now we have the built package in out/. let's start the test phase.
+# we build the test image. It should be a very minimal image, in order to check that all the deps are properly set.
+# possibly it could be a totally empty image; but I prefer making it clear that it's this way.
+# feel free to omit the test-image directory and set TEST_IMAGE to something you like (e.g. centos:7)
+# if you want to verify proper signing of your RPMs, make sure 'localpkg_gpgcheck=1' is set in yum.conf / dnf.conf
+docker build --pull -t ${TEST_IMAGE} test-image
+
+rm -rf test-logs && mkdir test-logs
+
+# we retain the env file, even though we might not need it. The out directory is actually readonly,
+# because we don't need to modify it. We create a test-logs directory which is writeable by the
+# container if we want to add test logs.
+# you can omit the PUBLIC_KEY_FILE part if you don't need verifying the signature of your packages.
+docker run \
+    --env-file ../../dependencies.list \
+    --rm \
+    -v $(pwd)/test-inside:/test-inside:ro,z \
+    -v $(pwd)/out:/out:ro,z \
+    -v $(pwd)/test-logs:/test-logs:z \
+    -w /test-inside ${TEST_IMAGE} /test-inside/test \
+    || (echo "ERROR: the test phase failed."; exit 1)
+
+echo "Test phase succeeded."

@@ -27,7 +27,7 @@
 
 namespace realm {
 
-class DateTime;
+class OldDateTime;
 class ArrayBinary;
 class ArrayInteger;
 class ArrayIntNull;
@@ -97,19 +97,19 @@ struct ColumnTypeTraits<double> {
 };
 
 template<>
-struct ColumnTypeTraits<DateTime> :
+struct ColumnTypeTraits<OldDateTime> :
     ColumnTypeTraits<int64_t>
 {
-    static const DataType id = type_DateTime;
-    static const ColumnType column_id = col_type_DateTime;
+    static const DataType id = type_OldDateTime;
+    static const ColumnType column_id = col_type_OldDateTime;
 };
 
 template<>
-struct ColumnTypeTraits<util::Optional<DateTime>> :
+struct ColumnTypeTraits<util::Optional<OldDateTime>> :
     ColumnTypeTraits<util::Optional<int64_t>>
 {
-    static const DataType id = type_DateTime;
-    static const ColumnType column_id = col_type_DateTime;
+    static const DataType id = type_OldDateTime;
+    static const ColumnType column_id = col_type_OldDateTime;
 };
 
 template<>

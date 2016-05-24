@@ -1,13 +1,14 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-# Enable tracing if REALM_SCRIPT_DEBUG is set
+# Loads a .realm file in the user home directory if present
 if [ -e $HOME/.realm ]; then
     . $HOME/.realm
 fi
+
+# Enable tracing if REALM_SCRIPT_DEBUG is set
 if [ "$REALM_SCRIPT_DEBUG" ]; then
     set -x
 fi
-
 
 if ! [ "$REALM_ORIG_CWD" ]; then
     REALM_ORIG_CWD="$(pwd)" || exit 1
@@ -28,6 +29,7 @@ if ! [ -x "$PRE_PUSH_HOOK_DESTINATION" ] || ! diff "$PRE_PUSH_HOOK_DESTINATION" 
     chmod +x "$PRE_PUSH_HOOK_DESTINATION"
 fi
 
+# Set mode to first argument and shift the argument array
 MODE="$1"
 [ $# -gt 0 ] && shift
 
@@ -63,77 +65,78 @@ usage()
     cat 1>&2 << EOF
 Unspecified or bad mode '$MODE'.
 Available modes are:
-    config:                             
-    clean:                              
-    build:                              
+    config:
+    clean:
+    build:
+    build-m32:                          build in 32-bit mode
     build-arm-benchmark:
-    build-config-progs:                 
-    build-osx:                          
-    build-iphone:                       
-    build-watchos:                      
-    build-tvos:                         
-    build-android:                      
-    build-cocoa:                        
-    build-osx-framework:                
-    test:                               
-    test-debug:                         
-    check:                              
-    check-debug:                        
-    memcheck:                           
-    memcheck-debug:                     
-    check-testcase:                     
-    check-testcase-debug:               
-    memcheck-testcase:                  
-    memcheck-testcase-debug:            
-    asan:                               
-    asan-debug:                         
+    build-config-progs:
+    build-osx:
+    build-iphone:
+    build-watchos:
+    build-tvos:
+    build-android:
+    build-cocoa:
+    build-osx-framework:
+    test:
+    test-debug:
+    check:
+    check-debug:
+    memcheck:
+    memcheck-debug:
+    check-testcase:
+    check-testcase-debug:
+    memcheck-testcase:
+    memcheck-testcase-debug:
+    asan:
+    asan-debug:
     build-test-ios-app:                 build an iOS app for testing core on device
     test-ios-app:                       execute the core tests on device
     leak-test-ios-app:                  execute the core tests on device, monitor for leaks
-    gdb:                                
-    gdb-debug:                          
-    gdb-testcase:                       
-    gdb-testcase-debug:                 
-    performance:                        
-    benchmark:                          
-    benchmark-*:                        
-    lcov:                               
-    gcovr:                              
-    show-install:                       
-    release-notes-prerelease:           
-    release-notes-postrelease:          
-    get-version:                        
-    set-version:                        
-    copy-tools:                         
-    install:                            
-    install-prod:                       
-    install-devel:                      
-    uninstall:                          
-    uninstall-prod:                     
-    uninstall-devel:                    
-    test-installed:                     
-    wipe-installed:                     
-    src-dist:                           
-    bin-dist:                           
-    dist-config:                        
-    dist-clean:                         
-    dist-build:                         
-    dist-build-iphone:                  
-    dist-test:                          
-    dist-test-debug:                    
-    dist-install:                       
-    dist-uninstall:                     
-    dist-test-installed:                
-    dist-status:                        
-    dist-pull:                          
-    dist-checkout:                      
-    dist-copy:                          
-    dist-deb:                           
+    gdb:
+    gdb-debug:
+    gdb-testcase:
+    gdb-testcase-debug:
+    performance:
+    benchmark:
+    benchmark-*:
+    lcov:
+    gcovr:
+    show-install:
+    release-notes-prerelease:
+    release-notes-postrelease:
+    get-version:
+    set-version:
+    copy-tools:
+    install:
+    install-prod:
+    install-devel:
+    uninstall:
+    uninstall-prod:
+    uninstall-devel:
+    test-installed:
+    wipe-installed:
+    src-dist:
+    bin-dist:
+    dist-config:
+    dist-clean:
+    dist-build:
+    dist-build-iphone:
+    dist-test:
+    dist-test-debug:
+    dist-install:
+    dist-uninstall:
+    dist-test-installed:
+    dist-status:
+    dist-pull:
+    dist-checkout:
+    dist-copy:
+    dist-deb:
     jenkins-pull-request:               Run by Jenkins for each pull request whenever it changes
     jenkins-pipeline-unit-tests:        Run by Jenkins as part of the core pipeline whenever master changes
     jenkins-pipeline-coverage:          Run by Jenkins as part of the core pipeline whenever master changes
     jenkins-pipeline-address-sanitizer: Run by Jenkins as part of the core pipeline whenever master changes
-    jenkins-valgrind:                   
+    jenkins-valgrind:
 EOF
 }
 
@@ -213,7 +216,7 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.1p'
+    openssl_ver='1.0.1t'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
@@ -342,7 +345,7 @@ find_apple_sdks()
             elif [ "$x" = "appletvos" ]; then
                 archs="arm64"
             elif [ "$x" = "macosx" ]; then
-                archs="i386,x86_64"
+                archs="x86_64"
             else
                 continue
             fi
@@ -688,6 +691,14 @@ EOF
         exit 0
         ;;
 
+    "build-m32")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        $MAKE EXTRA_CFLAGS="-m32" BASE_DENOM="m32" debug || exit 1
+        echo "Done building"
+        exit 0
+        ;;
+
     "build-config-progs")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
@@ -719,12 +730,8 @@ EOF
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
         export dir="$IPHONE_DIR"
-        export platform_suffix='-bitcode'
+        export platform_suffix=''
         export enable_bitcode='yes'
-        build_apple
-
-        export platform_suffix='-no-bitcode'
-        export enable_bitcode='no'
         build_apple
         ;;
 
@@ -842,7 +849,8 @@ EOF
                     $MAKE clean
                 ) || exit 1
 
-                PATH="$path" CC="$cc" CFLAGS="$cflags_arch" $MAKE -C "openssl" build_crypto|| exit 1
+                $MAKE -C "openssl" depend || exit 1
+                PATH="$path" CC="$cc" CFLAGS="$cflags_arch" PERL="perl" $MAKE -C "openssl" build_crypto || exit 1
                 cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
             fi
 
@@ -1004,6 +1012,13 @@ EOF
 
         zip -r -q realm-core-osx-$realm_version.zip $FRAMEWORK || exit 1
         echo "Core framework for OS X can be found under $FRAMEWORK and realm-core-osx-$realm_version.zip."
+        exit 0
+        ;;
+
+    "build-node")
+        auto_configure || exit 1
+        export REALM_HAVE_CONFIG="1"
+        $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
         exit 0
         ;;
 
@@ -1249,6 +1264,9 @@ EOF
         printf ",s/#define REALM_VER_MAJOR .*/#define REALM_VER_MAJOR $realm_ver_major/\nw\nq" | ed -s "$version_file" || exit 1
         printf ",s/#define REALM_VER_MINOR .*/#define REALM_VER_MINOR $realm_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
         printf ",s/#define REALM_VER_PATCH .*/#define REALM_VER_PATCH $realm_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
+
+        # update dependencies.list
+        sed -i.bck "s/^VERSION.*/VERSION=$realm_version/" dependencies.list && rm -f dependencies.list.bck
 
         sh tools/add-deb-changelog.sh "$realm_version" "$(pwd)/debian/changelog.in" librealm || exit 1
         sh build.sh release-notes-prerelease || exit 1

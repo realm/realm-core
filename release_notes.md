@@ -1,23 +1,264 @@
 # NEXT RELEASE
 
-### Bugfixes:
-
-* Bug fix: Misbehavior of empty asynchronous write in POSIX networking API.
-* Bug fix: Access dangling pointer while handling canceled asynchronous accept
-  in POSIX networking API.
-
-### API breaking changes:
+### Bugfixes
 
 * Lorem ipsum.
 
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 1.0.1 Release notes
+
+### Bugfixes
+
+* Fix a situation where a failure during SharedGroup::open() could cause stale
+  memory mappings to become accessible for later:
+  In case one of the following exceptions are thrown from SharedGroup::open():
+  - "Bad or incompatible history type",
+  - LogicError::mixed_durability,
+  - LogicError::mixed_history_type,
+  - "File format version deosn't match: "
+  - "Encrypted interprocess sharing is currently unsupported"
+  Then:
+  a) In a single process setting a later attempt to open the file would
+     hit the assert "!cfg.session_initiator" reported in issue #1782.
+  b) In a multiprocess setting, another process would be allowed to run
+     compact(), but the current process would retain its mapping of the
+     old file and attempt to reuse those mappings when a new SharedGroup
+     is opened, which would likely lead to a crash later. In that case, the
+     !cfg.session_initiator would not be triggered.
+  May fix issue #1782.
+
+**Note: This is a hotfix release built on top of 1.0.0
+
+----------------------------------------------
+
+# 1.0.0 Release notes
+
+### Bugfixes
+
+* Fixed move_last_over() replacing null values for binary columns in the moved
+  row with zero-length values.
+
+### Enhancements
+
+* File operations would previously throw `std::runtime_error` for error cases without a
+  specialized exception. They now throw `AccessError` instead and include path information.
+
+-----------
+
+### Internals
+
+* Fixed an error in Query_Sort_And_Requery_Untyped_Monkey2 test which would cause
+  this test to fail sometimes.
+
+----------------------------------------------
+
+# 0.100.4 Release notes
+
+### Bugfixes
+
+* Fix queries over multiple levels of backlinks to work when the tables involved have
+  their backlink columns at different indices.
+
+### Breaking changes
+
+* Reverting the breaking changes wrongly introduced by 0.100.3, so that
+  this release does NOT have breaking changes with respect to 0.100.2
+
+
+----------------------------------------------
+
+# 0.100.3 Release notes (This is a faulty release and should not be used)
+
+### Bugfixes
+
+* Fix initialization of read-only Groups which are sharing file mappings with
+  other read-only Groups for the same path.
+* Fix TableView::clear() to work in imperative mode (issue #1803, #827)
+* Fixed issue with Timestamps before the UNIX epoch not being read correctly in
+  the `TransactLogParser`. Rollbacks and advances with such Timestamps would
+  throw a `BadTransactLog` exception. (#1802)
+
+### Breaking changes
+
+* Search indexes no longer support strings with lengths greater than
+  `Table::max_indexed_string_length`. If you try to add a string with a longer length
+  (through the Table interface), then a `realm::LogicError` will be thrown with type 
+  `string_too_long_for_index`. Calling `Table::add_search_index()` will now return a
+  boolean value indicating whether or not the index could be created on the column. If
+  the column contains strings that exceed the maximum allowed length, then
+  `Table::add_search_index()` will return false and the index will not be created, but the data
+  in the underlying column will remain unaffected. This is so that bindings can attempt to
+  create a search index on a column without knowing the lengths of the strings in the column.
+  Realm will continue to operate as before on any search index that already stores strings longer
+  than the maximum allowed length meaning that this change is not file breaking (no upgrade is
+  required). However, as stated above, any new strings that exceed the maximum length will
+  not be allowed into a search index, to insert long strings just turn off the search index
+  (although this could be left up to the user).
+
+### Enhancements
+
+* Distinct is now supported for columns without a search index. Bindings no longer
+  need to ensure that a column has a search index before calling distinct. (#1739)
+
+-----------
+
+### Internals
+
+* Upgrading to OpenSSL 1.0.1t.
+
+----------------------------------------------
+
+# 0.100.2 Release notes
+
+### Bugfixes
+
+* Fix handing over an out of sync TableView that depends on a deleted link list or
+  row so that it doesn't remain perpetually out of sync (#1770).
+* Fix a use-after-free when using a column which was added to an existing table
+  with rows in the same transaction as it was added, which resulted in the
+  automatic migration from DateTime to Timestamp crashing with a stack overflow
+  in some circumstances.
+
+----------------------------------------------
+
+# 0.100.1 Release notes
+
+### Bugfixes:
+
+* Fix for: The commit logs were not properly unmapped and closed when a SharedGroup
+  was closed. If one thread closed and reopened a SharedGroup which was the sole
+  session participant at the time it was closed, while a different SharedGroup opened
+  and closed the database in between, the first SharedGroup could end up reusing it's
+  memory mappings for the commit logs, while the later accesses through a different
+  SharedGroup would operate on a different set of files. This could cause inconsistency
+  between the commit log and the database. In turn, this could lead to crashes during
+  advance_read(), promote_to_write() and possibly commit_and_continue_as_read().
+  Worse, It could also silently lead to accessors pointing to wrong objects which might
+  later open for changes to the database that would be percieved as corrupting. (#1762)
+* Fix for: When commitlogs change in size, all readers (and writers) must update their
+  memory mmapings accordingly. The old mechanism was based on comparing the size of
+  the log file with the previous size and remapping if they differ. Unfortunately, this
+  is not good enough, as the commitlog may first be shrunk, then expanded back to the
+  original size and in this case, the existing mechanism will not trigger remapping.
+  Without remapping in such situations, POSIX considers accesses to the part of the
+  mapping corresponding to deleted/added sections of the file to be undefined. Consequences
+  of this bug could be crashes in advance_read(), promote_to_write() or
+  commit_and_continue_as_read(). Conceivably it could also cause wrong accessor updates
+  leading to accessors pointing to wrong database objects. This, in turn, could lead
+  to what would be percieved as database corruption. (#1764)
+* S: Assertion was sometimes dereferencing a dangling pointer in
+  `util::network::buffered_input_stream::read_oper<H>::recycle_and_execute()`.
+
 ### Enhancements:
 
+* S: `util::bind_ptr<>` extended with capability to adopt and release naked
+  pointers.
+* The `SharedGroup` constructor now takes an optional callback function so bindings can
+  be notified when a Realm is upgraded. (#1740)
+
+----------------------------------------------
+
+# 0.100.0 Release notes
+
+### Bugfixes:
+
+* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most
+  likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
+  possibly also #1164 (crash in SharedGroup destructor on OS X).
+* Copying a `Query` restricted by a `TableView` will now avoid creating a dangling
+  reference to the restricting view if the query owns the view. Dangling references
+  may still occur if the `Query` does not own the restricting `TableView`.
+* Fixed #1747 (valgrind report of unitialized variable).
+* Fixed issue with creation of `ArrayIntNull` with certain default values that would
+  result in an all-null array. (Pull request #1721)
+
+### API breaking changes:
+
+* The return value for LangBindHelper::get_linklist_ptr() and the argument
+  to LangBindHelper::unbind_linklist_ptr has changed from being a 'LinkView*'
+  into a 'const LinkViewRef&'.
+* Fixed a bug, where handing over a TableView based on a Query restricted
+  by another TableView would fail to propagate synchronization status correctly
+  (issue #1698)
+* Fixed TableViews that represent backlinks to track the same row, even if that row
+  moves within its table. (Issue #1710)
+* Fixed incorrect semantics when comparing a LinkList column with a Row using a
+  query expression. (Issue #1713)
+* Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
+  the target row has been deleted.
+* `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
+  and will also return true if the target row of a `TableView` that represents backlinks
+  is deleted. (Issue #1710)
+* New nanosecond precision `Timestamp` data and column type replace our current `DateTime`
+  data and column type. (Issue #1476)
+* Notice: Due to the new `Timestamp` data and column type a file upgrade will take place.
+  Read-only Realm files in apps will have to be updated manually.
+
+### Enhancements:
+
+* TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
+* `Query::sync_view_if_needed()` allows for bringing a query's restricting view into sync with
+  its underlying data source.
+
+-----------
+
+### Internals:
+
+* Opening a Realm file which already has a management directory no longer throws
+  and catches an exception.
+* The r-value constructor for StringData has been removed because StringIndex does not
+  store any data. This prevents incorrect usage which can lead to strange results.
+
+----------------------------------------------
+
+# 0.99.0 Release notes
+
+### Breaking changes:
+
+* Lock file (`foo.realm.lock`) format bumped.
+* Moved all supporting files (all files except the .realm file) into a
+  separate ".management" subdirectory.
+
+### Bugfixes:
+
+* S: Misbehavior of empty asynchronous write in POSIX networking API.
+* S: Access dangling pointer while handling canceled asynchronous accept
+  in POSIX networking API.
+* Changed group operator== to take table names into account.  
+
+### Enhancements:
+
+* Multiple shared groups now share the read-only memory-mapping of
+  the database. This significantly lowers pressure on virtual memory
+  in multithreaded scenarios. Fixes issue #1477.
 * Added emulation of robust mutexes on platforms which do not
   provide the full posix API for it. This prevents a situation
   where a crash in one process holding the lock, would leave
-  the database locked. Fixes issue #1429
-* Moved all supporting files (all files except the .realm file) into a
-  separate ".management" subdirectory.
+  the database locked. Fixes #1429
+* Added support for queries that traverse backlinks. Fixes #776.
+* Improve the performance of advance_read() over transations that inserted rows
+  when there are live TableViews.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links.
+
+* S: Adding `util::network::buffered_input_stream::reset()`.
 
 -----------
 
@@ -31,8 +272,132 @@
   each test thread) (`UNITTEST_LOG_TO_FILES`), and an option to abort on first
   failed check (`UNITTEST_ABORT_ON_FAILURE`). Additionally, logging
   (`util::Logger`) is now directly available to each unit test.
-* New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
-* Headers and source files are now compiled as C++14.
+* New failure simulation features: Ability to prime for random triggering.
+
+* S: New unit tests: `Network_CancelEmptyWrite`, `Network_ThrowFromHandlers`.
+
+----------------------------------------------
+
+# 0.98.4 Release notes
+
+### Bugfixes:
+
+* Copying a `Query` restricted by a `TableView` will now avoid creating a dangling
+  reference to the restricting view if the query owns the view. Dangling references
+  may still occur if the `Query` does not own the restricting `TableView`. (#1741)
+
+### Enhancements:
+
+* `Query::sync_view_if_needed()` allows for bringing a query's restricting view into sync with
+  its underlying data source. (#1742)
+
+**Note: This is a hotfix release built on top of 0.98.3. The above fixes are
+        not present in version 0.99**
+
+----------------------------------------------
+
+# 0.98.3 Release notes
+
+### Bugfixes:
+
+* Fixed TableViews that represent backlinks to not assert beneath `sync_if_needed` when
+  the target row has been deleted. (Issue #1723)
+
+**Note: This is a hotfix release built on top of 0.98.2. The above fixes are
+        not present in version 0.99**
+
+----------------------------------------------
+
+# 0.98.2 Release notes
+
+### Bugfixes:
+
+* Fixed TableViews that represent backlinks to track the same row, even if that row
+  moves within its table. (Issue #1710)
+* Fixed incorrect semantics when comparing a LinkList column with a Row using a
+  query expression. (Issue #1713)
+
+### API breaking changes:
+
+* `TableView::depends_on_deleted_linklist` is now `TableView::depends_on_deleted_object`,
+  and will also return true if the target row of a `TableView` that represents backlinks
+  is deleted. (Issue #1710)
+
+### Enhancements:
+
+* TableView can now report whether its rows are guaranteed to be in table order. (Issue #1712)
+
+**Note: This is a hotfix release built on top of 0.98.1. The above fixes are
+        not present in version 0.99
+
+----------------------------------------------
+
+# 0.98.1 Release notes
+
+### Bugfixes:
+
+* Fixed a bug, where handing over a TableView based on a Query restricted
+  by another TableView would fail to propagate synchronization status correctly
+  (issue #1698)
+
+**Note: This is a hotfix release. The above bugfix is not present
+        in version 0.99
+
+----------------------------------------------
+
+# 0.98.0 Release notes
+
+### Enhancements:
+
+* Added support for queries that traverse backlinks. Fixes #776. See #1598.
+* The query expression API now supports equality comparisons between
+  `Columns<Link>` and row accessors. This allows for link equality
+  comparisons involving backlinks, and those that traverse multiple
+  levels of links. See #1609.
+
+### Bugfixes:
+
+* Fix a crash that occurred after moving a `Query` that owned a `TableView`.
+  See #1672.
+
+**NOTE: This is a hotfix release which is built on top of [0.97.4].**
+
+-----------------------------------------------
+
+# 0.97.4 Release notes
+
+### Bugfixes:
+
+* #1498: A crash during opening of a Realm could lead to Realm files
+  which could not later be read. The symptom would be a realm file with zeroes
+  in the end but on streaming form (which requires a footer at the end of the
+  file instead). See issue #1638.
+* Linked tables were not updated properly when calling erase with num_rows = 0
+  which could be triggered by rolling back a call to insert with num_rows = 0.
+  See issue #1652.
+* `TableView`s created by `Table::get_backlink_view` are now correctly handled by
+  `TableView`'s move assignment operator. Previously they would crash when used.
+  See issue #1641.
+
+**NOTE: This is a hotfix release which is built on top of [0.97.3].**
+
+----------------------------------------------
+
+# 0.97.3 Release notes
+
+### Bugfixes:
+
+* Update table accessors after table move rollback, issue #1551. This
+  issue could have caused corruption or crashes when tables are moved
+  and then the transaction is rolled back.
+* Detach subspec and enumkey accessors when they are removed
+  via a transaction (ex rollback). This could cause crashes
+  when removing the last column in a table of type link,
+  linklist, backlink, subtable, or enumkey. See #1585.
+* Handing over a detached row accessor no longer crashes.
+
+**NOTE: This is a hotfix release. The above changes are not present in
+versions [0.97.2].**
 
 ----------------------------------------------
 

@@ -1,13 +1,31 @@
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/commit_log.hpp>
+#include <realm/lang_bind_helper.hpp>
 #include "test.hpp"
 
+#include <ctime>
 #include <stdio.h>
 #include <fstream>
 
 using namespace realm;
 using namespace realm::util;
+
+// Determines whether or not to run the shared group verify function
+// after each transaction. This will find errors earlier but is expensive.
+#define REALM_VERIFY true
+
+#if REALM_VERIFY
+    #define REALM_DO_IF_VERIFY(log, op) \
+        do { \
+            if (log) *log << #op << ";\n"; \
+            op; \
+        } \
+        while(false)
+#else
+    #define REALM_DO_IF_VERIFY(log, owner) \
+        do {} while(false)
+#endif
 
 struct EndOfFile {};
 
@@ -22,6 +40,7 @@ std::string create_string(unsigned char byte)
 enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
+            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER,
 
             COUNT};
 
@@ -34,9 +53,10 @@ DataType get_type(unsigned char c)
         type_Double,
         type_String,
         type_Binary,
-        type_DateTime,
+        type_OldDateTime,
         type_Table,
-        type_Mixed
+        type_Mixed,
+        type_Timestamp
     };
 
     unsigned char mod = c % (sizeof(types) / sizeof(DataType));
@@ -67,7 +87,24 @@ int64_t get_int64(State& s) {
     return v;
 }
 
-void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std::ostream&> log)
+int32_t get_int32(State& s) {
+    int32_t v = 0;
+    for (size_t t = 0; t < 4; t++) {
+        unsigned char c = get_next(s);
+        *(reinterpret_cast<signed char*>(&v) + t) = c;
+    }
+    return v;
+}
+
+std::string get_current_time_stamp() {
+    std::time_t t = std::time(nullptr);
+    const int str_size = 100;
+    char str_buffer [str_size] = { 0 };
+    std::strftime(str_buffer, str_size, "%c", std::localtime(&t));
+    return str_buffer;
+}
+
+void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
 {
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
     const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
@@ -75,6 +112,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
     // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
     const size_t max_rows = 100000;
+    using realm::test_util::crypt_key;
 
     try {
         State s;
@@ -82,9 +120,38 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
         s.pos = 0;
 
         if (log) {
-            *log << "\n\n\n----------------------------------------------------------------------\n";
-            *log << "Group g;\n\n";
+            *log << "\n\n// Test case generated in "  REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
+            *log << "// ----------------------------------------------------------------------\n";
+            const char* key = crypt_key();
+            std::string printable_key;
+            if (key == nullptr) {
+                printable_key = "nullptr";
+            }
+            else {
+                printable_key = std::string("\"") + key + "\"";
+            }
+
+            *log << "std::unique_ptr<Replication> hist_r(make_client_history(\"" << path << "\", " << printable_key << "));\n";
+            *log << "std::unique_ptr<Replication> hist_w(make_client_history(\"" << path << "\", " << printable_key << "));\n";
+
+            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, " << printable_key << ");\n";
+            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, " << printable_key << ");\n";
+
+            *log << "Group& g = const_cast<Group&>(sg_w.begin_read());\n";
+            *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
+            *log << "LangBindHelper::promote_to_write(sg_w);\n";
+
+            *log << "\n";
         }
+
+        std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+        std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+
+        SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        Group& g = const_cast<Group&>(sg_w.begin_read());
+        Group& g_r = const_cast<Group&>(sg_r.begin_read());
+        LangBindHelper::promote_to_write(sg_w);
 
         for (;;) {
             char instr = get_next(s) % COUNT;
@@ -162,7 +229,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 // Mixed and Subtable cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\"," << (nullable ? "true" : "false") << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
                 }
                 g.get_table(table_ndx)->add_column(type, name, nullable);
             }
@@ -173,7 +240,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 std::string name = create_string(get_next(s) % Group::max_table_name_length);
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\"," << (nullable ? "true" : "false") << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
                 }
                 g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
             }
@@ -183,7 +250,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 if (t->get_column_count() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     if (log) {
-                        *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->remove_column(" << col_ndx << "); }\n";
+                        *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
                     }
                     t->remove_column(col_ndx);
                 }
@@ -199,7 +266,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                                                   type != type_Binary);
                     if (supports_search_index) {
                         if (log) {
-                            *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->add_search_index(" << col_ndx << "); }\n";
+                            *log << "g.get_table(" << table_ndx << ")->add_search_index(" << col_ndx << ");\n";
                         }
                         t->add_search_index(col_ndx);
                     }
@@ -213,7 +280,7 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                     // We don't need to check if the column is of a type that is indexable or if it has index on or off
                     // because Realm will just do a no-op at worst (no exception or assert).
                     if (log) {
-                        *log << "{ TableRef t = g.get_table(" << table_ndx << "); t->remove_search_index(" << col_ndx << "); }\n";
+                        *log << "g.get_table(" << table_ndx << ")->remove_search_index(" << col_ndx << ");\n";
                     }
                     t->remove_search_index(col_ndx);
                 }
@@ -258,16 +325,24 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                 if (t->get_column_count() > 0 && t->size() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
                     size_t row_ndx = get_next(s) % t->size();
+                    DataType type = t->get_column_type(col_ndx);
 
                     // With equal probability, either set to null or to a value
                     if (get_next(s) % 2 == 0 && t->is_nullable(col_ndx)) {
-                        if (log) {
-                            *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx << ");\n";
+                        if (type == type_Link) {
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->nullify_link(" << col_ndx << ", " << row_ndx << ");\n";
+                            }
+                            t->nullify_link(col_ndx, row_ndx);
                         }
-                        t->set_null(col_ndx, row_ndx);
+                        else {
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx << ");\n";
+                            }
+                            t->set_null(col_ndx, row_ndx);
+                        }
                     }
                     else {
-                        DataType type = t->get_column_type(col_ndx);
                         if (type == type_String) {
                             std::string str = create_string(get_next(s));
                             if (log) {
@@ -289,12 +364,12 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                             }
                             t->set_int(col_ndx, row_ndx, get_next(s));
                         }
-                        else if (type == type_DateTime) {
-                            DateTime value{ get_next(s) };
+                        else if (type == type_OldDateTime) {
+                            OldDateTime value{ get_next(s) };
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_datetime(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_olddatetime(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
-                            t->set_datetime(col_ndx, row_ndx, value);
+                            t->set_olddatetime(col_ndx, row_ndx, value);
                         }
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
@@ -331,15 +406,41 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                             TableRef target = t->get_link_target(col_ndx);
                             if (target->size() > 0) {
                                 LinkViewRef links = t->get_linklist(col_ndx, row_ndx);
-
                                 // either add or set, 50/50 probability
                                 if (links->size() > 0 && get_next(s) > 128) {
-                                    links->set(get_next(s) % links->size(), get_next(s) % target->size());
+                                    size_t linklist_row = get_next(s) % links->size();
+                                    size_t target_link_ndx = get_next(s) % target->size();
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
+                                            << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx << ");\n";
+                                    }
+                                    links->set(linklist_row, target_link_ndx);
                                 }
                                 else {
-                                    links->add(get_next(s) % target->size());
+                                    size_t target_link_ndx = get_next(s) % target->size();
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
+                                            << row_ndx << ")->add(" << target_link_ndx << ");\n";
+                                    }
+                                    links->add(target_link_ndx);
                                 }
                             }
+                        }
+                        else if (type == type_Timestamp) {
+                            int64_t seconds = get_int64(s);
+                            int32_t nanoseconds = get_int32(s) % 1000000000;
+                            // Make sure the values form a sensible Timestamp
+                            const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+                            const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+                            const bool correct_timestamp = both_non_negative || both_non_positive;
+                            if (!correct_timestamp) {
+                                nanoseconds = -nanoseconds;
+                            }
+                            Timestamp value{ seconds, nanoseconds };
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                            }
+                            t->set_timestamp(col_ndx, row_ndx, value);
                         }
                     }
                 }
@@ -355,6 +456,48 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
                     t->remove(row_ndx);
                 }
             }
+            else if (instr == MOVE_LAST_OVER && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    int32_t row_ndx = get_int32(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->move_last_over(" << row_ndx << ");\n";
+                    }
+                    t->move_last_over(row_ndx);
+                }
+            }
+            else if (instr == COMMIT) {
+                if (log) {
+                    *log << "LangBindHelper::commit_and_continue_as_read(sg_w);\n";
+                }
+                LangBindHelper::commit_and_continue_as_read(sg_w);
+                REALM_DO_IF_VERIFY(log, g.verify());
+                if (log) {
+                    *log << "LangBindHelper::promote_to_write(sg_w);\n";
+                }
+                LangBindHelper::promote_to_write(sg_w);
+                REALM_DO_IF_VERIFY(log, g.verify());
+            }
+            else if (instr == ROLLBACK) {
+                if (log) {
+                    *log << "LangBindHelper::rollback_and_continue_as_read(sg_w);\n";
+                }
+                LangBindHelper::rollback_and_continue_as_read(sg_w);
+                REALM_DO_IF_VERIFY(log, g.verify());
+                if (log) {
+                    *log << "LangBindHelper::promote_to_write(sg_w);\n";
+                }
+                LangBindHelper::promote_to_write(sg_w);
+                REALM_DO_IF_VERIFY(log, g.verify());
+            }
+            else if (instr == ADVANCE) {
+                if (log) {
+                    *log << "LangBindHelper::advance_read(sg_r);\n";
+                }
+                LangBindHelper::advance_read(sg_r);
+                REALM_DO_IF_VERIFY(log, g_r.verify());
+            }
         }
     }
     catch (const EndOfFile&) {
@@ -364,7 +507,10 @@ void parse_and_apply_instructions(std::string& in, Group& g, util::Optional<std:
 
 void usage(const char* argv[])
 {
-    fprintf(stderr, "Usage: %s <LOGFILE> [--log]\n(where <LOGFILE> is a instruction file that will be replayed.)\nPass --log to have code printed to stdout producing the same instructions.", argv[0]);
+    fprintf(stderr, "Usage: %s <LOGFILE> [--log] [--name testName]\n(where <LOGFILE> is a instruction file that will "
+            "be replayed.)\nPass --log to have code printed to stdout producing the same instructions.\nPass --name "
+            "testName with distinct values when running on multiple threads, to make sure the test don't use the same"
+            " file", argv[0]);
     exit(1);
 }
 
@@ -372,12 +518,16 @@ void usage(const char* argv[])
 int run_fuzzy(int argc, const char* argv[])
 {
     util::Optional<std::ostream&> log;
+    std::string name = "fuzz-test";
 
     size_t file_arg = size_t(-1);
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
         if (arg == "--log") {
             log = util::some<std::ostream&>(std::cout);
+        }
+        else if (arg == "--name"){
+            name = argv[++i];
         }
         else {
             file_arg = i;
@@ -390,26 +540,16 @@ int run_fuzzy(int argc, const char* argv[])
 
     std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
     if (!in.is_open()) {
-        fprintf(stderr, "Could not open file for reading: %s\n", argv[1]);
+        std::cerr << "Could not open file for reading: " << argv[file_arg] << "\n";
         exit(1);
     }
 
-    Group group;
+    disable_sync_to_disk();
+    realm::test_util::SharedGroupTestPathGuard path(name + ".realm");
 
     try {
-        if (log) {
-            time_t t = time(0);
-            tm t0;
-#ifndef _MSC_VER // fixme
-            localtime_r(&t, &t0);
-            char buffer[100] = { 0 };
-            strftime(buffer, sizeof(buffer), "%c", &t0);
-            *log << "// Test case generated by " << argv[0] << " on " << buffer << ".\n";
-#endif
-            *log << "Group g;\n";
-        }
         std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-        parse_and_apply_instructions(contents, group, std::cerr);
+        parse_and_apply_instructions(contents, path, log);
     }
     catch (const EndOfFile&) {
         return 0;

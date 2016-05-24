@@ -522,16 +522,20 @@ struct GetColumnTypeId<BinaryData>
     static const DataType id = type_Binary;
 };
 template<>
-struct GetColumnTypeId<DateTime>
+struct GetColumnTypeId<OldDateTime>
 {
-    static const DataType id = type_DateTime;
+    static const DataType id = type_OldDateTime;
 };
 template<>
 struct GetColumnTypeId<Mixed>
 {
     static const DataType id = type_Mixed;
 };
-
+template<>
+struct GetColumnTypeId<Timestamp>
+{
+        static const DataType id = type_Timestamp;
+};
 
 template<class Type, int col_idx>
 struct AddCol {
@@ -645,11 +649,21 @@ struct AssignIntoCol<SpecBase::Enum<E>, col_idx> {
 
 // AssignIntoCol specialization for dates
 template<int col_idx>
-struct AssignIntoCol<DateTime, col_idx> {
+struct AssignIntoCol<OldDateTime, col_idx> {
     template<class L>
     static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
     {
-        t->set_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
+        t->set_olddatetime(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for timestamps
+template<int col_idx>
+struct AssignIntoCol<Timestamp, col_idx> {
+    template<class L>
+    static void exec(Table* t, size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_timestamp(col_idx, row_idx, util::at<col_idx>(tuple));
     }
 };
 
@@ -693,7 +707,7 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::create(Allocator& alloc)
 {
     TableRef table = Table::create(alloc);
     set_dynamic_type(*table);
-    return unchecked_cast<BasicTable<Spec>>(move(table));
+    return unchecked_cast<BasicTable<Spec>>(std::move(table));
 }
 
 

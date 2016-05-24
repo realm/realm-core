@@ -97,6 +97,7 @@ public:
     void do_abort_transact() noexcept override;
     void do_interrupt() noexcept override {};
     void do_clear_interrupt() noexcept override {};
+    void commit_log_close() noexcept override;
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
     HistoryType get_history_type() const noexcept override;
@@ -167,11 +168,15 @@ protected:
         CommitLogPreamble preamble_a;
         CommitLogPreamble preamble_b;
 
+        // memory mapping counter, increased whenever a log is resized
+        uint64_t mmap_counter;
+
         CommitLogHeader(uint_fast64_t version):
             preamble_a(version),
             preamble_b(version)
         {
             use_preamble_a = true;
+            mmap_counter = 1;
         }
     };
 
@@ -188,7 +193,7 @@ protected:
         mutable util::File file;
         std::string name;
         mutable util::File::Map<CommitLogHeader> map;
-        mutable util::File::SizeType last_seen_size;
+        mutable uint64_t last_seen_mmap_counter = 0;
         CommitLogMetadata(std::string name): name(name) {}
     };
 
@@ -325,8 +330,8 @@ inline void WriteLogCollector::map_header_if_needed() const
     if (m_header.is_attached() == false) {
         File header_file(m_header_name, File::mode_Update);
         m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
+        m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
     }
-    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, m_header_name, "0");
 }
 
 
@@ -368,13 +373,13 @@ void WriteLogCollector::remap_if_needed(const CommitLogMetadata& log) const
 {
     if (log.map.is_attached() == false) {
         open_if_needed(log);
-        log.last_seen_size = log.file.get_size();
-        log.map.map(log.file, File::access_ReadWrite, log.last_seen_size);
+        log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
+        log.map.map(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
         return;
     }
-    if (log.last_seen_size != log.file.get_size()) {
-        log.map.remap(log.file, File::access_ReadWrite, log.file.get_size());
-        log.last_seen_size = log.file.get_size();
+    if (log.last_seen_mmap_counter != m_header.get_addr()->mmap_counter) {
+        log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
+        log.map.remap(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
     }
 }
 
@@ -388,8 +393,8 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         log.file.sync(); // Throws
+    log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
     log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
-    log.last_seen_size = minimal_pages * page_size;
 }
 
 void WriteLogCollector::reset_header()
@@ -403,9 +408,21 @@ void WriteLogCollector::reset_header()
     if (!disable_sync)
         header_file.sync(); // Throws
     m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
-    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, m_header_name, "0");
+    m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
 }
 
+void WriteLogCollector::commit_log_close() noexcept
+{
+    m_header.unmap();
+    m_log_a.map.unmap();
+    m_log_a.file.close();
+    m_log_b.map.unmap();
+    m_log_b.file.close();
+    // ensure we do not accidentally have a counter matching
+    // a later mmap.
+    m_log_a.last_seen_mmap_counter = 0;
+    m_log_b.last_seen_mmap_counter = 0;
+}
 
 
 // Helper methods for adding and cleaning up commit log entries:
@@ -435,6 +452,8 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         if (size > 4) {
             size -= size/4;
             size *= page_size * minimal_pages;
+            // indicate change of log size, forcing readers to remap to new size
+            m_header.get_addr()->mmap_counter++;
             active_log->map.unmap();
             active_log->file.resize(size); // Throws
             bool disable_sync = get_disable_sync_to_disk();
@@ -462,6 +481,7 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
         aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof(EntryHeader) + entry.changeset.size());
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size()) {
+        m_header.get_addr()->mmap_counter++;
         active_log->file.resize(size_needed); // Throws
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
@@ -555,13 +575,15 @@ void WriteLogCollector::terminate_session() noexcept
 void WriteLogCollector::set_log_entry_internal(HistoryEntry* entry,
                                                const EntryHeader* hdr, const char* log)
 {
-    entry->changeset = BinaryData(log, hdr->size);
+    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(hdr->size));
+    entry->changeset = BinaryData(log, size_t(hdr->size));
 }
+
 
 void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
                                                const EntryHeader* hdr, const char* log)
 {
-    *entry = BinaryData(log, hdr->size);
+    *entry = BinaryData(log, size_t(hdr->size));
 }
 
 
@@ -630,7 +652,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
         uint_fast64_t tmp_offset = m_read_offset + sizeof(EntryHeader);
         if (m_read_version >= from_version) {
             // std::cerr << "  --at: " << m_read_offset << ", " << size << "\n";
-            realm::util::encryption_read_barrier(hdr, size + sizeof(EntryHeader),
+            realm::util::encryption_read_barrier(hdr, size_t(size + sizeof(EntryHeader)),
                                                  first_map->get_encrypted_mapping());
             set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
             ++logs_buffer;

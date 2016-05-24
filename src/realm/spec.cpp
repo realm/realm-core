@@ -27,13 +27,17 @@ void Spec::init(MemRef mem) noexcept
     m_attr.init_from_ref(m_top.get_as_ref(2));
     m_attr.set_parent(&m_top, 2);
 
+    // Reset optional subarrays in the case of moving
+    // from initialized children to uninitialized
+    m_subspecs.detach();
+    m_enumkeys.detach();
+
     // Subspecs array is only there and valid when there are subtables
     // if there are enumkey, but no subtables yet it will be a zero-ref
-    if (top_size >= 4) {
-        if (ref_type ref = m_top.get_as_ref(3)) {
-            m_subspecs.init_from_ref(ref);
-            m_subspecs.set_parent(&m_top, 3);
-        }
+    if (has_subspec()) {
+        ref_type ref = m_top.get_as_ref(3);
+        m_subspecs.init_from_ref(ref);
+        m_subspecs.set_parent(&m_top, 3);
     }
 
     // Enumkeys array is only there when there are StringEnum columns
@@ -68,7 +72,7 @@ void Spec::update_from_parent(size_t old_baseline) noexcept
     m_names.update_from_parent(old_baseline);
     m_attr.update_from_parent(old_baseline);
 
-    if (m_top.size() > 3)
+    if (has_subspec())
         m_subspecs.update_from_parent(old_baseline);
 
     if (m_top.size() > 4)
@@ -128,11 +132,12 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
 
-    bool has_subspec = type == col_type_Table || type == col_type_Link ||
+    bool is_subspec_type = type == col_type_Table || type == col_type_Link ||
         type == col_type_LinkList || type == col_type_BackLink;
-    if (has_subspec) {
+    if (is_subspec_type) {
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
+        REALM_ASSERT_EX(m_subspecs.is_attached() == has_subspec(), m_subspecs.is_attached(), m_top.size());
         if (!m_subspecs.is_attached()) {
             bool context_flag = false;
             MemRef subspecs_mem =
@@ -180,7 +185,6 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
 
     update_has_strong_link_columns();
 }
-
 
 void Spec::erase_column(size_t column_ndx)
 {
@@ -301,6 +305,7 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
 {
     REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
 
+    REALM_ASSERT_EX(m_enumkeys.is_attached() == (m_top.size() > 4), m_enumkeys.is_attached(), m_top.size());
     // Create the enumkeys list if needed
     if (!m_enumkeys.is_attached()) {
         m_enumkeys.create(Array::type_HasRefs);
@@ -369,7 +374,9 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     uint64_t table_ref = uint64_t(tagged_value) >> 1;
-    return table_ref;
+
+    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(table_ref));
+    return size_t(table_ref);
 }
 
 
@@ -487,7 +494,8 @@ bool Spec::operator==(const Spec& spec) const noexcept
     // check each column's type
     const size_t column_count = get_column_count();
     for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx) {
-        switch (m_types.get(col_ndx))
+        ColumnType col_type = ColumnType(m_types.get(col_ndx));
+        switch (col_type)
         {
             case col_type_String:
             case col_type_StringEnum:
@@ -522,8 +530,8 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Bool:
             case col_type_Binary:
             case col_type_Mixed:
-            case col_type_DateTime:
-            case col_type_Reserved1:
+            case col_type_OldDateTime:
+            case col_type_Timestamp:
             case col_type_Float:
             case col_type_Double:
             case col_type_Reserved4:

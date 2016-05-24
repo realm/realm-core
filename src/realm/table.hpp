@@ -38,6 +38,8 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
+#include <realm/column_binary.hpp>
+#include <realm/column_timestamp.hpp>
 
 namespace realm {
 
@@ -59,6 +61,7 @@ struct LinkTargetInfo;
 
 struct Link {};
 typedef Link LinkList;
+typedef Link BackLink;
 
 namespace _impl { class TableFriend; }
 
@@ -329,9 +332,13 @@ public:
 
     template<class T>
     Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
+    template<class T>
+    Columns<T> column(const Table& origin, size_t origin_column_ndx);
 
-    template <class T>
+    template<class T>
     SubQuery<T> column(size_t column, Query subquery);
+    template<class T>
+    SubQuery<T> column(const Table& origin, size_t origin_column_ndx, Query subquery);
 
     // Table size and deletion
     bool is_empty() const noexcept;
@@ -396,13 +403,14 @@ public:
     // Get cell values. Will assert if the requested type does not match the column type
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const noexcept;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const noexcept;
-    DateTime    get_datetime(size_t column_ndx, size_t row_ndx) const noexcept;
+    OldDateTime get_olddatetime(size_t column_ndx, size_t row_ndx) const noexcept;
     float       get_float(size_t column_ndx, size_t row_ndx) const noexcept;
     double      get_double(size_t column_ndx, size_t row_ndx) const noexcept;
     StringData  get_string(size_t column_ndx, size_t row_ndx) const noexcept;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
+    Timestamp   get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
 
     template<class T> T get(size_t c, size_t r) const noexcept;
 
@@ -465,7 +473,8 @@ public:
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
+    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value);
+    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value);
     template<class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
@@ -553,11 +562,13 @@ public:
     int64_t maximum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
     float   maximum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  maximum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    DateTime maximum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    OldDateTime maximum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
     int64_t minimum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
     float   minimum_float(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  minimum_double(size_t column_ndx, size_t* return_ndx = nullptr) const;
-    DateTime minimum_datetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    OldDateTime minimum_olddatetime(size_t column_ndx, size_t* return_ndx = nullptr) const;
+    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
     double  average_int(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_float(size_t column_ndx, size_t* value_count = nullptr) const;
     double  average_double(size_t column_ndx, size_t* value_count = nullptr) const;
@@ -566,7 +577,8 @@ public:
     size_t    find_first_link(size_t target_row_index) const;
     size_t    find_first_int(size_t column_ndx, int64_t value) const;
     size_t    find_first_bool(size_t column_ndx, bool value) const;
-    size_t    find_first_datetime(size_t column_ndx, DateTime value) const;
+    size_t    find_first_olddatetime(size_t column_ndx, OldDateTime value) const;
+    size_t    find_first_timestamp(size_t column_ndx, Timestamp value) const;
     size_t    find_first_float(size_t column_ndx, float value) const;
     size_t    find_first_double(size_t column_ndx, double value) const;
     size_t    find_first_string(size_t column_ndx, StringData value) const;
@@ -579,8 +591,8 @@ public:
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(size_t column_ndx, bool value);
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    TableView      find_all_datetime(size_t column_ndx, DateTime value);
-    ConstTableView find_all_datetime(size_t column_ndx, DateTime value) const;
+    TableView      find_all_olddatetime(size_t column_ndx, OldDateTime value);
+    ConstTableView find_all_olddatetime(size_t column_ndx, OldDateTime value) const;
     TableView      find_all_float(size_t column_ndx, float value);
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     TableView      find_all_double(size_t column_ndx, double value);
@@ -592,7 +604,7 @@ public:
     TableView      find_all_null(size_t column_ndx);
     ConstTableView find_all_null(size_t column_ndx) const;
 
-    /// The following column types are supported: String, Integer, DateTime, Bool
+    /// The following column types are supported: String, Integer, OldDateTime, Bool
     TableView      get_distinct_view(size_t column_ndx);
     ConstTableView get_distinct_view(size_t column_ndx) const;
 
@@ -692,6 +704,7 @@ public:
     Query where(const LinkViewRef& lv) { return Query(*this, lv); }
 
     Table& link(size_t link_column);
+    Table& backlink(const Table& origin, size_t origin_col_ndx);
 
     // Optimizing. enforce == true will enforce enumeration of all string columns;
     // enforce == false will auto-evaluate if they should be enumerated or not
@@ -854,7 +867,7 @@ private:
     typedef std::vector<ColumnBase*> column_accessors;
     column_accessors m_cols;
 
-    mutable size_t m_ref_count;
+    mutable std::atomic<size_t> m_ref_count;
 
     // If this table is a root table (has independent descriptor),
     // then Table::m_descriptor refers to the accessor of its
@@ -897,6 +910,9 @@ private:
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
+    
+    // Upgrades OldDateTime columns to Timestamp columns
+    void upgrade_olddatetime();
 
     /// Update the version of this table and all tables which have links to it.
     /// This causes all views referring to those tables to go out of sync, so that
@@ -1042,8 +1058,8 @@ private:
     // Detach the type descriptor accessor if it exists.
     void discard_desc_accessor() noexcept;
 
-    void bind_ptr() const noexcept { ++m_ref_count; }
-    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
+    void bind_ptr() const noexcept;
+    void unbind_ptr() const noexcept;
 
     void register_view(const TableViewBase* view);
     void unregister_view(const TableViewBase* view) noexcept;
@@ -1090,6 +1106,8 @@ private:
     const SubtableColumn& get_column_table(size_t column_ndx) const noexcept;
     MixedColumn& get_column_mixed(size_t column_ndx);
     const MixedColumn& get_column_mixed(size_t column_ndx) const noexcept;
+    TimestampColumn& get_column_timestamp(size_t column_ndx);
+    const TimestampColumn& get_column_timestamp(size_t column_ndx) const noexcept;
     const LinkColumnBase& get_column_link_base(size_t ndx) const noexcept;
     LinkColumnBase& get_column_link_base(size_t ndx);
     const LinkColumn& get_column_link(size_t ndx) const noexcept;
@@ -1362,6 +1380,8 @@ private:
     friend class Query;
     template<class>
     friend class util::bind_ptr;
+    template<class>
+    friend class SimpleQuerySupport;
     friend class LangBindHelper;
     friend class TableViewBase;
     template<class T>
@@ -1457,6 +1477,28 @@ inline void Table::remove_last()
 {
     if (!is_empty())
         remove(size()-1);
+}
+
+// A good place to start if you want to understand the memory ordering
+// chosen for the operations below is http://preshing.com/20130922/acquire-and-release-fences/
+inline void Table::bind_ptr() const noexcept
+{
+    m_ref_count.fetch_add(1, std::memory_order_relaxed);
+}
+
+inline void Table::unbind_ptr() const noexcept
+{
+    // The delete operation runs the destructor, and the destructor
+    // must always see all changes to the object being deleted.
+    // Within each thread, we know that unbind_ptr will always happen after
+    // any changes, so it is a convenient place to do a release.
+    // The release will then be observed by the acquire fence in
+    // the case where delete is actually called (the count reaches 0)
+    if (m_ref_count.fetch_sub(1, std::memory_order_release) != 1)
+        return;
+
+    std::atomic_thread_fence(std::memory_order_acquire);
+    delete this;
 }
 
 inline void Table::register_view(const TableViewBase* view)
@@ -1657,37 +1699,60 @@ inline TableRef Table::copy(Allocator& alloc) const
 template<class T>
 inline Columns<T> Table::column(size_t column)
 {
-    std::vector<size_t> tmp = m_link_chain;
-    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value) {
-        tmp.push_back(column);
-    }
+    std::vector<size_t> link_chain = std::move(m_link_chain);
+    m_link_chain.clear();
 
     // Check if user-given template type equals Realm type. Todo, we should clean up and reuse all our
     // type traits (all the is_same() cases below).
-    const Table* table = get_link_chain_target(m_link_chain);
+    const Table* table = get_link_chain_target(link_chain);
 
     realm::DataType ct = table->get_column_type(column);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
         throw(LogicError::type_mismatch);
-    else if (std::is_same<T, realm::DateTime>::value && ct != type_DateTime)
+    else if (std::is_same<T, realm::OldDateTime>::value && ct != type_OldDateTime)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, float>::value && ct != type_Float)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, double>::value && ct != type_Double)
         throw(LogicError::type_mismatch);
 
+    if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value || std::is_same<T, BackLink>::value) {
+        link_chain.push_back(column);
+    }
 
+    return Columns<T>(column, this, std::move(link_chain));
+}
+
+template<class T>
+inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
+{
+    static_assert(std::is_same<T, BackLink>::value, "");
+
+    size_t origin_table_ndx = origin.get_index_in_group();
+    const Table& current_target_table = *get_link_chain_target(m_link_chain);
+    size_t backlink_col_ndx = current_target_table.m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+
+    std::vector<size_t> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
-    return Columns<T>(column, this, tmp);
+    link_chain.push_back(backlink_col_ndx);
+
+    return Columns<T>(backlink_col_ndx, this, std::move(link_chain));
 }
 
 template<class T>
 SubQuery<T> Table::column(size_t column_ndx, Query subquery)
 {
-    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list column");
+    static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(column_ndx), std::move(subquery));
+}
+
+template<class T>
+SubQuery<T> Table::column(const Table& origin, size_t origin_col_ndx, Query subquery)
+{
+    static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
+    return SubQuery<T>(column<T>(origin, origin_col_ndx), std::move(subquery));
 }
 
 // For use by queries
@@ -1695,6 +1760,14 @@ inline Table& Table::link(size_t link_column)
 {
     m_link_chain.push_back(link_column);
     return *this;
+}
+
+inline Table& Table::backlink(const Table& origin, size_t origin_col_ndx)
+{
+    size_t origin_table_ndx = origin.get_index_in_group();
+    const Table& current_target_table = *get_link_chain_target(m_link_chain);
+    size_t backlink_col_ndx = current_target_table.m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+    return link(backlink_col_ndx);
 }
 
 inline bool Table::is_empty() const noexcept
