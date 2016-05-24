@@ -32,7 +32,10 @@ template<> struct MakeEventLoop<AppleCoreFoundation> {
 
 
 #if REALM_PLATFORM_APPLE
-#  define IMPLEMENTATIONS Posix, AppleCoreFoundation
+// Apple Core Foundation based implementation currently disabled because it is
+// broken.
+//#  define IMPLEMENTATIONS Posix, AppleCoreFoundation
+#  define IMPLEMENTATIONS Posix
 #else
 #  define IMPLEMENTATIONS Posix
 #endif

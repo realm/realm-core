@@ -6,9 +6,15 @@
 #  define HAVE_POSIX_IMPLEMENTATION 1
 #endif
 
+/* The Apple Core Foundation based implementation is currently not working
+ * correctly. When reenabling it, remember to also reenable it in
+ * test_util_event_loop.cpp.
+
 #if REALM_PLATFORM_APPLE
 #  define HAVE_APPLE_CF_IMPLEMENTATION 1
 #endif
+
+*/
 
 
 using namespace realm;
