@@ -107,7 +107,7 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
     free(strs);
 #endif
 
-    ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
+    ss << "IMPORTANT: if you see this error, please send this log and reproduction steps to help@realm.io.";
 #ifdef REALM_DEBUG
     std::cerr << ss.rdbuf() << '\n';
 #endif

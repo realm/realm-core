@@ -23,25 +23,7 @@
 using namespace realm;
 using namespace realm::util;
 
-// First iteration of an automatic read / upgrade test
-// When in core version <= 89 / file version 2, this test will write files and
-// when in core version > 89 / file version 3, it will read / upgrade the
-// previously written files version 2 files.
-
-#if REALM_VER_MINOR > 89
-#  define TEST_READ_UPGRADE_MODE 1
-#else
-#  define TEST_READ_UPGRADE_MODE 0
-#endif
-
-
-// FIXME: This will not work when we hit 1.0, but we should also consider
-// testing the half matrix of all possible upgrade paths. E.g.:
-// 0.88.5->0.88.6->0.89.0->0.89.1->0.90.0->... and 0.88.5->0.90.0 directly etc.
-#if REALM_VER_MAJOR != 0
-#  error FIXME
-#endif
-
+#define TEST_READ_UPGRADE_MODE 1 // set to 0 when using this in an older version of core to write new tests files
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -930,7 +912,7 @@ TEST(Upgrade_Database_4_5_DateTime1)
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
         util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
 
-#if 1// TEST_READ_UPGRADE_MODE
+#if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
     {

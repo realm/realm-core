@@ -76,6 +76,7 @@ inline MemRef BasicArray<T>::create_array(Array::Type type, bool context_flag, s
         for (size_t i = 0; i < size; ++i) {
             tmp.set(i, value);
         }
+        return tmp.get_mem();
     }
     return mem;
 }
