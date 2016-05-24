@@ -865,7 +865,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
         new_version = to;
     };
 
-    // Callback that throws should revert the upgrade
+    // Callback should be called here, upgrade should succeed and throw
     upgrade_callback = exception_callback;
     bool exception_thrown = false;
     try {
@@ -880,9 +880,8 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
         exception_thrown = true;
     }
     CHECK(exception_thrown);
-    CHECK(!did_upgrade);
 
-    // Callback should be triggered here because the file still needs to be upgraded
+    // Callback should not be triggered here because the file has already been upgraded
     upgrade_callback = successful_callback;
     SharedGroup sg2(temp_copy,
                    no_create,
@@ -890,18 +889,6 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
                    encryption_key,
                    allow_file_format_upgrade,
                    upgrade_callback);
-    CHECK(did_upgrade);
-    CHECK_EQUAL(old_version, 3);
-    CHECK(new_version >= 5);
-
-    // Callback should not be triggered here because the file is already upgraded
-    did_upgrade = false;
-    SharedGroup sg3(temp_copy,
-                    no_create,
-                    durability,
-                    encryption_key,
-                    allow_file_format_upgrade,
-                    upgrade_callback);
     CHECK(!did_upgrade);
 }
 
