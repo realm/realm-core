@@ -212,8 +212,8 @@ public:
     /// Exceptions thrown by completion handlers will always propagate back
     /// through run().
     ///
-    /// Syncronous operations (e.g., socket::connect()) executes independently
-    /// of the event loop, and does not require that any thread calls run().
+    /// Syncronous operations (e.g., socket::connect()) execute independently of
+    /// the event loop, and do not require that any thread calls run().
     void run();
 
     /// @{ \brief Stop event loop execution.
@@ -236,7 +236,7 @@ public:
     void reset() noexcept;
     /// @}
 
-    /// \brief Submit a handler to the event loop.
+    /// \brief Submit a handler to be executed by the event loop thread.
     ///
     /// Register the sepcified completion handler for immediate asynchronous
     /// execution. The specified handler object will be copied as necessary, and
@@ -247,19 +247,18 @@ public:
     ///
     /// The handler will never be called as part of the execution of post(). It
     /// will always be called by a thread that is executing run(). If no thread
-    /// is executing run(), the handler will not be executed. If post() is
-    /// called while another thread is executing run(), the handler may be
-    /// called before post() returns. If post() is called from another
-    /// completion handler, the submitted handler is guaranteed to not be called
-    /// during the execution of post().
+    /// is currently executing run(), the handler will not be executed until a
+    /// thread starts executing run(). If post() is called while another thread
+    /// is executing run(), the handler may be called before post() returns. If
+    /// post() is called from another completion handler, the submitted handler
+    /// is guaranteed to not be called during the execution of post().
     ///
     /// Completion handlers added through post() will be executed in the order
     /// that they are added. More precisely, if post() is called twice to add
-    /// two handlers, A and B, and the execution of post(A) ands before the
+    /// two handlers, A and B, and the execution of post(A) ends before the
     /// beginning of the execution of post(B), then A is guaranteed to execute
     /// before B.
-    template<class H>
-    void post(const H& handler);
+    template<class H> void post(const H& handler);
 
 private:
     class async_oper;
@@ -317,8 +316,10 @@ public:
 
     io_service& service() noexcept;
 
+    /// @{ \brief Resolve the specified query to one or more endpoints.
     void resolve(const query&, endpoint::list&);
     std::error_code resolve(const query&, endpoint::list&, std::error_code&);
+    /// @}
 
 private:
     io_service& m_service;
@@ -365,8 +366,12 @@ public:
 
     bool is_open() const noexcept;
 
+    /// @{ \brief Open the socket for use with the specified protocol.
+    ///
+    /// It is an error to call open() on a socket that is already open.
     void open(const protocol&);
     std::error_code open(const protocol&, std::error_code&);
+    /// @}
 
     /// \brief Close this socket.
     ///
@@ -500,6 +505,32 @@ public:
     /// called when the operation completes. The operation completes when the
     /// connection is established, or an error occurs.
     ///
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing io_service::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing io_service::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_connect(), even when
+    /// async_connect() is executed by the event loop thread. The completion
+    /// handler is guaranteed to be called eventually, as long as there is time
+    /// enough for the operation to complete or fail, and a thread is executing
+    /// io_service::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the socket is closed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// remains cancelable up until the point in time where the completion
+    /// handler starts to execute. This means that if cancel() is called before
+    /// the completion handler starts to execute, then the completion handler is
+    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// regardless of whether cancel() is called explicitly or implicitly, such
+    /// as when the socket is destroyed.
+    ///
+    /// If the socket is not already open, it will be opened as part of the
+    /// connect operation as if by calling `open(ep.protocol())`. If the opening
+    /// operation succeeds, but the connect operation fails, the socket will be
+    /// left in the opened state.
+    ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec)` where `ec` is the
     /// error code.
@@ -507,12 +538,7 @@ public:
     /// It is an error to start a new connect operation (synchronous or
     /// asynchronous) while an asynchronous connect operation is in progress. An
     /// asynchronous connect operation is considered complete as soon as the
-    /// completion handler starts executing.
-    ///
-    /// The operation can be canceled by calling cancel(), and will be
-    /// automatically canceled if the socket is closed. If the operation is
-    /// canceled, it will fail with `error::operation_aborted`. The completion
-    /// handler will always be called, as long as the event loop is running.
+    /// completion handler starts to execute.
     ///
     /// \param ep The remote endpoint of the connection to be established.
     template<class H>
@@ -527,6 +553,27 @@ public:
     /// called when the operation completes. The operation completes when all
     /// the specified bytes have been written to the socket, or an error occurs.
     ///
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing io_service::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing io_service::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_write(), even when
+    /// async_write() is executed by the event loop thread. The completion
+    /// handler is guaranteed to be called eventually, as long as there is time
+    /// enough for the operation to complete or fail, and a thread is executing
+    /// io_service::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the socket is closed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// remains cancelable up until the point in time where the completion
+    /// handler starts to execute. This means that if cancel() is called before
+    /// the completion handler starts to execute, then the completion handler is
+    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// regardless of whether cancel() is called explicitly or implicitly, such
+    /// as when the socket is destroyed.
+    ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec, n)` where `ec` is the
     /// error code, and `n` is the number of bytes written (of type `size_t`).
@@ -537,14 +584,9 @@ public:
     /// It is an error to start a new write operation (synchronous or
     /// asynchronous) while an asynchronous write operation is in progress. An
     /// asynchronous write operation is considered complete as soon as the
-    /// completion handler starts executing. This means that a new write
+    /// completion handler starts to execute. This means that a new write
     /// operation can be started from the completion handler of another
     /// asynchronous write operation.
-    ///
-    /// The operation can be canceled by calling cancel(), and will be
-    /// automatically canceled if the socket is closed. If the operation is
-    /// canceled, it will fail with `error::operation_aborted`. The completion
-    /// handler will always be called, as long as the event loop is running.
     template<class H>
     void async_write(const char* data, size_t size, const H& handler);
 
@@ -686,6 +728,27 @@ public:
     /// the specified local socket will have become connected to a remote
     /// socket.
     ///
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing io_service::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing io_service::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_accept(), even when
+    /// async_accept() is executed by the event loop thread. The completion
+    /// handler is guaranteed to be called eventually, as long as there is time
+    /// enough for the operation to complete or fail, and a thread is executing
+    /// io_service::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the acceptor is closed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// remains cancelable up until the point in time where the completion
+    /// handler starts to execute. This means that if cancel() is called before
+    /// the completion handler starts to execute, then the completion handler is
+    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// regardless of whether cancel() is called explicitly or implicitly, such
+    /// as when the acceptor is destroyed.
+    ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec)` where `ec` is the
     /// error code.
@@ -695,11 +758,6 @@ public:
     /// asynchronous accept operation is considered complete as soon as the
     /// completion handler starts executing. This means that a new accept
     /// operation can be started from the completion handler.
-    ///
-    /// The operation can be canceled by calling cancel(), and will be
-    /// automatically canceled if the acceptor is closed. If the operation is
-    /// canceled, it will fail with `error::operation_aborted`. The completion
-    /// handler will always be called, as long as the event loop is running.
     ///
     /// \param sock This is the local socket, that upon successful completion
     /// will have become connected to the remote socket. It must be in the
@@ -759,10 +817,36 @@ public:
     /// `network::end_of_input`. Otherwise, if the operation succeeds, the last
     /// byte placed in the buffer is the delimiter.
     ///
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing io_service::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing io_service::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_read() or
+    /// async_read_until(), even when async_read() or async_read_until() is
+    /// executed by the event loop thread. The completion handler is guaranteed
+    /// to be called eventually, as long as there is time enough for the
+    /// operation to complete or fail, and a thread is executing
+    /// io_service::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel() on the associated
+    /// socket, and will be automatically canceled if the associated socket is
+    /// closed. If the operation is canceled, it will fail with
+    /// `error::operation_aborted`. The operation remains cancelable up until
+    /// the point in time where the completion handler starts to execute. This
+    /// means that if cancel() is called before the completion handler starts to
+    /// execute, then the completion handler is guaranteed to have
+    /// `error::operation_aborted` passed to it. This is true regardless of
+    /// whether cancel() is called explicitly or implicitly, such as when the
+    /// socket is destroyed.
+    ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec, n)` where `ec` is the
     /// error code, and `n` is the number of bytes placed in the buffer. `n` is
     /// guaranteed to be less than, or equal to \a size.
+    ///
+    /// It is an error to start a read operation before the associated socket is
+    /// connected.
     ///
     /// It is an error to start a new read operation (synchronous or
     /// asynchronous) while an asynchronous read operation is in progress. An
@@ -770,12 +854,6 @@ public:
     /// completion handler starts executing. This means that a new read
     /// operation can be started from the completion handler of another
     /// asynchronous buffered read operation.
-    ///
-    /// The operation can be canceled by calling socket::cancel(), and will be
-    /// automatically canceled if the associated socket is closed. If the
-    /// operation is canceled, it will fail with `error::operation_aborted`. The
-    /// completion handler will always be called, as long as the event loop is
-    /// running.
     ///
     /// When an asynchronous operation is started, the caller must ensure that
     /// one (or both) of the following events occur before the destruction of
@@ -826,17 +904,31 @@ public:
     ///
     /// Initiate an asynchronous wait operation. The completion handler becomes
     /// ready to execute when the expiration time is reached, or an error occurs
-    /// (cancellation counts as an error here). The completion handler will
-    /// **always** be executed, as long as a thread is executing the event
-    /// loop. The error code passed to the complition handler will **never**
-    /// indicate success, unless the expiration time was reached. The completion
-    /// handler will never be called directly as part of the execution of
-    /// async_wait().
+    /// (cancellation counts as an error here). The expiration time is the time
+    /// of initiation plus the specified delay. The error code passed to the
+    /// complition handler will **never** indicate success, unless the
+    /// expiration time was reached.
     ///
-    /// An asynchronous wait operation in progress can be canceled by calling
-    /// cancel(), and will be automatically canceled if the deadline timer is
-    /// destroyed. If the operation is canceled, its completion handler will be
-    /// called with `error::operation_aborted`.
+    /// The completion handler is always executed by the event loop thread,
+    /// i.e., by a thread that is executing io_service::run(). Conversely, the
+    /// completion handler is guaranteed to not be called while no thread is
+    /// executing io_service::run(). The execution of the completion handler is
+    /// always deferred to the event loop, meaning that it never happens as a
+    /// synchronous side effect of the execution of async_wait(), even when
+    /// async_wait() is executed by the event loop thread. The completion
+    /// handler is guaranteed to be called eventually, as long as there is time
+    /// enough for the operation to complete or fail, and a thread is executing
+    /// io_service::run() for long enough.
+    ///
+    /// The operation can be canceled by calling cancel(), and will be
+    /// automatically canceled if the timer is destroyed. If the operation is
+    /// canceled, it will fail with `error::operation_aborted`. The operation
+    /// remains cancelable up until the point in time where the completion
+    /// handler starts to execute. This means that if cancel() is called before
+    /// the completion handler starts to execute, then the completion handler is
+    /// guaranteed to have `error::operation_aborted` passed to it. This is true
+    /// regardless of whether cancel() is called explicitly or implicitly, such
+    /// as when the timer is destroyed.
     ///
     /// The specified handler object will be copied as necessary, and will be
     /// executed by an expression on the form `handler(ec)` where `ec` is the
@@ -845,8 +937,6 @@ public:
     /// It is an error to start a new asynchronous wait operation while an
     /// another one is in progress. An asynchronous wait operation is in
     /// progress until its completion handler starts executing.
-    ///
-    /// \param ep The remote endpoint of the connection to be established.
     template<class R, class P, class H>
     void async_wait(std::chrono::duration<R,P> delay, const H& handler) noexcept;
 
@@ -1087,17 +1177,17 @@ public:
         m_expiration_time(expiration_time)
     {
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(false); // Never called
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         bool orphaned = !m_timer;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_timer = 0;
     }
@@ -1115,16 +1205,16 @@ public:
         m_service(serv)
     {
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(false); // Never called
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         // io_service::recycle_post_oper() destroys this operation object
         io_service::recycle_post_oper(m_service, this);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         REALM_ASSERT(false); // Never called
     }
@@ -1141,7 +1231,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         // Recycle the operation object before the handler is exceuted, such
         // that the memory is available for a new post operation that might be
@@ -1173,21 +1263,21 @@ public:
         async_oper(size, false) // Second argument is `in_use`
     {
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(false); // Never called
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         // Must never be called
         REALM_ASSERT(false);
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         // Must never be called
         REALM_ASSERT(false);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         // Must never be called
         REALM_ASSERT(false);
@@ -1581,7 +1671,7 @@ public:
         if (m_socket->initiate_async_connect(ep, m_error_code))
             set_is_complete(true); // Failure, or immediate completion
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -1589,13 +1679,13 @@ public:
         m_socket->finalize_async_connect(m_error_code);
         set_is_complete(true);
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         bool orphaned = !m_socket;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_socket = nullptr;
     }
@@ -1613,7 +1703,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         bool orphaned = !m_socket;
@@ -1649,7 +1739,7 @@ public:
             set_is_complete(true); // Failure
         }
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -1661,13 +1751,13 @@ public:
         m_curr += n_2;
         set_is_complete(m_error_code || m_curr == m_end);
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         bool orphaned = !m_socket;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_socket = 0;
     }
@@ -1688,7 +1778,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         REALM_ASSERT(is_complete() || is_canceled());
         REALM_ASSERT(is_complete() == (m_error_code || m_curr == m_end));
@@ -1822,7 +1912,7 @@ public:
         if (m_acceptor->ensure_nonblocking_mode(m_error_code))
             set_is_complete(true); // Failure
     }
-    void proceed() noexcept override
+    void proceed() noexcept override final
     {
         REALM_ASSERT(!is_complete());
         REALM_ASSERT(!is_canceled());
@@ -1831,13 +1921,13 @@ public:
         m_acceptor->do_accept(m_socket, m_endpoint, m_error_code);
         set_is_complete(true);
     }
-    void recycle() noexcept override
+    void recycle() noexcept override final
     {
         bool orphaned = !m_acceptor;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_acceptor = 0;
     }
@@ -1857,7 +1947,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         REALM_ASSERT(is_canceled() || m_error_code || m_socket.is_open());
@@ -1982,14 +2072,14 @@ public:
         }
     }
     void process_buffered_input() noexcept;
-    void proceed() noexcept override;
-    void recycle() noexcept override
+    void proceed() noexcept override final;
+    void recycle() noexcept override final
     {
         bool orphaned = !m_stream;
         // Note: do_recycle() commits suicide.
         do_recycle(orphaned);
     }
-    void orphan() noexcept override
+    void orphan() noexcept override final
     {
         m_stream = 0;
     }
@@ -2012,7 +2102,7 @@ public:
         m_handler(h)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         REALM_ASSERT(is_complete() || (is_canceled() && !m_error_code));
         REALM_ASSERT(is_canceled() || m_error_code ||
@@ -2125,7 +2215,7 @@ public:
         m_handler(handler)
     {
     }
-    void recycle_and_execute() override
+    void recycle_and_execute() override final
     {
         bool orphaned = !m_timer;
         std::error_code ec;
