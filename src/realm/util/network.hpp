@@ -239,8 +239,9 @@ public:
     /// \brief Submit a handler to be executed by the event loop thread.
     ///
     /// Register the sepcified completion handler for immediate asynchronous
-    /// execution. The specified handler object will be copied as necessary, and
-    /// will be executed by an expression on the form `handler()`.
+    /// execution. The specified handler will be executed by an expression on
+    /// the form `handler()`. If the the handler object is movable, it will
+    /// never be copied. Otherwise, it will be copied as necessary.
     ///
     /// This function is thread-safe, that is, it may be called by any
     /// thread. It may also be called from other completion handlers.
@@ -258,7 +259,7 @@ public:
     /// two handlers, A and B, and the execution of post(A) ends before the
     /// beginning of the execution of post(B), then A is guaranteed to execute
     /// before B.
-    template<class H> void post(const H& handler);
+    template<class H> void post(H handler);
 
 private:
     class async_oper;
@@ -291,10 +292,10 @@ private:
     void add_wait_oper(LendersWaitOperPtr);
     void add_completed_oper(LendersOperPtr) noexcept;
 
-    using PostOperConstr = post_oper_base*(void* addr, size_t size, impl&, const void* cookie);
-    void do_post(PostOperConstr, size_t size, const void* cookie);
+    using PostOperConstr = post_oper_base*(void* addr, size_t size, impl&, void* cookie);
+    void do_post(PostOperConstr, size_t size, void* cookie);
     template<class H>
-    static post_oper_base* post_oper_constr(void* addr, size_t size, impl&, const void* cookie);
+    static post_oper_base* post_oper_constr(void* addr, size_t size, impl&, void* cookie);
     static void recycle_post_oper(impl&, post_oper_base*) noexcept;
 
     using clock = std::chrono::steady_clock;
@@ -531,9 +532,10 @@ public:
     /// operation succeeds, but the connect operation fails, the socket will be
     /// left in the opened state.
     ///
-    /// The specified handler object will be copied as necessary, and will be
-    /// executed by an expression on the form `handler(ec)` where `ec` is the
-    /// error code.
+    /// The specified handler will be executed by an expression on the form
+    /// `handler(ec)` where `ec` is the error code. If the the handler object is
+    /// movable, it will never be copied. Otherwise, it will be copied as
+    /// necessary.
     ///
     /// It is an error to start a new connect operation (synchronous or
     /// asynchronous) while an asynchronous connect operation is in progress. An
@@ -541,8 +543,7 @@ public:
     /// completion handler starts to execute.
     ///
     /// \param ep The remote endpoint of the connection to be established.
-    template<class H>
-    void async_connect(const endpoint& ep, const H& handler);
+    template<class H> void async_connect(const endpoint& ep, H handler);
 
     void write(const char* data, size_t size);
     std::error_code write(const char* data, size_t size, std::error_code&) noexcept;
@@ -574,9 +575,10 @@ public:
     /// regardless of whether cancel() is called explicitly or implicitly, such
     /// as when the socket is destroyed.
     ///
-    /// The specified handler object will be copied as necessary, and will be
-    /// executed by an expression on the form `handler(ec, n)` where `ec` is the
-    /// error code, and `n` is the number of bytes written (of type `size_t`).
+    /// The specified handler will be executed by an expression on the form
+    /// `handler(ec, n)` where `ec` is the error code, and `n` is the number of
+    /// bytes written (of type `size_t`). If the the handler object is movable,
+    /// it will never be copied. Otherwise, it will be copied as necessary.
     ///
     /// It is an error to start an asynchronous write operation before the
     /// socket is connected.
@@ -587,8 +589,7 @@ public:
     /// completion handler starts to execute. This means that a new write
     /// operation can be started from the completion handler of another
     /// asynchronous write operation.
-    template<class H>
-    void async_write(const char* data, size_t size, const H& handler);
+    template<class H> void async_write(const char* data, size_t size, H handler);
 
     /// @{ \brief Read at least one byte from this socket.
     ///
@@ -749,9 +750,10 @@ public:
     /// regardless of whether cancel() is called explicitly or implicitly, such
     /// as when the acceptor is destroyed.
     ///
-    /// The specified handler object will be copied as necessary, and will be
-    /// executed by an expression on the form `handler(ec)` where `ec` is the
-    /// error code.
+    /// The specified handler will be executed by an expression on the form
+    /// `handler(ec)` where `ec` is the error code. If the the handler object is
+    /// movable, it will never be copied. Otherwise, it will be copied as
+    /// necessary.
     ///
     /// It is an error to start a new accept operation (synchronous or
     /// asynchronous) while an asynchronous accept operation is in progress. An
@@ -765,11 +767,8 @@ public:
     ///
     /// \param ep Upon completion, the remote peer endpoint will have been
     /// assigned to this variable.
-    template<class H>
-    void async_accept(socket& sock, const H& handler);
-
-    template<class H>
-    void async_accept(socket& sock, endpoint& ep, const H& handler);
+    template<class H> void async_accept(socket& sock, H handler);
+    template<class H> void async_accept(socket& sock, endpoint& ep, H handler);
     /// @}
 
 private:
@@ -781,8 +780,7 @@ private:
 
     using LendersAcceptOperPtr = std::unique_ptr<accept_oper_base, io_service::LendersOperDeleter>;
 
-    template<class H>
-    void async_accept(socket&, endpoint*, const H&);
+    template<class H> void async_accept(socket&, endpoint*, H);
     void do_async_accept(LendersAcceptOperPtr);
 };
 
@@ -840,10 +838,11 @@ public:
     /// whether cancel() is called explicitly or implicitly, such as when the
     /// socket is destroyed.
     ///
-    /// The specified handler object will be copied as necessary, and will be
-    /// executed by an expression on the form `handler(ec, n)` where `ec` is the
-    /// error code, and `n` is the number of bytes placed in the buffer. `n` is
-    /// guaranteed to be less than, or equal to \a size.
+    /// The specified handler will be executed by an expression on the form
+    /// `handler(ec, n)` where `ec` is the error code, and `n` is the number of
+    /// bytes placed in the buffer (of type `size_t`). `n` is guaranteed to be
+    /// less than, or equal to \a size. If the the handler object is movable, it
+    /// will never be copied. Otherwise, it will be copied as necessary.
     ///
     /// It is an error to start a read operation before the associated socket is
     /// connected.
@@ -862,11 +861,8 @@ public:
     ///  - The completion handler is called (entry into the completion handler).
     ///
     ///  - The asynchronous operation is canceled (the socket is closed).
-    template<class H>
-    void async_read(char* buffer, size_t size, const H& handler);
-
-    template<class H>
-    void async_read_until(char* buffer, size_t size, char delim, const H& handler);
+    template<class H> void async_read(char* buffer, size_t size, H handler);
+    template<class H> void async_read_until(char* buffer, size_t size, char delim, H handler);
     /// @}
 
     /// Discard any buffered input.
@@ -886,8 +882,7 @@ private:
 
     size_t do_read(char* buffer, size_t size, int delim, std::error_code&) noexcept;
 
-    template<class H>
-    void async_read(char* buffer, size_t size, int delim, const H& handler);
+    template<class H> void async_read(char* buffer, size_t size, int delim, H);
     void do_async_read(LendersReadOperPtr);
 };
 
@@ -930,15 +925,16 @@ public:
     /// regardless of whether cancel() is called explicitly or implicitly, such
     /// as when the timer is destroyed.
     ///
-    /// The specified handler object will be copied as necessary, and will be
-    /// executed by an expression on the form `handler(ec)` where `ec` is the
-    /// error code.
+    /// The specified handler will be executed by an expression on the form
+    /// `handler(ec)` where `ec` is the error code. If the the handler object is
+    /// movable, it will never be copied. Otherwise, it will be copied as
+    /// necessary.
     ///
     /// It is an error to start a new asynchronous wait operation while an
     /// another one is in progress. An asynchronous wait operation is in
     /// progress until its completion handler starts executing.
     template<class R, class P, class H>
-    void async_wait(std::chrono::duration<R,P> delay, const H& handler) noexcept;
+    void async_wait(std::chrono::duration<R,P> delay, H handler);
 
     /// \brief Cancel an asynchronous wait operation.
     ///
@@ -1226,9 +1222,9 @@ template<class H>
 class io_service::post_oper:
         public post_oper_base {
 public:
-    post_oper(size_t size, impl& serv, const H& handler):
+    post_oper(size_t size, impl& serv, H handler):
         post_oper_base(size, serv),
-        m_handler(handler)
+        m_handler(std::move(handler))
     {
     }
     void recycle_and_execute() override final
@@ -1253,7 +1249,7 @@ public:
         }
     }
 private:
-    const H m_handler;
+    H m_handler;
 };
 
 class io_service::UnusedOper:
@@ -1284,7 +1280,7 @@ public:
     }
 };
 
-template<class H> inline void io_service::post(const H& handler)
+template<class H> inline void io_service::post(H handler)
 {
     do_post(&io_service::post_oper_constr<H>, sizeof (post_oper<H>), &handler);
 }
@@ -1348,10 +1344,10 @@ inline void io_service::execute(std::unique_ptr<Oper, LendersOperDeleter>& lende
 }
 
 template<class H> inline io_service::post_oper_base*
-io_service::post_oper_constr(void* addr, size_t size, impl& serv, const void* cookie)
+io_service::post_oper_constr(void* addr, size_t size, impl& serv, void* cookie)
 {
-    const H& handler = *static_cast<const H*>(cookie);
-    return new (addr) post_oper<H>(size, serv, handler); // Throws
+    H& handler = *static_cast<H*>(cookie);
+    return new (addr) post_oper<H>(size, serv, std::move(handler)); // Throws
 }
 
 inline bool io_service::async_oper::in_use() const noexcept
@@ -1698,9 +1694,9 @@ template<class H>
 class socket::connect_oper:
         public connect_oper_base {
 public:
-    connect_oper(size_t size, socket& sock, const endpoint& ep, const H& handler):
+    connect_oper(size_t size, socket& sock, const endpoint& ep, H handler):
         connect_oper_base(size, sock, ep),
-        m_handler(handler)
+        m_handler(std::move(handler))
     {
     }
     void recycle_and_execute() override final
@@ -1711,10 +1707,10 @@ public:
         if (is_canceled())
             ec = error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute(orphaned, m_handler, ec); // Throws
+        do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
     }
 private:
-    const H m_handler;
+    H m_handler;
 };
 
 class socket::write_oper_base:
@@ -1773,9 +1769,9 @@ template<class H>
 class socket::write_oper:
         public write_oper_base {
 public:
-    write_oper(size_t size_1, socket& sock, const char* data, size_t size_2, const H& handler):
+    write_oper(size_t size_1, socket& sock, const char* data, size_t size_2, H handler):
         write_oper_base(size_1, sock, data, size_2),
-        m_handler(handler)
+        m_handler(std::move(handler))
     {
     }
     void recycle_and_execute() override final
@@ -1789,10 +1785,10 @@ public:
             ec = error::operation_aborted;
         size_t num_bytes_transferred = size_t(m_curr - m_begin);
         // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute(orphaned, m_handler, ec, num_bytes_transferred); // Throws
+        do_recycle_and_execute<H>(orphaned, m_handler, ec, num_bytes_transferred); // Throws
     }
 private:
-    const H m_handler;
+    H m_handler;
 };
 
 inline socket::socket(io_service& service):
@@ -1812,10 +1808,10 @@ inline void socket::connect(const endpoint& ep)
 }
 
 template<class H>
-inline void socket::async_connect(const endpoint& ep, const H& handler)
+inline void socket::async_connect(const endpoint& ep, H handler)
 {
     LendersConnectOperPtr op =
-        io_service::alloc<connect_oper<H>>(m_write_oper, *this, ep, handler); // Throws
+        io_service::alloc<connect_oper<H>>(m_read_oper, *this, ep, std::move(handler)); // Throws
     do_async_connect(std::move(op)); // Throws
 }
 
@@ -1827,10 +1823,11 @@ inline void socket::write(const char* data, size_t size)
 }
 
 template<class H>
-inline void socket::async_write(const char* data, size_t size, const H& handler)
+inline void socket::async_write(const char* data, size_t size, H handler)
 {
     LendersWriteOperPtr op =
-        io_service::alloc<write_oper<H>>(m_write_oper, *this, data, size, handler); // Throws
+        io_service::alloc<write_oper<H>>(m_write_oper, *this, data, size,
+                                         std::move(handler)); // Throws
     do_async_write(std::move(op)); // Throws
 }
 
@@ -1942,9 +1939,9 @@ template<class H>
 class acceptor::accept_oper:
         public accept_oper_base {
 public:
-    accept_oper(size_t size, acceptor& a, socket& s, endpoint* e, const H& handler):
+    accept_oper(size_t size, acceptor& a, socket& s, endpoint* e, H handler):
         accept_oper_base(size, a, s, e),
-        m_handler(handler)
+        m_handler(std::move(handler))
     {
     }
     void recycle_and_execute() override final
@@ -1956,10 +1953,10 @@ public:
         if (is_canceled())
             ec = error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute(orphaned, m_handler, ec); // Throws
+        do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
     }
 private:
-    const H m_handler;
+    H m_handler;
 };
 
 inline acceptor::acceptor(io_service& service):
@@ -2003,17 +2000,15 @@ inline std::error_code acceptor::accept(socket& sock, endpoint& ep, std::error_c
     return accept(sock, &ep, ec); // Throws
 }
 
-template<class H>
-inline void acceptor::async_accept(socket& sock, const H& handler)
+template<class H> inline void acceptor::async_accept(socket& sock, H handler)
 {
     endpoint* ep = nullptr;
-    async_accept(sock, ep, handler); // Throws
+    async_accept(sock, ep, std::move(handler)); // Throws
 }
 
-template<class H>
-inline void acceptor::async_accept(socket& sock, endpoint& ep, const H& handler)
+template<class H> inline void acceptor::async_accept(socket& sock, endpoint& ep, H handler)
 {
-    async_accept(sock, &ep, handler); // Throws
+    async_accept(sock, &ep, std::move(handler)); // Throws
 }
 
 inline std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_code& ec)
@@ -2026,13 +2021,13 @@ inline std::error_code acceptor::accept(socket& sock, endpoint* ep, std::error_c
     return do_accept(sock, ep, ec);
 }
 
-template<class H>
-inline void acceptor::async_accept(socket& sock, endpoint* ep, const H& handler)
+template<class H> inline void acceptor::async_accept(socket& sock, endpoint* ep, H handler)
 {
     if (REALM_UNLIKELY(sock.is_open()))
         throw std::runtime_error("Socket is already open");
     LendersAcceptOperPtr op =
-        io_service::alloc<accept_oper<H>>(m_read_oper, *this, sock, ep, handler); // Throws
+        io_service::alloc<accept_oper<H>>(m_read_oper, *this, sock, ep,
+                                          std::move(handler)); // Throws
     do_async_accept(std::move(op)); // Throws
 }
 
@@ -2097,9 +2092,9 @@ class buffered_input_stream::read_oper:
         public read_oper_base {
 public:
     read_oper(size_t size_1, buffered_input_stream& stream, char* buffer, size_t size_2, int delim,
-              const H& h):
+              H handler):
         read_oper_base(size_1, stream, buffer, size_2, delim),
-        m_handler(h)
+        m_handler(std::move(handler))
     {
     }
     void recycle_and_execute() override final
@@ -2117,10 +2112,10 @@ public:
             ec = error::operation_aborted;
         size_t num_bytes_transferred = size_t(m_out_curr - m_out_begin);
         // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute(orphaned, m_handler, ec, num_bytes_transferred); // Throws
+        do_recycle_and_execute<H>(orphaned, m_handler, ec, num_bytes_transferred); // Throws
     }
 private:
-    const H m_handler;
+    H m_handler;
 };
 
 inline buffered_input_stream::buffered_input_stream(socket& sock):
@@ -2164,16 +2159,16 @@ inline size_t buffered_input_stream::read_until(char* buffer, size_t size, char 
 }
 
 template<class H>
-inline void buffered_input_stream::async_read(char* buffer, size_t size, const H& handler)
+inline void buffered_input_stream::async_read(char* buffer, size_t size, H handler)
 {
-    async_read(buffer, size, std::char_traits<char>::eof(), handler);
+    async_read(buffer, size, std::char_traits<char>::eof(), std::move(handler));
 }
 
 template<class H>
 inline void buffered_input_stream::async_read_until(char* buffer, size_t size, char delim,
-                                                    const H& handler)
+                                                    H handler)
 {
-    async_read(buffer, size, std::char_traits<char>::to_int_type(delim), handler);
+    async_read(buffer, size, std::char_traits<char>::to_int_type(delim), std::move(handler));
 }
 
 inline void buffered_input_stream::reset() noexcept
@@ -2183,12 +2178,11 @@ inline void buffered_input_stream::reset() noexcept
 }
 
 template<class H>
-inline void buffered_input_stream::async_read(char* buffer, size_t size, int delim,
-                                              const H& handler)
+inline void buffered_input_stream::async_read(char* buffer, size_t size, int delim, H handler)
 {
     LendersReadOperPtr op =
         io_service::alloc<read_oper<H>>(m_socket.m_read_oper, *this, buffer, size, delim,
-                                       handler); // Throws
+                                        std::move(handler)); // Throws
     do_async_read(std::move(op)); // Throws
 }
 
@@ -2210,9 +2204,9 @@ template<class H>
 class deadline_timer::wait_oper:
         public io_service::wait_oper_base {
 public:
-    wait_oper(size_t size, deadline_timer& timer, clock::time_point expiration_time, const H& handler):
+    wait_oper(size_t size, deadline_timer& timer, clock::time_point expiration_time, H handler):
         io_service::wait_oper_base(size, timer, expiration_time),
-        m_handler(handler)
+        m_handler(std::move(handler))
     {
     }
     void recycle_and_execute() override final
@@ -2222,10 +2216,10 @@ public:
         if (is_canceled())
             ec = error::operation_aborted;
         // Note: do_recycle_and_execute() commits suicide.
-        do_recycle_and_execute(orphaned, m_handler, ec); // Throws
+        do_recycle_and_execute<H>(orphaned, m_handler, ec); // Throws
     }
 private:
-    const H m_handler;
+    H m_handler;
 };
 
 inline deadline_timer::deadline_timer(io_service& serv):
@@ -2244,7 +2238,7 @@ inline io_service& deadline_timer::service() noexcept
 }
 
 template<class R, class P, class H>
-inline void deadline_timer::async_wait(std::chrono::duration<R,P> delay, const H& handler) noexcept
+inline void deadline_timer::async_wait(std::chrono::duration<R,P> delay, H handler)
 {
     clock::time_point now = clock::now();
     auto max_add = clock::time_point::max() - now;
@@ -2252,7 +2246,8 @@ inline void deadline_timer::async_wait(std::chrono::duration<R,P> delay, const H
         throw std::runtime_error("Expiration time overflow");
     clock::time_point expiration_time = now + delay;
     io_service::LendersWaitOperPtr op =
-        io_service::alloc<wait_oper<H>>(m_wait_oper, *this, expiration_time, handler); // Throws
+        io_service::alloc<wait_oper<H>>(m_wait_oper, *this, expiration_time,
+                                        std::move(handler)); // Throws
     m_service.add_wait_oper(std::move(op)); // Throws
 }
 
