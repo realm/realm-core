@@ -31,7 +31,7 @@ template<> struct MakeEventLoop<AppleCoreFoundation> {
 };
 
 
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE && !REALM_WATCHOS
 // Apple Core Foundation based implementation currently disabled because it is
 // broken.
 //#  define IMPLEMENTATIONS Posix, AppleCoreFoundation
@@ -205,7 +205,7 @@ void fill_kernel_write_buffer(Socket& socket, network::io_service& service)
     PingPongFixture ping_pong(service, event_loop);
     ping_pong.start();
     int num_successive_no_bytes_written = 0;
-    char data[40967];
+    char data[4096] = {};
     std::function<void()> initiate_write = [&] {
         auto handler = [&](std::error_code ec, size_t n) {
             if (ec && ec != error::operation_aborted)

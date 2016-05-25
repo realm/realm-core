@@ -1,7 +1,18 @@
+#include <realm/util/features.h>
+#include <realm/util/event_loop.hpp>
+
+#ifndef _WIN32
+#  define HAVE_POSIX_IMPLEMENTATION 1
+#else
+#  define HAVE_POSIX_IMPLEMENTATION 0
+#endif
+
+
+#if HAVE_POSIX_IMPLEMENTATION
+
 #include <memory>
 
 #include <realm/util/network.hpp>
-#include <realm/util/event_loop.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -245,13 +256,19 @@ ImplementationImpl g_implementation;
 
 } // unnamed namespace
 
+#endif // HAVE_POSIX_IMPLEMENTATION
+
 
 namespace realm {
 namespace _impl {
 
-EventLoop::Implementation& get_posix_event_loop_impl()
+realm::util::EventLoop::Implementation* get_posix_event_loop_impl()
 {
-    return g_implementation;
+#if HAVE_POSIX_IMPLEMENTATION
+    return &g_implementation;
+#else
+    return nullptr;
+#endif
 }
 
 } // namespace _impl

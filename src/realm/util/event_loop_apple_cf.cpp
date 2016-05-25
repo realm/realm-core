@@ -1,3 +1,19 @@
+#include <realm/util/features.h>
+#include <realm/util/event_loop.hpp>
+
+#if REALM_PLATFORM_APPLE && !REALM_WATCHOS
+// The Apple Core Foundation based implementation is currently not working
+// correctly. When reenabling it, remember to also reenable it in
+// test_util_event_loop.cpp.
+#  define HAVE_APPLE_CF_IMPLEMENTATION 0
+//#  define HAVE_APPLE_CF_IMPLEMENTATION 1
+#else
+#  define HAVE_APPLE_CF_IMPLEMENTATION 0
+#endif
+
+
+#if HAVE_APPLE_CF_IMPLEMENTATION
+
 #include <type_traits>
 #include <algorithm>
 #include <stdexcept>
@@ -12,7 +28,6 @@
 #include <realm/util/misc_errors.hpp>
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/util/network.hpp>
-#include <realm/util/event_loop.hpp>
 
 // https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/NetworkingTopics/Articles/UsingSocketsandSocketStreams.html#//apple_ref/doc/uid/CH73-SW4
 // https://developer.apple.com/library/mac/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/CFMemoryMgmt.html
@@ -1425,13 +1440,19 @@ ImplementationImpl g_implementation;
 
 } // unnamed namespace
 
+#endif // HAVE_APPLE_CF_IMPLEMENTATION
+
 
 namespace realm {
 namespace _impl {
 
-EventLoop::Implementation& get_apple_cf_event_loop_impl()
+realm::util::EventLoop::Implementation* get_apple_cf_event_loop_impl()
 {
-    return g_implementation;
+#if HAVE_APPLE_CF_IMPLEMENTATION
+    return &g_implementation;
+#else
+    return nullptr;
+#endif
 }
 
 } // namespace _impl
