@@ -949,6 +949,12 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             catch (SlabAlloc::Retry&) {
                 continue;
             }
+            // If we fail in any way, we must detach the allocator. Failure to do so
+            // will retain memory mappings in the mmap cache shared between allocators.
+            // This would allow other SharedGroups to reuse the mappings even in
+            // situations, where the database has been re-initialised (e.g. through
+            // compact()). This could render the mappings (partially) undefined.
+            SlabAlloc::DetachGuard alloc_detach_guard(alloc);
 
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
@@ -1019,8 +1025,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                     throw LogicError(LogicError::mixed_history_type);
 
 #ifndef _WIN32
-                if (encryption_key && info->session_initiator_pid != uint64_t(getpid()))
-                    throw std::runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
+                if (encryption_key && info->session_initiator_pid != uint64_t(getpid())) {
+                    std::stringstream ss;
+                    ss << path << ": Encrypted interprocess sharing is currently unsupported." <<
+                        "SharedGroup has been opened by pid: " << info->session_initiator_pid <<
+                        ". Current pid is " << getpid() << ".";
+                    throw std::runtime_error(ss.str());
+                }
 #endif
 
                 // We need per session agreement among all participants on the
@@ -1077,6 +1088,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             m_wait_for_change_enabled = true;
 
             // Keep the mappings and file open:
+            alloc_detach_guard.release();
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close

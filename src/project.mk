@@ -11,7 +11,7 @@ endif
 CFLAGS_DEBUG += -fno-elide-constructors
 CFLAGS_PTHREADS += -pthread
 CFLAGS_GENERAL += -Wextra -pedantic
-CFLAGS_CXX = -std=c++11
+CFLAGS_CXX = -std=c++14
 
 # Avoid a warning from Clang when linking on OS X. By default,
 # `LDFLAGS_PTHREADS` inherits its value from `CFLAGS_PTHREADS`, so we

@@ -424,7 +424,7 @@ bool BpTree<T>::is_null(size_t ndx) const noexcept
 template<class T>
 T BpTree<T>::get(size_t ndx) const noexcept
 {
-    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG_EX(ndx < size(), ndx, size());
     if (root_is_leaf()) {
         return root_as_leaf().get(ndx);
     }

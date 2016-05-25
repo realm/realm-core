@@ -5,6 +5,7 @@
 #include <set>
 
 #include <realm/util/optional.hpp>
+#include <realm/util/bind_ptr.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -88,16 +89,16 @@ ReleaseGuard<CFStringRef> make_cf_string(std::string str)
     static_assert(std::is_same<UInt8, char>::value || std::is_same<UInt8, unsigned char>::value,
                   "Unexpected byte type");
     const UInt8* bytes = reinterpret_cast<const UInt8*>(str.data());
-    Boolean isExternalRepresentation = FALSE;
+    Boolean is_external_representation = FALSE;
     CFStringRef str_2 = CFStringCreateWithBytes(kCFAllocatorDefault, bytes, str.size(),
-                                                kCFStringEncodingUTF8, isExternalRepresentation);
+                                                kCFStringEncodingUTF8, is_external_representation);
     if (!str_2)
         throw std::bad_alloc();
     return ReleaseGuard<CFStringRef>(str_2);
 }
 
 
-class Oper {
+class Oper: public RefCountBase {
 public:
     // Execute completion handler
     virtual void execute() = 0;
@@ -112,58 +113,204 @@ private:
 
 class PostOper: public Oper {
 public:
-    EventLoop::PostCompletionHandler handler;
-
+    void initiate(EventLoop::PostCompletionHandler handler) noexcept
+    {
+        REALM_ASSERT(!m_handler);
+        m_handler = std::move(handler);
+    }
     void execute() override final
     {
+        REALM_ASSERT(m_handler);
+        EventLoop::PostCompletionHandler handler = std::move(m_handler);
+        m_handler = EventLoop::PostCompletionHandler();
         handler(); // Throws
     }
+private:
+    EventLoop::PostCompletionHandler m_handler;
 };
+
 
 class ConnectOper: public Oper {
 public:
-    Socket::ConnectCompletionHandler handler;
-    std::error_code ec;
-
+    bool in_progress() const noexcept
+    {
+        return bool(m_handler);
+    }
+    bool is_complete() const noexcept
+    {
+        return in_progress() && m_complete;
+    }
+    bool is_incomplete() const noexcept
+    {
+        return in_progress() && !m_complete;
+    }
+    void initiate(Socket::ConnectCompletionHandler handler) noexcept
+    {
+        REALM_ASSERT(!in_progress());
+        m_handler = std::move(handler);
+        m_complete = false;
+    }
+    void cancel() noexcept
+    {
+        REALM_ASSERT(in_progress());
+        m_error_code = error::operation_aborted;
+    }
+    void complete(std::error_code ec) noexcept
+    {
+        REALM_ASSERT(is_incomplete());
+        m_error_code = ec;
+        m_complete = true;
+    }
     void execute() override final
     {
-        handler(ec); // Throws
+        REALM_ASSERT(is_complete());
+        Socket::ConnectCompletionHandler handler = std::move(m_handler);
+        m_handler = Socket::ConnectCompletionHandler();
+        handler(m_error_code); // Throws
     }
+private:
+    Socket::ConnectCompletionHandler m_handler;
+    std::error_code m_error_code;
+    bool m_complete = false;
 };
+
 
 class ReadOper: public Oper {
 public:
-    Socket::ReadCompletionHandler handler;
-    std::error_code ec;
-    size_t n = 0;
-
+    bool in_progress() const noexcept
+    {
+        return bool(m_handler);
+    }
+    bool is_complete() const noexcept
+    {
+        return in_progress() && m_complete;
+    }
+    bool is_incomplete() const noexcept
+    {
+        return in_progress() && !m_complete;
+    }
+    void initiate(Socket::ReadCompletionHandler handler) noexcept
+    {
+        REALM_ASSERT(!in_progress());
+        m_handler = std::move(handler);
+        m_complete = false;
+    }
+    void cancel() noexcept
+    {
+        REALM_ASSERT(in_progress());
+        m_error_code = error::operation_aborted;
+    }
+    void complete(std::error_code ec, size_t num_bytes_read) noexcept
+    {
+        REALM_ASSERT(is_incomplete());
+        m_error_code = ec;
+        m_num_bytes_read = num_bytes_read;
+        m_complete = true;
+    }
     void execute() override final
     {
-        handler(ec, n); // Throws
+        REALM_ASSERT(is_complete());
+        Socket::ReadCompletionHandler handler = std::move(m_handler);
+        m_handler = Socket::ReadCompletionHandler();
+        handler(m_error_code, m_num_bytes_read); // Throws
     }
+private:
+    Socket::ReadCompletionHandler m_handler;
+    std::error_code m_error_code;
+    size_t m_num_bytes_read = 0;
+    bool m_complete = false;
 };
+
 
 class WriteOper: public Oper {
 public:
-    Socket::WriteCompletionHandler handler;
-    std::error_code ec;
-    size_t n = 0;
-
+    bool in_progress() const noexcept
+    {
+        return bool(m_handler);
+    }
+    bool is_complete() const noexcept
+    {
+        return in_progress() && m_complete;
+    }
+    bool is_incomplete() const noexcept
+    {
+        return in_progress() && !m_complete;
+    }
+    void initiate(Socket::WriteCompletionHandler handler) noexcept
+    {
+        REALM_ASSERT(!in_progress());
+        m_handler = std::move(handler);
+        m_complete = false;
+    }
+    void cancel() noexcept
+    {
+        REALM_ASSERT(in_progress());
+        m_error_code = error::operation_aborted;
+    }
+    void complete(std::error_code ec, size_t num_bytes_written) noexcept
+    {
+        REALM_ASSERT(is_incomplete());
+        m_error_code = ec;
+        m_num_bytes_written = num_bytes_written;
+        m_complete = true;
+    }
     void execute() override final
     {
-        handler(ec, n); // Throws
+        REALM_ASSERT(is_complete());
+        Socket::WriteCompletionHandler handler = std::move(m_handler);
+        m_handler = Socket::WriteCompletionHandler();
+        handler(m_error_code, m_num_bytes_written); // Throws
     }
+private:
+    Socket::WriteCompletionHandler m_handler;
+    std::error_code m_error_code;
+    size_t m_num_bytes_written = 0;
+    bool m_complete = false;
 };
+
 
 class WaitOper: public Oper {
 public:
-    DeadlineTimer::WaitCompletionHandler handler;
-    std::error_code ec;
-
+    bool in_progress() const noexcept
+    {
+        return bool(m_handler);
+    }
+    bool is_complete() const noexcept
+    {
+        return in_progress() && m_complete;
+    }
+    bool is_incomplete() const noexcept
+    {
+        return in_progress() && !m_complete;
+    }
+    void initiate(DeadlineTimer::WaitCompletionHandler handler) noexcept
+    {
+        REALM_ASSERT(!in_progress());
+        m_handler = std::move(handler);
+        m_complete = false;
+    }
+    void cancel() noexcept
+    {
+        REALM_ASSERT(in_progress());
+        m_error_code = error::operation_aborted;
+    }
+    void complete(std::error_code ec) noexcept
+    {
+        REALM_ASSERT(is_incomplete());
+        m_error_code = ec;
+        m_complete = true;
+    }
     void execute() override final
     {
-        handler(ec); // Throws
+        REALM_ASSERT(is_complete());
+        DeadlineTimer::WaitCompletionHandler handler = std::move(m_handler);
+        m_handler = DeadlineTimer::WaitCompletionHandler();
+        handler(m_error_code); // Throws
     }
+private:
+    DeadlineTimer::WaitCompletionHandler m_handler;
+    std::error_code m_error_code;
+    bool m_complete = false;
 };
 
 
@@ -176,7 +323,7 @@ public:
     {
         return !m_back;
     }
-    void push_back(std::unique_ptr<Oper> op) noexcept
+    void push_back(bind_ptr<Oper> op) noexcept
     {
         REALM_ASSERT(!op->m_next);
         if (m_back) {
@@ -197,7 +344,7 @@ public:
         m_back = q.m_back;
         q.m_back = nullptr;
     }
-    std::unique_ptr<Oper> pop_front() noexcept
+    bind_ptr<Oper> pop_front() noexcept
     {
         Oper* op = nullptr;
         if (m_back) {
@@ -210,12 +357,12 @@ public:
             }
             op->m_next = nullptr;
         }
-        return std::unique_ptr<Oper>(op);
+        return bind_ptr<Oper>(op);
     }
     void clear() noexcept
     {
         if (m_back) {
-            std::unique_ptr<Oper> op(m_back);
+            bind_ptr<Oper> op(m_back);
             while (op->m_next != m_back)
                 op.reset(op->m_next);
             m_back = nullptr;
@@ -237,6 +384,8 @@ class DeadlineTimerImpl;
 
 class EventLoopImpl: public EventLoop {
 public:
+    // Number of asynchronous operations in progress (connect, read, write,
+    // wait)
     int_fast64_t num_operations_in_progress = 0;
 
     EventLoopImpl();
@@ -259,7 +408,7 @@ public:
         m_timers.erase(timer);
     }
 
-    void add_completed_operation(std::unique_ptr<Oper> oper) noexcept
+    void add_completed_operation(bind_ptr<Oper> oper) noexcept
     {
         m_completed_operations.push_back(std::move(oper));
     }
@@ -268,12 +417,22 @@ public:
     {
         // Note: Each handler execution can complete new operations, such as by
         // canceling operations in progress.
-        while (std::unique_ptr<Oper> op = m_completed_operations.pop_front())
+        while (bind_ptr<Oper> op = m_completed_operations.pop_front())
             op->execute(); // Throws
 
+        // Stop event loop if there are no asynchronous operations in progress
+        // and no post handlers waiting to be transferred from m_post_operations
+        // to m_completed_operations
         if (num_operations_in_progress == 0) {
-            CFRunLoopStop(m_cf_run_loop); // Out of work
-            m_returning = true;
+            bool no_pending_post_operations;
+            {
+                LockGuard lg(m_mutex);
+                no_pending_post_operations = m_post_operations.empty();
+            }
+            if (no_pending_post_operations) {
+                CFRunLoopStop(m_cf_run_loop); // Out of work
+                m_returning = true;
+            }
         }
     }
 
@@ -345,6 +504,9 @@ class SocketImpl: public Socket {
 public:
     SocketImpl(EventLoopImpl& event_loop):
         m_event_loop(event_loop),
+        m_connect_oper(new ConnectOper),
+        m_read_oper(new ReadOper),
+        m_write_oper(new WriteOper),
         m_read_buffer(new char[s_read_buffer_size]) // Throws
     {
     }
@@ -382,24 +544,31 @@ public:
     void close() noexcept override final
     {
         cancel();
-        if (m_read_stream)
-            discard_streams();
+        discard_streams();
         m_is_connected = false;
     }
 
     void cancel() noexcept override final
     {
-        if (m_connect_oper) {
+        if (m_connect_oper->in_progress()) {
             REALM_ASSERT(!m_is_connected);
-            REALM_ASSERT(!m_read_oper && !m_write_oper);
-            on_connect_complete(error::operation_aborted);
+            REALM_ASSERT(!m_read_oper->in_progress() && !m_write_oper->in_progress());
+            if (m_connect_oper->is_incomplete())
+                complete_connect();
+            m_connect_oper->cancel();
             discard_streams();
             return;
         }
-        if (m_read_oper)
-            on_read_complete(error::operation_aborted);
-        if (m_write_oper)
-            on_write_complete(error::operation_aborted);
+        if (m_read_oper->in_progress()) {
+            if (m_read_oper->is_incomplete())
+                complete_read();
+            m_read_oper->cancel();
+        }
+        if (m_write_oper->in_progress()) {
+            if (m_write_oper->is_incomplete())
+                complete_write();
+            m_write_oper->cancel();
+        }
     }
 
     EventLoop& get_event_loop() noexcept override final
@@ -411,11 +580,11 @@ public:
     {
         REALM_ASSERT(!m_cf_run_loop);
         m_cf_run_loop = cf_run_loop;
-        if (m_connect_oper || m_read_oper) {
+        if (m_connect_oper->is_incomplete() || m_read_oper->is_incomplete()) {
             CFReadStreamScheduleWithRunLoop(m_read_stream.get(), m_cf_run_loop,
                                             kCFRunLoopDefaultMode);
         }
-        if (m_write_oper) {
+        if (m_write_oper->is_incomplete()) {
             CFWriteStreamScheduleWithRunLoop(m_write_stream.get(), m_cf_run_loop,
                                              kCFRunLoopDefaultMode);
         }
@@ -424,11 +593,11 @@ public:
     void detach_from_cf_run_loop() noexcept
     {
         REALM_ASSERT(m_cf_run_loop);
-        if (m_connect_oper || m_read_oper) {
+        if (m_connect_oper->is_incomplete() || m_read_oper->is_incomplete()) {
             CFReadStreamUnscheduleFromRunLoop(m_read_stream.get(), m_cf_run_loop,
                                               kCFRunLoopDefaultMode);
         }
-        if (m_write_oper) {
+        if (m_write_oper->is_incomplete()) {
             CFWriteStreamUnscheduleFromRunLoop(m_write_stream.get(), m_cf_run_loop,
                                                kCFRunLoopDefaultMode);
         }
@@ -445,9 +614,9 @@ private:
     ReleaseGuard<CFReadStreamRef> m_read_stream;
     ReleaseGuard<CFWriteStreamRef> m_write_stream;
 
-    std::unique_ptr<ConnectOper> m_connect_oper;
-    std::unique_ptr<ReadOper> m_read_oper;
-    std::unique_ptr<WriteOper> m_write_oper;
+    const bind_ptr<ConnectOper> m_connect_oper;
+    const bind_ptr<ReadOper> m_read_oper;
+    const bind_ptr<WriteOper> m_write_oper;
 
     bool m_is_connected = false;
     Optional<char> m_read_delim;
@@ -470,48 +639,91 @@ private:
                           ConnectCompletionHandler handler)
     {
         REALM_ASSERT(!m_is_connected);
-        // A connect operation must not be in progress
+        REALM_ASSERT(!m_connect_oper->in_progress());
         REALM_ASSERT(!m_read_stream && !m_write_stream);
-        REALM_ASSERT(!m_read_oper && !m_write_oper);
+        REALM_ASSERT(!m_read_oper->in_progress() && !m_write_oper->in_progress());
 
-        ReleaseGuard<CFStringRef> host_2 = make_cf_string(std::move(host)); // Throws
-        UInt32 port_2 = UInt32(port);
-        CFReadStreamRef  read_stream;
-        CFWriteStreamRef write_stream;
-        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, host_2.get(), port_2,
-                                           &read_stream, &write_stream);
-        ReleaseGuard<CFReadStreamRef> read_stream_2(read_stream);
-        ReleaseGuard<CFWriteStreamRef> write_stream_2(write_stream);
-        if (!read_stream_2 || !write_stream_2)
+        ReleaseGuard<CFReadStreamRef> read_stream;
+        ReleaseGuard<CFWriteStreamRef> write_stream;
+        {
+            ReleaseGuard<CFStringRef> host_2 = make_cf_string(std::move(host)); // Throws
+            UInt32 port_2 = UInt32(port);
+            CFReadStreamRef  read_stream_2;
+            CFWriteStreamRef write_stream_2;
+            CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, host_2.get(), port_2,
+                                               &read_stream_2, &write_stream_2);
+            read_stream.reset(read_stream_2);
+            write_stream.reset(write_stream_2);
+        }
+        if (!read_stream || !write_stream)
             throw std::bad_alloc();
 
-        set_security_level(read_stream_2.get(), write_stream_2.get(), security); // Throws
-        set_io_callbacks(read_stream_2.get(), write_stream_2.get()); // Throws
+        set_security_level(read_stream.get(), write_stream.get(), security); // Throws
+        set_io_callbacks(read_stream.get(), write_stream.get()); // Throws
 
-        Boolean success_1 = CFReadStreamOpen(read_stream_2.get());
-        Boolean success_2 = CFWriteStreamOpen(write_stream_2.get());
-        if (!success_1 || !success_2) {
-            if (success_1)
-                CFReadStreamClose(read_stream_2.get());
-            if (success_2)
-                CFWriteStreamClose(write_stream_2.get());
-            throw std::runtime_error("Failed to open socket streams");
+        std::error_code ec;
+        {
+            Boolean success_1 = CFReadStreamOpen(read_stream.get());
+            Boolean success_2 = CFWriteStreamOpen(write_stream.get());
+            if (!success_1 || !success_2) {
+                auto seh = [&]() noexcept {
+                    if (success_1)
+                        CFReadStreamClose(read_stream.get());
+                    if (success_2)
+                        CFWriteStreamClose(write_stream.get());
+                    read_stream.reset();
+                    write_stream.reset();
+                };
+                auto seg = util::make_scope_exit(seh);
+                CFStreamStatus status_1 = CFReadStreamGetStatus(read_stream.get());
+                CFStreamStatus status_2 = CFWriteStreamGetStatus(write_stream.get());
+                if (success_1) {
+                    REALM_ASSERT(status_1 != kCFStreamStatusNotOpen &&
+                                 status_1 != kCFStreamStatusError);
+                }
+                else {
+                    REALM_ASSERT(status_1 == kCFStreamStatusNotOpen ||
+                                 status_1 == kCFStreamStatusError);
+                    if (status_1 != kCFStreamStatusError)
+                        throw std::runtime_error("Failed to open read stream");
+                }
+                if (success_2) {
+                    REALM_ASSERT(status_2 != kCFStreamStatusNotOpen &&
+                                 status_2 != kCFStreamStatusError);
+                }
+                else {
+                    REALM_ASSERT(status_2 == kCFStreamStatusNotOpen ||
+                                 status_2 == kCFStreamStatusError);
+                    if (status_2 != kCFStreamStatusError)
+                        throw std::runtime_error("Failed to open write stream");
+                }
+                if (!success_1) {
+                    ec = get_error(read_stream.get()); // Throws
+                }
+                else {
+                    ec = get_error(write_stream.get()); // Throws
+                }
+                if (!ec)
+                    ec = error::unknown;
+            }
         }
 
-        std::unique_ptr<ConnectOper> oper(new ConnectOper); // Throws
-        oper->handler = std::move(handler);
-
-        m_read_stream  = std::move(read_stream_2);
-        m_write_stream = std::move(write_stream_2);
-        m_connect_oper = std::move(oper);
+        m_read_stream  = std::move(read_stream);
+        m_write_stream = std::move(write_stream);
+        m_connect_oper->initiate(std::move(handler));
         ++m_event_loop.num_operations_in_progress;
 
-        if (m_cf_run_loop) {
+        bool is_complete = bool(ec);
+        if (is_complete) {
+            bool not_yet_attached_to_cf_run_loop = true;
+            complete_connect(ec, not_yet_attached_to_cf_run_loop);
+        }
+        else if (m_cf_run_loop) {
             CFReadStreamScheduleWithRunLoop(m_read_stream.get(), m_cf_run_loop,
                                             kCFRunLoopDefaultMode);
         }
 
-        // Discard previopusly buffered input
+        // Discard previously buffered input
         m_read_buffer_begin = m_read_buffer.get();
         m_read_buffer_end   = m_read_buffer_begin;
     }
@@ -522,23 +734,20 @@ private:
         REALM_ASSERT(m_is_connected);
 
         // A read operation must not be in progress
-        REALM_ASSERT(!m_read_oper);
-
-        std::unique_ptr<ReadOper> oper(new ReadOper); // Throws
-        oper->handler = std::move(handler);
+        REALM_ASSERT(!m_read_oper->in_progress());
 
         m_read_begin = buffer;
         m_read_curr  = buffer;
         m_read_end   = buffer + size;
         m_read_delim = delim;
-        m_read_oper  = std::move(oper);
+        m_read_oper->initiate(std::move(handler));
         ++m_event_loop.num_operations_in_progress;
 
         std::error_code ec; // Success
         bool is_complete = process_buffered_input(ec);
         if (is_complete) {
             bool not_yet_attached_to_cf_run_loop = true;
-            on_read_complete(ec, not_yet_attached_to_cf_run_loop);
+            complete_read(ec, not_yet_attached_to_cf_run_loop);
         }
         else if (m_cf_run_loop) {
             CFReadStreamScheduleWithRunLoop(m_read_stream.get(), m_cf_run_loop,
@@ -551,22 +760,19 @@ private:
         REALM_ASSERT(m_is_connected);
 
         // A write operation must not be in progress
-        REALM_ASSERT(!m_write_oper);
-
-        std::unique_ptr<WriteOper> oper(new WriteOper); // Throws
-        oper->handler = std::move(handler);
+        REALM_ASSERT(!m_write_oper->in_progress());
 
         m_write_begin = data;
         m_write_curr  = data;
         m_write_end   = data + size;
-        m_write_oper  = std::move(oper);
+        m_write_oper->initiate(std::move(handler));
         ++m_event_loop.num_operations_in_progress;
 
         std::error_code ec; // Success
         bool is_complete = (m_write_curr == m_write_end);
         if (is_complete) {
             bool not_yet_attached_to_cf_run_loop = true;
-            on_write_complete(ec, not_yet_attached_to_cf_run_loop);
+            complete_write(ec, not_yet_attached_to_cf_run_loop);
         }
         else if (m_cf_run_loop) {
             CFWriteStreamScheduleWithRunLoop(m_write_stream.get(), m_cf_run_loop,
@@ -639,18 +845,18 @@ private:
         switch (event_type) {
             case kCFStreamEventOpenCompleted: {
                 m_is_connected = true;
-                on_connect_complete();
+                complete_connect();
                 m_event_loop.process_completed_operations(); // Throws
                 return;
             }
             case kCFStreamEventHasBytesAvailable: {
-                REALM_ASSERT(m_read_oper);
+                REALM_ASSERT(m_read_oper->is_incomplete());
                 std::error_code ec; // Success
                 size_t n = read_some(m_read_buffer.get(), s_read_buffer_size, ec); // Throws
                 if (REALM_UNLIKELY(n == 0)) {
                     // Read error
                     REALM_ASSERT(ec);
-                    on_read_complete(ec);
+                    complete_read(ec);
                     m_event_loop.process_completed_operations(); // Throws
                     return;
                 }
@@ -659,7 +865,7 @@ private:
                 m_read_buffer_end = m_read_buffer_begin + n;
                 bool is_complete = process_buffered_input(ec);
                 if (is_complete) {
-                    on_read_complete(ec);
+                    complete_read(ec);
                     m_event_loop.process_completed_operations(); // Throws
                 }
                 return;
@@ -669,21 +875,20 @@ private:
                 // (I have seen it happening once now, but it is still a mystery
                 // why it happens so rarelygiven that we do simulate read errors
                 // by closing the connection on the remote side)
-                REALM_ASSERT(m_connect_oper || m_read_oper);
-                bool is_write_error = false;
-                std::error_code ec = get_error(is_write_error); // Throws
-                if (m_connect_oper) {
-                    on_connect_complete(ec);
+                REALM_ASSERT(m_connect_oper->is_incomplete() != m_read_oper->is_incomplete());
+                std::error_code ec = get_error(m_read_stream.get()); // Throws
+                if (m_connect_oper->is_incomplete()) {
+                    complete_connect(ec);
                 }
                 else {
-                    on_read_complete(ec);
+                    complete_read(ec);
                 }
                 m_event_loop.process_completed_operations(); // Throws
                 return;
             }
             case kCFStreamEventEndEncountered: {
                 // FIXME: It seems this this event never happens. Why is that?
-                on_read_complete(network::end_of_input);
+                complete_read(network::end_of_input);
                 m_event_loop.process_completed_operations(); // Throws
                 return;
             }
@@ -696,13 +901,13 @@ private:
         REALM_ASSERT(stream == m_write_stream.get());
         switch (event_type) {
             case kCFStreamEventCanAcceptBytes: {
-                REALM_ASSERT(m_write_oper);
+                REALM_ASSERT(m_write_oper->is_incomplete());
                 std::error_code ec; // Success
                 size_t n = write_some(m_write_curr, m_write_end - m_write_curr, ec); // Throws
                 if (REALM_UNLIKELY(n == 0)) {
                     // Write error
                     REALM_ASSERT(ec);
-                    on_write_complete(ec);
+                    complete_write(ec);
                     m_event_loop.process_completed_operations(); // Throws
                     return;
                 }
@@ -711,23 +916,22 @@ private:
                 m_write_curr += n;
                 bool is_complete = (m_write_curr == m_write_end);
                 if (is_complete) {
-                    on_write_complete(ec);
+                    complete_write(ec);
                     m_event_loop.process_completed_operations(); // Throws
                 }
                 return;
             }
             case kCFStreamEventErrorOccurred: {
                 // FIXME: It seems this this event never happens. Why is that?
-                REALM_ASSERT(m_write_oper);
-                bool is_write_error = true;
-                std::error_code ec = get_error(is_write_error); // Throws
-                on_write_complete(ec);
+                REALM_ASSERT(m_write_oper->is_incomplete());
+                std::error_code ec = get_error(m_write_stream.get()); // Throws
+                complete_write(ec);
                 m_event_loop.process_completed_operations(); // Throws
                 return;
             }
             case kCFStreamEventEndEncountered: {
                 // FIXME: It seems this this event never happens. Why is that?
-                on_write_complete(error::connection_reset);
+                complete_write(error::connection_reset);
                 m_event_loop.process_completed_operations(); // Throws
                 return;
             }
@@ -752,8 +956,7 @@ private:
             return 0;
         }
         REALM_ASSERT(n == -1);
-        bool is_write_error = false;
-        ec = get_error(is_write_error); // Throws
+        ec = get_error(m_read_stream.get()); // Throws
         return 0;
     }
 
@@ -769,8 +972,7 @@ private:
         if (REALM_LIKELY(n > 0))
             return n;
         REALM_ASSERT(n == -1);
-        bool is_write_error = true;
-        ec = get_error(is_write_error); // Throws
+        ec = get_error(m_write_stream.get()); // Throws
         return 0;
     }
 
@@ -798,27 +1000,12 @@ private:
         return true; // Complete
     }
 
-    void on_connect_complete(std::error_code ec = std::error_code()) noexcept
-    {
-        REALM_ASSERT(m_connect_oper);
-        m_connect_oper->ec = ec;
-        m_event_loop.add_completed_operation(std::move(m_connect_oper));
-        m_connect_oper.reset();
-        --m_event_loop.num_operations_in_progress;
-        if (m_cf_run_loop) {
-            CFReadStreamUnscheduleFromRunLoop(m_read_stream.get(), m_cf_run_loop,
-                                              kCFRunLoopDefaultMode);
-        }
-    }
-
-    void on_read_complete(std::error_code ec = std::error_code(),
+    void complete_connect(std::error_code ec = std::error_code(),
                           bool not_yet_attached_to_cf_run_loop = false) noexcept
     {
-        REALM_ASSERT(m_read_oper);
-        m_read_oper->ec = ec;
-        m_read_oper->n = m_read_curr - m_read_begin;
-        m_event_loop.add_completed_operation(std::move(m_read_oper));
-        m_read_oper.reset();
+        m_connect_oper->complete(ec);
+        bind_ptr<ConnectOper> oper = m_connect_oper;
+        m_event_loop.add_completed_operation(std::move(oper));
         --m_event_loop.num_operations_in_progress;
         if (!not_yet_attached_to_cf_run_loop && m_cf_run_loop) {
             CFReadStreamUnscheduleFromRunLoop(m_read_stream.get(), m_cf_run_loop,
@@ -826,13 +1013,27 @@ private:
         }
     }
 
-    void on_write_complete(std::error_code ec = std::error_code(),
-                           bool not_yet_attached_to_cf_run_loop = false) noexcept
+    void complete_read(std::error_code ec = std::error_code(),
+                       bool not_yet_attached_to_cf_run_loop = false) noexcept
     {
-        REALM_ASSERT(m_write_oper);
-        m_write_oper->ec = ec;
-        m_event_loop.add_completed_operation(std::move(m_write_oper));
-        m_write_oper.reset();
+        size_t n = size_t(m_read_curr - m_read_begin);
+        m_read_oper->complete(ec, n);
+        bind_ptr<ReadOper> oper = m_read_oper;
+        m_event_loop.add_completed_operation(std::move(oper));
+        --m_event_loop.num_operations_in_progress;
+        if (!not_yet_attached_to_cf_run_loop && m_cf_run_loop) {
+            CFReadStreamUnscheduleFromRunLoop(m_read_stream.get(), m_cf_run_loop,
+                                              kCFRunLoopDefaultMode);
+        }
+    }
+
+    void complete_write(std::error_code ec = std::error_code(),
+                        bool not_yet_attached_to_cf_run_loop = false) noexcept
+    {
+        size_t n = size_t(m_write_curr - m_write_begin);
+        m_write_oper->complete(ec, n);
+        bind_ptr<WriteOper> oper = m_write_oper;
+        m_event_loop.add_completed_operation(std::move(oper));
         --m_event_loop.num_operations_in_progress;
         if (!not_yet_attached_to_cf_run_loop && m_cf_run_loop) {
             CFWriteStreamUnscheduleFromRunLoop(m_write_stream.get(), m_cf_run_loop,
@@ -842,35 +1043,45 @@ private:
 
     void discard_streams() noexcept
     {
-        REALM_ASSERT(m_read_stream && m_write_stream);
-        CFReadStreamClose(m_read_stream.get());
-        CFWriteStreamClose(m_write_stream.get());
+        if (m_read_stream)
+            CFReadStreamClose(m_read_stream.get());
+        if (m_write_stream)
+            CFWriteStreamClose(m_write_stream.get());
         m_read_stream.reset();
         m_write_stream.reset();
     }
 
-    std::error_code get_error(bool is_write_error)
+    static std::error_code get_error(CFReadStreamRef read_stream)
     {
+        REALM_ASSERT(CFReadStreamGetStatus(read_stream) == kCFStreamStatusError);
         ReleaseGuard<CFErrorRef> error;
-        if (is_write_error) {
-            REALM_ASSERT(CFWriteStreamGetStatus(m_write_stream.get()) == kCFStreamStatusError);
-            error.reset(CFWriteStreamCopyError(m_write_stream.get()));
-        }
-        else {
-            REALM_ASSERT(CFReadStreamGetStatus(m_read_stream.get()) == kCFStreamStatusError);
-            error.reset(CFReadStreamCopyError(m_read_stream.get()));
-        }
+        error.reset(CFReadStreamCopyError(read_stream));
         if (!error)
             throw std::bad_alloc();
-        CFStringRef domain = CFErrorGetDomain(error.get());
+        return translate_error(error.get()); // Throws
+    }
+
+    static std::error_code get_error(CFWriteStreamRef write_stream)
+    {
+        REALM_ASSERT(CFWriteStreamGetStatus(write_stream) == kCFStreamStatusError);
+        ReleaseGuard<CFErrorRef> error;
+        error.reset(CFWriteStreamCopyError(write_stream));
+        if (!error)
+            throw std::bad_alloc();
+        return translate_error(error.get()); // Throws
+    }
+
+    static std::error_code translate_error(CFErrorRef error)
+    {
+        CFStringRef domain = CFErrorGetDomain(error);
         if (CFStringCompare(domain, kCFErrorDomainPOSIX, 0) == kCFCompareEqualTo) {
-            CFIndex code = CFErrorGetCode(error.get());
+            CFIndex code = CFErrorGetCode(error);
             return make_basic_system_error_code(int(code));
         }
         else if (CFStringCompare(domain, kCFErrorDomainCFNetwork, 0) == kCFCompareEqualTo) {
-            CFIndex code = CFErrorGetCode(error.get());
+            CFIndex code = CFErrorGetCode(error);
             if (code == 2) {
-                ReleaseGuard<CFDictionaryRef> user_info(CFErrorCopyUserInfo(error.get()));
+                ReleaseGuard<CFDictionaryRef> user_info(CFErrorCopyUserInfo(error));
                 if (!user_info)
                     throw std::bad_alloc();
                 const void* value =
@@ -899,7 +1110,7 @@ private:
         return error::unknown;
     }
 
-    std::error_code translate_addrinfo_error(int err) noexcept
+    static std::error_code translate_addrinfo_error(int err) noexcept
     {
         switch (err) {
             case EAI_AGAIN:
@@ -935,7 +1146,8 @@ private:
 class DeadlineTimerImpl: public DeadlineTimer {
 public:
     DeadlineTimerImpl(EventLoopImpl& event_loop):
-        m_event_loop(event_loop)
+        m_event_loop(event_loop),
+        m_wait_oper(new WaitOper) // Throws
     {
         CFAbsoluteTime fire_date = 0; // Set later
         CFTimeInterval interval = 1.0; // Enable repetition to prevent invalidation
@@ -967,15 +1179,12 @@ public:
     void async_wait(Duration duration, WaitCompletionHandler handler) override final
     {
         // A wait operation must not be in progress
-        REALM_ASSERT(!m_wait_oper);
-
-        std::unique_ptr<WaitOper> oper(new WaitOper); // Throws
-        oper->handler = std::move(handler);
+        REALM_ASSERT(!m_wait_oper->in_progress());
 
         CFAbsoluteTime fire_date = CFAbsoluteTimeGetCurrent() + double(duration.count()) / 1000;
         CFRunLoopTimerSetNextFireDate(m_cf_timer.get(), fire_date);
 
-        m_wait_oper = std::move(oper);
+        m_wait_oper->initiate(std::move(handler));
         ++m_event_loop.num_operations_in_progress;
 
         if (m_cf_run_loop)
@@ -984,8 +1193,11 @@ public:
 
     void cancel() noexcept override final
     {
-        if (m_wait_oper)
-            on_wait_complete(error::operation_aborted);
+        if (m_wait_oper->in_progress()) {
+            if (m_wait_oper->is_incomplete())
+                complete_wait();
+            m_wait_oper->cancel();
+        }
     }
 
     EventLoop& get_event_loop() noexcept override final
@@ -997,14 +1209,14 @@ public:
     {
         REALM_ASSERT(!m_cf_run_loop);
         m_cf_run_loop = cf_run_loop;
-        if (m_wait_oper)
+        if (m_wait_oper->is_incomplete())
             CFRunLoopAddTimer(m_cf_run_loop, m_cf_timer.get(), kCFRunLoopDefaultMode);
     }
 
     void detach_from_cf_run_loop() noexcept
     {
         REALM_ASSERT(m_cf_run_loop);
-        if (m_wait_oper)
+        if (m_wait_oper->is_incomplete())
             CFRunLoopRemoveTimer(m_cf_run_loop, m_cf_timer.get(), kCFRunLoopDefaultMode);
         m_cf_run_loop = nullptr;
     }
@@ -1018,7 +1230,7 @@ private:
 
     ReleaseGuard<CFRunLoopTimerRef> m_cf_timer;
 
-    std::unique_ptr<WaitOper> m_wait_oper;
+    const bind_ptr<WaitOper> m_wait_oper;
 
     static void wait_callback(CFRunLoopTimerRef cf_timer, void* info)
     {
@@ -1029,16 +1241,15 @@ private:
     void wait_callback(CFRunLoopTimerRef cf_timer)
     {
         REALM_ASSERT(cf_timer == m_cf_timer.get());
-        on_wait_complete(); // Throws
+        complete_wait(); // Throws
         m_event_loop.process_completed_operations(); // Throws
     }
 
-    void on_wait_complete(std::error_code ec = std::error_code()) noexcept
+    void complete_wait(std::error_code ec = std::error_code()) noexcept
     {
-        REALM_ASSERT(m_wait_oper);
-        m_wait_oper->ec = ec;
-        m_event_loop.add_completed_operation(std::move(m_wait_oper));
-        m_wait_oper.reset();
+        m_wait_oper->complete(ec);
+        bind_ptr<WaitOper> oper = m_wait_oper;
+        m_event_loop.add_completed_operation(std::move(oper));
         --m_event_loop.num_operations_in_progress;
         if (m_cf_run_loop)
             CFRunLoopRemoveTimer(m_cf_run_loop, m_cf_timer.get(), kCFRunLoopDefaultMode);
@@ -1098,8 +1309,8 @@ std::unique_ptr<DeadlineTimer> EventLoopImpl::make_timer()
 
 void EventLoopImpl::post(PostCompletionHandler handler)
 {
-    std::unique_ptr<PostOper> oper(new PostOper); // Throws
-    oper->handler = std::move(handler);
+    bind_ptr<PostOper> oper(new PostOper); // Throws
+    oper->initiate(std::move(handler));
     LockGuard lg(m_mutex);
     m_post_operations.push_back(std::move(oper));
     wake_up();

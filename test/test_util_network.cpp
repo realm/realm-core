@@ -10,6 +10,7 @@
 #include <realm/util/network.hpp>
 
 #include "test.hpp"
+#include "util/semaphore.hpp"
 
 using namespace realm::util;
 using namespace realm::test_util;
@@ -101,9 +102,10 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
     network::acceptor acceptor(service_1);
     network::endpoint ep = bind_acceptor(acceptor);
     acceptor.listen();
+    bool connect_completed = false;
     std::error_code ec_1, ec_2;
     acceptor.async_accept(socket_1, [&](std::error_code ec) { ec_1 = ec; });
-    socket_2.async_connect(ep, [&](std::error_code ec) { ec_2 = ec; });
+    socket_2.async_connect(ep, [&](std::error_code ec) { ec_2 = ec; connect_completed = true; });
     if (&service_1 == &service_2) {
         service_1.run();
     }
@@ -114,36 +116,12 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
         bool exception_in_thread = thread.join(); // FIXME: Transport exception instead
         REALM_ASSERT(!exception_in_thread);
     }
+    REALM_ASSERT(connect_completed);
     if (ec_1)
         throw std::system_error(ec_1);
     if (ec_2)
         throw std::system_error(ec_2);
 }
-
-class bowl_of_stones_semaphore {
-public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
-        m_num_stones(initial_number_of_stones)
-    {
-    }
-    void get_stone()
-    {
-        LockGuard lock(m_mutex);
-        while (m_num_stones == 0)
-            m_cond_var.wait(lock);
-        --m_num_stones;
-    }
-    void add_stone()
-    {
-        LockGuard lock(m_mutex);
-        ++m_num_stones;
-        m_cond_var.notify();
-    }
-private:
-    Mutex m_mutex;
-    int m_num_stones;
-    CondVar m_cond_var;
-};
 
 } // anonymous namespace
 
@@ -217,7 +195,7 @@ TEST(Network_EventLoopStopAndReset_2)
     thread_1.start([&] { service.run(); });
 
     // Check that the event loop is actually running
-    bowl_of_stones_semaphore bowl_1; // Empty
+    BowlOfStonesSemaphore bowl_1; // Empty
     service.post([&] { bowl_1.add_stone(); });
     bowl_1.get_stone(); // Block until the stone is added
 
@@ -239,7 +217,7 @@ TEST(Network_EventLoopStopAndReset_2)
     thread_2.start([&] { service.run(); });
 
     // Check that the event loop is actually running
-    bowl_of_stones_semaphore bowl_2; // Empty
+    BowlOfStonesSemaphore bowl_2; // Empty
     service.post([&] { bowl_2.add_stone(); });
     bowl_2.get_stone(); // Block until the stone is added
 

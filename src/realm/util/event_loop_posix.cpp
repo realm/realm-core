@@ -1,3 +1,5 @@
+#include <memory>
+
 #include <realm/util/network.hpp>
 #include <realm/util/event_loop.hpp>
 
@@ -60,7 +62,8 @@ public:
     SocketImpl(EventLoopImpl& event_loop):
         m_event_loop(event_loop),
         m_socket(event_loop.get_service()), // Throws
-        m_input_stream(m_socket) // Throws
+        m_input_stream(m_socket), // Throws
+        m_shared_error_code(std::make_shared<std::error_code>()) // Throws
     {
     }
 
@@ -86,12 +89,17 @@ public:
         std::error_code ec;
         resolver.resolve(query, m_endpoints, ec);
         if (ec) {
-            // Direct callbacks are not allowed
-            //
-            // FIXME: Use [handler=std::move(handler), ec] in C++14 to avoid a
-            // potentially expensive copy of user specified completion handler
-            // into the lambda
-            auto handler_2 = [=] {
+            // Direct callbacks are not allowed, so we need to postpone it using
+            // post(). Also, we need to make use of an error code object whose
+            // ownership is shared betweeen this socket object and the post
+            // handler, because connect completion handlers must be cancaleable
+            // up until the point int time where it starts to execute.
+            std::shared_ptr<std::error_code> sec = m_shared_error_code;
+            REALM_ASSERT(!*sec);
+            *sec = ec;
+            auto handler_2 = [handler=std::move(handler), sec=std::move(sec)] {
+                std::error_code ec = *sec;
+                *sec = std::error_code();
                 handler(ec); // Throws
             };
             m_socket.service().post(std::move(handler_2)); // Throws
@@ -131,6 +139,7 @@ public:
 
     void cancel() noexcept override final
     {
+        *m_shared_error_code = error::operation_aborted;
         if (m_connect_in_progress) {
             m_socket.close();
             m_connect_in_progress = false;
@@ -151,14 +160,12 @@ private:
     network::buffered_input_stream m_input_stream;
     network::endpoint::list m_endpoints;
     bool m_connect_in_progress = false;
+    std::shared_ptr<std::error_code> m_shared_error_code;
 
     void try_next_endpoint(network::endpoint::list::iterator i, ConnectCompletionHandler handler)
     {
         REALM_ASSERT(i != m_endpoints.end());
-        // FIXME: Use [this, handler=std::move(handler)] in C++14 to avoid a
-        // potentially expensive copy of user specified completion handler into
-        // the lambda
-        auto handler_2 = [=](std::error_code ec) {
+        auto handler_2 = [this, handler=std::move(handler), i](std::error_code ec) {
             // Note: If `ec` is `operation_aborted`, the the socket object may
             // already have been destroyed.
             if (ec != error::operation_aborted) {
