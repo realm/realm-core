@@ -292,7 +292,6 @@ public:
     virtual void refresh_accessor_tree(size_t new_col_ndx, const Spec&) = 0;
 
 #ifdef REALM_DEBUG
-    // Must be upper case to avoid conflict with macro in Objective-C
     virtual void verify() const = 0;
     virtual void verify(const Table&, size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
