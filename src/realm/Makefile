@@ -138,7 +138,7 @@ util/thread.cpp \
 util/network.cpp \
 util/event_loop.cpp \
 util/event_loop_posix.cpp \
-$(if $(call IS_EQUAL_TO,$(OS),Darwin),util/event_loop_apple_cf.cpp) \
+util/event_loop_apple_cf.cpp \
 util/uri.cpp \
 util/interprocess_condvar.cpp \
 alloc.cpp \
