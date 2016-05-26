@@ -22,7 +22,7 @@
 #define REALM_UTIL_INTERPROCESS_MUTEX
 
 // Enable this only on platforms where it might be needed
-#if REALM_PLATFORM_APPLE || REALM_PLATFORM_ANDROID
+#if REALM_PLATFORM_APPLE || REALM_ANDROID
 #define REALM_ROBUST_MUTEX_EMULATION
 #endif
 

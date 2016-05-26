@@ -28,6 +28,9 @@
 ### Internals
 
 * Upgrade build scripts to build as C++14 by default.
+* Corrected two usages of undefined REALM_PLATFORM_ANDROID to REALM_ANDROID.
+  This correctly enables Android log output on termination and allows using
+  robust mutexes on Android platforms. (#1834)
 
 ----------------------------------------------
 
