@@ -2955,7 +2955,9 @@ TEST(Shared_VersionOfBoundSnapshot)
 #if !defined(_WIN32)
 // Check what happens when Realm cannot allocate more virtual memory
 // We should throw an AddressSpaceExhausted exception.
-TEST(Shared_OutOfMemory)
+// This will try to use all available memory allowed for this process
+// so don't run it concurrently with other tests.
+NONCONCURRENT_TEST(Shared_OutOfMemory)
 {
     size_t string_length = 1024 * 1024;
     SHARED_GROUP_TEST_PATH(path);
@@ -2972,6 +2974,9 @@ TEST(Shared_OutOfMemory)
     sg.close();
 
     std::vector<std::pair<char*, size_t>> memory_list;
+    // Reserve enough for 500 Gb, but in practice the vector is only ever around size 10.
+    // Do this here to avoid the (small) chance that adding to the vector will request new virtual memory
+    memory_list.reserve(500);
     size_t chunk_size = 1024 * 1024 * 1024;
     while (chunk_size > string_length) {
         void* addr = ::mmap(nullptr, chunk_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
