@@ -1225,7 +1225,7 @@ public:
 #ifdef REALM_MEMORY_DEBUG
     // If m_no_relocation is false, then copy_on_write() will always relocate this array, regardless if it's
     // required or not. If it's true, then it will never relocate, which is currently only expeted inside 
-    // GroupWriter::write_group() due to a unique chicken/egg problem (see description there).l
+    // GroupWriter::write_group() due to a unique chicken/egg problem (see description there).
     bool m_no_relocation = false;
 #endif
 
