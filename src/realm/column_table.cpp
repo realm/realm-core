@@ -245,7 +245,7 @@ void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_p
 std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_parent) const
 {
     std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    return std::make_pair(p.first.get_ref(), p.second);
 }
 
 #endif
