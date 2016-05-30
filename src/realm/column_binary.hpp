@@ -208,7 +208,7 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
 
     // Non-leaf root
     std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
-    const char* leaf_header = p.first.m_addr;
+    const char* leaf_header = p.first.get_addr();
     size_t ndx_in_leaf = p.second;
     Allocator& alloc = m_array->get_alloc();
     bool is_big = Array::get_context_flag_from_header(leaf_header);

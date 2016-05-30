@@ -210,6 +210,12 @@ void display_build_config()
     const char* with_debug =
         Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
 
+#ifdef REALM_MEMORY_DEBUG
+    const char* trigger_relocations = "Enabled";
+#else
+    const char* trigger_relocations = "Disabled";
+#endif
+
 #if REALM_ENABLE_ENCRYPTION
     bool always_encrypt = is_always_encrypt_enabled();
     const char* encryption = always_encrypt ?
@@ -242,6 +248,7 @@ void display_build_config()
         "Encryption: "<<encryption<<"\n"
         "\n"
         "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
+        "REALM_MEMORY_DEBUG = " << trigger_relocations << "\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here

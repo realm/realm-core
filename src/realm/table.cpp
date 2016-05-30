@@ -1976,16 +1976,16 @@ ref_type Table::create_empty_table(Allocator& alloc)
 
     {
         MemRef mem = Spec::create_empty_spec(alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous case (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
     {
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous case (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
@@ -2045,7 +2045,7 @@ ref_type Table::clone_columns(Allocator& alloc) const
         ref_type new_col_ref;
         const ColumnBase* col = &get_column_base(col_ndx);
         MemRef mem = col->clone_deep(alloc);
-        new_col_ref = mem.m_ref;
+        new_col_ref = mem.get_ref();
         new_columns.add(int_fast64_t(new_col_ref)); // Throws
     }
     return new_columns.get_ref();
@@ -2056,7 +2056,7 @@ ref_type Table::clone(Allocator& alloc) const
 {
     if (m_top.is_attached()) {
         MemRef mem = m_top.clone_deep(alloc); // Throws
-        return mem.m_ref;
+        return mem.get_ref();
     }
 
     Array new_top(alloc);
@@ -2065,15 +2065,15 @@ ref_type Table::clone(Allocator& alloc) const
     _impl::DeepArrayRefDestroyGuard dg_2(alloc);
     {
         MemRef mem = m_spec.m_top.clone_deep(alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         new_top.add(v); // Throws
         dg_2.release();
     }
     {
         MemRef mem = m_columns.clone_deep(alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         new_top.add(v); // Throws
         dg_2.release();
     }
