@@ -1034,10 +1034,6 @@ public:
 
 #ifdef REALM_DEBUG
     void print() const;
-
-    /// This method 
-    void debug_relocate();
-
     void verify() const;
     typedef size_t (*LeafVerifier)(MemRef, Allocator&);
     void verify_bptree(LeafVerifier) const;
@@ -1225,7 +1221,13 @@ private:
 public:
     // FIXME: Should not be public
     char* m_data = nullptr; // Points to first byte after header
-    bool m_ignore_relocation_trigger = false;
+
+#ifdef REALM_MEMORY_DEBUG
+    // If m_no_relocation is false, then copy_on_write() will always relocate this array, regardless if it's
+    // required or not. If it's true, then it will never relocate, which is currently only expeted inside 
+    // GroupWriter::write_group() due to a unique chicken/egg problem (see description there).l
+    bool m_no_relocation = false;
+#endif
 
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
@@ -1577,7 +1579,7 @@ inline void Array::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
-    init_from_mem(MemRef(header, ref));
+    init_from_mem(MemRef(header, ref, m_alloc));
 }
 
 
@@ -1700,7 +1702,7 @@ inline ref_type Array::get_ref() const noexcept
 
 inline MemRef Array::get_mem() const noexcept
 {
-    return MemRef(get_header_from_data(m_data), m_ref);
+    return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
 inline void Array::destroy() noexcept
@@ -1809,7 +1811,7 @@ inline void Array::destroy_deep(ref_type ref, Allocator& alloc) noexcept
 
 inline void Array::destroy_deep(MemRef mem, Allocator& alloc) noexcept
 {
-    if (!get_hasrefs_from_header(mem.m_addr)) {
+    if (!get_hasrefs_from_header(mem.get_addr())) {
         alloc.free_(mem);
         return;
     }
@@ -2146,7 +2148,7 @@ inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has
 inline MemRef Array::clone_deep(Allocator& target_alloc) const
 {
     char* header = get_header_from_data(m_data);
-    return clone(MemRef(header, m_ref), m_alloc, target_alloc); // Throws
+    return clone(MemRef(header, m_ref, m_alloc), m_alloc, target_alloc); // Throws
 }
 
 inline void Array::move_assign(Array& a) noexcept
@@ -2331,12 +2333,12 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
     if (child_is_leaf) {
         size_t elem_ndx_in_child = npos; // Append
         new_sibling_ref =
-            TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
+            TreeTraits::leaf_insert(MemRef(child_header, child_ref, m_alloc), childs_parent,
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
     }
     else {
         Array child(m_alloc);
-        child.init_from_mem(MemRef(child_header, child_ref));
+        child.init_from_mem(MemRef(child_header, child_ref, m_alloc));
         child.set_parent(&childs_parent, child_ref_ndx);
         new_sibling_ref = child.bptree_append(state); // Throws
     }
@@ -2397,12 +2399,12 @@ ref_type Array::bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state)
     if (child_is_leaf) {
         REALM_ASSERT_3(elem_ndx_in_child, <=, REALM_MAX_BPNODE_SIZE);
         new_sibling_ref =
-            TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
+            TreeTraits::leaf_insert(MemRef(child_header, child_ref, m_alloc), childs_parent,
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
     }
     else {
         Array child(m_alloc);
-        child.init_from_mem(MemRef(child_header, child_ref));
+        child.init_from_mem(MemRef(child_header, child_ref, m_alloc));
         child.set_parent(&childs_parent, child_ref_ndx);
         new_sibling_ref = child.bptree_insert(elem_ndx_in_child, state); // Throws
     }

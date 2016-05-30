@@ -3945,7 +3945,7 @@ void test_write_slice_contents(TestContext& test_context, const Table& table,
 
 } // anonymous namespace
 
-/*
+
 TEST(Table_WriteSlice)
 {
     // check that the name of the written table is as expected
@@ -3989,7 +3989,7 @@ TEST(Table_WriteSlice)
         }
     }
 }
-*/
+
 
 TEST(Table_Parent)
 {

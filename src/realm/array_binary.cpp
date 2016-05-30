@@ -184,16 +184,16 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
         bool context_flag = false;
         int64_t value = 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v = from_ref(mem.m_ref);
+        dg_2.reset(mem.get_ref());
+        int64_t v = from_ref(mem.get_ref());
         top.add(v); // Throws
         dg_2.release();
     }
     {
         size_t blobs_size = 0;
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v = from_ref(mem.m_ref);
+        dg_2.reset(mem.get_ref());
+        int64_t v = from_ref(mem.get_ref());
         top.add(v); // Throws
         dg_2.release();
     }
@@ -205,8 +205,8 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
         bool context_flag = false;
         int64_t value = values.is_null() ? 1 : 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v = from_ref(mem.m_ref);
+        dg_2.reset(mem.get_ref());
+        int64_t v = from_ref(mem.get_ref());
         top.add(v); // Throws
         dg_2.release();
     }

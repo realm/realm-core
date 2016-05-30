@@ -210,7 +210,7 @@ void display_build_config()
     const char* with_debug =
         Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
 
-#ifdef REALM_TRIGGER_RELOCATIONS
+#ifdef REALM_MEMORY_DEBUG
     const char* trigger_relocations = "Enabled";
 #else
     const char* trigger_relocations = "Disabled";
@@ -248,7 +248,7 @@ void display_build_config()
         "Encryption: "<<encryption<<"\n"
         "\n"
         "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
-        "REALM_TRIGGER_RELOCATIONS = " << trigger_relocations << "\n"
+        "REALM_MEMORY_DEBUG = " << trigger_relocations << "\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
@@ -362,7 +362,7 @@ bool run_tests(util::Logger* logger)
 
     // Set number of threads
     {
-        const char* str = getenv("UNITTEST_THREADS");
+        const char* str = "4"; // getenv("UNITTEST_THREADS");
         if (str && strlen(str) != 0) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
