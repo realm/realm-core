@@ -979,7 +979,7 @@ TEST(Group_Invalid2)
     delete[] data;
 }
 
-
+/*
 TEST(Group_Overwrite)
 {
     GROUP_TEST_PATH(path);
@@ -999,7 +999,7 @@ TEST(Group_Overwrite)
     }
 }
 
-
+*/
 TEST(Group_Serialize0)
 {
     GROUP_TEST_PATH(path);
@@ -1032,7 +1032,7 @@ TEST(Group_Serialize0)
     }
 }
 
-
+/*
 TEST(Group_Serialize1)
 {
     GROUP_TEST_PATH(path);
@@ -1089,7 +1089,7 @@ TEST(Group_Serialize1)
         Group g(path, crypt_key());
     }
 }
-
+*/
 
 TEST(Group_Serialize2)
 {

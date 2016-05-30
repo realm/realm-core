@@ -1572,7 +1572,7 @@ void Array::copy_on_write()
     // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
     // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the m_no_relocation
     // member)
-    if (m_no_relocation) { 
+    if (!m_no_relocation) { 
 #else        
     if (m_alloc.is_read_only(m_ref)) {
 #endif
