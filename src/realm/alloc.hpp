@@ -317,8 +317,8 @@ inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept:
     m_alloc = &alloc;
 #endif
 }
-    
-    inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept:
+
+inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept:
     m_addr(alloc.translate(ref)),
     m_ref(ref)
 {
