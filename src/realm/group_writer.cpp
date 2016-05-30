@@ -11,6 +11,60 @@
 using namespace realm;
 using namespace realm::util;
 
+namespace {
+
+// Class controlling a memory mapped window into a file
+class MapWindow {
+public:
+    MapWindow(util::File& f, ref_type start_ref, size_t size);
+    ~MapWindow();
+
+    // get a base address that may be used for addressing with offsets
+    // which are inside the window defined during construction
+    char* addr_base();
+    void encryption_read_barrier(void* start_addr, size_t size);
+    void encryption_write_barrier(void* start_addr, size_t size);
+    void sync();
+private:
+    util::File::Map<char> map;
+    char* base;
+};
+
+MapWindow::MapWindow(util::File& f, ref_type start_ref, size_t size)
+{
+    size_t page_mask = page_size()-1;
+    ref_type base_ref = start_ref - (start_ref & page_mask);
+    size_t window_size = size + (start_ref & page_mask);
+    map.map(f, File::access_ReadWrite, window_size, 0, base_ref);
+    base = map.get_addr() - base_ref;
+}
+
+MapWindow::~MapWindow()
+{
+}
+
+void MapWindow::sync()
+{
+    map.sync();
+}
+
+char* MapWindow::addr_base()
+{
+    return base;
+}
+
+void MapWindow::encryption_read_barrier(void* start_addr, size_t size)
+{
+    realm::util::encryption_read_barrier(start_addr, size, map.get_encrypted_mapping());
+}
+
+void MapWindow::encryption_write_barrier(void* start_addr, size_t size)
+{
+    realm::util::encryption_write_barrier(start_addr, size, map.get_encrypted_mapping());
+}
+
+
+}
 
 GroupWriter::GroupWriter(Group& group):
     m_group(group),
@@ -87,8 +141,15 @@ GroupWriter::GroupWriter(Group& group):
         }
     }
 
-    m_file_map.map(m_alloc.get_file(), File::access_ReadWrite, m_alloc.get_baseline()); // Throws
+//    m_file_map.map(m_alloc.get_file(), File::access_ReadWrite, m_alloc.get_baseline()); // Throws
 }
+
+
+size_t GroupWriter::get_file_size() const noexcept
+{
+    return m_alloc.get_file().get_size();
+}
+
 
 
 ref_type GroupWriter::write_group()
@@ -252,7 +313,7 @@ ref_type GroupWriter::write_group()
     // m_free_positions has the capacity to store the new larger value without
     // reallocation.
     size_t rest = reserve_pos + reserve_size - size_t(end_ref);
-    size_t used = size_t(end_ref) - reserve_pos;
+    //size_t used = size_t(end_ref) - reserve_pos;
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = int_fast64_t(end_ref); // FIXME: Problematic unsigned -> signed conversion
     int_fast64_t value_9 = int_fast64_t(rest); // FIXME: Problematic unsigned -> signed conversion
@@ -265,20 +326,22 @@ ref_type GroupWriter::write_group()
     m_free_lengths.set(reserve_ndx, value_9); // Throws
 
     // The free-list now have their final form, so we can write them to the file
-    char* start_addr = m_file_map.get_addr() + reserve_ref;
-    realm::util::encryption_read_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
-    write_array_at(free_positions_ref, m_free_positions.get_header(),
+    //char* start_addr = m_file_map.get_addr() + reserve_ref;
+    MapWindow window(m_alloc.get_file(), reserve_ref, end_ref - reserve_ref);
+    //char* start_addr = window.addr_base() + reserve_ref;
+    //realm::util::encryption_read_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
+    write_array_at(window.addr_base(), free_positions_ref, m_free_positions.get_header(),
                    free_positions_size); // Throws
-    write_array_at(free_sizes_ref, m_free_lengths.get_header(),
+    write_array_at(window.addr_base(), free_sizes_ref, m_free_lengths.get_header(),
                    free_sizes_size); // Throws
     if (is_shared) {
-        write_array_at(free_versions_ref, m_free_versions.get_header(),
+        write_array_at(window.addr_base(), free_versions_ref, m_free_versions.get_header(),
                        free_versions_size); // Throws
     }
 
     // Write top
-    write_array_at(top_ref, top.get_header(), top_byte_size); // Throws
-    realm::util::encryption_write_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
+    write_array_at(window.addr_base(), top_ref, top.get_header(), top_byte_size); // Throws
+//    realm::util::encryption_write_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
 
     // Return top_ref so that it can be saved in lock file used for coordination
     return top_ref;
@@ -494,7 +557,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
 
-    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws
+//    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws
 
     size_t chunk_ndx  = m_free_positions.size();
     size_t chunk_size = new_file_size - logical_file_size;
@@ -519,10 +582,12 @@ void GroupWriter::write(const char* data, size_t size)
     REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
 
     // Write the block
-    char* dest_addr = m_file_map.get_addr() + pos;
-    realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
+//    char* dest_addr = m_file_map.get_addr() + pos;
+//    realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
+    MapWindow window(m_alloc.get_file(), pos, size);
+    char* dest_addr = window.addr_base() + pos;
     std::copy(data, data+size, dest_addr);
-    realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
+//    realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
 }
 
 
@@ -533,25 +598,27 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
     REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
 
     // Write the block
-    char* dest_addr = m_file_map.get_addr() + pos;
-    realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
+//    char* dest_addr = m_file_map.get_addr() + pos;
+//    realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
+    MapWindow window(m_alloc.get_file(), pos, size);
+    char* dest_addr = window.addr_base() + pos;
     memcpy(dest_addr, &checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);
 
-    realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
+//    realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
     // return ref of the written array
     ref_type ref = to_ref(pos);
     return ref;
 }
 
 
-void GroupWriter::write_array_at(ref_type ref, const char* data, size_t size)
+void GroupWriter::write_array_at(char* base, ref_type ref, const char* data, size_t size)
 {
     size_t pos = size_t(ref);
 
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));
-    REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
-    char* dest_addr = m_file_map.get_addr() + pos;
+    //REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
+    char* dest_addr = base + pos;
 
     uint32_t dummy_checksum = 41414141UL; // "AAAA" in ASCII
     memcpy(dest_addr, &dummy_checksum, 4);
@@ -561,9 +628,12 @@ void GroupWriter::write_array_at(ref_type ref, const char* data, size_t size)
 
 void GroupWriter::commit(ref_type new_top_ref)
 {
-    SlabAlloc::Header& file_header = *reinterpret_cast<SlabAlloc::Header*>(m_file_map.get_addr());
-    realm::util::encryption_read_barrier(&file_header, sizeof file_header,
-                                         m_file_map.get_encrypted_mapping());
+    MapWindow window(m_alloc.get_file(), 0, sizeof(SlabAlloc::Header));
+//    SlabAlloc::Header& file_header = *reinterpret_cast<SlabAlloc::Header*>(m_file_map.get_addr());
+    SlabAlloc::Header& file_header = *reinterpret_cast<SlabAlloc::Header*>(window.addr_base());
+//    realm::util::encryption_read_barrier(&file_header, sizeof file_header,
+//                                         m_file_map.get_encrypted_mapping());
+    window.encryption_read_barrier(&file_header, sizeof file_header);
 
     // One bit of the flags field selects which of the two top ref slots are in
     // use (same for file format version slots). The current value of the bit
@@ -585,10 +655,12 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
-    realm::util::encryption_write_barrier(&file_header, sizeof file_header,
-                                          m_file_map.get_encrypted_mapping());
+//    realm::util::encryption_write_barrier(&file_header, sizeof file_header,
+//                                          m_file_map.get_encrypted_mapping());
+    window.encryption_write_barrier(&file_header, sizeof file_header);
     if (!disable_sync)
-        m_file_map.sync(); // Throws
+//        m_file_map.sync(); // Throws
+        window.sync();
 
     // Flip the slot selector bit.
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
@@ -596,10 +668,12 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Write new selector to disk
     // FIXME: we might optimize this to write of a single page?
-    realm::util::encryption_write_barrier(&file_header, sizeof file_header,
-                                          m_file_map.get_encrypted_mapping());
+//    realm::util::encryption_write_barrier(&file_header, sizeof file_header,
+//                                          m_file_map.get_encrypted_mapping());
+    window.encryption_write_barrier(&file_header, sizeof file_header);
     if (!disable_sync)
-        m_file_map.sync(); // Throws
+//        m_file_map.sync(); // Throws
+        window.sync();
 }
 
 
@@ -611,7 +685,7 @@ void GroupWriter::dump()
     bool is_shared = m_group.m_is_shared;
 
     size_t count = m_free_lengths.size();
-    std::cout << "count: " << count << ", m_size = " << m_file_map.get_size() << ", "
+    std::cout << "count: " << count << ", m_size = " << m_alloc.get_file().get_size() << ", "
         "version >= " << m_readlock_version << "\n";
     if (!is_shared) {
         for (size_t i = 0; i < count; ++i) {

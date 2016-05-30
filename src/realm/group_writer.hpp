@@ -85,7 +85,6 @@ private:
     ArrayInteger m_free_versions;  // 6th slot in Group::m_top
     uint64_t   m_current_version;
     uint64_t   m_readlock_version;
-    util::File::Map<char> m_file_map;
 
     // Merge adjacent chunks
     void merge_free_space();
@@ -129,7 +128,7 @@ private:
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<size_t, size_t> extend_free_space(size_t requested_size);
 
-    void write_array_at(ref_type, const char* data, size_t size);
+    void write_array_at(char* base, ref_type, const char* data, size_t size);
     size_t split_freelist_chunk(size_t index, size_t start_pos,
                                 size_t alloc_pos, size_t chunk_size, bool is_shared);
 };
@@ -138,11 +137,6 @@ private:
 
 
 // Implementation:
-
-inline size_t GroupWriter::get_file_size() const noexcept
-{
-    return m_file_map.get_size();
-}
 
 inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noexcept
 {
