@@ -1211,6 +1211,8 @@ EOF
 
     "gdb"|"gdb-debug"|\
     "gdb-testcase"|"gdb-testcase-debug"|\
+    "lldb"|"lldb-debug"|\
+    "lldb-testcase"|"lldb-testcase-debug"|\
     "performance"|"benchmark"|"benchmark-"*|\
     "check-cover"|"check-cover-norun"|"lcov"|"gcovr")
         auto_configure || exit 1

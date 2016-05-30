@@ -549,7 +549,6 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
     cv->notify_all();
 }
 
-/* FIXME: Disabled because of sporadic failures on Android, which makes CI results non-deterministic
 
 void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, 
                        InterprocessMutex* mutex, InterprocessCondVar* cv)
@@ -562,7 +561,7 @@ void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter,
     feedback->add_stone();
 }
 
-*/
+
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
@@ -575,7 +574,7 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
 // Verify, that a wait on a condition variable actually waits
 // - this test relies on assumptions about scheduling, which
 //   may not hold on a heavily loaded system.
-TEST(Thread_CondvarWaits)
+NONCONCURRENT_TEST(Thread_CondvarWaits)
 {
     int signals = 0;
     InterprocessMutex mutex;
@@ -605,7 +604,7 @@ TEST(Thread_CondvarWaits)
 
 // Verify that a condition variable looses its signal if no one
 // is waiting on it
-TEST(Thread_CondvarIsStateless)
+NONCONCURRENT_TEST(Thread_CondvarIsStateless)
 {
     int signal_state = 0;
     InterprocessMutex mutex;
@@ -641,7 +640,7 @@ TEST(Thread_CondvarIsStateless)
 
 
 // this test hangs, if timeout doesn't work.
-TEST(Thread_CondvarTimeout)
+NONCONCURRENT_TEST(Thread_CondvarTimeout)
 {
     InterprocessMutex mutex;
     InterprocessMutex::SharedPart mutex_part;
@@ -666,7 +665,7 @@ TEST(Thread_CondvarTimeout)
 
 // test that notify_all will wake up all waiting threads, if there
 // are many waiters:
-TEST(Thread_CondvarNotifyAllWakeup)
+NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
 {
     InterprocessMutex mutex;
     InterprocessMutex::SharedPart mutex_part;
@@ -691,11 +690,12 @@ TEST(Thread_CondvarNotifyAllWakeup)
 }
 
 
-/* FIXME: Disabled because of sporadic failures on Android, which makes CI results non-deterministic
+// FIXME: Disabled because of sporadic failures on Android, which makes CI results non-deterministic
+// Reenabled again but marked as non-concurrent
 
 // test that notify will wake up only a single thread, even if there
 // are many waiters:
-TEST(Thread_CondvarNotifyWakeup)
+NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
 {
     int wait_counter = 0;
     InterprocessMutex mutex;
@@ -727,7 +727,7 @@ TEST(Thread_CondvarNotifyWakeup)
     changed.release_shared_part();
     mutex.release_shared_part();
 }
-*/
+
 
 #endif // _WIN32
 

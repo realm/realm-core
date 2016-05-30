@@ -6,17 +6,78 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* S: Type of completion handler arguments changed from `const H&` to `H` for all
+  asynchronous operations offered by the networking API (namespace
+  `util::network`).
+* S: `util::network::deadline_timer::async_wait()` no longer declared `noexcept`
+  (it never should have been).
 
 ### Enhancements
 
-* Lorem ipsum.
+* S: Event loop API reworked to more closely align with the `util::network` API,
+  and to better provide for multiple alternative implementations (not considered
+  breaking because the event loop API was not yet in use).
+* S: Bugs fixed in the POSIX based implementation (not listed under bug fixes
+  because the event loop API was not yet in use).
+* S: A new Apple CoreFoundation implementation of event loop API was added.
+* S: Movable completion handler objects are no longer copied by the networking
+  API (namespace `util::network`).
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* Upgrade build scripts to build as C++14 by default.
+* Corrected two usages of undefined REALM_PLATFORM_ANDROID to REALM_ANDROID.
+  This correctly enables Android log output on termination and allows using
+  robust mutexes on Android platforms. (#1834)
+
+----------------------------------------------
+
+# 1.0.1 Release notes
+
+### Bugfixes
+
+* Fix a situation where a failure during SharedGroup::open() could cause stale
+  memory mappings to become accessible for later:
+  In case one of the following exceptions are thrown from SharedGroup::open():
+  - "Bad or incompatible history type",
+  - LogicError::mixed_durability,
+  - LogicError::mixed_history_type,
+  - "File format version deosn't match: "
+  - "Encrypted interprocess sharing is currently unsupported"
+  Then:
+  a) In a single process setting a later attempt to open the file would
+     hit the assert "!cfg.session_initiator" reported in issue #1782.
+  b) In a multiprocess setting, another process would be allowed to run
+     compact(), but the current process would retain its mapping of the
+     old file and attempt to reuse those mappings when a new SharedGroup
+     is opened, which would likely lead to a crash later. In that case, the
+     !cfg.session_initiator would not be triggered.
+  May fix issue #1782.
+
+**Note: This is a hotfix release built on top of 1.0.0
+
+----------------------------------------------
+
+# 1.0.0 Release notes
+
+### Bugfixes
+
+* Fixed move_last_over() replacing null values for binary columns in the moved
+  row with zero-length values.
+
+### Enhancements
+
+* File operations would previously throw `std::runtime_error` for error cases without a
+  specialized exception. They now throw `AccessError` instead and include path information.
+
+-----------
+
+### Internals
+
+* Fixed an error in Query_Sort_And_Requery_Untyped_Monkey2 test which would cause
+  this test to fail sometimes.
 
 ----------------------------------------------
 
