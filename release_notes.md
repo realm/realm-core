@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a crash when `Table::set_string_unique()` is called but the underlying column
+  is actually a StringEnumColumn.
 
 ### Breaking changes
 
@@ -14,6 +15,7 @@
 
 ### Enhancements
 
+* Strictly enforce not allowing search indexes to be created on unsupported column types.
 * S: Event loop API reworked to more closely align with the `util::network` API,
   and to better provide for multiple alternative implementations (not considered
   breaking because the event loop API was not yet in use).
