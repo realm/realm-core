@@ -36,6 +36,18 @@
 
 ----------------------------------------------
 
+# 1.0.2 Release notes
+
+### Internals
+
+* This is functionally the same as 1.0.1 but with the bitcode build settings
+  changed. (#1813 is reverted). This is to build with Xamarin.
+
+**Note: This is a hotfix release and these changes are not necessarily included
+  in any above releases**
+
+----------------------------------------------
+
 # 1.0.1 Release notes
 
 ### Bugfixes
