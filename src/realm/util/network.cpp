@@ -56,7 +56,7 @@ void set_nonblocking(int fd, bool enable)
 }
 
 
-std::error_code translate_addrinfo_error(int err)
+std::error_code translate_addrinfo_error(int err) noexcept
 {
     switch (err) {
         case EAI_AGAIN:
@@ -103,8 +103,8 @@ struct getaddrinfo_result_owner {
 
 class network_error_category: public std::error_category {
 public:
-    const char* name() const noexcept override;
-    std::string message(int) const override;
+    const char* name() const noexcept override final;
+    std::string message(int) const override final;
 };
 
 network_error_category g_network_error_category;
@@ -392,7 +392,7 @@ public:
         m_completed_operations.push_back(std::move(op));
     }
 
-    void post(PostOperConstr constr, size_t size, const void* cookie)
+    void post(PostOperConstr constr, size_t size, void* cookie)
     {
         {
             LockGuard l(m_mutex);
@@ -706,7 +706,7 @@ void io_service::add_completed_oper(LendersOperPtr op) noexcept
     m_impl->add_completed_oper(std::move(op));
 }
 
-void io_service::do_post(PostOperConstr constr, size_t size, const void* cookie)
+void io_service::do_post(PostOperConstr constr, size_t size, void* cookie)
 {
     m_impl->post(constr, size, cookie); // Throws
 }
@@ -760,7 +760,7 @@ std::error_code resolver::resolve(const query& query, endpoint::list& list, std:
             curr = curr->ai_next;
         }
     }
-    REALM_ASSERT(num_endpoints > 0);
+    REALM_ASSERT(num_endpoints >= 1);
 
     // Copy the IPv4/IPv6 endpoints
     list.m_endpoints.set_size(num_endpoints); // Throws

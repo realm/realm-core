@@ -2733,6 +2733,7 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fno-elide-constructors",
+					"-Wundef",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
@@ -2775,6 +2776,10 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-Wundef",
+				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
 			};
@@ -2783,6 +2788,7 @@
 		3647E0EA14209E6B00D56FD7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				COMBINE_HIDPI_IMAGES = YES;
 				EXECUTABLE_PREFIX = lib;
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -2799,6 +2805,7 @@
 		3647E0EB14209E6B00D56FD7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
 				COMBINE_HIDPI_IMAGES = YES;
 				EXECUTABLE_PREFIX = lib;
 				LIBRARY_SEARCH_PATHS = (

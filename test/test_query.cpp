@@ -3984,6 +3984,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         // Test if sort order is the same as original
         for (size_t t = 0; t < tv2.size(); t++) {
             size_t a = tv2.get_source_ndx(t);
+            REALM_ASSERT_EX(b < tv.size(), b, tv.size());
             while (a != tv.get_source_ndx(b)) {
                 b++;
             }
@@ -4003,6 +4004,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         // Test if sort order is the same as original
         for (size_t t = 0; t < tv3.size(); t++) {
             size_t a = tv3.get_source_ndx(t);
+            REALM_ASSERT_EX(b < tv2.size(), b, tv2.size());
             while (a != tv2.get_source_ndx(b)) {
                 b++;
                 CHECK(b < tv2.size());
@@ -4016,8 +4018,8 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         Query q5 = table.where(&tv4).not_equal(0, 2);
         TableView tv5 = q5.find_all();
 
-        for (size_t t = 0; t < tv5.size() - 1; t++) {
-            CHECK(tv5.get_source_ndx(t) < tv5.get_source_ndx(t + 1));
+        for (size_t t = 1; t < tv5.size(); t++) {
+            CHECK(tv5.get_source_ndx(t - 1) < tv5.get_source_ndx(t));
         }
 
         // Test that tv5 is ordered the same way as tv4 (tv5 is subset of tv4)

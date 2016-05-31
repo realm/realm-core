@@ -10,12 +10,16 @@ doc_ref_cpp_examples_DEPS = src
 test: check
 test-debug: check-debug
 
-# Run test suite inside `gdb`
-.PHONY: gdb gdb-debug
+# Run test suite inside `gdb`/`lldb`
+.PHONY: gdb gdb-debug lldb lldb-debug
 gdb: check-norun/subdir/src
 	@$(MAKE) -C test gdb
 gdb-debug: check-debug-norun/subdir/src
 	@$(MAKE) -C test gdb-debug
+lldb: check-norun/subdir/src
+	@$(MAKE) -C test lldb
+lldb-debug: check-debug-norun/subdir/src
+	@$(MAKE) -C test lldb-debug
 
 # Build and run the benchmarking programs
 .PHONY: benchmark
@@ -87,7 +91,7 @@ gcovr: check-cover
 
 # Build and run whatever is in test/experiements/testcase.cpp
 .PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
-.PHONY: gdb-testcase gdb-testcase-debug
+.PHONY: gdb-testcase gdb-testcase-debug lldb-testcase lldb-testcase-debug
 check-testcase: check-norun/subdir/src
 	@$(MAKE) -C test check-testcase
 check-testcase-debug: check-debug-norun/subdir/src
@@ -100,6 +104,10 @@ gdb-testcase: check-norun/subdir/src
 	@$(MAKE) -C test gdb-testcase
 gdb-testcase-debug: check-debug-norun/subdir/src
 	@$(MAKE) -C test gdb-testcase-debug
+lldb-testcase: check-norun/subdir/src
+	@$(MAKE) -C test lldb-testcase
+lldb-testcase-debug: check-debug-norun/subdir/src
+	@$(MAKE) -C test lldb-testcase-debug
 
 # Used by build.sh
 .PHONY: get-exec-prefix get-includedir get-bindir get-libdir get-libexecdir

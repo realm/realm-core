@@ -47,7 +47,7 @@ using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
 // Random seed for various random number generators used by fuzzying unit tests.
-uint64_t unit_test_random_seed;
+unsigned long unit_test_random_seed;
 
 namespace {
 

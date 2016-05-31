@@ -730,12 +730,8 @@ EOF
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
         export dir="$IPHONE_DIR"
-        export platform_suffix='-bitcode'
+        export platform_suffix=''
         export enable_bitcode='yes'
-        build_apple
-
-        export platform_suffix='-no-bitcode'
-        export enable_bitcode='no'
         build_apple
         ;;
 
@@ -1215,6 +1211,8 @@ EOF
 
     "gdb"|"gdb-debug"|\
     "gdb-testcase"|"gdb-testcase-debug"|\
+    "lldb"|"lldb-debug"|\
+    "lldb-testcase"|"lldb-testcase-debug"|\
     "performance"|"benchmark"|"benchmark-"*|\
     "check-cover"|"check-cover-norun"|"lcov"|"gcovr")
         auto_configure || exit 1

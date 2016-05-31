@@ -10,6 +10,7 @@
 #include <realm/util/network.hpp>
 
 #include "test.hpp"
+#include "util/semaphore.hpp"
 
 using namespace realm::util;
 using namespace realm::test_util;
@@ -101,9 +102,10 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
     network::acceptor acceptor(service_1);
     network::endpoint ep = bind_acceptor(acceptor);
     acceptor.listen();
+    bool connect_completed = false;
     std::error_code ec_1, ec_2;
     acceptor.async_accept(socket_1, [&](std::error_code ec) { ec_1 = ec; });
-    socket_2.async_connect(ep, [&](std::error_code ec) { ec_2 = ec; });
+    socket_2.async_connect(ep, [&](std::error_code ec) { ec_2 = ec; connect_completed = true; });
     if (&service_1 == &service_2) {
         service_1.run();
     }
@@ -114,36 +116,12 @@ void connect_sockets(network::socket& socket_1, network::socket& socket_2)
         bool exception_in_thread = thread.join(); // FIXME: Transport exception instead
         REALM_ASSERT(!exception_in_thread);
     }
+    REALM_ASSERT(connect_completed);
     if (ec_1)
         throw std::system_error(ec_1);
     if (ec_2)
         throw std::system_error(ec_2);
 }
-
-class bowl_of_stones_semaphore {
-public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
-        m_num_stones(initial_number_of_stones)
-    {
-    }
-    void get_stone()
-    {
-        LockGuard lock(m_mutex);
-        while (m_num_stones == 0)
-            m_cond_var.wait(lock);
-        --m_num_stones;
-    }
-    void add_stone()
-    {
-        LockGuard lock(m_mutex);
-        ++m_num_stones;
-        m_cond_var.notify();
-    }
-private:
-    Mutex m_mutex;
-    int m_num_stones;
-    CondVar m_cond_var;
-};
 
 } // anonymous namespace
 
@@ -217,7 +195,7 @@ TEST(Network_EventLoopStopAndReset_2)
     thread_1.start([&] { service.run(); });
 
     // Check that the event loop is actually running
-    bowl_of_stones_semaphore bowl_1; // Empty
+    BowlOfStonesSemaphore bowl_1; // Empty
     service.post([&] { bowl_1.add_stone(); });
     bowl_1.get_stone(); // Block until the stone is added
 
@@ -239,7 +217,7 @@ TEST(Network_EventLoopStopAndReset_2)
     thread_2.start([&] { service.run(); });
 
     // Check that the event loop is actually running
-    bowl_of_stones_semaphore bowl_2; // Empty
+    BowlOfStonesSemaphore bowl_2; // Empty
     service.post([&] { bowl_2.add_stone(); });
     bowl_2.get_stone(); // Block until the stone is added
 
@@ -371,7 +349,8 @@ TEST(Network_CancelAsyncAccept)
 {
     network::io_service service;
     network::acceptor acceptor(service);
-    acceptor.open(network::protocol::ip_v4());
+    bind_acceptor(acceptor);
+    acceptor.listen();
     network::socket socket(service);
 
     bool accept_was_canceled = false;
@@ -389,6 +368,32 @@ TEST(Network_CancelAsyncAccept)
     acceptor.close();
     service.run();
     CHECK(accept_was_canceled);
+}
+
+
+TEST(Network_CancelAsyncConnect)
+{
+    network::io_service service;
+    network::acceptor acceptor(service);
+    network::endpoint ep = bind_acceptor(acceptor);
+    acceptor.listen();
+    network::socket socket(service);
+
+    bool connect_was_canceled = false;
+    auto handler = [&](std::error_code ec) {
+        if (ec == error::operation_aborted)
+            connect_was_canceled = true;
+    };
+    socket.async_connect(ep, handler);
+    socket.cancel();
+    service.run();
+    CHECK(connect_was_canceled);
+
+    connect_was_canceled = false;
+    socket.async_connect(ep, handler);
+    socket.close();
+    service.run();
+    CHECK(connect_was_canceled);
 }
 
 
@@ -1401,8 +1406,8 @@ TEST(Network_Async)
     ThreadWrapper server_thread, client_thread;
     server_thread.start([&] { server.run(); });
     client_thread.start([&] { client.run(); });
-    client_thread.join();
-    server_thread.join();
+    CHECK_NOT(client_thread.join());
+    CHECK_NOT(server_thread.join());
 }
 
 

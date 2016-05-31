@@ -96,14 +96,8 @@ bool try_make_dir(const std::string& path)
         case EACCES:
         case EROFS:
             throw File::PermissionDenied(msg, path);
-        case ELOOP:
-        case EMLINK:
-        case ENAMETOOLONG:
-        case ENOENT:
-        case ENOTDIR:
-            throw File::AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw File::AccessError(msg, path);
     }
 }
 
@@ -138,13 +132,8 @@ void remove_dir(const std::string& path)
             throw File::PermissionDenied(msg, path);
         case ENOENT:
             throw File::NotFound(msg, path);
-        case ELOOP:
-        case ENAMETOOLONG:
-        case EINVAL:
-        case ENOTDIR:
-            throw File::AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw File::AccessError(msg, path);
     }
 }
 
@@ -259,7 +248,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case ERROR_FILE_EXISTS:
             throw Exists(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 
 #else // POSIX version
@@ -315,14 +304,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             throw NotFound(msg, path);
         case EEXIST:
             throw Exists(msg, path);
-        case EISDIR:
-        case ELOOP:
-        case ENAMETOOLONG:
-        case ENOTDIR:
-        case ENXIO:
-            throw AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 
 #endif
@@ -551,7 +534,7 @@ void File::prealloc(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     prealloc_if_supported(offset, size);
 
@@ -570,7 +553,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
@@ -608,7 +591,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
 bool File::is_prealloc_supported()
 {
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
     return true;
 #else
     return false;
@@ -966,13 +949,8 @@ bool File::try_remove(const std::string& path)
             throw PermissionDenied(msg, path);
         case ENOENT:
             return false;
-        case ELOOP:
-        case ENAMETOOLONG:
-        case EISDIR: // Returned by Linux when path refers to a directory
-        case ENOTDIR:
-            throw AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 }
 
@@ -995,15 +973,8 @@ void File::move(const std::string& old_path, const std::string& new_path)
             throw PermissionDenied(msg, old_path);
         case ENOENT:
             throw File::NotFound(msg, old_path);
-        case ELOOP:
-        case EMLINK:
-        case ENAMETOOLONG:
-        case EINVAL:
-        case EISDIR:
-        case ENOTDIR:
-            throw AccessError(msg, old_path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, old_path);
     }
 }
 
@@ -1185,12 +1156,8 @@ DirScanner::DirScanner(const std::string& path)
                 throw File::PermissionDenied(msg, path);
             case ENOENT:
                 throw File::NotFound(msg, path);
-            case ELOOP:
-            case ENAMETOOLONG:
-            case ENOTDIR:
-                throw File::AccessError(msg, path);
             default:
-                throw std::runtime_error(msg);
+                throw File::AccessError(msg, path);
         }
     }
 }

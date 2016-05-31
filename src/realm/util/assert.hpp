@@ -25,6 +25,8 @@
 
 #if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
 #  define REALM_ASSERTIONS_ENABLED 1
+#else
+#  define REALM_ASSERTIONS_ENABLED 0
 #endif
 
 #define REALM_ASSERT_RELEASE(condition) \

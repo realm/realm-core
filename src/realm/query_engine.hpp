@@ -115,7 +115,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <iostream>
 #include <map>
 
-#if _MSC_FULL_VER >= 160040219
+#if defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219
 #  include <immintrin.h>
 #endif
 

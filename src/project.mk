@@ -10,8 +10,8 @@ endif
 
 CFLAGS_DEBUG += -fno-elide-constructors
 CFLAGS_PTHREADS += -pthread
-CFLAGS_GENERAL += -Wextra -pedantic
-CFLAGS_CXX = -std=c++11
+CFLAGS_GENERAL += -Wextra -pedantic -Wundef
+CFLAGS_CXX = -std=c++14
 
 # Avoid a warning from Clang when linking on OS X. By default,
 # `LDFLAGS_PTHREADS` inherits its value from `CFLAGS_PTHREADS`, so we
@@ -33,9 +33,11 @@ ifeq ($(COMPILER_IS),clang)
   CFLAGS_GENERAL += -Wshorten-64-to-32
 endif
 
-# CoreFoundation is required for logging
+# CoreFoundation is required for Apple specific logging. CoreFoundation and
+# CFNetwork are required for Apple specific event loop
+# (realm/util/event_loop_apple.cpp).
 ifeq ($(OS),Darwin)
-  PROJECT_LDFLAGS += -framework CoreFoundation
+  PROJECT_LDFLAGS += -framework CoreFoundation -framework CFNetwork
 endif
 
 # Android logging

@@ -26,7 +26,7 @@ cp -a /source /tmp/build
 cd /tmp/build
 
 # Configure the build
-sh build.sh config /usr
+REALM_ENABLE_ENCRYPTION=yes sh build.sh config /usr
 # Build and install
 sh build.sh build
 DESTDIR=/prod sh build.sh install-prod
@@ -61,6 +61,7 @@ fpm \
     --maintainer "Realm <help@realm.io>" \
     --after-install /tmp/post-ldconf \
     --after-remove /tmp/post-ldconf \
+    -d "openssl-libs" \
     -C /prod \
     usr/lib64 usr/libexec
 
@@ -78,6 +79,7 @@ fpm \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
     -d "realm = ${VERSION}-${BUILD_NUMBER}.el7" \
+    -d "openssl-devel" \
     -C /devel \
     usr/lib64 usr/include usr/bin
 
