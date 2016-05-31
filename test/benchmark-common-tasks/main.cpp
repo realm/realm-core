@@ -539,7 +539,7 @@ TEST(benchmark_common_tasks_main)
 #undef BENCH
 }
 
-#if !defined(REALM_IOS)
+#if !REALM_IOS
 int main(int, const char**)
 {
     bool success;
