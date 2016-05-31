@@ -355,16 +355,7 @@ bool run_tests(util::Logger* logger)
 
     // Set number of threads
     {
-#ifdef _WIN32
-    #ifdef UNITTEST_THREADS
-        const char* str = UNITTEST_THREADS;
-    #else
-        const char* str = "";
-    #endif
-#else
         const char* str = getenv("UNITTEST_THREADS");
-#endif
-
         if (str && strlen(str) != 0) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
