@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-builddir=core-builds
+builddir=./core-builds
 
 showUsage () {
   cat <<EOF
