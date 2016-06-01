@@ -30,7 +30,8 @@
 namespace realm {
 namespace util {
 
-template<class Ref> class CFPtr {
+template<class Ref>
+class CFPtr {
 public:
     explicit CFPtr(Ref ref = nullptr) noexcept:
         m_ref(ref)
@@ -49,7 +50,7 @@ public:
             CFRelease(m_ref);
     }
 
-    CFPtr &operator=(CFPtr&& rg) noexcept
+    CFPtr& operator=(CFPtr&& rg) noexcept
     {
         REALM_ASSERT(!m_ref || m_ref != rg.m_ref);
         if (m_ref)
