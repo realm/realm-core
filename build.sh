@@ -79,6 +79,7 @@ Available modes are:
     build-tvos:
     build-android:
     build-cocoa:
+    build-dotnet-cocoa:
     build-osx-framework:
     test:
     test-debug:
