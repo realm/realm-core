@@ -11,7 +11,10 @@
   column is actually a StringEnumColumn.
 
 ### Breaking changes
-
+* Sorting order of strings is now according to more commen scheme for special
+  characters (space, dash, etc), and for letters it's now such that visually
+  similiar letters (that is, those that differ only by diracritics, etc) are 
+  grouped together.
 * S: Type of completion handler arguments changed from `const H&` to `H` for all
   asynchronous operations offered by the networking API (namespace
   `util::network`).
