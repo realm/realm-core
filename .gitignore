@@ -64,6 +64,9 @@ Static library*/
 /watchos-lib/
 /tvos-lib/
 
+# sh build.sh build-dotnet-cocoa
+/realm-core-dotnet-cocoa*.zip
+
 # sh build.sh build-android
 /android-lib/
 /openssl/
