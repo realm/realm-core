@@ -130,10 +130,12 @@ void col_type_deleg(Op& op, ColumnType type)
     switch (type) {
         case col_type_Int:
         case col_type_Bool:
-        case col_type_DateTime:
+        case col_type_OldDateTime:
         case col_type_Link:
             op.template call<IntegerColumn>();
             return;
+        case col_type_Timestamp:
+            op.template call<TimestampColumn>();
         case col_type_String:
             op.template call<StringColumn>();
             return;
@@ -155,7 +157,6 @@ void col_type_deleg(Op& op, ColumnType type)
         case col_type_Double:
             op.template call<DoubleColumn>();
             return;
-        case col_type_Reserved1:
         case col_type_Reserved4:
         case col_type_LinkList:
         case col_type_BackLink:

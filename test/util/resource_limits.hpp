@@ -25,6 +25,8 @@ namespace test_util {
 
 
 enum Resource {
+    /// One plus the maximum file descriptor number that can be opened by this
+    /// process. Same as RLIMIT_NOFILE in POSIX.
     resource_NumOpenFiles
 };
 

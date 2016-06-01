@@ -30,6 +30,9 @@ util/file_mapper.hpp \
 util/encrypted_file_mapping.hpp \
 util/miscellaneous.hpp \
 util/to_string.hpp \
+util/scope_exit.hpp \
+util/call_with_tuple.hpp \
+util/hex_dump.hpp \
 exceptions.hpp \
 utilities.hpp \
 alloc.hpp \
@@ -47,13 +50,14 @@ impl/destroy_guard.hpp \
 impl/output_stream.hpp \
 impl/simulated_failure.hpp \
 null.hpp \
-datetime.hpp \
+olddatetime.hpp \
 string_data.hpp \
 impl/input_stream.hpp \
 impl/transact_log.hpp \
 binary_data.hpp \
 mixed.hpp \
 owned_data.hpp \
+timestamp.hpp \
 table.hpp \
 table_ref.hpp \
 table_basic_fwd.hpp \
@@ -100,6 +104,7 @@ array_string_long.hpp \
 column.hpp \
 column_tpl.hpp \
 column_binary.hpp \
+column_timestamp.hpp \
 column_string_enum.hpp \
 column_string.hpp \
 column_table.hpp \
@@ -132,6 +137,8 @@ util/terminate.cpp \
 util/thread.cpp \
 util/network.cpp \
 util/event_loop.cpp \
+util/event_loop_posix.cpp \
+util/event_loop_apple_cf.cpp \
 util/uri.cpp \
 util/interprocess_condvar.cpp \
 alloc.cpp \
@@ -154,6 +161,7 @@ column_mixed.cpp \
 column_string.cpp \
 column_string_enum.cpp \
 column_table.cpp \
+column_timestamp.cpp \
 descriptor.cpp \
 exceptions.cpp \
 group.cpp \

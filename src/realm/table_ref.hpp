@@ -122,14 +122,6 @@ class BasicTable;
 /// \endcode
 ///
 ///
-/// This class provides a form of move semantics that is compatible
-/// with C++03. It is similar to, but not as powerful as what is
-/// provided natively by C++11. Instead of using `std::move()` (in
-/// C++11), one must use `move()` without qualification. This will
-/// call a special function that is a friend of this class. The
-/// effectiveness of this form of move semantics relies on 'return
-/// value optimization' being enabled in the compiler.
-///
 /// \sa Table
 /// \sa TableRef
 template<class T>
@@ -159,12 +151,6 @@ public:
     BasicTableRef& operator=(BasicTableRef&&) noexcept;
     template<class U>
     BasicTableRef& operator=(BasicTableRef<U>&&) noexcept;
-
-    // Replacement for std::move() in C++03
-    friend BasicTableRef move(BasicTableRef& r) noexcept
-    {
-        return BasicTableRef(&r, move_tag());
-    }
 
     //@{
     /// Comparison
@@ -259,10 +245,6 @@ private:
     friend class BasicTableRef;
 
     explicit BasicTableRef(T* t) noexcept: util::bind_ptr<T>(t) {}
-
-    typedef typename util::bind_ptr<T>::move_tag move_tag;
-    BasicTableRef(BasicTableRef* r, move_tag) noexcept:
-        util::bind_ptr<T>(r, move_tag()) {}
 
     typedef typename util::bind_ptr<T>::casting_move_tag casting_move_tag;
     template<class U>

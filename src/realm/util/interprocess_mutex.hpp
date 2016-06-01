@@ -22,7 +22,7 @@
 #define REALM_UTIL_INTERPROCESS_MUTEX
 
 // Enable this only on platforms where it might be needed
-#if REALM_PLATFORM_APPLE || REALM_PLATFORM_ANDROID
+#if REALM_PLATFORM_APPLE || REALM_ANDROID
 #define REALM_ROBUST_MUTEX_EMULATION
 #endif
 
@@ -60,7 +60,8 @@ public:
     /// You need to bind the emulation to a SharedPart in shared/mmapped memory.
     /// The SharedPart is assumed to have been initialized (possibly by another process)
     /// elsewhere.
-    void set_shared_part(SharedPart& shared_part, std::string path, std::string mutex_name);
+    void set_shared_part(SharedPart& shared_part, const std::string& path, const std::string& mutex_name);
+    void set_shared_part(SharedPart& shared_part, File&& lock_file);
 
     /// Destroy shared object. Potentially release system resources. Caller must
     /// ensure that the shared_part is not in use at the point of call.
@@ -109,8 +110,8 @@ inline InterprocessMutex::~InterprocessMutex() noexcept
 }
 
 inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
-                                                 std::string path,
-                                                 std::string mutex_name)
+                                               const std::string& path,
+                                               const std::string& mutex_name)
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     static_cast<void>(shared_part);
@@ -124,14 +125,31 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
     m_shared_part = &shared_part;
     static_cast<void>(path);
     static_cast<void>(mutex_name);
+#endif
+}
 
+inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
+                                               File&& lock_file)
+{
+#ifdef REALM_ROBUST_MUTEX_EMULATION
+    static_cast<void>(shared_part);
+    if (m_file.is_attached()) {
+        m_file.close();
+    }
+    m_filename.clear();
+    std::lock_guard<Mutex> guard(m_local_mutex);
+    m_file = std::move(lock_file);
+#else
+    m_shared_part = &shared_part;
+    static_cast<void>(lock_file);
 #endif
 }
 
 inline void InterprocessMutex::release_shared_part()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    File::try_remove(m_filename);
+    if (!m_filename.empty())
+        File::try_remove(m_filename);
 #else
     m_shared_part = nullptr;
 #endif

@@ -69,8 +69,6 @@ inline MemRef BasicArray<T>::create_array(Array::Type type, bool context_flag, s
 {
     REALM_ASSERT(type == Array::type_Normal);
     REALM_ASSERT(!context_flag);
-    static_cast<void>(type);
-    static_cast<void>(context_flag);
     MemRef mem = create_array(size, alloc);
     if (size) {
         BasicArray<T> tmp(alloc);
@@ -78,6 +76,7 @@ inline MemRef BasicArray<T>::create_array(Array::Type type, bool context_flag, s
         for (size_t i = 0; i < size; ++i) {
             tmp.set(i, value);
         }
+        return tmp.get_mem();
     }
     return mem;
 }
@@ -88,8 +87,6 @@ inline void BasicArray<T>::create(Array::Type type, bool context_flag)
 {
     REALM_ASSERT(type == Array::type_Normal);
     REALM_ASSERT(!context_flag);
-    static_cast<void>(type);
-    static_cast<void>(context_flag);
     size_t size = 0;
     MemRef mem = create_array(size, get_alloc()); // Throws
     init_from_mem(mem);

@@ -72,7 +72,7 @@ REALM_TABLE_8(MyTable,
               alpha,   Int,
               beta,    Bool,
               gamma,   Enum<MyEnum>,
-              delta,   DateTime,
+              delta,   OldDateTime,
               epsilon, String,
               zeta,    Binary,
               eta,     Subtable<MySubtable>,
@@ -315,7 +315,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         BinaryData bin(data.get(), size);
         subsubtable->add(0, false, nne,  0, "", bin, 0, Mixed(int64_t(index*13)));
         subsubtable->add(1, false, tano, 0, "", bin, 0, Mixed(index%2==0?false:true));
-        subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(DateTime(index*13)));
+        subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(OldDateTime(index*13)));
         subsubtable->add(3, false, saba, 0, "", bin, 0, Mixed("click"));
         subsubtable->add(4, false, nane, 0, "", bin, 0, Mixed(bin));
         wt.commit();

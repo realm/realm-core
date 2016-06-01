@@ -33,20 +33,19 @@ using namespace realm;
 TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
                              MutableSourcePayload mode)
     : RowIndexes(src, mode),
-      m_linked_table(TableRef()),
-      m_linked_column(src.m_linked_column),
-      m_linked_row(src.m_linked_row),
-      m_linkview_source(LinkViewRef()),
-      m_query(src.m_query, patch.query_patch, mode)
+      m_linked_column(src.m_linked_column)
 {
     patch.was_in_sync = src.is_in_sync();
+    // m_query must be exported after patch.was_in_sync is updated
+    // as exporting m_query will bring src out of sync.
+    m_query = Query(src.m_query, patch.query_patch, mode);
+
     Table::generate_patch(src.m_table, patch.m_table);
     Table::generate_patch(src.m_linked_table, patch.linked_table);
-    patch.linked_column = src.m_linked_column;
-    patch.linked_row = src.m_linked_row;
+    Row::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
-    src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
+    src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
     m_sorting_predicate = src.m_sorting_predicate;
@@ -60,10 +59,7 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
 TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
                              ConstSourcePayload mode)
     : RowIndexes(src, mode),
-      m_linked_table(TableRef()),
       m_linked_column(src.m_linked_column),
-      m_linked_row(src.m_linked_row),
-      m_linkview_source(LinkViewRef()),
       m_query(src.m_query, patch.query_patch, mode)
 {
     if (mode == ConstSourcePayload::Stay)
@@ -72,8 +68,7 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
         patch.was_in_sync = src.is_in_sync();
     Table::generate_patch(src.m_table, patch.m_table);
     Table::generate_patch(src.m_linked_table, patch.linked_table);
-    patch.linked_column = src.m_linked_column;
-    patch.linked_row = src.m_linked_row;
+    ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
     m_last_seen_version = 0;
@@ -95,19 +90,18 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 
     if (patch.linked_table) {
         m_linked_table = Table::create_from_and_consume_patch(patch.linked_table, group);
-        m_linked_column = patch.linked_column;
-        m_linked_row = patch.linked_row;
+        m_linked_row.apply_and_consume_patch(patch.linked_row, group);
     }
 
     if (patch.was_in_sync)
         m_last_seen_version = outside_version();
     else
-        m_last_seen_version = -1;
+        m_last_seen_version = util::none;
 }
 
 // Searching
 
-// find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
+// find_*_integer() methods are used for all "kinds" of integer values (bool, int, OldDateTime)
 
 size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
@@ -222,10 +216,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     }
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
-        row_ndx = to_size_t(m_row_indexes.get(ss));
+
+        int64_t signed_row_ndx = m_row_indexes.get(ss);
 
         // skip detached references:
-        if (row_ndx == detached_ref) continue;
+        if (signed_row_ndx == detached_ref) continue;
+
+        row_ndx = to_size_t(signed_row_ndx);
 
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
@@ -266,8 +263,31 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         return res;
 }
 
-// sum
+// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf types
+// and also assume numeric types that support arithmetic (+, /, etc).
+template<class C>
+Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
+{
+    C compare = C();
+    Timestamp best = Timestamp(null{});
+    size_t ndx = npos;
+    for (size_t t = 0; t < size(); t++) {
+        Timestamp ts = get_timestamp(column_ndx, t);
+        // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
+        // the first non-null entry
+        if ((ndx == npos && !ts.is_null()) || compare(ts, best, ts.is_null(), best.is_null())) {
+            best = ts;
+            ndx = t;
+        }
+    }
 
+    if (return_ndx)
+        *return_ndx = ndx;
+
+    return best;
+}
+
+// sum
 int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
@@ -285,7 +305,6 @@ double TableViewBase::sum_double(size_t column_ndx) const
 }
 
 // Maximum
-
 int64_t TableViewBase::maximum_int(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
@@ -301,7 +320,7 @@ double TableViewBase::maximum_double(size_t column_ndx, size_t* return_ndx) cons
 {
     return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) const
+OldDateTime TableViewBase::maximum_olddatetime(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, 0, return_ndx);
@@ -309,8 +328,13 @@ DateTime TableViewBase::maximum_datetime(size_t column_ndx, size_t* return_ndx) 
         return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, 0, return_ndx);
 }
 
-// Minimum
+Timestamp TableViewBase::maximum_timestamp(size_t column_ndx, size_t* return_ndx) const
+{
+    return minmax_timestamp<realm::Greater>(column_ndx, return_ndx);
+}
 
+
+// Minimum
 int64_t TableViewBase::minimum_int(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
@@ -326,12 +350,17 @@ double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) cons
 {
     return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, 0.0, return_ndx);
 }
-DateTime TableViewBase::minimum_datetime(size_t column_ndx, size_t* return_ndx) const
+OldDateTime TableViewBase::minimum_olddatetime(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
         return aggregate<act_Max, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
     else
         return aggregate<act_Max, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+}
+
+Timestamp TableViewBase::minimum_timestamp(size_t column_ndx, size_t* return_ndx) const
+{
+    return minmax_timestamp<realm::Less> (column_ndx, return_ndx);
 }
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
@@ -368,6 +397,19 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
     return aggregate<act_Count, double, size_t, DoubleColumn>(nullptr, column_ndx, target);
 }
 
+size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
+{
+    size_t count = 0;
+    for (size_t t = 0; t < size(); t++) {
+        Timestamp ts = get_timestamp(column_ndx, t);
+        realm::Equal e;
+        if (e(ts, target, ts.is_null(), target.is_null())) {
+            count++;
+        }
+    }
+    return count;
+}
+
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
 void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
 {
@@ -383,7 +425,7 @@ void TableViewBase::to_json(std::ostream& out) const
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        const size_t real_row_index = get_source_ndx(r);
+        const int64_t real_row_index = get_source_ndx(r);
         if (real_row_index != detached_ref) {
             if (r > 0)
                 out << ",";
@@ -412,7 +454,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     size_t i = 0;
     size_t count = out_count;
     while (count) {
-        const size_t real_row_index = get_source_ndx(i);
+        const int64_t real_row_index = get_source_ndx(i);
         if (real_row_index != detached_ref) {
             m_table->to_string_row(real_row_index, out, widths);
             --count;
@@ -437,17 +479,17 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     m_table->to_string_header(out, widths);
 
     // Print row contents
-    size_t real_ndx = get_source_ndx(row_ndx);
+    int64_t real_ndx = get_source_ndx(row_ndx);
     REALM_ASSERT(real_ndx != detached_ref);
     m_table->to_string_row(real_ndx, out, widths);
 }
 
 
-bool TableViewBase::depends_on_deleted_linklist() const
+bool TableViewBase::depends_on_deleted_object() const
 {
     uint64_t max = std::numeric_limits<uint64_t>::max();
     // outside_version() will call itself recursively for each TableView in the dependency chain
-    // and terminate with `max` if the deepest depends on a deleted LinkList
+    // and terminate with `max` if the deepest depends on a deleted LinkList or Row
     return outside_version() == max;
 }
 
@@ -488,10 +530,14 @@ uint64_t TableViewBase::outside_version() const
             return max;
         }
     }
-    else {
-        // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)
-        return m_table->m_version;
+
+    if (m_linked_table && !m_linked_row) {
+        // m_linked_table is set when created by Table::get_backlink_view.
+        return max;
     }
+
+    // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)
+    return m_table->m_version;
 }
 
 bool TableViewBase::is_in_sync() const
@@ -511,7 +557,7 @@ uint_fast64_t TableViewBase::sync_if_needed() const
         // FIXME: Is this a reasonable handling of constness?
         const_cast<TableViewBase*>(this)->do_sync();
     }
-    return m_last_seen_version;
+    return *m_last_seen_version;
 }
 
 
@@ -766,9 +812,12 @@ void TableViewBase::do_sync()
     }
     else if (m_table && m_linked_table) {
         m_row_indexes.clear();
-        size_t backlink_count = m_linked_table->get_backlink_count(m_linked_row, *m_table, m_linked_column);
-        for (size_t i = 0; i < backlink_count; i++)
-            m_row_indexes.add(m_linked_table->get_backlink(m_linked_row, *m_table, m_linked_column, i));
+        if (m_linked_row.is_attached()) {
+            size_t linked_row_ndx = m_linked_row.get_index();
+            size_t backlink_count = m_linked_table->get_backlink_count(linked_row_ndx, *m_table, m_linked_column);
+            for (size_t i = 0; i < backlink_count; i++)
+                m_row_indexes.add(m_linked_table->get_backlink(linked_row_ndx, *m_table, m_linked_column, i));
+        }
     }
     // precondition: m_table is attached
     else if (!m_query.m_table) {
@@ -805,4 +854,27 @@ void TableViewBase::do_sync()
         distinct(m_distinct_columns);
 
     m_last_seen_version = outside_version();
+}
+
+bool TableViewBase::is_in_table_order() const
+{
+    if (!m_table) {
+        return false;
+    }
+    else if (m_linkview_source) {
+        return false;
+    }
+    else if (m_table && m_linked_table) {
+        return false;
+    }
+    else if (!m_query.m_table) {
+        // TableView originated from Table::find_all().
+        return !m_sorting_predicate;
+    }
+    else if (m_query.produces_results_in_table_order()) {
+        return !m_sorting_predicate;
+    }
+    else {
+        return false;
+    }
 }

@@ -30,7 +30,7 @@ class StringIndex;
 
 /// From the point of view of the application, an enumerated strings column
 /// (StringEnumColumn) is like a string column (StringColumn), yet it manages
-/// its stings in such a way that each unique string is stored only once. In
+/// its strings in such a way that each unique string is stored only once. In
 /// fact, an enumerated strings column is a combination of two subcolumns; a
 /// regular string column (StringColumn) that stores the unique strings, and an
 /// integer column that stores one unique string index for each entry in the
@@ -114,6 +114,7 @@ public:
     // Search index
     StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     void set_search_index_allow_duplicate_values(bool) noexcept override;
+    bool supports_search_index() const noexcept final { return true; }
     StringIndex* create_search_index() override;
     void install_search_index(std::unique_ptr<StringIndex>) noexcept;
     void destroy_search_index() noexcept override;
@@ -240,7 +241,6 @@ inline void StringEnumColumn::insert_rows(size_t row_ndx, size_t num_rows_to_ins
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
     REALM_ASSERT(!insert_nulls || m_nullable);
-    static_cast<void>(insert_nulls);
 
     StringData value = m_nullable ? realm::null() : StringData("");
     bool is_append = (row_ndx == prior_num_rows);

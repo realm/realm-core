@@ -30,12 +30,16 @@ TESTS := $(wildcard test_*.cpp large_tests/*.cpp fuzz_*.cpp)
 realm_tests_SOURCES = $(TESTS) main.cpp
 realm_tests_LIBS    = util/test-util.a
 
-# Run test suite inside `gdb`
-.PHONY: gdb gdb-debug
+# Run test suite inside `gdb`/`lldb`
+.PHONY: gdb gdb-debug lldb lldb-debug
 gdb: check-norun
 	gdb realm-tests
 gdb-debug: check-debug-norun
 	gdb realm-tests-dbg
+lldb: check-norun
+	lldb realm-tests
+lldb-debug: check-debug-norun
+	lldb realm-tests-dbg
 
 .PHONY: benchmark
 benchmark: check-norun/subdir/test-realm check-norun/subdir/test-sqlite3 check-norun/subdir/test-stl
@@ -105,7 +109,7 @@ fuzzy: check-norun/subdir/util
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
-.PHONY: gdb-testcase gdb-testcase-debug
+.PHONY: gdb-testcase gdb-testcase-debug lldb-testcase lldb-testcase-debug
 check-testcase: check-norun/subdir/util
 	@$(MAKE) -C experiments check
 check-testcase-debug: check-debug-norun/subdir/util
@@ -118,6 +122,10 @@ gdb-testcase: check-norun/subdir/util
 	@$(MAKE) -C experiments gdb-testcase
 gdb-testcase-debug: check-debug-norun/subdir/util
 	@$(MAKE) -C experiments gdb-testcase-debug
+lldb-testcase: check-norun/subdir/util
+	@$(MAKE) -C experiments lldb-testcase
+lldb-testcase-debug: check-debug-norun/subdir/util
+	@$(MAKE) -C experiments lldb-testcase-debug
 
 .PHONY: get-test-resources get-passive-subdirs
 get-test-resources:

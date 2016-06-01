@@ -79,32 +79,35 @@ namespace realm {
 namespace util {
 
 
-void make_dir(const std::string& path)
+bool try_make_dir(const std::string& path)
 {
 #ifdef _WIN32
     if (_mkdir(path.c_str()) == 0)
-        return;
+        return true;
 #else // POSIX
     if (::mkdir(path.c_str(), S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) == 0)
-        return;
+        return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("make_dir() failed: ", err);
     switch (err) {
+        case EEXIST:
+            return false;
         case EACCES:
         case EROFS:
             throw File::PermissionDenied(msg, path);
-        case EEXIST:
-            throw File::Exists(msg, path);
-        case ELOOP:
-        case EMLINK:
-        case ENAMETOOLONG:
-        case ENOENT:
-        case ENOTDIR:
-            throw File::AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw File::AccessError(msg, path);
     }
+}
+
+
+void make_dir(const std::string& path)
+{
+    if (try_make_dir(path))
+        return;
+    std::string msg = get_errno_msg("make_dir() failed: ", EEXIST);
+    throw File::Exists(msg, path);
 }
 
 
@@ -129,13 +132,8 @@ void remove_dir(const std::string& path)
             throw File::PermissionDenied(msg, path);
         case ENOENT:
             throw File::NotFound(msg, path);
-        case ELOOP:
-        case ENAMETOOLONG:
-        case EINVAL:
-        case ENOTDIR:
-            throw File::AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw File::AccessError(msg, path);
     }
 }
 
@@ -239,7 +237,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string msg = get_last_error_msg("CreateFile() failed: ", err);
+    std::string error_prefix = "CreateFile(\"" + path + "\") failed: ";
+    std::string msg = get_last_error_msg(error_prefix.c_str(), err);
     switch (err) {
         case ERROR_SHARING_VIOLATION:
         case ERROR_ACCESS_DENIED:
@@ -249,7 +248,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case ERROR_FILE_EXISTS:
             throw Exists(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 
 #else // POSIX version
@@ -294,7 +293,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string msg = get_errno_msg("open() failed: ", err);
+    std::string error_prefix = "open(\"" + path + "\") failed: ";
+    std::string msg = get_errno_msg(error_prefix.c_str(), err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -304,14 +304,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             throw NotFound(msg, path);
         case EEXIST:
             throw Exists(msg, path);
-        case EISDIR:
-        case ELOOP:
-        case ENAMETOOLONG:
-        case ENOTDIR:
-        case ENXIO:
-            throw AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 
 #endif
@@ -540,7 +534,7 @@ void File::prealloc(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     prealloc_if_supported(offset, size);
 
@@ -559,7 +553,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
@@ -597,7 +591,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
 bool File::is_prealloc_supported()
 {
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
     return true;
 #else
     return false;
@@ -955,13 +949,8 @@ bool File::try_remove(const std::string& path)
             throw PermissionDenied(msg, path);
         case ENOENT:
             return false;
-        case ELOOP:
-        case ENAMETOOLONG:
-        case EISDIR: // Returned by Linux when path refers to a directory
-        case ENOTDIR:
-            throw AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 }
 
@@ -984,15 +973,8 @@ void File::move(const std::string& old_path, const std::string& new_path)
             throw PermissionDenied(msg, old_path);
         case ENOENT:
             throw File::NotFound(msg, old_path);
-        case ELOOP:
-        case EMLINK:
-        case ENAMETOOLONG:
-        case EINVAL:
-        case EISDIR:
-        case ENOTDIR:
-            throw AccessError(msg, old_path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, old_path);
     }
 }
 
@@ -1174,12 +1156,8 @@ DirScanner::DirScanner(const std::string& path)
                 throw File::PermissionDenied(msg, path);
             case ENOENT:
                 throw File::NotFound(msg, path);
-            case ELOOP:
-            case ENAMETOOLONG:
-            case ENOTDIR:
-                throw File::AccessError(msg, path);
             default:
-                throw std::runtime_error(msg);
+                throw File::AccessError(msg, path);
         }
     }
 }

@@ -28,7 +28,7 @@
 
 // "Process shared mutexes" are not officially supported on Android,
 // but they appear to work anyway.
-#if _POSIX_THREAD_PROCESS_SHARED > 0 || REALM_ANDROID
+#if (defined(_POSIX_THREAD_PROCESS_SHARED) && _POSIX_THREAD_PROCESS_SHARED > 0) || REALM_ANDROID
 #  define REALM_HAVE_PTHREAD_PROCESS_SHARED
 #endif
 
@@ -130,7 +130,6 @@ void Mutex::init_as_process_shared(bool robust_if_available)
     r = pthread_mutex_init(&m_impl, &attr);
     int r2 = pthread_mutexattr_destroy(&attr);
     REALM_ASSERT(r2 == 0);
-    static_cast<void>(r2);
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
 #else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
@@ -217,7 +216,6 @@ bool RobustMutex::is_valid() noexcept
     if (r == 0) {
         r = pthread_mutex_unlock(&m_impl);
         REALM_ASSERT(r == 0);
-        static_cast<void>(r);
         return true;
     }
     return r != EINVAL;
@@ -229,7 +227,6 @@ void RobustMutex::mark_as_consistent() noexcept
 #ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
     int r = pthread_mutex_consistent(&m_impl);
     REALM_ASSERT(r == 0);
-    static_cast<void>(r);
 #endif
 }
 
@@ -247,7 +244,6 @@ CondVar::CondVar(process_shared_tag)
     r = pthread_cond_init(&m_impl, &attr);
     int r2 = pthread_condattr_destroy(&attr);
     REALM_ASSERT(r2 == 0);
-    static_cast<void>(r2);
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
 #else // !REALM_HAVE_PTHREAD_PROCESS_SHARED

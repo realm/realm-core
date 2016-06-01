@@ -23,9 +23,14 @@
 #include <realm/util/terminate.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/thread.hpp>
+#include <realm/util/to_string.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
+#include "fuzz_group.hpp"
+
 #include "test.hpp"
+
+extern unsigned long unit_test_random_seed;
 
 using namespace realm;
 using namespace realm::util;
@@ -88,7 +93,12 @@ REALM_TABLE_4(TestTableShared,
               third,  Bool,
               fourth, String)
 
-
+REALM_TABLE_5(TestTableSharedTimestamp,
+                  first,  Int,
+                  second, Int,
+                  third,  Bool,
+                  fourth, String,
+                  fifth, Timestamp)
 
 void writer(std::string path, int id)
 {
@@ -166,7 +176,7 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !REALM_ANDROID
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -581,13 +591,14 @@ TEST(Shared_1)
     {
         // Create a new shared db
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+        Timestamp first_timestamp_value{1,1};
 
         // Create first table in group
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            t1->add(1, 2, false, "test");
+            TestTableSharedTimestamp::Ref t1 = wt.add_table<TestTableSharedTimestamp>("test");
+            t1->add(1, 2, false, "test", Timestamp{1,1});
             wt.commit();
         }
 
@@ -598,19 +609,20 @@ TEST(Shared_1)
             rt.get_group().verify();
 
             // Verify that last set of changes are commited
-            TestTableShared::ConstRef t2 = rt.get_table<TestTableShared>("test");
+            TestTableSharedTimestamp::ConstRef t2 = rt.get_table<TestTableSharedTimestamp>("test");
             CHECK(t2->size() == 1);
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
             CHECK_EQUAL("test", t2[0].fourth);
+            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
 
             // Do a new change while stil having current read transaction open
             {
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-                t1->add(2, 3, true, "more test");
+                TestTableSharedTimestamp::Ref t1 = wt.get_table<TestTableSharedTimestamp>("test");
+                t1->add(2, 3, true, "more test", Timestamp{2,2});
                 wt.commit();
             }
 
@@ -621,14 +633,14 @@ TEST(Shared_1)
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
             CHECK_EQUAL("test", t2[0].fourth);
-
+            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
             // Do one more new change while stil having current read transaction open
             // so we know that it does not overwrite data held by
             {
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
-                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-                t1->add(0, 1, false, "even more test");
+                TestTableSharedTimestamp::Ref t1 = wt.get_table<TestTableSharedTimestamp>("test");
+                t1->add(0, 1, false, "even more test", Timestamp{3,3});
                 wt.commit();
             }
 
@@ -639,27 +651,33 @@ TEST(Shared_1)
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
             CHECK_EQUAL("test", t2[0].fourth);
+            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
         }
 
         // Start a new read transaction and verify that it can now see the changes
         {
             ReadTransaction rt(sg2);
             rt.get_group().verify();
-            TestTableShared::ConstRef t3 = rt.get_table<TestTableShared>("test");
+            TestTableSharedTimestamp::ConstRef t3 = rt.get_table<TestTableSharedTimestamp>("test");
 
             CHECK(t3->size() == 3);
             CHECK_EQUAL(1, t3[0].first);
             CHECK_EQUAL(2, t3[0].second);
             CHECK_EQUAL(false, t3[0].third);
             CHECK_EQUAL("test", t3[0].fourth);
+            CHECK_EQUAL(first_timestamp_value, t3[0].fifth);
             CHECK_EQUAL(2, t3[1].first);
             CHECK_EQUAL(3, t3[1].second);
             CHECK_EQUAL(true, t3[1].third);
             CHECK_EQUAL("more test", t3[1].fourth);
+            Timestamp second_timestamp_value{2,2};
+            CHECK_EQUAL(second_timestamp_value, t3[1].fifth);
             CHECK_EQUAL(0, t3[2].first);
             CHECK_EQUAL(1, t3[2].second);
             CHECK_EQUAL(false, t3[2].third);
             CHECK_EQUAL("even more test", t3[2].fourth);
+            Timestamp third_timestamp_value{3,3};
+            CHECK_EQUAL(third_timestamp_value, t3[2].fifth);
         }
     }
 
@@ -1423,7 +1441,7 @@ TEST(Shared_FormerErrorCase1)
         table->add_column(type_Int,      "alpha");
         table->add_column(type_Bool,     "beta");
         table->add_column(type_Int,      "gamma");
-        table->add_column(type_DateTime, "delta");
+        table->add_column(type_OldDateTime, "delta");
         table->add_column(type_String,   "epsilon");
         table->add_column(type_Binary,   "zeta");
         table->add_column(type_Table,    "eta", &sub_1);
@@ -2652,9 +2670,8 @@ TEST(Shared_MovingSearchIndex)
         table->add_column(type_String, "enum");
         table->add_empty_row(64);
         for (int i = 0; i < 64; ++i) {
-            std::ostringstream out;
-            out << "foo" << i;
-            table->set_string(0, i, out.str());
+            std::string out(std::string("foo") + util::to_string(i));
+            table->set_string(0, i, out);
             table->set_string(1, i, "bar");
         }
         table->set_string(1, 63, "bar63");
@@ -2931,5 +2948,68 @@ TEST(Shared_VersionOfBoundSnapshot)
         CHECK_LESS(version, rt.get_version());
     }
 }
+
+// Run some (repeatable) random checks through the fuzz tester.
+// For a comprehensive fuzz test, afl should be run. To do this see test/fuzzy/README.md
+// If this check fails for some reason, you can find the problem by changing
+// the parse_and_apply_instructions call to use std::cerr which will print out
+// the instructions used to duplicate the failure.
+TEST(Shared_StaticFuzzTestRunSanityCheck)
+{
+    // Either provide a crash file generated by AFL to reproduce a crash, or leave it blank in order to run
+    // a very simple fuzz test that just uses a random generator for generating Realm actions.
+    std::string filename = "";
+    //std::string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
+    //std::string filename = "d:/crash3";
+
+    std::string instr;
+    if (filename != "") {
+        const char* tmp[] = { "", filename.c_str(), "--log" };
+        run_fuzzy(sizeof(tmp) / sizeof(tmp[0]), tmp);
+    }
+    else {
+        // Number of fuzzy tests
+        const size_t iterations = 100;
+
+        // Number of instructions in each test
+        // Changing this strongly affects the test suite run time
+        const size_t instructions = 200;
+
+        for (size_t counter = 0; counter < iterations; counter++)
+        {
+            // You can use your own seed if you have observed a crashing unit test that
+            // printed out some specific seed (the "Unit test random seed:" part that appears).
+            //fastrand(534653645, true);
+            fastrand(unit_test_random_seed + counter, true);
+
+            std::string instr;
+
+            // "fastlog" is because logging to a stream is very very slow. Logging the sequence of
+            // bytes lets you perform many more tests per second.
+            std::string fastlog = "char[] instr2 = {";
+
+            for (size_t t = 0; t < instructions; t++) {
+                char c = static_cast<char>(fastrand());
+                instr += c;
+                std::string tmp;
+                unit_test::to_string(static_cast<int>(c), tmp);
+                fastlog += tmp;
+                if (t + 1 < instructions) {
+                    fastlog += ", ";
+                }
+                else {
+                    fastlog += "}; instr = string(instr2);";
+                }
+            }
+            // Scope guard of "path" is inside the loop to clean up files per iteration
+            SHARED_GROUP_TEST_PATH(path);
+            // If using std::cerr, you can copy/paste the console output into a unit test
+            // to get a reproduction test case
+            //parse_and_apply_instructions(instr, path, std::cerr);
+            parse_and_apply_instructions(instr, path, util::none);
+        }
+    }
+}
+
 
 #endif // TEST_SHARED

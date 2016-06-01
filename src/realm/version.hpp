@@ -23,8 +23,8 @@
 #include <string>
 #include <sstream>
 
-#define REALM_VER_MAJOR 0
-#define REALM_VER_MINOR 97
+#define REALM_VER_MAJOR 1
+#define REALM_VER_MINOR 0
 #define REALM_VER_PATCH 0
 #define REALM_PRODUCT_NAME "realm-core"
 

@@ -50,6 +50,11 @@ class EncryptedFileMapping;
 /// to unambiguously distinguish that particular reason).
 void make_dir(const std::string& path);
 
+/// Same as make_dir() except that this one returns false, rather than throwing
+/// an exception, if the specified directory already existed. If the directory
+// did not already exist and was newly created, this returns true.
+bool try_make_dir(const std::string& path);
+
 /// Remove the specified directory path from the file system. If the
 /// specified path is a directory, this function is equivalent to
 /// std::remove(const char*).
@@ -428,16 +433,17 @@ public:
     ///
     /// Examples (assuming POSIX):
     ///
-    ///    resolve("/foo/bar", "../baz") -> "/foo/baz"
-    ///    resolve(".", "foo")           -> "./foo"
-    ///    resolve("/foo/", ".")         -> "/foo"
-    ///    resolve("foo", "..")          -> "."
-    ///    resolve("foo", "../..")       -> ".."
+    ///    resolve("file", "dir")        -> "dir/file"
+    ///    resolve("../baz", "/foo/bar") -> "/foo/baz"
+    ///    resolve("foo", ".")           -> "./foo"
+    ///    resolve(".", "/foo/")         -> "/foo"
+    ///    resolve("..", "foo")          -> "."
+    ///    resolve("../..", "foo")       -> ".."
     ///    resolve("..", "..")           -> "../.."
     ///    resolve("", "")               -> "."
-    ///    resolve("/", "")              -> "/."
-    ///    resolve("/", "..")            -> "/."
-    ///    resolve("foo//bar", "..")     -> "foo"
+    ///    resolve("", "/")              -> "/."
+    ///    resolve("..", "/")            -> "/."
+    ///    resolve("..", "foo//bar")     -> "foo"
     ///
     /// This function does not access the file system.
     ///

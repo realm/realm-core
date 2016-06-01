@@ -179,6 +179,7 @@ public:
     virtual StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
 
     // Search index
+    virtual bool supports_search_index() const noexcept;
     virtual bool has_search_index() const noexcept;
     virtual StringIndex* create_search_index();
     virtual void destroy_search_index() noexcept;
@@ -292,7 +293,6 @@ public:
     virtual void refresh_accessor_tree(size_t new_col_ndx, const Spec&) = 0;
 
 #ifdef REALM_DEBUG
-    // Must be upper case to avoid conflict with macro in Objective-C
     virtual void verify() const = 0;
     virtual void verify(const Table&, size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
@@ -365,7 +365,7 @@ public:
     bool is_attached() const noexcept final { return m_array->is_attached(); }
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept final { m_array->set_parent(parent, ndx_in_parent); }
     size_t get_ndx_in_parent() const noexcept final { return m_array->get_ndx_in_parent(); }
-    void set_ndx_in_parent(size_t ndx_in_parent) noexcept final { m_array->set_ndx_in_parent(ndx_in_parent); }
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept override { m_array->set_ndx_in_parent(ndx_in_parent); }
     void update_from_parent(size_t old_baseline) noexcept override { m_array->update_from_parent(old_baseline); }
     MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
 
@@ -399,6 +399,7 @@ public:
     void move_assign(ColumnBaseWithIndex& col) noexcept;
     void destroy() noexcept override;
 
+    virtual bool supports_search_index() const noexcept override { return true; }
     bool has_search_index() const noexcept final { return bool(m_search_index); }
     StringIndex* get_search_index() noexcept final { return m_search_index.get(); }
     const StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
@@ -525,6 +526,8 @@ public:
 
     void populate_search_index();
     StringIndex* create_search_index() override;
+    inline bool supports_search_index() const noexcept override { return true; }
+
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -539,7 +542,7 @@ public:
     bool compare(const Column&) const noexcept;
 
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
-                           size_t size = 0, T value = 0);
+                           size_t size = 0, T value = T{});
 
     // Overriding method in ColumnBase
     ref_type write(size_t, size_t, size_t,
@@ -620,6 +623,12 @@ private:
 };
 
 // Implementation:
+
+inline bool ColumnBase::supports_search_index() const noexcept
+{
+    REALM_ASSERT(!has_search_index());
+    return false;
+}
 
 inline bool ColumnBase::has_search_index() const noexcept
 {
@@ -831,17 +840,19 @@ template<class T>
 StringData Column<T>::get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept
 {
     T x = get(ndx);
-    StringData str = to_str(x); // takes x by reference, returns StringData pointing to memory in
-                                // this stack frame.
-    // Copy bytes into buffer:
-    REALM_ASSERT(str.size() <= StringIndex::string_conversion_buffer_size);
-    if (str.data() != nullptr) {
-        std::copy(str.data(), str.data() + str.size(), buffer.data());
-        return StringData{buffer.data(), str.size()};
-    }
-    else {
-        return str; // "null"
-    }
+    return to_str(x, buffer);
+}
+
+template<>
+inline bool Column<float>::supports_search_index() const noexcept
+{
+    return false;
+}
+
+template<>
+inline bool Column<double>::supports_search_index() const noexcept
+{
+    return false;
 }
 
 template<class T>
@@ -866,9 +877,22 @@ template<class T>
 StringIndex* Column<T>::create_search_index()
 {
     REALM_ASSERT(!has_search_index());
+    REALM_ASSERT(supports_search_index());
     m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
     populate_search_index();
     return m_search_index.get();
+}
+
+template<>
+inline StringIndex* Column<float>::create_search_index()
+{
+    return nullptr;
+}
+
+template<>
+inline StringIndex* Column<double>::create_search_index()
+{
+    return nullptr;
 }
 
 template<class T>
@@ -1264,7 +1288,6 @@ template<class T> struct NullOrDefaultValue<T, typename std::enable_if<!Implicit
     static T null_or_default_value(bool is_null)
     {
         REALM_ASSERT(!is_null);
-        static_cast<void>(is_null);
         return T{};
     }
 };

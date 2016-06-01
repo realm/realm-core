@@ -99,13 +99,13 @@ public:
     StringIndex* get_search_index() noexcept override;
     const StringIndex* get_search_index() const noexcept override;
     std::unique_ptr<StringIndex> release_search_index() noexcept;
+    bool supports_search_index() const noexcept final { return true; }
     StringIndex* create_search_index() override;
 
     // Simply inserts all column values in the index in a loop
     void populate_search_index();
     void destroy_search_index() noexcept override;
 
-    // Optimizing data layout
     // Optimizing data layout. enforce == true will enforce enumeration;
     // enforce == false will auto-evaluate if it should be enumerated or not
     bool auto_enumerate(ref_type& keys, ref_type& values, bool enforce = false) const;
@@ -349,7 +349,6 @@ inline void StringColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
     REALM_ASSERT(!insert_nulls || m_nullable);
-    static_cast<void>(insert_nulls);
 
     StringData value = m_nullable ? realm::null() : StringData("");
     bool is_append = (row_ndx == prior_num_rows);

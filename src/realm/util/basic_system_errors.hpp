@@ -42,10 +42,16 @@ enum basic_system_errors {
     operation_aborted = ECANCELED,
 
     /// Connection aborted.
-    connection_aborted = ECONNABORTED
+    connection_aborted = ECONNABORTED,
+
+    /// Connection reset by peer
+    connection_reset = ECONNRESET,
+
+    /// Broken pipe
+    broken_pipe = EPIPE,
 };
 
-std::error_code make_error_code(basic_system_errors);
+std::error_code make_error_code(basic_system_errors) noexcept;
 
 } // namespace error
 } // namespace util
@@ -65,14 +71,14 @@ public:
 namespace realm {
 namespace util {
 
-std::error_code make_basic_system_error_code(int);
+std::error_code make_basic_system_error_code(int) noexcept;
 
 
 
 
 // implementation
 
-inline std::error_code make_basic_system_error_code(int err)
+inline std::error_code make_basic_system_error_code(int err) noexcept
 {
     using namespace error;
     return make_error_code(basic_system_errors(err));

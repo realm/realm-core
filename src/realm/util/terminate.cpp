@@ -68,7 +68,7 @@ void nslog(const char *message) noexcept
 
 void(*termination_notification_callback)(const char*) noexcept = nslog;
 
-#elif REALM_PLATFORM_ANDROID
+#elif REALM_ANDROID
 
 void android_log(const char* message) noexcept
 {
@@ -107,7 +107,7 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
     free(strs);
 #endif
 
-    ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
+    ss << "IMPORTANT: if you see this error, please send this log and reproduction steps to help@realm.io.";
 #ifdef REALM_DEBUG
     std::cerr << ss.rdbuf() << '\n';
 #endif

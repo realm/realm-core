@@ -42,7 +42,7 @@ namespace realm {
 struct SpecBase {
     typedef int64_t             Int;
     typedef bool                Bool;
-    typedef realm::DateTime   DateTime;
+    typedef realm::OldDateTime   OldDateTime;
     typedef float               Float;
     typedef double              Double;
     typedef realm::StringData String;
@@ -402,28 +402,51 @@ public:
 
 /// Field accessor specialization for dates.
 template<class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, DateTime, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, OldDateTime, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    DateTime get() const noexcept
+    OldDateTime get() const noexcept
     {
-        return Base::m_table->get_impl()->get_datetime(col_idx, Base::m_row_idx);
+        return Base::m_table->get_impl()->get_olddatetime(col_idx, Base::m_row_idx);
     }
 
-    void set(DateTime value) const
+    void set(OldDateTime value) const
     {
-        Base::m_table->get_impl()->set_datetime(col_idx, Base::m_row_idx, value);
+        Base::m_table->get_impl()->set_olddatetime(col_idx, Base::m_row_idx, value);
     }
 
-    operator DateTime() const noexcept { return get(); }
-    const FieldAccessor& operator=(DateTime value) const { set(value); return *this; }
+    operator OldDateTime() const noexcept { return get(); }
+    const FieldAccessor& operator=(OldDateTime value) const { set(value); return *this; }
 
 
     explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
 };
 
+/// Field accessor specialization for timestamps.
+template<class Taboid, int col_idx, bool const_tab>
+class FieldAccessor<Taboid, col_idx, Timestamp, const_tab>: public FieldAccessorBase<Taboid> {
+private:
+    typedef FieldAccessorBase<Taboid> Base;
+
+public:
+    Timestamp get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_timestamp(col_idx, Base::m_row_idx);
+    }
+
+    void set(Timestamp value) const
+    {
+        Base::m_table->get_impl()->set_timestamp(col_idx, Base::m_row_idx, value);
+    }
+
+    operator Timestamp() const noexcept { return get(); }
+    const FieldAccessor& operator=(Timestamp value) const { set(value); return *this; }
+
+
+    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+};
 
 /// Field accessor specialization for strings.
 template<class Taboid, int col_idx, bool const_tab>
@@ -613,7 +636,7 @@ public:
 
     bool get_bool() const noexcept { return get().get_bool(); }
 
-    DateTime get_datetime() const noexcept { return get().get_datetime(); }
+    OldDateTime get_olddatetime() const noexcept { return get().get_olddatetime(); }
 
     float get_float() const noexcept { return get().get_float(); }
 
@@ -1125,31 +1148,31 @@ public:
 
 /// Column accessor specialization for dates.
 template<class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, DateTime>: public ColumnAccessorBase<Taboid, col_idx, DateTime> {
+class ColumnAccessor<Taboid, col_idx, OldDateTime>: public ColumnAccessorBase<Taboid, col_idx, OldDateTime> {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, DateTime> Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, OldDateTime> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
-    DateTime maximum(size_t* return_ndx = nullptr) const
+    OldDateTime maximum(size_t* return_ndx = nullptr) const
     {
-        return Base::m_table->get_impl()->maximum_datetime(col_idx, return_ndx);
+        return Base::m_table->get_impl()->maximum_olddatetime(col_idx, return_ndx);
     }
 
-    DateTime minimum(size_t* return_ndx = nullptr) const
+    OldDateTime minimum(size_t* return_ndx = nullptr) const
     {
-        return Base::m_table->get_impl()->minimum_datetime(col_idx, return_ndx);
+        return Base::m_table->get_impl()->minimum_olddatetime(col_idx, return_ndx);
     }
 
-    size_t find_first(DateTime value) const
+    size_t find_first(OldDateTime value) const
     {
-        return Base::m_table->get_impl()->find_first_datetime(col_idx, value);
+        return Base::m_table->get_impl()->find_first_olddatetime(col_idx, value);
     }
 
-    BasicTableView<typename Base::RealTable> find_all(DateTime value) const
+    BasicTableView<typename Base::RealTable> find_all(OldDateTime value) const
     {
-        return Base::m_table->get_impl()->find_all_datetime(col_idx, value);
+        return Base::m_table->get_impl()->find_all_olddatetime(col_idx, value);
     }
 
     BasicTableView<typename Base::RealTable> get_distinct_view() const
@@ -1528,68 +1551,68 @@ public:
 
 /// QueryColumn specialization for dates.
 template<class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, DateTime>: public QueryColumnBase<Taboid, col_idx, DateTime> {
+class QueryColumn<Taboid, col_idx, OldDateTime>: public QueryColumnBase<Taboid, col_idx, OldDateTime> {
 private:
-    typedef QueryColumnBase<Taboid, col_idx, DateTime> Base;
+    typedef QueryColumnBase<Taboid, col_idx, OldDateTime> Base;
     typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q) noexcept: Base(q) {}
 
-    Query& equal(DateTime value) const
+    Query& equal(OldDateTime value) const
     {
-        Base::m_query->m_impl.equal_datetime(col_idx, value);
+        Base::m_query->m_impl.equal_olddatetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& not_equal(DateTime value) const
+    Query& not_equal(OldDateTime value) const
     {
-        Base::m_query->m_impl.not_equal_datetime(col_idx, value);
+        Base::m_query->m_impl.not_equal_olddatetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& greater(DateTime value) const
+    Query& greater(OldDateTime value) const
     {
-        Base::m_query->m_impl.greater_datetime(col_idx, value);
+        Base::m_query->m_impl.greater_olddatetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& greater_equal(DateTime value) const
+    Query& greater_equal(OldDateTime value) const
     {
-        Base::m_query->m_impl.greater_equal_datetime(col_idx, value);
+        Base::m_query->m_impl.greater_equal_olddatetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& less(DateTime value) const
+    Query& less(OldDateTime value) const
     {
-        Base::m_query->m_impl.less_datetime(col_idx, value);
+        Base::m_query->m_impl.less_olddatetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& less_equal(DateTime value) const
+    Query& less_equal(OldDateTime value) const
     {
-        Base::m_query->m_impl.less_equal_datetime(col_idx, value);
+        Base::m_query->m_impl.less_equal_olddatetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& between(DateTime from, DateTime to) const
+    Query& between(OldDateTime from, OldDateTime to) const
     {
-        Base::m_query->m_impl.between_datetime(col_idx, from, to);
+        Base::m_query->m_impl.between_olddatetime(col_idx, from, to);
         return *Base::m_query;
     };
 
-    DateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
+    OldDateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
                  size_t end = size_t(-1), size_t limit=size_t(-1),
                  size_t* return_ndx = nullptr) const
     {
-        return Base::m_query->m_impl.maximum_datetime(col_idx, resultcount, start, end, limit, return_ndx);
+        return Base::m_query->m_impl.maximum_olddatetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    DateTime minimum(size_t* resultcount = nullptr, size_t start = 0,
+    OldDateTime minimum(size_t* resultcount = nullptr, size_t start = 0,
                  size_t end = size_t(-1), size_t limit=size_t(-1),
                  size_t* return_ndx = nullptr) const
     {
-        return Base::m_query->m_impl.minimum_datetime(col_idx, resultcount, start, end, limit, return_ndx);
+        return Base::m_query->m_impl.minimum_olddatetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 };
 

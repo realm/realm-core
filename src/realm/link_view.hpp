@@ -20,7 +20,6 @@
 #ifndef REALM_LINK_VIEW_HPP
 #define REALM_LINK_VIEW_HPP
 
-#include <realm/util/bind_ptr.hpp>
 #include <realm/column.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/link_view_fwd.hpp>
@@ -41,7 +40,7 @@ class TransactLogConvenientEncoder;
 /// exceptions are is_attached() and the destructor.
 ///
 /// FIXME: Rename this class to `LinkList`.
-class LinkView : public RowIndexes {
+class LinkView : public RowIndexes, public std::enable_shared_from_this<LinkView> {
 public:
     ~LinkView() noexcept;
     bool is_attached() const noexcept;
@@ -50,7 +49,7 @@ public:
     bool is_empty() const noexcept;
 
     /// This method will return 0 if the LinkView is detached (no assert).
-    size_t size() const noexcept;
+    size_t size() const noexcept override;
 
     bool operator==(const LinkView&) const noexcept;
     bool operator!=(const LinkView&) const noexcept;
@@ -101,7 +100,7 @@ public:
     /// returned.
     size_t find(size_t target_row_ndx, size_t start=0) const noexcept;
 
-    const ColumnBase& get_column_base(size_t index) const; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
+    const ColumnBase& get_column_base(size_t index) const override; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
     const Table& get_origin_table() const noexcept;
     Table& get_origin_table() noexcept;
 
@@ -110,7 +109,13 @@ public:
     const Table& get_target_table() const noexcept;
     Table& get_target_table() noexcept;
 
+    // No-op because LinkViews are always kept in sync.
+    uint_fast64_t sync_if_needed() const override;
+    bool is_in_sync() const override { return true; }
+
 private:
+    struct ctor_cookie {};
+
     TableRef m_origin_table;
     LinkListColumn& m_origin_column;
     mutable size_t m_ref_count;
@@ -118,9 +123,6 @@ private:
     using HandoverPatch = LinkViewHandoverPatch;
     static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch);
     static LinkViewRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
-
-    // constructor (protected since it can only be used by friends)
-    LinkView(Table* origin_table, LinkListColumn&, size_t row_ndx);
 
     void detach();
     void set_origin_row_index(size_t row_ndx) noexcept;
@@ -133,9 +135,6 @@ private:
     void do_update_link(size_t old_target_row_ndx, size_t new_target_row_ndx);
     void do_swap_link(size_t target_row_ndx_1, size_t target_row_ndx_2);
 
-    void bind_ptr() const noexcept;
-    void unbind_ptr() const noexcept;
-
     void refresh_accessor_tree(size_t new_row_ndx) noexcept;
 
     void update_from_parent(size_t old_baseline) noexcept;
@@ -147,21 +146,26 @@ private:
 #ifdef REALM_DEBUG
     void verify(size_t row_ndx) const;
 #endif
+    // allocate using make_shared:
+    static std::shared_ptr<LinkView> create(Table* origin_table, LinkListColumn&, size_t row_ndx);
 
     friend class _impl::LinkListFriend;
     friend class LinkListColumn;
-    friend class util::bind_ptr<LinkView>;
-    friend class util::bind_ptr<const LinkView>;
     friend class LangBindHelper;
     friend class SharedGroup;
     friend class Query;
     friend class TableViewBase;
+
+    // must be public for use by make_shared, but cannot be called from outside,
+    // because ctor_cookie is private
+public:
+    LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn&, size_t row_ndx);
 };
 
 
 // Implementation
 
-inline LinkView::LinkView(Table* origin_table, LinkListColumn& column, size_t row_ndx):
+inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn& column, size_t row_ndx):
     RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()), // Throws
     m_origin_table(origin_table->get_table_ref()),
     m_origin_column(column),
@@ -173,25 +177,18 @@ inline LinkView::LinkView(Table* origin_table, LinkListColumn& column, size_t ro
         root.init_from_ref(ref);
 }
 
+inline std::shared_ptr<LinkView> 
+LinkView::create(Table* origin_table, LinkListColumn& column, size_t row_ndx)
+{
+    return std::make_shared<LinkView>(ctor_cookie(), origin_table, column, row_ndx);
+}
+
 inline LinkView::~LinkView() noexcept
 {
     if (is_attached()) {
         repl_unselect();
-        m_origin_column.unregister_linkview(*this);
+        m_origin_column.unregister_linkview();
     }
-}
-
-inline void LinkView::bind_ptr() const noexcept
-{
-    ++m_ref_count;
-}
-
-inline void LinkView::unbind_ptr() const noexcept
-{
-    if (--m_ref_count > 0)
-        return;
-
-    delete this;
 }
 
 inline void LinkView::detach()

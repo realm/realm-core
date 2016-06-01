@@ -1,0 +1,9 @@
+#!/bin/bash -ex
+# we should always set proper ownership before exiting, otherwise
+# the created logs will have root:root ownership and we'll be unable
+# to delete them from our host.
+trap 'chown -R --reference /test-inside/test /test-logs/' EXIT
+
+yum -y install /out/*.rpm
+
+# include build test here to ensure that everything is properly installed
