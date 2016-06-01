@@ -95,7 +95,7 @@ namespace realm {
     bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
     {
         if (method == STRING_COMPARE_CPP11) {
-#if !defined(REALM_ANDROID)
+#if !REALM_ANDROID
             std::string l = std::locale("").name();
             // We cannot use C locale because it puts 'Z' before 'a'
             if (l == "C")

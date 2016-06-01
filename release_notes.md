@@ -7,6 +7,8 @@
   where the last reference to the memory mapping goes out of scope, it would
   cause the assert "Destruction of mutex in use". Fix is to use unique_lock
   to ensure the mutex is unlocked before destruction.
+* Fix a crash when `Table::set_string_unique()` is called but the underlying 
+  column is actually a StringEnumColumn.
 
 ### Breaking changes
 
@@ -18,6 +20,7 @@
 
 ### Enhancements
 
+* Strictly enforce not allowing search indexes to be created on unsupported column types.
 * S: Event loop API reworked to more closely align with the `util::network` API,
   and to better provide for multiple alternative implementations (not considered
   breaking because the event loop API was not yet in use).
@@ -35,6 +38,18 @@
 * Corrected two usages of undefined REALM_PLATFORM_ANDROID to REALM_ANDROID.
   This correctly enables Android log output on termination and allows using
   robust mutexes on Android platforms. (#1834)
+
+----------------------------------------------
+
+# 1.0.2 Release notes
+
+### Internals
+
+* This is functionally the same as 1.0.1 but with the bitcode build settings
+  changed. (#1813 is reverted). This is to build with Xamarin.
+
+**Note: This is a hotfix release and these changes are not necessarily included
+  in any above releases**
 
 ----------------------------------------------
 

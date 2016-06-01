@@ -1467,8 +1467,9 @@ TEST(Table_SetIntUnique)
 }
 
 
-TEST(Table_SetStringUnique)
+TEST_TYPES(Table_SetStringUnique, std::true_type, std::false_type)
 {
+    bool string_enum_column = TEST_TYPE::value;
     Table table;
     table.add_column(type_Int, "ints");
     table.add_column(type_String, "strings");
@@ -1479,6 +1480,11 @@ TEST(Table_SetStringUnique)
     CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, "foo"), LogicError::no_search_index);
     table.add_search_index(1);
     table.add_search_index(2);
+
+    if (string_enum_column) {
+        bool force = true;
+        table.optimize(force);
+    }
 
     table.set_string_unique(1, 0, "bar");
 
@@ -6822,6 +6828,84 @@ TEST(Table_StaleLinkIndexOnTableRemove)
 
     CHECK_EQUAL(t->size(), 1);
     CHECK_EQUAL(t2->get_link(0, 0), realm::npos); // no link
+}
+
+TEST(Table_ColumnsSupportStringIndex)
+{
+    std::vector<DataType> all_types {
+        type_Int,
+        type_Bool,
+        type_Float,
+        type_Double,
+        type_String,
+        type_Binary,
+        type_OldDateTime,
+        type_Timestamp,
+        type_Table,
+        type_Mixed
+    };
+
+    std::vector<DataType> supports_index {
+        type_Int,
+        type_Bool,
+        type_String,
+        type_OldDateTime,
+        type_Timestamp
+    };
+
+    Group g; // type_Link must be part of a group
+    TableRef t = g.add_table("t1");
+    for (auto it = all_types.begin(); it != all_types.end(); ++it) {
+        t->add_column(*it, "");
+        ColumnBase& col = _impl::TableFriend::get_column(*t, 0);
+        bool does_support_index = col.supports_search_index();
+        auto found_pos = std::find(supports_index.begin(), supports_index.end(), *it);
+        CHECK_EQUAL(does_support_index, (found_pos != supports_index.end()));
+        CHECK_EQUAL(does_support_index, (col.create_search_index() != nullptr));
+        CHECK_EQUAL(does_support_index, col.has_search_index());
+        col.destroy_search_index();
+        CHECK(!col.has_search_index());
+        if (does_support_index) {
+            t->add_search_index(0);
+        }
+        else {
+            CHECK_THROW(t->add_search_index(0), LogicError);
+        }
+        CHECK_EQUAL(does_support_index, t->has_search_index(0));
+        t->remove_column(0);
+    }
+
+    // Check type_Link
+    t->add_column_link(type_Link, "", *t);
+    ColumnBase& link_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(!link_col.supports_search_index());
+    CHECK(link_col.create_search_index() == nullptr);
+    CHECK(!link_col.has_search_index());
+    CHECK_THROW(t->add_search_index(0), LogicError);
+    t->remove_column(0);
+
+    // Check type_LinkList
+    t->add_column_link(type_LinkList, "", *t);
+    ColumnBase& linklist_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(!linklist_col.supports_search_index());
+    CHECK(linklist_col.create_search_index() == nullptr);
+    CHECK(!linklist_col.has_search_index());
+    CHECK_THROW(t->add_search_index(0), LogicError);
+    t->remove_column(0);
+
+    // Check StringEnum
+    t->add_column(type_String, "");
+    bool force = true;
+    t->optimize(force);
+    ColumnBase& enum_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(enum_col.supports_search_index());
+    CHECK(enum_col.create_search_index() != nullptr);
+    CHECK(enum_col.has_search_index());
+    enum_col.destroy_search_index();
+    CHECK(!enum_col.has_search_index());
+    t->add_search_index(0);
+    CHECK(enum_col.has_search_index());
+    t->remove_column(0);
 }
 
 TEST(Table_getVersionCounterAfterRowAccessor) {
