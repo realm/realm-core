@@ -332,8 +332,9 @@ build_apple()
 build_cocoa()
 {
     local output_dir platforms
-    output_dir="$1"
-    platforms="$2"
+    file_basename="$1"
+    output_dir="$2"
+    platforms="$3"
 
     if [ "$OS" != "Darwin" ]; then
         echo "zip for iOS/OSX/watchOS/tvOS can only be generated under OS X."
@@ -347,42 +348,41 @@ build_cocoa()
     echo "Copying files"
     tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
     realm_version="$(sh build.sh get-version)" || exit 1
-    BASENAME="core"
-    rm -f "$BASENAME-$realm_version.zip" || exit 1
-    mkdir -p "$tmpdir/$BASENAME/include" || exit 1
+    rm -f "$file_basename-$realm_version.zip" || exit 1
+    mkdir -p "$tmpdir/$file_basename/include" || exit 1
 
     platform_for_headers=$(echo $platforms | cut -d ' ' -f 1 | sed s/-no-bitcode// | tr "[:lower:]" "[:upper:]")
     eval headers_dir=\$${platform_for_headers}_DIR
-    cp -r "$headers_dir/include/"* "$tmpdir/$BASENAME/include" || exit 1
+    cp -r "$headers_dir/include/"* "$tmpdir/$file_basename/include" || exit 1
 
     for platform in $platforms; do
         eval platform_dir=\$$(echo $platform | sed s/-no-bitcode// | tr "[:lower:]" "[:upper:]")_DIR
-        cp "$platform_dir"/*.a "$tmpdir/$BASENAME" || exit 1
+        cp "$platform_dir"/*.a "$tmpdir/$file_basename" || exit 1
     done
 
-    if [ -f "$tmpdir/$BASENAME"/librealm-macosx.a ]; then
+    if [ -f "$tmpdir/$file_basename"/librealm-macosx.a ]; then
         # If we built for OS X, add symlinks at the location of the old library names. This will give the bindings
         # a chance to update to the new names without breaking building with new versions of core.
-        rm -f "$tmpdir/$BASENAME"/librealm{,-dbg}.a
-        ln -sf librealm-macosx.a "$tmpdir/$BASENAME"/librealm.a
-        ln -sf librealm-macosx-dbg.a "$tmpdir/$BASENAME"/librealm-dbg.a
+        rm -f "$tmpdir/$file_basename"/librealm{,-dbg}.a
+        ln -sf librealm-macosx.a "$tmpdir/$file_basename"/librealm.a
+        ln -sf librealm-macosx-dbg.a "$tmpdir/$file_basename"/librealm-dbg.a
     fi
 
-    cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
+    cp tools/LICENSE "$tmpdir/$file_basename" || exit 1
     if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
         command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
-        pandoc -f markdown -t plain -o "$tmpdir/$BASENAME/release_notes.txt" release_notes.md || exit 1
+        pandoc -f markdown -t plain -o "$tmpdir/$file_basename/release_notes.txt" release_notes.md || exit 1
     fi
 
-    echo "Create zip file: '$BASENAME-$realm_version.zip'"
-    (cd $tmpdir && zip -r -q --symlinks "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
-    mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
+    echo "Create zip file: '$file_basename-$realm_version.zip'"
+    (cd $tmpdir && zip -r -q --symlinks "$file_basename-$realm_version.zip" "$file_basename") || exit 1
+    mv "$tmpdir/$file_basename-$realm_version.zip" . || exit 1
 
     echo "Unzipping in '$output_dir'"
     mkdir -p "$output_dir" || exit 1
-    rm -rf "$output_dir/$BASENAME" || exit 1
+    rm -rf "$output_dir/$file_basename" || exit 1
     cur_dir="$(pwd)"
-    (cd "$output_dir" && unzip -qq "$cur_dir/$BASENAME-$realm_version.zip") || exit 1
+    (cd "$output_dir" && unzip -qq "$cur_dir/$file_basename-$realm_version.zip") || exit 1
 
     rm -rf "$tmpdir" || exit 1
     echo "Done"
@@ -1001,8 +1001,9 @@ EOF
         if [ -z "$realm_cocoa_dir" ]; then
             realm_cocoa_dir="../realm-cocoa"
         fi
+        file_basename="core" # FIXME: we should change this to realm-core-cocoa everywhere
 
-        build_cocoa "$realm_cocoa_dir" "$REALM_COCOA_PLATFORMS"
+        build_cocoa "$file_basename" "$realm_cocoa_dir" "$REALM_COCOA_PLATFORMS"
         exit 0
         ;;
 
@@ -1012,8 +1013,9 @@ EOF
         if [ -z "$output_dir" ]; then
             output_dir="../realm-dotnet/wrappers"
         fi
+        file_basename="realm-core-dotnet-cocoa"
 
-        build_cocoa "$output_dir" "$REALM_DOTNET_COCOA_PLATFORMS"
+        build_cocoa "$file_basename" "$output_dir" "$REALM_DOTNET_COCOA_PLATFORMS"
         exit 0
         ;;
 
