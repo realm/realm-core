@@ -780,7 +780,7 @@ TEST(Query_NextGenSyntaxMonkey0)
 TEST(Query_NextGenSyntaxMonkey)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (int iter = 1; iter < 10 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
+    for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
             1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
@@ -2339,7 +2339,7 @@ TEST(Query_OnTableView_where)
 {
     Random random;
 
-    for (int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
+    for (int iter = 0; iter < 50 * (1 + TEST_DURATION * TEST_DURATION); iter++) {
         random.seed(164);
         OneIntTable oti;
         size_t cnt1 = 0;

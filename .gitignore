@@ -12,7 +12,7 @@ doc/html
 
 # Ignore all user files except one which includes execution path for test
 *.user
-!tighdb.vcxproj.user
+!Realm.vcxproj.user
 
 #ignore thumbnails created by windows
 Thumbs.db
