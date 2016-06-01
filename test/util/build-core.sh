@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# build-core.sh
+#
+# This script builds a given version of core in a dedicated directory of core
+# builds. This enables, for instance, comparing the performance of various of
+# versions of core on the same device.
+
 set -euo pipefail
 
 builddir=core-builds
