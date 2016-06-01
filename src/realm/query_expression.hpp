@@ -1436,7 +1436,7 @@ UnaryOperator<Pow<T>> power (const Subexpr2<T>& left) {
 // Classes used for LinkMap (see below).
 struct LinkMapFunction
 {
-    // Your consume() method is given row index of the linked-to table as argument, and you must return wether or
+    // Your consume() method is given row index of the linked-to table as argument, and you must return whether or
     // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
     // for the current main table row index (it will be a link tree if you have multiple type_LinkList columns
     // in a link()->link() query.
