@@ -2077,4 +2077,60 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 }
 
+
+TEST(TableView_SortOrder)
+{
+    TestTableString table;
+
+    // This is the expected sorting order with STRING_COMPARE_CORE. See utf8_compare() in unicode.cpp
+    //
+    // NOTE NOTE: Your editor must assume that Core source code is in utf8, and it must save as utf8, else this unit
+    // test will fail.
+
+    table.add(" ");
+    table.add("#");
+    table.add("%");
+    table.add("(");
+    table.add("+");
+    table.add("-");
+    table.add(".");
+    table.add("/");
+    table.add("<");
+    table.add("@");
+    table.add("[");
+    table.add("|");
+    table.add("a");
+    table.add("aa");
+    table.add("aA");
+    table.add("A");
+    table.add("Aa");
+    table.add("AA");
+    table.add("å");
+    table.add("Å");
+    table.add("æ");
+    table.add("Æ");
+    table.add("b");
+    table.add("bb");
+    table.add("bB");
+    table.add("B");
+    table.add("Bb");
+    table.add("BB");
+    table.add("ö");
+    table.add("Ö");
+    table.add("ø");
+    table.add("Ø");
+    table.add("z");
+
+    // Core-only is default comparer
+    TestTableString::View v1 = table.where().find_all();
+    TestTableString::View v2 = table.where().find_all();
+
+    v2.column().first.sort();
+
+    for (size_t t = 0; t < v1.size(); t++) {
+        CHECK_EQUAL(v1.get_source_ndx(t), v2.get_source_ndx(t));
+    }
+}
+
+
 #endif // TEST_TABLE_VIEW
