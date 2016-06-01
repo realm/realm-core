@@ -1,6 +1,7 @@
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/spec.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/to_string.hpp>
 
 using namespace realm;
 
@@ -561,22 +562,28 @@ void Spec::verify() const
 }
 
 
-void Spec::to_dot(std::ostream& out, StringData) const
+void Spec::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = m_top.get_ref();
 
     out << "subgraph cluster_specset" << ref << " {" << std::endl;
-    out << " label = \"specset\";" << std::endl;
+    out << " label = \"specset " << title << "\";" << std::endl;
+
+    std::string types_name = "types (" + util::to_string(m_types.size()) + ")";
+    std::string names_name = "names (" + util::to_string(m_names.size()) + ")";
+    std::string attr_name = "attrs (" + util::to_string(m_attr.size()) + ")";
 
     m_top.to_dot(out);
-    m_types.to_dot(out, "types");
-    m_names.to_dot(out, "names");
+    m_types.to_dot(out, types_name);
+    m_names.to_dot(out, names_name);
+    m_attr.to_dot(out, attr_name);
 
     size_t num_cols = m_types.size();
     bool have_subspecs = false;
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = ColumnType(m_types.get(i));
-        if (type == col_type_Table) {
+        if (type == col_type_Table || type == col_type_Link
+            || type == col_type_LinkList || type == col_type_BackLink) {
             have_subspecs = true;
             break;
         }

@@ -1653,17 +1653,15 @@ void Table::add_search_index(size_t col_ndx)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    if (REALM_UNLIKELY(get_column_type(col_ndx) == type_Float))
-        throw LogicError(LogicError::illegal_combination);
-
-    if (REALM_UNLIKELY(get_column_type(col_ndx) == type_Double))
-        throw LogicError(LogicError::illegal_combination);
-
     if (has_search_index(col_ndx))
         return;
 
-    // Create the index
     ColumnBase& col = get_column_base(col_ndx);
+
+    if (!col.supports_search_index())
+        throw LogicError(LogicError::illegal_combination);
+
+    // Create the index
     StringIndex* index = col.create_search_index(); // Throws
     if (!index) {
         throw LogicError(LogicError::illegal_combination);
@@ -3025,8 +3023,19 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
 
     bump_version();
 
-    StringColumn& col = get_column_string(col_ndx);
-    do_set_unique(col, ndx, value); // Throws
+    ColumnType actual_type = get_real_column_type(col_ndx);
+    REALM_ASSERT(actual_type == ColumnType::col_type_String
+                 || actual_type == ColumnType::col_type_StringEnum);
+
+    //FIXME: String and StringEnum columns should have a common base class
+    if (actual_type == ColumnType::col_type_String) {
+        StringColumn& col = get_column_string(col_ndx);
+        do_set_unique(col, ndx, value); // Throws
+    }
+    else {
+        StringEnumColumn& col = get_column_string_enum(col_ndx);
+        do_set_unique(col, ndx, value); // Throws
+    }
 
     if (Replication* repl = get_repl())
         repl->set_string_unique(this, col_ndx, ndx, value); // Throws
