@@ -30,26 +30,26 @@
 namespace realm {
 namespace util {
 
-template<class Ref> class ReleaseGuard {
+template<class Ref> class CFPtr {
 public:
-    explicit ReleaseGuard(Ref ref = nullptr) noexcept:
+    explicit CFPtr(Ref ref = nullptr) noexcept:
         m_ref(ref)
     {
     }
 
-    ReleaseGuard(ReleaseGuard&& rg) noexcept:
+    CFPtr(CFPtr&& rg) noexcept:
         m_ref(rg.m_ref)
     {
         rg.m_ref = nullptr;
     }
 
-    ~ReleaseGuard() noexcept
+    ~CFPtr() noexcept
     {
         if (m_ref)
             CFRelease(m_ref);
     }
 
-    ReleaseGuard &operator=(ReleaseGuard&& rg) noexcept
+    CFPtr &operator=(CFPtr&& rg) noexcept
     {
         REALM_ASSERT(!m_ref || m_ref != rg.m_ref);
         if (m_ref)
