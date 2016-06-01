@@ -202,7 +202,7 @@ public:
 
     typedef int32_t key_type;
 
-    static const size_t index_key_length = 4;
+    static const size_t s_index_key_length = 4;
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
 

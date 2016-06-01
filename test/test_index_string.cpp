@@ -1355,13 +1355,6 @@ TEST(StringIndex_InsertLongPrefix) {
 
     //col.clear(); // crash from Array::destroy_deep();
 
-    // if that didn't work for you, let's try more.
-    for (int i = 9408; i < 10000; ++i) {
-        std::string base_i(i, 'a');
-        col.add(base_i + "b");
-        col.add(base_i + "c");
-    }
-
     //TODO: check for other recursive functions such as do_update_ref(); do_delete();
     //TODO: check moving long strings from list to subindex and reversed after removal
 }

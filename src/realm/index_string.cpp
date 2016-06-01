@@ -356,7 +356,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     // This leaf already has a slot for for the key
 
     int_fast64_t slot_value = m_array->get(ins_pos+1);
-    size_t suboffset = offset + index_key_length;
+    size_t suboffset = offset + s_index_key_length;
 
     // Single match (lowest bit set indicates literal row_ndx)
     if ((slot_value & 1) != 0) {
@@ -386,7 +386,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 
             // Fast forward suboffset until there is a difference in the strings
             while (key_for_value == key_for_v2) {
-                suboffset += index_key_length;
+                suboffset += s_index_key_length;
                 key_for_value = create_key(value, suboffset);
                 key_for_v2 = create_key(v2, suboffset);
             }
@@ -401,7 +401,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             // Reverse suboffset again and build up the line of nested StringIndices
             // from the bottom. The previous level down is pointed to by last_ref
             while (suboffset > start_offset) {
-                suboffset -= index_key_length;
+                suboffset -= s_index_key_length;
                 // Create leaf node with key = create_key(value, suboffset)
                 StringIndex shared_index(m_target_column, m_array->get_alloc());
                 shared_index.insert_with_offset(row_ndx, value, suboffset);
@@ -464,7 +464,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     key_type next_key = create_key(value, suboffset);
     ref_type parent_array_ref = m_array->get_ref();
 
-    while (suboffset + index_key_length < value.size()) {
+    while (suboffset + s_index_key_length < value.size()) {
         Array parent_array(alloc);
         parent_array.init_from_ref(parent_array_ref);
         StringIndex subindex(ref, &parent_array, sub_ndx_in_parent, m_target_column,
@@ -481,7 +481,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                     char* header = alloc.translate(next_ref);
                     if (Array::get_context_flag_from_header(header)) { // Not a list. Therefore this match is a subindex.
                         ref = next_ref;
-                        suboffset += index_key_length;
+                        suboffset += s_index_key_length;
                         next_key = create_key(value, suboffset);
                         sub_ndx_in_parent = sub_ndx_to_check_refs;
                         parent_array_ref = subindex.m_array->get_ref();
@@ -655,7 +655,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
             if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
-                subindex.do_delete(row_ndx, value, offset + index_key_length);
+                subindex.do_delete(row_ndx, value, offset + s_index_key_length);
 
                 if (subindex.is_empty()) {
                     values.erase(pos);
@@ -716,7 +716,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
             if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
-                subindex.do_update_ref(value, row_ndx, new_row_ndx, offset + index_key_length);
+                subindex.do_update_ref(value, row_ndx, new_row_ndx, offset + s_index_key_length);
             }
             else {
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
