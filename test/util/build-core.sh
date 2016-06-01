@@ -25,8 +25,8 @@ performance of various of versions of core on the same machine.
 
 Examples:
 
-$ ./util/build-core.sh master # master assumed by default.
-$ ./util/build-core.sh tags/v0.97.3 # Tags must be prefixed with "tag/".
+$ ./util/build-core.sh master # master is assumed by default.
+$ ./util/build-core.sh tags/v0.97.3 # Tags must be prefixed with "tags/".
 $ ./util/build-core.sh ea310804 # Can be a short commit ID.
 $ ./util/build-core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
 
