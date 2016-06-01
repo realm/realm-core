@@ -1011,8 +1011,7 @@ private:
     static std::error_code get_error(CFReadStreamRef read_stream)
     {
         REALM_ASSERT(CFReadStreamGetStatus(read_stream) == kCFStreamStatusError);
-        CFPtr<CFErrorRef> error;
-        error.reset(CFReadStreamCopyError(read_stream));
+        CFPtr<CFErrorRef> error = adoptCF(CFReadStreamCopyError(read_stream));
         if (!error)
             throw std::bad_alloc();
         return translate_error(error.get()); // Throws
@@ -1021,8 +1020,7 @@ private:
     static std::error_code get_error(CFWriteStreamRef write_stream)
     {
         REALM_ASSERT(CFWriteStreamGetStatus(write_stream) == kCFStreamStatusError);
-        CFPtr<CFErrorRef> error;
-        error.reset(CFWriteStreamCopyError(write_stream));
+        CFPtr<CFErrorRef> error = adoptCF(CFWriteStreamCopyError(write_stream));
         if (!error)
             throw std::bad_alloc();
         return translate_error(error.get()); // Throws
@@ -1052,9 +1050,8 @@ private:
             }
         }
 /*
-        CFPtr<CFDataRef> domain_2;
-        domain_2.reset(CFStringCreateExternalRepresentation(kCFAllocatorDefault, domain,
-                                                            kCFStringEncodingUTF8, '?'));
+        CFPtr<CFDataRef> domain_2 = adoptCF(CFStringCreateExternalRepresentation(kCFAllocatorDefault, domain,
+                                                                                 kCFStringEncodingUTF8, '?'));
         if (!domain_2)
             throw std::bad_alloc();
         static_assert(std::is_same<UInt8, char>::value || std::is_same<UInt8, unsigned char>::value,
@@ -1117,9 +1114,8 @@ public:
         context.retain = nullptr;
         context.release = nullptr;
         context.copyDescription = nullptr;
-        CFPtr<CFRunLoopTimerRef> cf_timer;
-        cf_timer.reset(CFRunLoopTimerCreate(kCFAllocatorDefault, fire_date, interval, flags, order,
-                                            callout, &context));
+        CFPtr<CFRunLoopTimerRef> cf_timer = adoptCF(CFRunLoopTimerCreate(kCFAllocatorDefault, fire_date, interval,
+                                                                         flags, order, callout, &context));
         if (!cf_timer)
             throw std::bad_alloc();
 
@@ -1228,8 +1224,7 @@ EventLoopImpl::EventLoopImpl()
     context.schedule = nullptr; // Called when added to run loop
     context.cancel = nullptr; // Called when removed from run loop
     context.perform = &EventLoopImpl::wake_up_callback;
-    CFPtr<CFRunLoopSourceRef> source;
-    source.reset(CFRunLoopSourceCreate(kCFAllocatorDefault, order, &context));
+    CFPtr<CFRunLoopSourceRef> source = adoptCF(CFRunLoopSourceCreate(kCFAllocatorDefault, order, &context));
     if (!source)
         throw std::bad_alloc();
 
