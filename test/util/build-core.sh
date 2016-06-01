@@ -67,7 +67,7 @@ fi
 
 basedir="${builddir}/${ref}"
 mkdir -p "${basedir}"
-basedir="$(realpath "${basedir}")"
+basedir="$(cd "${basedir}" && pwd -P)"
 
 srcdir="${basedir}/src"
 
