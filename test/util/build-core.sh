@@ -5,6 +5,20 @@
 # This script builds a given version of core in a dedicated directory of core
 # builds under the current working directory. This enables, for instance,
 # comparing the performance of various of versions of core on the same device.
+#
+# Examples:
+#
+# $ ./util/build-core.sh master # master assumed by default.
+# $ ./util/build-core.sh tags/v0.97.3
+# $ ./util/build-core.sh ea310804
+# $ ./util/build-core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
+#
+# This results in directories:
+#
+# $ ./core-builds/master
+# $ ./core-builds/tags/v0.97.3
+# $ ./core-builds/ea310804
+# $ ./core-builds/32b3b79d2ab90e784ad5f14f201d682be9746781
 
 set -euo pipefail
 
