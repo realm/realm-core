@@ -45,6 +45,7 @@ OSX_DIR="macosx-lib"
 IPHONE_EXTENSIONS="objc"
 IPHONE_SDKS="iphoneos iphonesimulator"
 IPHONE_DIR="ios-lib"
+IPHONE_NO_BITCODE_DIR="ios-no-bitcode-lib"
 
 WATCHOS_SDKS="watchos watchsimulator"
 WATCHOS_DIR="watchos-lib"
@@ -351,12 +352,12 @@ build_cocoa()
     rm -f "$file_basename-$realm_version.zip" || exit 1
     mkdir -p "$tmpdir/$file_basename/include" || exit 1
 
-    platform_for_headers=$(echo $platforms | cut -d ' ' -f 1 | sed s/-no-bitcode// | tr "[:lower:]" "[:upper:]")
+    platform_for_headers=$(echo $platforms | cut -d ' ' -f 1 | tr "-" "_" | tr "[:lower:]" "[:upper:]")
     eval headers_dir=\$${platform_for_headers}_DIR
     cp -r "$headers_dir/include/"* "$tmpdir/$file_basename/include" || exit 1
 
     for platform in $platforms; do
-        eval platform_dir=\$$(echo $platform | sed s/-no-bitcode// | tr "[:lower:]" "[:upper:]")_DIR
+        eval platform_dir=\$$(echo $platform | tr "-" "_" | tr "[:lower:]" "[:upper:]")_DIR
         cp "$platform_dir"/*.a "$tmpdir/$file_basename" || exit 1
     done
 
@@ -803,7 +804,7 @@ EOF
         export min_version='7.0'
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
-        export dir="$IPHONE_DIR"
+        export dir="$IPHONE_NO_BITCODE_DIR"
         export platform_suffix='-no-bitcode'
         export enable_bitcode='no'
         build_apple

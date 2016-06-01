@@ -61,6 +61,7 @@ Static library*/
 /core-*.zip
 /macosx-lib/
 /ios-lib/
+/ios-no-bitcode-lib/
 /watchos-lib/
 /tvos-lib/
 
