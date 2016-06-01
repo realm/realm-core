@@ -310,7 +310,7 @@ build_apple()
     mkdir -p "$dir" || exit 1
     echo "Creating '$dir/librealm-$os_name$platform_suffix.a'"
     libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$dir/librealm-$os_name$platform_suffix.a"     || exit 1
-    echo "Creating '$dir/librealm-$os_name-dbg.a'"
+    echo "Creating '$dir/librealm-$os_name$platform_suffix-dbg.a'"
     libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$dir/librealm-$os_name$platform_suffix-dbg.a" || exit 1
     echo "Copying headers to '$dir/include'"
     mkdir -p "$dir/include" || exit 1
