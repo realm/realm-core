@@ -70,7 +70,7 @@ Static library*/
 # sh build.sh build-android
 /android-lib/
 /openssl/
-core-android-*.tar.gz
+/realm-core-android-*.tar.gz
 
 # debian/ubuntu builds
 /debian/realm/*
