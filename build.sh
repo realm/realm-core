@@ -730,8 +730,12 @@ EOF
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
         export dir="$IPHONE_DIR"
-        export platform_suffix=''
+        export platform_suffix='-bitcode'
         export enable_bitcode='yes'
+        build_apple
+
+        export platform_suffix='-no-bitcode'
+        export enable_bitcode='no'
         build_apple
         ;;
 
