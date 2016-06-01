@@ -61,13 +61,17 @@ Static library*/
 /core-*.zip
 /macosx-lib/
 /ios-lib/
+/ios-no-bitcode-lib/
 /watchos-lib/
 /tvos-lib/
+
+# sh build.sh build-dotnet-cocoa
+/realm-core-dotnet-cocoa*.zip
 
 # sh build.sh build-android
 /android-lib/
 /openssl/
-core-android-*.tar.gz
+/realm-core-android-*.tar.gz
 
 # debian/ubuntu builds
 /debian/realm/*
