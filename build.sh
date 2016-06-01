@@ -53,7 +53,7 @@ TVOS_SDKS="appletvos appletvsimulator"
 TVOS_DIR="tvos-lib"
 
 : ${REALM_COCOA_PLATFORMS:="osx iphone watchos tvos"}
-: ${REALM_DOTNET_COCOA_PLATFORMS:="osx iphone-no-bitcode"}
+: ${REALM_DOTNET_COCOA_PLATFORMS:="iphone-no-bitcode"}
 
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
