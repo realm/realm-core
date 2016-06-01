@@ -1493,16 +1493,8 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 
 Query& Query::and_query(const Query& q)
 {
-    if (auto root_node = q.root_node()) {
-        add_node(root_node->clone());
-
-        if (q.m_source_link_view) {
-            REALM_ASSERT(!m_source_link_view || m_source_link_view == q.m_source_link_view);
-            m_source_link_view = q.m_source_link_view;
-        }
-    }
-
-    return *this;
+    Query copy(q);
+    return and_query(std::move(copy));
 }
 
 Query& Query::and_query(Query&& q)
