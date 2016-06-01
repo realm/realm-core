@@ -22,6 +22,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/util/bind_ptr.hpp>
+#include <realm/util/cf_ptr.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -39,65 +40,6 @@ using namespace realm;
 using namespace realm::util;
 
 namespace {
-
-template<class Ref> class ReleaseGuard {
-public:
-    explicit ReleaseGuard(Ref ref = nullptr) noexcept:
-        m_ref(ref)
-    {
-    }
-
-    ReleaseGuard(ReleaseGuard&& rg) noexcept:
-        m_ref(rg.m_ref)
-    {
-        rg.m_ref = nullptr;
-    }
-
-    ~ReleaseGuard() noexcept
-    {
-        if (m_ref)
-            CFRelease(m_ref);
-    }
-
-    ReleaseGuard &operator=(ReleaseGuard&& rg) noexcept
-    {
-        REALM_ASSERT(!m_ref || m_ref != rg.m_ref);
-        if (m_ref)
-            CFRelease(m_ref);
-        m_ref = rg.m_ref;
-        rg.m_ref = nullptr;
-        return *this;
-    }
-
-    explicit operator bool() const noexcept
-    {
-        return bool(m_ref);
-    }
-
-    Ref get() const noexcept
-    {
-        return m_ref;
-    }
-
-    Ref release() noexcept
-    {
-        Ref ref = m_ref;
-        m_ref = nullptr;
-        return ref;
-    }
-
-    void reset(Ref ref = nullptr) noexcept
-    {
-        REALM_ASSERT(!m_ref || m_ref != ref);
-        if (m_ref)
-            CFRelease(m_ref);
-        m_ref = ref;
-    }
-
-private:
-    Ref m_ref;
-};
-
 
 ReleaseGuard<CFStringRef> make_cf_string(std::string str)
 {
