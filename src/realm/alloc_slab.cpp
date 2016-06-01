@@ -538,7 +538,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         }
         m_file_mappings = p;
     }
-    std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
+    std::unique_lock<Mutex> lock(m_file_mappings->m_mutex);
 
     // If the file has already been mapped by another thread, reuse all relevant data
     // from the earlier mapping.
@@ -639,6 +639,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
+    // ensure that the lock is released before destruction of the mutex, in case
+    // an exception is thrown. Since lock2 is constructed after the detach guard,
+    // it will be destructed first, releasing the lock before the detach guard
+    // releases the MappedFile structure containing the mutex.
+    std::unique_lock<Mutex> lock2(move(lock));
 
     // make sure the database is not on streaming format. If we did not do this, 
     // a later commit would have to do it. That would require coordination with
@@ -734,7 +739,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             }
         }
     }
-    dg.release();
+    dg.release(); // Do not detach
     fcg.release(); // Do not close
     m_file_mappings->m_success = true;
     return top_ref;
