@@ -8863,4 +8863,60 @@ TEST(Query_SyncViewIfNeeded)
         CHECK_EQUAL(bool(version), false);
     }
 }
+
+// Ensure that two queries can be combined via Query::and_query, &&, and || even if one of them has no conditions.
+TEST(Query_CombineWithEmptyQueryDoesntCrash)
+{
+    Table table;
+    size_t col_id = table.add_column(type_Int, "id");
+    table.add_empty_row(3);
+    table.set_int(col_id, 0, 0);
+    table.set_int(col_id, 1, 1);
+    table.set_int(col_id, 2, 2);
+
+    {
+        Query q = table.where().equal(col_id, 1);
+        q.and_query(table.where());
+        CHECK_EQUAL(1, q.find_all().size());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = table.where();
+        q1.and_query(q2);
+        CHECK_EQUAL(1, q1.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = table.where();
+        q2.and_query(q1);
+        CHECK_EQUAL(1, q2.count());
+    }
+
+    {
+        Query q = table.where();
+        q.and_query(table.where().equal(col_id, 1));
+        CHECK_EQUAL(1, q.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = q1 && table.where();
+        CHECK_EQUAL(1, q2.count());
+
+        Query q3 = table.where() && q1;
+        CHECK_EQUAL(1, q3.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = q1 || table.where();
+        CHECK_EQUAL(1, q2.count());
+
+        Query q3 = table.where() || q1;
+        CHECK_EQUAL(1, q3.count());
+    }
+}
+
 #endif // TEST_QUERY

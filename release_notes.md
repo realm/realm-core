@@ -9,6 +9,7 @@
   to ensure the mutex is unlocked before destruction.
 * Fix a crash when `Table::set_string_unique()` is called but the underlying 
   column is actually a StringEnumColumn.
+* Fix an assertion failure when combining a `Query` with no conditions with another `Query`.
 
 ### Breaking changes
 
