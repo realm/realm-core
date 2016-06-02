@@ -2096,7 +2096,7 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.m_link_columns.size() == 1) {
             // We can fall back to Query::links_to for != and == operations on links, but only
-            // for == on link lists. This is because negating query.links_to(…) is equivalent to
+            // for == on link lists. This is because negating query.links_to() is equivalent to
             // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
             if (link_map.m_link_types[0] == col_type_Link ||
                 (link_map.m_link_types[0] == col_type_LinkList && std::is_same<Operator, Equal>::value)) {
