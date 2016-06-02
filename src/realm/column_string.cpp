@@ -1398,7 +1398,6 @@ void StringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
         // fix it now, but we have probably already written to an incorrect index at this point.
         REALM_ASSERT_DEBUG_EX(search_ndx_in_parent == ndx_in_parent + 1,
                               search_ndx_in_parent, ndx_in_parent + 1);
-        m_search_index->set_ndx_in_parent(ndx_in_parent + 1);
         m_search_index->refresh_accessor_tree(col_ndx, spec); // Throws
     }
 }
