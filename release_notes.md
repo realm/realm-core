@@ -1,3 +1,12 @@
+# 1.0.2 Release notes
+
+### Internals
+
+* This is functionally the same as 1.0.1. For Xamarin we now do a specialized
+  cocoa build with only iOS support and without bitcode.
+
+----------------------------------------------
+
 # 1.0.1 Release notes
 
 ### Bugfixes
