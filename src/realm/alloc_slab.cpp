@@ -1043,6 +1043,7 @@ size_t SlabAlloc::find_section_in_range(size_t start_pos,
 void SlabAlloc::resize_file(size_t new_file_size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
+    REALM_ASSERT(matches_section_boundary(new_file_size));
     m_file_mappings->m_file.prealloc(0, new_file_size); // Throws
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
@@ -1052,6 +1053,8 @@ void SlabAlloc::resize_file(size_t new_file_size)
 void SlabAlloc::reserve_disk_space(size_t size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
+    if (!matches_section_boundary(size))
+        size = get_upper_section_boundary(size);
     m_file_mappings->m_file.prealloc_if_supported(0, size); // Throws
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
