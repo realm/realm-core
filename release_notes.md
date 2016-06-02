@@ -2,8 +2,14 @@
 
 ### Bugfixes
 
-* Fix a crash when `Table::set_string_unique()` is called but the underlying column
-  is actually a StringEnumColumn.
+* Fix for #1846: If an exception is thrown from SlabAlloc::attach_file(), it
+  forgot to unlock a mutex protecting the shared memory mapping. In cases
+  where the last reference to the memory mapping goes out of scope, it would
+  cause the assert "Destruction of mutex in use". Fix is to use unique_lock
+  to ensure the mutex is unlocked before destruction.
+* Fix a crash when `Table::set_string_unique()` is called but the underlying 
+  column is actually a StringEnumColumn.
+* Fix an assertion failure when combining a `Query` with no conditions with another `Query`.
 
 ### Breaking changes
 
@@ -40,11 +46,8 @@
 
 ### Internals
 
-* This is functionally the same as 1.0.1 but with the bitcode build settings
-  changed. (#1813 is reverted). This is to build with Xamarin.
-
-**Note: This is a hotfix release and these changes are not necessarily included
-  in any above releases**
+* This is functionally the same as 1.0.1. For Xamarin we now do a specialized
+  cocoa build with only iOS support and without bitcode.
 
 ----------------------------------------------
 

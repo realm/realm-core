@@ -526,7 +526,13 @@ public:
 
     void populate_search_index();
     StringIndex* create_search_index() override;
-    inline bool supports_search_index() const noexcept override { return true; }
+    inline bool supports_search_index() const noexcept override 
+    { 
+        if (realm::is_any<T, float, double>::value)
+            return false;
+        else
+            return true; 
+    }
 
 
     //@{
@@ -843,18 +849,6 @@ StringData Column<T>::get_index_data(size_t ndx, StringIndex::StringConversionBu
     return to_str(x, buffer);
 }
 
-template<>
-inline bool Column<float>::supports_search_index() const noexcept
-{
-    return false;
-}
-
-template<>
-inline bool Column<double>::supports_search_index() const noexcept
-{
-    return false;
-}
-
 template<class T>
 void Column<T>::populate_search_index()
 {
@@ -876,23 +870,14 @@ void Column<T>::populate_search_index()
 template<class T>
 StringIndex* Column<T>::create_search_index()
 {
+    if (realm::is_any<T, float, double>::value)
+        return nullptr;
+
     REALM_ASSERT(!has_search_index());
     REALM_ASSERT(supports_search_index());
     m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
     populate_search_index();
     return m_search_index.get();
-}
-
-template<>
-inline StringIndex* Column<float>::create_search_index()
-{
-    return nullptr;
-}
-
-template<>
-inline StringIndex* Column<double>::create_search_index()
-{
-    return nullptr;
 }
 
 template<class T>
