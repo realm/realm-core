@@ -46,11 +46,8 @@
 
 ### Internals
 
-* This is functionally the same as 1.0.1 but with the bitcode build settings
-  changed. (#1813 is reverted). This is to build with Xamarin.
-
-**Note: This is a hotfix release and these changes are not necessarily included
-  in any above releases**
+* This is functionally the same as 1.0.1. For Xamarin we now do a specialized
+  cocoa build with only iOS support and without bitcode.
 
 ----------------------------------------------
 
