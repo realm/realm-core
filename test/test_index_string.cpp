@@ -1346,14 +1346,23 @@ TEST(StringIndex_InsertLongPrefix) {
     CHECK_EQUAL(col.find_first(base + "b"), 2);
     CHECK_EQUAL(col.find_first(base + "c"), 3);
 
-    std::string base2(999408, 'a');
+
+    // To trigger the bug, the length must be more than 10000, but Array::destroy_deep()
+    // will stack overflow at around lengths > 90000 on mac and less on android devices.
+    // We should be able to input strings of any arbitrary length now, but because we want
+    // to have a clean valgrind test, we also want to be able to clean up afterwards with
+    // col.destry() so to be able to do this, keep the length of the string around 20000
+    std::string base2(20000, 'a');
     col.add(base2 + "b");
     col.add(base2 + "c");
 
     CHECK_EQUAL(col.find_first(base2 + "b"), 4);
     CHECK_EQUAL(col.find_first(base2 + "c"), 5);
 
-    //col.clear(); // crash from Array::destroy_deep();
+    // col.clear() and col.destroy() both call Array::destroy_deep() which is also recursive
+    // but puts much less on the stack per recursion than StringIndex::insert() does (this
+    // call could also cause a crash for very long strings.)
+    col.destroy();
 
     //TODO: check for other recursive functions such as do_update_ref(); do_delete();
     //TODO: check moving long strings from list to subindex and reversed after removal
