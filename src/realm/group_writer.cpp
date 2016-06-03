@@ -313,7 +313,7 @@ ref_type GroupWriter::write_group()
     // m_free_positions has the capacity to store the new larger value without
     // reallocation.
     size_t rest = reserve_pos + reserve_size - size_t(end_ref);
-    //size_t used = size_t(end_ref) - reserve_pos;
+    size_t used = size_t(end_ref) - reserve_pos;
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = int_fast64_t(end_ref); // FIXME: Problematic unsigned -> signed conversion
     int_fast64_t value_9 = int_fast64_t(rest); // FIXME: Problematic unsigned -> signed conversion
@@ -328,8 +328,9 @@ ref_type GroupWriter::write_group()
     // The free-list now have their final form, so we can write them to the file
     //char* start_addr = m_file_map.get_addr() + reserve_ref;
     MapWindow window(m_alloc.get_file(), reserve_ref, end_ref - reserve_ref);
-    //char* start_addr = window.addr_base() + reserve_ref;
+    char* start_addr = window.addr_base() + reserve_ref;
     //realm::util::encryption_read_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
+    window.encryption_read_barrier(start_addr, used);
     write_array_at(window.addr_base(), free_positions_ref, m_free_positions.get_header(),
                    free_positions_size); // Throws
     write_array_at(window.addr_base(), free_sizes_ref, m_free_lengths.get_header(),
@@ -342,7 +343,7 @@ ref_type GroupWriter::write_group()
     // Write top
     write_array_at(window.addr_base(), top_ref, top.get_header(), top_byte_size); // Throws
 //    realm::util::encryption_write_barrier(start_addr, used, m_file_map.get_encrypted_mapping());
-
+    window.encryption_write_barrier(start_addr, used);
     // Return top_ref so that it can be saved in lock file used for coordination
     return top_ref;
 }
@@ -586,8 +587,10 @@ void GroupWriter::write(const char* data, size_t size)
 //    realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
     MapWindow window(m_alloc.get_file(), pos, size);
     char* dest_addr = window.addr_base() + pos;
+    window.encryption_read_barrier(dest_addr, size);
     std::copy(data, data+size, dest_addr);
 //    realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
+    window.encryption_write_barrier(dest_addr, size);
 }
 
 
@@ -602,10 +605,12 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
 //    realm::util::encryption_read_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
     MapWindow window(m_alloc.get_file(), pos, size);
     char* dest_addr = window.addr_base() + pos;
+    window.encryption_read_barrier(dest_addr, size);
     memcpy(dest_addr, &checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);
 
 //    realm::util::encryption_write_barrier(dest_addr, size, m_file_map.get_encrypted_mapping());
+    window.encryption_write_barrier(dest_addr, size);
     // return ref of the written array
     ref_type ref = to_ref(pos);
     return ref;
