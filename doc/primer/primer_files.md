@@ -16,23 +16,23 @@ First, the top pointer is updated and then the switch bit is updated. If that fa
 
 ### Entries
 
-The elements are not allocated contigously. Only arrays are guaranteed to be allocated contiguously.
+The elements are not allocated contiguously. Only arrays are guaranteed to be allocated contiguously.
 
 ## .lock file
 
-Contains metadata pertaining to the shared group. This is responsible for allowing multiple threads use the same realm.
+Contains metadata pertaining to the shared group. This is responsible for allowing multiple threads and processes use the same realm.
 
 ## Commit logs history
 
-- Used to update the indexes 
+- Used to update the indexes
 - Used for sync
 - Maintained by 3 files:
     two with data
     one that handles management.
 
 ## Scratch pad
-    
-The scratch pad is not a file, but actually in the memory.
+
+The scratch pad is not a file, but actually in the memory. It is used to make the modifications during a transaction, before committing to the file.
 
 # Updates
 
@@ -42,6 +42,6 @@ There are two types of updates:
 
 # Memory mapping:
 
-The whole file is not mapped contagiously, because you might not have enough space if the memory is fragmented.
+The whole file is not mapped contiguously, because you might not have enough space if the memory is fragmented.
 So the memory is mapped in chunks. The chunks increase exponentially in size. There is an algorithm that can do this in constant time, using a table and bit manipulation.
 For the future, we could only map the chunks that we need.
