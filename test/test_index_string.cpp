@@ -1359,11 +1359,9 @@ TEST(StringIndex_InsertLongPrefix) {
     // We should be able to input strings of any arbitrary length now, but because we want
     // to have a clean valgrind test, we also want to be able to clean up afterwards with
     // col.destry() so to be able to do this, keep the length of the string around 20000
-    size_t long_length = 20000;
-    std::string base2_b(long_length, 'a');
-    std::string base2_c(long_length, 'a');
-    base2_b += "b";
-    base2_c += "c";
+    std::string base2(20000, 'a');
+    std::string base2_b = base2 + "b";
+    std::string base2_c = base2 + "c";
     StringData base2bs(base2_b);
     StringData base2cs(base2_c);
 
