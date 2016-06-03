@@ -52,6 +52,7 @@ public:
     // information to the group, if it is not already present (6th and 7th entry
     // in Group::m_top).
     GroupWriter(Group&);
+    ~GroupWriter();
 
     void set_versions(uint64_t current, uint64_t read_lock) noexcept;
 
@@ -78,6 +79,7 @@ public:
 #endif
 
 private:
+    class MapWindow;
     Group&     m_group;
     SlabAlloc& m_alloc;
     ArrayInteger m_free_positions; // 4th slot in Group::m_top
@@ -85,6 +87,17 @@ private:
     ArrayInteger m_free_versions;  // 6th slot in Group::m_top
     uint64_t   m_current_version;
     uint64_t   m_readlock_version;
+
+    // Currently cached memory mappings
+    const static int num_map_windows = 8;
+    MapWindow* m_map_windows[num_map_windows];
+
+    // Get a suitable memory mapping for later access:
+    // potentially adding it to the cache
+    MapWindow* get_window(ref_type start_ref, size_t size);
+
+    // Sync all cached memory mappings
+    void sync_all_mappings();
 
     // Merge adjacent chunks
     void merge_free_space();
