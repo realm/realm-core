@@ -1345,12 +1345,14 @@ TEST(StringIndex_InsertLongPrefix) {
     CHECK_EQUAL(col.find_first("test_index_string2"), 1);
 
     std::string base(107, 'a');
-    col.add(base + "b");
-    col.add(base + "c");
+    std::string base_b = base + "b";
+    std::string base_c = base + "c";
 
-    CHECK_EQUAL(col.find_first(base + "b"), 2);
-    CHECK_EQUAL(col.find_first(base + "c"), 3);
+    col.add(base_b);
+    col.add(base_c);
 
+    CHECK_EQUAL(col.find_first(base_b), 2);
+    CHECK_EQUAL(col.find_first(base_c), 3);
 
     // To trigger the bug, the length must be more than 10000, but Array::destroy_deep()
     // will stack overflow at around lengths > 90000 on mac and less on android devices.
@@ -1358,11 +1360,16 @@ TEST(StringIndex_InsertLongPrefix) {
     // to have a clean valgrind test, we also want to be able to clean up afterwards with
     // col.destry() so to be able to do this, keep the length of the string around 20000
     std::string base2(20000, 'a');
-    col.add(base2 + "b");
-    col.add(base2 + "c");
+    std::string base2_b = base2 + "b";
+    std::string base2_c = base2 + "c";
+    StringData base2bs(base2_b);
+    StringData base2cs(base2_c);
 
-    CHECK_EQUAL(col.find_first(base2 + "b"), 4);
-    CHECK_EQUAL(col.find_first(base2 + "c"), 5);
+    col.add(base2bs);
+    col.add(base2cs);
+
+    CHECK_EQUAL(col.find_first(base2bs), 4);
+    CHECK_EQUAL(col.find_first(base2cs), 5);
 
     // col.clear() and col.destroy() both call Array::destroy_deep() which is also recursive
     // but puts much less on the stack per recursion than StringIndex::insert() does (this
