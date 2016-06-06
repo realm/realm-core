@@ -1338,7 +1338,8 @@ TEST(StringIndex_Deny_Duplicates)
 // for the col.destroy() method to complete recursivly.
 // Non-concurrent tests run on the main process thread and they
 // do not have this stack size limitation.
-NONCONCURRENT_TEST(StringIndex_InsertLongPrefix) {
+NONCONCURRENT_TEST(StringIndex_InsertLongPrefix)
+{
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, true);
 

@@ -51,7 +51,8 @@
     TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, true)
 
 /// Add a test that must neither execute concurrently with other tests, nor with
-/// itself.
+/// itself. These tests will always be executed by the thread that calls
+/// TestList::run().
 #define NONCONCURRENT_TEST(name) \
     NONCONCURRENT_TEST_IF(name, true)
 
