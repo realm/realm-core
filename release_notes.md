@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 1.1.0 Release notes
 
 ### Bugfixes
 
@@ -7,7 +7,7 @@
   where the last reference to the memory mapping goes out of scope, it would
   cause the assert "Destruction of mutex in use". Fix is to use unique_lock
   to ensure the mutex is unlocked before destruction.
-* Fix a crash when `Table::set_string_unique()` is called but the underlying 
+* Fix a crash when `Table::set_string_unique()` is called but the underlying
   column is actually a StringEnumColumn.
 * Fix an assertion failure when combining a `Query` with no conditions with another `Query`.
 
@@ -128,7 +128,7 @@
 
 * Search indexes no longer support strings with lengths greater than
   `Table::max_indexed_string_length`. If you try to add a string with a longer length
-  (through the Table interface), then a `realm::LogicError` will be thrown with type 
+  (through the Table interface), then a `realm::LogicError` will be thrown with type
   `string_too_long_for_index`. Calling `Table::add_search_index()` will now return a
   boolean value indicating whether or not the index could be created on the column. If
   the column contains strings that exceed the maximum allowed length, then
