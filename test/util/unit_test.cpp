@@ -361,6 +361,11 @@ bool TestList::run(Config config)
             num_threads = int(max_threads);
     }
 
+    // If two or more threads are requested, increment this by one to account for the
+    // main process thread which will run the non-concurrent tests.
+    if (num_threads > 1)
+        ++num_threads;
+
     // Shuffle
     if (config.shuffle) {
         Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -409,16 +414,22 @@ bool TestList::run(Config config)
         ThreadContextImpl thread_context(shared_context, 0, loggers[0].get());
         thread_context.run();
     }
-    else {
+    else if (num_threads > 2){
         auto thread = [&](int i) {
             ThreadContextImpl thread_context(shared_context, i, loggers[i].get());
             thread_context.run();
         };
-        std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
-        for (int i = 0; i != num_threads; ++i)
+        std::unique_ptr<Thread[]> threads(new Thread[num_threads - 1]);
+        for (int i = 0; i != num_threads - 1; ++i)
             threads[i].start([=] { thread(i); });
-        for (int i = 0; i != num_threads; ++i)
+        for (int i = 0; i != num_threads - 1; ++i)
             threads[i].join();
+
+        // At this point, all concurrent tests will have finished. Now run the
+        // remaining (non-concurrent) tests on the main process thread.
+        ThreadContextImpl thread_context(shared_context, num_threads - 1,
+                                         loggers[num_threads - 1].get());
+        thread_context.run();
     }
 
     // Summarize

@@ -1332,7 +1332,13 @@ TEST(StringIndex_Deny_Duplicates)
 // for the characters at the end (they have an identical very
 // long prefix). This was causing a stack overflow because of
 // the recursive nature of the insert function.
-TEST(StringIndex_InsertLongPrefix) {
+//
+// This test is marked non-concurrent because on a mac, spawned
+// threads will have a stack limit of 512k which is not enough
+// for the col.destroy() method to complete recursivly.
+// Non-concurrent tests run on the main process thread and they
+// do not have this stack size limitation.
+NONCONCURRENT_TEST(StringIndex_InsertLongPrefix) {
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, true);
 
