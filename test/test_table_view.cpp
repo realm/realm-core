@@ -2021,6 +2021,31 @@ TEST(TableView_Distinct)
     CHECK(tv.get_string(0, 5).is_null());
 }
 
+TEST(TableView_IsRowAttachedAfterClear)
+{
+    Table t;
+    size_t col_id = t.add_column(type_Int, "id");
+
+    t.add_empty_row(2);
+    t.set_int(col_id, 0, 0);
+    t.set_int(col_id, 1, 1);
+
+    TableView tv = t.where().find_all();
+    CHECK_EQUAL(2, tv.size());
+    CHECK(tv.is_row_attached(0));
+    CHECK(tv.is_row_attached(1));
+
+    t.move_last_over(1);
+    CHECK_EQUAL(2, tv.size());
+    CHECK(tv.is_row_attached(0));
+    CHECK(!tv.is_row_attached(1));
+
+    t.clear();
+    CHECK_EQUAL(2, tv.size());
+    CHECK(!tv.is_row_attached(0)); // <-- This assertion fails.
+    CHECK(!tv.is_row_attached(1));
+}
+
 TEST(TableView_IsInTableOrder)
 {
     Group g;
