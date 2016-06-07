@@ -383,7 +383,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_bool(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_bool(" << col_ndx << ", " << row_ndx << ", " << (value ? "true" : "false") << ");\n";
                             }
                             t->set_bool(col_ndx, row_ndx, value);
                         }
