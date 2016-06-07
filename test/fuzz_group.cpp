@@ -55,7 +55,6 @@ DataType get_type(unsigned char c)
         type_Double,
         type_String,
         type_Binary,
-        type_OldDateTime,
         type_Table,
         type_Mixed,
         type_Timestamp
@@ -380,13 +379,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 *log << "g.get_table(" << table_ndx << ")->set_int(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
                             }
                             t->set_int(col_ndx, row_ndx, get_next(s));
-                        }
-                        else if (type == type_OldDateTime) {
-                            OldDateTime value{ get_next(s) };
-                            if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_olddatetime(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
-                            }
-                            t->set_olddatetime(col_ndx, row_ndx, value);
                         }
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
