@@ -88,12 +88,18 @@ private:
     uint64_t   m_current_version;
     uint64_t   m_readlock_version;
 
-    // Currently cached memory mappings
-    const static int num_map_windows = 8;
+    // Currently cached memory mappings. We keep as many as 16 1MB windows
+    // open for writing. The allocator will favor sequential allocation
+    // from a modest number of windows, depending upon fragmentation, so
+    // 16 windows should be more than enough. If more than 16 windows are
+    // needed, the least recently used is sync'ed and closed to make room
+    // for a new one.
+    const static int num_map_windows = 16;
     MapWindow* m_map_windows[num_map_windows];
 
     // Get a suitable memory mapping for later access:
-    // potentially adding it to the cache
+    // potentially adding it to the cache, potentially closing
+    // the least recently used and sync'ing it to disk
     MapWindow* get_window(ref_type start_ref, size_t size);
 
     // Sync all cached memory mappings
@@ -141,7 +147,7 @@ private:
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<size_t, size_t> extend_free_space(size_t requested_size);
 
-    void write_array_at(char* base, ref_type, const char* data, size_t size);
+    void write_array_at(MapWindow* window, ref_type, const char* data, size_t size);
     size_t split_freelist_chunk(size_t index, size_t start_pos,
                                 size_t alloc_pos, size_t chunk_size, bool is_shared);
 };
