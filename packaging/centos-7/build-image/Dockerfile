@@ -10,7 +10,7 @@ RUN yum -y install \
 # whatever is required for building should be installed in this image; just
 # like BuildRequires: for RPM specs
 RUN yum -y install python-cheetah which chrpath devtoolset-3-gcc \
-    devtoolset-3-gcc-c++ openssl-devel \
+    devtoolset-3-gcc-c++ devtoolset-3-binutils openssl-devel \
     && yum -y remove gcc gcc-c++ \
     && yum clean all
 
