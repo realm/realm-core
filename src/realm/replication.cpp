@@ -723,7 +723,7 @@ private:
     template<class... Params> void log(const char* message, Params... params)
     {
         if (m_logger)
-            m_logger->log(message, params...); // Throws
+            m_logger->trace(message, params...); // Throws
     }
 #else
     template<class... Params> void log(const char*, Params...)

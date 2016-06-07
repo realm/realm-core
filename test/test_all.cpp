@@ -92,8 +92,6 @@ const char* file_order[] = {
     "test_link_query_view.cpp",
     "test_json.cpp",
     "test_replication*.cpp",
-    "test_transform.cpp",
-    "test_sync.cpp",
 
     "test_lang_bind_helper.cpp",
 
@@ -427,6 +425,20 @@ bool run_tests(util::Logger* logger)
     if (filter_str && strlen(filter_str) != 0)
         filter.reset(create_wildcard_filter(filter_str));
     config.filter = filter.get();
+
+    // Set intra test log level threshold
+    {
+        const char* str = getenv("UNITTEST_LOG_LEVEL");
+        if (str && strlen(str) != 0) {
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+            in >> config.intra_test_log_level;
+            bool bad = !in || in.get() != std::char_traits<char>::eof();
+            if (bad)
+                throw std::runtime_error("Bad intra test log level");
+        }
+    }
 
     // Set up per-thread file logging
     {

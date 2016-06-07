@@ -230,6 +230,33 @@ private:
     patterns m_include, m_exclude;
 };
 
+
+class IntraTestLogger: private Logger::LevelThreshold, public util::Logger {
+public:
+    IntraTestLogger(util::Logger& base_logger, Level level_threshold):
+        util::Logger::LevelThreshold(),
+        util::Logger(static_cast<util::Logger::LevelThreshold&>(*this)),
+        m_base_logger(base_logger),
+        m_level_threshold(level_threshold)
+    {
+    }
+
+    void do_log(std::string message) override final
+    {
+        Logger::do_log(m_base_logger, message); // Throws
+    }
+
+private:
+    Logger& m_base_logger;
+    const Level m_level_threshold;
+
+    Level get() const noexcept override final
+    {
+        return m_level_threshold;
+    }
+};
+
+
 } // anonymous namespace
 
 
@@ -243,6 +270,7 @@ class TestList::SharedContextImpl: public SharedContext {
 public:
     Reporter& reporter;
     const bool abort_on_failure;
+    const util::Logger::Level intra_test_log_level;
     Mutex mutex;
     struct Entry {
         const Test* test;
@@ -257,10 +285,12 @@ public:
     int num_ended_threads = 0;
 
     SharedContextImpl(const TestList& test_list, int num_recurrences, int num_threads,
-                      util::Logger& logger, Reporter& r, bool aof):
-        SharedContext(test_list, num_recurrences, num_threads, logger),
+                      util::Logger& report_logger, Reporter& r, bool aof,
+                      util::Logger::Level itll):
+        SharedContext(test_list, num_recurrences, num_threads, report_logger),
         reporter(r),
-        abort_on_failure(aof)
+        abort_on_failure(aof),
+        intra_test_log_level(itll)
     {
     }
 };
@@ -269,6 +299,7 @@ public:
 
 class TestList::ThreadContextImpl: public ThreadContext {
 public:
+    IntraTestLogger intra_test_logger;
     SharedContextImpl& shared_context;
     Mutex mutex;
     std::atomic<long long> num_checks{0};
@@ -276,8 +307,9 @@ public:
     long num_failed_tests = 0;
     bool errors_seen;
 
-    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* logger):
-        ThreadContext(sc, ti, logger ? *logger : sc.logger),
+    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* report_logger):
+        ThreadContext(sc, ti, report_logger ? *report_logger : sc.report_logger),
+        intra_test_logger(ThreadContext::report_logger, sc.intra_test_log_level),
         shared_context(sc)
     {
     }
@@ -312,8 +344,9 @@ bool TestList::run(Config config)
     if (config.num_threads < 1)
         throw std::runtime_error("Bad number of threads");
 
-    util::StderrLogger base_logger;
-    util::ThreadSafeLogger shared_logger(base_logger);
+    util::StderrLogger fallback_logger;
+    util::Logger& root_logger = config.logger ? *config.logger : fallback_logger;
+    util::ThreadSafeLogger shared_logger(root_logger);
 
     Reporter fallback_reporter;
     Reporter& reporter = config.reporter ? *config.reporter : fallback_reporter;
@@ -370,7 +403,8 @@ bool TestList::run(Config config)
 
     // Execute
     SharedContextImpl shared_context(*this, config.num_repetitions, num_threads, shared_logger,
-                                     reporter, config.abort_on_failure);
+                                     reporter, config.abort_on_failure,
+                                     config.intra_test_log_level);
     shared_context.concur_tests    = std::move(concur_tests);
     shared_context.no_concur_tests = std::move(no_concur_tests);
     std::unique_ptr<std::unique_ptr<util::Logger>[]> loggers;
@@ -399,7 +433,7 @@ bool TestList::run(Config config)
                 formatter.str(std::string());
                 formatter << a<<std::setw(thread_digits)<<(i+1)<<b;
                 std::string path = formatter.str();
-                shared_logger.log("Logging to %1", path);
+                shared_logger.info("Logging to %1", path);
                 loggers[i].reset(new util::FileLogger(path));
             }
         }
@@ -507,6 +541,7 @@ TestContext::TestContext(TestList::ThreadContextImpl& tc, const TestDetails& td,
     test_details(td),
     test_index(ti),
     recurrence_index(ri),
+    logger(tc.intra_test_logger),
     m_thread_context(tc)
 {
 }
@@ -524,7 +559,7 @@ REALM_NORETURN void TestContext::abort()
     const char* format = context.num_threads == 1 ?
         "Aborting due to failure" :
         "Aborting due to failure in test thread %1";
-    context.logger.log(format, m_thread_context.thread_index+1);
+    context.report_logger.info(format, m_thread_context.thread_index+1);
     ::abort();
 }
 
@@ -731,24 +766,24 @@ void SimpleReporter::begin(const TestContext& context)
         return;
 
     const TestDetails& details = context.test_details;
-    util::Logger& logger = context.thread_context.logger;
+    util::Logger& logger = context.thread_context.report_logger;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ?
         "%1:%2: Begin %3" :
         "%1:%2: Begin %3#%4";
-    logger.log(format, details.file_name, details.line_number, details.test_name,
-               context.recurrence_index+1);
+    logger.info(format, details.file_name, details.line_number, details.test_name,
+                context.recurrence_index+1);
 }
 
 void SimpleReporter::fail(const TestContext& context, const char* file_name, long line_number,
                           const std::string& message)
 {
     const TestDetails& details = context.test_details;
-    util::Logger& logger = context.thread_context.logger;
+    util::Logger& logger = context.thread_context.report_logger;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ?
         "%1:%2: ERROR in %3: %5" :
         "%1:%2: ERROR in %3#%4: %5";
-    logger.log(format, file_name, line_number, details.test_name, context.recurrence_index+1,
-               message);
+    logger.info(format, file_name, line_number, details.test_name, context.recurrence_index+1,
+                message);
 }
 
 void SimpleReporter::thread_end(const ThreadContext& context)
@@ -757,29 +792,29 @@ void SimpleReporter::thread_end(const ThreadContext& context)
         return;
 
     if (context.shared_context.num_threads > 1) {
-        util::Logger& logger = context.logger;
-        logger.log("End of thread");
+        util::Logger& logger = context.report_logger;
+        logger.info("End of thread");
     }
 }
 
 void SimpleReporter::summary(const SharedContext& context, const Summary& summary)
 {
-    util::Logger& logger = context.logger;
+    util::Logger& logger = context.report_logger;
     if (summary.num_failed_tests == 0) {
-        logger.log("Success: All %1 tests passed (%2 checks).", summary.num_executed_tests,
-                   summary.num_executed_checks);
+        logger.info("Success: All %1 tests passed (%2 checks).", summary.num_executed_tests,
+                    summary.num_executed_checks);
     }
     else {
-        logger.log("FAILURE: %1 out of %2 tests failed (%3 out of %4 checks failed).",
-                   summary.num_failed_tests,  summary.num_executed_tests,
-                   summary.num_failed_checks, summary.num_executed_checks);
+        logger.info("FAILURE: %1 out of %2 tests failed (%3 out of %4 checks failed).",
+                    summary.num_failed_tests,  summary.num_executed_tests,
+                    summary.num_failed_checks, summary.num_executed_checks);
     }
-    logger.log("Test time: %1", Timer::format(summary.elapsed_seconds));
+    logger.info("Test time: %1", Timer::format(summary.elapsed_seconds));
     if (summary.num_excluded_tests >= 1) {
         auto format = summary.num_excluded_tests == 1 ?
             "Note: One test was excluded!" :
             "Note: %1 tests were excluded!";
-        logger.log(format, summary.num_excluded_tests);
+        logger.info(format, summary.num_excluded_tests);
     }
 }
 
