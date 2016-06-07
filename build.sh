@@ -925,7 +925,7 @@ EOF
                     $MAKE clean
                 ) || exit 1
 
-                $MAKE -C "openssl" DEPFLAG="-I$temp_dir/sysroot/usr/include -I$temp_dir/sysroot/usr/include/linux -I$temp_dir/lib/gcc/arm-linux-androideabi/4.9/include" depend || exit 1
+                $MAKE -C "openssl" DEPFLAG="-I$temp_dir/sysroot/usr/include -I$temp_dir/sysroot/usr/include/linux -I$temp_dir/include/c++/4.9/tr1 -I$temp_dir/include/c++/4.9" depend || exit 1
                 PATH="$path" CC="$cc" CFLAGS="$cflags_arch" PERL="perl" $MAKE -C "openssl" build_crypto || exit 1
                 cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
             fi
