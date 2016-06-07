@@ -68,7 +68,7 @@ public:
     template<class... Params> void log(Level, const char* message, Params...);
 
     /// Shorthand for `int(level) >= int(level_threshold.get())`.
-    bool will_log(Level level) const noexcept;
+    bool would_log(Level level) const noexcept;
 
     class LevelThreshold;
 
@@ -265,11 +265,11 @@ template<class... Params> inline void Logger::fatal(const char* message, Params.
 template<class... Params>
 inline void Logger::log(Level level, const char* message, Params... params)
 {
-    if (will_log(level))
+    if (would_log(level))
         do_log(level, message, params...); // Throws
 }
 
-inline bool Logger::will_log(Level level) const noexcept
+inline bool Logger::would_log(Level level) const noexcept
 {
     return int(level) >= int(level_threshold.get());
 }
