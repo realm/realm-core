@@ -25,6 +25,13 @@ if [ $num_files -eq 0 ]; then
     exit 0
 fi
 
+echo "Minimizing $num_files found crashes and hangs"
+
+for file in ${files[@]}
+do
+	afl-tmin -i "$file" -o "$file.minimized" "$executable_path" @@
+done
+
 echo "Converting $num_files found crashes and hangs into .cpp unit tests in \"$unit_tests_path\""
 
 mkdir -p "$unit_tests_path"
@@ -33,5 +40,5 @@ mkdir -p "$unit_tests_path"
 for file in ${files[@]}
 do
     cpp_file="$unit_tests_path$(basename $file).cpp"
-    "$executable_path" "$file" --log > "$cpp_file"
+    "$executable_path" "$file.minimized" --log > "$cpp_file"
 done
