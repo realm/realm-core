@@ -50,7 +50,7 @@ pkill afl-fuzz
 rm -rf findings/* &> /dev/null
 
 # see also stop_parallel_fuzzer.sh
-time_out="100" # ms
+time_out="1000" # ms
 memory="100" # MB
 
 echo "Starting $num_fuzzers fuzzers in parallel"

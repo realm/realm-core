@@ -26,7 +26,7 @@ if [ $num_files -eq 0 ]; then
 fi
 
 # see also start_parallel_fuzzer.sh
-time_out="100" # ms
+time_out="1000" # ms
 memory="100" # MB
 
 # Let AFL try to minimize each input before converting to .cpp
