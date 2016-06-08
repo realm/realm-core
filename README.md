@@ -283,16 +283,6 @@ creating OS X application. The command is:
     sh build.sh build-osx-framework
 
 
-Packaging for iOS
------------------
-
-You can create a framework for iOS after you have built the core
-library for iOS (the `build-ios` target). The framework is useful when
-creating apps for iPhone and iPad. The command is:
-
-    sh build.sh build-ios-framework
-
-
 Packaging for Debian/Ubuntu
 ---------------------------
 
