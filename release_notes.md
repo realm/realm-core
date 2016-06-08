@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Implement `TableViewBase`'s copy-assignment operator to prevent link errors when it is used.
 
 ### Breaking changes
 
