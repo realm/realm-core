@@ -2102,4 +2102,41 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 }
 
+// Verify that copy-constructed and copy-assigned TableViews work normally.
+TEST(TableView_Copy)
+{
+    Table table;
+    size_t col_id = table.add_column(type_Int, "id");
+    for (size_t i = 0; i < 3; ++i)
+        table.set_int(col_id, table.add_empty_row(), i);
+
+    TableView tv = (table.column<Int>(col_id) > 0).find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    TableView copy_1(tv);
+    TableView copy_2;
+    copy_2 = tv;
+
+    CHECK_EQUAL(2, copy_1.size());
+    CHECK_EQUAL(1, copy_1.get_source_ndx(0));
+    CHECK_EQUAL(2, copy_1.get_source_ndx(1));
+
+    CHECK_EQUAL(2, copy_2.size());
+    CHECK_EQUAL(1, copy_2.get_source_ndx(0));
+    CHECK_EQUAL(2, copy_2.get_source_ndx(1));
+
+    table.move_last_over(1);
+
+    CHECK(!copy_1.is_in_sync());
+    CHECK(!copy_2.is_in_sync());
+
+    copy_1.sync_if_needed();
+    CHECK_EQUAL(1, copy_1.size());
+    CHECK_EQUAL(1, copy_1.get_source_ndx(0));
+
+    copy_2.sync_if_needed();
+    CHECK_EQUAL(1, copy_2.size());
+    CHECK_EQUAL(1, copy_2.get_source_ndx(0));
+}
+
 #endif // TEST_TABLE_VIEW
