@@ -532,7 +532,17 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     {
         std::lock_guard<Mutex> lock(all_files_mutex);
         std::shared_ptr<SlabAlloc::MappedFile> p = all_files[path].lock();
-        if (!bool(p)) {
+        // In case we're the session initiator, we'll need a new mapping in any case.
+        // NOTE: normally, it should not be possible to find an old mapping while being
+        // the session initiator, since by definition the session initiator is the first
+        // to attach the file. If, however, the user is deleting the .lock file while he
+        // has one or more shared groups attached to the database, a session initiator
+        // *will* see a stale mapping. From versions 0.99 to 1.1.0 we asserted when detecting
+        // this situation, and this lead to many bug reports. It is likely that many of these
+        // would otherwise *not* have lead to observable bugs, because the user would not
+        // actually touch the stale database anymore, it was just a case of delayed deallocation
+        // of a shared group.
+        if (cfg.session_initiator || !bool(p)) {
             p = std::make_shared<MappedFile>();
             all_files[path] = p;
         }
@@ -543,7 +553,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // If the file has already been mapped by another thread, reuse all relevant data
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
-        REALM_ASSERT(!cfg.session_initiator);
         m_data = m_file_mappings->m_initial_mapping.get_addr();
         m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
