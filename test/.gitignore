@@ -18,6 +18,3 @@
 
 # Jenkins unit test reports
 /unit-test-report.xml
-
-# Various builds of core for cross-commit benchmarking
-/core-builds
