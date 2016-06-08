@@ -50,24 +50,11 @@ each of our major platforms:
     sudo yum install python-cheetah
     sudo yum install procps-devel
 
-### Mac OS X 10.7, 10.8, and 10.9
+### OS X 10.10 and 10.11
 
-On Mac OS X, the build procedure uses Clang as the C/C++ compiler by
-default. It needs at least Clang 3.0 which comes with Xcode 4.2. On OS
-X 10.9 (Mavericks) we recommend at least Xcode 5.0, since in some
-cases when a previous version of OS X is upgraded to 10.9, you will be
-left with a malfunctioning set of command line tools (in particular
-the `lipo` command), and this is most easily fixed by upgrading to
-Xcode 5. Run the following command in the command prompt to see if you
-have Xcode installed, and, if so, what version it is:
-
-    xcodebuild -version
-
-If you have Xcode 5 or later, you will already have the required
-command line tools installed. In Xcode 4, however, the "Command line
-tools" is an optional Xcode add-on that you must install. You can find
-it under the "Downloads" pane of the "Preferences" dialog in the Xcode
-4 menu.
+On OS X, Clang is used as the C/C++ compiler by default. Clang is installed
+as part of Xcode. Xcode 7.0 or newer is required, and can be installed via
+the Mac App Store.
 
 Download the latest version of Python Cheetah
 (https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz),
