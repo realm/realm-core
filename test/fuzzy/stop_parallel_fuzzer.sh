@@ -16,7 +16,7 @@ echo "Removing any leftover Realm files"
 rm -rf fuzzer*.realm*
 
 # Find all interesting cases
-files=($(find findings \( -path "*hang/id:s*" -or -path "*crashes/id:*" \)))
+files=($(find findings \( -path "*/hangs/id:*" -or -path "*/crashes/id:*" \)))
 
 num_files=${#files[@]}
 
