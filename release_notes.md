@@ -3,6 +3,7 @@
 ### Bugfixes
 
 * Implement `TableViewBase`'s copy-assignment operator to prevent link errors when it is used.
+* Update table views so that rows are not attached after calling Table::clear() (#1837)
 
 ### Breaking changes
 
