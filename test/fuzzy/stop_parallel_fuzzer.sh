@@ -25,11 +25,15 @@ if [ $num_files -eq 0 ]; then
     exit 0
 fi
 
+# see also start_parallel_fuzzer.sh
+time_out="100" # ms
+memory="100" # MB
+
 # Let AFL try to minimize each input before converting to .cpp
 echo "Minimizing $num_files found crashes and hangs"
 for file in ${files[@]}
 do
-	afl-tmin -i "$file" -o "$file.minimized" "$executable_path" @@
+	afl-tmin -t $time_out -m $memory -i "$file" -o "$file.minimized" "$executable_path" @@
 done
 
 # Run executable for each and save the .cpp reproduction case

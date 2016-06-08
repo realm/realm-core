@@ -49,6 +49,7 @@ echo "Cleaning up the findings directory"
 pkill afl-fuzz
 rm -rf findings/* &> /dev/null
 
+# see also stop_parallel_fuzzer.sh
 time_out="100" # ms
 memory="100" # MB
 
@@ -56,7 +57,7 @@ echo "Starting $num_fuzzers fuzzers in parallel"
 
 # if we have only one fuzzer
 if [ $num_fuzzers -eq 1 ]; then
-    afl-fuzz  -t $time_out -m $memory -i testcases -o findings "$executable_path" @@
+    afl-fuzz -t $time_out -m $memory -i testcases -o findings "$executable_path" @@
     exit 0
 fi
 
