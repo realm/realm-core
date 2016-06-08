@@ -304,6 +304,7 @@
 		5D8640451CFE857000CA3CE4 /* event_loop_apple_cf.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D8640381CFE841400CA3CE4 /* event_loop_apple_cf.cpp */; };
 		5D8640461CFE857300CA3CE4 /* event_loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D3205861C880F4B00864053 /* event_loop.cpp */; };
 		5D8640471CFE857400CA3CE4 /* event_loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5D3205861C880F4B00864053 /* event_loop.cpp */; };
+		5D8640491CFE85EA00CA3CE4 /* cf_ptr.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5D8640481CFE85EA00CA3CE4 /* cf_ptr.hpp */; };
 		5D8EC9921BBB67C000447FF8 /* owned_data.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5D8EC9911BBB67C000447FF8 /* owned_data.hpp */; };
 		5DC597321B854C960020D712 /* column_type_traits.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5DC597311B854C960020D712 /* column_type_traits.hpp */; };
 		5DC597331B854CB90020D712 /* column_type_traits.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5DC597311B854C960020D712 /* column_type_traits.hpp */; };
@@ -961,6 +962,7 @@
 		5D8640381CFE841400CA3CE4 /* event_loop_apple_cf.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = event_loop_apple_cf.cpp; sourceTree = "<group>"; };
 		5D8640391CFE841400CA3CE4 /* event_loop_posix.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = event_loop_posix.cpp; sourceTree = "<group>"; };
 		5D86403A1CFE841400CA3CE4 /* interprocess_mutex.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = interprocess_mutex.hpp; sourceTree = "<group>"; };
+		5D8640481CFE85EA00CA3CE4 /* cf_ptr.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = cf_ptr.hpp; sourceTree = "<group>"; };
 		5D8EC9911BBB67C000447FF8 /* owned_data.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = owned_data.hpp; path = realm/owned_data.hpp; sourceTree = "<group>"; };
 		5DC597311B854C960020D712 /* column_type_traits.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_type_traits.hpp; path = realm/column_type_traits.hpp; sourceTree = "<group>"; };
 		65033A741C7DD3B80019E9F2 /* column_timestamp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = column_timestamp.cpp; path = realm/column_timestamp.cpp; sourceTree = "<group>"; };
@@ -1491,6 +1493,7 @@
 				52D7C4691852A01700633748 /* bind_ptr.hpp */,
 				52D7C46A1852A01700633748 /* buffer.hpp */,
 				5D3205831C880F4B00864053 /* call_with_tuple.hpp */,
+				5D8640481CFE85EA00CA3CE4 /* cf_ptr.hpp */,
 				52D7C46B1852A01700633748 /* config.sh */,
 				3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */,
 				3FC68FD81A0AD3BF005F3103 /* encrypted_file_mapping.hpp */,
@@ -1714,6 +1717,7 @@
 				365CCE60157CC37D00172BF8 /* query_conditions.hpp in Headers */,
 				365CCE61157CC37D00172BF8 /* query_engine.hpp in Headers */,
 				365CCE78157CC3A100172BF8 /* realm.hpp in Headers */,
+				5D8640491CFE85EA00CA3CE4 /* cf_ptr.hpp in Headers */,
 				4222F2FF19640B8400EC86A5 /* replication.hpp in Headers */,
 				522EA517192C4CA0002AD3B6 /* row.hpp in Headers */,
 				52D7C4861852A01700633748 /* safe_int_ops.hpp in Headers */,

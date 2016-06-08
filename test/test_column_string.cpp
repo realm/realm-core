@@ -1135,6 +1135,19 @@ TEST_TYPES(ColumnString_Count, non_nullable, nullable)
     e.destroy();
 }
 
+TEST(ColumnString_SetIndexInParent)
+{
+    ref_type asc_ref = StringColumn::create(Allocator::get_default());
+    StringColumn sc(Allocator::get_default(), asc_ref, true);
+
+    StringIndex* ndx = sc.create_search_index();
+    CHECK(ndx != nullptr);
+    sc.set_ndx_in_parent(0);
+    CHECK_EQUAL(sc.get_ndx_in_parent() + 1, ndx->get_ndx_in_parent());
+
+    sc.destroy();
+}
+
 TEST(ColumnString_SwapRows)
 {
     // Normal case

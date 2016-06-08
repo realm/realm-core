@@ -2,19 +2,42 @@
 
 ### Bugfixes
 
+* Implement `TableViewBase`'s copy-assignment operator to prevent link errors when it is used.
+
+### Breaking changes
+
+* Sorting order of strings is now according to more common scheme for special
+  characters (space, dash, etc), and for letters it's now such that visually
+  similiar letters (that is, those that differ only by diracritics, etc) are 
+  grouped together. (#1639)
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 1.1.0 Release notes
+
+### Bugfixes
+
 * Fix for #1846: If an exception is thrown from SlabAlloc::attach_file(), it
   forgot to unlock a mutex protecting the shared memory mapping. In cases
   where the last reference to the memory mapping goes out of scope, it would
   cause the assert "Destruction of mutex in use". Fix is to use unique_lock
   to ensure the mutex is unlocked before destruction.
-* Fix a crash when `Table::set_string_unique()` is called but the underlying 
+* Fix a crash when `Table::set_string_unique()` is called but the underlying
   column is actually a StringEnumColumn.
+* Fix an assertion failure when combining a `Query` with no conditions with another `Query`.
 
 ### Breaking changes
-* Sorting order of strings is now according to more common scheme for special
-  characters (space, dash, etc), and for letters it's now such that visually
-  similiar letters (that is, those that differ only by diracritics, etc) are 
-  grouped together.
+
 * S: Type of completion handler arguments changed from `const H&` to `H` for all
   asynchronous operations offered by the networking API (namespace
   `util::network`).
@@ -48,11 +71,8 @@
 
 ### Internals
 
-* This is functionally the same as 1.0.1 but with the bitcode build settings
-  changed. (#1813 is reverted). This is to build with Xamarin.
-
-**Note: This is a hotfix release and these changes are not necessarily included
-  in any above releases**
+* This is functionally the same as 1.0.1. For Xamarin we now do a specialized
+  cocoa build with only iOS support and without bitcode.
 
 ----------------------------------------------
 
@@ -133,7 +153,7 @@
 
 * Search indexes no longer support strings with lengths greater than
   `Table::max_indexed_string_length`. If you try to add a string with a longer length
-  (through the Table interface), then a `realm::LogicError` will be thrown with type 
+  (through the Table interface), then a `realm::LogicError` will be thrown with type
   `string_too_long_for_index`. Calling `Table::add_search_index()` will now return a
   boolean value indicating whether or not the index could be created on the column. If
   the column contains strings that exceed the maximum allowed length, then
