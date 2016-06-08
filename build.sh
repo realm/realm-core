@@ -53,8 +53,8 @@ WATCHOS_DIR="watchos-lib"
 TVOS_SDKS="appletvos appletvsimulator"
 TVOS_DIR="tvos-lib"
 
-: ${REALM_COCOA_PLATFORMS:="osx iphone watchos tvos"}
-: ${REALM_DOTNET_COCOA_PLATFORMS:="iphone-no-bitcode"}
+: ${REALM_COCOA_PLATFORMS:="osx ios watchos tvos"}
+: ${REALM_DOTNET_COCOA_PLATFORMS:="ios-no-bitcode"}
 
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
@@ -74,8 +74,8 @@ Available modes are:
     build-arm-benchmark:
     build-config-progs:
     build-osx:
-    build-iphone:
-    build-iphone-no-bitcode:
+    build-ios:
+    build-ios-no-bitcode:
     build-watchos:
     build-tvos:
     build-android:
@@ -787,7 +787,7 @@ EOF
         build_apple
         ;;
 
-    "build-iphone")
+    "build-ios" | "build-iphone")
         export name='iPhone'
         export available_sdks_config_key='IPHONE_SDKS_AVAIL'
         export min_version='7.0'
@@ -799,7 +799,7 @@ EOF
         build_apple
         ;;
 
-    "build-iphone-no-bitcode")
+    "build-ios-no-bitcode" | "build-iphone-no-bitcode")
         export name='iPhone'
         export available_sdks_config_key='IPHONE_SDKS_AVAIL'
         export min_version='7.0'
@@ -1128,7 +1128,7 @@ EOF
             esac
         done
 
-        sh build.sh build-iphone
+        sh build.sh build-ios
 
         TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"
@@ -2939,12 +2939,12 @@ EOF
         git clean -xfd || exit 1
 
         REALM_MAX_BPNODE_SIZE_DEBUG="4" REALM_ENABLE_ENCRYPTION="yes" sh build.sh config "$WORKSPACE/install" || exit 1
-        sh build.sh build-iphone || exit 1
+        sh build.sh build-ios || exit 1
         sh build.sh build-android || exit 1
         UNITTEST_ENCRYPT_ALL=yes sh build.sh check || exit 1
 
         REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
-        sh build.sh build-iphone || exit 1
+        sh build.sh build-ios || exit 1
         sh build.sh build-android || exit 1
         sh build.sh build || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
