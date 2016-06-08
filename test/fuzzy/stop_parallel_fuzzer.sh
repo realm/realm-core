@@ -33,7 +33,7 @@ memory="100" # MB
 echo "Minimizing $num_files found crashes and hangs"
 for file in ${files[@]}
 do
-	afl-tmin -t $time_out -m $memory -i "$file" -o "$file.minimized" "$executable_path" @@
+    afl-tmin -t $time_out -m $memory -i "$file" -o "$file.minimized" "$executable_path" @@
 done
 
 # Run executable for each and save the .cpp reproduction case
