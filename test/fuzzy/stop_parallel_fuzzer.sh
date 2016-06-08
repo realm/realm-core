@@ -34,6 +34,7 @@ echo "Minimizing $num_files found crashes and hangs"
 for file in ${files[@]}
 do
     afl-tmin -t $time_out -m $memory -i "$file" -o "$file.minimized" "$executable_path" @@
+    test $? -eq 1 && exit 1 # terminate if afl-tmin is being terminated
 done
 
 # Run executable for each and save the .cpp reproduction case
@@ -43,4 +44,5 @@ for file in ${files[@]}
 do
     cpp_file="$unit_tests_path$(basename $file).cpp"
     "$executable_path" "$file.minimized" --log > "$cpp_file"
+    test $? -eq 1 && exit 1 # terminate if afl-tmin is being terminated
 done
