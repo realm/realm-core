@@ -25,18 +25,16 @@ if [ $num_files -eq 0 ]; then
     exit 0
 fi
 
+# Let AFL try to minimize each input before converting to .cpp
 echo "Minimizing $num_files found crashes and hangs"
-
 for file in ${files[@]}
 do
 	afl-tmin -i "$file" -o "$file.minimized" "$executable_path" @@
 done
 
+# Run executable for each and save the .cpp reproduction case
 echo "Converting $num_files found crashes and hangs into .cpp unit tests in \"$unit_tests_path\""
-
 mkdir -p "$unit_tests_path"
-
-# Run executable for each and capture the output
 for file in ${files[@]}
 do
     cpp_file="$unit_tests_path$(basename $file).cpp"
