@@ -130,36 +130,46 @@ It can be built using the following command:
 
     sh build.sh build-android
 
-Building for iOS
-----------------
+Building for iOS, watchOS and tvOS
+----------------------------------
 
-On Mac OS X it is possible to build a version of the Realm core
-library for iOS (the iPhone OS). It requires that the iPhoneOS and
-iPhoneSimulator SDKs for Xcode are installed.
+Realm core may be built for iOS, watchOS and tvOS from an OS X machine.
+See the OS X section of [Prerequisites](#prerequisites) above for information
+about the version of Xcode that is required.
 
-Run the following command to build the Realm core library for
-iPhone/iOS:
+To build for iOS:
 
-    sh build.sh build-iphone
+    sh build.sh build-ios
 
 This produces the following files and directories:
 
-    iphone-lib/include/
-    iphone-lib/librealm-ios.a
-    iphone-lib/librealm-ios-dbg.a
-    iphone-lib/realm-config
-    iphone-lib/realm-config-dbg
+    ios-lib/include/
+    ios-lib/librealm-ios.a
+    ios-lib/librealm-ios-dbg.a
+    ios-lib/realm-config
+    ios-lib/realm-config-dbg
 
 The `include` directory holds a copy of the header files, which are
 identical to the ones installed by `sh build.sh install`. There are
 two versions of the static library, one that is compiled with
 optimization, and one that is compiled for debugging. Each one
-contains code compiled for both iOS and for the iOS
-simulator. Each one also comes with a `config` program that can be
-used to enquire about required compiler and linker flags.
+contains code compiled for both iOS devices and the iOS simulator.
+Each one also comes with a `config` program that can be used to
+enquire about required compiler and linker flags.
 
-If you need to use the core library for development of the Objective C
-binding, consider running `sh build.sh build-objc`.
+To build for watchOS:
+
+    sh build.sh build-watchos
+
+The output is placed in watchos-lib, and is structured the same as
+is described for iOS above.
+
+To build for tvOS:
+
+    sh build.sh build-tvos
+
+The output is placed in tvos-lib, and is structured the same as
+is described for iOS above.
 
 Configuration
 -------------
@@ -277,7 +287,7 @@ Packaging for iOS
 -----------------
 
 You can create a framework for iOS after you have built the core
-library for iOS (the `build-iphone` target=. The framework is useful when
+library for iOS (the `build-ios` target). The framework is useful when
 creating apps for iPhone and iPad. The command is:
 
     sh build.sh build-ios-framework
