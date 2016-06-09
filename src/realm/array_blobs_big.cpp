@@ -1,9 +1,5 @@
 #include <algorithm>
 
-#ifdef _WIN32
-#include <win32/types.h>
-#endif
-
 #include <realm/array_blobs_big.hpp>
 #include <realm/column.hpp>
 

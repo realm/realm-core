@@ -1,7 +1,3 @@
-#ifdef _MSC_VER
-#  include <win32/types.h>
-#endif
-
 #include <utility> // pair
 
 #include <realm/array_binary.hpp>
