@@ -1,7 +1,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_GROUP
 
-#include <stdint.h>
+#include <cstdint>
 #include <algorithm>
 #include <fstream>
 

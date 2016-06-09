@@ -8,7 +8,7 @@
 #include "../util/mem.hpp"
 #include "../util/number_names.hpp"
 
-#include <stdint.h>
+#include <cstdint>
 
 using namespace realm;
 

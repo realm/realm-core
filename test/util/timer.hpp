@@ -20,7 +20,7 @@
 #ifndef REALM_TEST_UTIL_TIMER_HPP
 #define REALM_TEST_UTIL_TIMER_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <ostream>
 #include <string>
 

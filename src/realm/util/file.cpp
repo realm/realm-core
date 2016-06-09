@@ -3,11 +3,11 @@
 #include <algorithm>
 #include <vector>
 
-#include <errno.h>
-#include <string.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cerrno>
+#include <cstring>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 
 #ifdef _WIN32
 #  define NOMINMAX

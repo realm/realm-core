@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <stdexcept>

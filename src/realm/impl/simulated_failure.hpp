@@ -21,7 +21,7 @@
 #ifndef REALM_IMPL_SIMULATED_FAILURE_HPP
 #define REALM_IMPL_SIMULATED_FAILURE_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <system_error>
 
 #include <realm/util/features.h>

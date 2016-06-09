@@ -20,7 +20,7 @@
 #ifndef REALM_ALLOC_HPP
 #define REALM_ALLOC_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <cstddef>
 
 #include <realm/util/features.h>

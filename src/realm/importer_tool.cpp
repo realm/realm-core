@@ -27,7 +27,7 @@
 #include <realm.hpp>
 #include <realm/utilities.hpp>
 #include <realm/importer.hpp>
-#include <stdarg.h>
+#include <cstdarg>
 
 using namespace realm;
 

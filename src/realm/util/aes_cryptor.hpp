@@ -21,7 +21,7 @@
 #include <cstddef>
 #include <memory>
 #include <realm/util/features.h>
-#include <stdint.h>
+#include <cstdint>
 #include <vector>
 
 #if REALM_ENABLE_ENCRYPTION

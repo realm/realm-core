@@ -1,5 +1,5 @@
 #include <cstdio>
-#include <stdint.h>
+#include <cstdint>
 
 union Float_t
 {

@@ -20,7 +20,7 @@
 #ifndef REALM_TABLE_BASIC_HPP
 #define REALM_TABLE_BASIC_HPP
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 #include <cstddef>
 #include <utility>
 

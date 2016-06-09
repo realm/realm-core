@@ -20,7 +20,7 @@
 #ifndef REALM_ROW_HPP
 #define REALM_ROW_HPP
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <realm/util/type_traits.hpp>
 #include <realm/mixed.hpp>

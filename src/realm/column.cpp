@@ -1,4 +1,4 @@
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 #include <cstdlib>
 #include <cstring>
 #include <climits>

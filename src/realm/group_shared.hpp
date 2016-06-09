@@ -21,7 +21,7 @@
 #define REALM_GROUP_SHARED_HPP
 
 #ifdef REALM_DEBUG
-    #include <time.h> // usleep()
+    #include <ctime> // usleep()
 #endif
 
 #include <functional>

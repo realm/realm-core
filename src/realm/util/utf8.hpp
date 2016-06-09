@@ -20,7 +20,7 @@
 #ifndef REALM_UTIL_UTF8_HPP
 #define REALM_UTIL_UTF8_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 
 #include <realm/util/safe_int_ops.hpp>

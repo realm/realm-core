@@ -23,7 +23,7 @@
 #include <cstddef>
 #include <ostream>
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <realm/util/features.h>
 

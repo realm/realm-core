@@ -5,7 +5,7 @@
 #include "test.hpp"
 
 #include <ctime>
-#include <stdio.h>
+#include <cstdio>
 #include <fstream>
 
 using namespace realm;

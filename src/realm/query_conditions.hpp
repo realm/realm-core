@@ -20,7 +20,7 @@
 #ifndef REALM_QUERY_CONDITIONS_HPP
 #define REALM_QUERY_CONDITIONS_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 
 #include <realm/unicode.hpp>

@@ -7,7 +7,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
-#include <float.h> // DBL_MIN, DBL_MAX
+#include <cfloat> // DBL_MIN, DBL_MAX
 
 #include <unistd.h> // link, unlink
 

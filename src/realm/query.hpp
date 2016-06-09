@@ -20,7 +20,7 @@
 #ifndef REALM_QUERY_HPP
 #define REALM_QUERY_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <cstdio>
 #include <climits>
 #include <algorithm>

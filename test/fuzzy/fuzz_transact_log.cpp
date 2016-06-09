@@ -2,7 +2,7 @@
 #include <realm/commit_log.hpp>
 #include "../test.hpp"
 
-#include <stdio.h>
+#include <cstdio>
 #include <fstream>
 
 using namespace realm;

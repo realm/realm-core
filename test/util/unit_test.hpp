@@ -20,7 +20,7 @@
 #ifndef REALM_TEST_UTIL_UNIT_TEST_HPP
 #define REALM_TEST_UTIL_UNIT_TEST_HPP
 
-#include <stddef.h>
+#include <cstddef>
 #include <cmath>
 #include <cstring>
 #include <algorithm>

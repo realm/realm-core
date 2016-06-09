@@ -27,7 +27,7 @@
 #include <cstring>
 
 #include <cfloat>
-#include <math.h>
+#include <cmath>
 
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>

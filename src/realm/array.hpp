@@ -47,7 +47,7 @@ Searching: The main finding function is:
 #include <ostream>
 #include <sstream>
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 
 #include <realm/util/meta.hpp>
 #include <realm/util/assert.hpp>
@@ -2991,9 +2991,9 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
         if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(3 + baseindex); else return 3;} chunk >>= 16;
 
         // Following illustrates it:
-        #include <stdint.h>
-        #include <stdio.h>
-        #include <stdlib.h>
+        #include <cstdint>
+        #include <cstdio>
+        #include <cstdlib>
 
         size_t bug(int64_t v, uint64_t chunk)
         {

@@ -18,7 +18,7 @@
  *
  **************************************************************************/
 
-#include <stddef.h>
+#include <cstddef>
 #include <memory>
 #include <functional>
 #include <chrono>

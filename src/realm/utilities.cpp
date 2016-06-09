@@ -1,7 +1,7 @@
 #include <cstdlib> // size_t
 #include <string>
 #include <iostream>
-#include <stdint.h>
+#include <cstdint>
 #include <atomic>
 
 #include <realm/utilities.hpp>

@@ -6,7 +6,7 @@
 #include <iostream>
 #include <typeinfo>
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <realm/util/type_list.hpp>
 #include <realm/util/safe_int_ops.hpp>

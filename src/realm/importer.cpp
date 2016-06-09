@@ -20,7 +20,7 @@
 
 // Test tool in test/test_csv/test.pl
 
-#include <stdint.h>
+#include <cstdint>
 #include <limits>
 #include <vector>
 #include <sstream>

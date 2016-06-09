@@ -21,7 +21,7 @@
 #ifndef REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
 #define REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <memory>
 
 #include <realm/column_binary.hpp>

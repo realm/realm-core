@@ -25,7 +25,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/interprocess_mutex.hpp>
-#include <stdint.h>
+#include <cstdint>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <semaphore.h>

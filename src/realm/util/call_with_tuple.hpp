@@ -20,7 +20,7 @@
 #ifndef REALM_UTIL_CALL_WITH_TUPLE_HPP
 #define REALM_UTIL_CALL_WITH_TUPLE_HPP
 
-#include <stddef.h>
+#include <cstddef>
 #include <tuple>
 
 namespace realm {
