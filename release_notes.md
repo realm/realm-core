@@ -590,6 +590,11 @@ versions [0.97.0].**
 * `SharedGroup::compact()` does a sync before renaming to avoid corrupted db
   file after compacting.
 
+### API breaking changes:
+
+* TableView::distinct() now returns a new TableView with the result. Older calls
+  to distinct() are therefore no longer reversed/forgotten upon successive calls.
+
 ### Enhancements:
 
 * Add SharedGroup::get_transact_stage().

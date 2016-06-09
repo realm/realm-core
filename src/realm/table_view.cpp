@@ -48,6 +48,7 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
     src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
+    m_distinct_columns = src.m_distinct_columns;
     m_sorting_predicate = src.m_sorting_predicate;
     m_auto_sort = src.m_auto_sort;
     m_start = src.m_start;
@@ -73,6 +74,7 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
     m_table = TableRef();
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
+    m_distinct_columns = src.m_distinct_columns;
     m_sorting_predicate = src.m_sorting_predicate;
     m_auto_sort = src.m_auto_sort;
     m_start = src.m_start;
@@ -681,31 +683,39 @@ void TableViewBase::sync_distinct_view(size_t column)
     }
 }
 
-void TableViewBase::distinct(size_t column)
+TableView TableViewBase::distinct(size_t column)
 {
-    distinct(std::vector<size_t> { column });
+    return distinct(std::vector<size_t> { column });
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
-void TableViewBase::distinct(std::vector<size_t> columns)
+TableView TableViewBase::distinct(std::vector<size_t> columns)
 {
-    m_distinct_columns.clear();
-    const_cast<TableViewBase*>(this)->do_sync();
+    TableView res = TableView(*static_cast<TableView*>(this));
+    res.distinct_internal(columns);
+    return res;
+}
+
+void TableViewBase::distinct_internal(std::vector<size_t> columns)
+{
     m_distinct_columns = columns;
 
     if (m_distinct_columns.size() == 0)
         return;
 
+    std::vector<bool> ascending;
+    for (size_t r = 0; r < m_distinct_columns.size(); r++)
+        ascending.push_back(true);
+
     // Step 1: First copy original TableView into a vector
     std::vector<size_t> original;
     original.resize(size());
-    std::vector<bool> ascending;
+
     for (size_t r = 0; r < size(); r++) {
         int64_t row_index_r = m_row_indexes.get(r);
         REALM_ASSERT(!util::int_cast_has_overflow<size_t>(row_index_r));
         original[r] = size_t(row_index_r);
-        ascending.push_back(true);
     }
 
     // Step 2: Now sort ascending using the same column set that was passed to distinct()
@@ -851,7 +861,7 @@ void TableViewBase::do_sync()
         re_sort();
 
     if (m_distinct_columns.size() > 0)
-        distinct(m_distinct_columns);
+        distinct_internal(std::vector<size_t>{m_distinct_columns});
 
     m_last_seen_version = outside_version();
 }

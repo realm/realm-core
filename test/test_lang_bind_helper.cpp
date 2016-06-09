@@ -35,6 +35,7 @@
 
 
 #include "test.hpp"
+#include "util/thread_wrapper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -10417,7 +10418,7 @@ TEST(LangBindHelper_HandoverDistinctView)
             LangBindHelper::commit_and_continue_as_read(sg_w);
             vid = sg_w.get_version_of_current_transaction();
             tv1 = table->where().find_all();
-            tv1.distinct(0);
+            tv1 = tv1.distinct(0);
             CHECK(tv1.size() == 1);
             CHECK(tv1.get_source_ndx(0) == 0);
             CHECK(tv1.is_attached());
@@ -10441,11 +10442,6 @@ TEST(LangBindHelper_HandoverDistinctView)
             tv2->sync_if_needed();
             CHECK_EQUAL(tv2->size(), 1);
             CHECK_EQUAL(tv2->get_source_ndx(0), 0);
-
-            // Remove distinct property
-            tv2->distinct(std::vector<size_t>());
-            tv2->sync_if_needed();
-            CHECK_EQUAL(tv2->size(), 2);
         }
     }
 }
