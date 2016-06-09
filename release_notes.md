@@ -3,6 +3,10 @@
 ### Bugfixes
 
 * Implement `TableViewBase`'s copy-assignment operator to prevent link errors when it is used.
+* No longer assert on a "!cfg.session_initiator" in SlabAlloc::attach_file(). This makes issue
+  #1784 go away, but also removes an option to detect and flag if the ".lock" file is deleted
+  while a SharedGroup is attached to the file. Please note: Removal of the ".lock" file while
+  the database is attached may lead to corruption of the database.
 
 ### Breaking changes
 
