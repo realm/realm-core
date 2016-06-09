@@ -23,10 +23,6 @@
 #include <cstddef>
 #include <vector>
 
-#ifdef _WIN32
-#  include <win32\stdint.h>
-#endif
-
 #include <realm/array.hpp>
 #include <realm/column.hpp>
 
