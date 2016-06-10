@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed a recently introduced crash bug on indexed columns (#1869)
 
 ### Breaking changes
 
