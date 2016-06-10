@@ -19,7 +19,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Non concurrent tests are run on the main process thread. (#1862)
 
 ----------------------------------------------
 
