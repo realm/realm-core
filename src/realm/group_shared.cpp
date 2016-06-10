@@ -922,7 +922,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                 sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
             m_reader_map.map(m_file, File::access_ReadWrite, reader_info_size, File::map_NoSync);
             File::UnmapGuard fug_2(m_reader_map);
-            m_reader_map_base.store(m_reader_map.get_addr(), std::memory_order_release);
 
             // proceed to initialize versioning and other metadata information related to
             // the database. Also create the database if we're beginning a new session
@@ -1006,7 +1005,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
 
                 info->latest_version_number = version;
 
-                SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+                SharedInfo* r_info = m_reader_map.get_addr();
                 size_t file_size = alloc.get_baseline();
                 r_info->init_versioning(top_ref, file_size, version);
             }
@@ -1176,7 +1175,7 @@ bool SharedGroup::compact()
     // rename(). Solve the problem by using `util::File::move()` instead.
     rename(tmp_path.c_str(), m_db_path.c_str());
     {
-        SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+        SharedInfo* r_info = m_reader_map.get_addr();
         Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
         REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
         static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
@@ -1201,7 +1200,7 @@ bool SharedGroup::compact()
     gf::set_file_format_version(m_group, info->file_format_version);
 
     // update the versioning info to match
-    SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+    SharedInfo* r_info = m_reader_map.get_addr();
     Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
     REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
     rc.filesize = file_size;
@@ -1278,7 +1277,6 @@ void SharedGroup::close() noexcept
     m_file.close();
     m_file_map.unmap();
     m_reader_map.unmap();
-    m_reader_map_base.store(nullptr, std::memory_order_release);
 }
 
 bool SharedGroup::has_changed()
@@ -1497,10 +1495,7 @@ SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
 
 void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
-    // Make sure we can handle release of a readlock obtained on another
-    // SharedGroup, which may have advanced to a larger mapping of the lockfile
-    grow_reader_mapping(read_lock.m_reader_idx);
-    SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+    SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
 }
@@ -1510,13 +1505,13 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 {
     if (version_id.version == std::numeric_limits<version_type>::max()) {
         for (;;) {
-            SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+            SharedInfo* r_info = m_reader_map.get_addr();
             read_lock.m_reader_idx = r_info->readers.last();
             if (grow_reader_mapping(read_lock.m_reader_idx)) { // Throws
                 // remapping takes time, so retry with a fresh entry
                 continue;
             }
-            r_info = m_reader_map_base.load(std::memory_order_consume);
+            r_info = m_reader_map.get_addr();
             const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
             // if the entry is stale and has been cleared by the cleanup process,
             // we need to start all over again. This is extremely unlikely, but possible.
@@ -1530,13 +1525,13 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
     }
 
     for (;;) {
-        SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+        SharedInfo* r_info = m_reader_map.get_addr();
         read_lock.m_reader_idx = version_id.index;
         if (grow_reader_mapping(read_lock.m_reader_idx)) { // Throws
             // remapping takes time, so retry with a fresh entry
             continue;
         }
-        r_info = m_reader_map_base.load(std::memory_order_consume);
+        r_info = m_reader_map.get_addr();
         const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
 
         // if the entry is stale and has been cleared by the cleanup process,
@@ -1747,7 +1742,7 @@ Replication::version_type SharedGroup::do_commit()
 {
     REALM_ASSERT(m_transact_stage == transact_Writing);
 
-    SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+    SharedInfo* r_info = m_reader_map.get_addr();
 
     version_type current_version = r_info->get_current_version_unchecked();
     version_type new_version = current_version + 1;
@@ -1763,7 +1758,7 @@ Replication::version_type SharedGroup::do_commit()
         }
         catch (...) {
             repl->abort_transact();
-            r_info = m_reader_map_base.load(std::memory_order_consume);
+            r_info = m_reader_map.get_addr();
             r_info->commit_in_critical_phase = 0;
             throw;
         }
@@ -1772,7 +1767,7 @@ Replication::version_type SharedGroup::do_commit()
     else {
         low_level_commit(new_version); // Throws
     }
-    r_info = m_reader_map_base.load(std::memory_order_consume);
+    r_info = m_reader_map.get_addr();
     r_info->commit_in_critical_phase = 0;
     return new_version;
 }
@@ -1815,18 +1810,14 @@ bool SharedGroup::grow_reader_mapping(uint_fast32_t index)
     using _impl::SimulatedFailure;
     SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
 
-    if (index >= m_local_max_entry.load(std::memory_order_acquire)) {
-        std::lock_guard<util::Mutex> lock(m_reader_map_lock);
-        if (index >= m_local_max_entry) {
-            // handle mapping expansion if required
-            SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
-            m_local_max_entry.store(r_info->readers.get_num_entries(), std::memory_order_release);
-            size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
-            // std::cout << "Growing reader mapping to " << infosize << std::endl;
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
-            m_reader_map_base.store(m_reader_map.get_addr(), std::memory_order_release);
-            return true;
-        }
+    if (index >= m_local_max_entry) {
+        // handle mapping expansion if required
+        SharedInfo* r_info = m_reader_map.get_addr();
+        m_local_max_entry = r_info->readers.get_num_entries();
+        size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
+        // std::cout << "Growing reader mapping to " << infosize << std::endl;
+        m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
+        return true;
     }
     return false;
 }
@@ -1847,7 +1838,7 @@ SharedGroup::version_type SharedGroup::get_version_of_latest_snapshot()
             // make sure that the index we are about to dereference falls within
             // the portion of the ringbuffer that we have mapped - if not, extend
             // the mapping to fit.
-            r_info = m_reader_map_base.load(std::memory_order_consume);
+            r_info = m_reader_map.get_addr();
             index = r_info->readers.last();
         }
         while (grow_reader_mapping(index)); // throws
@@ -1875,13 +1866,13 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // of the current session.
     uint_fast64_t oldest_version;
     {
-        SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+        SharedInfo* r_info = m_reader_map.get_addr();
 
         // the cleanup process may access the entire ring buffer, so make sure it is mapped.
         // this is not ensured as part of begin_read, which only makes sure that the current
         // last entry in the buffer is available.
         if (grow_reader_mapping(r_info->readers.get_num_entries())) { // throws
-            r_info = m_reader_map_base.load(std::memory_order_consume);
+            r_info = m_reader_map.get_addr();
         }
         r_info->readers.cleanup();
         const Ringbuffer::ReadCount& rc = r_info->readers.get_oldest();
@@ -1918,7 +1909,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     size_t new_file_size = out.get_file_size();
     // Update reader info
     {
-        SharedInfo* r_info = m_reader_map_base.load(std::memory_order_consume);
+        SharedInfo* r_info = m_reader_map.get_addr();
         if (r_info->readers.is_full()) {
             // buffer expansion
             uint_fast32_t entries = r_info->readers.get_num_entries();
@@ -1926,14 +1917,10 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space( entries );
             // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
             m_file.prealloc(0, new_info_size); // Throws
-            {
-                std::lock_guard<util::Mutex> lock(m_reader_map_lock);
-                m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
-                r_info = m_reader_map.get_addr();
-                m_reader_map_base.store(r_info, std::memory_order_release);
-                m_local_max_entry = entries;
-                r_info->readers.expand_to(entries);
-            }
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
+            r_info = m_reader_map.get_addr();
+            m_local_max_entry = entries;
+            r_info->readers.expand_to(entries);
         }
         Ringbuffer::ReadCount& r = r_info->readers.get_next();
         r.current_top = new_top_ref;
