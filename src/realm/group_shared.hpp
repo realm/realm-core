@@ -522,32 +522,16 @@ public:
     /// may want to momentarily pin the current version until the other thread
     /// has retrieved it.
     ///
-    /// The release (unpinning) can be done on any SharedGroup as long as it
-    /// is attached to the same database.
+    /// The release can be done on the background thread, but in that case it has to
+    /// be done on the receiving (thread local) SharedGroup, rather than the sender.
     ///
-    /// Both pin_version() and unpin_version() are thread-safe.
-    ///
-    /// As a general rule:
-    /// Don't use the version obtained by pin_version() to control which version
-    /// a receiving thread should lock on to using begin_read() or advance_read().
-    /// For that purpose you should use the version in the handover object.
-    ///
-    /// You can pin a version multiple times but the number of pin and unpin
-    /// operations must be equal to actually release the version.
-    ///
-    /// It is the users responsibility to keep at least one SharedGroup
-    /// alive and attached to the database until it can be unpinned.
-    ///
-    /// Important: When a version is pinned, younger versions cannot be
-    /// reclaimed even if they are no longer referenced. This can cause
-    /// the database to grow. Use get_number_of_versions() to learn how
-    /// many versions are present in the database at any one time and
-    /// potentially detect (and react) if there are too many.
+    /// It is the users responsibility to keep the sending SharedGroup alive until
+    /// the version has been unpinned.
 
     // Pin version for handover
     VersionID pin_version();
 
-    // Release pinned version
+    // Release pinned version (not thread safe)
     void unpin_version(VersionID version);
 
 private:
