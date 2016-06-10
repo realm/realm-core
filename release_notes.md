@@ -2,12 +2,55 @@
 
 ### Bugfixes
 
+* Lorem ipsum.
+
+### Breaking changes
+
+* Sorting order of strings is now according to more common scheme for special
+  characters (space, dash, etc), and for letters it's now such that visually
+  similiar letters (that is, those that differ only by diracritics, etc) are 
+  grouped together. (#1639)
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 1.1.1 Release notes
+
+### Bugfixes
+
+* Fixed a recently introduced crash bug on indexed columns (#1869)
+* Implement `TableViewBase`'s copy-assignment operator to prevent link errors when it is used.
+* No longer assert on a "!cfg.session_initiator" in SlabAlloc::attach_file(). This makes issue
+  #1784 go away, but also removes an option to detect and flag if the ".lock" file is deleted
+  while a SharedGroup is attached to the file. Please note: Removal of the ".lock" file while
+  the database is attached may lead to corruption of the database.
+
+### Enhancements
+
+* Improve performance of opening Realm files and making commits when using
+  external writelogs by eliminating some unneeded `fsync()`s.
+
+----------------------------------------------
+
+# 1.1.0 Release notes
+
+### Bugfixes
+
 * Fix for #1846: If an exception is thrown from SlabAlloc::attach_file(), it
   forgot to unlock a mutex protecting the shared memory mapping. In cases
   where the last reference to the memory mapping goes out of scope, it would
   cause the assert "Destruction of mutex in use". Fix is to use unique_lock
   to ensure the mutex is unlocked before destruction.
-* Fix a crash when `Table::set_string_unique()` is called but the underlying 
+* Fix a crash when `Table::set_string_unique()` is called but the underlying
   column is actually a StringEnumColumn.
 * Fix an assertion failure when combining a `Query` with no conditions with another `Query`.
 
@@ -128,7 +171,7 @@
 
 * Search indexes no longer support strings with lengths greater than
   `Table::max_indexed_string_length`. If you try to add a string with a longer length
-  (through the Table interface), then a `realm::LogicError` will be thrown with type 
+  (through the Table interface), then a `realm::LogicError` will be thrown with type
   `string_too_long_for_index`. Calling `Table::add_search_index()` will now return a
   boolean value indicating whether or not the index could be created on the column. If
   the column contains strings that exceed the maximum allowed length, then
