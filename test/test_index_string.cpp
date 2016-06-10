@@ -1327,6 +1327,7 @@ TEST(StringIndex_Deny_Duplicates)
     col.destroy();
 }
 
+#ifndef _WIN32
 // There is a corner case where two very long strings are
 // inserted into the string index which are identical except
 // for the characters at the end (they have an identical very
@@ -1379,5 +1380,6 @@ TEST(StringIndex_InsertLongPrefix) {
     //TODO: check for other recursive functions such as do_update_ref(); do_delete();
     //TODO: check moving long strings from list to subindex and reversed after removal
 }
+#endif // _WIN32
 
 #endif // TEST_INDEX_STRING
