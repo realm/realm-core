@@ -12229,4 +12229,26 @@ TEST_TYPES(LangBindHelper_SetTimestampAdvanceRead, std::true_type, std::false_ty
 }
 
 
+// Found by AFL.
+TEST(LangbindHelper_BoolSearchIndexCommitPromote)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path));
+    std::unique_ptr<Replication> hist_w(make_client_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef t = g.add_table("");
+    t->insert_column(0, type_Bool, "", true);
+    t->add_empty_row(5);
+    t->set_bool(0, 0, false);
+    t->add_search_index(0);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+    t->add_empty_row(5);
+    t->remove(8);
+}
+
+
 #endif

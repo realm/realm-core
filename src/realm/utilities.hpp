@@ -28,7 +28,6 @@
 #include <functional>
 
 #ifdef _MSC_VER
-#  include <win32/types.h>
 #  include <intrin.h>
 #endif
 
@@ -70,7 +69,7 @@ template<int version>
 REALM_FORCEINLINE bool sseavx()
 {
 /*
-    Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
+    Return whether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
     is based on the CPUID instruction.
 
     sse_support = -1: No SSE support

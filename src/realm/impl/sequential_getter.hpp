@@ -60,7 +60,7 @@ public:
 
     REALM_FORCEINLINE bool cache_next(size_t index)
     {
-        // Return wether or not leaf array has changed (could be useful to know for caller)
+        // Return whether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
             typename ColType::LeafInfo leaf { &m_leaf_ptr, m_array_ptr.get() };
             size_t ndx_in_leaf;

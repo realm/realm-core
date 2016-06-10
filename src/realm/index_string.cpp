@@ -375,7 +375,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     // This leaf already has a slot for for the key
 
     int_fast64_t slot_value = m_array->get(ins_pos+1);
-    size_t suboffset = offset + 4;
+    size_t suboffset = offset + s_index_key_length;
 
     // Single match (lowest bit set indicates literal row_ndx)
     if ((slot_value & 1) != 0) {
@@ -384,6 +384,8 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         StringConversionBuffer buffer;
         StringData v2 = get(row_ndx2, buffer);
         if (v2 == value) {
+            // Strings are equal but this is not a list. Create a list and add both rows.
+
             if (m_deny_duplicate_values)
                 throw LogicError(LogicError::unique_constraint_violation);
             // convert to list (in sorted order)
@@ -394,10 +396,12 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             m_array->set(ins_pos_refs, row_list.get_ref());
         }
         else {
-            // convert to subindex
+            // These strings have the same prefix up to this point but they are actually not
+            // equal. Extend the tree recursivly until the prefix of these strings is different.
             StringIndex subindex(m_target_column, m_array->get_alloc());
             subindex.insert_with_offset(row_ndx2, v2, suboffset);
             subindex.insert_with_offset(row_ndx, value, suboffset);
+            // Join the string of SubIndices to the current position of m_array
             m_array->set(ins_pos_refs, subindex.get_ref());
         }
         return true;
@@ -444,13 +448,14 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         return true;
     }
 
-    // subindex
+    // The key matches, but there is a subindex here so go down a level in the tree.
     StringIndex subindex(ref, m_array.get(), ins_pos_refs, m_target_column,
                          m_deny_duplicate_values, alloc);
     subindex.insert_with_offset(row_ndx, value, suboffset);
 
     return true;
 }
+
 
 void StringIndex::distinct(IntegerColumn& result) const
 {
@@ -605,7 +610,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
             if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
-                subindex.do_delete(row_ndx, value, offset+4);
+                subindex.do_delete(row_ndx, value, offset + s_index_key_length);
 
                 if (subindex.is_empty()) {
                     values.erase(pos);
@@ -617,8 +622,8 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
                 size_t r = sub.lower_bound(row_ndx);
-                REALM_ASSERT(r != not_found);
                 size_t sub_size = sub.size(); // Slow
+                REALM_ASSERT(r != sub_size);
                 bool is_last = r == sub_size - 1;
                 sub.erase(r, is_last);
 
@@ -666,7 +671,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
             if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
-                subindex.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
+                subindex.do_update_ref(value, row_ndx, new_row_ndx, offset + s_index_key_length);
             }
             else {
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
@@ -674,7 +679,8 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
                 size_t old_pos = sub.lower_bound(row_ndx);
                 size_t new_pos = sub.lower_bound(new_row_ndx);
-                REALM_ASSERT(old_pos != not_found);
+                size_t sub_size = sub.size();
+                REALM_ASSERT(old_pos != sub_size);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
 
                 // The payload-value exists in multiple rows, and these rows indexes are stored in an IntegerColumn.

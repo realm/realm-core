@@ -2474,7 +2474,7 @@ If pattern == false:
     'index' tells the row index of a single match and 'value' tells its value. Return false to make Array-finder break its search or return true to let it continue until
     'end' or 'limit'.
 
-Array-finder decides itself if - and when - it wants to pass you an indexpattern. It depends on array bit width, match frequency, and wether the arithemetic and
+Array-finder decides itself if - and when - it wants to pass you an indexpattern. It depends on array bit width, match frequency, and whether the arithemetic and
 computations for the given search criteria makes it feasible to construct such a pattern.
 */
 
