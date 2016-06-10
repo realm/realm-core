@@ -421,7 +421,7 @@ bool TestList::run(Config config)
         for (int i = 0; i < num_threads; ++i)
             thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i].get()));
 
-        // First execute regular (not nonconcurrent) tests
+        // First execute regular (concurrent) tests
         {
             auto thread = [&](int i) {
                 thread_contexts[i]->run();
