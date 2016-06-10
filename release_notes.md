@@ -31,20 +31,10 @@
   while a SharedGroup is attached to the file. Please note: Removal of the ".lock" file while
   the database is attached may lead to corruption of the database.
 
-### Breaking changes
-
-* Lorem ipsum.
-
 ### Enhancements
 
 * Improve performance of opening Realm files and making commits when using
   external writelogs by eliminating some unneeded `fsync()`s.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
