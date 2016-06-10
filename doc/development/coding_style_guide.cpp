@@ -149,6 +149,13 @@ private:
 
 
 
+// Use literals when possible
+
+char* str = nullptr; // don't use 0, NULL
+bool enable_feature = true;
+bool is_last = false;
+
+
 
 // Use of 'auto' keyword:
 //
