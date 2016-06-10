@@ -12167,7 +12167,7 @@ TEST_TYPES(LangBindHelper_SetTimestampAdvanceRead, std::true_type, std::false_ty
 
 
 // Found by AFL. Change ONLY back to TEST when the bug has been fixed.
-ONLY(LangbindHolder_BoolSearchIndexCommitPromote)
+ONLY(LangbindHelper_BoolSearchIndexCommitPromote)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_client_history(path));

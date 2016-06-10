@@ -475,7 +475,6 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         }
         return true;
     }
-
     // The key matches, but there is a subindex here so go down a level in the tree.
     // The loop below optimizes out recursive calls via insert_with_offset to children
     // which themselves contain another match at the next level (identical prefixes).
@@ -686,8 +685,8 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
                 size_t r = sub.lower_bound(row_ndx);
-                REALM_ASSERT(r != not_found);
                 size_t sub_size = sub.size(); // Slow
+                REALM_ASSERT(r != sub_size);
                 bool is_last = r == sub_size - 1;
                 sub.erase(r, is_last);
 
@@ -743,7 +742,8 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
                 size_t old_pos = sub.lower_bound(row_ndx);
                 size_t new_pos = sub.lower_bound(new_row_ndx);
-                REALM_ASSERT(old_pos != not_found);
+                size_t sub_size = sub.size();
+                REALM_ASSERT(old_pos != sub_size);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
 
                 // The payload-value exists in multiple rows, and these rows indexes are stored in an IntegerColumn.
