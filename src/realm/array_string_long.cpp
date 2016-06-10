@@ -1,7 +1,3 @@
-#ifdef _MSC_VER
-#include <win32/types.h> //ssize_t
-#endif
-
 #include <iostream>
 
 #include <realm/array_string_long.hpp>
