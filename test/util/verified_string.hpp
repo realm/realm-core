@@ -24,10 +24,6 @@
 #include <vector>
 #include <string>
 
-#ifdef _WIN32
-#  include <win32\stdint.h>
-#endif
-
 #include <realm/string_data.hpp>
 #include <realm/column_string.hpp>
 

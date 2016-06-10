@@ -101,19 +101,3 @@ Allocator& Allocator::get_default() noexcept
     static DefaultAllocator default_alloc;
     return default_alloc;
 }
-
-MemRef Allocator::do_realloc(ref_type ref, const char* addr, size_t old_size,
-                             size_t new_size)
-{
-    // Allocate new space
-    MemRef new_mem = do_alloc(new_size); // Throws
-
-    // Copy existing contents
-    char* new_addr = new_mem.m_addr;
-    std::copy(addr, addr+old_size, new_addr);
-
-    // Free old chunk
-    do_free(ref, addr);
-
-    return new_mem;
-}
