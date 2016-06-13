@@ -1290,7 +1290,7 @@ void buffered_input_stream::read_oper_base::proceed() noexcept
     REALM_ASSERT(m_out_curr < m_out_end);
     size_t n = m_stream->m_socket.do_read_some(m_stream->m_buffer.get(), s_buffer_size,
                                               m_error_code);
-    // During asynchronous operation the socked is in nonblocking mode, and
+    // During asynchronous operation the socket is in nonblocking mode, and
     // proceed() will only be called when the socket is reported ready for
     // reading (by poll() or select()). Even then, it may still occasionally
     // happen that read() (the system call) fails with EAGAIN
@@ -1298,7 +1298,7 @@ void buffered_input_stream::read_oper_base::proceed() noexcept
     // notes that such a situation might occur.
     //
     // The best way to deal with a situation like this, seems to be to ignore
-    // the incidence and go back to waiting for the socked to become ready for
+    // the incidence and go back to waiting for the socket to become ready for
     // reading again. It is hoped (and assumed) that these incidences are
     // sufficiently rare, that it does not lead to an effective busy wait for
     // the socket to become truly ready for reading.

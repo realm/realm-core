@@ -1783,7 +1783,7 @@ public:
         size_t n_2 = m_socket->do_write_some(m_curr, n_1, m_error_code);
         REALM_ASSERT(n_2 <= n_1);
         m_curr += n_2;
-        // During asynchronous operation the socked is in nonblocking mode, and
+        // During asynchronous operation the socket is in nonblocking mode, and
         // proceed() will only be called when the socket is reported ready for
         // writing (by poll() or select()). Even then, it may still occasionally
         // happen that write() (the system call) fails with EAGAIN
@@ -1793,7 +1793,7 @@ public:
         // quickly.
         //
         // The best way to deal with a situation like this, seems to be to
-        // ignore the incidence and go back to waiting for the socked to become
+        // ignore the incidence and go back to waiting for the socket to become
         // ready for writing again. It is hoped (and assumed) that these
         // incidences are sufficiently rare, that it does not lead to an
         // effective busy wait for the socket to become truly ready for writing.
@@ -1975,7 +1975,7 @@ public:
         REALM_ASSERT(!m_error_code);
         REALM_ASSERT(!m_socket.is_open());
         m_acceptor->do_accept(m_socket, m_endpoint, m_error_code);
-        // During asynchronous operation the listening socked is in nonblocking
+        // During asynchronous operation the listening socket is in nonblocking
         // mode, and proceed() will only be called when the socket is reported
         // ready for reading (by poll() or select()). Even then, it may still
         // occasionally happen that accept() (the system call) fails with EAGAIN
@@ -1983,7 +1983,7 @@ public:
         // select() notes that such a situation might occur.
         //
         // The best way to deal with a situation like this, seems to be to
-        // ignore the incidence and go back to waiting for the socked to become
+        // ignore the incidence and go back to waiting for the socket to become
         // ready for reading again. It is hoped (and assumed) that these
         // incidences are sufficiently rare, that it does not lead to an
         // effective busy wait for the socket to become truly ready for reading.
