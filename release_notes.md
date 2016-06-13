@@ -11,7 +11,7 @@
 
 * Sorting order of strings is now according to more common scheme for special
   characters (space, dash, etc), and for letters it's now such that visually
-  similiar letters (that is, those that differ only by diracritics, etc) are 
+  similiar letters (that is, those that differ only by diracritics, etc) are
   grouped together. (#1639)
 
 ### Enhancements
