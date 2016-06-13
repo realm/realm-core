@@ -545,8 +545,21 @@ public:
     /// \param ep The remote endpoint of the connection to be established.
     template<class H> void async_connect(const endpoint& ep, H handler);
 
+    /// @{ \brief Perform a synchronous write operation.
+    ///
+    /// write() will not return until all the specified bytes have been written
+    /// to the socket, or an error occurs.
+    ///
+    /// The versions of write() that does not take an `std::error_code&`
+    /// argument will throw std::system_error on failure.
+    ///
+    /// The versions that does take an `std::error_code&` argument will set \a
+    /// ec to `std::error_code()` on success, and to something else on
+    /// failure. It returns the same error code as it assigns to \a ec.
+    ///
     void write(const char* data, size_t size);
-    std::error_code write(const char* data, size_t size, std::error_code&) noexcept;
+    std::error_code write(const char* data, size_t size, std::error_code& ec) noexcept;
+    /// @}
 
     /// \brief Perform an asynchronous write operation.
     ///
@@ -692,7 +705,7 @@ private:
     using LendersWriteOperPtr =
         std::unique_ptr<write_oper_base, io_service::LendersOperDeleter>;
 
-    size_t do_read_some(char* buffer, size_t size, std::error_code& ec) noexcept;
+    size_t do_read_some(char* buffer, size_t size, std::error_code&) noexcept;
     size_t do_write_some(const char* data, size_t size, std::error_code&) noexcept;
 
     void do_async_connect(LendersConnectOperPtr);
@@ -790,12 +803,37 @@ public:
     buffered_input_stream(socket&);
     ~buffered_input_stream() noexcept;
 
+    /// @{ \brief Perform a synchronous read operation.
+    ///
+    /// read() will not return until the specified buffer is full, or an error
+    /// occurs. Reaching the end of input before the buffer is filled, is
+    /// considered an error, and will cause the operation to fail with
+    /// `network::end_of_input`.
+    ///
+    /// read_until() will not return until the specified buffer contains the
+    /// specified delimiter, or an error occurs. If the buffer is filled before
+    /// the delimiter is found, the operation fails with
+    /// `network::delim_not_found`. Otherwise, if the end of input is reached
+    /// before the delimiter is found, the operation fails with
+    /// `network::end_of_input`. If the operation succeeds, the last byte placed
+    /// in the buffer is the delimiter.
+    ///
+    /// The versions of read() and read_until() that do not take an
+    /// `std::error_code&` argument will throw std::system_error on failure.
+    ///
+    /// The versions that do take an `std::error_code&` argument will set \a ec
+    /// to `std::error_code()` on success, and to something else on failure. On
+    /// failure they will return the number of bytes placed in the specified
+    /// buffer before the error occured.
+    ///
+    /// \return The number of bytes places in the specified buffer upon return.
     size_t read(char* buffer, size_t size);
-    size_t read(char* buffer, size_t size, std::error_code&) noexcept;
+    size_t read(char* buffer, size_t size, std::error_code& ec) noexcept;
 
     size_t read_until(char* buffer, size_t size, char delim);
     size_t read_until(char* buffer, size_t size, char delim,
-                           std::error_code&) noexcept;
+                           std::error_code& ec) noexcept;
+    /// @}
 
     /// @{ \brief Perform an asynchronous read operation.
     ///
@@ -1745,7 +1783,26 @@ public:
         size_t n_2 = m_socket->do_write_some(m_curr, n_1, m_error_code);
         REALM_ASSERT(n_2 <= n_1);
         m_curr += n_2;
-        set_is_complete(m_error_code || m_curr == m_end);
+        // During asynchronous operation the socked is in nonblocking mode, and
+        // proceed() will only be called when the socket is reported ready for
+        // writing (by poll() or select()). Even then, it may still occasionally
+        // happen that write() (the system call) fails with EAGAIN
+        // (error::resource_unavailable_try_again). The Linux man page for
+        // select() notes that such a situation might occur. This has been
+        // observed to occur on Mac OSX when writing large amounts of data
+        // quickly.
+        //
+        // The best way to deal with a situation like this, seems to be to
+        // ignore the incidence and go back to waiting for the socked to become
+        // ready for writing again. It is hoped (and assumed) that these
+        // incidences are sufficiently rare, that it does not lead to an
+        // effective busy wait for the socket to become truly ready for writing.
+        if (REALM_UNLIKELY(m_error_code == error::resource_unavailable_try_again)) {
+            m_error_code = std::error_code(); // Clear
+        }
+        else {
+            set_is_complete(m_error_code || m_curr == m_end);
+        }
     }
     void recycle() noexcept override final
     {
@@ -1811,7 +1868,7 @@ template<class H>
 inline void socket::async_connect(const endpoint& ep, H handler)
 {
     LendersConnectOperPtr op =
-        io_service::alloc<connect_oper<H>>(m_read_oper, *this, ep, std::move(handler)); // Throws
+        io_service::alloc<connect_oper<H>>(m_write_oper, *this, ep, std::move(handler)); // Throws
     do_async_connect(std::move(op)); // Throws
 }
 
@@ -1876,6 +1933,7 @@ inline void socket::do_async_connect(LendersConnectOperPtr op)
         m_service.add_completed_oper(std::move(op));
     }
     else {
+        REALM_ASSERT(op == m_write_oper);
         m_service.add_io_oper(get_sock_fd(), std::move(op), io_service::io_op_Write); // Throws
     }
 }
@@ -1887,6 +1945,7 @@ inline void socket::do_async_write(LendersWriteOperPtr op)
         m_service.add_completed_oper(std::move(op));
     }
     else {
+        REALM_ASSERT(op == m_write_oper);
         m_service.add_io_oper(get_sock_fd(), std::move(op), io_service::io_op_Write); // Throws
     }
 }
@@ -1916,7 +1975,24 @@ public:
         REALM_ASSERT(!m_error_code);
         REALM_ASSERT(!m_socket.is_open());
         m_acceptor->do_accept(m_socket, m_endpoint, m_error_code);
-        set_is_complete(true);
+        // During asynchronous operation the listening socked is in nonblocking
+        // mode, and proceed() will only be called when the socket is reported
+        // ready for reading (by poll() or select()). Even then, it may still
+        // occasionally happen that accept() (the system call) fails with EAGAIN
+        // (error::resource_unavailable_try_again). The Linux man page for
+        // select() notes that such a situation might occur.
+        //
+        // The best way to deal with a situation like this, seems to be to
+        // ignore the incidence and go back to waiting for the socked to become
+        // ready for reading again. It is hoped (and assumed) that these
+        // incidences are sufficiently rare, that it does not lead to an
+        // effective busy wait for the socket to become truly ready for reading.
+        if (REALM_UNLIKELY(m_error_code == error::resource_unavailable_try_again)) {
+            m_error_code = std::error_code(); // Clear
+        }
+        else {
+            set_is_complete(true);
+        }
     }
     void recycle() noexcept override final
     {
@@ -2038,6 +2114,7 @@ inline void acceptor::do_async_accept(LendersAcceptOperPtr op)
         m_service.add_completed_oper(std::move(op));
     }
     else {
+        REALM_ASSERT(op == m_read_oper);
         m_service.add_io_oper(get_sock_fd(), std::move(op), io_service::io_op_Read); // Throws
     }
 }
@@ -2193,6 +2270,7 @@ inline void buffered_input_stream::do_async_read(LendersReadOperPtr op)
         m_socket.m_service.add_completed_oper(std::move(op));
     }
     else {
+        REALM_ASSERT(op == m_socket.m_read_oper);
         m_socket.m_service.add_io_oper(m_socket.get_sock_fd(), std::move(op),
                                        io_service::io_op_Read); // Throws
     }

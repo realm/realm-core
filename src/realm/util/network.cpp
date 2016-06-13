@@ -1290,9 +1290,26 @@ void buffered_input_stream::read_oper_base::proceed() noexcept
     REALM_ASSERT(m_out_curr < m_out_end);
     size_t n = m_stream->m_socket.do_read_some(m_stream->m_buffer.get(), s_buffer_size,
                                               m_error_code);
+    // During asynchronous operation the socked is in nonblocking mode, and
+    // proceed() will only be called when the socket is reported ready for
+    // reading (by poll() or select()). Even then, it may still occasionally
+    // happen that read() (the system call) fails with EAGAIN
+    // (error::resource_unavailable_try_again). The Linux man page for select()
+    // notes that such a situation might occur.
+    //
+    // The best way to deal with a situation like this, seems to be to ignore
+    // the incidence and go back to waiting for the socked to become ready for
+    // reading again. It is hoped (and assumed) that these incidences are
+    // sufficiently rare, that it does not lead to an effective busy wait for
+    // the socket to become truly ready for reading.
     if (REALM_UNLIKELY(m_error_code)) {
-        set_is_complete(true);
-        return;
+        if (m_error_code == error::resource_unavailable_try_again) {
+            m_error_code = std::error_code(); // Clear
+        }
+        else {
+            set_is_complete(true);
+            return;
+        }
     }
     REALM_ASSERT(n > 0);
     REALM_ASSERT(n <= s_buffer_size);
