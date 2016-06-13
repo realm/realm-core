@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* S: In the network API (namespace `util::network`), do not report an error to
+  the application if system calls `read()`, `write()`, or `accept()` fail with
+  `EAGAIN` on a socket in nonblocking mode after `poll()` has signalled
+  readiness. Instead, go back and wait for `poll()` to signal readiness again.
 
 ### Breaking changes
 
@@ -19,6 +22,8 @@
 
 ### Internals
 
+* S: New unit tests `Network_ReadWriteLargeAmount` and
+  `Network_AsyncReadWriteLargeAmount`.
 * S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
   `<realm/util/features.h>`. This also fixes a dangling reference to
   `REALM_QUOTE_2()` in `<realm/util/features.h>`.

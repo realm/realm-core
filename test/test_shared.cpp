@@ -3,10 +3,13 @@
 
 #include <streambuf>
 #include <fstream>
+#include <tuple>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
 #  include <unistd.h>
+#  include <sys/mman.h>
+#  include <sys/types.h>
 #  include <sys/wait.h>
 #  include <signal.h>
 #  include <sched.h>
@@ -2950,6 +2953,71 @@ TEST(Shared_VersionOfBoundSnapshot)
         CHECK_LESS(version, rt.get_version());
     }
 }
+
+#if !defined(_WIN32)
+// Check what happens when Realm cannot allocate more virtual memory
+// We should throw an AddressSpaceExhausted exception.
+// This will try to use all available memory allowed for this process
+// so don't run it concurrently with other tests.
+NONCONCURRENT_TEST(Shared_OutOfMemory)
+{
+    size_t string_length = 1024 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_String, "string_col");
+        std::string long_string(string_length, 'a');
+        table->add_empty_row();
+        table->set_string(0, 0, long_string);
+        wt.commit();
+    }
+    sg.close();
+
+    std::vector<std::pair<char*, size_t>> memory_list;
+    // Reserve enough for 500 Gb, but in practice the vector is only ever around size 10.
+    // Do this here to avoid the (small) chance that adding to the vector will request new virtual memory
+    memory_list.reserve(500);
+    size_t chunk_size = 1024 * 1024 * 1024;
+    while (chunk_size > string_length) {
+        void* addr = ::mmap(nullptr, chunk_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+        if (addr == MAP_FAILED) {
+            chunk_size /= 2;
+        }
+        else {
+            memory_list.push_back(std::pair<char*,size_t>((char*)addr, chunk_size));
+        }
+    }
+
+    bool expected_exception_caught = false;
+
+    // Attempt to open Realm, should fail because we hold too much already.
+    try {
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    }
+    catch (AddressSpaceExhausted& e) {
+        expected_exception_caught = true;
+    }
+
+    CHECK(expected_exception_caught);
+
+    // Release memory manually.
+    for (auto it = memory_list.begin(); it != memory_list.end(); ++it) {
+        ::munmap(it->first, it->second);
+    }
+
+    // Realm should succeed to open now.
+    expected_exception_caught = false;
+    try {
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    }
+    catch (AddressSpaceExhausted& e) {
+        expected_exception_caught = true;
+    }
+    CHECK(!expected_exception_caught);
+}
+#endif // win32
 
 // Run some (repeatable) random checks through the fuzz tester.
 // For a comprehensive fuzz test, afl should be run. To do this see test/fuzzy/README.md
