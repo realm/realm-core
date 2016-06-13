@@ -16,7 +16,9 @@
 
 ### Internals
 
-* Lorem ipsum.
+* S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
+  `<realm/util/features.h>`. This also fixes a dangling reference to
+  `REALM_QUOTE_2()` in `<realm/util/features.h>`.
 
 ----------------------------------------------
 
