@@ -28,7 +28,6 @@
 #include <functional>
 
 #ifdef _MSC_VER
-#  include <win32/types.h>
 #  include <intrin.h>
 #endif
 

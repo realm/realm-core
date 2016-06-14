@@ -8,11 +8,7 @@
 #include "../util/mem.hpp"
 #include "../util/number_names.hpp"
 
-#ifdef _MSC_VER
-#include "../../src/win32/stdint.h"
-#else
 #include <stdint.h>
-#endif
 
 using namespace realm;
 

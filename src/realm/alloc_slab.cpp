@@ -161,7 +161,7 @@ void SlabAlloc::detach() noexcept
             m_file_mappings = nullptr;
             goto found;
     }
-    REALM_ASSERT(false);
+    REALM_UNREACHABLE();
   found:
     invalidate_cache();
     m_attach_mode = attach_None;
@@ -176,7 +176,7 @@ SlabAlloc::~SlabAlloc() noexcept
         if (m_attach_mode != attach_SharedFile) {
             // No point inchecking if free space info is invalid
             if (m_free_space_state != free_space_Invalid) {
-                if (!is_all_free()) {
+                if (REALM_COVER_NEVER(!is_all_free())) {
                     print();
 #  ifndef REALM_SLAB_ALLOC_DEBUG
                     std::cerr << "To get the stack-traces of the corresponding allocations,"
@@ -208,8 +208,9 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
+
     m_free_space_state = free_space_Dirty;
 
     // Do we have a free space we can reuse?
@@ -233,7 +234,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
                 }
 
 #ifdef REALM_DEBUG
-                if (m_debug_out)
+                if (REALM_COVER_NEVER(m_debug_out))
                     std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
@@ -286,7 +287,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     }
 
 #ifdef REALM_DEBUG
-    if (m_debug_out)
+    if (REALM_COVER_NEVER(m_debug_out))
         std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
@@ -319,11 +320,11 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     ref_type ref_end = ref + size;
 
 #ifdef REALM_DEBUG
-    if (m_debug_out)
+    if (REALM_COVER_NEVER(m_debug_out))
         std::cerr << "Free ref: " << ref << " size: " << size << "\n";
 #endif
 
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         return;
 
     // Mutable memory cannot be freed unless it has first been allocated, and
@@ -402,7 +403,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     do_free(ref, addr);
 
 #ifdef REALM_DEBUG
-    if (m_debug_out) {
+    if (REALM_COVER_NEVER(m_debug_out)) {
         std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
             "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
     }
@@ -532,7 +533,17 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     {
         std::lock_guard<Mutex> lock(all_files_mutex);
         std::shared_ptr<SlabAlloc::MappedFile> p = all_files[path].lock();
-        if (!bool(p)) {
+        // In case we're the session initiator, we'll need a new mapping in any case.
+        // NOTE: normally, it should not be possible to find an old mapping while being
+        // the session initiator, since by definition the session initiator is the first
+        // to attach the file. If, however, the user is deleting the .lock file while he
+        // has one or more shared groups attached to the database, a session initiator
+        // *will* see a stale mapping. From versions 0.99 to 1.1.0 we asserted when detecting
+        // this situation, and this lead to many bug reports. It is likely that many of these
+        // would otherwise *not* have lead to observable bugs, because the user would not
+        // actually touch the stale database anymore, it was just a case of delayed deallocation
+        // of a shared group.
+        if (cfg.session_initiator || !bool(p)) {
             p = std::make_shared<MappedFile>();
             all_files[path] = p;
         }
@@ -543,7 +554,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // If the file has already been mapped by another thread, reuse all relevant data
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
-        REALM_ASSERT(!cfg.session_initiator);
         m_data = m_file_mappings->m_initial_mapping.get_addr();
         m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
@@ -604,9 +614,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         // Pre-alloc initial space
         size_t initial_size = m_initial_section_size;
         m_file_mappings->m_file.prealloc(0, initial_size); // Throws
+
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             m_file_mappings->m_file.sync(); // Throws
+
         size = initial_size;
     }
     ref_type top_ref;
@@ -968,7 +980,7 @@ void SlabAlloc::remap(size_t file_size)
 
 const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 {
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
     return m_free_read_only;
 }
@@ -1044,6 +1056,7 @@ void SlabAlloc::resize_file(size_t new_file_size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     m_file_mappings->m_file.prealloc(0, new_file_size); // Throws
+
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
@@ -1053,6 +1066,7 @@ void SlabAlloc::reserve_disk_space(size_t size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     m_file_mappings->m_file.prealloc_if_supported(0, size); // Throws
+
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
