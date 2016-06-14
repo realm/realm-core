@@ -2398,6 +2398,11 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
     m_size = 0;
 
     discard_row_accessors();
+
+    for (auto& view : m_views) {
+        view->adj_row_acc_clear();
+    }
+
     bump_version();
 }
 

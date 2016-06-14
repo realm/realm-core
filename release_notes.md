@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Update table views so that rows are not attached after calling Table::clear() (#1837)
 
 ### Breaking changes
 
