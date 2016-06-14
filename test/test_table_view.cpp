@@ -2043,7 +2043,7 @@ TEST(TableView_IsRowAttachedAfterClear)
 
     t.clear();
     CHECK_EQUAL(2, tv.size());
-    CHECK(!tv.is_row_attached(0)); // <-- This assertion fails.
+    CHECK(!tv.is_row_attached(0));
     CHECK(!tv.is_row_attached(1));
 }
 
