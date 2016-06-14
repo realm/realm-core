@@ -2,9 +2,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <climits>
-#include <sstream>
-#include <iostream>
-#include <iomanip>
+
+#ifdef REALM_DEBUG
+#   include <iostream>
+#   include <iomanip>
+#   include <sstream>
+#endif
 
 #include <realm/column.hpp>
 #include <realm/column_table.hpp>

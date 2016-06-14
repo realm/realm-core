@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Reduced the object-size overhead of assertions.
 
 -----------
 

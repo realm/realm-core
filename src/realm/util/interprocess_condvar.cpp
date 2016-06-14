@@ -24,6 +24,7 @@
 #include <system_error>
 #include <unistd.h>
 #include <poll.h>
+#include <sstream>
 
 using namespace realm;
 using namespace realm::util;

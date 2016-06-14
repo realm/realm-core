@@ -1,10 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <limits>
 #include <stdexcept>
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <sstream>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#  include <iomanip>
+#endif
 
 #include <realm/util/features.h>
 #include <realm/util/miscellaneous.hpp>

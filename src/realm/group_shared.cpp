@@ -18,14 +18,14 @@
  *
  **************************************************************************/
 
-#include <cerrno>
-#include <type_traits>
 #include <algorithm>
-#include <iostream>
-
-#include <fcntl.h>
 #include <atomic>
+#include <cerrno>
+#include <fcntl.h>
+#include <iostream>
 #include <mutex>
+#include <sstream>
+#include <type_traits>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>

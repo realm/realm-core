@@ -21,7 +21,6 @@
 #define REALM_VERSION_HPP
 
 #include <string>
-#include <sstream>
 
 #include <realm/util/features.h>
 
