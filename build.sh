@@ -44,8 +44,8 @@ OSX_DIR="macosx-lib"
 
 IPHONE_EXTENSIONS="objc"
 IPHONE_SDKS="iphoneos iphonesimulator"
-IPHONE_DIR="ios-lib"
-IPHONE_NO_BITCODE_DIR="ios-no-bitcode-lib"
+IOS_DIR="ios-lib"
+IOS_NO_BITCODE_DIR="ios-no-bitcode-lib"
 
 WATCHOS_SDKS="watchos watchsimulator"
 WATCHOS_DIR="watchos-lib"
@@ -341,6 +341,8 @@ build_cocoa()
         echo "zip for iOS/OSX/watchOS/tvOS can only be generated under OS X."
         exit 0
     fi
+
+    platforms=$(echo "$platforms" | sed -e 's/iphone/ios/g')
 
     for platform in $platforms; do
         sh build.sh build-$platform || exit 1
@@ -725,7 +727,7 @@ EOF
             $MAKE -C "src/realm" clean BASE_DENOM="ios" || exit 1
             $MAKE -C "src/realm" clean BASE_DENOM="watch" || exit 1
             $MAKE -C "src/realm" clean BASE_DENOM="tv" || exit 1
-            for dir in "$OSX_DIR" "$IPHONE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
+            for dir in "$OSX_DIR" "$IOS_DIR" "$IOS_NO_BITCODE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
                 if [ -e "$dir" ]; then
                     echo "Removing '$dir'"
                     rm -rf "$dir/include" || exit 1
@@ -793,7 +795,7 @@ EOF
         export min_version='7.0'
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
-        export dir="$IPHONE_DIR"
+        export dir="$IOS_DIR"
         export platform_suffix=''
         export enable_bitcode='yes'
         build_apple
@@ -805,7 +807,7 @@ EOF
         export min_version='7.0'
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
-        export dir="$IPHONE_NO_BITCODE_DIR"
+        export dir="$IOS_NO_BITCODE_DIR"
         export platform_suffix='-no-bitcode'
         export enable_bitcode='no'
         build_apple
