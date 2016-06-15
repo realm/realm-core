@@ -8,12 +8,14 @@
 
 * Sorting order of strings is now according to more common scheme for special
   characters (space, dash, etc), and for letters it's now such that visually
-  similiar letters (that is, those that differ only by diracritics, etc) are 
+  similiar letters (that is, those that differ only by diracritics, etc) are
   grouped together. (#1639)
+* Removed the 'stealing' variant of export for handover. It was not a great
+  idea. It was not being used and required locking which we'd like to avoid.
 
 ### Enhancements
 
-* Lorem ipsum.
+* Allow SharedGroups to pin specific versions for handover
 
 -----------
 
@@ -73,7 +75,6 @@
 * S: A new Apple CoreFoundation implementation of event loop API was added.
 * S: Movable completion handler objects are no longer copied by the networking
   API (namespace `util::network`).
-* Allow SharedGroups to pin specific versions for handover
 
 -----------
 
