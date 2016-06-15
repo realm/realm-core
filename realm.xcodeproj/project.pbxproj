@@ -2762,6 +2762,7 @@
 					"$(inherited)",
 					"-fno-elide-constructors",
 					"-Wundef",
+					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
@@ -2807,6 +2808,7 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wundef",
+					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
