@@ -59,8 +59,16 @@ TVOS_DIR="tvos-lib"
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
-CONFIG_VERSION=1
+NODE_DIR="node-lib"
 
+CONFIG_VERSION=1
+CURRENT_PLATFORM="win"
+if [ "`uname`" = "Darwin" ]; then
+  CURRENT_PLATFORM="osx"
+fi
+if [ "`uname`" = "Linux" ]; then
+  CURRENT_PLATFORM="linux"
+fi
 
 usage()
 {
@@ -1060,6 +1068,29 @@ EOF
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
         $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+
+        mkdir -p "$NODE_DIR" || exit 1
+        cp "src/realm/librealm-node.a" "$NODE_DIR" || exit 1
+        cp "src/realm/librealm-node-dbg.a" "$NODE_DIR" || exit 1
+
+        echo "Copying headers to '$NODE_DIR/include'"
+        mkdir -p "$NODE_DIR/include" || exit 1
+        cp "src/realm.hpp" "$NODE_DIR/include/" || exit 1
+        mkdir -p "$NODE_DIR/include/realm" || exit 1
+        inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
+        temp_dir="$(mktemp -d /tmp/realm.build-node.XXXX)" || exit 1
+        (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
+        (cd "$REALM_HOME/$NODE_DIR/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+
+        realm_version="$(sh build.sh get-version)" || exit
+        dir_name="core-$realm_version"
+        file_name="realm-core-node-$realm_version-$CURRENT_PLATFORM.tar.gz"
+        tar_files='librealm*'
+
+        echo "Create tar.gz file $file_name"
+        rm -f "$REALM_HOME/$file_name" || exit 1
+        (cd "$REALM_HOME/$NODE_DIR" && tar czf "$REALM_HOME/$file_name" include $tar_files) || exit 1
+
         exit 0
         ;;
 
