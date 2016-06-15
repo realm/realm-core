@@ -12,8 +12,10 @@ clean_binaries() {
     rm -rf usr/{lib64,libexec,bin}/*-dbg*
 
     for file in usr/{lib64,libexec,bin}/*; do
-        strip --strip-debug --strip-unneeded "$file"
-        chrpath -d "$file" || true
+        if [ -f "$file"  ];then
+            strip --strip-debug --strip-unneeded "$file"
+            chrpath -d "$file" || true
+        fi
     done
 
     cd - >/dev/null

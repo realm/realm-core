@@ -63,6 +63,9 @@
 #endif
 
 
+#define REALM_QUOTE_2(x) #x
+#define REALM_QUOTE(x) REALM_QUOTE_2(x)
+
 /* See these links for information about feature check macroes in GCC,
  * Clang, and MSVC:
  *
@@ -87,7 +90,7 @@
 #endif
 
 #if defined(__GNUC__) // clang or GCC
-#  define REALM_PRAGMA(v) _Pragma(REALM_QUOTE2(v))
+#  define REALM_PRAGMA(v) _Pragma(REALM_QUOTE_2(v))
 #elif defined(_MSC_VER) // VS
 #  define REALM_PRAGMA(v) __pragma(v)
 #else

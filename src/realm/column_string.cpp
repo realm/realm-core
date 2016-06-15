@@ -4,10 +4,6 @@
 #include <iostream>
 #include <iomanip>
 
-#ifdef _WIN32
-#  include <win32\types.h>
-#endif
-
 #include <memory>
 
 #include <realm/query_conditions.hpp>

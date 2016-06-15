@@ -487,10 +487,12 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     // error messages.
     std::cout.setf(std::ios::unitbuf);
 
+#ifndef REALM_COVER
     // No need to synchronize file changes to physical medium in the test suite,
     // as that would only make a difference if the entire system crashes,
     // e.g. due to power off.
     disable_sync_to_disk();
+#endif
 
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
