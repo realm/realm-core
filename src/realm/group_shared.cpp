@@ -1495,6 +1495,11 @@ SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
 
 void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
+    // The release may be tried on a version imported from a different thread,
+    // hence generated on a different shared group, which may have memory mapped
+    // a larger ringbuffer than we - so make sure we've mapped enough of the
+    // ringbuffer to access the chosen ringbuffer entry.
+    grow_reader_mapping(read_lock.m_reader_idx);
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
@@ -1778,7 +1783,6 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    util::LockGuard lg(m_handover_lock);
     version_type version = do_commit(); // Throws
 
     // advance read lock but dont update accessors:
@@ -1956,7 +1960,6 @@ void SharedGroup::reserve(size_t size)
 std::unique_ptr<SharedGroup::Handover<LinkView>>
 SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
 {
-    LockGuard lg(m_handover_lock);
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
     }
@@ -1981,7 +1984,6 @@ LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<
 
 std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_handover(const TableRef& accessor)
 {
-    LockGuard lg(m_handover_lock);
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
     }
