@@ -62,7 +62,13 @@ ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 NODE_DIR="node-lib"
 
 CONFIG_VERSION=1
-
+CURRENT_PLATFORM="win"
+if [ "`uname`" = "Darwin" ]; then
+  CURRENT_PLATFORM="osx"
+fi
+if [ "`uname`" = "Linux" ]; then
+  CURRENT_PLATFORM="linux"
+fi
 
 usage()
 {
@@ -1078,7 +1084,7 @@ EOF
 
         realm_version="$(sh build.sh get-version)" || exit
         dir_name="core-$realm_version"
-        file_name="realm-core-node-$realm_version.tar.gz"
+        file_name="realm-core-node-$realm_version-$CURRENT_PLATFORM.tar.gz"
         tar_files='librealm*'
 
         echo "Create tar.gz file $file_name"
