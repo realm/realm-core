@@ -6,7 +6,11 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* S: A concept of log levels was added to `util::Logger`. `util::Logger::log()`
+  now takes a log level argument, and new shorthand methods were added
+  (`debug()`, `info()`, `warn()`, ...). All loggers now have a `level_threshold`
+  property through which they efficiently query for the current log level
+  threshold.
 
 ### Enhancements
 
@@ -19,8 +23,11 @@
 * S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
   `<realm/util/features.h>`. This also fixes a dangling reference to
   `REALM_QUOTE_2()` in `<realm/util/features.h>`.
+* New feature in the unit test framework: Ability to specify log level
+  threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
 
 ----------------------------------------------
+
 
 # 1.1.2 Release notes
 
@@ -46,6 +53,7 @@
   `Network_AsyncReadWriteLargeAmount`.
 
 ----------------------------------------------
+
 
 # 1.1.1 Release notes
 
@@ -85,11 +93,6 @@
   `util::network`).
 * S: `util::network::deadline_timer::async_wait()` no longer declared `noexcept`
   (it never should have been).
-* S: A concept of log levels was added to `util::Logger`. `util::Logger::log()`
-  now takes a log level argument, and new shorthand methods were added
-  (`debug()`, `info()`, `warn()`, ...). All loggers now have a `level_threshold`
-  property through which they efficiently query for the current log level
-  threshold.
 
 ### Enhancements
 
@@ -111,8 +114,6 @@
 * Corrected two usages of undefined REALM_PLATFORM_ANDROID to REALM_ANDROID.
   This correctly enables Android log output on termination and allows using
   robust mutexes on Android platforms. (#1834)
-* New feature in the unit test framework: Ability to specify log level
-  threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
 
 
 ----------------------------------------------
