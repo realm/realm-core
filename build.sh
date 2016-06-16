@@ -1093,7 +1093,7 @@ EOF
 
         realm_version="$(sh build.sh get-version)" || exit
         dir_name="core-$realm_version"
-        file_name="realm-core-node-$realm_version-$CURRENT_PLATFORM.tar.gz"
+        file_name="realm-core-node-$CURRENT_PLATFORM-$realm_version.tar.gz"
         tar_files='librealm*'
 
         echo "Create tar.gz file $file_name"
