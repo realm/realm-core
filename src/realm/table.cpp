@@ -1,10 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <limits>
 #include <stdexcept>
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <sstream>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#  include <iomanip>
+#endif
 
 #include <realm/util/features.h>
 #include <realm/util/miscellaneous.hpp>
@@ -2398,6 +2399,11 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
     m_size = 0;
 
     discard_row_accessors();
+
+    for (auto& view : m_views) {
+        view->adj_row_acc_clear();
+    }
+
     bump_version();
 }
 

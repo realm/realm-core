@@ -1,12 +1,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio> // debug
-#include <iostream>
 #include <iomanip>
-
-#ifdef _WIN32
-#  include <win32\types.h>
-#endif
+#include <ostream>
 
 #include <memory>
 

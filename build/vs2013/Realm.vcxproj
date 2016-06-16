@@ -654,6 +654,7 @@
     <ClCompile Include="..\..\src\realm\row.cpp" />
     <ClCompile Include="..\..\src\realm\table_view.cpp" />
     <ClCompile Include="..\..\src\realm\util\terminate.cpp" />
+    <ClCompile Include="..\..\src\realm\util\to_string.cpp" />
     <ClCompile Include="..\..\src\realm\utilities.cpp" />
     <ClCompile Include="..\..\src\realm\lang_bind_helper.cpp" />
     <ClCompile Include="..\..\src\realm\version.cpp" />

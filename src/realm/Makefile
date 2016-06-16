@@ -142,6 +142,7 @@ util/event_loop_posix.cpp \
 util/event_loop_apple_cf.cpp \
 util/uri.cpp \
 util/interprocess_condvar.cpp \
+util/to_string.cpp \
 alloc.cpp \
 alloc_slab.cpp \
 array.cpp \

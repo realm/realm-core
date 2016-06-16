@@ -214,7 +214,7 @@ protected:
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
     virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size,
-                              size_t new_size);
+                              size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
     virtual void do_free(ref_type, const char* addr) noexcept = 0;

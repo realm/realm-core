@@ -3,6 +3,8 @@
 If you haven't done so previously, please review the \ref primer_intro
 "Introduction". It contains some links and stuff to get you set-up and ready to
 follow along.
+For a more detailed view on the files used and how they interact, review
+\ref primer_files "Core files".
 
 ## Realm is a database and a library ##
 
@@ -226,7 +228,7 @@ this shouldn't be taken as a "security", only convenience):
     const size_t name_col_idx = my_table.get_column_index("name");
     const size_t user_idx = my_table.find_first_string(name_col_idx, "foobar");
     auto my_row = my_table.get(user_idx);
-    
+
     update_user(my_row);
 
 For a high level overview on what is required to get a realm up and running to
