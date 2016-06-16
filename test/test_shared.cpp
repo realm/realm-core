@@ -3081,5 +3081,49 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
 }
 
+// Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
+NONCONCURRENT_TEST(Shared_BigAllocations)
+{
+    // String length at 2K will not trigger the error.
+    // all lenghts >= 4K (that was tried) triggers the error
+    size_t string_length = 4 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    std::string long_string(string_length, 'a');
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_String, "string_col");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        table->add_empty_row();
+        table->set_string(0, 0, long_string);
+        wt.commit();
+    }
+    // With this call to compact, the *second* write transaction below
+    // will assert. Without it, the test completes.
+    sg.compact(); 
+    {
+        WriteTransaction wt(sg);
+        wt.get_group().verify();
+        TableRef table = wt.get_table("table");
+        table->set_string(0, 0, long_string);
+        wt.get_group().verify();
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg); // <---- fails here
+        wt.get_group().verify();
+        TableRef table = wt.get_table("table");
+        table->set_string(0, 0, long_string);
+        wt.get_group().verify();
+        wt.commit();
+    }
+    sg.close();
+}
+
 
 #endif // TEST_SHARED
