@@ -42,7 +42,7 @@ enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, IN
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
             COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
-            CREATE_TABLE_VIEW,
+            CREATE_TABLE_VIEW, COMPACT,
 
             COUNT};
 
@@ -558,6 +558,35 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 TableView tv = t->where().find_all();
                 table_views.push_back(tv);
+            }
+            else if (instr == COMPACT) {
+                if (log) {
+                    *log << "sg_r.close();\n";
+                }
+                sg_r.close();
+                if (log) {
+                    *log << "sg_w.commit();\n";
+                }
+                sg_w.commit();
+
+                if (log) {
+                    *log << "REALM_ASSERT_RELEASE(sg_w.compact());\n";
+                }
+                REALM_ASSERT_RELEASE(sg_w.compact());
+
+                if (log) {
+                    *log << "sg_w.begin_write();\n";
+                }
+                sg_w.begin_write();
+                if (log) {
+                    *log << "sg_r.open(path);\n";
+                }
+                sg_r.open(path);
+                if (log) {
+                    *log << "sg_r.begin_read();\n";
+                }
+                sg_r.begin_read();
+                REALM_DO_IF_VERIFY(log, g_r.verify());
             }
         }
     }
