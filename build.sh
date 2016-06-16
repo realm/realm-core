@@ -1085,6 +1085,12 @@ EOF
         (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
 
+        cp tools/LICENSE "$node_directory" || exit 1
+        if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
+            command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
+            pandoc -f markdown -t plain -o "$node_directory/release_notes.txt" release_notes.md || exit 1
+        fi
+
         realm_version="$(sh build.sh get-version)" || exit
         dir_name="core-$realm_version"
         file_name="realm-core-node-$realm_version-$CURRENT_PLATFORM.tar.gz"
