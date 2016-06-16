@@ -20,7 +20,6 @@
 
 #include <algorithm>
 #include <vector>
-#include <iostream>
 
 #ifdef _WIN32
     #define NOMINMAX

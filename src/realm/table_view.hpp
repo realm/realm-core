@@ -20,8 +20,6 @@
 #ifndef REALM_TABLE_VIEW_HPP
 #define REALM_TABLE_VIEW_HPP
 
-#include <iostream>
-
 #include <realm/views.hpp>
 #include <realm/table.hpp>
 #include <realm/link_view.hpp>

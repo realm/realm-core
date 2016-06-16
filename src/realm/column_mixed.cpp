@@ -1,5 +1,5 @@
-#include <iostream>
 #include <iomanip>
+#include <ostream>
 
 #include <memory>
 #include <realm/column_mixed.hpp>

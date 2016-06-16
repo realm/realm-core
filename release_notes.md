@@ -2,26 +2,50 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Update table views so that rows are not attached after calling Table::clear() (#1837)
 
 ### Breaking changes
 
-* Sorting order of strings is now according to more common scheme for special
-  characters (space, dash, etc), and for letters it's now such that visually
-  similiar letters (that is, those that differ only by diracritics, etc) are
-  grouped together. (#1639)
 * Removed the 'stealing' variant of export for handover. It was not a great
   idea. It was not being used and required locking which we'd like to avoid.
 
 ### Enhancements
 
 * Allow SharedGroups to pin specific versions for handover
+* Reduced the object-size overhead of assertions.
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
+  `<realm/util/features.h>`. This also fixes a dangling reference to
+  `REALM_QUOTE_2()` in `<realm/util/features.h>`.
+
+----------------------------------------------
+
+# 1.1.2 Release notes
+
+### Bugfixes
+
+* S: In the network API (namespace `util::network`), do not report an error to
+  the application if system calls `read()`, `write()`, or `accept()` fail with
+  `EAGAIN` on a socket in nonblocking mode after `poll()` has signalled
+  readiness. Instead, go back and wait for `poll()` to signal readiness again.
+
+### Breaking changes
+
+* Sorting order of strings is now according to more common scheme for special
+  characters (space, dash, etc), and for letters it's now such that visually
+  similiar letters (that is, those that differ only by diacritics, etc) are
+  grouped together. (#1639)
+
+-----------
+
+### Internals
+
+* S: New unit tests `Network_ReadWriteLargeAmount` and
+  `Network_AsyncReadWriteLargeAmount`.
 
 ----------------------------------------------
 

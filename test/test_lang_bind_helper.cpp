@@ -11989,6 +11989,80 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
 }
 
 
+TEST(LangBindHelper_IsRowAttachedAfterClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, nullptr));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, nullptr);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    TableRef t = g.add_table("t");
+    TableRef t2 = g.add_table("t2");
+    size_t col_id = t->add_column(type_Int, "id");
+    size_t link_col_id = t2->add_column_link(type_Link, "link", *t);
+
+    t->add_empty_row(2);
+    t->set_int(col_id, 0, 0);
+    t->set_int(col_id, 1, 1);
+    t2->add_empty_row(2);
+    t2->set_link(link_col_id, 0, 0);
+    t2->set_link(link_col_id, 1, 1);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    TableView tv = t->where().find_all();
+    TableView tv_r = g_r.get_table(0)->where().find_all();
+    TableView tv_r2 = g_r.get_table(1)->where().find_all();
+
+    CHECK_EQUAL(2, tv.size());
+    CHECK(tv.is_row_attached(0));
+    CHECK(tv.is_row_attached(1));
+    CHECK_EQUAL(2, tv_r.size());
+    CHECK(tv_r.is_row_attached(0));
+    CHECK(tv_r.is_row_attached(1));
+    CHECK_EQUAL(tv_r2.get_link(link_col_id, 0), 0);
+    CHECK_EQUAL(tv_r2.get_link(link_col_id, 1), 1);
+
+    LangBindHelper::promote_to_write(sg_w);
+    t->move_last_over(1);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    CHECK_EQUAL(2, tv.size());
+    CHECK(tv.is_row_attached(0));
+    CHECK(!tv.is_row_attached(1));
+    CHECK_EQUAL(2, tv_r.size());
+    CHECK(tv_r.is_row_attached(0));
+    CHECK(!tv_r.is_row_attached(1));
+    CHECK_EQUAL(tv_r2.get_link(link_col_id, 0), 0);
+    CHECK_EQUAL(tv_r2.get_link(link_col_id, 1), realm::npos);
+
+    LangBindHelper::promote_to_write(sg_w);
+    t->clear();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    CHECK_EQUAL(2, tv.size());
+    CHECK(!tv.is_row_attached(0));
+    CHECK(!tv.is_row_attached(1));
+    CHECK_EQUAL(2, tv_r.size());
+    CHECK(!tv_r.is_row_attached(0));
+    CHECK(!tv_r.is_row_attached(1));
+    CHECK_EQUAL(tv_r2.get_link(link_col_id, 0), realm::npos);
+    CHECK_EQUAL(tv_r2.get_link(link_col_id, 1), realm::npos);
+}
+
+
 TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
     SHARED_GROUP_TEST_PATH(shared_path)

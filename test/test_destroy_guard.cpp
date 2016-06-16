@@ -83,7 +83,7 @@ public:
     {
         throw std::runtime_error("Not implemented");
 
-        return {0,0};
+        return {};
     }
 
     void do_free(ref_type ref, const char* addr) noexcept override

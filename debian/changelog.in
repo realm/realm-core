@@ -1,3 +1,10 @@
+librealm (1.1.2~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Radu Tutueanu <rt@realm.io>  Mon, 13 Jun 2016 14:04:35 +0200
+
+
 librealm (1.1.1~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

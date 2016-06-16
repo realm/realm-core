@@ -304,6 +304,135 @@ TEST(Network_ReadWrite)
 }
 
 
+TEST(Network_ReadWriteLargeAmount)
+{
+    network::io_service service_1;
+    network::acceptor acceptor(service_1);
+    network::endpoint listening_endpoint = bind_acceptor(acceptor);
+    acceptor.listen();
+
+    size_t num_bytes_per_chunk = 1048576L/2;
+    std::unique_ptr<char[]> chunk(new char [num_bytes_per_chunk]);
+    for (size_t i = 0; i < num_bytes_per_chunk; ++i)
+        chunk[i] = char(i % 128);
+    int num_chunks = 128;
+
+    auto reader = [&] {
+        network::socket socket_1(service_1);
+        acceptor.accept(socket_1);
+        network::buffered_input_stream input(socket_1);
+        size_t buffer_size = 8191; // Prime
+        std::unique_ptr<char[]> buffer(new char[buffer_size]);
+        size_t offset_in_chunk = 0;
+        int chunk_index = 0;
+        for (;;) {
+            std::error_code ec;
+            size_t n = input.read(buffer.get(), buffer_size, ec);
+            bool equal = true;
+            for (size_t i = 0; i < n; ++i) {
+                if (chunk[offset_in_chunk] != buffer[i]) {
+                    equal = false;
+                    break;
+                }
+                if (++offset_in_chunk == num_bytes_per_chunk) {
+                    offset_in_chunk = 0;
+                    ++chunk_index;
+                }
+            }
+            CHECK(equal);
+            if (ec == network::end_of_input)
+                break;
+            CHECK_NOT(ec);
+        }
+        CHECK_EQUAL(0, offset_in_chunk);
+        CHECK_EQUAL(num_chunks, chunk_index);
+    };
+    ThreadWrapper thread;
+    thread.start(reader);
+
+    network::io_service service_2;
+    network::socket socket_2(service_2);
+    socket_2.connect(listening_endpoint);
+    for (int i = 0; i < num_chunks; ++i)
+        socket_2.write(chunk.get(), num_bytes_per_chunk);
+    socket_2.close();
+
+    CHECK_NOT(thread.join());
+}
+
+
+TEST(Network_AsyncReadWriteLargeAmount)
+{
+    network::io_service service_1;
+    network::acceptor acceptor(service_1);
+    network::endpoint listening_endpoint = bind_acceptor(acceptor);
+    acceptor.listen();
+
+    size_t num_bytes_per_chunk = 1048576L/2;
+    std::unique_ptr<char[]> chunk(new char [num_bytes_per_chunk]);
+    for (size_t i = 0; i < num_bytes_per_chunk; ++i)
+        chunk[i] = char(i % 128);
+    int num_chunks = 128;
+
+    auto reader = [&] {
+        network::socket socket_1(service_1);
+        acceptor.accept(socket_1);
+        network::buffered_input_stream input(socket_1);
+        size_t buffer_size = 8191; // Prime
+        std::unique_ptr<char[]> buffer(new char[buffer_size]);
+        size_t offset_in_chunk = 0;
+        int chunk_index = 0;
+        std::function<void()> read_chunk = [&] {
+            auto handler = [&](std::error_code ec, size_t n) {
+                bool equal = true;
+                for (size_t i = 0; i < n; ++i) {
+                    if (buffer[i] != chunk[offset_in_chunk]) {
+                        equal = false;
+                        break;
+                    }
+                    if (++offset_in_chunk == num_bytes_per_chunk) {
+                        offset_in_chunk = 0;
+                        ++chunk_index;
+                    }
+                }
+                CHECK(equal);
+                if (ec == network::end_of_input)
+                    return;
+                CHECK_NOT(ec);
+                read_chunk();
+            };
+            input.async_read(buffer.get(), buffer_size, handler);
+        };
+        read_chunk();
+        service_1.run();
+        CHECK_EQUAL(0, offset_in_chunk);
+        CHECK_EQUAL(num_chunks, chunk_index);
+    };
+    ThreadWrapper thread;
+    thread.start(reader);
+
+    network::io_service service_2;
+    network::socket socket_2(service_2);
+    socket_2.connect(listening_endpoint);
+    std::function<void(int)> write_chunk = [&](int i) {
+        auto handler = [=](std::error_code ec, size_t n) {
+            if (CHECK_NOT(ec)) {
+                CHECK_EQUAL(num_bytes_per_chunk, n);
+                if (i + 1 == num_chunks)
+                    return;
+                write_chunk(i + 1);
+            }
+        };
+        socket_2.async_write(chunk.get(), num_bytes_per_chunk, handler);
+    };
+    write_chunk(0);
+    service_2.run();
+    socket_2.close();
+
+    CHECK_NOT(thread.join());
+}
+
+
 TEST(Network_SocketAndAcceptorOpen)
 {
     network::io_service service_1;

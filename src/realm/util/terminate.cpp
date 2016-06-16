@@ -17,6 +17,8 @@
  * from Realm Incorporated.
  *
  **************************************************************************/
+#include <realm/util/terminate.hpp>
+
 #include <iostream>
 #include <sstream>
 #include <realm/util/features.h>
@@ -32,7 +34,6 @@
 #  include <android/log.h>
 #endif
 
-#include <realm/util/terminate.hpp>
 
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
@@ -94,7 +95,7 @@ void set_termination_notification_callback(void(*callback)(const char* ) noexcep
 }
 
 // LCOV_EXCL_START
-REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
+REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {
 
 #if REALM_PLATFORM_APPLE
@@ -107,7 +108,7 @@ REALM_NORETURN void terminate_internal(std::stringstream& ss) noexcept
     free(strs);
 #endif
 
-    ss << "IMPORTANT: if you see this error, please send this log and reproduction steps to help@realm.io.";
+    ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
 #ifdef REALM_DEBUG
     std::cerr << ss.rdbuf() << '\n';
 #endif
@@ -123,6 +124,26 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line) 
 {
     std::stringstream ss;
     ss << file << ":" << line << ": " REALM_VER_CHUNK " " << message << '\n';
+    terminate_internal(ss);
+}
+
+REALM_NORETURN void terminate(const char* message, const char* file, long line,
+                              std::initializer_list<Printable>&& values) noexcept
+{
+    std::stringstream ss;
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message;
+    Printable::print_all(ss, values, false);
+    ss << '\n';
+    terminate_internal(ss);
+}
+REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
+                                        const char* interesting_names,
+                                        std::initializer_list<Printable>&& values) noexcept
+{
+    std::stringstream ss;
+    ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message << " with " << interesting_names << " = ";
+    Printable::print_all(ss, values, true);
+    ss << '\n';
     terminate_internal(ss);
 }
 // LCOV_EXCL_STOP

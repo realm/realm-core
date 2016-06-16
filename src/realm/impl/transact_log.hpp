@@ -22,7 +22,6 @@
 #define REALM_IMPL_TRANSACT_LOG_HPP
 
 #include <stdexcept>
-#include <iostream>
 
 #include <realm/string_data.hpp>
 #include <realm/data_type.hpp>
