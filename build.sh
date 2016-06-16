@@ -1069,18 +1069,21 @@ EOF
         export REALM_HAVE_CONFIG="1"
         $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
 
-        mkdir -p "$NODE_DIR" || exit 1
-        cp "src/realm/librealm-node.a" "$NODE_DIR" || exit 1
-        cp "src/realm/librealm-node-dbg.a" "$NODE_DIR" || exit 1
+        dir_basename=core
+        node_directory="$NODE_DIR/$dir_basename"
 
-        echo "Copying headers to '$NODE_DIR/include'"
-        mkdir -p "$NODE_DIR/include" || exit 1
-        cp "src/realm.hpp" "$NODE_DIR/include/" || exit 1
-        mkdir -p "$NODE_DIR/include/realm" || exit 1
+        mkdir -p "$node_directory" || exit 1
+        cp "src/realm/librealm-node.a" "$node_directory" || exit 1
+        cp "src/realm/librealm-node-dbg.a" "$node_directory" || exit 1
+
+        echo "Copying headers to '$node_directory/include'"
+        mkdir -p "$node_directory/include" || exit 1
+        cp "src/realm.hpp" "$node_directory/include/" || exit 1
+        mkdir -p "$node_directory/include/realm" || exit 1
         inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
         temp_dir="$(mktemp -d /tmp/realm.build-node.XXXX)" || exit 1
         (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
-        (cd "$REALM_HOME/$NODE_DIR/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
 
         realm_version="$(sh build.sh get-version)" || exit
         dir_name="core-$realm_version"
@@ -1089,7 +1092,7 @@ EOF
 
         echo "Create tar.gz file $file_name"
         rm -f "$REALM_HOME/$file_name" || exit 1
-        (cd "$REALM_HOME/$NODE_DIR" && tar czf "$REALM_HOME/$file_name" include $tar_files) || exit 1
+        (cd "$REALM_HOME/$NODE_DIR" && tar czf "$REALM_HOME/$file_name" $dir_basename) || exit 1
 
         exit 0
         ;;
