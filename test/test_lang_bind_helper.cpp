@@ -9549,6 +9549,69 @@ TEST(LangBindHelper_HandoverPartialQuery)
     }
 }
 
+
+TEST(LangBindHelper_HandoverWithPinning)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    sg.begin_read();
+
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        SharedGroup::VersionID token;
+
+        // Untyped interface
+        std::unique_ptr<SharedGroup::Handover<Query> > handover;
+        {
+            LangBindHelper::promote_to_write(sg_w);
+            TableRef table = group_w.add_table("table2");
+            table->add_column(type_Int, "first");
+            for (int i = 0; i <100; ++i) {
+                table->add_empty_row();
+                table->set_int(0, i, i);
+            }
+            CHECK_EQUAL(100, table->size());
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            vid = sg_w.get_version_of_current_transaction();
+            TableView view = table->where().less(0, 50).find_all();
+            TableView* tv = &view;
+            Query query(view.get_parent().where(tv));
+            handover = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
+            token = sg_w.pin_version();
+        }
+
+        // Advance the SharedGroup past the handover version
+        {
+            LangBindHelper::promote_to_write(sg_w);
+
+            TableRef table = group_w.get_table("table2");
+            table->add_empty_row();
+
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+        }
+        {
+            // Now move to the pinned version
+            LangBindHelper::advance_read(sg, token);
+
+            sg_w.unpin_version(token);
+            sg_w.close();
+
+            // importing query
+            std::unique_ptr<Query> q(sg.import_from_handover(move(handover)));
+            TableView tv = q->greater(0, 48).find_all();
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(1, tv.size());
+            CHECK_EQUAL(49, tv.get_int(0,0));
+        }
+    }
+}
+
+
 // Verify that an in-sync TableView backed by a Query that is restricted to a TableView
 // remains in sync when handed-over using a mutable payload.
 TEST(LangBindHelper_HandoverNestedTableViews)
@@ -9979,125 +10042,6 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     Thread querier, verifier;
     querier.start([&] { handover_querier(&control, test_context, path); });
     verifier.start([&] { handover_verifier(&control, test_context, path); });
-    querier.join();
-    verifier.join();
-
-}
-
-namespace {
-// for stealing, we need to expose the shared group of the thread we're stealing from,
-// as well as the tableview we want to steal. Stealing can be done while the shared group
-// is advancing, BUT care must be taken to ensure that the object we're stealing remains
-// valid and unchanged until stealing is complete.
-struct StealingInfo {
-    SharedGroup* sg;
-    TableView* tv;
-};
-
-
-void stealing_querier(HandoverControl<StealingInfo>* control,
-                      TestContext& test_context, std::string path)
-{
-    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    // We need to ensure that the initial version observed is *before* the final
-    // one written by the writer thread. We do this (simplisticly) by locking on
-    // to the initial version before even starting the writer.
-    Group& g = const_cast<Group&>(sg.begin_read());
-    Thread writer;
-    writer.start([&] { handover_writer(path); });
-    TableRef table = g.get_table("table");
-    TableView tv = table->where().greater(0,50).find_all();
-    for (;;) {
-        // wait here for writer to change the database. Kind of wasteful, but wait_for_change
-        // is not available on osx.
-        if (!sg.has_changed()) {
-            sched_yield();
-            continue;
-        }
-        LangBindHelper::advance_read(sg);
-        CHECK(!tv.is_in_sync());
-        tv.sync_if_needed();
-        CHECK(tv.is_in_sync());
-        std::unique_ptr<StealingInfo> info(new StealingInfo);
-        info->sg = &sg;
-        info->tv = &tv;
-        control->put(move(info), sg.get_version_of_current_transaction());
-        control->wait_feedback();
-        if (table->size() > 0 && table->get_int(0,0) <= 0) {
-            // we need to wait for the verifier to steal our latest payload.
-            // if we go out of scope too early, the payload will become invalid
-            LangBindHelper::advance_read(sg);
-            if (table->get_int(0,0) == -1)
-                break;
-        }
-    }
-    sg.end_read();
-    writer.join();
-}
-
-void stealing_verifier(HandoverControl<StealingInfo>* control,
-                       TestContext& test_context, std::string path)
-{
-    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    for (;;) {
-        std::unique_ptr<StealingInfo> info;
-        std::unique_ptr<SharedGroup::Handover<TableView>> handover;
-        SharedGroup::VersionID version;
-        control->get(info, version);
-        // Actually steal the payload:
-        handover = info->sg->export_for_handover(*info->tv, MutableSourcePayload::Move);
-        // we need to use the same version as the exported one.
-        // if we had used the version obtained from control->get(),
-        // we would risk using a stale version, because the producing
-        // thread might advance_read() after control->put() but
-        // before we did the export_for_handover() above.
-        version = handover->version;
-        Group& g = const_cast<Group&>(sg.begin_read(version));
-        control->signal_feedback();
-        TableRef table = g.get_table("table");
-        TableView tv = table->where().greater(0,50).find_all();
-        CHECK(tv.is_in_sync());
-
-        std::unique_ptr<TableView> tv2 = sg.import_from_handover(move(handover));
-        CHECK(tv.is_in_sync());
-        CHECK(tv2->is_in_sync());
-        CHECK(tv.size() == tv2->size());
-        for (size_t k=0; k<tv.size(); ++k)
-            CHECK(tv.get_int(0,k) == tv2->get_int(0,k));
-        // this looks wrong!
-        if (table->size() > 0 && table->get_int(0,0) == 0) {
-            LangBindHelper::promote_to_write(sg);
-            table->set_int(0,0,-1);
-            sg.commit();
-            control->signal_feedback();
-            break;
-        }
-        else
-            sg.end_read();
-    }
-}
-
-} // anonymous namespace
-
-TEST(LangBindHelper_HandoverStealing)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    Group& g = sg.begin_write();
-    TheTable::Ref table = g.add_table<TheTable>("table");
-    sg.commit();
-    sg.begin_read();
-    table = g.get_table<TheTable>("table");
-    CHECK(bool(table));
-    sg.end_read();
-    HandoverControl<StealingInfo> control;
-
-    Thread querier, verifier;
-    querier.start([&] { stealing_querier(&control, test_context, path); });
-    verifier.start([&] { stealing_verifier(&control, test_context, path); });
     querier.join();
     verifier.join();
 

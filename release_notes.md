@@ -6,10 +6,12 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Removed the 'stealing' variant of export for handover. It was not a great
+  idea. It was not being used and required locking which we'd like to avoid.
 
 ### Enhancements
 
+* Allow SharedGroups to pin specific versions for handover
 * Reduced the object-size overhead of assertions.
 
 -----------
