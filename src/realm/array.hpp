@@ -1225,6 +1225,7 @@ protected:
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+    static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept;
 
     friend class SlabAlloc;
     friend class GroupWriter;
@@ -2017,44 +2018,40 @@ inline char* Array::get_header() noexcept
     return get_header_from_data(m_data);
 }
 
+inline size_t Array::calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
+{
+    size_t num_bytes = 0;
+    switch (wtype) {
+        case wtype_Bits: {
+            // Current assumption is that size is at most 2^24 and that width is at most 64.
+            // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
+            REALM_ASSERT_3(size, <, 0x1000000);
+            size_t num_bits = size * width;
+            num_bytes = (num_bits + 7) >> 3;
+            break;
+        }
+        case wtype_Multiply: {
+            num_bytes = size * width;
+            break;
+        }
+        case wtype_Ignore:
+            num_bytes = size;
+            break;
+    }
+
+    // Ensure 8-byte alignment
+    num_bytes = (num_bytes + 7) & ~size_t(7);
+
+    num_bytes += header_size;
+
+    return num_bytes;
+}
 
 inline size_t Array::get_byte_size() const noexcept
 {
-    size_t num_bytes = 0;
     const char* header = get_header_from_data(m_data);
-    switch (get_wtype_from_header(header)) {
-        case wtype_Bits: {
-            // FIXME: The following arithmetic could overflow, that
-            // is, even though both the total number of elements and
-            // the total number of bytes can be represented in
-            // uint_fast64_t, the total number of bits may not
-            // fit. Note that "num_bytes = width < 8 ? size / (8 /
-            // width) : size * (width / 8)" would be guaranteed to
-            // never overflow, but it potentially involves two slow
-            // divisions.
-            uint_fast64_t num_bits = uint_fast64_t(m_size) * m_width;
-            num_bytes = size_t(num_bits / 8);
-            if (num_bits & 0x7)
-                ++num_bytes;
-            goto found;
-        }
-        case wtype_Multiply: {
-            num_bytes = m_size * m_width;
-            goto found;
-        }
-        case wtype_Ignore:
-            num_bytes = m_size;
-            goto found;
-    }
-    REALM_ASSERT_DEBUG(false);
-
-  found:
-    // Ensure 8-byte alignment
-    size_t rest = (~num_bytes & 0x7) + 1;
-    if (rest < 8)
-        num_bytes += rest;
-
-    num_bytes += header_size;
+    WidthType wtype = get_wtype_from_header(header);
+    size_t num_bytes = calc_byte_size(wtype, m_size, m_width);
 
     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||,
                    num_bytes, <=, get_capacity_from_header(header));
@@ -2065,35 +2062,10 @@ inline size_t Array::get_byte_size() const noexcept
 
 inline size_t Array::get_byte_size_from_header(const char* header) noexcept
 {
-    size_t num_bytes = 0;
     size_t size = get_size_from_header(header);
-    switch (get_wtype_from_header(header)) {
-        case wtype_Bits: {
-            size_t width = get_width_from_header(header);
-            size_t num_bits = (size * width); // FIXME: Prone to overflow
-            num_bytes = num_bits / 8;
-            if (num_bits & 0x7)
-                ++num_bytes;
-            goto found;
-        }
-        case wtype_Multiply: {
-            size_t width = get_width_from_header(header);
-            num_bytes = size * width;
-            goto found;
-        }
-        case wtype_Ignore:
-            num_bytes = size;
-            goto found;
-    }
-    REALM_ASSERT_DEBUG(false);
-
-  found:
-    // Ensure 8-byte alignment
-    size_t rest = (~num_bytes & 0x7) + 1;
-    if (rest < 8)
-        num_bytes += rest;
-
-    num_bytes += header_size;
+    size_t width = get_width_from_header(header);
+    WidthType wtype = get_wtype_from_header(header);
+    size_t num_bytes = calc_byte_size(wtype, size, width);
 
     return num_bytes;
 }
