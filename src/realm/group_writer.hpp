@@ -93,9 +93,9 @@ private:
     // from a modest number of windows, depending upon fragmentation, so
     // 16 windows should be more than enough. If more than 16 windows are
     // needed, the least recently used is sync'ed and closed to make room
-    // for a new one.
+    // for a new one. The windows are kept in MRU (most recently used) order.
     const static int num_map_windows = 16;
-    MapWindow* m_map_windows[num_map_windows];
+    std::vector<MapWindow*> m_map_windows;
 
     // Get a suitable memory mapping for later access:
     // potentially adding it to the cache, potentially closing

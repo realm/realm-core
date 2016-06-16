@@ -34,15 +34,17 @@ private:
     ref_type base_ref;
     ref_type aligned_to_mmap_block(ref_type start_ref);
     size_t get_window_size(util::File& f, ref_type start_ref, size_t size);
+    static const size_t intended_alignment = 0x100000; // 1MB
 };
 
 // True if a requested block fall within a memory mapping.
 bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
 {
-    bool inside = true;
-    if (start_ref < base_ref) inside = false;
-    else if (start_ref + size > base_ref + map.get_size()) inside = false;
-    return inside;
+    if (start_ref < base_ref) 
+        return false;
+    if (start_ref + size > base_ref + map.get_size()) 
+        return false;
+    return true;
 }
 
 // When determining which part of the file to mmap, We try to pick a 1MB window containing
@@ -55,16 +57,16 @@ bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
 ref_type GroupWriter::MapWindow::aligned_to_mmap_block(ref_type start_ref)
 {
     // align to 1MB boundary
-    size_t page_mask = 0xFFFFF;
-    return start_ref - (start_ref & page_mask);
+    size_t page_mask = intended_alignment-1;
+    return start_ref & ~page_mask;
 }
 
 size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref, size_t size)
 {
     size_t window_size = start_ref + size - base_ref;
     // always map at least 1MB
-    if (window_size < 0x100000)
-        window_size = 0x100000;
+    if (window_size < intended_alignment)
+        window_size = intended_alignment;
     // but never map beyond end of file
     size_t file_size = f.get_size();
     REALM_ASSERT_DEBUG(start_ref+size < file_size);
@@ -133,8 +135,9 @@ GroupWriter::GroupWriter(Group& group):
     m_free_versions(m_alloc),
     m_current_version(0)
 {
+    m_map_windows.reserve(num_map_windows);
     for (int i = 0; i < num_map_windows; ++i)
-        m_map_windows[i] = nullptr;
+        m_map_windows.push_back(nullptr);
 
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
@@ -206,11 +209,15 @@ GroupWriter::GroupWriter(Group& group):
 
 GroupWriter::~GroupWriter()
 {
-    for (int i = 0; i < num_map_windows; ++i) {
-        if (m_map_windows[i]) {
-            delete m_map_windows[i];
-            m_map_windows[i] = nullptr;
+    for (auto& window: m_map_windows) {
+        if (window) {
+            // Sync'ing is done explicitly by a call to sync_all_mappings(),
+            // here we just delete it, unmapping the memory.
+            delete window;
+            window = nullptr;
         }
+        else
+            break;
     }
 }
 
@@ -221,14 +228,18 @@ size_t GroupWriter::get_file_size() const noexcept
 
 void GroupWriter::sync_all_mappings()
 {
-    for (int j = 0; j < num_map_windows && m_map_windows[j]; ++j)
-        m_map_windows[j]->sync();
+    for (const auto& window: m_map_windows) {
+        if (window)
+            window->sync();
+        else
+            break;
+    }
 }
 
 // Get a window matching a request, either creating a new window or reusing an
 // existing one (possibly extended to accomodate the new request). Maintain a
 // cache of open windows which are sync'ed and closed following a least recently
-// used policy
+// used policy. Entries in the cache are kept in MRU order.
 GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 {
     MapWindow* found_window = nullptr;
