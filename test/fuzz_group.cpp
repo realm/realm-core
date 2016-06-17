@@ -224,6 +224,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             }
             else if (instr == INSERT_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
+                if (g.get_table(table_ndx)->get_column_count() == 0) {
+                    continue; // do not insert rows if there are no columns
+                }
                 size_t row_ndx = get_next(s) % (g.get_table(table_ndx)->size() + 1);
                 size_t num_rows = get_next(s);
                 if (log) {
@@ -233,6 +236,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             }
             else if (instr == ADD_EMPTY_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
+                if (g.get_table(table_ndx)->get_column_count() == 0) {
+                    continue; // do not add rows if there are no columns
+                }
                 size_t num_rows = get_next(s);
                 if (g.get_table(table_ndx)->size() + num_rows < max_rows) {
                     if (log) {
