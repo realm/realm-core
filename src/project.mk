@@ -31,6 +31,7 @@ endif
 # The shorten-64-to-32 flag is only defined for clang.
 ifeq ($(COMPILER_IS),clang)
   CFLAGS_GENERAL += -Wshorten-64-to-32
+  CFLAGS_GENERAL += -Wold-style-cast
 endif
 
 # CoreFoundation is required for Apple specific logging. CoreFoundation and

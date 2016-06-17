@@ -2769,6 +2769,7 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fno-elide-constructors",
+					"-Wold-style-cast",
 					"-Wundef",
 				);
 				SDKROOT = macosx;
@@ -2815,6 +2816,7 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wundef",
+					"-Wold-style-cast",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
@@ -2834,7 +2836,7 @@
 					"$(PROJECT_DIR)/src/realm",
 				);
 				PRODUCT_NAME = realm;
-				WARNING_CFLAGS = "-Wold-style-cast";
+				WARNING_CFLAGS = "";
 			};
 			name = Debug;
 		};
@@ -2849,7 +2851,7 @@
 					"$(PROJECT_DIR)/src/realm",
 				);
 				PRODUCT_NAME = realm;
-				WARNING_CFLAGS = "-Wold-style-cast";
+				WARNING_CFLAGS = "";
 			};
 			name = Release;
 		};
