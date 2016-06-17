@@ -31,8 +31,10 @@ cd /tmp/build
 REALM_ENABLE_ENCRYPTION=yes sh build.sh config /usr
 # Build and install
 sh build.sh build
+sh build.sh build-node
 DESTDIR=/prod sh build.sh install-prod
 DESTDIR=/devel sh build.sh install-devel
+cp src/realm/librealm-node* /devel/usr/lib64
 
 clean_binaries /prod /devel
 
