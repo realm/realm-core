@@ -65,7 +65,7 @@ static jsmnerr_t jsmn_parse_primitive(jsmn_parser *parser, const char *js,
 found:
     if (tokens == nullptr) {
         parser->pos--;
-        return (jsmnerr_t)0;
+        return static_cast<jsmnerr_t>(0);
     }
     token = jsmn_alloc_token(parser, tokens, num_tokens);
     if (token == nullptr) {
@@ -77,7 +77,7 @@ found:
     token->parent = parser->toksuper;
 #endif
     parser->pos--;
-    return (jsmnerr_t)0;
+    return static_cast<jsmnerr_t>(0);
 }
 
 /**
@@ -98,7 +98,7 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
         /* Quote: end of string */
         if (c == '\"') {
             if (tokens == nullptr) {
-                return (jsmnerr_t)0;
+                return static_cast<jsmnerr_t>(0);
             }
             token = jsmn_alloc_token(parser, tokens, num_tokens);
             if (token == nullptr) {
@@ -109,7 +109,7 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
 #ifdef JSMN_PARENT_LINKS
             token->parent = parser->toksuper;
 #endif
-            return (jsmnerr_t)0;
+            return static_cast<jsmnerr_t>(0);
         }
 
         /* Backslash: Quoted symbol expected */
@@ -269,7 +269,7 @@ jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
         }
     }
 
-    return (jsmnerr_t)count;
+    return static_cast<jsmnerr_t>(count);
 }
 
 /**

@@ -2986,7 +2986,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
             chunk_size /= 2;
         }
         else {
-            memory_list.push_back(std::pair<char*,size_t>((char*)addr, chunk_size));
+            memory_list.push_back(std::pair<char*,size_t>(reinterpret_cast<char*>(addr), chunk_size));
         }
     }
 
