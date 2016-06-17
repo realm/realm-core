@@ -595,6 +595,13 @@ get_dist_log_path()
     printf "%s\n" "$path"
 }
 
+build_node()
+{
+    auto_configure || exit 1
+    export REALM_HAVE_CONFIG="1"
+    $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+}
+
 case "$MODE" in
 
     "config")
@@ -1065,9 +1072,12 @@ EOF
         ;;
 
     "build-node")
-        auto_configure || exit 1
-        export REALM_HAVE_CONFIG="1"
-        $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+        build_node
+        exit 0
+        ;;
+
+    "build-node-package")
+        build_node
 
         dir_basename=core
         node_directory="$NODE_DIR/$dir_basename"
