@@ -3091,8 +3091,7 @@ TEST(Shared_TopSizeNotEqualNine)
 
     TableRef t = g.add_table("");
     t->add_column(type_Double, "");
-    t->add_column(type_Double, "");
-    t->insert_empty_row(0, 128);
+    t->add_empty_row(241);
     sg.commit();
     REALM_ASSERT_RELEASE(sg.compact());
     sg.begin_write();
