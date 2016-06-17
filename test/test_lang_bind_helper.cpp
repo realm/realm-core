@@ -12207,22 +12207,21 @@ TEST(LangbindHelper_BoolSearchIndexCommitPromote)
 
 
 // Found by AFL after adding the compact instruction
-TEST(LangBindHelper_MaybeDoubleFree)
+ONLY(LangBindHelper_MaybeDoubleFree)
 {
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
-    std::unique_ptr<Replication> hist_r(make_client_history(path, key));
-    std::unique_ptr<Replication> hist_w(make_client_history(path, key));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
     g.add_table("");
-    g.get_table(0)->insert_column(0, DataType(10), "dgrpn", true);
+    g.get_table(0)->add_column(type_Double, "dgrpn", true);
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
-    g.get_table(0)->insert_empty_row(0, 246);
+    g.get_table(0)->add_empty_row(246);
     g.get_table(0)->insert_column_link(0, type_Link, "pgmjb", *g.get_table(0));
     sg_r.close();
     sg_w.commit();
@@ -12231,9 +12230,7 @@ TEST(LangBindHelper_MaybeDoubleFree)
     sg_r.open(path);
     sg_r.begin_read();
     g_r.verify();
-    g.get_table(0)->add_empty_row(15);
-    g.get_table(0)->insert_empty_row(119, 128);
-    g.get_table(0)->insert_empty_row(253, 253);
+    g.get_table(0)->add_empty_row(396);
 }
 
 
