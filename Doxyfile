@@ -779,6 +779,8 @@ INPUT                  = src \
 # possible encodings.
 # The default value is: UTF-8.
 
+# If this encoding changes, you can remove unicode.cpp from the excluded files.
+
 INPUT_ENCODING         = US-ASCII
 
 # If the value of the INPUT tag contains directories, you can use the
@@ -810,7 +812,9 @@ RECURSIVE              = YES
 # Note that relative paths are relative to the directory from which doxygen is
 # run.
 
-EXCLUDE                = src/win32/
+# src/realm/unicode.cpp contains some utf-8 characters
+
+EXCLUDE                = src/win32/ src/realm/unicode.cpp
 
 # The EXCLUDE_SYMLINKS tag can be used to select whether or not files or
 # directories that are symbolic links (a Unix file system feature) are excluded
