@@ -49,20 +49,20 @@ struct OneShotPrimeMode: PrimeMode {
 };
 
 struct RandomPrimeMode: PrimeMode {
-    std::mt19937_64 random;
-    std::uniform_int_distribution<int> dist;
-    int n;
+    std::mt19937_64 m_random;
+    std::uniform_int_distribution<int> m_dist;
+    int m_n;
     RandomPrimeMode(int n, int m, uint_fast64_t seed):
-        random(seed),
-        dist(0, m-1),
-        n(n)
+        m_random(seed),
+        m_dist(0, m-1),
+        m_n(n)
     {
         REALM_ASSERT(n >= 0 && m > 0);
     }
     bool check_trigger() noexcept override
     {
-        int i = dist(random);
-        return i < n;
+        int i = m_dist(m_random);
+        return i < m_n;
     }
 };
 
