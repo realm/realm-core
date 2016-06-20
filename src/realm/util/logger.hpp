@@ -122,6 +122,9 @@ private:
 
 
 /// A logger that writes to STDERR. This logger is not thread-safe.
+///
+/// Since this class is a RootLogger, it contains modifiable a log level
+/// threshold.
 class StderrLogger: public RootLogger {
 protected:
     void do_log(std::string) override final;
@@ -130,6 +133,9 @@ protected:
 
 
 /// A logger that writes to a stream. This logger is not thread-safe.
+///
+/// Since this class is a RootLogger, it contains modifiable a log level
+/// threshold.
 class StreamLogger: public RootLogger {
 public:
     explicit StreamLogger(std::ostream&) noexcept;
@@ -144,6 +150,9 @@ private:
 
 
 /// A logger that writes to a file. This logger is not thread-safe.
+///
+/// Since this class is a RootLogger, it contains modifiable a log level
+/// threshold.
 class FileLogger: public StreamLogger {
 public:
     explicit FileLogger(std::string path);
