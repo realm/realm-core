@@ -82,9 +82,9 @@ private:
 };
 
 struct SharedFileInfo {
-    int fd;
-    AESCryptor cryptor;
-    std::vector<EncryptedFileMapping*> mappings;
+    int m_fd;
+    AESCryptor m_cryptor;
+    std::vector<EncryptedFileMapping*> m_mappings;
 
     SharedFileInfo(const uint8_t* key, int fd);
 };

@@ -43,7 +43,7 @@ namespace realm {
 namespace util {
 
 SharedFileInfo::SharedFileInfo(const uint8_t* key, int fd)
-: fd(fd), cryptor(key)
+: m_fd(fd), m_cryptor(key)
 {
 }
 
@@ -334,14 +334,14 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 {
     REALM_ASSERT(m_blocks_per_page * block_size == (1ULL << m_page_shift));
     set(addr, size, file_offset); // throws
-    file.mappings.push_back(this);
+    file.m_mappings.push_back(this);
 }
 
 EncryptedFileMapping::~EncryptedFileMapping()
 {
     flush();
     sync();
-    m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
+    m_file.m_mappings.erase(remove(m_file.m_mappings.begin(), m_file.m_mappings.end(), this));
 }
 
 char* EncryptedFileMapping::page_addr(size_t i) const noexcept
@@ -372,8 +372,8 @@ void EncryptedFileMapping::mark_up_to_date(size_t i) noexcept
 
 bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
 {
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
+    for (size_t i = 0; i < m_file.m_mappings.size(); ++i) {
+        EncryptedFileMapping* m = m_file.m_mappings[i];
         if (m == this || page >= m->m_page_count)
             continue;
 
@@ -390,7 +390,7 @@ void EncryptedFileMapping::refresh_page(size_t i)
     char* addr = page_addr(i);
 
     if (!copy_up_to_date_page(i))
-        m_file.cryptor.read(m_file.fd, i << m_page_shift, addr, 1 << m_page_shift);
+        m_file.m_cryptor.read(m_file.m_fd, i << m_page_shift, addr, 1 << m_page_shift);
 
     m_up_to_date_pages[i] = true;
 }
@@ -399,8 +399,8 @@ void EncryptedFileMapping::write_page(size_t page) noexcept
 {
     // Go through all other mappings of this file and mark
     // the page outdated in those mappings:
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
+    for (size_t i = 0; i < m_file.m_mappings.size(); ++i) {
+        EncryptedFileMapping* m = m_file.m_mappings[i];
         if (m != this && page < m->m_page_count) {
             m->mark_outdated(page);
             //if (m->m_up_to_date_pages[page])
@@ -417,12 +417,12 @@ void EncryptedFileMapping::validate_page(size_t page) noexcept
     if (!m_up_to_date_pages[page])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, page << m_page_shift,
+    if (!m_file.m_cryptor.read(m_file.m_fd, page << m_page_shift,
                              m_validate_buffer.get(), 1 << m_page_shift))
         return;
 
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
+    for (size_t i = 0; i < m_file.m_mappings.size(); ++i) {
+        EncryptedFileMapping* m = m_file.m_mappings[i];
         if (m != this && page < m->m_page_count && m->m_dirty_pages[page]) {
             memcpy(m_validate_buffer.get(), m->page_addr(page), 1 << m_page_shift);
             break;
@@ -430,7 +430,7 @@ void EncryptedFileMapping::validate_page(size_t page) noexcept
     }
 
     if (memcmp(m_validate_buffer.get(), page_addr(page), 1 << m_page_shift)) {
-        std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page("
+        std::cerr << "mismatch " << this << ": fd(" << m_file.m_fd << ") page("
                   << page << "/" << m_page_count << ") " << m_validate_buffer.get() << " "
                   << page_addr(page) << std::endl;
         REALM_TERMINATE("");
@@ -456,7 +456,7 @@ void EncryptedFileMapping::flush() noexcept
             continue;
         }
 
-        m_file.cryptor.write(m_file.fd, i << m_page_shift, page_addr(i), 1 << m_page_shift);
+        m_file.m_cryptor.write(m_file.m_fd, i << m_page_shift, page_addr(i), 1 << m_page_shift);
         m_dirty_pages[i] = false;
     }
 
@@ -465,7 +465,7 @@ void EncryptedFileMapping::flush() noexcept
 
 void EncryptedFileMapping::sync() noexcept
 {
-    fsync(m_file.fd);
+    fsync(m_file.m_fd);
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
     // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
     //
@@ -502,7 +502,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     REALM_ASSERT(new_size % (1 << m_page_shift) == 0);
     REALM_ASSERT(new_size > 0);
 
-    m_file.cryptor.set_file_size(new_size + new_file_offset);
+    m_file.m_cryptor.set_file_size(new_size + new_file_offset);
 
     flush();
     m_addr = new_addr;
