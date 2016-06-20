@@ -2,10 +2,12 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Update table views so that rows are not attached after calling Table::clear() (#1837)
 
 ### Breaking changes
 
+* Removed the 'stealing' variant of export for handover. It was not a great
+  idea. It was not being used and required locking which we'd like to avoid.
 * S: A concept of log levels was added to `util::Logger`. `util::Logger::log()`
   now takes a log level argument, and new shorthand methods were added
   (`debug()`, `info()`, `warn()`, ...). All loggers now have a `level_threshold`
@@ -14,7 +16,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Allow SharedGroups to pin specific versions for handover
+* Reduced the object-size overhead of assertions.
 
 -----------
 

@@ -8,6 +8,7 @@
 #include <realm/link_view.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/logger.hpp>
 
 using namespace realm;
 using namespace realm::util;

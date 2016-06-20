@@ -1,8 +1,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio> // debug
-#include <iostream>
 #include <iomanip>
+#include <ostream>
 
 #include <memory>
 

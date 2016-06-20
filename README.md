@@ -50,24 +50,11 @@ each of our major platforms:
     sudo yum install python-cheetah
     sudo yum install procps-devel
 
-### Mac OS X 10.7, 10.8, and 10.9
+### OS X 10.10 and 10.11
 
-On Mac OS X, the build procedure uses Clang as the C/C++ compiler by
-default. It needs at least Clang 3.0 which comes with Xcode 4.2. On OS
-X 10.9 (Mavericks) we recommend at least Xcode 5.0, since in some
-cases when a previous version of OS X is upgraded to 10.9, you will be
-left with a malfunctioning set of command line tools (in particular
-the `lipo` command), and this is most easily fixed by upgrading to
-Xcode 5. Run the following command in the command prompt to see if you
-have Xcode installed, and, if so, what version it is:
-
-    xcodebuild -version
-
-If you have Xcode 5 or later, you will already have the required
-command line tools installed. In Xcode 4, however, the "Command line
-tools" is an optional Xcode add-on that you must install. You can find
-it under the "Downloads" pane of the "Preferences" dialog in the Xcode
-4 menu.
+On OS X, Clang is used as the C/C++ compiler by default. Clang is installed
+as part of Xcode. Xcode 7.0 or newer is required, and can be installed via
+the Mac App Store.
 
 Download the latest version of Python Cheetah
 (https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz),
@@ -143,36 +130,46 @@ It can be built using the following command:
 
     sh build.sh build-android
 
-Building for iOS
-----------------
+Building for iOS, watchOS and tvOS
+----------------------------------
 
-On Mac OS X it is possible to build a version of the Realm core
-library for iOS (the iPhone OS). It requires that the iPhoneOS and
-iPhoneSimulator SDKs for Xcode are installed.
+Realm core may be built for iOS, watchOS and tvOS from an OS X machine.
+See the OS X section of [Prerequisites](#prerequisites) above for information
+about the version of Xcode that is required.
 
-Run the following command to build the Realm core library for
-iPhone/iOS:
+To build for iOS:
 
-    sh build.sh build-iphone
+    sh build.sh build-ios
 
 This produces the following files and directories:
 
-    iphone-lib/include/
-    iphone-lib/librealm-ios.a
-    iphone-lib/librealm-ios-dbg.a
-    iphone-lib/realm-config
-    iphone-lib/realm-config-dbg
+    ios-lib/include/
+    ios-lib/librealm-ios.a
+    ios-lib/librealm-ios-dbg.a
+    ios-lib/realm-config
+    ios-lib/realm-config-dbg
 
 The `include` directory holds a copy of the header files, which are
 identical to the ones installed by `sh build.sh install`. There are
 two versions of the static library, one that is compiled with
 optimization, and one that is compiled for debugging. Each one
-contains code compiled for both iOS and for the iOS
-simulator. Each one also comes with a `config` program that can be
-used to enquire about required compiler and linker flags.
+contains code compiled for both iOS devices and the iOS simulator.
+Each one also comes with a `config` program that can be used to
+enquire about required compiler and linker flags.
 
-If you need to use the core library for development of the Objective C
-binding, consider running `sh build.sh build-objc`.
+To build for watchOS:
+
+    sh build.sh build-watchos
+
+The output is placed in watchos-lib, and is structured the same as
+is described for iOS above.
+
+To build for tvOS:
+
+    sh build.sh build-tvos
+
+The output is placed in tvos-lib, and is structured the same as
+is described for iOS above.
 
 Configuration
 -------------
@@ -289,16 +286,6 @@ core library (the `build` target). The framework is useful when
 creating OS X application. The command is:
 
     sh build.sh build-osx-framework
-
-
-Packaging for iOS
------------------
-
-You can create a framework for iOS after you have built the core
-library for iOS (the `build-iphone` target=. The framework is useful when
-creating apps for iPhone and iPad. The command is:
-
-    sh build.sh build-ios-framework
 
 
 Packaging for Debian/Ubuntu

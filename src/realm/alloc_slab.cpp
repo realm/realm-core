@@ -2,9 +2,12 @@
 #include <exception>
 #include <algorithm>
 #include <memory>
-#include <iostream>
 #include <mutex>
 #include <map>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
 #  include <cstdlib>

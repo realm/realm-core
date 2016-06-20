@@ -1,6 +1,3 @@
-#include <iostream>
-#include <iomanip>
-
 #include <realm/column_table.hpp>
 
 #include <realm/util/miscellaneous.hpp>

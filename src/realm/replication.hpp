@@ -31,11 +31,13 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/string_buffer.hpp>
-#include <realm/util/logger.hpp>
 #include <realm/impl/continuous_transactions_history.hpp>
 #include <realm/impl/transact_log.hpp>
 
 namespace realm {
+namespace util {
+    class Logger;
+}
 
 // FIXME: Be careful about the possibility of one modification function being called by another where both do transaction logging.
 

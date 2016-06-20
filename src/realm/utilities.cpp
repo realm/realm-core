@@ -1,6 +1,5 @@
 #include <cstdlib> // size_t
 #include <string>
-#include <iostream>
 #include <stdint.h>
 #include <atomic>
 

@@ -1,5 +1,6 @@
 #include <realm/util/features.h>
 #include <realm/version.hpp>
+#include <sstream>
 
 using namespace realm;
 

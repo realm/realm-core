@@ -1,8 +1,12 @@
-#include <cstring> // std::memcpy
-#include <limits>
-#include <iostream>
-#include <iomanip>
 #include <array>
+#include <cstring> // std::memcpy
+#include <iomanip>
+#include <limits>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#  include <sstream>
+#endif
 
 #ifdef _MSC_VER
 #  include <intrin.h>
@@ -2129,6 +2133,18 @@ void Array::verify() const
     REALM_ASSERT_3(ref_in_parent, ==, m_ref);
 }
 
+template<class C, class T>
+std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats)
+{
+    std::ostringstream out_2;
+    out_2.setf(std::ios::fixed);
+    out_2.precision(1);
+    double used_percent = 100.0 * stats.used / stats.allocated;
+    out_2 << "allocated = "<<stats.allocated<<", used = "<<stats.used<<" ("<<used_percent<<"%), "
+        "array_count = "<<stats.array_count;
+    out << out_2.str();
+    return out;
+}
 
 namespace {
 
