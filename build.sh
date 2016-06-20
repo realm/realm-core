@@ -90,6 +90,8 @@ Available modes are:
     build-cocoa:
     build-dotnet-cocoa:
     build-osx-framework:
+    build-node:
+    build-node-package:
     test:
     test-debug:
     check:
