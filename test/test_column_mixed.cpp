@@ -135,8 +135,8 @@ TEST(MixedColumn_Double)
 
     for (size_t i = 0; i < c.size(); ++i) {
         CHECK_EQUAL(type_Double, c.get_type(i));
-        double v = c.get_double(i);
-        CHECK_EQUAL(fval1[i], v);
+        double v_i = c.get_double(i);
+        CHECK_EQUAL(fval1[i], v_i);
     }
 
     // Set to new values - ensure sign is changed

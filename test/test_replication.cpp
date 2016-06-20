@@ -108,7 +108,7 @@ private:
 };
 
 REALM_TABLE_1(MySubsubsubtable,
-              i, Int)
+              first, Int)
 
 REALM_TABLE_3(MySubsubtable,
               a, Int,

@@ -5668,12 +5668,12 @@ TEST(Query_DeepCopy)
     // Attempt to overwrite memory of the deleted q3 by allocating various sized objects so that a spurious execution
     // of methods on q3 can be detected (by making unit test crash).
     char* tmp[1000];
-    for (size_t t = 0; t < sizeof(tmp) / sizeof(tmp[0]); t++) {
-        tmp[t] = new char[t];
-        memset(tmp[t], 0, t);
+    for (size_t i = 0; i < sizeof(tmp) / sizeof(tmp[0]); i++) {
+        tmp[i] = new char[i];
+        memset(tmp[i], 0, i);
     }
-    for (size_t t = 0; t < sizeof(tmp) / sizeof(tmp[0]); t++) {
-        delete[] tmp[t];
+    for (size_t i = 0; i < sizeof(tmp) / sizeof(tmp[0]); i++) {
+        delete[] tmp[i];
     }
 
     CHECK_EQUAL(2, q4->find());
@@ -5978,11 +5978,11 @@ TEST(Query_Nulls_Fuzzy)
                         }
                         else {
                             // random string
-                            for (size_t t = 0; t < len; t++) {
+                            for (size_t s = 0; s < len; s++) {
                                 if (fastrand(100) > 20)
-                                    buf2[t] = 0;                        // zero byte
+                                    buf2[s] = 0;                        // zero byte
                                 else
-                                    buf2[t] = static_cast<char>(fastrand(255));  // random byte
+                                    buf2[s] = static_cast<char>(fastrand(255));  // random byte
                             }
                             // no generated string can equal "null" (our vector magic value for null) because
                             // len == 4 is not possible
@@ -6008,12 +6008,12 @@ TEST(Query_Nulls_Fuzzy)
 
 
                 CHECK_EQUAL(table.size(), v.size());
-                for (size_t i = 0; i < table.size(); i++) {
-                    if (v[i] == "null") {
-                        CHECK(table.get_string(0, i).is_null());
+                for (size_t j = 0; j < table.size(); j++) {
+                    if (v[j] == "null") {
+                        CHECK(table.get_string(0, j).is_null());
                     }
                     else {
-                        CHECK(table.get_string(0, i) == v[i]);
+                        CHECK(table.get_string(0, j) == v[j]);
                     }
                 }
 
