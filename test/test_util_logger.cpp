@@ -39,6 +39,33 @@ using namespace realm;
 
 namespace {
 
+TEST(Util_Logger_LevelToFromString)
+{
+    auto check = [&test_context=test_context](util::Logger::Level level, const char* name) {
+        std::ostringstream out;
+        out.imbue(std::locale::classic());
+        out << level;
+        CHECK_EQUAL(name, out.str());
+        util::Logger::Level level_2;
+        std::istringstream in(name);
+        in.imbue(std::locale::classic());
+        in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+        in >> level_2;
+        CHECK(in && in.get() == std::char_traits<char>::eof());
+        CHECK_EQUAL(level, level_2);
+    };
+    check(util::Logger::Level::all,   "all");
+    check(util::Logger::Level::trace, "trace");
+    check(util::Logger::Level::debug, "debug");
+    check(util::Logger::Level::detail, "detail");
+    check(util::Logger::Level::info,  "info");
+    check(util::Logger::Level::warn,  "warn");
+    check(util::Logger::Level::error, "error");
+    check(util::Logger::Level::fatal, "fatal");
+    check(util::Logger::Level::off,   "off");
+}
+
+
 TEST(Util_Logger_Stream)
 {
     std::ostringstream out_1;
@@ -49,7 +76,7 @@ TEST(Util_Logger_Stream)
         for (int i = 0; i < 10; ++i) {
             std::ostringstream formatter;
             formatter << "Foo "<<i;
-            logger.log(formatter.str().c_str());
+            logger.info(formatter.str().c_str());
             out_2 << "Foo "<<i<<"\n";
         }
     }
@@ -64,19 +91,19 @@ TEST(Util_Logger_Formatting)
     out_2.imbue(std::locale::classic());
     {
         util::StreamLogger logger(out_1);
-        logger.log("Foo %1", 1);
+        logger.info("Foo %1", 1);
         out_2 << "Foo 1\n";
-        logger.log("Foo %1 bar %2", "x", 2);
+        logger.info("Foo %1 bar %2", "x", 2);
         out_2 << "Foo x bar 2\n";
-        logger.log("Foo %2 bar %1", 3, "y");
+        logger.info("Foo %2 bar %1", 3, "y");
         out_2 << "Foo y bar 3\n";
-        logger.log("%3 foo %1 bar %2", 4.1, 4, "z");
+        logger.info("%3 foo %1 bar %2", 4.1, 4, "z");
         out_2 << "z foo 4.1 bar 4\n";
-        logger.log("Foo %1");
+        logger.info("Foo %1");
         out_2 << "Foo %1\n";
-        logger.log("Foo %1 bar %2", "x");
+        logger.info("Foo %1 bar %2", "x");
         out_2 << "Foo x bar %2\n";
-        logger.log("Foo %2 bar %1", "x");
+        logger.info("Foo %2 bar %1", "x");
         out_2 << "Foo %2 bar x\n";
     }
     CHECK(out_1.str() == out_2.str());
@@ -92,7 +119,7 @@ TEST(Util_Logger_File_1)
     {
         util::FileLogger logger(path);
         for (int i = 0; i < 10; ++i) {
-            logger.log("Foo %1", i);
+            logger.info("Foo %1", i);
             out << "Foo "<<i<<"\n";
         }
     }
@@ -116,7 +143,7 @@ TEST(Util_Logger_File_2)
     {
         util::FileLogger logger(util::File(path, util::File::mode_Write));
         for (int i = 0; i < 10; ++i) {
-            logger.log("Foo %1", i);
+            logger.info("Foo %1", i);
             out << "Foo "<<i<<"\n";
         }
     }
@@ -136,11 +163,11 @@ TEST(Util_Logger_Prefix)
     std::ostringstream out_1;
     std::ostringstream out_2;
     {
-        util::StreamLogger base_logger(out_1);
-        util::PrefixLogger logger("Prefix: ", base_logger);
-        logger.log("Foo");
+        util::StreamLogger root_logger(out_1);
+        util::PrefixLogger logger("Prefix: ", root_logger);
+        logger.info("Foo");
         out_2 << "Prefix: Foo\n";
-        logger.log("Bar");
+        logger.info("Bar");
         out_2 << "Prefix: Bar\n";
     }
     CHECK(out_1.str() == out_2.str());
@@ -149,20 +176,20 @@ TEST(Util_Logger_Prefix)
 
 TEST(Util_Logger_ThreadSafe)
 {
-    struct BaseLogger: public util::Logger {
+    struct BalloonLogger: public util::RootLogger {
         std::vector<std::string> messages;
         void do_log(std::string message) override
         {
             messages.push_back(std::move(message));
         }
     };
-    BaseLogger base_logger;
-    util::ThreadSafeLogger logger(base_logger);
+    BalloonLogger root_logger;
+    util::ThreadSafeLogger logger(root_logger);
 
     const long num_iterations = 10000;
     auto func = [&](int i) {
         for (long j = 0; j < num_iterations; ++j)
-            logger.log("%1:%2", i, j);
+            logger.info("%1:%2", i, j);
     };
 
     const int num_threads = 8;
@@ -172,7 +199,7 @@ TEST(Util_Logger_ThreadSafe)
     for (int i = 0; i < num_threads; ++i)
         CHECK_NOT(threads[i].join());
 
-    std::vector<std::string> messages_1(std::move(base_logger.messages)), messages_2;
+    std::vector<std::string> messages_1(std::move(root_logger.messages)), messages_2;
     for (int i = 0; i < num_threads; ++i) {
         for (long j = 0; j < num_iterations; ++j) {
             std::ostringstream out;
