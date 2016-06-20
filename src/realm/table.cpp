@@ -4100,8 +4100,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 const size_t res_count = result.size();
                 for (size_t i = 0; i < res_count; ++i) {
                     int64_t sum   = dst_column.get(i);
-                    int64_t count = cnt_column.get(i);
-                    double res   = double(sum) / double(count);
+                    int64_t item_count = cnt_column.get(i);
+                    double res   = double(sum) / double(item_count);
                     mean_column.set(i, res);
                 }
 
@@ -4192,8 +4192,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 const size_t res_count = result.size();
                 for (size_t i = 0; i < res_count; ++i) {
                     int64_t sum   = dst_column.get(i);
-                    int64_t count = cnt_column.get(i);
-                    double res    = double(sum) / double(count);
+                    int64_t item_count = cnt_column.get(i);
+                    double res    = double(sum) / double(item_count);
                     mean_column.set(i, res);
                 }
 
@@ -4360,12 +4360,12 @@ void Table::optimize(bool enforce)
 
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
-        ColumnType type = get_real_column_type(i);
-        if (type == col_type_String) {
-            StringColumn* column = &get_column_string(i);
+        ColumnType type_i = get_real_column_type(i);
+        if (type_i == col_type_String) {
+            StringColumn* column_i = &get_column_string(i);
 
             ref_type ref, keys_ref;
-            bool res = column->auto_enumerate(keys_ref, ref, enforce);
+            bool res = column_i->auto_enumerate(keys_ref, ref, enforce);
             if (!res)
                 continue;
 
@@ -4378,10 +4378,10 @@ void Table::optimize(bool enforce)
             // refs to keylists in other columns so we
             // have to update their parent info
             for (size_t c = i+1; c < m_cols.size(); ++c) {
-                ColumnType type = get_real_column_type(c);
-                if (type == col_type_StringEnum) {
-                    StringEnumColumn& column = get_column_string_enum(c);
-                    column.adjust_keys_ndx_in_parent(1);
+                ColumnType type_c = get_real_column_type(c);
+                if (type_c == col_type_StringEnum) {
+                    StringEnumColumn& column_c = get_column_string_enum(c);
+                    column_c.adjust_keys_ndx_in_parent(1);
                 }
             }
 
@@ -4397,12 +4397,12 @@ void Table::optimize(bool enforce)
 
             // Inherit any existing index
             if (info.m_has_search_index) {
-                e->install_search_index(column->release_search_index());
+                e->install_search_index(column_i->release_search_index());
             }
 
             // Clean up the old column
-            column->destroy();
-            delete column;
+            column_i->destroy();
+            delete column_i;
         }
     }
 

@@ -500,8 +500,8 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 while (rest_size > 0 && num_children != REALM_MAX_BPNODE_SIZE) {
                     ref_type child = build(&rest_size, height, alloc, handler); // Throws
                     try {
-                        int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
-                        new_inner_node.add(v); // Throws
+                        int_fast64_t w = child; // FIXME: Dangerous cast here (unsigned -> signed)
+                        new_inner_node.add(w); // Throws
                     }
                     catch (...) {
                         Array::destroy_deep(child, alloc);

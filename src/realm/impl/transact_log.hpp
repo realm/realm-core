@@ -1386,7 +1386,7 @@ inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list
 inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
 {
     struct iter {
-        iter(const IntegerColumn& values, size_t ndx): m_values(&values), m_ndx(ndx) {}
+        iter(const IntegerColumn& iter_values, size_t ndx): m_values(&iter_values), m_ndx(ndx) {}
         const IntegerColumn* m_values;
         size_t m_ndx;
         bool operator==(const iter& i) const { return m_ndx == i.m_ndx; }

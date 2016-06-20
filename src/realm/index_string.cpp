@@ -230,8 +230,8 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
                 // Move items after split to new node
                 size_t len = m_array->size();
                 for (size_t i = refs_ndx; i < len; ++i) {
-                    ref_type ref = m_array->get_as_ref(i);
-                    new_node.node_add_key(ref);
+                    ref_type ref_i = m_array->get_as_ref(i);
+                    new_node.node_add_key(ref_i);
                 }
                 offsets.truncate(node_ndx);
                 m_array->truncate(refs_ndx);

@@ -564,9 +564,9 @@ void Spec::verify() const
 
 void Spec::to_dot(std::ostream& out, StringData title) const
 {
-    ref_type ref = m_top.get_ref();
+    ref_type top_ref = m_top.get_ref();
 
-    out << "subgraph cluster_specset" << ref << " {" << std::endl;
+    out << "subgraph cluster_specset" << top_ref << " {" << std::endl;
     out << " label = \"specset " << title << "\";" << std::endl;
 
     std::string types_name = "types (" + util::to_string(m_types.size()) + ")";
@@ -601,8 +601,8 @@ void Spec::to_dot(std::ostream& out, StringData title) const
             if (type != col_type_Table)
                 continue;
             size_t subspec_ndx = get_subspec_ndx(i);
-            ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
-            MemRef mem(ref, alloc);
+            ref_type subspec_ref = m_subspecs.get_as_ref(subspec_ndx);
+            MemRef mem(subspec_ref, alloc);
             Spec subspec(alloc);
             subspec.init(mem);
             subspec.set_parent(const_cast<Array*>(&m_subspecs), i);

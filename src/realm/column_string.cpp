@@ -189,9 +189,9 @@ void StringColumn::populate_search_index()
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         StringData value = get(row_ndx);
-        size_t num_rows = 1;
+        size_t num_rows_to_insert = 1;
         bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        m_search_index->insert(row_ndx, value, num_rows_to_insert, is_append); // Throws
     }
 }
 
