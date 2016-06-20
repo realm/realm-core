@@ -338,8 +338,6 @@ protected:
 #endif
 
 private:
-    class WriteSliceHandler;
-
     static ref_type build(size_t* rest_size_ptr, size_t fixed_height,
                           Allocator&, CreateHandler&);
 };
