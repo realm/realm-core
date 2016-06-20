@@ -578,7 +578,7 @@ void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 class ColumnBase::LeafToDot: public Array::ToDotHandler {
 public:
@@ -634,4 +634,4 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 } // namespace _impl
 } // namespace realm
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

@@ -324,7 +324,7 @@ void StringEnumColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void StringEnumColumn::verify() const
 {
@@ -393,4 +393,4 @@ void StringEnumColumn::do_dump_node_structure(std::ostream& out, int level) cons
     m_search_index->do_dump_node_structure(out, level+1);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

@@ -1440,6 +1440,7 @@ void Column<T>::verify() const
     m_tree.verify();
 }
 
+
 template<class T>
 void Column<T>::to_dot(std::ostream& out, StringData title) const
 {
@@ -1473,7 +1474,6 @@ MemStats Column<T>::stats() const
     get_root_array()->stats(stats);
     return stats;
 }
-
 
 namespace _impl {
     void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level);

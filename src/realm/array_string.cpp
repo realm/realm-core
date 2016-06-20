@@ -342,7 +342,7 @@ MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) c
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayString::string_stats() const
 {
@@ -399,4 +399,4 @@ void ArrayString::to_dot(std::ostream& out, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

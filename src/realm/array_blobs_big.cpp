@@ -179,7 +179,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayBigBlobs::verify() const
 {
@@ -194,6 +194,7 @@ void ArrayBigBlobs::verify() const
         }
     }
 }
+
 
 void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
 {
@@ -220,4 +221,4 @@ void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif
+#endif // LCOV_EXCL_STOP ignore debug functions
