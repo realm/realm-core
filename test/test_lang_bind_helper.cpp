@@ -9959,10 +9959,10 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
         std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID version;
         control->get(handover, version);
-        CHECK_EQUAL(version.version, handover->version.version);
+        CHECK_EQUAL(version.m_version, handover->version.m_version);
         CHECK(version == handover->version);
         Group& g = const_cast<Group&>(sg.begin_read(version));
-        CHECK_EQUAL(version.version, sg.get_version_of_current_transaction().version);
+        CHECK_EQUAL(version.m_version, sg.get_version_of_current_transaction().m_version);
         CHECK(version == sg.get_version_of_current_transaction());
         control->signal_feedback();
         TableRef table = g.get_table("table");

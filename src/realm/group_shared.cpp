@@ -1508,7 +1508,7 @@ void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
 
 void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 {
-    if (version_id.version == std::numeric_limits<version_type>::max()) {
+    if (version_id.m_version == std::numeric_limits<version_type>::max()) {
         for (;;) {
             SharedInfo* r_info = m_reader_map.get_addr();
             read_lock.m_reader_idx = r_info->readers.last();
@@ -1531,7 +1531,7 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 
     for (;;) {
         SharedInfo* r_info = m_reader_map.get_addr();
-        read_lock.m_reader_idx = version_id.index;
+        read_lock.m_reader_idx = version_id.m_index;
         if (grow_reader_mapping(read_lock.m_reader_idx)) { // Throws
             // remapping takes time, so retry with a fresh entry
             continue;
@@ -1552,7 +1552,7 @@ void SharedGroup::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
         }
         // we managed to lock an entry in the ringbuffer, but it may be so old that
         // the version doesn't match the specific request. In that case we must release and fail
-        if (r.version != version_id.version) {
+        if (r.version != version_id.m_version) {
             atomic_double_dec(r.count); // <-- release
             throw BadVersion();
         }
@@ -1659,10 +1659,8 @@ SharedGroup::VersionID SharedGroup::pin_version()
     REALM_ASSERT(m_transact_stage == transact_Reading);
 
     // Get current version
-    VersionID version_id = VersionID();
-    version_id.version = m_read_lock.m_version;
-    version_id.index   = m_read_lock.m_reader_idx;
-    
+    VersionID version_id(m_read_lock.m_version, m_read_lock.m_reader_idx);
+
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id); // Throws
 
@@ -1672,7 +1670,7 @@ SharedGroup::VersionID SharedGroup::pin_version()
 void SharedGroup::unpin_version(VersionID token)
 {
     ReadLockInfo read_lock;
-    read_lock.m_reader_idx = token.index;
+    read_lock.m_reader_idx = token.m_index;
 
     release_read_lock(read_lock);
 }
