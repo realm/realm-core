@@ -2770,6 +2770,7 @@
 					"$(inherited)",
 					"-fno-elide-constructors",
 					"-Wundef",
+					"-Wshadow",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
@@ -2815,6 +2816,7 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wundef",
+					"-Wshadow",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
