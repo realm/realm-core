@@ -2063,7 +2063,7 @@ inline size_t Array::get_byte_size() const noexcept
 inline size_t Array::get_byte_size_from_header(const char* header) noexcept
 {
     size_t size = get_size_from_header(header);
-    size_t width = get_width_from_header(header);
+    uint_least8_t width = uint_least8_t(get_width_from_header(header));
     WidthType wtype = get_wtype_from_header(header);
     size_t num_bytes = calc_byte_size(wtype, size, width);
 
