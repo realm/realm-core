@@ -991,7 +991,7 @@ public:
     static bool get_hasrefs_from_header(const char*) noexcept;
     static bool get_context_flag_from_header(const char*) noexcept;
     static WidthType get_wtype_from_header(const char*) noexcept;
-    static size_t get_width_from_header(const char*) noexcept;
+    static uint_least8_t get_width_from_header(const char*) noexcept;
     static size_t get_size_from_header(const char*) noexcept;
 
     static Type get_type_from_header(const char*) noexcept;
@@ -1073,7 +1073,7 @@ protected:
     bool get_hasrefs_from_header() const noexcept;
     bool get_context_flag_from_header() const noexcept;
     WidthType get_wtype_from_header() const noexcept;
-    size_t get_width_from_header() const noexcept;
+    uint_least8_t get_width_from_header() const noexcept;
     size_t get_size_from_header() const noexcept;
 
     // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
@@ -1839,11 +1839,11 @@ inline Array::WidthType Array::get_wtype_from_header(const char* header) noexcep
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return WidthType((int(h[4]) & 0x18) >> 3);
 }
-inline size_t Array::get_width_from_header(const char* header) noexcept
+inline uint_least8_t Array::get_width_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
-    return size_t((1 << (int(h[4]) & 0x07)) >> 1);
+    return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
 }
 inline size_t Array::get_size_from_header(const char* header) noexcept
 {
@@ -1889,7 +1889,7 @@ inline Array::WidthType Array::get_wtype_from_header() const noexcept
 {
     return get_wtype_from_header(get_header_from_data(m_data));
 }
-inline size_t Array::get_width_from_header() const noexcept
+inline uint_least8_t Array::get_width_from_header() const noexcept
 {
     return get_width_from_header(get_header_from_data(m_data));
 }
@@ -2063,7 +2063,7 @@ inline size_t Array::get_byte_size() const noexcept
 inline size_t Array::get_byte_size_from_header(const char* header) noexcept
 {
     size_t size = get_size_from_header(header);
-    uint_least8_t width = uint_least8_t(get_width_from_header(header));
+    uint_least8_t width = get_width_from_header(header);
     WidthType wtype = get_wtype_from_header(header);
     size_t num_bytes = calc_byte_size(wtype, size, width);
 
