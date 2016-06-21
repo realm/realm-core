@@ -211,7 +211,7 @@ ref_type GroupWriter::write_group()
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
     int_fast64_t value_4 = int_fast64_t(reserve_pos + max_free_space_needed); // FIXME: Problematic unsigned -> signed conversion
 
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     m_free_positions.m_no_relocation = true;
     m_free_lengths.m_no_relocation = true;
 #endif

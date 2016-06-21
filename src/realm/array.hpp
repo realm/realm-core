@@ -1222,7 +1222,7 @@ public:
     // FIXME: Should not be public
     char* m_data = nullptr; // Points to first byte after header
 
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     // If m_no_relocation is false, then copy_on_write() will always relocate this array, regardless if it's
     // required or not. If it's true, then it will never relocate, which is currently only expeted inside 
     // GroupWriter::write_group() due to a unique chicken/egg problem (see description there).

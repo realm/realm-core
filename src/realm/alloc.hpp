@@ -56,7 +56,7 @@ public:
 private:
     char* m_addr;
     ref_type m_ref;
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     // Allocator that created m_ref. Used to verify that the ref is valid whenever you call 
     // get_ref()/get_addr and that it e.g. has not been free'ed
     const Allocator* m_alloc = nullptr;
@@ -313,7 +313,7 @@ inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept:
     m_ref(ref)
 {
     static_cast<void>(alloc);
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     m_alloc = &alloc;
 #endif
 }
@@ -323,14 +323,14 @@ inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept:
     m_ref(ref)
 {
     static_cast<void>(alloc);
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     m_alloc = &alloc;
 #endif
 }
 
 inline char* MemRef::get_addr()
 {
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     // Asserts if the ref has been freed
     m_alloc->translate(m_ref);
 #endif
@@ -339,7 +339,7 @@ inline char* MemRef::get_addr()
 
 inline ref_type MemRef::get_ref()
 {
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     // Asserts if the ref has been freed
     m_alloc->translate(m_ref);
 #endif
@@ -348,7 +348,7 @@ inline ref_type MemRef::get_ref()
 
 inline void MemRef::set_ref(ref_type ref)
 {
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     // Asserts if the ref has been freed
     m_alloc->translate(ref);
 #endif

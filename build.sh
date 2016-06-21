@@ -565,6 +565,11 @@ case "$MODE" in
             enable_assertions="yes"
         fi
 
+	    enable_memdebug="no"
+        if [ "$REALM_ENABLE_MEMDEBUG" ]; then
+            enable_memdebug="yes"
+        fi
+		
         # Find Xcode
         xcode_home="none"
         xcodeselect="xcode-select"
@@ -629,6 +634,7 @@ INSTALL_LIBEXECDIR    = $install_libexecdir
 MAX_BPNODE_SIZE       = $max_bpnode_size
 MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_ASSERTIONS     = $enable_assertions
+ENABLE_MEMDEBUG       = $enable_memdebug
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home

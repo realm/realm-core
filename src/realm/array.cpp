@@ -1568,7 +1568,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
 void Array::copy_on_write()
 {
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
     // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
     // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the m_no_relocation
     // member)
@@ -1604,7 +1604,7 @@ void Array::copy_on_write()
 
         update_parent();
 
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
         if (!m_alloc.is_read_only(old_ref)) {
             // Overwrite free'd array with 0x77. We cannot overwrite the header because free_() needs to know the size
             // of the allocated block in order to free it. This size is computed from the width and size header fields.

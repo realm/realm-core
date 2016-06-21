@@ -219,7 +219,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
         for (iter i = m_free_space.rbegin(); i != rend; ++i) {
             if (size <= i->size) {
 
-#ifdef REALM_MEMORY_DEBUG
+#if REALM_ENABLE_MEMDEBUG
                 // Pick a *random* match instead of just the first. This will increase the chance of catching
                 // use-after-free bugs in Core. It's chosen such that the mathematical average of all picked 
                 // positions is the middle of the list. 

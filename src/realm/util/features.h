@@ -45,6 +45,10 @@
 #    define REALM_ENABLE_ASSERTIONS     0
 #  endif
 
+#  ifndef REALM_ENABLE_MEMDEBUG
+#    define REALM_ENABLE_MEMDEBUG		0
+#  endif
+
 #  ifndef _WIN32
 #    define REALM_INSTALL_PREFIX      "/usr/local"
 #    define REALM_INSTALL_EXEC_PREFIX REALM_INSTALL_PREFIX
