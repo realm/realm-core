@@ -237,7 +237,7 @@ void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_p
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_parent) const
 {
@@ -245,8 +245,7 @@ std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_
     return std::make_pair(p.first.m_ref, p.second);
 }
 
-#endif
-
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 size_t SubtableColumn::get_subtable_size(size_t ndx) const noexcept
 {
@@ -374,7 +373,7 @@ void SubtableColumn::do_discard_child_accessors() noexcept
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void SubtableColumn::verify(const Table& table, size_t col_ndx) const
 {
@@ -397,6 +396,7 @@ void SubtableColumn::verify(const Table& table, size_t col_ndx) const
         subtable->verify();
     }
 }
+
 
 void SubtableColumn::to_dot(std::ostream& out, StringData title) const
 {
@@ -435,4 +435,4 @@ void SubtableColumn::do_dump_node_structure(std::ostream& out, int level) const
     get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions
