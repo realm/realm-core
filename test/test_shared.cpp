@@ -3088,32 +3088,30 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     // all lenghts >= 4K (that was tried) triggers the error
     size_t string_length = 4 * 1024;
     SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     std::string long_string(string_length, 'a');
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
     {
-        WriteTransaction wt(sg);
-        TableRef table = wt.add_table("table");
-        table->add_column(type_String, "string_col");
-        wt.commit();
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.add_table("table");
+            table->add_column(type_String, "string_col");
+            table->add_empty_row();
+            table->set_string(0, 0, long_string);
+            wt.commit();
+        }
+        sg.compact(); // <- required to provoke subsequent failures
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().verify();
+            TableRef table = wt.get_table("table");
+            table->set_string(0, 0, long_string);
+            wt.get_group().verify();
+            wt.commit();
+        }
     }
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
-        table->add_empty_row();
-        table->set_string(0, 0, long_string);
-        wt.commit();
-    }
-    // With this call to compact, the *second* write transaction below
-    // will assert. Without it, the test completes.
-    sg.compact(); 
-    {
-        WriteTransaction wt(sg);
-        wt.get_group().verify();
-        TableRef table = wt.get_table("table");
-        table->set_string(0, 0, long_string);
-        wt.get_group().verify();
-        wt.commit();
-    }
+    //SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    //sg.close();
+    //sg.open(path);
     {
         WriteTransaction wt(sg); // <---- fails here
         wt.get_group().verify();
@@ -3125,5 +3123,24 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     sg.close();
 }
 
+// Found by AFL (on a heavy hint from Finn that we should add a compact() instruction
+NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_write());
 
+    TableRef t = g.add_table("");
+    t->add_column(type_Double, "");
+    t->add_empty_row(241);
+    sg.commit();
+    REALM_ASSERT_RELEASE(sg.compact());
+    SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    sg2.begin_write();
+    sg2.commit();
+    sg2.begin_read(); // <- does not fail
+    SharedGroup sg3(path, false, SharedGroup::durability_Full, crypt_key());
+    sg3.begin_read(); // <- does not fail
+    sg.begin_read(); // <- does fail
+}
 #endif // TEST_SHARED
