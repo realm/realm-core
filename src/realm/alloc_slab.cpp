@@ -161,7 +161,9 @@ void SlabAlloc::detach() noexcept
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
-            m_file_mappings = nullptr;
+            m_file_mappings.reset();
+            m_local_mappings.reset();
+            m_num_local_mappings = 0;
             goto found;
     }
     REALM_UNREACHABLE();
