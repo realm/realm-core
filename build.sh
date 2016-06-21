@@ -639,7 +639,7 @@ case "$MODE" in
             enable_assertions="yes"
         fi
 
-	    enable_memdebug="no"
+        enable_memdebug="no"
         if [ "$REALM_ENABLE_MEMDEBUG" ]; then
             enable_memdebug="yes"
         fi

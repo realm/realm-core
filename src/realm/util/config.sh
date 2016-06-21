@@ -107,5 +107,5 @@ cat >"$target" <<EOF
 #define REALM_ENABLE_ALLOC_SET_ZERO $enable_alloc_set_zero
 #define REALM_ENABLE_ENCRYPTION     $enable_encryption
 #define REALM_ENABLE_ASSERTIONS     $enable_assertions
-#define REALM_ENABLE_MEMDEBUG		$enable_memdebug
+#define REALM_ENABLE_MEMDEBUG       $enable_memdebug
 EOF
