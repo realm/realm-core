@@ -1160,6 +1160,7 @@ bool SharedGroup::compact()
 
     // Using begin_read here ensures that we have access to the latest entry
     // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
+    // This is also needed to attach the group (get the proper top pointer, etc)
     begin_read(); // Throws
 
     // Compact by writing a new file holding only live data, then renaming the new file
