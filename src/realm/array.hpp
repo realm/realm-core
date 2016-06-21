@@ -3120,7 +3120,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     size_t i = 0;
-    __m128i compare = {0};
+    __m128i compare_result = {0};
     unsigned int resmask;
 
     // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
@@ -3128,40 +3128,40 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
         // equal / not-equal
         if (std::is_same<cond, Equal>::value || std::is_same<cond, NotEqual>::value) {
             if (width == 8)
-                compare = _mm_cmpeq_epi8(action_data[i], *data);
+                compare_result = _mm_cmpeq_epi8(action_data[i], *data);
             if (width == 16)
-                compare = _mm_cmpeq_epi16(action_data[i], *data);
+                compare_result = _mm_cmpeq_epi16(action_data[i], *data);
             if (width == 32)
-                compare = _mm_cmpeq_epi32(action_data[i], *data);
+                compare_result = _mm_cmpeq_epi32(action_data[i], *data);
             if (width == 64) {
-                compare = _mm_cmpeq_epi64(action_data[i], *data); // SSE 4.2 only
+                compare_result = _mm_cmpeq_epi64(action_data[i], *data); // SSE 4.2 only
             }
         }
 
         // greater
         else if (std::is_same<cond, Greater>::value) {
             if (width == 8)
-                compare = _mm_cmpgt_epi8(action_data[i], *data);
+                compare_result = _mm_cmpgt_epi8(action_data[i], *data);
             if (width == 16)
-                compare = _mm_cmpgt_epi16(action_data[i], *data);
+                compare_result = _mm_cmpgt_epi16(action_data[i], *data);
             if (width == 32)
-                compare = _mm_cmpgt_epi32(action_data[i], *data);
+                compare_result = _mm_cmpgt_epi32(action_data[i], *data);
             if (width == 64)
-                compare = _mm_cmpgt_epi64(action_data[i], *data);
+                compare_result = _mm_cmpgt_epi64(action_data[i], *data);
         }
         // less
         else if (std::is_same<cond, Less>::value) {
             if (width == 8)
-                compare = _mm_cmplt_epi8(action_data[i], *data);
+                compare_result = _mm_cmplt_epi8(action_data[i], *data);
             else if (width == 16)
-                compare = _mm_cmplt_epi16(action_data[i], *data);
+                compare_result = _mm_cmplt_epi16(action_data[i], *data);
             else if (width == 32)
-                compare = _mm_cmplt_epi32(action_data[i], *data);
+                compare_result = _mm_cmplt_epi32(action_data[i], *data);
             else
                 REALM_ASSERT(false);
         }
 
-        resmask = _mm_movemask_epi8(compare);
+        resmask = _mm_movemask_epi8(compare_result);
 
         if (std::is_same<cond, NotEqual>::value)
             resmask = ~resmask & 0x0000ffff;

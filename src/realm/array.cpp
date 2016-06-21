@@ -1189,7 +1189,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
         if ((w == 8 || w == 16 || w == 32) && end - start > sizeof (__m128i) * 8 / no0(w)) {
             __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
-            __m128i sum = {0};
+            __m128i sum_result = {0};
             __m128i sum2;
 
             size_t chunks = (end - start) * w / 8 / sizeof (__m128i);
@@ -1202,16 +1202,16 @@ int64_t Array::sum(size_t start, size_t end) const
                     __m128i vh = data[t];
                     vh.m128i_i64[0] = vh.m128i_i64[1];
                     vh = _mm_cvtepi8_epi16(vh);
-                    sum = _mm_add_epi16(sum, vl);
-                    sum = _mm_add_epi16(sum, vh);
+                    sum_result = _mm_add_epi16(sum_result, vl);
+                    sum_result = _mm_add_epi16(sum_result, vh);
                     */
 
                     /*
                     // 424 ms
                     __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0));
                     __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
-                    sum = _mm_add_epi32(sum, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
-                    sum = _mm_add_epi32(sum, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
+                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
+                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
                     */
 
                     __m128i vl = _mm_cvtepi8_epi16(data[t]);        // sign extend lower words 8->16
@@ -1222,8 +1222,8 @@ int64_t Array::sum(size_t start, size_t end) const
                     __m128i sumH = _mm_cvtepi16_epi32(sum1);
                     __m128i sumL = _mm_srli_si128(sum1, 8);         // v >>= 64
                     sumL = _mm_cvtepi16_epi32(sumL);
-                    sum = _mm_add_epi32(sum, sumL);
-                    sum = _mm_add_epi32(sum, sumH);
+                    sum_result = _mm_add_epi32(sum_result, sumL);
+                    sum_result = _mm_add_epi32(sum_result, sumH);
                 }
                 else if (w == 16) {
                     // todo, can overflow for array size > 2^32
@@ -1231,29 +1231,29 @@ int64_t Array::sum(size_t start, size_t end) const
                     __m128i vh = data[t];
                     vh = _mm_srli_si128(vh, 8);                     // v >>= 64
                     vh = _mm_cvtepi16_epi32(vh);                    // sign extend lower words 16->32
-                    sum = _mm_add_epi32(sum, vl);
-                    sum = _mm_add_epi32(sum, vh);
+                    sum_result = _mm_add_epi32(sum_result, vl);
+                    sum_result = _mm_add_epi32(sum_result, vh);
                 }
                 else if (w == 32) {
                     __m128i v = data[t];
                     __m128i v0 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
                     v = _mm_srli_si128(v, 8);                       // v >>= 64
                     __m128i v1 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
-                    sum = _mm_add_epi64(sum, v0);
-                    sum = _mm_add_epi64(sum, v1);
+                    sum_result = _mm_add_epi64(sum_result, v0);
+                    sum_result = _mm_add_epi64(sum_result, v1);
 
                     /*
                     __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need underflow test).
                     __m128i mm = _mm_and_si128(data[t], m);
                     zz = _mm_or_si128(mm, zz);
-                    sum = _mm_add_epi32(sum, data[t]);
+                    sum_result = _mm_add_epi32(sum_result, data[t]);
                     */
                 }
             }
             start += sizeof (__m128i) * 8 / no0(w) * chunks;
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-            sum2 = sum;
+            sum2 = sum_result;
 
             // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
             char sum3[sizeof sum2];

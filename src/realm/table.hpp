@@ -1696,7 +1696,7 @@ inline TableRef Table::copy(Allocator& alloc) const
 
 // For use by queries
 template<class T>
-inline Columns<T> Table::column(size_t column)
+inline Columns<T> Table::column(size_t column_ndx)
 {
     std::vector<size_t> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
@@ -1705,7 +1705,7 @@ inline Columns<T> Table::column(size_t column)
     // type traits (all the is_same() cases below).
     const Table* table = get_link_chain_target(link_chain);
 
-    realm::DataType ct = table->get_column_type(column);
+    realm::DataType ct = table->get_column_type(column_ndx);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
@@ -1718,10 +1718,10 @@ inline Columns<T> Table::column(size_t column)
         throw(LogicError::type_mismatch);
 
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value || std::is_same<T, BackLink>::value) {
-        link_chain.push_back(column);
+        link_chain.push_back(column_ndx);
     }
 
-    return Columns<T>(column, this, std::move(link_chain));
+    return Columns<T>(column_ndx, this, std::move(link_chain));
 }
 
 template<class T>

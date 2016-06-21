@@ -354,7 +354,6 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     // Check if we can merge with adjacent preceeding free block (not if that
     // would cross slab boundary)
     if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref)) == m_slabs.end()) {
-        typedef chunks::iterator iter;
         iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEndEq(ref));
         if (i != free_space.end()) {
             if (merged_with != free_space.end()) {
