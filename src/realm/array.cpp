@@ -1,12 +1,15 @@
-#include <cstring> // std::memcpy
-#include <limits>
-#include <iostream>
-#include <iomanip>
 #include <array>
+#include <cstring> // std::memcpy
+#include <iomanip>
+#include <limits>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#  include <sstream>
+#endif
 
 #ifdef _MSC_VER
 #  include <intrin.h>
-#  include <win32/types.h>
 #  pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
@@ -789,7 +792,7 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
 {
     REALM_ASSERT(start < (indirection ? indirection->size() : size()));
 
-#if REALM_DEBUG
+#ifdef REALM_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
@@ -2115,7 +2118,7 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
     return new_leaf.get_ref();
 }
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void Array::print() const
 {
@@ -2143,6 +2146,18 @@ void Array::verify() const
     REALM_ASSERT_3(ref_in_parent, ==, m_ref);
 }
 
+template<class C, class T>
+std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats)
+{
+    std::ostringstream out_2;
+    out_2.setf(std::ios::fixed);
+    out_2.precision(1);
+    double used_percent = 100.0 * stats.used / stats.allocated;
+    out_2 << "allocated = "<<stats.allocated<<", used = "<<stats.used<<" ("<<used_percent<<"%), "
+        "array_count = "<<stats.array_count;
+    out << out_2.str();
+    return out;
+}
 
 namespace {
 
@@ -2240,6 +2255,7 @@ void Array::verify_bptree(LeafVerifier leaf_verifier) const
 {
     ::verify_bptree(*this, leaf_verifier);
 }
+
 
 void Array::dump_bptree_structure(std::ostream& out, int level, LeafDumper leaf_dumper) const
 {
@@ -2475,7 +2491,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
     }
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 
 namespace {

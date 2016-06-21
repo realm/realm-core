@@ -1,7 +1,3 @@
-#ifdef _MSC_VER
-#  include <win32/types.h>
-#endif
-
 #include <utility> // pair
 
 #include <realm/array_binary.hpp>
@@ -55,12 +51,12 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    size_t current_end = to_size_t(m_offsets.get(ndx));
+    int_fast64_t start = ndx ? m_offsets.get(ndx-1) : 0;
+    int_fast64_t current_end = m_offsets.get(ndx);
     size_t stored_size = value.size();
     if (add_zero_term)
         ++stored_size;
-    ssize_t diff =  (start + stored_size) - current_end;
+    int_fast64_t diff = (start + stored_size) - current_end;
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
 
@@ -234,7 +230,7 @@ MemRef ArrayBinary::slice(size_t offset, size_t size, Allocator& target_alloc) c
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayBinary::to_dot(std::ostream& out, bool, StringData title) const
 {
@@ -253,4 +249,4 @@ void ArrayBinary::to_dot(std::ostream& out, bool, StringData title) const
     out << "}" << std::endl;
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

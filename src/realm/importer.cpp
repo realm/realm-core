@@ -20,10 +20,11 @@
 
 // Test tool in test/test_csv/test.pl
 
-#include <stdint.h>
+#include <iostream>
 #include <limits>
-#include <vector>
 #include <sstream>
+#include <stdint.h>
+#include <vector>
 
 #include <realm/util/assert.hpp>
 #include <realm/importer.hpp>
@@ -100,7 +101,7 @@ void print_row(Table& table, size_t r)
         if(table.get_column_type(c) == type_Int)
             sprintf(buf, "%lld", static_cast<long long>(table.get_int(c, r)));
         if(table.get_column_type(c) == type_String) {
-#if _MSC_VER
+#if defined(_MSC_VER) && _MSC_VER
             _snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
 #else
             snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());

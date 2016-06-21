@@ -1,9 +1,3 @@
-#ifdef _MSC_VER
-#include <win32/types.h> //ssize_t
-#endif
-
-#include <iostream>
-
 #include <realm/array_string_long.hpp>
 #include <realm/array_blob.hpp>
 #include <realm/impl/destroy_guard.hpp>
@@ -279,7 +273,7 @@ MemRef ArrayStringLong::slice(size_t offset, size_t size, Allocator& target_allo
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayStringLong::to_dot(std::ostream& out, StringData title) const
 {
@@ -298,4 +292,4 @@ void ArrayStringLong::to_dot(std::ostream& out, StringData title) const
     out << "}" << std::endl;
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

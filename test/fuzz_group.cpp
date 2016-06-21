@@ -260,10 +260,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableRef t = g.get_table(table_ndx);
                 if (t->get_column_count() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
-                    DataType type = t->get_column_type(col_ndx);
-                    bool supports_search_index = (type != type_Float && type != type_Double && type != type_Link &&
-                                                  type != type_LinkList && type != type_Table && type != type_Mixed &&
-                                                  type != type_Binary);
+                    bool supports_search_index = _impl::TableFriend::get_column(*t, col_ndx).supports_search_index();
+
                     if (supports_search_index) {
                         if (log) {
                             *log << "g.get_table(" << table_ndx << ")->add_search_index(" << col_ndx << ");\n";

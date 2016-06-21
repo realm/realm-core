@@ -179,6 +179,7 @@ public:
     virtual StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
 
     // Search index
+    virtual bool supports_search_index() const noexcept;
     virtual bool has_search_index() const noexcept;
     virtual StringIndex* create_search_index();
     virtual void destroy_search_index() noexcept;
@@ -292,7 +293,6 @@ public:
     virtual void refresh_accessor_tree(size_t new_col_ndx, const Spec&) = 0;
 
 #ifdef REALM_DEBUG
-    // Must be upper case to avoid conflict with macro in Objective-C
     virtual void verify() const = 0;
     virtual void verify(const Table&, size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
@@ -338,8 +338,6 @@ protected:
 #endif
 
 private:
-    class WriteSliceHandler;
-
     static ref_type build(size_t* rest_size_ptr, size_t fixed_height,
                           Allocator&, CreateHandler&);
 };
@@ -399,6 +397,7 @@ public:
     void move_assign(ColumnBaseWithIndex& col) noexcept;
     void destroy() noexcept override;
 
+    virtual bool supports_search_index() const noexcept override { return true; }
     bool has_search_index() const noexcept final { return bool(m_search_index); }
     StringIndex* get_search_index() noexcept final { return m_search_index.get(); }
     const StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
@@ -525,6 +524,14 @@ public:
 
     void populate_search_index();
     StringIndex* create_search_index() override;
+    inline bool supports_search_index() const noexcept override 
+    { 
+        if (realm::is_any<T, float, double>::value)
+            return false;
+        else
+            return true; 
+    }
+
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -620,6 +627,12 @@ private:
 };
 
 // Implementation:
+
+inline bool ColumnBase::supports_search_index() const noexcept
+{
+    REALM_ASSERT(!has_search_index());
+    return false;
+}
 
 inline bool ColumnBase::has_search_index() const noexcept
 {
@@ -855,7 +868,11 @@ void Column<T>::populate_search_index()
 template<class T>
 StringIndex* Column<T>::create_search_index()
 {
+    if (realm::is_any<T, float, double>::value)
+        return nullptr;
+
     REALM_ASSERT(!has_search_index());
+    REALM_ASSERT(supports_search_index());
     m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
     populate_search_index();
     return m_search_index.get();
@@ -1421,6 +1438,7 @@ void Column<T>::verify() const
     m_tree.verify();
 }
 
+
 template<class T>
 void Column<T>::to_dot(std::ostream& out, StringData title) const
 {
@@ -1454,7 +1472,6 @@ MemStats Column<T>::stats() const
     get_root_array()->stats(stats);
     return stats;
 }
-
 
 namespace _impl {
     void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level);

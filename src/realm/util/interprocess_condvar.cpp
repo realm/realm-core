@@ -24,6 +24,7 @@
 #include <system_error>
 #include <unistd.h>
 #include <poll.h>
+#include <sstream>
 
 using namespace realm;
 using namespace realm::util;
@@ -93,7 +94,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     static_cast<void>(base_path);
     static_cast<void>(condvar_name);
 #ifdef REALM_CONDVAR_EMULATION
-#if !TARGET_OS_TV
+#if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";
 
     // Create and open the named pipe
@@ -130,7 +131,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         throw std::system_error(errno, std::system_category());
     }
 
-#else // !TARGET_OS_TV
+#else // !REALM_TVOS
 
     // tvOS does not support named pipes, so use an anonymous pipe instead
     int notification_pipe[2];
@@ -142,7 +143,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     m_fd_read = notification_pipe[0];
     m_fd_write = notification_pipe[1];
 
-#endif // TARGET_OS_TV
+#endif // REALM_TVOS
 
     // Make writing to the pipe return -1 when the pipe's buffer is full
     // rather than blocking until there's space available

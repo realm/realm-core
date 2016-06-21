@@ -1,5 +1,8 @@
 #include <algorithm>
-#include <iostream>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
 
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>

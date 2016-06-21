@@ -1327,4 +1327,5 @@ TEST(StringIndex_Deny_Duplicates)
     col.destroy();
 }
 
+
 #endif // TEST_INDEX_STRING

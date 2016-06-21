@@ -54,7 +54,7 @@
 #   include <mach/exc.h>
 #endif
 
-#ifdef REALM_ANDROID
+#if REALM_ANDROID
 #include <linux/unistd.h>
 #include <sys/syscall.h>
 #endif

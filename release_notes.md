@@ -2,7 +2,93 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Update table views so that rows are not attached after calling Table::clear() (#1837)
+
+### Breaking changes
+
+* Removed the 'stealing' variant of export for handover. It was not a great
+  idea. It was not being used and required locking which we'd like to avoid.
+* S: A concept of log levels was added to `util::Logger`. `util::Logger::log()`
+  now takes a log level argument, and new shorthand methods were added
+  (`debug()`, `info()`, `warn()`, ...). All loggers now have a `level_threshold`
+  property through which they efficiently query for the current log level
+  threshold.
+
+### Enhancements
+
+* Allow SharedGroups to pin specific versions for handover
+* Reduced the object-size overhead of assertions.
+
+-----------
+
+### Internals
+
+* Non concurrent tests are run on the main process thread. (#1862)
+* S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
+  `<realm/util/features.h>`. This also fixes a dangling reference to
+  `REALM_QUOTE_2()` in `<realm/util/features.h>`.
+* New feature in the unit test framework: Ability to specify log level
+  threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
+
+----------------------------------------------
+
+
+# 1.1.2 Release notes
+
+### Bugfixes
+
+* S: In the network API (namespace `util::network`), do not report an error to
+  the application if system calls `read()`, `write()`, or `accept()` fail with
+  `EAGAIN` on a socket in nonblocking mode after `poll()` has signalled
+  readiness. Instead, go back and wait for `poll()` to signal readiness again.
+
+### Breaking changes
+
+* Sorting order of strings is now according to more common scheme for special
+  characters (space, dash, etc), and for letters it's now such that visually
+  similiar letters (that is, those that differ only by diacritics, etc) are
+  grouped together. (#1639)
+
+-----------
+
+### Internals
+
+* S: New unit tests `Network_ReadWriteLargeAmount` and
+  `Network_AsyncReadWriteLargeAmount`.
+
+----------------------------------------------
+
+
+# 1.1.1 Release notes
+
+### Bugfixes
+
+* Fixed a recently introduced crash bug on indexed columns (#1869)
+* Implement `TableViewBase`'s copy-assignment operator to prevent link errors when it is used.
+* No longer assert on a "!cfg.session_initiator" in SlabAlloc::attach_file(). This makes issue
+  #1784 go away, but also removes an option to detect and flag if the ".lock" file is deleted
+  while a SharedGroup is attached to the file. Please note: Removal of the ".lock" file while
+  the database is attached may lead to corruption of the database.
+
+### Enhancements
+
+* Improve performance of opening Realm files and making commits when using
+  external writelogs by eliminating some unneeded `fsync()`s.
+
+----------------------------------------------
+
+# 1.1.0 Release notes
+
+### Bugfixes
+
+* Fix for #1846: If an exception is thrown from SlabAlloc::attach_file(), it
+  forgot to unlock a mutex protecting the shared memory mapping. In cases
+  where the last reference to the memory mapping goes out of scope, it would
+  cause the assert "Destruction of mutex in use". Fix is to use unique_lock
+  to ensure the mutex is unlocked before destruction.
+* Fix a crash when `Table::set_string_unique()` is called but the underlying
+  column is actually a StringEnumColumn.
+* Fix an assertion failure when combining a `Query` with no conditions with another `Query`.
 
 ### Breaking changes
 
@@ -14,6 +100,7 @@
 
 ### Enhancements
 
+* Strictly enforce not allowing search indexes to be created on unsupported column types.
 * S: Event loop API reworked to more closely align with the `util::network` API,
   and to better provide for multiple alternative implementations (not considered
   breaking because the event loop API was not yet in use).
@@ -31,6 +118,16 @@
 * Corrected two usages of undefined REALM_PLATFORM_ANDROID to REALM_ANDROID.
   This correctly enables Android log output on termination and allows using
   robust mutexes on Android platforms. (#1834)
+
+
+----------------------------------------------
+
+# 1.0.2 Release notes
+
+### Internals
+
+* This is functionally the same as 1.0.1. For Xamarin we now do a specialized
+  cocoa build with only iOS support and without bitcode.
 
 ----------------------------------------------
 
@@ -111,7 +208,7 @@
 
 * Search indexes no longer support strings with lengths greater than
   `Table::max_indexed_string_length`. If you try to add a string with a longer length
-  (through the Table interface), then a `realm::LogicError` will be thrown with type 
+  (through the Table interface), then a `realm::LogicError` will be thrown with type
   `string_too_long_for_index`. Calling `Table::add_search_index()` will now return a
   boolean value indicating whether or not the index could be created on the column. If
   the column contains strings that exceed the maximum allowed length, then

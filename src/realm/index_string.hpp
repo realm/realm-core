@@ -20,7 +20,6 @@
 #ifndef REALM_INDEX_STRING_HPP
 #define REALM_INDEX_STRING_HPP
 
-#include <iostream>
 #include <cstring>
 #include <memory>
 #include <array>
@@ -127,16 +126,37 @@ public:
     void verify() const;
     void verify_entries(const StringColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
-    void to_dot() const { to_dot(std::cerr); }
+    void to_dot() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
     typedef int32_t key_type;
 
+    static const size_t s_index_key_length = 4;
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
 
 private:
+
+    // m_array is a compact representation for storing the children of this StringIndex.
+    // Children can be:
+    // 1) a row number
+    // 2) a reference to a list which stores row numbers (for duplicate strings).
+    // 3) a reference to a sub-index
+    // m_array[0] is always a reference to a values array which stores the 4 byte chunk
+    // of payload data for quick string chunk comparisons. The array stored
+    // at m_array[0] lines up with the indices of values in m_array[1] so for example
+    // starting with an empty StringIndex:
+    // StringColumn::insert(target_row_ndx=42, value="test_string") would result with
+    // get_array_from_ref(m_array[0])[0] == create_key("test") and
+    // m_array[1] == 42
+    // In this way, m_array which stores one child has a size of two.
+    // Children are type 1 (row number) if the LSB of the value is set.
+    // To get the actual row value, shift value down by one.
+    // If the LSB of the value is 0 then the value is a reference and can be either
+    // type 2, or type 3 (no shifting in either case).
+    // References point to a list if the context header flag is NOT set.
+    // If the header flag is set, references point to a sub-StringIndex (nesting).
     std::unique_ptr<Array> m_array;
     ColumnBase* m_target_column;
     bool m_deny_duplicate_values;

@@ -678,7 +678,7 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -747,4 +747,4 @@ std::pair<ref_type, size_t> LinkListColumn::get_to_dot_parent(size_t ndx_in_pare
     return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

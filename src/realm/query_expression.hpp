@@ -1436,7 +1436,7 @@ UnaryOperator<Pow<T>> power (const Subexpr2<T>& left) {
 // Classes used for LinkMap (see below).
 struct LinkMapFunction
 {
-    // Your consume() method is given row index of the linked-to table as argument, and you must return wether or
+    // Your consume() method is given row index of the linked-to table as argument, and you must return whether or
     // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
     // for the current main table row index (it will be a link tree if you have multiple type_LinkList columns
     // in a link()->link() query.
@@ -2096,7 +2096,7 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.m_link_columns.size() == 1) {
             // We can fall back to Query::links_to for != and == operations on links, but only
-            // for == on link lists. This is because negating query.links_to(…) is equivalent to
+            // for == on link lists. This is because negating query.links_to() is equivalent to
             // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
             if (link_map.m_link_types[0] == col_type_Link ||
                 (link_map.m_link_types[0] == col_type_LinkList && std::is_same<Operator, Equal>::value)) {

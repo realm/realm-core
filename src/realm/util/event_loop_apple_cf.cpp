@@ -22,6 +22,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/util/bind_ptr.hpp>
+#include <realm/util/cf_ptr.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -40,66 +41,7 @@ using namespace realm::util;
 
 namespace {
 
-template<class Ref> class ReleaseGuard {
-public:
-    explicit ReleaseGuard(Ref ref = nullptr) noexcept:
-        m_ref(ref)
-    {
-    }
-
-    ReleaseGuard(ReleaseGuard&& rg) noexcept:
-        m_ref(rg.m_ref)
-    {
-        rg.m_ref = nullptr;
-    }
-
-    ~ReleaseGuard() noexcept
-    {
-        if (m_ref)
-            CFRelease(m_ref);
-    }
-
-    ReleaseGuard &operator=(ReleaseGuard&& rg) noexcept
-    {
-        REALM_ASSERT(!m_ref || m_ref != rg.m_ref);
-        if (m_ref)
-            CFRelease(m_ref);
-        m_ref = rg.m_ref;
-        rg.m_ref = nullptr;
-        return *this;
-    }
-
-    explicit operator bool() const noexcept
-    {
-        return bool(m_ref);
-    }
-
-    Ref get() const noexcept
-    {
-        return m_ref;
-    }
-
-    Ref release() noexcept
-    {
-        Ref ref = m_ref;
-        m_ref = nullptr;
-        return ref;
-    }
-
-    void reset(Ref ref = nullptr) noexcept
-    {
-        REALM_ASSERT(!m_ref || m_ref != ref);
-        if (m_ref)
-            CFRelease(m_ref);
-        m_ref = ref;
-    }
-
-private:
-    Ref m_ref;
-};
-
-
-ReleaseGuard<CFStringRef> make_cf_string(std::string str)
+CFPtr<CFStringRef> make_cf_string(std::string str)
 {
     static_assert(std::is_same<UInt8, char>::value || std::is_same<UInt8, unsigned char>::value,
                   "Unexpected byte type");
@@ -109,7 +51,7 @@ ReleaseGuard<CFStringRef> make_cf_string(std::string str)
                                                 kCFStringEncodingUTF8, is_external_representation);
     if (!str_2)
         throw std::bad_alloc();
-    return ReleaseGuard<CFStringRef>(str_2);
+    return CFPtr<CFStringRef>(str_2);
 }
 
 
@@ -452,7 +394,7 @@ public:
     }
 
 private:
-    ReleaseGuard<CFRunLoopSourceRef> m_wake_up_source;
+    CFPtr<CFRunLoopSourceRef> m_wake_up_source;
 
     // Operations whose completion handlers are ready to be executed
     OperQueue m_completed_operations;
@@ -626,8 +568,8 @@ private:
     // executing EventLoopImpl::run()).
     CFRunLoopRef m_cf_run_loop = nullptr;
 
-    ReleaseGuard<CFReadStreamRef> m_read_stream;
-    ReleaseGuard<CFWriteStreamRef> m_write_stream;
+    CFPtr<CFReadStreamRef> m_read_stream;
+    CFPtr<CFWriteStreamRef> m_write_stream;
 
     const bind_ptr<ConnectOper> m_connect_oper;
     const bind_ptr<ReadOper> m_read_oper;
@@ -658,10 +600,10 @@ private:
         REALM_ASSERT(!m_read_stream && !m_write_stream);
         REALM_ASSERT(!m_read_oper->in_progress() && !m_write_oper->in_progress());
 
-        ReleaseGuard<CFReadStreamRef> read_stream;
-        ReleaseGuard<CFWriteStreamRef> write_stream;
+        CFPtr<CFReadStreamRef> read_stream;
+        CFPtr<CFWriteStreamRef> write_stream;
         {
-            ReleaseGuard<CFStringRef> host_2 = make_cf_string(std::move(host)); // Throws
+            CFPtr<CFStringRef> host_2 = make_cf_string(std::move(host)); // Throws
             UInt32 port_2 = UInt32(port);
             CFReadStreamRef  read_stream_2;
             CFWriteStreamRef write_stream_2;
@@ -1069,8 +1011,7 @@ private:
     static std::error_code get_error(CFReadStreamRef read_stream)
     {
         REALM_ASSERT(CFReadStreamGetStatus(read_stream) == kCFStreamStatusError);
-        ReleaseGuard<CFErrorRef> error;
-        error.reset(CFReadStreamCopyError(read_stream));
+        CFPtr<CFErrorRef> error = adoptCF(CFReadStreamCopyError(read_stream));
         if (!error)
             throw std::bad_alloc();
         return translate_error(error.get()); // Throws
@@ -1079,8 +1020,7 @@ private:
     static std::error_code get_error(CFWriteStreamRef write_stream)
     {
         REALM_ASSERT(CFWriteStreamGetStatus(write_stream) == kCFStreamStatusError);
-        ReleaseGuard<CFErrorRef> error;
-        error.reset(CFWriteStreamCopyError(write_stream));
+        CFPtr<CFErrorRef> error = adoptCF(CFWriteStreamCopyError(write_stream));
         if (!error)
             throw std::bad_alloc();
         return translate_error(error.get()); // Throws
@@ -1096,7 +1036,7 @@ private:
         else if (CFStringCompare(domain, kCFErrorDomainCFNetwork, 0) == kCFCompareEqualTo) {
             CFIndex code = CFErrorGetCode(error);
             if (code == 2) {
-                ReleaseGuard<CFDictionaryRef> user_info(CFErrorCopyUserInfo(error));
+                CFPtr<CFDictionaryRef> user_info(CFErrorCopyUserInfo(error));
                 if (!user_info)
                     throw std::bad_alloc();
                 const void* value =
@@ -1110,9 +1050,8 @@ private:
             }
         }
 /*
-        ReleaseGuard<CFDataRef> domain_2;
-        domain_2.reset(CFStringCreateExternalRepresentation(kCFAllocatorDefault, domain,
-                                                            kCFStringEncodingUTF8, '?'));
+        CFPtr<CFDataRef> domain_2 = adoptCF(CFStringCreateExternalRepresentation(kCFAllocatorDefault, domain,
+                                                                                 kCFStringEncodingUTF8, '?'));
         if (!domain_2)
             throw std::bad_alloc();
         static_assert(std::is_same<UInt8, char>::value || std::is_same<UInt8, unsigned char>::value,
@@ -1175,9 +1114,8 @@ public:
         context.retain = nullptr;
         context.release = nullptr;
         context.copyDescription = nullptr;
-        ReleaseGuard<CFRunLoopTimerRef> cf_timer;
-        cf_timer.reset(CFRunLoopTimerCreate(kCFAllocatorDefault, fire_date, interval, flags, order,
-                                            callout, &context));
+        CFPtr<CFRunLoopTimerRef> cf_timer = adoptCF(CFRunLoopTimerCreate(kCFAllocatorDefault, fire_date, interval,
+                                                                         flags, order, callout, &context));
         if (!cf_timer)
             throw std::bad_alloc();
 
@@ -1243,7 +1181,7 @@ private:
     // executing EventLoopImpl::run()).
     CFRunLoopRef m_cf_run_loop = nullptr;
 
-    ReleaseGuard<CFRunLoopTimerRef> m_cf_timer;
+    CFPtr<CFRunLoopTimerRef> m_cf_timer;
 
     const bind_ptr<WaitOper> m_wait_oper;
 
@@ -1286,8 +1224,7 @@ EventLoopImpl::EventLoopImpl()
     context.schedule = nullptr; // Called when added to run loop
     context.cancel = nullptr; // Called when removed from run loop
     context.perform = &EventLoopImpl::wake_up_callback;
-    ReleaseGuard<CFRunLoopSourceRef> source;
-    source.reset(CFRunLoopSourceCreate(kCFAllocatorDefault, order, &context));
+    CFPtr<CFRunLoopSourceRef> source = adoptCF(CFRunLoopSourceCreate(kCFAllocatorDefault, order, &context));
     if (!source)
         throw std::bad_alloc();
 

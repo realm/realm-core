@@ -1,9 +1,5 @@
 #include <algorithm>
 
-#ifdef _WIN32
-#include <win32/types.h>
-#endif
-
 #include <realm/array_blobs_big.hpp>
 #include <realm/column.hpp>
 
@@ -183,7 +179,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayBigBlobs::verify() const
 {
@@ -198,6 +194,7 @@ void ArrayBigBlobs::verify() const
         }
     }
 }
+
 
 void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
 {
@@ -224,4 +221,4 @@ void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif
+#endif // LCOV_EXCL_STOP ignore debug functions

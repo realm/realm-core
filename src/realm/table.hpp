@@ -242,7 +242,6 @@ public:
     /// \param column_ndx The index of a column of this table.
 
     bool has_search_index(size_t column_ndx) const noexcept;
-//    void remove_search_index(size_t col_ndx);
     void add_search_index(size_t column_ndx);
     void remove_search_index(size_t column_ndx);
 
@@ -784,7 +783,7 @@ public:
 
     // Debug
 #ifdef REALM_DEBUG
-    void verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void verify() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;

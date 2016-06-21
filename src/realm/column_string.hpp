@@ -99,13 +99,13 @@ public:
     StringIndex* get_search_index() noexcept override;
     const StringIndex* get_search_index() const noexcept override;
     std::unique_ptr<StringIndex> release_search_index() noexcept;
+    bool supports_search_index() const noexcept final { return true; }
     StringIndex* create_search_index() override;
 
     // Simply inserts all column values in the index in a loop
     void populate_search_index();
     void destroy_search_index() noexcept override;
 
-    // Optimizing data layout
     // Optimizing data layout. enforce == true will enforce enumeration;
     // enforce == false will auto-evaluate if it should be enumerated or not
     bool auto_enumerate(ref_type& keys, ref_type& values, bool enforce = false) const;
@@ -134,6 +134,7 @@ public:
     void erase_rows(size_t, size_t, size_t, bool) override;
     void move_last_row_over(size_t, size_t, bool) override;
     void clear(size_t, bool) override;
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept override;
     void update_from_parent(size_t old_baseline) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 

@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <iostream>
 #include <iomanip>
 
 #include <memory>
@@ -572,7 +571,7 @@ void BinaryColumn::update_from_ref(ref_type ref)
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -680,4 +679,4 @@ void BinaryColumn::do_dump_node_structure(std::ostream& out, int level) const
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

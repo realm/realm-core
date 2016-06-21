@@ -780,7 +780,7 @@ TEST(Query_NextGenSyntaxMonkey0)
 TEST(Query_NextGenSyntaxMonkey)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (int iter = 1; iter < 10 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
+    for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
             1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
@@ -2339,7 +2339,7 @@ TEST(Query_OnTableView_where)
 {
     Random random;
 
-    for (int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
+    for (int iter = 0; iter < 50 * (1 + TEST_DURATION * TEST_DURATION); iter++) {
         random.seed(164);
         OneIntTable oti;
         size_t cnt1 = 0;
@@ -8863,4 +8863,60 @@ TEST(Query_SyncViewIfNeeded)
         CHECK_EQUAL(bool(version), false);
     }
 }
+
+// Ensure that two queries can be combined via Query::and_query, &&, and || even if one of them has no conditions.
+TEST(Query_CombineWithEmptyQueryDoesntCrash)
+{
+    Table table;
+    size_t col_id = table.add_column(type_Int, "id");
+    table.add_empty_row(3);
+    table.set_int(col_id, 0, 0);
+    table.set_int(col_id, 1, 1);
+    table.set_int(col_id, 2, 2);
+
+    {
+        Query q = table.where().equal(col_id, 1);
+        q.and_query(table.where());
+        CHECK_EQUAL(1, q.find_all().size());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = table.where();
+        q1.and_query(q2);
+        CHECK_EQUAL(1, q1.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = table.where();
+        q2.and_query(q1);
+        CHECK_EQUAL(1, q2.count());
+    }
+
+    {
+        Query q = table.where();
+        q.and_query(table.where().equal(col_id, 1));
+        CHECK_EQUAL(1, q.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = q1 && table.where();
+        CHECK_EQUAL(1, q2.count());
+
+        Query q3 = table.where() && q1;
+        CHECK_EQUAL(1, q3.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = q1 || table.where();
+        CHECK_EQUAL(1, q2.count());
+
+        Query q3 = table.where() || q1;
+        CHECK_EQUAL(1, q3.count());
+    }
+}
+
 #endif // TEST_QUERY

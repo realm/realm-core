@@ -44,7 +44,8 @@ OSX_DIR="macosx-lib"
 
 IPHONE_EXTENSIONS="objc"
 IPHONE_SDKS="iphoneos iphonesimulator"
-IPHONE_DIR="ios-lib"
+IOS_DIR="ios-lib"
+IOS_NO_BITCODE_DIR="ios-no-bitcode-lib"
 
 WATCHOS_SDKS="watchos watchsimulator"
 WATCHOS_DIR="watchos-lib"
@@ -52,13 +53,22 @@ WATCHOS_DIR="watchos-lib"
 TVOS_SDKS="appletvos appletvsimulator"
 TVOS_DIR="tvos-lib"
 
-: ${REALM_COCOA_PLATFORMS:="osx iphone watchos tvos"}
+: ${REALM_COCOA_PLATFORMS:="osx ios watchos tvos"}
+: ${REALM_DOTNET_COCOA_PLATFORMS:="ios-no-bitcode"}
 
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
-CONFIG_VERSION=1
+NODE_DIR="node-lib"
 
+CONFIG_VERSION=1
+CURRENT_PLATFORM="win"
+if [ "`uname`" = "Darwin" ]; then
+  CURRENT_PLATFORM="osx"
+fi
+if [ "`uname`" = "Linux" ]; then
+  CURRENT_PLATFORM="linux"
+fi
 
 usage()
 {
@@ -72,11 +82,13 @@ Available modes are:
     build-arm-benchmark:
     build-config-progs:
     build-osx:
-    build-iphone:
+    build-ios:
+    build-ios-no-bitcode:
     build-watchos:
     build-tvos:
     build-android:
     build-cocoa:
+    build-dotnet-cocoa:
     build-osx-framework:
     test:
     test-debug:
@@ -307,7 +319,7 @@ build_apple()
     mkdir -p "$dir" || exit 1
     echo "Creating '$dir/librealm-$os_name$platform_suffix.a'"
     libtool "$temp_dir/platforms"/*/"librealm.a"     -static -o "$dir/librealm-$os_name$platform_suffix.a"     || exit 1
-    echo "Creating '$dir/librealm-$os_name-dbg.a'"
+    echo "Creating '$dir/librealm-$os_name$platform_suffix-dbg.a'"
     libtool "$temp_dir/platforms"/*/"librealm-dbg.a" -static -o "$dir/librealm-$os_name$platform_suffix-dbg.a" || exit 1
     echo "Copying headers to '$dir/include'"
     mkdir -p "$dir/include" || exit 1
@@ -324,6 +336,68 @@ build_apple()
     rm -rf "$temp_dir"
     echo "Done building"
     return 0
+}
+
+build_cocoa()
+{
+    local output_dir platforms
+    file_basename="$1"
+    output_dir="$2"
+    platforms="$3"
+
+    if [ "$OS" != "Darwin" ]; then
+        echo "zip for iOS/OSX/watchOS/tvOS can only be generated under OS X."
+        exit 0
+    fi
+
+    platforms=$(echo "$platforms" | sed -e 's/iphone/ios/g')
+
+    for platform in $platforms; do
+        sh build.sh build-$platform || exit 1
+    done
+
+    echo "Copying files"
+    tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
+    realm_version="$(sh build.sh get-version)" || exit 1
+    dir_basename=core
+    rm -f "$file_basename-$realm_version.zip" || exit 1
+    mkdir -p "$tmpdir/$dir_basename/include" || exit 1
+
+    platform_for_headers=$(echo $platforms | cut -d ' ' -f 1 | tr "-" "_" | tr "[:lower:]" "[:upper:]")
+    eval headers_dir=\$${platform_for_headers}_DIR
+    cp -r "$headers_dir/include/"* "$tmpdir/$dir_basename/include" || exit 1
+
+    for platform in $platforms; do
+        eval platform_dir=\$$(echo $platform | tr "-" "_" | tr "[:lower:]" "[:upper:]")_DIR
+        cp "$platform_dir"/*.a "$tmpdir/$dir_basename" || exit 1
+    done
+
+    if [ -f "$tmpdir/$dir_basename"/librealm-macosx.a ]; then
+        # If we built for OS X, add symlinks at the location of the old library names. This will give the bindings
+        # a chance to update to the new names without breaking building with new versions of core.
+        rm -f "$tmpdir/$dir_basename"/librealm{,-dbg}.a
+        ln -sf librealm-macosx.a "$tmpdir/$dir_basename"/librealm.a
+        ln -sf librealm-macosx-dbg.a "$tmpdir/$dir_basename"/librealm-dbg.a
+    fi
+
+    cp tools/LICENSE "$tmpdir/$dir_basename" || exit 1
+    if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
+        command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
+        pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/release_notes.txt" release_notes.md || exit 1
+    fi
+
+    echo "Create zip file: '$file_basename-$realm_version.zip'"
+    (cd $tmpdir && zip -r -q --symlinks "$file_basename-$realm_version.zip" "$dir_basename") || exit 1
+    mv "$tmpdir/$file_basename-$realm_version.zip" . || exit 1
+
+    echo "Unzipping in '$output_dir'"
+    mkdir -p "$output_dir" || exit 1
+    rm -rf "$output_dir/$dir_basename" || exit 1
+    cur_dir="$(pwd)"
+    (cd "$output_dir" && unzip -qq "$cur_dir/$file_basename-$realm_version.zip") || exit 1
+
+    rm -rf "$tmpdir" || exit 1
+    echo "Done"
 }
 
 find_apple_sdks()
@@ -667,7 +741,7 @@ EOF
             $MAKE -C "src/realm" clean BASE_DENOM="ios" || exit 1
             $MAKE -C "src/realm" clean BASE_DENOM="watch" || exit 1
             $MAKE -C "src/realm" clean BASE_DENOM="tv" || exit 1
-            for dir in "$OSX_DIR" "$IPHONE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
+            for dir in "$OSX_DIR" "$IOS_DIR" "$IOS_NO_BITCODE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
                 if [ -e "$dir" ]; then
                     echo "Removing '$dir'"
                     rm -rf "$dir/include" || exit 1
@@ -729,15 +803,27 @@ EOF
         build_apple
         ;;
 
-    "build-iphone")
+    "build-ios" | "build-iphone")
         export name='iPhone'
         export available_sdks_config_key='IPHONE_SDKS_AVAIL'
         export min_version='7.0'
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
-        export dir="$IPHONE_DIR"
+        export dir="$IOS_DIR"
         export platform_suffix=''
         export enable_bitcode='yes'
+        build_apple
+        ;;
+
+    "build-ios-no-bitcode" | "build-iphone-no-bitcode")
+        export name='iPhone'
+        export available_sdks_config_key='IPHONE_SDKS_AVAIL'
+        export min_version='7.0'
+        export os_name='ios'
+        export sdks_config_key='IPHONE_SDKS'
+        export dir="$IOS_NO_BITCODE_DIR"
+        export platform_suffix='-no-bitcode'
+        export enable_bitcode='no'
         build_apple
         ;;
 
@@ -928,63 +1014,26 @@ EOF
         ;;
 
     "build-cocoa")
-        if [ "$OS" != "Darwin" ]; then
-            echo "zip for iOS/OSX/watchOS/tvOS can only be generated under OS X."
-            exit 0
-        fi
-
         # the user can specify where to find realm-cocoa repository
         realm_cocoa_dir="$1"
         if [ -z "$realm_cocoa_dir" ]; then
             realm_cocoa_dir="../realm-cocoa"
         fi
+        file_basename="core" # FIXME: we should change this to realm-core-cocoa everywhere
 
-        for platform in $REALM_COCOA_PLATFORMS; do
-            sh build.sh build-$platform || exit 1
-        done
+        build_cocoa "$file_basename" "$realm_cocoa_dir" "$REALM_COCOA_PLATFORMS"
+        exit 0
+        ;;
 
-        echo "Copying files"
-        tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
-        realm_version="$(sh build.sh get-version)" || exit 1
-        BASENAME="core"
-        rm -f "$BASENAME-$realm_version.zip" || exit 1
-        mkdir -p "$tmpdir/$BASENAME/include" || exit 1
-
-        platform_for_headers=$(echo $REALM_COCOA_PLATFORMS | cut -d ' ' -f 1 | tr "[:lower:]" "[:upper:]")
-        eval headers_dir=\$${platform_for_headers}_DIR
-        cp -r "$headers_dir/include/"* "$tmpdir/$BASENAME/include" || exit 1
-
-        for platform in $REALM_COCOA_PLATFORMS; do
-            eval platform_dir=\$$(echo $platform | tr "[:lower:]" "[:upper:]")_DIR
-            cp "$platform_dir"/*.a "$tmpdir/$BASENAME" || exit 1
-        done
-
-        if [ -f "$tmpdir/$BASENAME"/librealm-macosx.a ]; then
-            # If we built for OS X, add symlinks at the location of the old library names. This will give the bindings
-            # a chance to update to the new names without breaking building with new versions of core.
-            rm -f "$tmpdir/$BASENAME"/librealm{,-dbg}.a
-            ln -sf librealm-macosx.a "$tmpdir/$BASENAME"/librealm.a
-            ln -sf librealm-macosx-dbg.a "$tmpdir/$BASENAME"/librealm-dbg.a
+    "build-dotnet-cocoa")
+        # the user can specify where to place the extracted output
+        output_dir="$1"
+        if [ -z "$output_dir" ]; then
+            output_dir="../realm-dotnet/wrappers"
         fi
+        file_basename="realm-core-dotnet-cocoa"
 
-        cp tools/LICENSE "$tmpdir/$BASENAME" || exit 1
-        if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
-            command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
-            pandoc -f markdown -t plain -o "$tmpdir/$BASENAME/release_notes.txt" release_notes.md || exit 1
-        fi
-
-        echo "Create zip file: '$BASENAME-$realm_version.zip'"
-        (cd $tmpdir && zip -r -q --symlinks "$BASENAME-$realm_version.zip" "$BASENAME") || exit 1
-        mv "$tmpdir/$BASENAME-$realm_version.zip" . || exit 1
-
-        echo "Unzipping in '$realm_cocoa_dir'"
-        mkdir -p "$realm_cocoa_dir" || exit 1
-        rm -rf "$realm_cocoa_dir/$BASENAME" || exit 1
-        cur_dir="$(pwd)"
-        (cd "$realm_cocoa_dir" && unzip -qq "$cur_dir/$BASENAME-$realm_version.zip") || exit 1
-
-        rm -rf "$tmpdir" || exit 1
-        echo "Done"
+        build_cocoa "$file_basename" "$output_dir" "$REALM_DOTNET_COCOA_PLATFORMS"
         exit 0
         ;;
 
@@ -1025,6 +1074,38 @@ EOF
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
         $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+
+        dir_basename=core
+        node_directory="$NODE_DIR/$dir_basename"
+
+        mkdir -p "$node_directory" || exit 1
+        cp "src/realm/librealm-node.a" "$node_directory" || exit 1
+        cp "src/realm/librealm-node-dbg.a" "$node_directory" || exit 1
+
+        echo "Copying headers to '$node_directory/include'"
+        mkdir -p "$node_directory/include" || exit 1
+        cp "src/realm.hpp" "$node_directory/include/" || exit 1
+        mkdir -p "$node_directory/include/realm" || exit 1
+        inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
+        temp_dir="$(mktemp -d /tmp/realm.build-node.XXXX)" || exit 1
+        (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
+        (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+
+        cp tools/LICENSE "$node_directory" || exit 1
+        if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
+            command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
+            pandoc -f markdown -t plain -o "$node_directory/release_notes.txt" release_notes.md || exit 1
+        fi
+
+        realm_version="$(sh build.sh get-version)" || exit
+        dir_name="core-$realm_version"
+        file_name="realm-core-node-$CURRENT_PLATFORM-$realm_version.tar.gz"
+        tar_files='librealm*'
+
+        echo "Create tar.gz file $file_name"
+        rm -f "$REALM_HOME/$file_name" || exit 1
+        (cd "$REALM_HOME/$NODE_DIR" && tar czf "$REALM_HOME/$file_name" $dir_basename) || exit 1
+
         exit 0
         ;;
 
@@ -1095,7 +1176,7 @@ EOF
             esac
         done
 
-        sh build.sh build-iphone
+        sh build.sh build-ios
 
         TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"
@@ -2906,12 +2987,12 @@ EOF
         git clean -xfd || exit 1
 
         REALM_MAX_BPNODE_SIZE_DEBUG="4" REALM_ENABLE_ENCRYPTION="yes" sh build.sh config "$WORKSPACE/install" || exit 1
-        sh build.sh build-iphone || exit 1
+        sh build.sh build-ios || exit 1
         sh build.sh build-android || exit 1
         UNITTEST_ENCRYPT_ALL=yes sh build.sh check || exit 1
 
         REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
-        sh build.sh build-iphone || exit 1
+        sh build.sh build-ios || exit 1
         sh build.sh build-android || exit 1
         sh build.sh build || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1
