@@ -398,16 +398,16 @@ public:
     void cancel() noexcept;
 
     template<class O>
-    void get_option(O& option) const;
+    void get_option(O& opt) const;
 
     template<class O>
-    std::error_code get_option(O& option, std::error_code&) const;
+    std::error_code get_option(O& opt, std::error_code&) const;
 
     template<class O>
-    void set_option(const O& option);
+    void set_option(const O& opt);
 
     template<class O>
-    std::error_code set_option(const O& option, std::error_code&);
+    std::error_code set_option(const O& opt, std::error_code&);
 
     void bind(const endpoint&);
     std::error_code bind(const endpoint&, std::error_code&);
@@ -1583,32 +1583,32 @@ inline void socket_base::close() noexcept
 }
 
 template<class O>
-inline void socket_base::get_option(O& option) const
+inline void socket_base::get_option(O& opt) const
 {
     std::error_code ec;
-    if (get_option(option, ec))
+    if (get_option(opt, ec))
         throw std::system_error(ec);
 }
 
 template<class O>
-inline std::error_code socket_base::get_option(O& option, std::error_code& ec) const
+inline std::error_code socket_base::get_option(O& opt, std::error_code& ec) const
 {
-    option.get(*this, ec);
+    opt.get(*this, ec);
     return ec;
 }
 
 template<class O>
-inline void socket_base::set_option(const O& option)
+inline void socket_base::set_option(const O& opt)
 {
     std::error_code ec;
-    if (set_option(option, ec))
+    if (set_option(opt, ec))
         throw std::system_error(ec);
 }
 
 template<class O>
-inline std::error_code socket_base::set_option(const O& option, std::error_code& ec)
+inline std::error_code socket_base::set_option(const O& opt, std::error_code& ec)
 {
-    option.set(*this, ec);
+    opt.set(*this, ec);
     return ec;
 }
 
