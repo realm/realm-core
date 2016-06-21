@@ -3082,4 +3082,22 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
 }
 
 
+// Found by AFL (on a heavy hint from Finn that we should add a compact() instruction
+TEST(Shared_TopSizeNotEqualNine)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_write());
+
+    TableRef t = g.add_table("");
+    t->add_column(type_Double, "");
+    t->add_empty_row(241);
+    sg.commit();
+    REALM_ASSERT_RELEASE(sg.compact());
+    sg.begin_write();
+    sg.commit();
+    REALM_ASSERT_RELEASE(sg.compact());
+}
+
+
 #endif // TEST_SHARED
