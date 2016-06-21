@@ -283,6 +283,7 @@ public:
     long long num_checks = 0;
     long long num_failed_checks = 0;
     int num_ended_threads = 0;
+    int last_thread_to_end = -1;
 
     SharedContextImpl(const TestList& test_list, int num_recurrences, int num_threads,
                       util::Logger& report_logger, Reporter& r, bool aof,
@@ -315,8 +316,10 @@ public:
     }
 
     void run();
+    void nonconcur_run();
 
     void run(SharedContextImpl::Entry, UniqueLock&);
+    void finalize(UniqueLock&);
 };
 
 
@@ -377,6 +380,8 @@ bool TestList::run(Config config)
             entry.test_index = p.second;
             entry.recurrence_index = i;
             const Test& test = *entry.test;
+            // In case only one test thread was asked for, we run all tests as
+            // nonconcurrent tests to avoid reordering
             auto& tests = (test.allow_concur && num_threads > 1 ? concur_tests : no_concur_tests);
             tests.push_back(entry);
             if (num_executed_tests == std::numeric_limits<size_t>::max())
@@ -442,17 +447,29 @@ bool TestList::run(Config config)
     if (num_threads == 1) {
         ThreadContextImpl thread_context(shared_context, 0, loggers[0].get());
         thread_context.run();
+        thread_context.nonconcur_run();
     }
     else {
-        auto thread = [&](int i) {
-            ThreadContextImpl thread_context(shared_context, i, loggers[i].get());
-            thread_context.run();
-        };
-        std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
-        for (int i = 0; i != num_threads; ++i)
-            threads[i].start([=] { thread(i); });
-        for (int i = 0; i != num_threads; ++i)
-            threads[i].join();
+        std::unique_ptr<std::unique_ptr<ThreadContextImpl>[]> thread_contexts;
+        thread_contexts.reset(new std::unique_ptr<ThreadContextImpl>[num_threads]);
+        for (int i = 0; i < num_threads; ++i)
+            thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i].get()));
+
+        // First execute regular (concurrent) tests
+        {
+            auto thread = [&](int i) {
+                thread_contexts[i]->run();
+            };
+            std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
+            for (int i = 0; i < num_threads; ++i)
+                threads[i].start([=] { thread(i); });
+            for (int i = 0; i < num_threads; ++i)
+                threads[i].join();
+        }
+
+        // Then execute nonconcurrent tests on main thread
+        if (shared_context.last_thread_to_end != -1)
+            thread_contexts[shared_context.last_thread_to_end]->nonconcur_run();
     }
 
     // Summarize
@@ -483,20 +500,32 @@ void TestList::ThreadContextImpl::run()
         run(entry, lock);
     }
 
-    // When only the last test thread running, we can run the tests that cannot
-    // safely run concurrently with other threads or with itself.
-    int num_remaining_threads = shared_context.num_threads - shared_context.num_ended_threads;
-    if (num_remaining_threads == 1) {
-        for (auto entry: shared_context.no_concur_tests)
-            run(entry, lock);
+    // When only the last test thread is running, we can run the tests that
+    // cannot safely run concurrently with other threads or with itself, but
+    // this has to happen on the main thread (the one that calls
+    // TestList::run()).
+    if (!shared_context.no_concur_tests.empty()) {
+        int num_remaining_threads = shared_context.num_threads - shared_context.num_ended_threads;
+        if (num_remaining_threads == 1) {
+            // Tell the main thread which thread context to use for executing the
+            // nonconcurrent tests (nonconcur_run()).
+            shared_context.last_thread_to_end = thread_index;
+            return;
+        }
     }
 
-    shared_context.num_failed_tests  += num_failed_tests;
-    shared_context.num_checks        += num_checks;
-    shared_context.num_failed_checks += num_failed_checks;
+    finalize(lock);
+}
 
-    ++shared_context.num_ended_threads;
-    shared_context.reporter.thread_end(*this);
+
+void TestList::ThreadContextImpl::nonconcur_run()
+{
+    UniqueLock lock(shared_context.mutex);
+
+    for (auto entry: shared_context.no_concur_tests)
+        run(entry, lock);
+
+    finalize(lock);
 }
 
 
@@ -526,6 +555,17 @@ void TestList::ThreadContextImpl::run(SharedContextImpl::Entry entry, UniqueLock
 
     lock.lock();
     shared_context.reporter.end(test_context, elapsed_time);
+}
+
+
+void TestList::ThreadContextImpl::finalize(UniqueLock&)
+{
+    shared_context.num_failed_tests  += num_failed_tests;
+    shared_context.num_checks        += num_checks;
+    shared_context.num_failed_checks += num_failed_checks;
+
+    ++shared_context.num_ended_threads;
+    shared_context.reporter.thread_end(*this);
 }
 
 
