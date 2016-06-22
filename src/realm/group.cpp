@@ -97,7 +97,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
 
     static_cast<void>(current_file_format_version);
     static_cast<void>(requested_history_type_2);
-    return 5;
+    return Allocator::CURRENT_FILE_FORMAT_VERSION;
 }
 
 

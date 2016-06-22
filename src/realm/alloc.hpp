@@ -67,6 +67,8 @@ public:
 /// \sa SlabAlloc
 class Allocator {
 public:
+	static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
+
     /// The specified size must be divisible by 8, and must not be
     /// zero.
     ///
