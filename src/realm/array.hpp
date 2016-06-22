@@ -1067,7 +1067,6 @@ protected:
     virtual size_t calc_byte_len(size_t size, size_t width) const;
 
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
-    virtual WidthType GetWidthType() const { return wtype_Bits; }
 
     bool get_is_inner_bptree_node_from_header() const noexcept;
     bool get_hasrefs_from_header() const noexcept;

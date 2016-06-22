@@ -1481,7 +1481,7 @@ void StringColumn::refresh_root_accessor()
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -1653,4 +1653,4 @@ void StringColumn::do_dump_node_structure(std::ostream& out, int level) const
     m_search_index->do_dump_node_structure(out, level+1);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions
