@@ -43,13 +43,13 @@ bool wildcard_pattern::match(const char* begin, const char* end) const noexcept
 
     // Check anchored prefix card
     {
-        const card& card = m_cards.front();
-        if (size_t(end_2 - begin_2) < card.m_size)
+        const card& front_card = m_cards.front();
+        if (size_t(end_2 - begin_2) < front_card.m_size)
             return false;
-        str_iter card_begin = m_text.begin() + card.m_offset;
-        if (!equal(begin_2, begin_2 + card.m_size, card_begin))
+        str_iter card_begin = m_text.begin() + front_card.m_offset;
+        if (!equal(begin_2, begin_2 + front_card.m_size, card_begin))
             return false;
-        begin_2 += card.m_size;
+        begin_2 += front_card.m_size;
     }
 
     if (num_cards == 1)
@@ -57,24 +57,24 @@ bool wildcard_pattern::match(const char* begin, const char* end) const noexcept
 
     // Check anchored suffix card
     {
-        const card& card = m_cards.back();
-        if (size_t(end_2 - begin_2) < card.m_size)
+        const card& back_card = m_cards.back();
+        if (size_t(end_2 - begin_2) < back_card.m_size)
             return false;
-        str_iter card_begin = m_text.begin() + card.m_offset;
-        if (!equal(end_2 - card.m_size, end_2, card_begin))
+        str_iter card_begin = m_text.begin() + back_card.m_offset;
+        if (!equal(end_2 - back_card.m_size, end_2, card_begin))
             return false;
-        end_2 -= card.m_size;
+        end_2 -= back_card.m_size;
     }
 
     // Check unanchored infix cards
     for (size_t i = 1; i != num_cards-1; ++i) {
-        const card& card = m_cards[i];
-        str_iter card_begin = m_text.begin() + card.m_offset;
-        str_iter card_end   = card_begin + card.m_size;
+        const card& card_i = m_cards[i];
+        str_iter card_begin = m_text.begin() + card_i.m_offset;
+        str_iter card_end   = card_begin + card_i.m_size;
         begin_2 = search(begin_2, end_2, card_begin, card_end);
         if (begin_2 == end_2)
             return false;
-        begin_2 += card.m_size;
+        begin_2 += card_i.m_size;
     }
 
     return true;

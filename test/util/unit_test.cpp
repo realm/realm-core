@@ -256,9 +256,9 @@ public:
     long long num_failed_checks = 0;
     int num_ended_threads = 0;
 
-    SharedContextImpl(const TestList& test_list, int num_recurrences, int num_threads,
-                      util::Logger& logger, Reporter& r, bool aof):
-        SharedContext(test_list, num_recurrences, num_threads, logger),
+    SharedContextImpl(const TestList& tests, int repetitions, int threads,
+                      util::Logger& l, Reporter& r, bool aof):
+        SharedContext(tests, repetitions, threads, l),
         reporter(r),
         abort_on_failure(aof)
     {
@@ -276,8 +276,8 @@ public:
     long num_failed_tests = 0;
     bool errors_seen;
 
-    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* logger):
-        ThreadContext(sc, ti, logger ? *logger : sc.logger),
+    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger):
+        ThreadContext(sc, ti, attached_logger ? *attached_logger : sc.logger),
         shared_context(sc)
     {
     }

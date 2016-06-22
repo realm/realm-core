@@ -893,11 +893,11 @@ TEST(ColumnString_SetNullThrowsUnlessNullable)
     size_t keys, values;
     bool res = c.auto_enumerate(keys, values, true);
     CHECK(res);
-    StringEnumColumn e{Allocator::get_default(), values, keys, false};
-    CHECK_LOGIC_ERROR(e.set_null(0), LogicError::column_not_nullable);
+    StringEnumColumn enum_column{Allocator::get_default(), values, keys, false};
+    CHECK_LOGIC_ERROR(enum_column.set_null(0), LogicError::column_not_nullable);
 
     c.destroy();
-    e.destroy();
+    enum_column.destroy();
 }
 
 
