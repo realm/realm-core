@@ -99,6 +99,10 @@ TEST(LangBindHelper_SetSubtable)
     CHECK_EQUAL(t2.get_column_count(), sub->get_column_count());
     CHECK_EQUAL(t2.size(), sub->size());
     CHECK(t2 == *sub);
+
+    Table* table_ptr = LangBindHelper::get_subtable_ptr_during_insert(&t1, 0, 0);
+    CHECK(table_ptr == sub);
+    LangBindHelper::unbind_table_ptr(table_ptr);
 }
 
 
@@ -12205,5 +12209,20 @@ TEST(LangbindHelper_BoolSearchIndexCommitPromote)
     t->remove(8);
 }
 
+TEST(LangbindHelper_GetDataTypeName)
+{
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Int), "int"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Bool), "bool"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Float), "float"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Double), "double"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_String), "string"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Binary), "binary"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_OldDateTime), "date"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Timestamp), "timestamp"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Table), "table"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Mixed), "mixed"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Link), "link"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_LinkList), "linklist"));
+}
 
 #endif

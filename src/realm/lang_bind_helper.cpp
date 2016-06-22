@@ -31,6 +31,6 @@ const char* LangBindHelper::get_data_type_name(DataType type) noexcept
         case type_Link:        return "link";
         case type_LinkList:    return "linklist";
     }
-    REALM_ASSERT(false);
-    return "int";
+
+    return "unknown";   // LCOV_EXCL_LINE
 }
