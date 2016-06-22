@@ -957,7 +957,7 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
 
     Allocator& alloc = m_row_indexes.get_alloc();
     MemRef mem = tv.m_row_indexes.get_root_array()->clone_deep(alloc); // Throws
-    _impl::DeepArrayRefDestroyGuard ref_guard(mem.m_ref, alloc);
+    _impl::DeepArrayRefDestroyGuard ref_guard(mem.get_ref(), alloc);
     m_row_indexes.destroy();
     m_row_indexes.get_root_array()->init_from_mem(mem);
     ref_guard.release();
