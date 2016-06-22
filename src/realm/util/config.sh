@@ -73,6 +73,13 @@ else
     enable_assertions="0"
 fi
 
+enable_memdebug="$(get_config_param "ENABLE_MEMDEBUG")" || exit 1
+if [ "$enable_memdebug" = "yes" ]; then
+    enable_memdebug="1"
+else
+    enable_memdebug="0"
+fi
+
 cat >"$target" <<EOF
 /*************************************************************************
  *
@@ -100,4 +107,5 @@ cat >"$target" <<EOF
 #define REALM_ENABLE_ALLOC_SET_ZERO $enable_alloc_set_zero
 #define REALM_ENABLE_ENCRYPTION     $enable_encryption
 #define REALM_ENABLE_ASSERTIONS     $enable_assertions
+#define REALM_ENABLE_MEMDEBUG       $enable_memdebug
 EOF
