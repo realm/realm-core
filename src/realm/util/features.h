@@ -116,6 +116,12 @@
 #  define REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE()
 #endif
 
+#ifdef _MSC_VER
+#  define REALM_DIAG_IGNORE_UNSIGNED_MINUS() REALM_PRAGMA(warning(disable:4146)) 
+#else
+#  define REALM_DIAG_IGNORE_UNSIGNED_MINUS() 
+#endif
+
 /* Compiler is MSVC (Microsoft Visual C++) */
 #if defined(_MSC_VER) && _MSC_VER >= 1600
 #  define REALM_HAVE_AT_LEAST_MSVC_10_2010 1
