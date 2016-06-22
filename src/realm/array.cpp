@@ -2105,7 +2105,7 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void Array::print() const
 {
@@ -2242,6 +2242,7 @@ void Array::verify_bptree(LeafVerifier leaf_verifier) const
 {
     ::verify_bptree(*this, leaf_verifier);
 }
+
 
 void Array::dump_bptree_structure(std::ostream& out, int level, LeafDumper leaf_dumper) const
 {
@@ -2477,7 +2478,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
     }
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 
 namespace {

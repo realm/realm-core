@@ -398,7 +398,7 @@ void BacklinkColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
     m_origin_column_ndx = origin_col_ndx;
 }
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -455,11 +455,10 @@ void BacklinkColumn::get_backlinks(std::vector<VerifyPair>& pairs)
     sort(pairs.begin(), pairs.end());
 }
 
-
 std::pair<ref_type, size_t> BacklinkColumn::get_to_dot_parent(size_t ndx_in_parent) const
 {
     std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
     return std::make_pair(p.first.m_ref, p.second);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions
