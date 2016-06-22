@@ -58,7 +58,7 @@ public:
 #if REALM_ENABLE_ALLOC_SET_ZERO
         std::fill(addr, addr+size, 0);
 #endif
-        return MemRef(addr, reinterpret_cast<size_t>(addr));
+        return MemRef(addr, reinterpret_cast<size_t>(addr), *this);
     }
 
     MemRef do_realloc(ref_type, const char* addr, size_t old_size,
@@ -74,7 +74,7 @@ public:
 #else
         static_cast<void>(old_size);
 #endif
-        return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
+        return MemRef(new_addr, reinterpret_cast<size_t>(new_addr), *this);
     }
 
     void do_free(ref_type, const char* addr) noexcept override
@@ -100,4 +100,20 @@ Allocator& Allocator::get_default() noexcept
 {
     static DefaultAllocator default_alloc;
     return default_alloc;
+}
+
+MemRef Allocator::do_realloc(ref_type ref, const char* addr, size_t old_size,
+                             size_t new_size)
+{
+    // Allocate new space
+    MemRef new_mem = do_alloc(new_size); // Throws
+
+    // Copy existing contents
+    char* new_addr = new_mem.get_addr();
+    std::copy(addr, addr+old_size, new_addr);
+
+    // Free old chunk
+    do_free(ref, addr);
+
+    return new_mem;
 }
