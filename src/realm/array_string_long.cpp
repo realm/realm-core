@@ -226,16 +226,16 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         bool context_flag = false;
         int_fast64_t value = 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
     {
         size_t blobs_size = 0;
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
@@ -244,8 +244,8 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         bool context_flag = false;
         int64_t value = 0; // initialize all rows to realm::null()
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
