@@ -242,10 +242,10 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         // Is there room in the list?
         Array old_offsets(m_array->get_alloc());
         get_child(*m_array, 0, old_offsets);
-        REALM_ASSERT(m_array->size() == old_offsets.size()+1);
+        const size_t old_offsets_size = old_offsets.size();
+        REALM_ASSERT(m_array->size() == old_offsets_size + 1);
 
-        size_t count = old_offsets.size();
-        bool noextend = count >= REALM_MAX_BPNODE_SIZE;
+        bool noextend = old_offsets_size >= REALM_MAX_BPNODE_SIZE;
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
@@ -264,14 +264,14 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
             return NodeChange(NodeChange::insert_before, new_list.get_ref());
 
         // insert after
-        if (ndx == old_offsets.size())
+        if (ndx == old_offsets_size)
             return NodeChange(NodeChange::insert_after, new_list.get_ref());
 
         // split
         Array new_offsets(alloc);
         get_child(*new_list.m_array, 0, new_offsets);
         // Move items after split to new list
-        for (size_t i = ndx; i < count; ++i) {
+        for (size_t i = ndx; i < old_offsets_size; ++i) {
             int64_t v2 = old_offsets.get(i);
             int64_t v3 = m_array->get(i+1);
 
@@ -464,11 +464,11 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 void StringIndex::distinct(IntegerColumn& result) const
 {
     Allocator& alloc = m_array->get_alloc();
-    const size_t count = m_array->size();
+    const size_t m_array_size = m_array->size();
 
     // Get first matching row for every key
     if (m_array->is_inner_bptree_node()) {
-        for (size_t i = 1; i < count; ++i) {
+        for (size_t i = 1; i < m_array_size; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, 0, 0, m_target_column,
                             m_deny_duplicate_values, alloc);
@@ -476,7 +476,7 @@ void StringIndex::distinct(IntegerColumn& result) const
         }
     }
     else {
-        for (size_t i = 1; i < count; ++i) {
+        for (size_t i = 1; i < m_array_size; ++i) {
             int64_t ref = m_array->get(i);
 
             // low bit set indicate literal ref (shifted)
@@ -512,10 +512,10 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
     REALM_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
 
     Allocator& alloc = m_array->get_alloc();
-    const size_t count = m_array->size();
+    const size_t m_array_size = m_array->size();
 
     if (m_array->is_inner_bptree_node()) {
-        for (size_t i = 1; i < count; ++i) {
+        for (size_t i = 1; i < m_array_size; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, m_array.get(), i, m_target_column,
                             m_deny_duplicate_values, alloc);
@@ -523,7 +523,7 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
         }
     }
     else {
-        for (size_t i = 1; i < count; ++i) {
+        for (size_t i = 1; i < m_array_size; ++i) {
             int64_t ref = m_array->get(i);
 
             // low bit set indicate literal ref (shifted)
@@ -813,8 +813,8 @@ void StringIndex::verify_entries(const StringColumn& column) const
     ref_type results_ref = IntegerColumn::create(alloc); // Throws
     IntegerColumn results(alloc, results_ref); // Throws
 
-    size_t count = column.size();
-    for (size_t i = 0; i < count; ++i) {
+    const size_t column_size = column.size();
+    for (size_t i = 0; i < column_size; ++i) {
         StringData value = column.get(i);
 
         find_all(results, value);
