@@ -1117,7 +1117,7 @@ private:
     BacklinkColumn& get_column_backlink(size_t ndx);
 
     void instantiate_before_change();
-    void validate_column_type(const ColumnBase& column, ColumnType expected_type,
+    void validate_column_type(const ColumnBase& col, ColumnType expected_type,
                               size_t ndx) const;
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
