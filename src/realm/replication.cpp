@@ -14,13 +14,6 @@ using namespace realm;
 using namespace realm::util;
 
 
-void Replication::set_replication(Group& group, Replication* repl) noexcept
-{
-    typedef _impl::GroupFriend gf;
-    gf::set_replication(group, repl);
-}
-
-
 class Replication::TransactLogApplier {
 public:
     TransactLogApplier(Group& group):
