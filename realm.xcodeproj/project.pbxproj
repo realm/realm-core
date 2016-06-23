@@ -2773,7 +2773,12 @@
 					"-Wold-style-cast",
 					"-Wundef",
 				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"$(OTHER_CFLAGS)",
+				);
 				SDKROOT = macosx;
+				WARNING_CFLAGS = "$(inherited)";
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Debug;
@@ -2817,10 +2822,16 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wextra-semi",
-					"-Wundef",
+					"-fno-elide-constructors",
 					"-Wold-style-cast",
+					"-Wundef",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"$(OTHER_CFLAGS)",
 				);
 				SDKROOT = macosx;
+				WARNING_CFLAGS = "$(inherited)";
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Release;
