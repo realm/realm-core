@@ -101,6 +101,9 @@ public:
         // ...
     }
 
+    // Public member variables do not have a 'm_' prefix.
+    int baz;
+
 private:
     // Static member variables have prefix 's_'.
     static int s_foo;
