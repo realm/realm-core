@@ -46,7 +46,7 @@ public:
     MemRef do_alloc(size_t size) override
     {
         char* addr = static_cast<char*>(::malloc(size));
-        if (REALM_UNLIKELY(!addr)) {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!addr))) {
             REALM_ASSERT_DEBUG(errno == ENOMEM);
             throw std::bad_alloc();
         }
@@ -60,7 +60,7 @@ public:
                       size_t new_size) override
     {
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
-        if (REALM_UNLIKELY(!new_addr)) {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
             REALM_ASSERT_DEBUG(errno == ENOMEM);
             throw std::bad_alloc();
         }
@@ -95,20 +95,4 @@ Allocator& Allocator::get_default() noexcept
 {
     static DefaultAllocator default_alloc;
     return default_alloc;
-}
-
-MemRef Allocator::do_realloc(ref_type ref, const char* addr, size_t old_size,
-                             size_t new_size)
-{
-    // Allocate new space
-    MemRef new_mem = do_alloc(new_size); // Throws
-
-    // Copy existing contents
-    char* new_addr = new_mem.get_addr();
-    std::copy(addr, addr+old_size, new_addr);
-
-    // Free old chunk
-    do_free(ref, addr);
-
-    return new_mem;
 }
