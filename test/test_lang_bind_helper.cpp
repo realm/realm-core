@@ -12218,10 +12218,10 @@ ONLY(LangBindHelper_AssertionFailedSlabsEnd)
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
-    try { g.insert_table(0, "hjnskmesdjafmchdhjamdjjrantsqprgmhkntjtbhmnqffil"); } catch (const TableNameInUse&) { }
-    g.get_table(0)->insert_column(0, DataType(10), "orbnieikeqkdcgjebnriinsbpnfodqfjpojbrpfelsidfcmg", true);
+    g.add_table("hjnskmesdjafmchdhjamdjjrantsqprgmhkntjtbhmnqffil");
+    g.get_table(0)->add_column(type_Double, "orbnieikeqkdcgjebnriinsbpnfodqfjpojbrpfelsidfcmg", true);
     g.get_table(0)->insert_empty_row(0, 255);
-    g.get_table(0)->insert_column(0, DataType(10), "qrsebrlirsrroejlfppsctimaroipinkgccfcmhbpmlbklsr", true);
+    g.get_table(0)->insert_column(0, type_Double, "qrsebrlirsrroejlfppsctimaroipinkgccfcmhbpmlbklsr", true);
     sg_r.close();
     sg_w.commit();
     REALM_ASSERT_RELEASE(sg_w.compact());
