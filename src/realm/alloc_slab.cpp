@@ -154,18 +154,20 @@ void SlabAlloc::detach() noexcept
     switch (m_attach_mode) {
         case attach_None:
         case attach_UsersBuffer:
-            goto found;
+            break;
         case attach_OwnedBuffer:
             ::free(m_data);
-            goto found;
+            break;
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
-            m_file_mappings = nullptr;
-            goto found;
+            m_file_mappings.reset();
+            m_local_mappings.reset();
+            m_num_local_mappings = 0;
+            break;
+        default:
+            REALM_UNREACHABLE();
     }
-    REALM_UNREACHABLE();
-  found:
     invalidate_cache();
     m_attach_mode = attach_None;
 }
