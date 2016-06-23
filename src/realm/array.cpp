@@ -180,7 +180,7 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
-    char* header = mem.m_addr;
+    char* header = mem.get_addr();
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs             = get_hasrefs_from_header(header);
@@ -189,7 +189,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_size                 = get_size_from_header(header);
 
     // Capacity is how many items there are room for
-    bool is_read_only = m_alloc.is_read_only(mem.m_ref);
+    bool is_read_only = m_alloc.is_read_only(mem.get_ref());
     if (is_read_only) {
         m_capacity = m_size;
     }
@@ -202,9 +202,8 @@ void Array::init_from_mem(MemRef mem) noexcept
         m_capacity = calc_item_count(byte_capacity, m_width);
     }
 
-    m_ref = mem.m_ref;
+    m_ref = mem.get_ref();
     m_data = get_data_from_header(header);
-
     set_width(m_width);
 }
 
@@ -301,8 +300,8 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
         ref_type ref = to_ref(value);
         Allocator& alloc = get_alloc();
         MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
-        dg_2.reset(new_mem.m_ref);
-        value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(new_mem.get_ref());
+        value = new_mem.get_ref(); // FIXME: Dangerous cast (unsigned -> signed)
         slice.add(value); // Throws
         dg_2.release();
     }
@@ -1507,7 +1506,7 @@ size_t Array::calc_item_count(size_t bytes, size_t width) const noexcept
 
 MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
-    const char* header = mem.m_addr;
+    const char* header = mem.get_addr();
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
         // copy, which is more efficient.
@@ -1517,7 +1516,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
         // Create the new array
         MemRef clone_mem = target_alloc.alloc(size); // Throws
-        char* clone_header = clone_mem.m_addr;
+        char* clone_header = clone_mem.get_addr();
 
         // Copy contents
         const char* src_begin = header;
@@ -1560,8 +1559,8 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
         ref_type ref = to_ref(value);
         MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
-        dg_2.reset(new_mem.m_ref);
-        value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(new_mem.get_ref());
+        value = new_mem.get_ref(); // FIXME: Dangerous cast (unsigned -> signed)
         new_array.add(value); // Throws
         dg_2.release();
     }
@@ -1572,40 +1571,54 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
 void Array::copy_on_write()
 {
-    if (!m_alloc.is_read_only(m_ref))
-        return;
+#if REALM_ENABLE_MEMDEBUG
+    // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
+    // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the m_no_relocation
+    // member)
+    if (!m_no_relocation) { 
+#else        
+    if (m_alloc.is_read_only(m_ref)) {
+#endif
+        // Calculate size in bytes (plus a bit of matchcount room for expansion)
+        size_t size = calc_byte_len(m_size, m_width);
+        size_t rest = (~size & 0x7) + 1;
+        if (rest < 8)
+            size += rest; // 64bit blocks
+        size_t new_size = size + 64;
 
-    // Calculate size in bytes (plus a bit of matchcount room for expansion)
-    size_t size = calc_byte_len(m_size, m_width);
-    size_t rest = (~size & 0x7) + 1;
-    if (rest < 8)
-        size += rest; // 64bit blocks
-    size_t new_size = size + 64;
+        // Create new copy of array
+        MemRef mref = m_alloc.alloc(new_size); // Throws
+        const char* old_begin = get_header_from_data(m_data);
+        const char* old_end = get_header_from_data(m_data) + size;
+        char* new_begin = mref.get_addr();
+        std::copy(old_begin, old_end, new_begin);
 
-    // Create new copy of array
-    MemRef mref = m_alloc.alloc(new_size); // Throws
-    const char* old_begin = get_header_from_data(m_data);
-    const char* old_end   = get_header_from_data(m_data) + size;
-    char* new_begin = mref.m_addr;
-    std::copy(old_begin, old_end, new_begin);
+        ref_type old_ref = m_ref;
 
-    ref_type old_ref = m_ref;
+        // Update internal data
+        m_ref = mref.get_ref();
+        m_data = get_data_from_header(new_begin);
+        m_capacity = calc_item_count(new_size, m_width);
+        REALM_ASSERT_DEBUG(m_capacity > 0);
 
-    // Update internal data
-    m_ref = mref.m_ref;
-    m_data = get_data_from_header(new_begin);
-    m_capacity = calc_item_count(new_size, m_width);
-    REALM_ASSERT_DEBUG(m_capacity > 0);
+        // Update capacity in header. Uses m_data to find header, so
+        // m_data must be initialized correctly first.
+        set_header_capacity(new_size);
 
-    // Update capacity in header. Uses m_data to find header, so
-    // m_data must be initialized correctly first.
-    set_header_capacity(new_size);
+        update_parent();
 
-    update_parent();
+#if REALM_ENABLE_MEMDEBUG
+        if (!m_alloc.is_read_only(old_ref)) {
+            // Overwrite free'd array with 0x77. We cannot overwrite the header because free_() needs to know the size
+            // of the allocated block in order to free it. This size is computed from the width and size header fields.
+            memset(const_cast<char*>(old_begin) + header_size, 0x77, old_end - old_begin - header_size);
+        }
+#endif
 
-    // Mark original as deleted, so that the space can be reclaimed in
-    // future commits, when no versions are using it anymore
-    m_alloc.free_(old_ref, old_begin);
+        // Mark original as deleted, so that the space can be reclaimed in
+        // future commits, when no versions are using it anymore
+        m_alloc.free_(old_ref, old_begin);
+    }
 }
 
 
@@ -1713,7 +1726,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     // address of that member
     size_t byte_size = std::max(byte_size_0, initial_capacity+0);
     MemRef mem = alloc.alloc(byte_size); // Throws
-    char* header = mem.m_addr;
+    char* header = mem.get_addr();
 
     init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type,
                 width, size, byte_size);
@@ -1768,13 +1781,14 @@ void Array::alloc(size_t size, size_t width)
             char* header = get_header_from_data(m_data);
             MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes,
                                               capacity_bytes); // Throws
-            header = mem_ref.m_addr;
+            
+            header = mem_ref.get_addr();
             set_header_width(int(width), header);
             set_header_size(size, header);
             set_header_capacity(capacity_bytes, header);
 
             // Update this accessor and its ancestors
-            m_ref      = mem_ref.m_ref;
+            m_ref      = mem_ref.get_ref();
             m_data     = get_data_from_header(header);
             m_capacity = calc_item_count(capacity_bytes, width);
             // FIXME: Trouble when this one throws. We will then leave
@@ -2104,8 +2118,7 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
     return new_leaf.get_ref();
 }
 
-
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void Array::print() const
 {
@@ -2191,7 +2204,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         size_t elems_in_child;
         int leaf_level_of_child;
         if (child_is_leaf) {
-            elems_in_child = (*leaf_verifier)(MemRef(child_header, child_ref), alloc);
+            elems_in_child = (*leaf_verifier)(MemRef(child_header, child_ref, alloc), alloc);
             // Verify invar:bptree-nonempty-leaf
             REALM_ASSERT_3(elems_in_child, >= , 1);
             leaf_level_of_child = 0;
@@ -2242,6 +2255,7 @@ void Array::verify_bptree(LeafVerifier leaf_verifier) const
 {
     ::verify_bptree(*this, leaf_verifier);
 }
+
 
 void Array::dump_bptree_structure(std::ostream& out, int level, LeafDumper leaf_dumper) const
 {
@@ -2457,7 +2471,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         char* header = m_alloc.translate(ref);
         bool has_refs = get_hasrefs_from_header(header);
         if (has_refs) {
-            MemRef mem(header, ref);
+            MemRef mem(header, ref, m_alloc);
             subarray.init_from_mem(mem);
             subarray.report_memory_usage_2(handler);
             used = subarray.get_byte_size();
@@ -2477,7 +2491,7 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
     }
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 
 namespace {
@@ -3103,7 +3117,7 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
     child_info.m_mem = MemRef(node.get_as_ref(child_info.m_ndx_in_parent), alloc);
     child_info.m_offset = child_offset;
     bool children_are_leaves =
-        !Array::get_is_inner_bptree_node_from_header(child_info.m_mem.m_addr);
+        !Array::get_is_inner_bptree_node_from_header(child_info.m_mem.get_addr());
     for (;;) {
         child_info.m_size = elems_per_child;
         bool is_last_child = child_ndx == num_children - 1;
@@ -3167,7 +3181,7 @@ void simplified_foreach_bptree_leaf(Array& node, Handler handler)
     child_info.m_offset = 0;
     child_info.m_size   = 0;
     bool children_are_leaves =
-        !Array::get_is_inner_bptree_node_from_header(child_info.m_mem.m_addr);
+        !Array::get_is_inner_bptree_node_from_header(child_info.m_mem.get_addr());
     for (;;) {
         if (children_are_leaves) {
             const Array::NodeInfo& const_child_info = child_info;
@@ -3205,7 +3219,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
 {
     MemRef mem_2 = mem;
     for (;;) {
-        const char* header = mem_2.m_addr;
+        const char* header = mem_2.get_addr();
         bool is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
         if (is_leaf) {
             handler.destroy_leaf(mem_2);
@@ -3221,8 +3235,8 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
 
         destroy_inner_bptree_node(mem_2, first_value, alloc);
 
-        mem_2.m_ref  = child_ref;
-        mem_2.m_addr = alloc.translate(child_ref);
+        mem_2.set_ref(child_ref);
+        mem_2.set_addr(alloc.translate(child_ref));
         // inform encryption layer on next loop iteration
     }
 }
@@ -3233,7 +3247,7 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
 {
     Allocator& alloc = root->get_alloc();
     char* child_header = alloc.translate(child_ref);
-    MemRef child_mem(child_header, child_ref);
+    MemRef child_mem(child_header, child_ref, alloc);
     bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         handler.replace_root_by_leaf(child_mem); // Throws
@@ -3304,7 +3318,7 @@ std::pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const noexcept
         char* child_header = m_alloc.translate(child_ref);
         bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
-            MemRef mem(child_header, child_ref);
+            MemRef mem(child_header, child_ref, m_alloc);
             return std::make_pair(mem, ndx_in_child);
         }
         ndx_2 = ndx_in_child;
@@ -3381,7 +3395,7 @@ void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
     size_t child_ref_ndx = 1 + child_ndx;
     ref_type child_ref = get_as_ref(child_ref_ndx);
     char* child_header = m_alloc.translate(child_ref);
-    MemRef child_mem(child_header, child_ref);
+    MemRef child_mem(child_header, child_ref, m_alloc);
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         handler.update(child_mem, this, child_ref_ndx, ndx_in_child); // Throws
@@ -3428,7 +3442,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
         destroy_inner_bptree_node(root_mem, first_value, alloc);
         char* child_header = alloc.translate(child_ref);
         // destroy_singlet.... will take care of informing the encryption layer
-        MemRef child_mem(child_header, child_ref);
+        MemRef child_mem(child_header, child_ref, alloc);
         destroy_singlet_bptree_branch(child_mem, alloc, handler);
         return;
     }
@@ -3493,7 +3507,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
     size_t child_ref_ndx = 1 + child_ndx;
     ref_type child_ref = get_as_ref(child_ref_ndx);
     char* child_header = m_alloc.translate(child_ref);
-    MemRef child_mem(child_header, child_ref);
+    MemRef child_mem(child_header, child_ref, m_alloc);
     bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     bool destroy_child;
     if (child_is_leaf) {
@@ -3516,7 +3530,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
         child_ref = get_as_ref(child_ref_ndx);
         child_header = m_alloc.translate(child_ref);
         // destroy_singlet.... will take care of informing the encryption layer
-        child_mem = MemRef(child_header, child_ref);
+        child_mem = MemRef(child_header, child_ref, m_alloc);
         erase(child_ref_ndx); // Throws
         destroy_singlet_bptree_branch(child_mem, m_alloc, handler);
         // If the erased element is the last one, we did not attach

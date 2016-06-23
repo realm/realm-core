@@ -97,7 +97,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
 
     static_cast<void>(current_file_format_version);
     static_cast<void>(requested_history_type_2);
-    return 5;
+    return Allocator::CURRENT_FILE_FORMAT_VERSION;
 }
 
 
@@ -1856,7 +1856,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -2177,9 +2177,10 @@ void Group::to_dot(const char* file_path) const
     to_dot(out);
 }
 
+
 std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 {
     return std::make_pair(m_tables.get_ref(), ndx_in_parent);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions
