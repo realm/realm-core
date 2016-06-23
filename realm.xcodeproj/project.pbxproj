@@ -2848,7 +2848,6 @@
 					"$(PROJECT_DIR)/src/realm",
 				);
 				PRODUCT_NAME = realm;
-				WARNING_CFLAGS = "";
 			};
 			name = Debug;
 		};
@@ -2862,7 +2861,6 @@
 					"$(PROJECT_DIR)/src/realm",
 				);
 				PRODUCT_NAME = realm;
-				WARNING_CFLAGS = "";
 			};
 			name = Release;
 		};
