@@ -92,8 +92,6 @@ const char* file_order[] = {
     "test_link_query_view.cpp",
     "test_json.cpp",
     "test_replication*.cpp",
-    "test_transform.cpp",
-    "test_sync.cpp",
 
     "test_lang_bind_helper.cpp",
 
@@ -210,6 +208,12 @@ void display_build_config()
     const char* with_debug =
         Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
 
+#if REALM_ENABLE_MEMDEBUG
+    const char* memdebug = "Enabled";
+#else
+    const char* memdebug = "Disabled";
+#endif
+
 #if REALM_ENABLE_ENCRYPTION
     bool always_encrypt = is_always_encrypt_enabled();
     const char* encryption = always_encrypt ?
@@ -242,6 +246,7 @@ void display_build_config()
         "Encryption: "<<encryption<<"\n"
         "\n"
         "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
+        "REALM_MEMDEBUG = " << memdebug << "\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
@@ -428,6 +433,20 @@ bool run_tests(util::Logger* logger)
         filter.reset(create_wildcard_filter(filter_str));
     config.filter = filter.get();
 
+    // Set intra test log level threshold
+    {
+        const char* str = getenv("UNITTEST_LOG_LEVEL");
+        if (str && strlen(str) != 0) {
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+            in >> config.intra_test_log_level;
+            bool bad = !in || in.get() != std::char_traits<char>::eof();
+            if (bad)
+                throw std::runtime_error("Bad intra test log level");
+        }
+    }
+
     // Set up per-thread file logging
     {
         const char* str = getenv("UNITTEST_LOG_TO_FILES");
@@ -475,10 +494,12 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     // error messages.
     std::cout.setf(std::ios::unitbuf);
 
+#ifndef REALM_COVER
     // No need to synchronize file changes to physical medium in the test suite,
     // as that would only make a difference if the entire system crashes,
     // e.g. due to power off.
     disable_sync_to_disk();
+#endif
 
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 

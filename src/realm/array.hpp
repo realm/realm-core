@@ -45,7 +45,6 @@ Searching: The main finding function is:
 #include <utility>
 #include <vector>
 #include <ostream>
-#include <sstream>
 
 #include <stdint.h> // unint8_t etc
 
@@ -159,30 +158,13 @@ namespace _impl { class ArrayWriterBase; }
 
 
 #ifdef REALM_DEBUG
-class MemStats {
-public:
-    MemStats():
-        allocated(0),
-        used(0),
-        array_count(0)
-    {
-    }
-    size_t allocated;
-    size_t used;
-    size_t array_count;
+struct MemStats {
+    size_t allocated = 0;
+    size_t used = 0;
+    size_t array_count = 0;
 };
 template<class C, class T>
-std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats)
-{
-    std::ostringstream out_2;
-    out_2.setf(std::ios::fixed);
-    out_2.precision(1);
-    double used_percent = 100.0 * stats.used / stats.allocated;
-    out_2 << "allocated = "<<stats.allocated<<", used = "<<stats.used<<" ("<<used_percent<<"%), "
-        "array_count = "<<stats.array_count;
-    out << out_2.str();
-    return out;
-}
+std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats);
 #endif
 
 
@@ -1085,7 +1067,6 @@ protected:
     virtual size_t calc_byte_len(size_t size, size_t width) const;
 
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
-    virtual WidthType GetWidthType() const { return wtype_Bits; }
 
     bool get_is_inner_bptree_node_from_header() const noexcept;
     bool get_hasrefs_from_header() const noexcept;
@@ -1222,6 +1203,13 @@ public:
     // FIXME: Should not be public
     char* m_data = nullptr; // Points to first byte after header
 
+#if REALM_ENABLE_MEMDEBUG
+    // If m_no_relocation is false, then copy_on_write() will always relocate this array, regardless if it's
+    // required or not. If it's true, then it will never relocate, which is currently only expeted inside 
+    // GroupWriter::write_group() due to a unique chicken/egg problem (see description there).
+    bool m_no_relocation = false;
+#endif
+
 protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
@@ -1234,6 +1222,7 @@ private:
     size_t m_ref;
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
+
 protected:
     uint_least8_t m_width = 0;  // Size of an element (meaning depend on type of array).
     bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
@@ -1243,6 +1232,7 @@ protected:
 private:
     ref_type do_write_shallow(_impl::ArrayWriterBase&) const;
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
+    static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept;
 
     friend class SlabAlloc;
     friend class GroupWriter;
@@ -1571,7 +1561,7 @@ inline void Array::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
-    init_from_mem(MemRef(header, ref));
+    init_from_mem(MemRef(header, ref, m_alloc));
 }
 
 
@@ -1694,7 +1684,7 @@ inline ref_type Array::get_ref() const noexcept
 
 inline MemRef Array::get_mem() const noexcept
 {
-    return MemRef(get_header_from_data(m_data), m_ref);
+    return MemRef(get_header_from_data(m_data), m_ref, m_alloc);
 }
 
 inline void Array::destroy() noexcept
@@ -1803,7 +1793,7 @@ inline void Array::destroy_deep(ref_type ref, Allocator& alloc) noexcept
 
 inline void Array::destroy_deep(MemRef mem, Allocator& alloc) noexcept
 {
-    if (!get_hasrefs_from_header(mem.m_addr)) {
+    if (!get_hasrefs_from_header(mem.get_addr())) {
         alloc.free_(mem);
         return;
     }
@@ -2035,44 +2025,40 @@ inline char* Array::get_header() noexcept
     return get_header_from_data(m_data);
 }
 
+inline size_t Array::calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
+{
+    size_t num_bytes = 0;
+    switch (wtype) {
+        case wtype_Bits: {
+            // Current assumption is that size is at most 2^24 and that width is at most 64.
+            // In that case the following will never overflow. (Assuming that size_t is at least 32 bits)
+            REALM_ASSERT_3(size, <, 0x1000000);
+            size_t num_bits = size * width;
+            num_bytes = (num_bits + 7) >> 3;
+            break;
+        }
+        case wtype_Multiply: {
+            num_bytes = size * width;
+            break;
+        }
+        case wtype_Ignore:
+            num_bytes = size;
+            break;
+    }
+
+    // Ensure 8-byte alignment
+    num_bytes = (num_bytes + 7) & ~size_t(7);
+
+    num_bytes += header_size;
+
+    return num_bytes;
+}
 
 inline size_t Array::get_byte_size() const noexcept
 {
-    size_t num_bytes = 0;
     const char* header = get_header_from_data(m_data);
-    switch (get_wtype_from_header(header)) {
-        case wtype_Bits: {
-            // FIXME: The following arithmetic could overflow, that
-            // is, even though both the total number of elements and
-            // the total number of bytes can be represented in
-            // uint_fast64_t, the total number of bits may not
-            // fit. Note that "num_bytes = width < 8 ? size / (8 /
-            // width) : size * (width / 8)" would be guaranteed to
-            // never overflow, but it potentially involves two slow
-            // divisions.
-            uint_fast64_t num_bits = uint_fast64_t(m_size) * m_width;
-            num_bytes = size_t(num_bits / 8);
-            if (num_bits & 0x7)
-                ++num_bytes;
-            goto found;
-        }
-        case wtype_Multiply: {
-            num_bytes = m_size * m_width;
-            goto found;
-        }
-        case wtype_Ignore:
-            num_bytes = m_size;
-            goto found;
-    }
-    REALM_ASSERT_DEBUG(false);
-
-  found:
-    // Ensure 8-byte alignment
-    size_t rest = (~num_bytes & 0x7) + 1;
-    if (rest < 8)
-        num_bytes += rest;
-
-    num_bytes += header_size;
+    WidthType wtype = get_wtype_from_header(header);
+    size_t num_bytes = calc_byte_size(wtype, m_size, m_width);
 
     REALM_ASSERT_7(m_alloc.is_read_only(m_ref), ==, true, ||,
                    num_bytes, <=, get_capacity_from_header(header));
@@ -2083,35 +2069,10 @@ inline size_t Array::get_byte_size() const noexcept
 
 inline size_t Array::get_byte_size_from_header(const char* header) noexcept
 {
-    size_t num_bytes = 0;
     size_t size = get_size_from_header(header);
-    switch (get_wtype_from_header(header)) {
-        case wtype_Bits: {
-            size_t width = get_width_from_header(header);
-            size_t num_bits = (size * width); // FIXME: Prone to overflow
-            num_bytes = num_bits / 8;
-            if (num_bits & 0x7)
-                ++num_bytes;
-            goto found;
-        }
-        case wtype_Multiply: {
-            size_t width = get_width_from_header(header);
-            num_bytes = size * width;
-            goto found;
-        }
-        case wtype_Ignore:
-            num_bytes = size;
-            goto found;
-    }
-    REALM_ASSERT_DEBUG(false);
-
-  found:
-    // Ensure 8-byte alignment
-    size_t rest = (~num_bytes & 0x7) + 1;
-    if (rest < 8)
-        num_bytes += rest;
-
-    num_bytes += header_size;
+    size_t width = get_width_from_header(header);
+    WidthType wtype = get_wtype_from_header(header);
+    size_t num_bytes = calc_byte_size(wtype, size, width);
 
     return num_bytes;
 }
@@ -2140,7 +2101,7 @@ inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has
 inline MemRef Array::clone_deep(Allocator& target_alloc) const
 {
     char* header = get_header_from_data(m_data);
-    return clone(MemRef(header, m_ref), m_alloc, target_alloc); // Throws
+    return clone(MemRef(header, m_ref, m_alloc), m_alloc, target_alloc); // Throws
 }
 
 inline void Array::move_assign(Array& a) noexcept
@@ -2325,12 +2286,12 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
     if (child_is_leaf) {
         size_t elem_ndx_in_child = npos; // Append
         new_sibling_ref =
-            TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
+            TreeTraits::leaf_insert(MemRef(child_header, child_ref, m_alloc), childs_parent,
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
     }
     else {
         Array child(m_alloc);
-        child.init_from_mem(MemRef(child_header, child_ref));
+        child.init_from_mem(MemRef(child_header, child_ref, m_alloc));
         child.set_parent(&childs_parent, child_ref_ndx);
         new_sibling_ref = child.bptree_append(state); // Throws
     }
@@ -2391,12 +2352,12 @@ ref_type Array::bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state)
     if (child_is_leaf) {
         REALM_ASSERT_3(elem_ndx_in_child, <=, REALM_MAX_BPNODE_SIZE);
         new_sibling_ref =
-            TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
+            TreeTraits::leaf_insert(MemRef(child_header, child_ref, m_alloc), childs_parent,
                                     child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
     }
     else {
         Array child(m_alloc);
-        child.init_from_mem(MemRef(child_header, child_ref));
+        child.init_from_mem(MemRef(child_header, child_ref, m_alloc));
         child.set_parent(&childs_parent, child_ref_ndx);
         new_sibling_ref = child.bptree_insert(elem_ndx_in_child, state); // Throws
     }

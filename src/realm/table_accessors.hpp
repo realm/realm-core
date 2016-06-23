@@ -1347,7 +1347,7 @@ public:
     {
         Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
-    };
+    }
 
     int64_t sum(size_t* resultcount = nullptr, size_t start = 0,
                 size_t end = size_t(-1), size_t limit=size_t(-1)) const
@@ -1418,7 +1418,7 @@ public:
     {
         Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
-    };
+    }
 
     double sum(size_t* resultcount = nullptr, size_t start = 0,
                size_t end = size_t(-1), size_t limit=size_t(-1)) const
@@ -1489,7 +1489,7 @@ public:
     {
         Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
-    };
+    }
 
     double sum(size_t* resultcount = nullptr, size_t start = 0,
                size_t end = size_t(-1), size_t limit=size_t(-1)) const
@@ -1599,7 +1599,7 @@ public:
     {
         Base::m_query->m_impl.between_olddatetime(col_idx, from, to);
         return *Base::m_query;
-    };
+    }
 
     OldDateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
                  size_t end = size_t(-1), size_t limit=size_t(-1),

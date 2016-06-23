@@ -95,8 +95,8 @@ public:
     version_type do_prepare_commit(version_type) override;
     void do_finalize_commit() noexcept override;
     void do_abort_transact() noexcept override;
-    void do_interrupt() noexcept override {};
-    void do_clear_interrupt() noexcept override {};
+    void do_interrupt() noexcept override {}
+    void do_clear_interrupt() noexcept override {}
     void commit_log_close() noexcept override;
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
@@ -390,9 +390,6 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
     File::try_remove(log.name);
     log.file.open(log.name, File::mode_Write);
     log.file.resize(minimal_pages * page_size); // Throws
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        log.file.sync(); // Throws
     log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
     log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
 }
@@ -404,9 +401,6 @@ void WriteLogCollector::reset_header()
 
     File header_file(m_header_name, File::mode_Write);
     header_file.resize(sizeof (CommitLogHeader)); // Throws
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        header_file.sync(); // Throws
     m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
     m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
 }
@@ -456,9 +450,6 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
             m_header.get_addr()->mmap_counter++;
             active_log->map.unmap();
             active_log->file.resize(size); // Throws
-            bool disable_sync = get_disable_sync_to_disk();
-            if (!disable_sync)
-                active_log->file.sync(); // Throws
         }
     }
 }
@@ -483,9 +474,6 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     if (size_needed > active_log->file.get_size()) {
         m_header.get_addr()->mmap_counter++;
         active_log->file.resize(size_needed); // Throws
-        bool disable_sync = get_disable_sync_to_disk();
-        if (!disable_sync)
-            active_log->file.sync(); // Throws
     }
 
     // create/update mapping so that we are sure it covers the file we are about
@@ -546,9 +534,6 @@ void WriteLogCollector::initiate_session(version_type version)
     // This protects us against deadlock when we restart after crash on a
     // platform without support for robust mutexes.
     new (& m_header.get_addr()->shared_part_of_lock) InterprocessMutex::SharedPart();
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        m_header.sync(); // Throws
 }
 
 

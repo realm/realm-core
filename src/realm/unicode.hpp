@@ -147,7 +147,6 @@ namespace realm {
     size_t search_case_fold(StringData haystack, const char* needle_upper,
         const char* needle_lower, size_t needle_size);
 
-
 } // namespace realm
 
 #endif // REALM_UNICODE_HPP

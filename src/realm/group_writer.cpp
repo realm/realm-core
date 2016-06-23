@@ -1,5 +1,8 @@
 #include <algorithm>
-#include <iostream>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
 
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -210,6 +213,11 @@ ref_type GroupWriter::write_group()
     size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
     int_fast64_t value_4 = int_fast64_t(reserve_pos + max_free_space_needed); // FIXME: Problematic unsigned -> signed conversion
+
+#if REALM_ENABLE_MEMDEBUG
+    m_free_positions.m_no_relocation = true;
+    m_free_lengths.m_no_relocation = true;
+#endif
 
     // Ensure that this arrays does not reposition itself
     m_free_positions.ensure_minimum_width(value_4); // Throws

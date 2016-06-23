@@ -3,10 +3,13 @@
 
 #include <streambuf>
 #include <fstream>
+#include <tuple>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
 #  include <unistd.h>
+#  include <sys/mman.h>
+#  include <sys/types.h>
 #  include <sys/wait.h>
 #  include <signal.h>
 #  include <sched.h>
@@ -2951,6 +2954,71 @@ TEST(Shared_VersionOfBoundSnapshot)
     }
 }
 
+#if !defined(_WIN32)
+// Check what happens when Realm cannot allocate more virtual memory
+// We should throw an AddressSpaceExhausted exception.
+// This will try to use all available memory allowed for this process
+// so don't run it concurrently with other tests.
+NONCONCURRENT_TEST(Shared_OutOfMemory)
+{
+    size_t string_length = 1024 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_String, "string_col");
+        std::string long_string(string_length, 'a');
+        table->add_empty_row();
+        table->set_string(0, 0, long_string);
+        wt.commit();
+    }
+    sg.close();
+
+    std::vector<std::pair<char*, size_t>> memory_list;
+    // Reserve enough for 500 Gb, but in practice the vector is only ever around size 10.
+    // Do this here to avoid the (small) chance that adding to the vector will request new virtual memory
+    memory_list.reserve(500);
+    size_t chunk_size = 1024 * 1024 * 1024;
+    while (chunk_size > string_length) {
+        void* addr = ::mmap(nullptr, chunk_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+        if (addr == MAP_FAILED) {
+            chunk_size /= 2;
+        }
+        else {
+            memory_list.push_back(std::pair<char*,size_t>((char*)addr, chunk_size));
+        }
+    }
+
+    bool expected_exception_caught = false;
+
+    // Attempt to open Realm, should fail because we hold too much already.
+    try {
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    }
+    catch (AddressSpaceExhausted& e) {
+        expected_exception_caught = true;
+    }
+
+    CHECK(expected_exception_caught);
+
+    // Release memory manually.
+    for (auto it = memory_list.begin(); it != memory_list.end(); ++it) {
+        ::munmap(it->first, it->second);
+    }
+
+    // Realm should succeed to open now.
+    expected_exception_caught = false;
+    try {
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    }
+    catch (AddressSpaceExhausted& e) {
+        expected_exception_caught = true;
+    }
+    CHECK(!expected_exception_caught);
+}
+#endif // win32
+
 // Run some (repeatable) random checks through the fuzz tester.
 // For a comprehensive fuzz test, afl should be run. To do this see test/fuzzy/README.md
 // If this check fails for some reason, you can find the problem by changing
@@ -3013,5 +3081,63 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
 }
 
+// Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
+NONCONCURRENT_TEST(Shared_BigAllocations)
+{
+    // String length at 2K will not trigger the error.
+    // all lengths >= 4K (that were tried) trigger the error
+    size_t string_length = 4 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    std::string long_string(string_length, 'a');
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    {
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.add_table("table");
+            table->add_column(type_String, "string_col");
+            table->add_empty_row();
+            table->set_string(0, 0, long_string);
+            wt.commit();
+        }
+        sg.compact(); // <- required to provoke subsequent failures
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().verify();
+            TableRef table = wt.get_table("table");
+            table->set_string(0, 0, long_string);
+            wt.get_group().verify();
+            wt.commit();
+        }
+    }
+    {
+        WriteTransaction wt(sg); // <---- fails here
+        wt.get_group().verify();
+        TableRef table = wt.get_table("table");
+        table->set_string(0, 0, long_string);
+        wt.get_group().verify();
+        wt.commit();
+    }
+    sg.close();
+}
 
+// Found by AFL (on a heavy hint from Finn that we should add a compact() instruction
+NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_write());
+
+    TableRef t = g.add_table("");
+    t->add_column(type_Double, "");
+    t->add_empty_row(241);
+    sg.commit();
+    REALM_ASSERT_RELEASE(sg.compact());
+    SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    sg2.begin_write();
+    sg2.commit();
+    sg2.begin_read(); // <- does not fail
+    SharedGroup sg3(path, false, SharedGroup::durability_Full, crypt_key());
+    sg3.begin_read(); // <- does not fail
+    sg.begin_read(); // <- does fail
+}
 #endif // TEST_SHARED

@@ -91,10 +91,7 @@ public:
             throw std::runtime_error("Already connected");
         // Discard buffered input from when the connection was last established
         m_input_stream.reset();
-        std::stringstream out;
-        out.imbue(std::locale::classic());
-        out << port;
-        network::resolver::query query{host, out.str()};
+        network::resolver::query query{host, util::to_string(port)};
         network::resolver resolver{m_socket.service()};
         // FIXME: Avoid synchronous DNS lookup
         std::error_code ec;

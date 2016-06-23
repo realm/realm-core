@@ -44,8 +44,8 @@ OSX_DIR="macosx-lib"
 
 IPHONE_EXTENSIONS="objc"
 IPHONE_SDKS="iphoneos iphonesimulator"
-IPHONE_DIR="ios-lib"
-IPHONE_NO_BITCODE_DIR="ios-no-bitcode-lib"
+IOS_DIR="ios-lib"
+IOS_NO_BITCODE_DIR="ios-no-bitcode-lib"
 
 WATCHOS_SDKS="watchos watchsimulator"
 WATCHOS_DIR="watchos-lib"
@@ -53,14 +53,22 @@ WATCHOS_DIR="watchos-lib"
 TVOS_SDKS="appletvos appletvsimulator"
 TVOS_DIR="tvos-lib"
 
-: ${REALM_COCOA_PLATFORMS:="osx iphone watchos tvos"}
-: ${REALM_DOTNET_COCOA_PLATFORMS:="iphone-no-bitcode"}
+: ${REALM_COCOA_PLATFORMS:="osx ios watchos tvos"}
+: ${REALM_DOTNET_COCOA_PLATFORMS:="ios-no-bitcode"}
 
 ANDROID_DIR="android-lib"
 ANDROID_PLATFORMS="arm arm-v7a arm64 mips x86 x86_64"
 
-CONFIG_VERSION=1
+NODE_DIR="node-lib"
 
+CONFIG_VERSION=1
+CURRENT_PLATFORM="win"
+if [ "`uname`" = "Darwin" ]; then
+  CURRENT_PLATFORM="osx"
+fi
+if [ "`uname`" = "Linux" ]; then
+  CURRENT_PLATFORM="linux"
+fi
 
 usage()
 {
@@ -74,8 +82,8 @@ Available modes are:
     build-arm-benchmark:
     build-config-progs:
     build-osx:
-    build-iphone:
-    build-iphone-no-bitcode:
+    build-ios:
+    build-ios-no-bitcode:
     build-watchos:
     build-tvos:
     build-android:
@@ -341,6 +349,8 @@ build_cocoa()
         echo "zip for iOS/OSX/watchOS/tvOS can only be generated under OS X."
         exit 0
     fi
+
+    platforms=$(echo "$platforms" | sed -e 's/iphone/ios/g')
 
     for platform in $platforms; do
         sh build.sh build-$platform || exit 1
@@ -629,6 +639,11 @@ case "$MODE" in
             enable_assertions="yes"
         fi
 
+        enable_memdebug="no"
+        if [ "$REALM_ENABLE_MEMDEBUG" ]; then
+            enable_memdebug="yes"
+        fi
+		
         # Find Xcode
         xcode_home="none"
         xcodeselect="xcode-select"
@@ -693,6 +708,7 @@ INSTALL_LIBEXECDIR    = $install_libexecdir
 MAX_BPNODE_SIZE       = $max_bpnode_size
 MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_ASSERTIONS     = $enable_assertions
+ENABLE_MEMDEBUG       = $enable_memdebug
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home
@@ -725,7 +741,7 @@ EOF
             $MAKE -C "src/realm" clean BASE_DENOM="ios" || exit 1
             $MAKE -C "src/realm" clean BASE_DENOM="watch" || exit 1
             $MAKE -C "src/realm" clean BASE_DENOM="tv" || exit 1
-            for dir in "$OSX_DIR" "$IPHONE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
+            for dir in "$OSX_DIR" "$IOS_DIR" "$IOS_NO_BITCODE_DIR" "$WATCHOS_DIR" "$TVOS_DIR"; do
                 if [ -e "$dir" ]; then
                     echo "Removing '$dir'"
                     rm -rf "$dir/include" || exit 1
@@ -787,25 +803,25 @@ EOF
         build_apple
         ;;
 
-    "build-iphone")
+    "build-ios" | "build-iphone")
         export name='iPhone'
         export available_sdks_config_key='IPHONE_SDKS_AVAIL'
         export min_version='7.0'
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
-        export dir="$IPHONE_DIR"
+        export dir="$IOS_DIR"
         export platform_suffix=''
         export enable_bitcode='yes'
         build_apple
         ;;
 
-    "build-iphone-no-bitcode")
+    "build-ios-no-bitcode" | "build-iphone-no-bitcode")
         export name='iPhone'
         export available_sdks_config_key='IPHONE_SDKS_AVAIL'
         export min_version='7.0'
         export os_name='ios'
         export sdks_config_key='IPHONE_SDKS'
-        export dir="$IPHONE_NO_BITCODE_DIR"
+        export dir="$IOS_NO_BITCODE_DIR"
         export platform_suffix='-no-bitcode'
         export enable_bitcode='no'
         build_apple
@@ -1058,6 +1074,38 @@ EOF
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
         $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+
+        dir_basename=core
+        node_directory="$NODE_DIR/$dir_basename"
+
+        mkdir -p "$node_directory" || exit 1
+        cp "src/realm/librealm-node.a" "$node_directory" || exit 1
+        cp "src/realm/librealm-node-dbg.a" "$node_directory" || exit 1
+
+        echo "Copying headers to '$node_directory/include'"
+        mkdir -p "$node_directory/include" || exit 1
+        cp "src/realm.hpp" "$node_directory/include/" || exit 1
+        mkdir -p "$node_directory/include/realm" || exit 1
+        inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
+        temp_dir="$(mktemp -d /tmp/realm.build-node.XXXX)" || exit 1
+        (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
+        (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+
+        cp tools/LICENSE "$node_directory" || exit 1
+        if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
+            command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
+            pandoc -f markdown -t plain -o "$node_directory/release_notes.txt" release_notes.md || exit 1
+        fi
+
+        realm_version="$(sh build.sh get-version)" || exit
+        dir_name="core-$realm_version"
+        file_name="realm-core-node-$CURRENT_PLATFORM-$realm_version.tar.gz"
+        tar_files='librealm*'
+
+        echo "Create tar.gz file $file_name"
+        rm -f "$REALM_HOME/$file_name" || exit 1
+        (cd "$REALM_HOME/$NODE_DIR" && tar czf "$REALM_HOME/$file_name" $dir_basename) || exit 1
+
         exit 0
         ;;
 
@@ -1128,7 +1176,7 @@ EOF
             esac
         done
 
-        sh build.sh build-iphone
+        sh build.sh build-ios
 
         TMPL_DIR="test/ios/template"
         TEST_DIR="test/ios/app"
@@ -2939,12 +2987,12 @@ EOF
         git clean -xfd || exit 1
 
         REALM_MAX_BPNODE_SIZE_DEBUG="4" REALM_ENABLE_ENCRYPTION="yes" sh build.sh config "$WORKSPACE/install" || exit 1
-        sh build.sh build-iphone || exit 1
+        sh build.sh build-ios || exit 1
         sh build.sh build-android || exit 1
         UNITTEST_ENCRYPT_ALL=yes sh build.sh check || exit 1
 
         REALM_MAX_BPNODE_SIZE_DEBUG="4" sh build.sh config "$WORKSPACE/install" || exit 1
-        sh build.sh build-iphone || exit 1
+        sh build.sh build-ios || exit 1
         sh build.sh build-android || exit 1
         sh build.sh build || exit 1
         UNITTEST_SHUFFLE="1" UNITTEST_RANDOM_SEED="random" UNITTEST_THREADS="1" UNITTEST_XML="1" sh build.sh check-debug || exit 1

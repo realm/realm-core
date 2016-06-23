@@ -8,6 +8,7 @@
 #include <realm/link_view.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/logger.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -723,7 +724,7 @@ private:
     template<class... Params> void log(const char* message, Params... params)
     {
         if (m_logger)
-            m_logger->log(message, params...); // Throws
+            m_logger->trace(message, params...); // Throws
     }
 #else
     template<class... Params> void log(const char*, Params...)

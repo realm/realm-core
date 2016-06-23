@@ -2,9 +2,12 @@
 #include <exception>
 #include <algorithm>
 #include <memory>
-#include <iostream>
 #include <mutex>
 #include <map>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
 #  include <cstdlib>
@@ -151,18 +154,20 @@ void SlabAlloc::detach() noexcept
     switch (m_attach_mode) {
         case attach_None:
         case attach_UsersBuffer:
-            goto found;
+            break;
         case attach_OwnedBuffer:
             ::free(m_data);
-            goto found;
+            break;
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
-            m_file_mappings = nullptr;
-            goto found;
+            m_file_mappings.reset();
+            m_local_mappings.reset();
+            m_num_local_mappings = 0;
+            break;
+        default:
+            REALM_UNREACHABLE();
     }
-    REALM_ASSERT(false);
-  found:
     invalidate_cache();
     m_attach_mode = attach_None;
 }
@@ -176,7 +181,7 @@ SlabAlloc::~SlabAlloc() noexcept
         if (m_attach_mode != attach_SharedFile) {
             // No point inchecking if free space info is invalid
             if (m_free_space_state != free_space_Invalid) {
-                if (!is_all_free()) {
+                if (REALM_COVER_NEVER(!is_all_free())) {
                     print();
 #  ifndef REALM_SLAB_ALLOC_DEBUG
                     std::cerr << "To get the stack-traces of the corresponding allocations,"
@@ -208,8 +213,9 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
+
     m_free_space_state = free_space_Dirty;
 
     // Do we have a free space we can reuse?
@@ -218,6 +224,19 @@ MemRef SlabAlloc::do_alloc(size_t size)
         iter rend = m_free_space.rend();
         for (iter i = m_free_space.rbegin(); i != rend; ++i) {
             if (size <= i->size) {
+
+#if REALM_ENABLE_MEMDEBUG
+                // Pick a *random* match instead of just the first. This will increase the chance of catching
+                // use-after-free bugs in Core. It's chosen such that the mathematical average of all picked 
+                // positions is the middle of the list. 
+                iter j = i;
+                while (j != rend && (size > j->size || fastrand() % (m_free_space.size() / 2 + 1) != 0)) {
+                    j++;
+                }
+                if (j != rend)
+                    i = j;
+#endif
+
                 ref_type ref = i->ref;
                 size_t rest = i->size - size;
 
@@ -233,7 +252,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
                 }
 
 #ifdef REALM_DEBUG
-                if (m_debug_out)
+                if (REALM_COVER_NEVER(m_debug_out))
                     std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
@@ -244,7 +263,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
-                return MemRef(addr, ref);
+                return MemRef(addr, ref, *this);
             }
         }
     }
@@ -286,7 +305,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     }
 
 #ifdef REALM_DEBUG
-    if (m_debug_out)
+    if (REALM_COVER_NEVER(m_debug_out))
         std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
@@ -297,7 +316,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     malloc_debug_map[ref] = malloc(1);
 #endif
 
-    return MemRef(slab.addr, ref);
+    return MemRef(slab.addr, ref, *this);
 }
 
 
@@ -319,11 +338,11 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     ref_type ref_end = ref + size;
 
 #ifdef REALM_DEBUG
-    if (m_debug_out)
+    if (REALM_COVER_NEVER(m_debug_out))
         std::cerr << "Free ref: " << ref << " size: " << size << "\n";
 #endif
 
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         return;
 
     // Mutable memory cannot be freed unless it has first been allocated, and
@@ -395,16 +414,16 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     MemRef new_mem = do_alloc(new_size); // Throws
 
     // Copy existing segment
-    char* new_addr = new_mem.m_addr;
+    char* new_addr = new_mem.get_addr();
     std::copy(addr, addr+old_size, new_addr);
 
     // Add old segment to freelist
     do_free(ref, addr);
 
 #ifdef REALM_DEBUG
-    if (m_debug_out) {
+    if (REALM_COVER_NEVER(m_debug_out)) {
         std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
-            "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
+            "new_ref: " << new_mem.get_ref() << " new_size: " << new_size << "\n";
     }
 #endif // REALM_DEBUG
 
@@ -532,7 +551,17 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     {
         std::lock_guard<Mutex> lock(all_files_mutex);
         std::shared_ptr<SlabAlloc::MappedFile> p = all_files[path].lock();
-        if (!bool(p)) {
+        // In case we're the session initiator, we'll need a new mapping in any case.
+        // NOTE: normally, it should not be possible to find an old mapping while being
+        // the session initiator, since by definition the session initiator is the first
+        // to attach the file. If, however, the user is deleting the .lock file while he
+        // has one or more shared groups attached to the database, a session initiator
+        // *will* see a stale mapping. From versions 0.99 to 1.1.0 we asserted when detecting
+        // this situation, and this lead to many bug reports. It is likely that many of these
+        // would otherwise *not* have lead to observable bugs, because the user would not
+        // actually touch the stale database anymore, it was just a case of delayed deallocation
+        // of a shared group.
+        if (cfg.session_initiator || !bool(p)) {
             p = std::make_shared<MappedFile>();
             all_files[path] = p;
         }
@@ -543,7 +572,6 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // If the file has already been mapped by another thread, reuse all relevant data
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
-        REALM_ASSERT(!cfg.session_initiator);
         m_data = m_file_mappings->m_initial_mapping.get_addr();
         m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
@@ -604,9 +632,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         // Pre-alloc initial space
         size_t initial_size = m_initial_section_size;
         m_file_mappings->m_file.prealloc(0, initial_size); // Throws
+
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             m_file_mappings->m_file.sync(); // Throws
+
         size = initial_size;
     }
     ref_type top_ref;
@@ -968,7 +998,7 @@ void SlabAlloc::remap(size_t file_size)
 
 const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 {
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
     return m_free_read_only;
 }
@@ -1044,6 +1074,7 @@ void SlabAlloc::resize_file(size_t new_file_size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     m_file_mappings->m_file.prealloc(0, new_file_size); // Throws
+
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
@@ -1053,6 +1084,7 @@ void SlabAlloc::reserve_disk_space(size_t size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
     m_file_mappings->m_file.prealloc_if_supported(0, size); // Throws
+
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws

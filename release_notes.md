@@ -2,21 +2,88 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Update table views so that rows are not attached after calling Table::clear() (#1837)
+* The SlabAlloctor was not correctly releasing all its stale memory mappings
+  when it was detached. If a SharedGroup was reused to access a database
+  following both a call of compact() and a commit() (the latter potentially
+  by a different SharedGroup), the stale memory mappings would shadow part
+  of the database. This would look like some form of corruption. Specifically
+  issues #1092 and #1601 are known to be symptoms of this bug, but issues
+  #1506 and #1769 are also likely to be caused by it. Note that even though
+  this bug looks like corruption, the database isn't corrupted at all.
+  Reopening it by a different SharedGroup will work fine; Only the SharedGroup
+  that executed the compact() will have a stale view of the file.
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Removed the 'stealing' variant of export for handover. It was not a great
+  idea. It was not being used and required locking which we'd like to avoid.
+* S: A concept of log levels was added to `util::Logger`. `util::Logger::log()`
+  now takes a log level argument, and new shorthand methods were added
+  (`debug()`, `info()`, `warn()`, ...). All loggers now have a `level_threshold`
+  property through which they efficiently query for the current log level
+  threshold.
 
 ### Enhancements
 
-* Lorem ipsum.
+* Allow SharedGroups to pin specific versions for handover
+* Reduced the object-size overhead of assertions.
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* Non concurrent tests are run on the main process thread. (#1862)
+* S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
+  `<realm/util/features.h>`. This also fixes a dangling reference to
+  `REALM_QUOTE_2()` in `<realm/util/features.h>`.
+* New feature in the unit test framework: Ability to specify log level
+  threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
+
+----------------------------------------------
+
+
+# 1.1.2 Release notes
+
+### Bugfixes
+
+* S: In the network API (namespace `util::network`), do not report an error to
+  the application if system calls `read()`, `write()`, or `accept()` fail with
+  `EAGAIN` on a socket in nonblocking mode after `poll()` has signalled
+  readiness. Instead, go back and wait for `poll()` to signal readiness again.
+
+### Breaking changes
+
+* Sorting order of strings is now according to more common scheme for special
+  characters (space, dash, etc), and for letters it's now such that visually
+  similiar letters (that is, those that differ only by diacritics, etc) are
+  grouped together. (#1639)
+
+-----------
+
+### Internals
+
+* S: New unit tests `Network_ReadWriteLargeAmount` and
+  `Network_AsyncReadWriteLargeAmount`.
+
+----------------------------------------------
+
+
+# 1.1.1 Release notes
+
+### Bugfixes
+
+* Fixed a recently introduced crash bug on indexed columns (#1869)
+* Implement `TableViewBase`'s copy-assignment operator to prevent link errors when it is used.
+* No longer assert on a "!cfg.session_initiator" in SlabAlloc::attach_file(). This makes issue
+  #1784 go away, but also removes an option to detect and flag if the ".lock" file is deleted
+  while a SharedGroup is attached to the file. Please note: Removal of the ".lock" file while
+  the database is attached may lead to corruption of the database.
+
+### Enhancements
+
+* Improve performance of opening Realm files and making commits when using
+  external writelogs by eliminating some unneeded `fsync()`s.
 
 ----------------------------------------------
 
@@ -61,6 +128,7 @@
 * Corrected two usages of undefined REALM_PLATFORM_ANDROID to REALM_ANDROID.
   This correctly enables Android log output on termination and allows using
   robust mutexes on Android platforms. (#1834)
+
 
 ----------------------------------------------
 

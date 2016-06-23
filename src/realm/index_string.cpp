@@ -1,6 +1,10 @@
 #include <cstdio>
 #include <iomanip>
 
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
+
 #include <realm/exceptions.hpp>
 #include <realm/index_string.hpp>
 #include <realm/column.hpp>
@@ -396,41 +400,13 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             m_array->set(ins_pos_refs, row_list.get_ref());
         }
         else {
-            // These strings have the same prefix up to this point but they are actually
-            // not equal. Extend the tree until the prefix of these strings is different.
-
-            key_type key_for_value = create_key(value, suboffset);
-            key_type key_for_v2 = create_key(v2, suboffset);
-            size_t start_offset = suboffset;
-
-            // Fast forward suboffset until there is a difference in the strings
-            while (key_for_value == key_for_v2) {
-                suboffset += s_index_key_length;
-                key_for_value = create_key(value, suboffset);
-                key_for_v2 = create_key(v2, suboffset);
-            }
-
-            // Create subindex with the difference in the strings. This will
-            // not recurse because at this this point the strings are different.
+            // These strings have the same prefix up to this point but they are actually not
+            // equal. Extend the tree recursivly until the prefix of these strings is different.
             StringIndex subindex(m_target_column, m_array->get_alloc());
             subindex.insert_with_offset(row_ndx2, v2, suboffset);
             subindex.insert_with_offset(row_ndx, value, suboffset);
-
-            ref_type last_ref = subindex.get_ref();
-            // Reverse suboffset again and build up the line of nested StringIndices
-            // from the bottom. The previous level down is pointed to by last_ref
-            while (suboffset > start_offset) {
-                suboffset -= s_index_key_length;
-                // Create leaf node with key = create_key(value, suboffset)
-                StringIndex shared_index(m_target_column, m_array->get_alloc());
-                shared_index.insert_with_offset(row_ndx, value, suboffset);
-                // Index 0 is ref to keys, 1 is first element of values; set this to last_ref
-                shared_index.m_array->set(1, last_ref);
-                last_ref = shared_index.get_ref();
-            }
-
             // Join the string of SubIndices to the current position of m_array
-            m_array->set(ins_pos_refs, last_ref);
+            m_array->set(ins_pos_refs, subindex.get_ref());
         }
         return true;
     }
@@ -477,43 +453,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     }
 
     // The key matches, but there is a subindex here so go down a level in the tree.
-    // The loop below optimizes out recursive calls via insert_with_offset to children
-    // which themselves contain another match at the next level (identical prefixes).
-    size_t sub_ndx_in_parent = ins_pos_refs;
-    key_type next_key = create_key(value, suboffset);
-    ref_type parent_array_ref = m_array->get_ref();
-
-    while (suboffset + s_index_key_length < value.size()) {
-        Array parent_array(alloc);
-        parent_array.init_from_ref(parent_array_ref);
-        StringIndex subindex(ref, &parent_array, sub_ndx_in_parent, m_target_column,
-                             m_deny_duplicate_values, alloc);
-        if (!subindex.m_array->is_inner_bptree_node()) { // Sub-StringIndices are store in leaf nodes
-            Array sub_values(alloc);
-            get_child(*(subindex.m_array.get()), 0, sub_values); // Index 0 is ref to values
-            size_t sub_ndx_to_check = sub_values.find_first(next_key); // Search in immediate children
-            if (sub_ndx_to_check != realm::npos) {
-                size_t sub_ndx_to_check_refs = sub_ndx_to_check + 1; // First index is ref to values array
-                int_fast64_t slot_value = subindex.m_array->get(sub_ndx_to_check_refs);
-                if ((slot_value & 1) == 0) { // Lowest bit NOT set indicates ref (to subindex or list).
-                    size_t next_ref = to_ref(slot_value);
-                    char* header = alloc.translate(next_ref);
-                    if (Array::get_context_flag_from_header(header)) { // Not a list. Therefore this match is a subindex.
-                        ref = next_ref;
-                        suboffset += s_index_key_length;
-                        next_key = create_key(value, suboffset);
-                        sub_ndx_in_parent = sub_ndx_to_check_refs;
-                        parent_array_ref = subindex.m_array->get_ref();
-                        continue;
-                    }
-                }
-            }
-        }
-        break;
-    }
-    Array parent_array(alloc);
-    parent_array.init_from_ref(parent_array_ref);
-    StringIndex subindex(ref, &parent_array, sub_ndx_in_parent, m_target_column,
+    StringIndex subindex(ref, m_array.get(), ins_pos_refs, m_target_column,
                          m_deny_duplicate_values, alloc);
     subindex.insert_with_offset(row_ndx, value, suboffset);
 
@@ -686,8 +626,8 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
                 size_t r = sub.lower_bound(row_ndx);
-                REALM_ASSERT(r != not_found);
                 size_t sub_size = sub.size(); // Slow
+                REALM_ASSERT(r != sub_size);
                 bool is_last = r == sub_size - 1;
                 sub.erase(r, is_last);
 
@@ -743,7 +683,8 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
                 size_t old_pos = sub.lower_bound(row_ndx);
                 size_t new_pos = sub.lower_bound(new_row_ndx);
-                REALM_ASSERT(old_pos != not_found);
+                size_t sub_size = sub.size();
+                REALM_ASSERT(old_pos != sub_size);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
 
                 // The payload-value exists in multiple rows, and these rows indexes are stored in an IntegerColumn.
@@ -854,9 +795,7 @@ void StringIndex::node_add_key(ref_type ref)
 }
 
 
-#ifdef REALM_DEBUG
-
-// LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void StringIndex::verify() const
 {
@@ -954,6 +893,12 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
 void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
 {
     dump_node_structure(*m_array, out, level);
+}
+
+
+void StringIndex::to_dot() const
+{
+    to_dot(std::cerr);
 }
 
 
@@ -1071,6 +1016,4 @@ void StringIndex::keys_to_dot(std::ostream& out, const Array& array, StringData 
     out << std::endl;
 }
 
-// LCOV_EXCL_STOP ignore debug functions
-
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

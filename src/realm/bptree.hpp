@@ -279,7 +279,7 @@ BpTree<T>::BpTree(BpTreeBase::unattached_tag) : BpTreeBase(nullptr)
 template<class T>
 std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef mem)
 {
-    const char* header = mem.m_addr;
+    const char* header = mem.get_addr();
     std::unique_ptr<Array> new_root;
     bool is_inner_bptree_node = Array::get_is_inner_bptree_node_from_header(header);
 
@@ -312,7 +312,7 @@ std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef 
 template<class T>
 std::unique_ptr<Array> BpTree<T>::create_root_from_ref(Allocator& alloc, ref_type ref)
 {
-    MemRef mem = MemRef{alloc.translate(ref), ref};
+    MemRef mem = MemRef{alloc.translate(ref), ref, alloc};
     return create_root_from_mem(alloc, mem);
 }
 
@@ -431,7 +431,7 @@ T BpTree<T>::get(size_t ndx) const noexcept
 
     // Use direct getter to avoid initializing leaf array:
     std::pair<MemRef, size_t> p = root().get_bptree_leaf(ndx);
-    const char* leaf_header = p.first.m_addr;
+    const char* leaf_header = p.first.get_addr();
     size_t ndx_in_leaf = p.second;
     return LeafType::get(leaf_header, ndx_in_leaf);
 }
@@ -614,7 +614,7 @@ struct BpTree<T>::EraseHandler : Array::EraseHandler {
 template<class T>
 void BpTree<T>::erase(size_t ndx, bool is_last)
 {
-    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG_EX(ndx < size(), ndx, size());
     REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
     if (root_is_leaf()) {
         root_as_leaf().erase(ndx);
