@@ -3085,7 +3085,7 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
 NONCONCURRENT_TEST(Shared_BigAllocations)
 {
     // String length at 2K will not trigger the error.
-    // all lenghts >= 4K (that was tried) triggers the error
+    // all lengths >= 4K (that were tried) trigger the error
     size_t string_length = 4 * 1024;
     SHARED_GROUP_TEST_PATH(path);
     std::string long_string(string_length, 'a');
@@ -3109,9 +3109,6 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
             wt.commit();
         }
     }
-    //SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
-    //sg.close();
-    //sg.open(path);
     {
         WriteTransaction wt(sg); // <---- fails here
         wt.get_group().verify();
