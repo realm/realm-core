@@ -3081,5 +3081,63 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
 }
 
+// Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
+NONCONCURRENT_TEST(Shared_BigAllocations)
+{
+    // String length at 2K will not trigger the error.
+    // all lengths >= 4K (that were tried) trigger the error
+    size_t string_length = 4 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    std::string long_string(string_length, 'a');
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    {
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.add_table("table");
+            table->add_column(type_String, "string_col");
+            table->add_empty_row();
+            table->set_string(0, 0, long_string);
+            wt.commit();
+        }
+        sg.compact(); // <- required to provoke subsequent failures
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().verify();
+            TableRef table = wt.get_table("table");
+            table->set_string(0, 0, long_string);
+            wt.get_group().verify();
+            wt.commit();
+        }
+    }
+    {
+        WriteTransaction wt(sg); // <---- fails here
+        wt.get_group().verify();
+        TableRef table = wt.get_table("table");
+        table->set_string(0, 0, long_string);
+        wt.get_group().verify();
+        wt.commit();
+    }
+    sg.close();
+}
 
+// Found by AFL (on a heavy hint from Finn that we should add a compact() instruction
+NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_write());
+
+    TableRef t = g.add_table("");
+    t->add_column(type_Double, "");
+    t->add_empty_row(241);
+    sg.commit();
+    REALM_ASSERT_RELEASE(sg.compact());
+    SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    sg2.begin_write();
+    sg2.commit();
+    sg2.begin_read(); // <- does not fail
+    SharedGroup sg3(path, false, SharedGroup::durability_Full, crypt_key());
+    sg3.begin_read(); // <- does not fail
+    sg.begin_read(); // <- does fail
+}
 #endif // TEST_SHARED

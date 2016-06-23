@@ -252,6 +252,11 @@ These are the available variables:
    file. For details, see `realm::test_util::unit_test::create_xml_reporter()`
    in `test/util/unit_test.hpp`.
 
+ - Set `UNITTEST_LOG_LEVEL` to adjust the log level threshold for custom intra
+   test logging. Valid values are `all`, `trace`, `debug`, `info`, `warn`,
+   `error`, `fatal`, `off`. The default threshold is `off` meaning that nothing
+   is logged.
+
  - Set `UNITTEST_LOG_TO_FILES` to a non-empty value to redirect log messages
    (including progress messages) to log files. One log file will be created per
    test thread (`UNITTEST_THREADS`). The files will be named

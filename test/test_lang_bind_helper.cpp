@@ -11954,8 +11954,8 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 TEST(LangBindHelper_RollbackInsertZeroRows)
 {
     SHARED_GROUP_TEST_PATH(shared_path)
-    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -11992,10 +11992,10 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
 TEST(LangBindHelper_IsRowAttachedAfterClear)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_client_history(path, nullptr));
-    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, nullptr);
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -12065,9 +12065,9 @@ TEST(LangBindHelper_IsRowAttachedAfterClear)
 
 TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
-    SHARED_GROUP_TEST_PATH(shared_path)
-    std::unique_ptr<Replication> hist_w(make_client_history(shared_path, 0));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    SHARED_GROUP_TEST_PATH(path)
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -12106,8 +12106,8 @@ TEST_TYPES(LangBindHelper_AddEmptyRowsAndRollBackTimestamp, std::true_type, std:
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
     TableRef t = g.insert_table(0, "");
@@ -12126,8 +12126,8 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -12148,8 +12148,8 @@ TEST_TYPES(LangBindHelper_SetTimestampRollback, std::true_type, std::false_type)
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     TableRef t = g.add_table("");
@@ -12166,10 +12166,10 @@ TEST_TYPES(LangBindHelper_SetTimestampAdvanceRead, std::true_type, std::false_ty
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_client_history(path, nullptr));
-    std::unique_ptr<Replication> hist_w(make_client_history(path, nullptr));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, nullptr);
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, nullptr);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -12188,10 +12188,10 @@ TEST_TYPES(LangBindHelper_SetTimestampAdvanceRead, std::true_type, std::false_ty
 TEST(LangbindHelper_BoolSearchIndexCommitPromote)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_client_history(path));
-    std::unique_ptr<Replication> hist_w(make_client_history(path));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full);
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     TableRef t = g.add_table("");

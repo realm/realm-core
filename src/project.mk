@@ -32,6 +32,7 @@ endif
 ifeq ($(COMPILER_IS),clang)
   CFLAGS_GENERAL += -Wshorten-64-to-32
   CFLAGS_GENERAL += -Wold-style-cast
+  CFLAGS_GENERAL += -Wextra-semi
 endif
 
 # CoreFoundation is required for Apple specific logging. CoreFoundation and

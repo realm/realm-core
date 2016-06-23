@@ -471,7 +471,7 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void MixedColumn::verify() const
 {
@@ -513,6 +513,7 @@ void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
     REALM_ASSERT_3(types_len, ==, refs_len);
 }
 
+
 void MixedColumn::to_dot(std::ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
@@ -546,4 +547,4 @@ void MixedColumn::do_dump_node_structure(std::ostream& out, int level) const
     m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

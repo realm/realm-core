@@ -56,7 +56,7 @@ inline MemRef BasicArray<T>::create_array(size_t size, Allocator& alloc)
     bool has_refs = false;
     bool context_flag = false;
     int width = sizeof (T);
-    init_header(mem.m_addr, is_inner_bptree_node, has_refs, context_flag, wtype_Multiply,
+    init_header(mem.get_addr(), is_inner_bptree_node, has_refs, context_flag, wtype_Multiply,
                 width, size, byte_size);
 
     return mem;

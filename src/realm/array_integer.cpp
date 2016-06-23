@@ -96,7 +96,7 @@ void ArrayIntNull::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
-    init_from_mem(MemRef{header, ref});
+    init_from_mem(MemRef{header, ref, m_alloc});
 }
 
 void ArrayIntNull::init_from_mem(MemRef mem) noexcept
