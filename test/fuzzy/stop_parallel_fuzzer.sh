@@ -32,20 +32,20 @@ fi
 time_out="10000" # ms, 10x
 memory="100" # MB
 
-# Let AFL try to minimize each input before converting to .cpp
-echo "Minimizing $num_files found crashes and hangs"
-for file in ${files[@]}
-do
-    afl-tmin -t $time_out -m $memory -i "$file" -o "$file.minimized" "$executable_path" @@
-    test $? -eq 1 && exit 1 # terminate if afl-tmin is being terminated
-done
-
-# Run executable for each and save the .cpp reproduction case
-echo "Converting $num_files found crashes and hangs into .cpp unit tests in \"$unit_tests_path\""
 mkdir -p "$unit_tests_path"
+
+# This loop was deliberately changed into doing two things in order to get
+# cpp files as early as possible
+echo "Minimizing and converting $num_files found crashes and hangs"
 for file in ${files[@]}
 do
+	# Let AFL try to minimize each input before converting to .cpp
+	minimized_file="$file.minimized"
+    afl-tmin -t $time_out -m $memory -i "$file" -o "$minimized_file" "$executable_path" @@
+    test $? -eq 1 && exit 1 # terminate if afl-tmin is being terminated
+
+    # Convert into cpp file
     cpp_file="$unit_tests_path$(basename $file).cpp"
-    "$executable_path" "$file.minimized" --log > "$cpp_file"
+    "$executable_path" "$minimized_file" --log > "$cpp_file"
     test $? -eq 1 && exit 1 # terminate if afl-tmin is being terminated
 done
