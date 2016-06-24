@@ -93,6 +93,10 @@ namespace my_namespace {
 template<class T>
 class MyClass: public Base {
 public:
+
+    // Public member variables do not have a 'm_' prefix.
+    int baz;
+
     MyClass(...):
         Base(...),
         m_bar(7),
@@ -100,9 +104,6 @@ public:
     {
         // ...
     }
-
-    // Public member variables do not have a 'm_' prefix.
-    int baz;
 
 private:
     // Static member variables have prefix 's_'.
