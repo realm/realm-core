@@ -2771,6 +2771,7 @@
 					"-Wextra-semi",
 					"-fno-elide-constructors",
 					"-Wundef",
+					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
@@ -2817,6 +2818,7 @@
 					"$(inherited)",
 					"-Wextra-semi",
 					"-Wundef",
+					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;

@@ -2859,7 +2859,7 @@ top:
         // List of matching row indexes
         if (!sub_isindex) {
             const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
-            size_t sub_count;
+            size_t sub_count = -1;
 
             // In most cases the row list will just be an array but there
             // might be so many matches that it has branched into a column
