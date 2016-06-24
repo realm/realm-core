@@ -95,8 +95,8 @@ public:
     version_type do_prepare_commit(version_type) override;
     void do_finalize_commit() noexcept override;
     void do_abort_transact() noexcept override;
-    void do_interrupt() noexcept override {};
-    void do_clear_interrupt() noexcept override {};
+    void do_interrupt() noexcept override {}
+    void do_clear_interrupt() noexcept override {}
     void commit_log_close() noexcept override;
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;

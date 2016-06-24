@@ -165,7 +165,7 @@ public:
     bool nullify_link(size_t, size_t, size_t) { return true; }
     bool insert_substring(size_t, size_t, size_t, StringData) { return true; }
     bool erase_substring(size_t, size_t, size_t, size_t) { return true; }
-    bool optimize_table() { return true; };
+    bool optimize_table() { return true; }
 
     // Must have descriptor selected:
     bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return true; }

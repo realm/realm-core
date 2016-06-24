@@ -1386,7 +1386,7 @@ public:
     ref_type create_leaf(size_t size) override
     {
         MemRef mem = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
-        return mem.m_ref;
+        return mem.get_ref();
     }
 private:
     const T m_value;

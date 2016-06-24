@@ -22,15 +22,14 @@ ifeq ($(OS),Darwin)
   endif
 endif
 
+# Clang specific flags
+ifeq ($(COMPILER_IS),clang)
 # While -Wunreachable-code is accepted by GCC, it is ignored and will be removed
 # in the future.
-ifeq ($(COMPILER_IS),clang)
   CFLAGS_GENERAL += -Wunreachable-code
-endif
-
-# The shorten-64-to-32 flag is only defined for clang.
-ifeq ($(COMPILER_IS),clang)
-  CFLAGS_GENERAL += -Wshorten-64-to-32
+  CFLAGS_GENERAL += -Wshorten-64-to-32 
+  CFLAGS_GENERAL += -Wconditional-uninitialized
+  CFLAGS_GENERAL += -Wextra-semi
 endif
 
 # CoreFoundation is required for Apple specific logging. CoreFoundation and

@@ -154,18 +154,20 @@ void SlabAlloc::detach() noexcept
     switch (m_attach_mode) {
         case attach_None:
         case attach_UsersBuffer:
-            goto found;
+            break;
         case attach_OwnedBuffer:
             ::free(m_data);
-            goto found;
+            break;
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
-            m_file_mappings = nullptr;
-            goto found;
+            m_file_mappings.reset();
+            m_local_mappings.reset();
+            m_num_local_mappings = 0;
+            break;
+        default:
+            REALM_UNREACHABLE();
     }
-    REALM_UNREACHABLE();
-  found:
     invalidate_cache();
     m_attach_mode = attach_None;
 }
@@ -222,6 +224,19 @@ MemRef SlabAlloc::do_alloc(size_t size)
         iter rend = m_free_space.rend();
         for (iter i = m_free_space.rbegin(); i != rend; ++i) {
             if (size <= i->size) {
+
+#if REALM_ENABLE_MEMDEBUG
+                // Pick a *random* match instead of just the first. This will increase the chance of catching
+                // use-after-free bugs in Core. It's chosen such that the mathematical average of all picked 
+                // positions is the middle of the list. 
+                iter j = i;
+                while (j != rend && (size > j->size || fastrand() % (m_free_space.size() / 2 + 1) != 0)) {
+                    j++;
+                }
+                if (j != rend)
+                    i = j;
+#endif
+
                 ref_type ref = i->ref;
                 size_t rest = i->size - size;
 
@@ -248,7 +263,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
-                return MemRef(addr, ref);
+                return MemRef(addr, ref, *this);
             }
         }
     }
@@ -301,7 +316,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
     malloc_debug_map[ref] = malloc(1);
 #endif
 
-    return MemRef(slab.addr, ref);
+    return MemRef(slab.addr, ref, *this);
 }
 
 
@@ -398,7 +413,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     MemRef new_mem = do_alloc(new_size); // Throws
 
     // Copy existing segment
-    char* new_addr = new_mem.m_addr;
+    char* new_addr = new_mem.get_addr();
     std::copy(addr, addr+old_size, new_addr);
 
     // Add old segment to freelist
@@ -407,7 +422,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out)) {
         std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
-            "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
+            "new_ref: " << new_mem.get_ref() << " new_size: " << new_size << "\n";
     }
 #endif // REALM_DEBUG
 
