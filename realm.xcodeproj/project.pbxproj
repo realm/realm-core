@@ -2773,10 +2773,6 @@
 					"-Wold-style-cast",
 					"-Wundef",
 				);
-				OTHER_CPLUSPLUSFLAGS = (
-					"$(inherited)",
-					"$(OTHER_CFLAGS)",
-				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
 			};
@@ -2824,10 +2820,6 @@
 					"-fno-elide-constructors",
 					"-Wold-style-cast",
 					"-Wundef",
-				);
-				OTHER_CPLUSPLUSFLAGS = (
-					"$(inherited)",
-					"$(OTHER_CFLAGS)",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
