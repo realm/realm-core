@@ -263,6 +263,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
+                std::cerr << "alloc(" << ref << ", " << size << ") @ " << (void*)addr << std::endl;
                 return MemRef(addr, ref, *this);
             }
         }
@@ -315,6 +316,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
 #endif
+    std::cerr << "alloc(" << ref << ", " << size << ") @ " << (void*)slab.addr << std::endl;
 
     return MemRef(slab.addr, ref, *this);
 }
@@ -335,6 +337,8 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     // Get size from segment
     size_t size = read_only ? Array::get_byte_size_from_header(addr) :
         Array::get_capacity_from_header(addr);
+    std::cerr << "free(" << ref << ", " << size << ") @ " << (void*)addr << std::endl;
+    REALM_ASSERT_3(size, <, 4*1024);
     ref_type ref_end = ref + size;
 
 #ifdef REALM_DEBUG
@@ -345,12 +349,24 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         return;
 
+    if (!read_only) {
+        bool matched = false;
+        for (int i=0; i<m_slabs.size(); ++i) {
+            if (ref_end <= m_slabs[i].ref_end)
+                matched = true;
+        }
+        REALM_ASSERT(matched);
+    }
     // Mutable memory cannot be freed unless it has first been allocated, and
     // any allocation puts free space tracking into the "dirty" state.
     REALM_ASSERT_3(read_only, ||, m_free_space_state == free_space_Dirty);
 
     m_free_space_state = free_space_Dirty;
 
+    for (int i=0; i<m_free_space.size();++i) {
+        REALM_ASSERT_3(m_free_space[i].ref, <, 100000000);
+        REALM_ASSERT_3(m_free_space[i].size, <, 100000000);
+    }
     // Check if we can merge with adjacent succeeding free block
     typedef chunks::iterator iter;
     iter merged_with = free_space.end();
@@ -364,6 +380,10 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
                 merged_with = i;
             }
         }
+    }
+    for (int i=0; i<m_free_space.size();++i) {
+        REALM_ASSERT_3(m_free_space[i].ref, <, 100000000);
+        REALM_ASSERT_3(m_free_space[i].size, <, 100000000);
     }
 
     // Check if we can merge with adjacent preceeding free block (not if that
@@ -384,6 +404,10 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
             return;
         }
     }
+    for (int i=0; i<m_free_space.size();++i) {
+        REALM_ASSERT_3(m_free_space[i].ref, <, 100000000);
+        REALM_ASSERT_3(m_free_space[i].size, <, 100000000);
+    }
 
     // Else just add to freelist
     if (merged_with == free_space.end()) {
@@ -396,6 +420,11 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
         catch (...) {
             m_free_space_state = free_space_Invalid;
         }
+    }
+
+    for (int i=0; i<m_free_space.size();++i) {
+        REALM_ASSERT_3(m_free_space[i].ref, <, 100000000);
+        REALM_ASSERT_3(m_free_space[i].size, <, 100000000);
     }
 }
 
@@ -410,12 +439,24 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     // check whether m_free_space_state == free_state_Invalid. Also remember to
     // fill with zero if REALM_ENABLE_ALLOC_SET_ZERO is non-zero.
 
+    for (int i=0; i<m_free_space.size();++i) {
+        REALM_ASSERT_3(m_free_space[i].ref, <, 100000000);
+        REALM_ASSERT_3(m_free_space[i].size, <, 100000000);
+    }
     // Allocate new space
     MemRef new_mem = do_alloc(new_size); // Throws
+    for (int i=0; i<m_free_space.size();++i) {
+        REALM_ASSERT_3(m_free_space[i].ref, <, 100000000);
+        REALM_ASSERT_3(m_free_space[i].size, <, 100000000);
+    }
 
     // Copy existing segment
     char* new_addr = new_mem.get_addr();
     std::copy(addr, addr+old_size, new_addr);
+    for (int i=0; i<m_free_space.size();++i) {
+        REALM_ASSERT_3(m_free_space[i].ref, <, 100000000);
+        REALM_ASSERT_3(m_free_space[i].size, <, 100000000);
+    }
 
     // Add old segment to freelist
     do_free(ref, addr);
@@ -900,6 +941,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 
 void SlabAlloc::reset_free_space_tracking()
 {
+    std::cerr << "RESET" << std::endl;
     invalidate_cache();
     if (is_free_space_clean())
         return;
@@ -984,6 +1026,7 @@ void SlabAlloc::remap(size_t file_size)
     }
     // Rebase slabs and free list (assumes exactly one entry in m_free_space for
     // each entire slab in m_slabs)
+    std::cerr << "REMAP" << std::endl;
     size_t slab_ref = file_size;
     size_t n = m_free_space.size();
     REALM_ASSERT_DEBUG(m_slabs.size() == n);

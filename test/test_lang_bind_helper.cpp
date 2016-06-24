@@ -12215,17 +12215,18 @@ TEST(LangBindHelper_MaybeDoubleFree)
     SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_write());
-    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    const Group& g_r = sg_r.begin_read();
 
     g.add_table("");
     g.get_table(0)->add_column(type_Double, "dgrpn", true);
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
     g.get_table(0)->add_empty_row(246);
-    g.get_table(0)->insert_column_link(0, type_Link, "pgmjb", *g.get_table(0));
+    //g.get_table(0)->insert_column_link(0, type_Link, "pgmjb", *g.get_table(0));
     sg_r.close();
     sg_w.commit();
     REALM_ASSERT_RELEASE(sg_w.compact());
+//    sg_w.get_group().m_alloc.reset_free_space_tracking();
     sg_w.begin_write();
     sg_r.open(path);
     sg_r.begin_read();
