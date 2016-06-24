@@ -18,14 +18,14 @@
  *
  **************************************************************************/
 
-#include <cerrno>
-#include <type_traits>
 #include <algorithm>
-#include <iostream>
-
-#include <fcntl.h>
 #include <atomic>
+#include <cerrno>
+#include <fcntl.h>
+#include <iostream>
 #include <mutex>
+#include <sstream>
+#include <type_traits>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
@@ -1147,64 +1147,49 @@ bool SharedGroup::compact()
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    std::string tmp_path = m_db_path + ".tmp_compaction_space";
-    SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-    if (info->num_participants > 1)
-        return false;
-
-    // group::write() will throw if the file already exists.
-    // To prevent this, we have to remove the file (should it exist)
-    // before calling group::write().
-    File::try_remove(tmp_path);
-
-    // Using begin_read here ensures that we have access to the latest entry
-    // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
-    begin_read(); // Throws
-
-    // Compact by writing a new file holding only live data, then renaming the new file
-    // so it becomes the database file, replacing the old one in the process.
-    File file;
-    file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-    m_group.write(file, m_key, info->latest_version_number);
-    // Data needs to be flushed to the disk before renaming.
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        file.sync(); // Throws
-    // FIXME: Forgetting to check the return value of standard library
-    // rename(). Solve the problem by using `util::File::move()` instead.
-    rename(tmp_path.c_str(), m_db_path.c_str());
+    DurabilityLevel dura;
     {
-        SharedInfo* r_info = m_reader_map.get_addr();
-        Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
-        REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
-        static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
+        std::string tmp_path = m_db_path + ".tmp_compaction_space";
+        SharedInfo* info = m_file_map.get_addr();
+        std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
+        if (info->num_participants > 1)
+            return false;
+
+        // group::write() will throw if the file already exists.
+        // To prevent this, we have to remove the file (should it exist)
+        // before calling group::write().
+        File::try_remove(tmp_path);
+
+        // Using begin_read here ensures that we have access to the latest entry
+        // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
+        // This is also needed to attach the group (get the proper top pointer, etc)
+        begin_read(); // Throws
+
+        // Compact by writing a new file holding only live data, then renaming the new file
+        // so it becomes the database file, replacing the old one in the process.
+        File file;
+        file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
+        m_group.write(file, m_key, info->latest_version_number);
+        // Data needs to be flushed to the disk before renaming.
+        bool disable_sync = get_disable_sync_to_disk();
+        if (!disable_sync)
+            file.sync(); // Throws
+        util::File::move(tmp_path.c_str(), m_db_path.c_str());
+        {
+            SharedInfo* r_info = m_reader_map.get_addr();
+            Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
+            REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
+            static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
+        }
+        end_read();
+        dura = DurabilityLevel(info->durability);
+        // We need to release any shared mapping *before* releasing the control mutex.
+        // When someone attaches to the new database file, they *must* *not* see and
+        // reuse any existing memory mapping of the stale file.
+        m_group.m_alloc.detach();
     }
-    end_read();
-
-    SlabAlloc& alloc = m_group.m_alloc;
-
-    // close and reopen the database file.
-    alloc.detach();
-    SlabAlloc::Config cfg;
-    cfg.skip_validate = true;
-    cfg.no_create = true;
-    cfg.is_shared = true;
-    cfg.session_initiator = true;
-    cfg.encryption_key = m_key;
-    ref_type top_ref = alloc.attach_file(m_db_path, cfg);
-    size_t file_size = alloc.get_baseline();
-    using gf = _impl::GroupFriend;
-    REALM_ASSERT(gf::get_file_format_version(m_group) == 0 ||
-                 gf::get_file_format_version(m_group) == info->file_format_version);
-    gf::set_file_format_version(m_group, info->file_format_version);
-
-    // update the versioning info to match
-    SharedInfo* r_info = m_reader_map.get_addr();
-    Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
-    REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
-    rc.filesize = file_size;
-    rc.current_top = top_ref;
+    close();
+    do_open(m_db_path, true, dura, false, m_key, false);
     return true;
 }
 
@@ -1495,6 +1480,11 @@ SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
 
 void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
+    // The release may be tried on a version imported from a different thread,
+    // hence generated on a different shared group, which may have memory mapped
+    // a larger ringbuffer than we - so make sure we've mapped enough of the
+    // ringbuffer to access the chosen ringbuffer entry.
+    grow_reader_mapping(read_lock.m_reader_idx);
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
@@ -1649,6 +1639,29 @@ void SharedGroup::rollback() noexcept
     m_transact_stage = transact_Ready;
 }
 
+SharedGroup::VersionID SharedGroup::pin_version()
+{
+    REALM_ASSERT(m_transact_stage == transact_Reading);
+
+    // Get current version
+    VersionID version_id = VersionID();
+    version_id.version = m_read_lock.m_version;
+    version_id.index   = m_read_lock.m_reader_idx;
+    
+    ReadLockInfo read_lock;
+    grab_read_lock(read_lock, version_id); // Throws
+
+    return version_id;
+}
+
+void SharedGroup::unpin_version(VersionID token)
+{
+    ReadLockInfo read_lock;
+    read_lock.m_reader_idx = token.index;
+
+    release_read_lock(read_lock);
+}
+
 
 void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 {
@@ -1755,7 +1768,6 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    util::LockGuard lg(m_handover_lock);
     version_type version = do_commit(); // Throws
 
     // advance read lock but dont update accessors:
@@ -1933,7 +1945,6 @@ void SharedGroup::reserve(size_t size)
 std::unique_ptr<SharedGroup::Handover<LinkView>>
 SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
 {
-    LockGuard lg(m_handover_lock);
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
     }
@@ -1958,7 +1969,6 @@ LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<
 
 std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_handover(const TableRef& accessor)
 {
-    LockGuard lg(m_handover_lock);
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
     }

@@ -1,6 +1,10 @@
 #include <cstdio>
 #include <iomanip>
 
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
+
 #include <realm/exceptions.hpp>
 #include <realm/index_string.hpp>
 #include <realm/column.hpp>
@@ -791,9 +795,7 @@ void StringIndex::node_add_key(ref_type ref)
 }
 
 
-#ifdef REALM_DEBUG
-
-// LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void StringIndex::verify() const
 {
@@ -891,6 +893,12 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
 void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
 {
     dump_node_structure(*m_array, out, level);
+}
+
+
+void StringIndex::to_dot() const
+{
+    to_dot(std::cerr);
 }
 
 
@@ -1008,6 +1016,4 @@ void StringIndex::keys_to_dot(std::ostream& out, const Array& array, StringData 
     out << std::endl;
 }
 
-// LCOV_EXCL_STOP ignore debug functions
-
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

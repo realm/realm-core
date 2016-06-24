@@ -48,7 +48,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayBlob::verify() const
 {
@@ -86,4 +86,4 @@ void ArrayBlob::to_dot(std::ostream& out, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

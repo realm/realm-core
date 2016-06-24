@@ -1,10 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <limits>
 #include <stdexcept>
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <sstream>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#  include <iomanip>
+#endif
 
 #include <realm/util/features.h>
 #include <realm/util/miscellaneous.hpp>
@@ -1974,16 +1975,16 @@ ref_type Table::create_empty_table(Allocator& alloc)
 
     {
         MemRef mem = Spec::create_empty_spec(alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous case (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
     {
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous case (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
@@ -2043,7 +2044,7 @@ ref_type Table::clone_columns(Allocator& alloc) const
         ref_type new_col_ref;
         const ColumnBase* col = &get_column_base(col_ndx);
         MemRef mem = col->clone_deep(alloc);
-        new_col_ref = mem.m_ref;
+        new_col_ref = mem.get_ref();
         new_columns.add(int_fast64_t(new_col_ref)); // Throws
     }
     return new_columns.get_ref();
@@ -2054,7 +2055,7 @@ ref_type Table::clone(Allocator& alloc) const
 {
     if (m_top.is_attached()) {
         MemRef mem = m_top.clone_deep(alloc); // Throws
-        return mem.m_ref;
+        return mem.get_ref();
     }
 
     Array new_top(alloc);
@@ -2063,15 +2064,15 @@ ref_type Table::clone(Allocator& alloc) const
     _impl::DeepArrayRefDestroyGuard dg_2(alloc);
     {
         MemRef mem = m_spec.m_top.clone_deep(alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         new_top.add(v); // Throws
         dg_2.release();
     }
     {
         MemRef mem = m_columns.clone_deep(alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         new_top.add(v); // Throws
         dg_2.release();
     }
@@ -2398,6 +2399,11 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
     m_size = 0;
 
     discard_row_accessors();
+
+    for (auto& view : m_views) {
+        view->adj_row_acc_clear();
+    }
+
     bump_version();
 }
 
@@ -5762,7 +5768,7 @@ TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& pa
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void Table::verify() const
 {
@@ -5957,4 +5963,4 @@ void Table::dump_node_structure(std::ostream& out, int level) const
     }
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

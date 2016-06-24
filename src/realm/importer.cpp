@@ -20,10 +20,11 @@
 
 // Test tool in test/test_csv/test.pl
 
-#include <stdint.h>
+#include <iostream>
 #include <limits>
-#include <vector>
 #include <sstream>
+#include <stdint.h>
+#include <vector>
 
 #include <realm/util/assert.hpp>
 #include <realm/importer.hpp>

@@ -41,6 +41,7 @@
     <ClCompile Include="..\..\src\realm\row.cpp" />
     <ClCompile Include="..\..\src\realm\table_view.cpp" />
     <ClCompile Include="..\..\src\realm\util\terminate.cpp" />
+    <ClCompile Include="..\..\src\realm\util\to_string.cpp" />
     <ClCompile Include="..\..\src\realm\utilities.cpp" />
     <ClCompile Include="..\..\src\realm\lang_bind_helper.cpp" />
     <ClCompile Include="..\..\src\realm\version.cpp" />
@@ -152,6 +153,7 @@
     <ClInclude Include="..\..\src\realm\unicode.hpp" />
     <ClInclude Include="..\..\src\realm\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\realm\util\terminate.hpp" />
+    <ClInclude Include="..\..\src\realm\util\to_string.hpp" />
     <ClInclude Include="..\..\src\realm\util\unique_ptr.hpp" />
     <ClInclude Include="..\..\src\realm\util\bind_ptr.hpp" />
     <ClInclude Include="..\..\src\realm\column.hpp" />
