@@ -3936,32 +3936,35 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
 namespace {
 
 struct AggrState {
-    AggrState(const Table& table) : m_table(table), m_cache(table.get_alloc()), m_added_row(false) {}
+    AggrState(const Table& target_table):
+	table(target_table),
+	cache(table.get_alloc()),
+	added_row(false) {}
 
-    const Table& m_table;
-    const StringIndex* m_dst_index;
-    size_t m_group_by_column;
+    const Table& table;
+    const StringIndex* dst_index;
+    size_t group_by_column;
 
-    const StringEnumColumn* m_enums;
-    std::vector<size_t> m_keys;
-    const ArrayInteger* m_block = nullptr;
-    ArrayInteger m_cache;
-    size_t m_offset;
-    size_t m_block_end;
+    const StringEnumColumn* enums;
+    std::vector<size_t> keys;
+    const ArrayInteger* block = nullptr;
+    ArrayInteger cache;
+    size_t offset;
+    size_t block_end;
 
-    bool m_added_row;
+    bool added_row;
 };
 
 typedef size_t (*get_group_fnc)(size_t, AggrState&, Table&);
 
 size_t get_group_ndx(size_t i, AggrState& state, Table& result)
 {
-    StringData str = state.m_table.get_string(state.m_group_by_column, i);
-    size_t ndx = state.m_dst_index->find_first(str);
+    StringData str = state.table.get_string(state.group_by_column, i);
+    size_t ndx = state.dst_index->find_first(str);
     if (ndx == not_found) {
         ndx = result.add_empty_row();
         result.set_string(0, ndx, str);
-        state.m_added_row = true;
+        state.added_row = true;
     }
     return ndx;
 }
@@ -3969,26 +3972,26 @@ size_t get_group_ndx(size_t i, AggrState& state, Table& result)
 size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 {
     // We iterate entire blocks at a time by keeping current leaf cached
-    if (i >= state.m_block_end) {
+    if (i >= state.block_end) {
         size_t ndx_in_leaf;
-        IntegerColumn::LeafInfo leaf { &state.m_block, &state.m_cache };
-        state.m_enums->IntegerColumn::get_leaf(i, ndx_in_leaf, leaf);
-        state.m_offset = i - ndx_in_leaf;
-        state.m_block_end = state.m_offset + state.m_block->size();
+        IntegerColumn::LeafInfo leaf { &state.block, &state.cache };
+        state.enums->IntegerColumn::get_leaf(i, ndx_in_leaf, leaf);
+        state.offset = i - ndx_in_leaf;
+        state.block_end = state.offset + state.block->size();
     }
 
     // Since we know the exact number of distinct keys,
     // we can use that to avoid index lookups
-    int64_t key = state.m_block->get(i - state.m_offset);
-    size_t ndx = state.m_keys[to_size_t(key)];
+    int64_t key = state.block->get(i - state.offset);
+    size_t ndx = state.keys[to_size_t(key)];
 
     // Stored position is offset by one, so zero can indicate
     // that no entry have been added yet.
     if (ndx == 0) {
         ndx = result.add_empty_row();
-        result.set_string(0, ndx, state.m_enums->get(i));
-        state.m_keys[to_size_t(key)] = ndx+1;
-        state.m_added_row = true;
+        result.set_string(0, ndx, state.enums->get(i));
+        state.keys[to_size_t(key)] = ndx+1;
+        state.added_row = true;
     }
     else
         --ndx;
@@ -4031,14 +4034,14 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         const StringEnumColumn& enums = get_column_string_enum(group_by_column);
         size_t key_count = enums.get_keys().size();
 
-        state.m_enums = &enums;
-        state.m_keys.assign(key_count, 0);
+        state.enums = &enums;
+        state.keys.assign(key_count, 0);
 
         size_t ndx_in_leaf;
-        IntegerColumn::LeafInfo leaf { &state.m_block, &state.m_cache };
+        IntegerColumn::LeafInfo leaf { &state.block, &state.cache };
         enums.IntegerColumn::get_leaf(0, ndx_in_leaf, leaf);
-        state.m_offset = 0 - ndx_in_leaf;
-        state.m_block_end = state.m_offset + state.m_block->size();
+        state.offset = 0 - ndx_in_leaf;
+        state.block_end = state.offset + state.block->size();
         get_group_ndx_fnc = &get_group_ndx_blocked;
     }
     else {
@@ -4047,8 +4050,8 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         result.add_search_index(0);
         const StringIndex& dst_index = *result.get_column_string(0).get_search_index();
 
-        state.m_dst_index = &dst_index;
-        state.m_group_by_column = group_by_column;
+        state.dst_index = &dst_index;
+        state.group_by_column = group_by_column;
         get_group_ndx_fnc = &get_group_ndx;
     }
 
@@ -4116,10 +4119,10 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
-                    if (state.m_added_row) {
+                    if (state.added_row) {
                         // Set the real value, to overwrite the default value
                         dst_column.set(ndx, value);
-                        state.m_added_row = false;
+                        state.added_row = false;
                     }
                     else {
                         int64_t current = dst_column.get(ndx);
@@ -4134,10 +4137,10 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
-                    if (state.m_added_row) {
+                    if (state.added_row) {
                         // Set the real value, to overwrite the default value
                         dst_column.set(ndx, value);
-                        state.m_added_row = false;
+                        state.added_row = false;
                     }
                     else {
                         int64_t current = dst_column.get(ndx);
@@ -4206,10 +4209,10 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 for (size_t i = 0; i < count; ++i) {
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
-                    if (state.m_added_row) {
+                    if (state.added_row) {
                         // Set the real value, to overwrite the default value
                         dst_column.set(ndx, value);
-                        state.m_added_row = false;
+                        state.added_row = false;
                     }
                     else {
                         int64_t current = dst_column.get(ndx);
@@ -4222,10 +4225,10 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 for (size_t i = 0; i < count; ++i) {
                     size_t ndx = (*get_group_ndx_fnc)(i, state, result);
                     int64_t value = src_column.get(i);
-                    if (state.m_added_row) {
+                    if (state.added_row) {
                         // Set the real value, to overwrite the default value
                         dst_column.set(ndx, value);
-                        state.m_added_row = false;
+                        state.added_row = false;
                     }
                     else {
                         int64_t current = dst_column.get(ndx);

@@ -282,22 +282,22 @@ public:
     using version_type = _impl::History::version_type;
 
     struct VersionID {
-        version_type m_version = std::numeric_limits<version_type>::max();
-        uint_fast32_t m_index   = 0;
+        version_type version = std::numeric_limits<version_type>::max();
+        uint_fast32_t index   = 0;
 
         VersionID() {}
-        VersionID(version_type version, uint_fast32_t index)
+        VersionID(version_type initial_version, uint_fast32_t initial_index)
         {
-            m_version = version;
-            m_index = index;
+            version = initial_version;
+            index = initial_index;
         }
 
-        bool operator==(const VersionID& other) { return m_version == other.m_version; }
-        bool operator!=(const VersionID& other) { return m_version != other.m_version; }
-        bool operator<(const VersionID& other) { return m_version < other.m_version; }
-        bool operator<=(const VersionID& other) { return m_version <= other.m_version; }
-        bool operator>(const VersionID& other) { return m_version > other.m_version; }
-        bool operator>=(const VersionID& other) { return m_version >= other.m_version; }
+        bool operator==(const VersionID& other) { return version == other.version; }
+        bool operator!=(const VersionID& other) { return version != other.version; }
+        bool operator<(const VersionID& other) { return version < other.version; }
+        bool operator<=(const VersionID& other) { return version <= other.version; }
+        bool operator>(const VersionID& other) { return version > other.version; }
+        bool operator>=(const VersionID& other) { return version >= other.version; }
     };
 
     /// Thrown by begin_read() if the specified version does not correspond to a
@@ -939,7 +939,7 @@ inline void SharedGroup::advance_read(O* observer, VersionID version_id)
         throw LogicError(LogicError::wrong_transact_state);
 
     // It is an error if the new version precedes the currently bound one.
-    if (version_id.m_version < m_read_lock.m_version)
+    if (version_id.version < m_read_lock.m_version)
         throw LogicError(LogicError::bad_version);
 
     _impl::History* hist = get_history(); // Throws

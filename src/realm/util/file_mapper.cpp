@@ -178,8 +178,8 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_o
         return m_ptr;
     }
     catch (...) {
-        if (it->info->m_mappings.empty()) {
-            ::close(it->info->m_fd);
+        if (it->info->mappings.empty()) {
+            ::close(it->info->fd);
             mappings_by_file.erase(it);
         }
         throw;
@@ -197,8 +197,8 @@ void remove_mapping(void* addr, size_t size)
     mappings_by_addr.erase(mappings_by_addr.begin() + (m - &mappings_by_addr[0]));
 
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
-        if (it->info->m_mappings.empty()) {
-            if (::close(it->info->m_fd) != 0) {
+        if (it->info->mappings.empty()) {
+            if (::close(it->info->fd) != 0) {
                 int err = errno; // Eliminate any risk of clobbering
                 if (err == EBADF || err == EIO) // FIXME: how do we handle EINTR?
                     throw std::runtime_error(get_errno_msg("close() failed: ", err));

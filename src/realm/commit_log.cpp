@@ -190,11 +190,11 @@ protected:
 
     // Metadata for a file (in memory):
     struct CommitLogMetadata {
-        mutable util::File m_file;
-        std::string m_name;
-        mutable util::File::Map<CommitLogHeader> m_map;
-        mutable uint64_t m_last_seen_mmap_counter = 0;
-        CommitLogMetadata(std::string name): m_name(name) {}
+        mutable util::File file;
+        std::string name;
+        mutable util::File::Map<CommitLogHeader> map;
+        mutable uint64_t last_seen_mmap_counter = 0;
+        CommitLogMetadata(std::string log_name): name(log_name) {}
     };
 
     class MergingIndexTranslator;
@@ -286,8 +286,8 @@ WriteLogCollector::WriteLogCollector(const std::string& database_name,
     m_header_name = database_name + ".management/log_access";
     m_read_version = 0;
     m_read_offset = 0;
-    m_log_a.m_file.set_encryption_key(encryption_key);
-    m_log_b.m_file.set_encryption_key(encryption_key);
+    m_log_a.file.set_encryption_key(encryption_key);
+    m_log_b.file.set_encryption_key(encryption_key);
 }
 
 
@@ -343,12 +343,12 @@ void WriteLogCollector::get_maps_in_order(const CommitLogPreamble* preamble,
                            const util::File::Map<CommitLogHeader>*& second) const
 {
     if (preamble->active_file_is_log_a) {
-        first  = &m_log_b.m_map;
-        second = &m_log_a.m_map;
+        first  = &m_log_b.map;
+        second = &m_log_a.map;
     }
     else {
-        first  = &m_log_a.m_map;
-        second = &m_log_b.m_map;
+        first  = &m_log_a.map;
+        second = &m_log_b.map;
     }
 }
 
@@ -365,33 +365,33 @@ WriteLogCollector::get_active_log(CommitLogPreamble* preamble)
 
 void WriteLogCollector::open_if_needed(const CommitLogMetadata& log) const
 {
-    if (log.m_file.is_attached() == false)
-        log.m_file.open(log.m_name, File::mode_Update);
+    if (log.file.is_attached() == false)
+        log.file.open(log.name, File::mode_Update);
 }
 
 void WriteLogCollector::remap_if_needed(const CommitLogMetadata& log) const
 {
-    if (log.m_map.is_attached() == false) {
+    if (log.map.is_attached() == false) {
         open_if_needed(log);
-        log.m_last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
-        log.m_map.map(log.m_file, File::access_ReadWrite, size_t(log.m_file.get_size()));
+        log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
+        log.map.map(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
         return;
     }
-    if (log.m_last_seen_mmap_counter != m_header.get_addr()->mmap_counter) {
-        log.m_last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
-        log.m_map.remap(log.m_file, File::access_ReadWrite, size_t(log.m_file.get_size()));
+    if (log.last_seen_mmap_counter != m_header.get_addr()->mmap_counter) {
+        log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
+        log.map.remap(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
     }
 }
 
 void WriteLogCollector::reset_file(CommitLogMetadata& log)
 {
-    log.m_map.unmap();
-    log.m_file.close();
-    File::try_remove(log.m_name);
-    log.m_file.open(log.m_name, File::mode_Write);
-    log.m_file.resize(minimal_pages * page_size); // Throws
-    log.m_last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
-    log.m_map.map(log.m_file, File::access_ReadWrite, minimal_pages * page_size);
+    log.map.unmap();
+    log.file.close();
+    File::try_remove(log.name);
+    log.file.open(log.name, File::mode_Write);
+    log.file.resize(minimal_pages * page_size); // Throws
+    log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
+    log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
 }
 
 void WriteLogCollector::reset_header()
@@ -408,14 +408,14 @@ void WriteLogCollector::reset_header()
 void WriteLogCollector::commit_log_close() noexcept
 {
     m_header.unmap();
-    m_log_a.m_map.unmap();
-    m_log_a.m_file.close();
-    m_log_b.m_map.unmap();
-    m_log_b.m_file.close();
+    m_log_a.map.unmap();
+    m_log_a.file.close();
+    m_log_b.map.unmap();
+    m_log_b.file.close();
     // ensure we do not accidentally have a counter matching
     // a later mmap.
-    m_log_a.m_last_seen_mmap_counter = 0;
-    m_log_b.m_last_seen_mmap_counter = 0;
+    m_log_a.last_seen_mmap_counter = 0;
+    m_log_b.last_seen_mmap_counter = 0;
 }
 
 
@@ -441,15 +441,15 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         // shrink the recycled file by 1/4
         CommitLogMetadata* active_log = get_active_log(preamble);
         open_if_needed(*active_log);
-        File::SizeType size = active_log->m_file.get_size();
+        File::SizeType size = active_log->file.get_size();
         size /= page_size * minimal_pages;
         if (size > 4) {
             size -= size/4;
             size *= page_size * minimal_pages;
             // indicate change of log size, forcing readers to remap to new size
             m_header.get_addr()->mmap_counter++;
-            active_log->m_map.unmap();
-            active_log->m_file.resize(size); // Throws
+            active_log->map.unmap();
+            active_log->file.resize(size); // Throws
         }
     }
 }
@@ -471,9 +471,9 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     File::SizeType size_needed =
         aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof(EntryHeader) + entry.changeset.size());
     size_needed = aligned_to(page_size, size_needed);
-    if (size_needed > active_log->m_file.get_size()) {
+    if (size_needed > active_log->file.get_size()) {
         m_header.get_addr()->mmap_counter++;
-        active_log->m_file.resize(size_needed); // Throws
+        active_log->file.resize(size_needed); // Throws
     }
 
     // create/update mapping so that we are sure it covers the file we are about
@@ -481,9 +481,9 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     remap_if_needed(*active_log);
 
     // append data from write pointer and onwards:
-    char* write_ptr = reinterpret_cast<char*>(active_log->m_map.get_addr()) + preamble->write_offset;
+    char* write_ptr = reinterpret_cast<char*>(active_log->map.get_addr()) + preamble->write_offset;
     realm::util::encryption_read_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size(),
-                                         active_log->m_map.get_encrypted_mapping());
+                                         active_log->map.get_encrypted_mapping());
     EntryHeader hdr;
     hdr.size = entry.changeset.size();
     *reinterpret_cast<EntryHeader*>(write_ptr) = hdr;
@@ -491,9 +491,9 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     std::copy(entry.changeset.data(), entry.changeset.data() + entry.changeset.size(), write_ptr2);
     bool disable_sync = get_disable_sync_to_disk();
     realm::util::encryption_write_barrier(write_ptr, sizeof(EntryHeader) + entry.changeset.size(),
-                                          active_log->m_map.get_encrypted_mapping());
+                                          active_log->map.get_encrypted_mapping());
     if (!disable_sync)
-        active_log->m_map.sync(); // Throws
+        active_log->map.sync(); // Throws
 
     // update metadata to reflect the added commit log
     preamble->write_offset += aligned_to(sizeof (uint64_t), entry.changeset.size() + sizeof(EntryHeader));
@@ -544,14 +544,14 @@ void WriteLogCollector::terminate_session() noexcept
 #ifdef _WIN32
     // FIXME: on Windows, terminate_session() fails to delete a file because it's open
     try {
-        File::try_remove(m_log_a.m_name);
-        File::try_remove(m_log_b.m_name);
+        File::try_remove(m_log_a.name);
+        File::try_remove(m_log_b.name);
         File::try_remove(m_header_name);
     }
     catch (...) {}
 #else
-    File::try_remove(m_log_a.m_name);
-    File::try_remove(m_log_b.m_name);
+    File::try_remove(m_log_a.name);
+    File::try_remove(m_log_b.name);
     File::try_remove(m_header_name);
 #endif
 }
