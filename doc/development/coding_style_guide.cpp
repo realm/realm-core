@@ -5,6 +5,8 @@
 
 // Lines should never exceed 118 characters --------------------------------------------------------------------------
 
+// Code should only include regular ASCII encoded characters.
+// Comments may include UTF-8 encoded characters.
 
 // Macro names use uppercase and have "REALM_" as prefix. Non-macro
 // names never use all uppercase.
