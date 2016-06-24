@@ -400,9 +400,9 @@ std::basic_istream<C,T>& operator>>(std::basic_istream<C,T>& in, Logger::Level& 
     return in;
 }
 
-inline void RootLogger::set_level_threshold(Level level_threshold) noexcept
+inline void RootLogger::set_level_threshold(Level new_level_threshold) noexcept
 {
-    m_level_threshold = level_threshold;
+    m_level_threshold = new_level_threshold;
 }
 
 inline RootLogger::RootLogger():
@@ -449,10 +449,10 @@ inline FileLogger::FileLogger(util::File file):
 {
 }
 
-inline ThreadSafeLogger::ThreadSafeLogger(Logger& base_logger, Level level_threshold):
+inline ThreadSafeLogger::ThreadSafeLogger(Logger& base_logger, Level threshold):
     Logger::LevelThreshold(),
     Logger(static_cast<Logger::LevelThreshold&>(*this)),
-    m_level_threshold(level_threshold),
+    m_level_threshold(threshold),
     m_base_logger(base_logger)
 {
 }

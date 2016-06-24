@@ -233,11 +233,11 @@ private:
 
 class IntraTestLogger: private Logger::LevelThreshold, public util::Logger {
 public:
-    IntraTestLogger(util::Logger& base_logger, Level level_threshold):
+    IntraTestLogger(util::Logger& base_logger, Level threshold):
         util::Logger::LevelThreshold(),
         util::Logger(static_cast<util::Logger::LevelThreshold&>(*this)),
         m_base_logger(base_logger),
-        m_level_threshold(level_threshold)
+        m_level_threshold(threshold)
     {
     }
 
