@@ -235,8 +235,8 @@ inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg):
 {
 }
 
-inline LogicError::LogicError(LogicError::ErrorKind kind):
-    m_kind(kind)
+inline LogicError::LogicError(LogicError::ErrorKind k):
+    m_kind(k)
 {
 }
 

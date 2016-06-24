@@ -337,10 +337,10 @@ public:
         address_configured = AI_ADDRCONFIG
     };
 
-    query(std::string service, int flags = passive|address_configured);
-    query(const protocol&, std::string service, int flags = passive|address_configured);
-    query(std::string host, std::string service, int flags = address_configured);
-    query(const protocol&, std::string host, std::string service, int flags = address_configured);
+    query(std::string service_port, int init_flags = passive|address_configured);
+    query(const protocol&, std::string service_port, int init_flags = passive|address_configured);
+    query(std::string host_name, std::string service_port, int init_flags = address_configured);
+    query(const protocol&, std::string host_name, std::string service_port, int init_flags = address_configured);
 
     ~query() noexcept;
 
@@ -477,9 +477,9 @@ private:
 };
 
 struct socket_base::linger_opt {
-    linger_opt(bool enabled, int timeout_seconds = 0)
+    linger_opt(bool enable, int timeout_seconds = 0)
     {
-        m_linger.l_onoff = enabled ? 1 : 0;
+        m_linger.l_onoff = enable ? 1 : 0;
         m_linger.l_linger = timeout_seconds;
     }
 
@@ -1410,9 +1410,9 @@ inline void io_service::async_oper::cancel() noexcept
     m_canceled = true;
 }
 
-inline io_service::async_oper::async_oper(size_t size, bool in_use) noexcept:
+inline io_service::async_oper::async_oper(size_t size, bool is_in_use) noexcept:
     m_size(size),
-    m_in_use(in_use)
+    m_in_use(is_in_use)
 {
 }
 
@@ -1491,32 +1491,32 @@ inline void resolver::resolve(const query& q, endpoint::list& l)
         throw std::system_error(ec);
 }
 
-inline resolver::query::query(std::string service, int flags):
-    m_flags(flags),
-    m_service(service)
+inline resolver::query::query(std::string service_port, int init_flags):
+    m_flags(init_flags),
+    m_service(service_port)
 {
 }
 
-inline resolver::query::query(const class protocol& prot, std::string service, int flags):
-    m_flags(flags),
+inline resolver::query::query(const class protocol& prot, std::string service_port, int init_flags):
+    m_flags(init_flags),
     m_protocol(prot),
-    m_service(service)
+    m_service(service_port)
 {
 }
 
-inline resolver::query::query(std::string host, std::string service, int flags):
-    m_flags(flags),
-    m_host(host),
-    m_service(service)
+inline resolver::query::query(std::string host_name, std::string service_port, int init_flags):
+    m_flags(init_flags),
+    m_host(host_name),
+    m_service(service_port)
 {
 }
 
-inline resolver::query::query(const class protocol& prot, std::string host, std::string service,
-                              int flags):
-    m_flags(flags),
+inline resolver::query::query(const class protocol& prot, std::string host_name, std::string service_port,
+                              int init_flags):
+    m_flags(init_flags),
     m_protocol(prot),
-    m_host(host),
-    m_service(service)
+    m_host(host_name),
+    m_service(service_port)
 {
 }
 
@@ -1546,9 +1546,9 @@ inline std::string resolver::query::service() const
 
 // ---------------- socket_base ----------------
 
-inline socket_base::socket_base(io_service& service):
+inline socket_base::socket_base(io_service& s):
     m_sock_fd(-1),
-    m_service(service)
+    m_service(s)
 {
 }
 
@@ -1660,8 +1660,8 @@ inline std::error_code socket_base::ensure_nonblocking_mode(std::error_code& ec)
 }
 
 template<class T, int opt, class U>
-inline socket_base::option<T, opt, U>::option(T value):
-    m_value(value)
+inline socket_base::option<T, opt, U>::option(T init_value):
+    m_value(init_value)
 {
 }
 
@@ -1689,8 +1689,8 @@ inline void socket_base::option<T, opt, U>::get(const socket_base& sock, std::er
 template<class T, int opt, class U>
 inline void socket_base::option<T, opt, U>::set(socket_base& sock, std::error_code& ec) const
 {
-    U value = U(m_value);
-    sock.set_option(opt_enum(opt), &value, sizeof value, ec);
+    U value_to_set = U(m_value);
+    sock.set_option(opt_enum(opt), &value_to_set, sizeof value_to_set, ec);
 }
 
 // ---------------- socket ----------------
@@ -1848,8 +1848,8 @@ private:
     H m_handler;
 };
 
-inline socket::socket(io_service& service):
-    socket_base(service)
+inline socket::socket(io_service& s):
+    socket_base(s)
 {
 }
 
@@ -2035,8 +2035,8 @@ private:
     H m_handler;
 };
 
-inline acceptor::acceptor(io_service& service):
-    socket_base(service)
+inline acceptor::acceptor(io_service& s):
+    socket_base(s)
 {
 }
 

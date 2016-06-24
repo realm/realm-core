@@ -726,10 +726,10 @@ std::error_code resolver::resolve(const query& query_info, endpoint::list& list,
     hints.ai_socktype = query_info.m_protocol.m_socktype;
     hints.ai_protocol = query_info.m_protocol.m_protocol;
 
-    const char* host = query_info.m_host.empty() ? 0 : query_info.m_host.c_str();
-    const char* service = query_info.m_service.empty() ? 0 : query_info.m_service.c_str();
+    const char* query_host = query_info.m_host.empty() ? 0 : query_info.m_host.c_str();
+    const char* query_service = query_info.m_service.empty() ? 0 : query_info.m_service.c_str();
     struct addrinfo* first = nullptr;
-    int ret = ::getaddrinfo(host, service, &hints, &first);
+    int ret = ::getaddrinfo(query_host, query_service, &hints, &first);
     if (REALM_UNLIKELY(ret != 0)) {
 #ifdef EAI_SYSTEM
         if (ret == EAI_SYSTEM) {
