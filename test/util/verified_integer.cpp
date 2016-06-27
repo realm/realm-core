@@ -44,7 +44,7 @@ int64_t VerifiedInteger::get(size_t ndx)
 
 int64_t VerifiedInteger::sum(size_t start, size_t end)
 {
-    int64_t sum = 0;
+    int64_t running_sum = 0;
 
     if (start == end)
         return 0;
@@ -53,10 +53,10 @@ int64_t VerifiedInteger::sum(size_t start, size_t end)
         end = v.size();
 
     for (size_t t = start; t < end; ++t)
-        sum += v[t];
+        running_sum += v[t];
 
-    REALM_ASSERT(sum == u.sum(start, end));
-    return sum;
+    REALM_ASSERT(running_sum == u.sum(start, end));
+    return running_sum;
 }
 
 int64_t VerifiedInteger::maximum(size_t start, size_t end)

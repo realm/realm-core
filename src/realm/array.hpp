@@ -351,11 +351,11 @@ public:
     /// Construct a shallow copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will **not** be cloned. See
     /// slice_and_clone_children() for an alternative.
-    MemRef slice(size_t offset, size_t size, Allocator& target_alloc) const;
+    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
 
     /// Construct a deep copy of the specified slice of this array using the
     /// specified target allocator. Subarrays will be cloned.
-    MemRef slice_and_clone_children(size_t offset, size_t size,
+    MemRef slice_and_clone_children(size_t offset, size_t slice_size,
                                     Allocator& target_alloc) const;
 
     // Parent tracking
@@ -458,7 +458,7 @@ public:
     ///
     /// This function guarantees that no exceptions will be thrown if
     /// get_alloc().is_read_only(get_ref()) would return false before the call.
-    void truncate(size_t size);
+    void truncate(size_t new_size);
 
     /// Reduce the size of this array to the specified number of elements. It is
     /// an error to specify a size that is greater than the current size of this
@@ -467,7 +467,7 @@ public:
     ///
     /// This function is guaranteed not to throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
-    void truncate_and_destroy_children(size_t size);
+    void truncate_and_destroy_children(size_t new_size);
 
     /// Remove every element from this array. This is just a shorthand for
     /// calling truncate(0).
@@ -591,8 +591,8 @@ public:
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
     size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
-    void preset(int64_t min, int64_t max, size_t count);
-    void preset(size_t bitwidth, size_t count);
+    void preset(int64_t min, int64_t max, size_t num_items);
+    void preset(size_t bitwidth, size_t num_items);
 
     int64_t sum(size_t start = 0, size_t end = size_t(-1)) const;
     size_t count(int64_t value) const noexcept;
@@ -1024,7 +1024,7 @@ public:
         virtual void handle(ref_type ref, size_t allocated, size_t used) = 0;
     };
     void report_memory_usage(MemUsageHandler&) const;
-    void stats(MemStats& stats) const;
+    void stats(MemStats& stats_dest) const;
     typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, int level);
     void dump_bptree_structure(std::ostream&, int level, LeafDumper) const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
@@ -1064,7 +1064,7 @@ protected:
 //    void add_positive_local(int64_t value);
 
     // Includes array header. Not necessarily 8-byte aligned.
-    virtual size_t calc_byte_len(size_t size, size_t width) const;
+    virtual size_t calc_byte_len(size_t num_items, size_t width) const;
 
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
 
@@ -1116,7 +1116,7 @@ protected:
     template<size_t width>
     void set_width() noexcept;
     void set_width(size_t) noexcept;
-    void alloc(size_t count, size_t width);
+    void alloc(size_t init_size, size_t width);
     void copy_on_write();
 
 private:
@@ -1536,8 +1536,8 @@ inline RefOrTagged::RefOrTagged(int_fast64_t value) noexcept:
 {
 }
 
-inline Array::Array(Allocator& alloc) noexcept:
-    m_alloc(alloc)
+inline Array::Array(Allocator& allocator) noexcept:
+    m_alloc(allocator)
 {
 }
 
@@ -1550,9 +1550,9 @@ inline Array::Array(no_prealloc_tag) noexcept:
 }
 
 
-inline void Array::create(Type type, bool context_flag, size_t size, int_fast64_t value)
+inline void Array::create(Type type, bool context_flag, size_t length, int_fast64_t value)
 {
-    MemRef mem = create_array(type, context_flag, size, value, m_alloc); // Throws
+    MemRef mem = create_array(type, context_flag, length, value, m_alloc); // Throws
     init_from_mem(mem);
 }
 

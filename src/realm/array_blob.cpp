@@ -5,17 +5,17 @@
 using namespace realm;
 
 
-void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size, bool add_zero_term)
+void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term)
 {
     REALM_ASSERT_3(begin, <=, end);
     REALM_ASSERT_3(end, <=, m_size);
-    REALM_ASSERT(size == 0 || data);
+    REALM_ASSERT(data_size == 0 || data);
 
     copy_on_write(); // Throws
 
     // Reallocate if needed
     size_t remove_size = end - begin;
-    size_t add_size = size;
+    size_t add_size = data_size;
     if (add_zero_term)
         ++add_size;
     size_t new_size = m_size - remove_size + add_size;
@@ -40,7 +40,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
     }
 
     // Insert the data
-    modify_begin = std::copy(data, data+size, modify_begin);
+    modify_begin = std::copy(data, data+data_size, modify_begin);
     if (add_zero_term)
         *modify_begin = 0;
 

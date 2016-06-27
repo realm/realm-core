@@ -607,7 +607,7 @@ void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx
 void TableViewBase::adj_row_acc_clear() noexcept
 {
     m_num_detached_refs = m_row_indexes.size();
-    for (size_t i = 0, size = m_row_indexes.size(); i < size; ++i)
+    for (size_t i = 0, num_rows = m_row_indexes.size(); i < num_rows; ++i)
         m_row_indexes.set(i, -1);
 }
 

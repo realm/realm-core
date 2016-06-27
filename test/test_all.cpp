@@ -284,9 +284,9 @@ public:
         SimpleReporter::end(context, elapsed_seconds);
     }
 
-    void summary(const SharedContext& context, const Summary& summary) override
+    void summary(const SharedContext& context, const Summary& results_summary) override
     {
-        SimpleReporter::summary(context, summary);
+        SimpleReporter::summary(context, results_summary);
 
         size_t max_n = 5;
         size_t n = std::min<size_t>(max_n, m_results.size());

@@ -487,7 +487,7 @@ public:
     void set_null(size_t column_ndx, size_t row_ndx);
 
     void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
-    void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size = realm::npos);
+    void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);
 
     //@}
 
@@ -725,12 +725,12 @@ public:
     /// (see add_search_index()) will not be carried over to the new
     /// table.
     ///
-    /// \param offset Index of first row to include (if `size >
+    /// \param offset Index of first row to include (if `slice_size >
     /// 0`). Must be less than, or equal to size().
     ///
-    /// \param size Number of rows to include. May be zero. If `size >
-    /// size() - offset`, then the effective size of the written slice
-    /// will be `size() - offset`.
+    /// \param slice_size Number of rows to include. May be zero. If 
+    /// `slice_size > size() - offset`, then the effective size of 
+    /// the written slice will be `size() - offset`.
     ///
     /// \throw std::out_of_range If `offset > size()`.
     ///
@@ -739,7 +739,7 @@ public:
     /// of general utility. This is unfortunate, because it pulls
     /// quite a large amount of code into the core library to support
     /// it.
-    void write(std::ostream&, size_t offset = 0, size_t size = npos,
+    void write(std::ostream&, size_t offset = 0, size_t slice_size = npos,
                StringData override_table_name = StringData()) const;
 
     // Conversion
@@ -973,7 +973,7 @@ private:
     struct MoveSubtableColumns;
 
     void insert_root_column(size_t col_ndx, DataType type, StringData name,
-                            LinkTargetInfo& link, bool nullable = false);
+                            LinkTargetInfo& link_target, bool nullable = false);
     void erase_root_column(size_t col_ndx);
     void move_root_column(size_t from, size_t to);
     void do_insert_root_column(size_t col_ndx, ColumnType, StringData name, bool nullable = false);

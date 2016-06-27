@@ -810,7 +810,7 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 }
 
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
-                               LinkTargetInfo& link, bool nullable)
+                               LinkTargetInfo& link_target, bool nullable)
 {
     using tf = _impl::TableFriend;
 
@@ -828,22 +828,22 @@ void Table::insert_root_column(size_t col_ndx, DataType type, StringData name,
     // it should not try to establish the connection yet. The connection will be
     // established by Table::refresh_column_accessors() when it is invoked for
     // the target table below.
-    if (link.is_valid()) {
-        size_t target_table_ndx = link.m_target_table->get_index_in_group();
+    if (link_target.is_valid()) {
+        size_t target_table_ndx = link_target.m_target_table->get_index_in_group();
         m_spec.set_opposite_link_table_ndx(col_ndx, target_table_ndx); // Throws
-        link.m_target_table->mark();
+        link_target.m_target_table->mark();
     }
 
     refresh_column_accessors(col_ndx); // Throws
 
-    if (link.is_valid()) {
-        link.m_target_table->unmark();
+    if (link_target.is_valid()) {
+        link_target.m_target_table->unmark();
         size_t origin_table_ndx = get_index_in_group();
-        if (link.m_backlink_col_ndx == realm::npos) {
-            const Spec& target_spec = tf::get_spec(*(link.m_target_table));
-            link.m_backlink_col_ndx = target_spec.get_column_count();   // insert at back of target
+        if (link_target.m_backlink_col_ndx == realm::npos) {
+            const Spec& target_spec = tf::get_spec(*(link_target.m_target_table));
+            link_target.m_backlink_col_ndx = target_spec.get_column_count();   // insert at back of target
         }
-        link.m_target_table->insert_backlink_column(origin_table_ndx, col_ndx, link.m_backlink_col_ndx); // Throws
+        link_target.m_target_table->insert_backlink_column(origin_table_ndx, col_ndx, link_target.m_backlink_col_ndx); // Throws
     }
 
     refresh_link_target_accessors(col_ndx);
@@ -1259,8 +1259,8 @@ void Table::create_degen_subtab_columns()
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = m_spec.get_column_type(i);
         bool nullable = (m_spec.get_column_attr(i) & col_attr_Nullable) != 0;
-        size_t size = 0;
-        ref_type ref = create_column(type, size, nullable, alloc); // Throws
+        size_t init_size = 0;
+        ref_type ref = create_column(type, init_size, nullable, alloc); // Throws
         m_columns.add(int_fast64_t(ref)); // Throws
 
         // So far, only root tables can have search indexes, and this is not a
@@ -2191,10 +2191,10 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
     }
 
     if (skip_cascade) {
-        size_t size = row_indexes.size();
+        size_t num_rows = row_indexes.size();
         std::vector<size_t> rows;
-        rows.reserve(size);
-        for (size_t i = 0; i < size; ++i) {
+        rows.reserve(num_rows);
+        for (size_t i = 0; i < num_rows; ++i) {
             int64_t v = row_indexes.get(i);
             if (v != detached_ref) {
                 size_t row_ndx = to_size_t(v);
@@ -2232,9 +2232,9 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
     REALM_ASSERT(table_ndx != realm::npos);
 
     CascadeState state;
-    size_t size = row_indexes.size();
-    state.rows.reserve(size);
-    for (size_t i = 0; i < size; ++i) {
+    size_t num_rows = row_indexes.size();
+    state.rows.reserve(num_rows);
+    for (size_t i = 0; i < num_rows; ++i) {
         int64_t v = row_indexes.get(i);
         if (v != detached_ref) {
             size_t row_ndx = to_size_t(v);
@@ -2252,8 +2252,8 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
         state.track_link_nullifications = g->has_cascade_notification_handler();
 
     // Iterate over a copy of `rows` since cascading deletes mutate it
-    auto copy = state.rows;
-    for (auto const& row : copy) {
+    auto rows_copy = state.rows;
+    for (auto const& row : rows_copy) {
         cascade_break_backlinks_to(row.row_ndx, state); // Throws
     }
 
@@ -3079,7 +3079,7 @@ void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringD
 }
 
 
-void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size)
+void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -3098,7 +3098,7 @@ void Table::remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t 
         throw LogicError(LogicError::string_position_out_of_range);
 
     std::string copy_of_value = old_value; // Throws
-    copy_of_value.erase(pos, size); // Throws
+    copy_of_value.erase(pos, substring_size); // Throws
 
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
@@ -4513,13 +4513,13 @@ private:
 };
 
 
-void Table::write(std::ostream& out, size_t offset, size_t size, StringData override_table_name) const
+void Table::write(std::ostream& out, size_t offset, size_t slice_size, StringData override_table_name) const
 {
     size_t table_size = this->size();
     if (offset > table_size)
         throw std::out_of_range("Offset is out of range");
     size_t remaining_size = table_size - offset;
-    size_t size_2 = size;
+    size_t size_2 = slice_size;
     if (size_2 > remaining_size)
         size_2 = remaining_size;
     StringData table_name = override_table_name;
@@ -4770,12 +4770,12 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out, size_t link_depth,
             }
             else {
                 out << "[";
-                for (size_t link = 0; link < lv->size(); link++) {
-                    if (link > 0)
+                for (size_t link_ndx = 0; link_ndx < lv->size(); link_ndx++) {
+                    if (link_ndx > 0)
                         out << ", ";
                     followed.push_back(lnk);
                     size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                    table.to_json_row(lv->get(link).get_index(), out, new_depth, renames, followed);
+                    table.to_json_row(lv->get(link_ndx).get_index(), out, new_depth, renames, followed);
                 }
                 out << "]";
             }
@@ -5608,9 +5608,9 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         // If there is no search index accessor, but the column has been
         // equipped with a search index, create the accessor now.
         ColumnAttr attr = m_spec.get_column_attr(col_ndx);
-        bool has_search_index = (attr & col_attr_Indexed) != 0;
+        bool column_has_search_index = (attr & col_attr_Indexed) != 0;
 
-        if (!has_search_index && col)
+        if (!column_has_search_index && col)
             col->destroy_search_index();
 
         // If the current column accessor is StringColumn, but the underlying
@@ -5671,7 +5671,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             }
         }
 
-        if (has_search_index) {
+        if (column_has_search_index) {
             bool allow_duplicate_values = true;
             if (col->has_search_index()) {
                 col->set_search_index_allow_duplicate_values(allow_duplicate_values);
@@ -5683,7 +5683,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
             }
         }
 
-        ndx_in_parent += (has_search_index ? 2 : 1);
+        ndx_in_parent += (column_has_search_index ? 2 : 1);
     }
 
     // Set table size
@@ -5943,9 +5943,9 @@ void Table::print() const
 
 MemStats Table::stats() const
 {
-    MemStats stats;
-    m_top.stats(stats);
-    return stats;
+    MemStats mem_stats;
+    m_top.stats(mem_stats);
+    return mem_stats;
 }
 
 

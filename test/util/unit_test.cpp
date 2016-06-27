@@ -84,16 +84,16 @@ public:
         i->second.elapsed_seconds = elapsed_seconds;
     }
 
-    void summary(const SharedContext& context, const Summary& summary) override
+    void summary(const SharedContext& context, const Summary& results_summary) override
     {
         m_out <<
             "<?xml version=\"1.0\"?>\n"
             "<unittest-results "
-            "tests=\"" << summary.num_executed_tests << "\" "
-            "failedtests=\"" << summary.num_failed_tests << "\" "
-            "checks=\"" << summary.num_executed_checks << "\" "
-            "failures=\"" << summary.num_failed_checks << "\" "
-            "time=\"" << summary.elapsed_seconds << "\">\n";
+            "tests=\"" << results_summary.num_executed_tests << "\" "
+            "failedtests=\"" << results_summary.num_failed_tests << "\" "
+            "checks=\"" << results_summary.num_executed_checks << "\" "
+            "failures=\"" << results_summary.num_failed_checks << "\" "
+            "time=\"" << results_summary.elapsed_seconds << "\">\n";
         std::ostringstream out;
         out.imbue(std::locale::classic());
         for (const auto& p: m_tests) {
@@ -473,16 +473,16 @@ bool TestList::run(Config config)
     }
 
     // Summarize
-    Summary summary;
-    summary.num_disabled_tests  = long(num_disabled);
-    summary.num_excluded_tests  = long(num_enabled - included_tests.size());
-    summary.num_included_tests  = long(included_tests.size());
-    summary.num_executed_tests  = long(num_executed_tests);
-    summary.num_failed_tests    = shared_context.num_failed_tests;
-    summary.num_executed_checks = shared_context.num_checks;
-    summary.num_failed_checks   = shared_context.num_failed_checks;
-    summary.elapsed_seconds     = timer.get_elapsed_time();
-    reporter.summary(shared_context, summary);
+    Summary results_summary;
+    results_summary.num_disabled_tests  = long(num_disabled);
+    results_summary.num_excluded_tests  = long(num_enabled - included_tests.size());
+    results_summary.num_included_tests  = long(included_tests.size());
+    results_summary.num_executed_tests  = long(num_executed_tests);
+    results_summary.num_failed_tests    = shared_context.num_failed_tests;
+    results_summary.num_executed_checks = shared_context.num_checks;
+    results_summary.num_failed_checks   = shared_context.num_failed_checks;
+    results_summary.elapsed_seconds     = timer.get_elapsed_time();
+    reporter.summary(shared_context, results_summary);
 
     return shared_context.num_failed_tests == 0;
 }
@@ -837,24 +837,24 @@ void SimpleReporter::thread_end(const ThreadContext& context)
     }
 }
 
-void SimpleReporter::summary(const SharedContext& context, const Summary& summary)
+void SimpleReporter::summary(const SharedContext& context, const Summary& results_summary)
 {
     util::Logger& logger = context.report_logger;
-    if (summary.num_failed_tests == 0) {
-        logger.info("Success: All %1 tests passed (%2 checks).", summary.num_executed_tests,
-                    summary.num_executed_checks);
+    if (results_summary.num_failed_tests == 0) {
+        logger.info("Success: All %1 tests passed (%2 checks).", results_summary.num_executed_tests,
+                    results_summary.num_executed_checks);
     }
     else {
         logger.info("FAILURE: %1 out of %2 tests failed (%3 out of %4 checks failed).",
-                    summary.num_failed_tests,  summary.num_executed_tests,
-                    summary.num_failed_checks, summary.num_executed_checks);
+                    results_summary.num_failed_tests,  results_summary.num_executed_tests,
+                    results_summary.num_failed_checks, results_summary.num_executed_checks);
     }
-    logger.info("Test time: %1", Timer::format(summary.elapsed_seconds));
-    if (summary.num_excluded_tests >= 1) {
-        auto format = summary.num_excluded_tests == 1 ?
+    logger.info("Test time: %1", Timer::format(results_summary.elapsed_seconds));
+    if (results_summary.num_excluded_tests >= 1) {
+        auto format = results_summary.num_excluded_tests == 1 ?
             "Note: One test was excluded!" :
             "Note: %1 tests were excluded!";
-        logger.info(format, summary.num_excluded_tests);
+        logger.info(format, results_summary.num_excluded_tests);
     }
 }
 

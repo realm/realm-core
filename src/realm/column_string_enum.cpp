@@ -348,9 +348,9 @@ void StringEnumColumn::verify(const Table& table, size_t col_ndx) const
     IntegerColumn::verify(table, col_ndx);
 
     ColumnAttr attr = spec.get_column_attr(col_ndx);
-    bool has_search_index = (attr & col_attr_Indexed) != 0;
-    REALM_ASSERT_3(has_search_index, ==, bool(m_search_index));
-    if (has_search_index) {
+    bool column_has_search_index = (attr & col_attr_Indexed) != 0;
+    REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
+    if (column_has_search_index) {
         REALM_ASSERT_3(m_search_index->get_ndx_in_parent(), ==,
                        get_root_array()->get_ndx_in_parent() + 1);
     }

@@ -209,9 +209,9 @@ void TimestampColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     if (has_search_index()) {
         auto value_1 = get(row_ndx_1);
         auto value_2 = get(row_ndx_2);
-        size_t size = this->size();
-        bool row_ndx_1_is_last = row_ndx_1 == size - 1;
-        bool row_ndx_2_is_last = row_ndx_2 == size - 1;
+        size_t column_size = this->size();
+        bool row_ndx_1_is_last = row_ndx_1 == column_size - 1;
+        bool row_ndx_2_is_last = row_ndx_2 == column_size - 1;
         m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last); // Throws
         m_search_index->insert(row_ndx_1, value_2, 1, row_ndx_1_is_last); // Throws
         m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last); // Throws
@@ -348,9 +348,9 @@ void TimestampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/
 
 void TimestampColumn::add(const Timestamp& ts)
 {
-    bool is_null = ts.is_null();
-    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
-    int32_t nanoseconds = is_null ? 0 : ts.get_nanoseconds();
+    bool ts_is_null = ts.is_null();
+    util::Optional<int64_t> seconds = ts_is_null ? util::none : util::make_optional(ts.get_seconds());
+    int32_t nanoseconds = ts_is_null ? 0 : ts.get_nanoseconds();
     m_seconds->insert(npos, seconds); // Throws
     m_nanoseconds->insert(npos, nanoseconds); // Throws
 

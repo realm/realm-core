@@ -361,8 +361,8 @@ public:
             const ReadCount& r = get(old_pos.load(std::memory_order_relaxed));
             if (! atomic_one_if_zero( r.count ))
                 break;
-            auto next = get(old_pos.load(std::memory_order_relaxed)).next;
-            old_pos.store(next, std::memory_order_relaxed);
+            auto next_ndx = get(old_pos.load(std::memory_order_relaxed)).next;
+            old_pos.store(next_ndx, std::memory_order_relaxed);
         }
     }
 
