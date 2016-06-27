@@ -731,8 +731,10 @@ bool File::lock(bool exclusive, bool non_blocking)
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking)
         operation |=  LOCK_NB;
-    if (flock(m_fd, operation) == 0)
-        return true;
+    do {
+        if (flock(m_fd, operation) == 0)
+            return true;
+    } while (errno == EINTR);
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
         return false;
