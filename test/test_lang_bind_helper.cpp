@@ -12223,6 +12223,7 @@ TEST(LangbindHelper_GetDataTypeName)
     CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Mixed), "mixed"));
     CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Link), "link"));
     CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_LinkList), "linklist"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(static_cast<DataType>(42)), "unknown"));
 }
 
 #endif

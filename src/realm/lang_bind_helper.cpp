@@ -32,5 +32,5 @@ const char* LangBindHelper::get_data_type_name(DataType type) noexcept
         case type_LinkList:    return "linklist";
     }
 
-    return "unknown";   // LCOV_EXCL_LINE
+    return "unknown";
 }
