@@ -13,6 +13,7 @@
   this bug looks like corruption, the database isn't corrupted at all.
   Reopening it by a different SharedGroup will work fine; Only the SharedGroup
   that executed the compact() will have a stale view of the file.
+* Check and retry if flock() returns EINTR (issue #1916)
 
 ### Breaking changes
 
