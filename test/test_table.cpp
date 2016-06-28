@@ -6977,6 +6977,26 @@ TEST(Table_addRowsToTableWithNoColumns)
     CHECK_EQUAL(u->size(), 0);
     CHECK_EQUAL(t->size(), 0);
     CHECK_THROW(t->add_empty_row(1), LogicError);
+
+    // Check that links are nulled when connected table is cleared
+    u->add_column_link(type_Link, "link from u to t", *t);
+    u->add_empty_row(1);
+    CHECK_EQUAL(u->size(), 1);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_THROW(u->set_link(0, 0, 0), LogicError);
+    CHECK(u->is_null_link(0, 0));
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row();
+    u->set_link(0, 0, 0);
+    CHECK_EQUAL(u->get_link(0, 0), 0);
+    CHECK(!u->is_null_link(0, 0));
+    CHECK_EQUAL(t->size(), 1);
+    t->add_column(type_Int, "int column");
+    CHECK_EQUAL(t->size(), 1);
+    t->remove_column(0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_EQUAL(u->size(), 1);
+    CHECK(u->is_null_link(0, 0));
 }
 
 TEST(Table_getVersionCounterAfterRowAccessor)
