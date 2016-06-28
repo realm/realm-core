@@ -169,6 +169,15 @@ void SlabAlloc::detach() noexcept
             REALM_UNREACHABLE();
     }
     invalidate_cache();
+
+    // Release all allocated memory - this forces us to create new
+    // slabs after re-attaching thereby ensuring that the slabs are
+    // placed correctly (logically) after the end of the file.
+    for (auto& slab : m_slabs) {
+        delete[] slab.addr;
+    }
+    m_slabs.clear();
+
     m_attach_mode = attach_None;
 }
 
@@ -194,11 +203,6 @@ SlabAlloc::~SlabAlloc() noexcept
         }
     }
 #endif
-
-    // Release all allocated memory
-    for (auto& slab : m_slabs) {
-        delete[] slab.addr;
-    }
 
     if (is_attached())
         detach();
