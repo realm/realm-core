@@ -3140,4 +3140,32 @@ NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
     sg3.begin_read(); // <- does not fail
     sg.begin_read(); // <- does fail
 }
+
+// Found by AFL after adding the compact instruction
+// after further manual simplification, this test no longer triggers
+// the double free, but crashes in a different way
+TEST(Shared_Bptree_insert_failure)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg_w(path, false, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    g.add_table("");
+    g.get_table(0)->add_column(type_Double, "dgrpn", true);
+    g.get_table(0)->add_empty_row(246);
+    sg_w.commit();
+    REALM_ASSERT_RELEASE(sg_w.compact());
+    #if 0
+    {
+        // This intervening sg can do the same operation as the one doing compact,
+        // but without failing:
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+        Group& g2 = const_cast<Group&>(sg2.begin_write());
+        g2.get_table(0)->add_empty_row(396);
+    }
+    #endif
+    sg_w.begin_write();
+    g.get_table(0)->add_empty_row(396);
+}
+
 #endif // TEST_SHARED
