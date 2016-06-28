@@ -2817,7 +2817,6 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wextra-semi",
-					"-fno-elide-constructors",
 					"-Wold-style-cast",
 					"-Wundef",
 				);
