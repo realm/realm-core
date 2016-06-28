@@ -277,6 +277,15 @@ following example:
 
     REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 
+Measuring test coverage:
+
+You can measure how much of the code is tested by executing:
+
+    sh build.sh lcov
+
+It will generate a html page under cover_html directory. Be aware that the lcov
+tool will not generate correct results if you build from a directory path that contains
+symlinked elements.
 
 Packaging for OS X
 -------------------
