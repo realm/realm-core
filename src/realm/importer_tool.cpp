@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
     TableRef table2 = group.add_table(tablename);
     Table &table = *table2;
 
-    size_t imported_rows;
+    size_t imported_rows = 0;
 
     Importer importer;
     importer.Quiet = quiet_flag;

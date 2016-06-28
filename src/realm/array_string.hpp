@@ -104,7 +104,6 @@ private:
     size_t calc_byte_len(size_t count, size_t width) const override;
     size_t calc_item_count(size_t bytes,
                               size_t width) const noexcept override;
-    WidthType GetWidthType() const override { return wtype_Multiply; }
 
     bool m_nullable;
 };
@@ -171,7 +170,7 @@ inline void ArrayString::add()
 inline StringData ArrayString::get(const char* header, size_t ndx, bool nullable) noexcept
 {
     REALM_ASSERT(ndx < get_size_from_header(header));
-    size_t width = get_width_from_header(header);
+    uint_least8_t width = get_width_from_header(header);
     const char* data = get_data_from_header(header) + (ndx * width);
 
     if (width == 0)

@@ -66,7 +66,6 @@ private:
     size_t calc_byte_len(size_t count, size_t width) const override;
     size_t calc_item_count(size_t bytes,
                               size_t width) const noexcept override;
-    WidthType GetWidthType() const override { return wtype_Ignore; }
 };
 
 

@@ -639,6 +639,11 @@ case "$MODE" in
             enable_assertions="yes"
         fi
 
+        enable_memdebug="no"
+        if [ "$REALM_ENABLE_MEMDEBUG" ]; then
+            enable_memdebug="yes"
+        fi
+		
         # Find Xcode
         xcode_home="none"
         xcodeselect="xcode-select"
@@ -703,6 +708,7 @@ INSTALL_LIBEXECDIR    = $install_libexecdir
 MAX_BPNODE_SIZE       = $max_bpnode_size
 MAX_BPNODE_SIZE_DEBUG = $max_bpnode_size_debug
 ENABLE_ASSERTIONS     = $enable_assertions
+ENABLE_MEMDEBUG       = $enable_memdebug
 ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
 ENABLE_ENCRYPTION     = $enable_encryption
 XCODE_HOME            = $xcode_home
@@ -935,7 +941,11 @@ EOF
                     $MAKE clean
                 ) || exit 1
 
-                $MAKE -C "openssl" depend || exit 1
+                # makedepend interprets -mandroid as -m
+                (cd openssl && mv Makefile Makefile.dep && sed -e 's/\-mandroid//g' Makefile.dep > Makefile) || exit 1
+                DEPFLAGS="$(grep DEPFLAG= Makefile | head -1 | cut -f2 -d=)"
+                $MAKE -C "openssl" DEPFLAG="$DEPFLAGS -I$temp_dir/sysroot/usr/include -I$temp_dir/sysroot/usr/include/linux -I$temp_dir/include/c++/4.9/tr1 -I$temp_dir/include/c++/4.9" depend || exit 1
+                (cd openssl && mv Makefile.dep Makefile) || exit 1
                 PATH="$path" CC="$cc" CFLAGS="$cflags_arch" PERL="perl" $MAKE -C "openssl" build_crypto || exit 1
                 cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
             fi
@@ -1069,27 +1079,36 @@ EOF
         export REALM_HAVE_CONFIG="1"
         $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
 
-        mkdir -p "$NODE_DIR" || exit 1
-        cp "src/realm/librealm-node.a" "$NODE_DIR" || exit 1
-        cp "src/realm/librealm-node-dbg.a" "$NODE_DIR" || exit 1
+        dir_basename=core
+        node_directory="$NODE_DIR/$dir_basename"
 
-        echo "Copying headers to '$NODE_DIR/include'"
-        mkdir -p "$NODE_DIR/include" || exit 1
-        cp "src/realm.hpp" "$NODE_DIR/include/" || exit 1
-        mkdir -p "$NODE_DIR/include/realm" || exit 1
+        mkdir -p "$node_directory" || exit 1
+        cp "src/realm/librealm-node.a" "$node_directory" || exit 1
+        cp "src/realm/librealm-node-dbg.a" "$node_directory" || exit 1
+
+        echo "Copying headers to '$node_directory/include'"
+        mkdir -p "$node_directory/include" || exit 1
+        cp "src/realm.hpp" "$node_directory/include/" || exit 1
+        mkdir -p "$node_directory/include/realm" || exit 1
         inst_headers="$(cd "src/realm" && $MAKE --no-print-directory get-inst-headers)" || exit 1
         temp_dir="$(mktemp -d /tmp/realm.build-node.XXXX)" || exit 1
         (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
-        (cd "$REALM_HOME/$NODE_DIR/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+
+        cp tools/LICENSE "$node_directory" || exit 1
+        if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
+            command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
+            pandoc -f markdown -t plain -o "$node_directory/release_notes.txt" release_notes.md || exit 1
+        fi
 
         realm_version="$(sh build.sh get-version)" || exit
         dir_name="core-$realm_version"
-        file_name="realm-core-node-$realm_version-$CURRENT_PLATFORM.tar.gz"
+        file_name="realm-core-node-$CURRENT_PLATFORM-$realm_version.tar.gz"
         tar_files='librealm*'
 
         echo "Create tar.gz file $file_name"
         rm -f "$REALM_HOME/$file_name" || exit 1
-        (cd "$REALM_HOME/$NODE_DIR" && tar czf "$REALM_HOME/$file_name" include $tar_files) || exit 1
+        (cd "$REALM_HOME/$NODE_DIR" && tar czf "$REALM_HOME/$file_name" $dir_basename) || exit 1
 
         exit 0
         ;;

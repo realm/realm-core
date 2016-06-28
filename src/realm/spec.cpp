@@ -94,8 +94,8 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         // One type for each column
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v(mem.m_ref); // FIXME: Dangerous case: unsigned -> signed
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case: unsigned -> signed
         spec_set.add(v); // Throws
         dg_2.release();
     }
@@ -103,8 +103,8 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         size_t size = 0;
         // One name for each column
         MemRef mem = ArrayString::create_array(size, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v = mem.m_ref; // FIXME: Dangerous case: unsigned -> signed
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v = mem.get_ref(); // FIXME: Dangerous case: unsigned -> signed
         spec_set.add(v); // Throws
         dg_2.release();
     }
@@ -112,8 +112,8 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
         // One attrib set for each column
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int_fast64_t v = mem.m_ref; // FIXME: Dangerous case: unsigned -> signed
+        dg_2.reset(mem.get_ref());
+        int_fast64_t v = mem.get_ref(); // FIXME: Dangerous case: unsigned -> signed
         spec_set.add(v); // Throws
         dg_2.release();
     }
@@ -143,16 +143,16 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             bool context_flag = false;
             MemRef subspecs_mem =
                 Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
-            _impl::DeepArrayRefDestroyGuard dg(subspecs_mem.m_ref, alloc);
+            _impl::DeepArrayRefDestroyGuard dg(subspecs_mem.get_ref(), alloc);
             if (m_top.size() == 3) {
-                int_fast64_t v(subspecs_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+                int_fast64_t v(subspecs_mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
                 m_top.add(v); // Throws
             }
             else {
-                int_fast64_t v(subspecs_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+                int_fast64_t v(subspecs_mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
                 m_top.set(3, v); // Throws
             }
-            m_subspecs.init_from_ref(subspecs_mem.m_ref);
+            m_subspecs.init_from_ref(subspecs_mem.get_ref());
             m_subspecs.set_parent(&m_top, 3);
             dg.release();
         }
@@ -160,9 +160,9 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
         if (type == col_type_Table) {
             // Add a new empty spec to `m_subspecs`
             MemRef subspec_mem = create_empty_spec(alloc); // Throws
-            _impl::DeepArrayRefDestroyGuard dg(subspec_mem.m_ref, alloc);
+            _impl::DeepArrayRefDestroyGuard dg(subspec_mem.get_ref(), alloc);
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
-            int_fast64_t v(subspec_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t v(subspec_mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
             m_subspecs.insert(subspec_ndx, v); // Throws
             dg.release();
         }
@@ -257,7 +257,7 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
     if (type == col_type_Table || tf::is_link_type(type)) {
         // Table columns and link type columns have a single subspec.
         size_t old_subspec_ndx = get_subspec_ndx(from_ndx);
-        size_t new_subspec_ndx = get_subspec_ndx_after(to_ndx);
+        size_t new_subspec_ndx = get_subspec_ndx_after(to_ndx, from_ndx);
         if (old_subspec_ndx != new_subspec_ndx) {
             m_subspecs.move_rotate(old_subspec_ndx, new_subspec_ndx);
         }
@@ -278,17 +278,21 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
                    get_column_type(column_ndx) == col_type_LinkList ||
                    get_column_type(column_ndx) == col_type_BackLink );
 
-    return get_subspec_ndx_after(column_ndx);
+    return get_subspec_ndx_after(column_ndx, column_ndx);
 }
 
 
-size_t Spec::get_subspec_ndx_after(size_t column_ndx) const noexcept
+size_t Spec::get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx <= get_column_count());
     // The m_subspecs array only keep info for subtables so we need to
     // count up to it's position
     size_t subspec_ndx = 0;
     for (size_t i = 0; i != column_ndx; ++i) {
+        if (i == skip_column_ndx) {
+            continue;
+        }
+
         ColumnType type = ColumnType(m_types.get(i));
         if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
             ++subspec_ndx;
@@ -548,7 +552,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void Spec::verify() const
 {
@@ -613,4 +617,4 @@ void Spec::to_dot(std::ostream& out, StringData title) const
     out << "}" << std::endl;
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions
