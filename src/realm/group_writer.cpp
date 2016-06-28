@@ -43,9 +43,9 @@ private:
 // True if a requested block fall within a memory mapping.
 bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
 {
-    if (start_ref < base_ref) 
+    if (start_ref < base_ref)
         return false;
-    if (start_ref + size > base_ref + map.get_size()) 
+    if (start_ref + size > base_ref + map.get_size())
         return false;
     return true;
 }
@@ -139,8 +139,6 @@ GroupWriter::GroupWriter(Group& group):
     m_current_version(0)
 {
     m_map_windows.reserve(num_map_windows);
-    for (int i = 0; i < num_map_windows; ++i)
-        m_map_windows.push_back(nullptr);
 
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
@@ -213,15 +211,9 @@ GroupWriter::GroupWriter(Group& group):
 GroupWriter::~GroupWriter()
 {
     for (auto& window: m_map_windows) {
-        if (window) {
-            // Sync'ing is done explicitly by a call to sync_all_mappings(),
-            // here we just delete it, unmapping the memory.
-            delete window;
-            window = nullptr;
-        }
-        else
-            break;
+        delete window;
     }
+    m_map_windows.clear();
 }
 
 size_t GroupWriter::get_file_size() const noexcept
@@ -232,10 +224,7 @@ size_t GroupWriter::get_file_size() const noexcept
 void GroupWriter::sync_all_mappings()
 {
     for (const auto& window: m_map_windows) {
-        if (window)
-            window->sync();
-        else
-            break;
+        window->sync();
     }
 }
 
@@ -246,9 +235,7 @@ void GroupWriter::sync_all_mappings()
 GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 {
     MapWindow* found_window = nullptr;
-    for (int i = 0; i < num_map_windows; ++i) {
-        if (m_map_windows[i] == nullptr) 
-            break;
+    for (unsigned int i = 0; i < m_map_windows.size(); ++i) {
         if (m_map_windows[i]->matches(start_ref, size)
             || m_map_windows[i]->extends_to_match(m_alloc.get_file(), start_ref, size)) {
             found_window = m_map_windows[i];
@@ -260,15 +247,15 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
         }
     }
     // no window found, make room for a new one at the top
-    MapWindow* last_window = m_map_windows[num_map_windows-1];
-    if (last_window) {
+    if (m_map_windows.size() == num_map_windows) {
+        MapWindow* last_window = m_map_windows.back();
         last_window->sync();
         delete last_window;
+        m_map_windows.pop_back();
     }
-    for (int j=num_map_windows-1; j; --j)
-        m_map_windows[j] = m_map_windows[j-1];
-    m_map_windows[0] = new MapWindow(m_alloc.get_file(), start_ref, size);
-    return m_map_windows[0];
+    MapWindow* new_window = new MapWindow(m_alloc.get_file(), start_ref, size);
+    m_map_windows.insert(m_map_windows.begin(), new_window);
+    return new_window;
 }
 
 ref_type GroupWriter::write_group()
