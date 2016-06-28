@@ -12221,4 +12221,31 @@ TEST(LangbindHelper_GetDataTypeName)
     CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(static_cast<DataType>(42)), "unknown"));
 }
 
+// Found by AFL.
+ONLY(LangBindHelper_AssertionFailedSlabsEnd)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
+    std::unique_ptr<Replication> hist_r(make_client_history(path, key));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, key));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    g.add_table("hjnskmesdjafmchdhjamdjjrantsqprgmhkntjtbhmnqffil");
+    g.get_table(0)->add_column(type_Double, "orbnieikeqkdcgjebnriinsbpnfodqfjpojbrpfelsidfcmg", true);
+    g.get_table(0)->insert_empty_row(0, 255);
+    g.get_table(0)->insert_column(0, type_Double, "qrsebrlirsrroejlfppsctimaroipinkgccfcmhbpmlbklsr", true);
+    sg_r.close();
+    sg_w.commit();
+    REALM_ASSERT_RELEASE(sg_w.compact());
+    sg_w.begin_write();
+    sg_r.open(path);
+    sg_r.begin_read();
+    g_r.verify();
+    g.get_table(0)->insert_empty_row(48, 48);
+}
+
+
 #endif
