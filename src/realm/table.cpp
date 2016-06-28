@@ -721,8 +721,10 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     // column that is not a backlink column. If there are no backlink columns,
     // then the removal of the last column is enough to effectively truncate the
     // size (number of rows) to zero, since the number of rows is simply the
-    // number of entries in each column. If, on the other hand, there are
-    // additional backlink columns, we need to inject a clear operation before
+    // number of entries in each column. Although the size of the table at this point
+    // will be zero (locally), we need to explicitly inject a clear operation
+    // so that sync can handle conflicts with adding rows. Additionally, if there
+    // are backlink columns, we need to inject a clear operation before
     // the column removal to correctly reproduce the desired effect, namely that
     // the table appears truncated after the removal of the last non-hidden
     // column. The clear operation needs to be submitted to the replication
@@ -730,7 +732,7 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     // operation in order to get the right behaviour in
     // Group::advance_transact().
     if (desc.is_root()) {
-        if (root_table.m_spec.get_public_column_count() == 1 && root_table.m_cols.size() > 1)
+        if (root_table.m_spec.get_public_column_count() == 1)
             root_table.clear(); // Throws
     }
 
