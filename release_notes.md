@@ -38,6 +38,7 @@
 
 * Allow SharedGroups to pin specific versions for handover
 * Reduced the object-size overhead of assertions.
+* Fixed a spelling mistake in the message of the `LogicError::wrong_group_state`.
 
 -----------
 
