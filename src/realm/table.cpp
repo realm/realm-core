@@ -717,12 +717,11 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     REALM_ASSERT(!root_table.has_shared_type());
     REALM_ASSERT_3(col_ndx, <, desc.get_column_count());
 
-    // For root tables, it is possible that the column to be removed is the last
-    // column that is not a backlink column. If there are no backlink columns,
-    // then the removal of the last column is enough to effectively truncate the
-    // size (number of rows) to zero, since the number of rows is simply the
-    // number of entries in each column. Although the size of the table at this point
-    // will be zero (locally), we need to explicitly inject a clear operation
+    // It is possible that the column to be removed is the last column. If there
+    // are no backlink columns, then the removal of the last column is enough to
+    // effectively truncate the size (number of rows) to zero, since the number of rows
+    // is simply the number of entries in each column. Although the size of the table at
+    // this point will be zero (locally), we need to explicitly inject a clear operation
     // so that sync can handle conflicts with adding rows. Additionally, if there
     // are backlink columns, we need to inject a clear operation before
     // the column removal to correctly reproduce the desired effect, namely that
@@ -731,10 +730,8 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     // handler as an individual operation, and precede the column removal
     // operation in order to get the right behaviour in
     // Group::advance_transact().
-    if (desc.is_root()) {
-        if (root_table.m_spec.get_public_column_count() == 1)
-            root_table.clear(); // Throws
-    }
+    if (root_table.m_spec.get_public_column_count() == 1)
+        root_table.clear(); // Throws
 
     if (Replication* repl = root_table.get_repl())
         repl->erase_column(desc, col_ndx); // Throws
