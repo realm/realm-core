@@ -3081,39 +3081,6 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
 }
 
-NONCONCURRENT_TEST(Shared_BigAllocations)
-{
-    size_t string_length = 15 * 1024 * 1024;
-    SHARED_GROUP_TEST_PATH(path);
-    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
-    std::string long_string(string_length, 'a');
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.add_table("table");
-        table->add_column(type_String, "string_col");
-        wt.commit();
-    }
-    {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
-        for (int i = 0; i < 32; ++i) {
-            table->add_empty_row();
-            table->set_string(0, i, long_string);
-        }
-        wt.commit();
-    }
-    for (int k = 0; k < 10; ++k) {
-        sg.compact();
-        for (int j = 0; j < 50; ++j) {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("table");
-            for (int i = 0; i < 32; ++i) {
-                table->set_string(0, i, long_string);
-            }
-            wt.commit();
-        }
-    }
-}
 
 // Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
 NONCONCURRENT_TEST(Shared_BigAllocations)
