@@ -47,6 +47,8 @@
 * S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
   `<realm/util/features.h>`. This also fixes a dangling reference to
   `REALM_QUOTE_2()` in `<realm/util/features.h>`.
+* Minimize the amount of additional virtual address space used during Commit().
+  (#1478)
 * New feature in the unit test framework: Ability to specify log level
   threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
 
