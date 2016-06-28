@@ -14,6 +14,16 @@
   Reopening it by a different SharedGroup will work fine; Only the SharedGroup
   that executed the compact() will have a stale view of the file.
 * Check and retry if flock() returns EINTR (issue #1916)
+* The slabs (regions of memory used for temporary storage during a write transaction),
+  did not correctly track changes in file size, if the allocator was detached, the
+  file shrunk and the allocator was re-attached. This scenario can be triggered by
+  compact, or by copying/creating a new realm file which is then smaller than the
+  old one when you re-attach. The bug led to possible allocation of overlapping
+  memory chunks, one of which would then later corrupt the other. To a user this
+  would look like file corruption. It is theoretically possibly, but not likely,
+  that the corrupted datastructure could be succesfully committed leading to a real
+  corruption of the database. The fix is to release all slabs when the allocator
+  is detached. Fixes #1898, #1915, #1918, very likely #1337 and possibly #1822.
 
 ### Breaking changes
 
@@ -38,6 +48,8 @@
 * S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
   `<realm/util/features.h>`. This also fixes a dangling reference to
   `REALM_QUOTE_2()` in `<realm/util/features.h>`.
+* Minimize the amount of additional virtual address space used during Commit().
+  (#1478)
 * New feature in the unit test framework: Ability to specify log level
   threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
 

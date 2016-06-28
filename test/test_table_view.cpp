@@ -2139,7 +2139,7 @@ TEST(TableView_SortOrder)
     table.add("#");
     table.add("%");
     table.add("&");
-    table.add("'");	
+    table.add("'");
     table.add("(");
     table.add(")");
     table.add("*");

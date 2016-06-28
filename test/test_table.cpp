@@ -2329,6 +2329,30 @@ TEST(Table_SpecMoveColumns)
 }
 
 
+TEST(Table_SpecMoveLinkColumn)
+{
+    using df = _impl::DescriptorFriend;
+
+    Group group;
+    TableRef target = group.add_table("target");
+    target->add_column(type_Int, "a");
+
+    TableRef origin = group.add_table("origin");
+    origin->add_column_link(type_Link, "a", *target);
+    origin->add_column(type_Int, "b");
+
+    origin->add_empty_row(2);
+    target->add_empty_row(2);
+    origin->set_link(0, 0, 1);
+
+    df::move_column(*origin->get_descriptor(), 0, 1);
+
+    CHECK_EQUAL(origin->get_link(1, 0), 1);
+    CHECK_EQUAL(target->get_backlink_count(0, *origin, 1), 0);
+    CHECK_EQUAL(target->get_backlink_count(1, *origin, 1), 1);
+}
+
+
 TEST(Table_SpecMoveColumnsWithIndexes)
 {
     using df = _impl::DescriptorFriend;

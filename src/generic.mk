@@ -1919,16 +1919,16 @@ GET_CFLAGS_FOR_TARGET = $(foreach x,PROJECT DIR $(foreach y,$(GMK_TARGETS_$(call
 
 
 %$(SUFFIX_OBJ_STATIC_COVER): %.c
-	$(strip $(CC_STATIC_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $(abspath $<) -o $(abspath $@)
+	$(strip $(CC_STATIC_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $< -o $@
 
 %$(SUFFIX_OBJ_STATIC_COVER): %.cpp
-	$(strip $(CXX_STATIC_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $(abspath $<) -o $(abspath $@)
+	$(strip $(CXX_STATIC_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $< -o $@
 
 %$(SUFFIX_OBJ_SHARED_COVER): %.c
-	$(strip $(CC_SHARED_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $(abspath $<) -o $(abspath $@)
+	$(strip $(CC_SHARED_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $< -o $@
 
 %$(SUFFIX_OBJ_SHARED_COVER): %.cpp
-	$(strip $(CXX_SHARED_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $(abspath $<) -o $(abspath $@)
+	$(strip $(CXX_SHARED_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $< -o $@
 
 
 
@@ -1959,16 +1959,16 @@ GET_CFLAGS_FOR_TARGET = $(foreach x,PROJECT DIR $(foreach y,$(GMK_TARGETS_$(call
 
 
 %$(SUFFIX_OBJ_STATIC_COVER): %.m
-	$(strip $(OCC_STATIC_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $(abspath $<) -o $(abspath $@)
+	$(strip $(OCC_STATIC_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $< -o $@
 
 %$(SUFFIX_OBJ_STATIC_COVER): %.mm
-	$(strip $(OCXX_STATIC_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $(abspath $<) -o $(abspath $@)
+	$(strip $(OCXX_STATIC_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $< -o $@
 
 %$(SUFFIX_OBJ_SHARED_COVER): %.m
-	$(strip $(OCC_SHARED_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $(abspath $<) -o $(abspath $@)
+	$(strip $(OCC_SHARED_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $< -o $@
 
 %$(SUFFIX_OBJ_SHARED_COVER): %.mm
-	$(strip $(OCXX_SHARED_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $(abspath $<) -o $(abspath $@)
+	$(strip $(OCXX_SHARED_COVER) $(call GET_CFLAGS_FOR_TARGET,$*.o,COVER) $(CFLAGS_OTHER)) -c $< -o $@
 
 
 -include $(OBJECTS:.o=.d)
