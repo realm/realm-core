@@ -3104,9 +3104,8 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
         wt.commit();
     }
     for (int k = 0; k < 10; ++k) {
-        //sg.compact();
+        //sg.compact(); // <--- enable this if you want to stress with compact()
         for (int j = 0; j < 20; ++j) {
-            std::cerr << "[ " << k << ", " << j << " ]" << std::endl;
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
             for (int i = 0; i < 20; ++i) {
