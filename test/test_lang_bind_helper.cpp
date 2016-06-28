@@ -1,10 +1,5 @@
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
 
-// To make std::mutex work in Windows
-#ifdef _WIN32
-    #define INTMAX_MAX _I64_MAX
-#endif
-
 #include <map>
 #include <sstream>
 #include <mutex>
