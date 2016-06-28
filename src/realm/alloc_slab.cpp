@@ -172,7 +172,7 @@ void SlabAlloc::detach() noexcept
 
     // Release all allocated memory - this forces us to create new
     // slabs after re-attaching thereby ensuring that the slabs are
-    // placed correctly (logicall) after the end of the file.
+    // placed correctly (logically) after the end of the file.
     for (auto& slab : m_slabs) {
         delete[] slab.addr;
     }
