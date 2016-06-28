@@ -13,6 +13,7 @@
   this bug looks like corruption, the database isn't corrupted at all.
   Reopening it by a different SharedGroup will work fine; Only the SharedGroup
   that executed the compact() will have a stale view of the file.
+* Check and retry if flock() returns EINTR (issue #1916)
 * The slabs (regions of memory used for temporary storage during a write transaction),
   did not correctly track changes in file size, if the allocator was detached, the
   file shrunk and the allocator was re-attached. This scenario can be triggered by
