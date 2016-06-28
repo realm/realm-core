@@ -397,12 +397,6 @@ protected:
 
     virtual void do_clear_interrupt() noexcept = 0;
 
-    // Part of a temporary ugly hack to avoid generating new transaction logs
-    // during application of ones that have olready been created elsewhere. See
-    // ReplicationImpl::do_initiate_transact() in
-    // realm/replication/simplified/provider.cpp for more on this.
-    static void set_replication(Group&, Replication*) noexcept;
-
     friend class _impl::TransactReverser;
 };
 

@@ -2772,6 +2772,7 @@
 					"-fno-elide-constructors",
 					"-Wold-style-cast",
 					"-Wundef",
+					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
@@ -2819,6 +2820,7 @@
 					"-Wextra-semi",
 					"-Wold-style-cast",
 					"-Wundef",
+					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
