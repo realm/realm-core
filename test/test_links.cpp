@@ -1219,8 +1219,8 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     Group group;
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    target->add_empty_row();
     origin->add_column_link(type_LinkList, "", *target);
+    target->add_empty_row();
     origin->add_empty_row();
     LinkViewRef link_list = origin->get_linklist(0,0);
     for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE+1; ++i)

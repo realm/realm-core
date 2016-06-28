@@ -207,19 +207,25 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx = get_next(s) % g.size();
                 size_t row_ndx = get_next(s) % (g.get_table(table_ndx)->size() + 1);
                 size_t num_rows = get_next(s);
-                if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->insert_empty_row(" << row_ndx << ", " << num_rows % add_empty_row_max << ");\n";
+                typedef _impl::TableFriend tf;
+                if (g.get_table(table_ndx)->get_column_count() > 0 || tf::is_cross_table_link_target(*g.get_table(table_ndx))) {
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->insert_empty_row(" << row_ndx << ", " << num_rows % add_empty_row_max << ");\n";
+                    }
+                    g.get_table(table_ndx)->insert_empty_row(row_ndx, num_rows % add_empty_row_max);
                 }
-                g.get_table(table_ndx)->insert_empty_row(row_ndx, num_rows % add_empty_row_max);
             }
             else if (instr == ADD_EMPTY_ROW && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 size_t num_rows = get_next(s);
                 if (g.get_table(table_ndx)->size() + num_rows < max_rows) {
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % add_empty_row_max << ");\n";
+                    typedef _impl::TableFriend tf;
+                    if (g.get_table(table_ndx)->get_column_count() > 0 || tf::is_cross_table_link_target(*g.get_table(table_ndx))) {
+                        if (log) {
+                            *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % add_empty_row_max << ");\n";
+                        }
+                        g.get_table(table_ndx)->add_empty_row(num_rows % add_empty_row_max);
                     }
-                    g.get_table(table_ndx)->add_empty_row(num_rows % add_empty_row_max);
                 }
             }
             else if (instr == ADD_COLUMN && g.size() > 0) {

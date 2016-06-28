@@ -6937,7 +6937,50 @@ TEST(Table_ColumnsSupportStringIndex)
     t->remove_column(0);
 }
 
-TEST(Table_getVersionCounterAfterRowAccessor) {
+TEST(Table_addRowsToTableWithNoColumns)
+{
+    Group g; // type_Link must be part of a group
+    TableRef t = g.add_table("t");
+
+    CHECK_THROW(t->add_empty_row(1), LogicError);
+    CHECK_THROW(t->insert_empty_row(0), LogicError);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_column(type_String, "str_col");
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    t->add_search_index(0);
+    t->insert_empty_row(0);
+    CHECK_EQUAL(t->size(), 2);
+    t->remove_column(0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_THROW(t->add_empty_row(1), LogicError);
+
+    // Can add rows to a table with backlinks
+    TableRef u = g.add_table("u");
+    u->add_column_link(type_Link, "link from u to t", *t);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    u->remove_column(0);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_THROW(t->add_empty_row(1), LogicError);
+
+    // Do the exact same as above but with LinkLists
+    u->add_column_link(type_LinkList, "link list from u to t", *t);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    u->remove_column(0);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_THROW(t->add_empty_row(1), LogicError);
+}
+
+TEST(Table_getVersionCounterAfterRowAccessor)
+{
     Table t;
     size_t col_bool    = t.add_column(type_Bool,     "bool",    true);
     size_t col_int     = t.add_column(type_Int,      "int",     true);

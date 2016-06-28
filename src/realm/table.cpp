@@ -2086,9 +2086,14 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_DEBUG(row_ndx <= m_size);
     REALM_ASSERT_DEBUG(num_rows <= std::numeric_limits<size_t>::max() - row_ndx);
-    bump_version();
 
     size_t num_cols = m_spec.get_column_count();
+    if (REALM_UNLIKELY(num_cols == 0)) {
+        throw LogicError(LogicError::table_has_no_columns);
+    }
+
+    bump_version();
+
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
         bool insert_nulls = is_nullable(col_ndx);
