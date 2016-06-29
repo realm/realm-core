@@ -52,7 +52,7 @@ void Printable::print(std::ostream &out, bool quote) const
     }
 }
 
-void Printable::print_all(std::ostream& out, std::initializer_list<Printable>& values, bool quote)
+void Printable::print_all(std::ostream& out, const std::initializer_list<Printable>& values, bool quote)
 {
     if (values.size() == 0)
         return;

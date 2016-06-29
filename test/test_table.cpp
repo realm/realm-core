@@ -301,8 +301,14 @@ TEST(Table_ColumnNameTooLong)
     TableRef table = group.add_table("foo");
     const size_t buf_size = 64;
     std::unique_ptr<char[]> buf(new char[buf_size]);
-    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf.get(), buf_size)),
-                      LogicError::column_name_too_long);
+    std::string errText;
+    try {
+        table->add_column(type_Int, StringData(buf.get(), buf_size));
+    }
+    catch (const LogicError& e) {
+        errText = e.what();
+    }
+    CHECK_EQUAL(errText, "Column name too long");
     CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, StringData(buf.get(), buf_size)),
                       LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column_link(type_Link,
