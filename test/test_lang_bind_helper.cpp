@@ -12233,18 +12233,13 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
-    std::vector<TableView> table_views;
 
-    try { g.add_table("dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbterse"); } catch (const TableNameInUse&) { }
-    try { g.add_table("pknglaqnckqbffehqfgjnrepcfohoedkhiqsiedlotmaqitm"); } catch (const TableNameInUse&) { }
-    g.get_table(0)->insert_column(0, DataType(10), "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
-    g.get_table(0)->insert_empty_row(0, 69);
-    table_views.push_back(g.get_table(0)->where().find_all());
+    g.add_table("dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbterse");
+    g.add_table("pknglaqnckqbffehqfgjnrepcfohoedkhiqsiedlotmaqitm");
+    g.get_table(0)->add_column(type_Double, "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
     g.get_table(1)->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr", *g.get_table(0));
-    g.get_table(0)->add_empty_row(51);
-    g.get_table(0)->add_empty_row(255);
-    table_views.push_back(g.get_table(0)->where().find_all());
-    try { g.add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil"); } catch (const TableNameInUse&) { }
+    g.get_table(0)->add_empty_row(375);
+    g.add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
     sg_r.close();
     sg_w.commit();
     REALM_ASSERT_RELEASE(sg_w.compact());
@@ -12252,9 +12247,9 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     sg_r.open(path);
     sg_r.begin_read();
     g_r.verify();
-    try { g.add_table("citdgiaclkfbbksfaqegcfiqcserceaqmttkilnlbknoadtb"); } catch (const TableNameInUse&) { }
-    try { g.add_table("tqtnnikpggeakeqcqhfqtshmimtjqkchgbnmbpttbetlahfi"); } catch (const TableNameInUse&) { }
-    try { g.add_table("hkesaecjqbkemmmkffctacsnskekjbtqmpoetjnqkpactenf"); } catch (const TableNameInUse&) { }
+    g.add_table("citdgiaclkfbbksfaqegcfiqcserceaqmttkilnlbknoadtb");
+    g.add_table("tqtnnikpggeakeqcqhfqtshmimtjqkchgbnmbpttbetlahfi");
+    g.add_table("hkesaecjqbkemmmkffctacsnskekjbtqmpoetjnqkpactenf");
     sg_r.close();
     sg_w.commit();
 }
