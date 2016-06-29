@@ -155,6 +155,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
             *log << "Group& g = const_cast<Group&>(sg_w.begin_write());\n";
             *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
+            *log << "std::vector<TableView> table_views;\n";
 
             *log << "\n";
         }
