@@ -45,6 +45,11 @@ mkdir -p /utils/usr/bin
 mv /prod/usr/bin/realm-import /utils/usr/bin
 mv /prod/usr/lib64/*.so /devel/usr/lib64
 
+# Realm-node package
+doc_folder=usr/share/doc/realm-node-$VERSION
+mkdir -p /node/$doc_folder
+echo "The realm-node package is empty at the moment." > /node/$doc_folder/README
+
 echo "ldconfig" > /tmp/post-ldconf
 echo "echo >/dev/null" >> /tmp/post-ldconf
 
@@ -88,6 +93,22 @@ fpm \
     -d "openssl-devel" \
     -C /devel \
     usr/lib64 usr/include usr/bin
+
+fpm \
+    -t rpm \
+    -s dir \
+    -n realm-node \
+    --rpm-dist el6 \
+    --license "Realm License" \
+    --version ${VERSION} \
+    --iteration ${BUILD_NUMBER} \
+    --description "Realm-core C++ library for node"" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    -C /node \
+    $doc_folder
 
 fpm \
     -t rpm \
