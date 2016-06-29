@@ -51,7 +51,7 @@ const char* LogicError::what() const noexcept
         case column_not_nullable:
             return "Attempted to insert null into non-nullable column";
         case wrong_group_state:
-            return "Wrong state og group accessor (already attached, "
+            return "Wrong state or group accessor (already attached, "
                 "or managed by a SharedGroup object)";
         case wrong_transact_state:
             return "Wrong transactional state (no active transaction, wrong type of transaction, "
