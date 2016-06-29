@@ -48,12 +48,6 @@ void show_help(const std::string& program_name)
         "  -h,--help    Print this message\n";
 }
 
-struct Configuration {
-    std::string path;
-    Optional<std::string> key;
-    bool upgrade = false;
-};
-
 namespace Logging {
 
 struct Naught {};
@@ -105,6 +99,12 @@ void Log(const char* file, int line, LogData<List>&& data)
 #define LOG(x) (Logging::Log(__FILE__, __LINE__, Logging::LogData<Logging::Naught>() << x))
 
 } // namespace Logging
+
+struct Configuration {
+    std::string path;
+    Optional<std::string> key;
+    bool upgrade = false;
+};
 
 void parse_arguments(int argc, char* argv[], Configuration& configuration)
 {
@@ -237,7 +237,7 @@ void SchemaDumper::list_columns(std::ostream& stream, const ConstTableRef& table
 
 void SchemaDumper::open()
 {
-    LOG("Opening Realm file `" << m_config.path);
+    LOG("Opening Realm file `" << m_config.path << '\'');
 
     bool dont_create = true;
     bool upgrade_file_format = m_config.upgrade;
@@ -245,7 +245,7 @@ void SchemaDumper::open()
 
     if (m_config.key) {
         encryption_key = (*m_config.key).c_str();
-        LOG("Using encryption key `" << *m_config.key << "'");
+        LOG("Using encryption key `" << *m_config.key << '\'');
     }
 
     m_sg.open(m_config.path, dont_create, SharedGroup::durability_Full,
