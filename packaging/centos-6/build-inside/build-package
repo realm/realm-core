@@ -102,7 +102,7 @@ fpm \
     --license "Realm License" \
     --version ${VERSION} \
     --iteration ${BUILD_NUMBER} \
-    --description "Realm-core C++ library for node"" \
+    --description "Realm-core C++ library for node" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
