@@ -2772,6 +2772,7 @@
 					"-fno-elide-constructors",
 					"-Wundef",
 					"-Wconditional-uninitialized",
+                    "-Wswitch-enum",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
@@ -2819,6 +2820,7 @@
 					"-Wextra-semi",
 					"-Wundef",
 					"-Wconditional-uninitialized",
+                    "-Wswitch-enum",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
