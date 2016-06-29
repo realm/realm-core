@@ -218,7 +218,7 @@ void SchemaDumper::list_tables(std::ostream& stream)
 
 void SchemaDumper::list_columns(std::ostream& stream, const ConstTableRef& table)
 {
-    auto column_count = table->size();
+    auto column_count = table->get_column_count();
 
     for (std::size_t idx = 0; idx < column_count; ++idx) {
         auto column_name = table->get_column_name(idx);
