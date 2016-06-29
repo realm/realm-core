@@ -72,7 +72,7 @@ size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref
         window_size = intended_alignment;
     // but never map beyond end of file
     size_t file_size = f.get_size();
-    REALM_ASSERT_DEBUG(start_ref+size < file_size);
+    REALM_ASSERT_DEBUG_EX(start_ref+size <= file_size, start_ref+size, file_size);
     if (window_size > file_size - base_ref)
         window_size = file_size - base_ref;
     return window_size;
