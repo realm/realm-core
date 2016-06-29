@@ -173,7 +173,7 @@ using realm::ReadTransaction;
 using realm::SharedGroup;
 
 class SchemaDumper {
-    public:
+public:
     // ctors & dtors
     SchemaDumper(const Configuration& config);
 
@@ -181,7 +181,7 @@ class SchemaDumper {
     void list_tables(std::ostream& stream);
     void list_columns(std::ostream& stream, const ConstTableRef& table);
 
-    private:
+private:
     // private methods
     void open();
 
@@ -200,10 +200,10 @@ void SchemaDumper::list_tables(std::ostream& stream)
 {
     ReadTransaction rt(m_sg);
     const Group& group = rt.get_group();
-    auto table_count = group.size();
+    size_t table_count = group.size();
 
-    for (std::size_t idx = 0; idx < table_count; ++idx) {
-        auto table_name = group.get_table_name(idx);
+    for (size_t idx = 0; idx < table_count; ++idx) {
+        std::string table_name = group.get_table_name(idx);
         const ConstTableRef table = group.get_table(idx);
 
         stream << "table " << table_name << " {\n";
@@ -218,12 +218,12 @@ void SchemaDumper::list_tables(std::ostream& stream)
 
 void SchemaDumper::list_columns(std::ostream& stream, const ConstTableRef& table)
 {
-    auto column_count = table->get_column_count();
+    size_t column_count = table->get_column_count();
 
-    for (std::size_t idx = 0; idx < column_count; ++idx) {
-        auto column_name = table->get_column_name(idx);
-        auto column_type = table->get_column_type(idx);
-        auto column_type_name = LangBindHelper::get_data_type_name(column_type);
+    for (size_t idx = 0; idx < column_count; ++idx) {
+        std::string column_name = table->get_column_name(idx);
+        realm::DataType column_type = table->get_column_type(idx);
+        std::string column_type_name = LangBindHelper::get_data_type_name(column_type);
 
         stream << "    " << column_type_name << " " << column_name
             << " (type id: " << column_type << ")";
@@ -256,7 +256,7 @@ void SchemaDumper::open()
 
 int main(int argc, char* argv[])
 {
-    auto config = build_configuration(argc, argv);
+    Configuration config = build_configuration(argc, argv);
     try {
         SchemaDumper sd(config);
         sd.list_tables(std::cout);
@@ -265,7 +265,7 @@ int main(int argc, char* argv[])
         LOG("Error while opening Realm file: " << e.what());
         std::exit(EXIT_FAILURE);
     }
-    catch (const realm::FileFormatUpgradeRequired& e) {
+    catch (const realm::FileFormatUpgradeRequired&) {
         LOG("Error: This Realm file requires a file format upgrade before being usable");
         std::exit(EXIT_FAILURE);
     }
