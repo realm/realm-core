@@ -75,6 +75,7 @@
   (#1478)
 * New feature in the unit test framework: Ability to specify log level
   threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
+* Switch from `-O3` to `-Os` to compile OpenSSL: https://github.com/android-ndk/ndk/issues/110
 
 ----------------------------------------------
 
