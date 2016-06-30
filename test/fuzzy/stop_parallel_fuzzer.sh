@@ -41,7 +41,7 @@ for file in ${files[@]}
 do
 	# Let AFL try to minimize each input before converting to .cpp
 	minimized_file="$file.minimized"
-    afl-tmin -t $time_out -m $memory -i "$file" -o "$minimized_file" "$executable_path" @@
+    afl-tmin -t "$time_out" -m "$memory" -i "$file" -o "$minimized_file" "$executable_path" @@
     test $? -eq 1 && exit 1 # terminate if afl-tmin is being terminated
 
     # Convert into cpp file

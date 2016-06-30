@@ -3,7 +3,7 @@ if [ "$#" -ne 2 ]; then
     echo "Usage sh $0 num_fuzzers executable_path (e.g. ./fuzz-group-dbg)"
     exit 1
 fi
-num_fuzzers=$1
+num_fuzzers="$1"
 executable_path="$2"
 
 compiler="afl-g++"
@@ -37,12 +37,12 @@ echo "Building core"
 
 cd ../../
 REALM_ENABLE_ENCRYPTION=yes sh build.sh config
-CXX=$compiler REALM_HAVE_CONFIG=yes make -j check-debug-norun $flags
+CXX="$compiler" REALM_HAVE_CONFIG=yes make -j check-debug-norun "$flags"
 
 echo "Building fuzz target"
 
 cd -
-CXX=$compiler make -j check-debug-norun $flags
+CXX="$compiler" make -j check-debug-norun "$flags"
 
 echo "Cleaning up the findings directory"
 
@@ -57,16 +57,16 @@ echo "Starting $num_fuzzers fuzzers in parallel"
 
 # if we have only one fuzzer
 if [ $num_fuzzers -eq 1 ]; then
-    afl-fuzz -t $time_out -m $memory -i testcases -o findings "$executable_path" @@
+    afl-fuzz -t "$time_out" -m "$memory" -i testcases -o findings "$executable_path" @@
     exit 0
 fi
 
 # start the fuzzers in parallel
-afl-fuzz -t $time_out -m $memory -i testcases -o findings -M fuzzer1 "$executable_path" @@ --name fuzzer1 >/dev/null 2>&1 &
+afl-fuzz -t "$time_out" -m "$memory" -i testcases -o findings -M "fuzzer1" "$executable_path" @@ --name "fuzzer1" >/dev/null 2>&1 &
 
 for i in $(seq 2 $num_fuzzers);
 do
-    afl-fuzz -t $time_out -m $memory -i testcases -o findings -S fuzzer$i "$executable_path" @@ --name fuzzer$i >/dev/null 2>&1 &
+    afl-fuzz -t "$time_out" -m "$memory" -i testcases -o findings -S "fuzzer$i" "$executable_path" @@ --name "fuzzer$i" >/dev/null 2>&1 &
 done
 
 echo
