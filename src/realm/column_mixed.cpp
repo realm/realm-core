@@ -225,9 +225,19 @@ DataType MixedColumn::get_type(size_t ndx) const noexcept
     REALM_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
     switch (coltype) {
-        case mixcol_IntNeg:    return type_Int;
-        case mixcol_DoubleNeg: return type_Double;
-        default: return DataType(coltype);   // all others must be in sync with ColumnType
+        case mixcol_IntNeg:      return type_Int;
+        case mixcol_DoubleNeg:   return type_Double;
+        case mixcol_Int:         return type_Int;
+        case mixcol_Bool:        return type_Bool;
+        case mixcol_String:      return type_String;
+        case mixcol_Binary:      return type_Binary;
+        case mixcol_Table:       return type_Table;
+        case mixcol_Mixed:       return type_Mixed;
+        case mixcol_OldDateTime: return type_OldDateTime;
+        case mixcol_Timestamp:   return type_Timestamp;
+        case mixcol_Float:       return type_Float;
+        case mixcol_Double:      return type_Double;
+        default: return DataType(coltype);
     }
 }
 

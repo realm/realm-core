@@ -329,6 +329,12 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
         case type_Timestamp: {
             return MakeConditionNode<TimestampNode<Cond>>::make(column_ndx, value);
         }
+
+        // Not supported
+        case type_Table:
+        case type_Mixed:
+        case type_Link:
+        case type_LinkList:
         default: {
             throw LogicError{LogicError::type_mismatch};
         }
@@ -1473,6 +1479,7 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
             or_node->m_conditions.back()->add_child(std::move(node));
             break;
         }
+        case QueryGroup::State::Default: // Fall through to default
         default: {
             if (!current_group.m_root_node) {
                 current_group.m_root_node = std::move(node);

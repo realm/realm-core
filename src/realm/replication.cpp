@@ -310,17 +310,16 @@ public:
                 return false;
             log("table = table->get_subtable(%1, %2);", col_ndx, row_ndx); // Throws
             DataType type = m_table->get_column_type(col_ndx);
-            switch (type) {
-                case type_Table:
-                    m_table = m_table->get_subtable(col_ndx, row_ndx); // Throws
-                    break;
-                case type_Mixed:
-                    m_table = m_table->get_subtable(col_ndx, row_ndx); // Throws
-                    if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
-                        return false;
-                    break;
-                default:
+            if (type == type_Table) {
+                m_table = m_table->get_subtable(col_ndx, row_ndx); // Throws
+            }
+            else if (type == type_Mixed) {
+                m_table = m_table->get_subtable(col_ndx, row_ndx); // Throws
+                if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
                     return false;
+            }
+            else {
+                return false;
             }
         }
         return true;

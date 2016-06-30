@@ -74,8 +74,20 @@ Searching: The main finding function is:
 
 namespace realm {
 
-enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx,
-             act_CallbackVal, act_CallbackNone, act_CallbackBoth, act_Average};
+enum Action {
+    act_ReturnFirst,
+    act_Sum,
+    act_Max,
+    act_Min,
+    act_Count,
+    act_FindAll,
+    act_CallIdx,
+    act_CallbackIdx,
+    act_CallbackVal,
+    act_CallbackNone,
+    act_CallbackBoth,
+    act_Average
+};
 
 template<class T>
 inline T no0(T v) { return v == 0 ? 1 : v; }

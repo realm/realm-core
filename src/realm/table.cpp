@@ -5862,15 +5862,15 @@ void Table::print() const
     for (size_t i = 0; i < column_count; ++i) {
         ColumnType type = get_real_column_type(i);
         switch (type) {
-            case type_Int:
+            case col_type_Int:
                 std::cout << "Int        "; break;
-            case type_Float:
+            case col_type_Float:
                 std::cout << "Float      "; break;
-            case type_Double:
+            case col_type_Double:
                 std::cout << "Double     "; break;
-            case type_Bool:
+            case col_type_Bool:
                 std::cout << "Bool       "; break;
-            case type_String:
+            case col_type_String:
                 std::cout << "String     "; break;
             case col_type_StringEnum:
                 std::cout << "String     "; break;
@@ -5878,9 +5878,35 @@ void Table::print() const
                 size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(i);
                 ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
                 const StringData target_name = target_table->get_name();
-                std::cout << "->" << std::setw(8) << std::string(target_name).substr(0, 8) << " ";
+                std::cout << "L->" << std::setw(7) << std::string(target_name).substr(0, 7) << " ";
                 break;
             }
+            case col_type_LinkList: {
+                size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(i);
+                ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
+                const StringData target_name = target_table->get_name();
+                std::cout << "LL->" << std::setw(6) << std::string(target_name).substr(0, 6) << " ";
+                break;
+            }
+            case col_type_BackLink: {
+                size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(i);
+                ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
+                const StringData target_name = target_table->get_name();
+                std::cout << "BL->" << std::setw(6) << std::string(target_name).substr(0, 6) << " ";
+                break;
+            }
+            case col_type_Binary:
+                std::cout << "Binary     "; break;
+            case col_type_Table:
+                std::cout << "SubTable   "; break;
+            case col_type_Mixed:
+                std::cout << "Mixed      "; break;
+            case col_type_OldDateTime:
+                std::cout << "OldDateTime"; break;
+            case col_type_Timestamp:
+                std::cout << "Timestamp  "; break;
+            case col_type_Reserved4:
+                std::cout << "Reserved4  "; break;
             default:
                 REALM_ASSERT(false);
         }
@@ -5893,27 +5919,27 @@ void Table::print() const
         for (size_t n = 0; n < column_count; ++n) {
             ColumnType type = get_real_column_type(n);
             switch (type) {
-                case type_Int: {
+                case col_type_Int: {
                     const IntegerColumn& column = get_column(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
-                case type_Float: {
+                case col_type_Float: {
                     const FloatColumn& column = get_column_float(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
-                case type_Double: {
+                case col_type_Double: {
                     const DoubleColumn& column = get_column_double(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
-                case type_Bool: {
+                case col_type_Bool: {
                     const IntegerColumn& column = get_column(n);
                     std::cout << (column.get(i) == 0 ? "     false " : "      true ");
                     break;
                 }
-                case type_String: {
+                case col_type_String: {
                     const StringColumn& column = get_column_string(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
@@ -5928,6 +5954,36 @@ void Table::print() const
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
+                case col_type_Binary: {
+                    const BinaryColumn& column = get_column_binary(n);
+                    std::cout << std::setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_Table: {
+                    const SubtableColumn& column = get_column_table(n);
+                    std::cout << std::setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_Timestamp: {
+                    const TimestampColumn& column = get_column_timestamp(n);
+                    std::cout << std::setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_LinkList: {
+                    const LinkListColumn& column = get_column_link_list(n);
+                    std::cout << std::setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_BackLink: {
+                    const BacklinkColumn& column = get_column_backlink(n);
+                    std::cout << std::setw(10) << column.get(i) << " ";
+                    break;
+                }
+
+                // Not supported
+                case col_type_Mixed:
+                case col_type_OldDateTime:
+                case col_type_Reserved4:
                 default:
                     REALM_ASSERT(false);
             }
