@@ -1330,7 +1330,6 @@
 		3647DFF214209CE600D56FD7 /* test */ = {
 			isa = PBXGroup;
 			children = (
-				B647249B1D225C87006AB240 /* test_util_type_list.cpp */,
 				F4D0FC211B00E1090040956A /* benchmark-common-tasks */,
 				F4D0FC281B00F4010040956A /* benchmark-common-tasks-ios */,
 				52F2E0E017D5F8F500415958 /* large_tests */,
@@ -1392,9 +1391,10 @@
 				65F666EB1BFD012900749FA2 /* test_util_inspect.cpp */,
 				4852311F1B2E9361003C72AF /* test_util_network.cpp */,
 				65F666EC1BFD012900749FA2 /* test_util_stringbuffer.cpp */,
+				B67A2D381D1D5C1F00F0A0E7 /* test_util_to_string.cpp */,
+				B647249B1D225C87006AB240 /* test_util_type_list.cpp */,
 				65F666ED1BFD012900749FA2 /* test_util_uri.cpp */,
 				80ADCCED18A23E2D0049D472 /* test_version.cpp */,
-				B67A2D381D1D5C1F00F0A0E7 /* test_util_to_string.cpp */,
 			);
 			path = test;
 			sourceTree = "<group>";
