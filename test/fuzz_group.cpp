@@ -131,7 +131,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         s.pos = 0;
 
         const bool use_encryption = get_next(s) % 2 == 0;
-        const char* key = crypt_key(use_encryption);
+        const char* key = use_encryption ? crypt_key(true) : nullptr;
 
         if (log) {
             *log << "// Test case generated in "  REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
