@@ -524,6 +524,8 @@ TEST(ColumnString_UpperLowerBounds)
     CHECK_EQUAL(c.upper_bound_string("def"), 3);
     c.add("qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio ");
     CHECK_EQUAL(c.upper_bound_string("oops"), 6);
+
+    c.destroy();
 }
 
 TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
