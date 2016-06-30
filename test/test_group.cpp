@@ -909,6 +909,21 @@ TEST(Group_MoveTableWithLinks)
 }
 
 
+TEST(Group_MoveTableImmediatelyAfterOpen)
+{
+    Group g1;
+    TableRef a = g1.add_table("a");
+    TableRef b = g1.add_table("b");
+    CHECK_EQUAL(2, g1.size());
+
+    Group g2(g1.write_to_mem());
+    g2.move_table(0, 1);
+    CHECK_EQUAL(2, g2.size());
+    CHECK_EQUAL("b", g2.get_table_name(0));
+    CHECK_EQUAL("a", g2.get_table_name(1));
+}
+
+
 namespace {
 
 void setup_table(TestTableGroup::Ref t)

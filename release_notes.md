@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a crash when Group::move_table() is called before table accessors are
+  initialized.
 
 ### Breaking changes
 
