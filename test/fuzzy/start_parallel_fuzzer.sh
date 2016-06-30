@@ -47,7 +47,7 @@ CXX="$compiler" make -j check-debug-norun "$flags"
 echo "Cleaning up the findings directory"
 
 pkill afl-fuzz
-rm -rf findings/* &> /dev/null
+rm -rf findings/*
 
 # see also stop_parallel_fuzzer.sh
 time_out="1000" # ms
