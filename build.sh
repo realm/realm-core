@@ -90,6 +90,8 @@ Available modes are:
     build-cocoa:
     build-dotnet-cocoa:
     build-osx-framework:
+    build-node:
+    build-node-package:
     test:
     test-debug:
     check:
@@ -595,6 +597,13 @@ get_dist_log_path()
     printf "%s\n" "$path"
 }
 
+build_node()
+{
+    auto_configure || exit 1
+    export REALM_HAVE_CONFIG="1"
+    $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+}
+
 case "$MODE" in
 
     "config")
@@ -945,7 +954,8 @@ EOF
                 (cd openssl && mv Makefile Makefile.dep && sed -e 's/\-mandroid//g' Makefile.dep > Makefile) || exit 1
                 DEPFLAGS="$(grep DEPFLAG= Makefile | head -1 | cut -f2 -d=)"
                 $MAKE -C "openssl" DEPFLAG="$DEPFLAGS -I$temp_dir/sysroot/usr/include -I$temp_dir/sysroot/usr/include/linux -I$temp_dir/include/c++/4.9/tr1 -I$temp_dir/include/c++/4.9" depend || exit 1
-                (cd openssl && mv Makefile.dep Makefile) || exit 1
+                # -O3 seems to be buggy on Android
+                (cd openssl && sed -e 's/O3/Os/g' Makefile.dep > Makefile && rm -f Makefile.dep) || exit 1
                 PATH="$path" CC="$cc" CFLAGS="$cflags_arch" PERL="perl" $MAKE -C "openssl" build_crypto || exit 1
                 cp "openssl/libcrypto.a" "$ANDROID_DIR/$libcrypto_name" || exit 1
             fi
@@ -1075,9 +1085,12 @@ EOF
         ;;
 
     "build-node")
-        auto_configure || exit 1
-        export REALM_HAVE_CONFIG="1"
-        $MAKE -C "src/realm" "librealm-node.a" "librealm-node-dbg.a" BASE_DENOM="node" EXTRA_CFLAGS="-fPIC -DPIC" || exit 1
+        build_node
+        exit 0
+        ;;
+
+    "build-node-package")
+        build_node
 
         dir_basename=core
         node_directory="$NODE_DIR/$dir_basename"

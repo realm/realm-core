@@ -244,6 +244,37 @@ void fill_kernel_write_buffer(Socket& socket, network::io_service& service)
 }
 
 
+TEST(EventLoop_construct)
+{
+    // Default
+    {
+        auto event_loop = make_event_loop();
+        int n = 0;
+        event_loop->post([&] { ++n; });
+        event_loop->run();
+        CHECK_EQUAL(1, n);
+    }
+    // Named
+    {
+        auto event_loop = EventLoop::Implementation::get("posix").make_event_loop();
+        int n = 0;
+        event_loop->post([&] { ++n; });
+        event_loop->run();
+        CHECK_EQUAL(1, n);
+    }
+    // Bad name
+    {
+        std::string eStr;
+        try{
+            auto event_loop = EventLoop::Implementation::get("Windows").make_event_loop();
+        }
+        catch (const std::exception& e) {
+            eStr = e.what();
+        }
+        CHECK_EQUAL(eStr, "No such event loop implementation on this platform");
+    }
+}
+
 
 TEST_TYPES(EventLoop_Post_Basics, IMPLEMENTATIONS)
 {

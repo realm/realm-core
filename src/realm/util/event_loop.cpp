@@ -27,11 +27,13 @@ EventLoop::Implementation& EventLoop::Implementation::get_default()
     if (auto impl = _impl::get_posix_event_loop_impl()) // Throws
         return *impl;
 
+    // LCOV_EXCL_START Hard to reach on platforms where posix is available
     auto all = get_all(); // Throws
     if (!all.empty())
         return *all[0];
 
     throw NotAvailable();
+    // LCOV_EXCL_STOP
 }
 
 
@@ -63,13 +65,14 @@ EventLoop::Implementation& EventLoop::Implementation::get_posix()
     throw NotAvailable();
 }
 
-
+// LCOV_EXCL_START
 EventLoop::Implementation& EventLoop::Implementation::get_apple_cf()
 {
     if (auto impl = _impl::get_apple_cf_event_loop_impl()) // Throws
         return *impl;
     throw NotAvailable();
 }
+// LCOV_EXCL_STOP
 
 } // namespace util
 } // namespace realm

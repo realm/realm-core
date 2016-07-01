@@ -42,7 +42,7 @@ public:
     void print(std::ostream& out, bool quote) const;
     std::string str() const;
 
-    static void print_all(std::ostream& out, std::initializer_list<Printable>& values, bool quote);
+    static void print_all(std::ostream& out, const std::initializer_list<Printable>& values, bool quote);
 
 private:
     enum class Type {

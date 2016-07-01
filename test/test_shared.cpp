@@ -2975,7 +2975,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
     }
     sg.close();
 
-    std::vector<std::pair<char*, size_t>> memory_list;
+    std::vector<std::pair<void*, size_t>> memory_list;
     // Reserve enough for 500 Gb, but in practice the vector is only ever around size 10.
     // Do this here to avoid the (small) chance that adding to the vector will request new virtual memory
     memory_list.reserve(500);
@@ -2986,7 +2986,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
             chunk_size /= 2;
         }
         else {
-            memory_list.push_back(std::pair<char*,size_t>(static_cast<char*>(addr), chunk_size));
+            memory_list.push_back(std::pair<void*, size_t>(addr, chunk_size));
         }
     }
 
@@ -3081,8 +3081,44 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
 }
 
-// Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
+// Scaled down stress test. (Use string length ~15MB for max stress)
 NONCONCURRENT_TEST(Shared_BigAllocations)
+{
+    size_t string_length = 64 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    std::string long_string(string_length, 'a');
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_String, "string_col");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        for (int i = 0; i < 32; ++i) {
+            table->add_empty_row();
+            table->set_string(0, i, long_string);
+        }
+        wt.commit();
+    }
+    for (int k = 0; k < 10; ++k) {
+        //sg.compact(); // <--- enable this if you want to stress with compact()
+        for (int j = 0; j < 20; ++j) {
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("table");
+            for (int i = 0; i < 20; ++i) {
+                table->set_string(0, i, long_string);
+            }
+            wt.commit();
+        }
+    }
+    sg.close();
+}
+
+// Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
+NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
 {
     // String length at 2K will not trigger the error.
     // all lengths >= 4K (that were tried) trigger the error
@@ -3140,4 +3176,32 @@ NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
     sg3.begin_read(); // <- does not fail
     sg.begin_read(); // <- does fail
 }
+
+// Found by AFL after adding the compact instruction
+// after further manual simplification, this test no longer triggers
+// the double free, but crashes in a different way
+TEST(Shared_Bptree_insert_failure)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg_w(path, false, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    g.add_table("");
+    g.get_table(0)->add_column(type_Double, "dgrpn", true);
+    g.get_table(0)->add_empty_row(246);
+    sg_w.commit();
+    REALM_ASSERT_RELEASE(sg_w.compact());
+    #if 0
+    {
+        // This intervening sg can do the same operation as the one doing compact,
+        // but without failing:
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+        Group& g2 = const_cast<Group&>(sg2.begin_write());
+        g2.get_table(0)->add_empty_row(396);
+    }
+    #endif
+    sg_w.begin_write();
+    g.get_table(0)->add_empty_row(396);
+}
+
 #endif // TEST_SHARED
