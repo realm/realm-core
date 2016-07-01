@@ -25,8 +25,8 @@
 #include <realm/util/features.h>
 
 #define REALM_VER_MAJOR 1
-#define REALM_VER_MINOR 1
-#define REALM_VER_PATCH 2
+#define REALM_VER_MINOR 2
+#define REALM_VER_PATCH 0
 #define REALM_PRODUCT_NAME "realm-core"
 
 #define REALM_VER_STRING REALM_QUOTE(REALM_VER_MAJOR) "." REALM_QUOTE(REALM_VER_MINOR) "." REALM_QUOTE(REALM_VER_PATCH)

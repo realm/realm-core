@@ -1,10 +1,5 @@
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
 
-// To make std::mutex work in Windows
-#ifdef _WIN32
-    #define INTMAX_MAX _I64_MAX
-#endif
-
 #include <map>
 #include <sstream>
 #include <mutex>
@@ -99,6 +94,10 @@ TEST(LangBindHelper_SetSubtable)
     CHECK_EQUAL(t2.get_column_count(), sub->get_column_count());
     CHECK_EQUAL(t2.size(), sub->size());
     CHECK(t2 == *sub);
+
+    Table* table_ptr = LangBindHelper::get_subtable_ptr_during_insert(&t1, 0, 0);
+    CHECK(table_ptr == sub);
+    LangBindHelper::unbind_table_ptr(table_ptr);
 }
 
 
@@ -12203,6 +12202,56 @@ TEST(LangbindHelper_BoolSearchIndexCommitPromote)
     LangBindHelper::promote_to_write(sg_w);
     t->add_empty_row(5);
     t->remove(8);
+}
+
+
+TEST(LangbindHelper_GetDataTypeName)
+{
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Int), "int"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Bool), "bool"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Float), "float"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Double), "double"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_String), "string"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Binary), "binary"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_OldDateTime), "date"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Timestamp), "timestamp"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Table), "table"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Mixed), "mixed"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Link), "link"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_LinkList), "linklist"));
+    CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(static_cast<DataType>(42)), "unknown"));
+}
+
+
+// Found by AFL.
+TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    g.add_table("dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbterse");
+    g.add_table("pknglaqnckqbffehqfgjnrepcfohoedkhiqsiedlotmaqitm");
+    g.get_table(0)->add_column(type_Double, "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
+    g.get_table(1)->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr", *g.get_table(0));
+    g.get_table(0)->add_empty_row(375);
+    g.add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
+    sg_r.close();
+    sg_w.commit();
+    REALM_ASSERT_RELEASE(sg_w.compact());
+    sg_w.begin_write();
+    sg_r.open(path);
+    sg_r.begin_read();
+    g_r.verify();
+    g.add_table("citdgiaclkfbbksfaqegcfiqcserceaqmttkilnlbknoadtb");
+    g.add_table("tqtnnikpggeakeqcqhfqtshmimtjqkchgbnmbpttbetlahfi");
+    g.add_table("hkesaecjqbkemmmkffctacsnskekjbtqmpoetjnqkpactenf");
+    sg_r.close();
+    sg_w.commit();
 }
 
 

@@ -257,7 +257,7 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
     if (type == col_type_Table || tf::is_link_type(type)) {
         // Table columns and link type columns have a single subspec.
         size_t old_subspec_ndx = get_subspec_ndx(from_ndx);
-        size_t new_subspec_ndx = get_subspec_ndx_after(to_ndx);
+        size_t new_subspec_ndx = get_subspec_ndx_after(to_ndx, from_ndx);
         if (old_subspec_ndx != new_subspec_ndx) {
             m_subspecs.move_rotate(old_subspec_ndx, new_subspec_ndx);
         }
@@ -278,17 +278,21 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
                    get_column_type(column_ndx) == col_type_LinkList ||
                    get_column_type(column_ndx) == col_type_BackLink );
 
-    return get_subspec_ndx_after(column_ndx);
+    return get_subspec_ndx_after(column_ndx, column_ndx);
 }
 
 
-size_t Spec::get_subspec_ndx_after(size_t column_ndx) const noexcept
+size_t Spec::get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx <= get_column_count());
     // The m_subspecs array only keep info for subtables so we need to
     // count up to it's position
     size_t subspec_ndx = 0;
     for (size_t i = 0; i != column_ndx; ++i) {
+        if (i == skip_column_ndx) {
+            continue;
+        }
+
         ColumnType type = ColumnType(m_types.get(i));
         if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
             ++subspec_ndx;

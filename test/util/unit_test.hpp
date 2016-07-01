@@ -115,6 +115,19 @@
     } \
     while(false)
 
+#define CHECK_THROW_WHAT(expr, exception_class, expected_what) \
+    do { \
+        try { \
+            (expr); \
+            test_context.throw_failed(__FILE__, __LINE__, #expr, #exception_class); \
+        } \
+        catch (const exception_class& e) { \
+            std::string e_what = e.what(); \
+            test_context.check_equal(e_what, expected_what, __FILE__, __LINE__, e.what(), #expected_what); \
+        } \
+    } \
+    while(false)
+
 #define CHECK_THROW_EX(expr, exception_class, exception_cond) \
     do { \
         try { \

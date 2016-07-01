@@ -114,9 +114,9 @@ TEST(Upgrade_Database_2_3)
         const char* encryption_key = nullptr;
         bool allow_upgrade = false;
 
-        CHECK_THROW(
+        CHECK_THROW_WHAT(
             SharedGroup(temp_copy, no_create, durability, encryption_key, allow_upgrade),
-            FileFormatUpgradeRequired);
+            FileFormatUpgradeRequired, "Database upgrade required but prohibited");
     }
 
     // Automatic upgrade from SharedGroup

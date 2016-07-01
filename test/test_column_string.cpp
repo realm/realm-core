@@ -364,9 +364,6 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
-
         c.add("foobar");
         c.add("bar abc");
         c.add("baz");
@@ -377,8 +374,6 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
         CHECK_EQUAL("foobar", c.get(0));
         CHECK_EQUAL("40 chars  40 chars  40 chars  40 chars  ", c.get(1));
         CHECK_EQUAL("baz", c.get(2));
-
-        col.destroy();
     }
 
 
@@ -389,9 +384,6 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.clear();
 
     {
-        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn col(Allocator::get_default(), col_ref);
-
         c.add("foobar");
         c.add("bar abc");
         c.add("baz");
@@ -403,8 +395,6 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
         CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ",
                     c.get(1));
         CHECK_EQUAL("baz", c.get(2));
-
-        col.destroy();
     }
 
 
@@ -516,12 +506,33 @@ TEST_TYPES(ColumnString_Find2, non_nullable, nullable)
     c.destroy();
 }
 
+TEST(ColumnString_UpperLowerBounds)
+{
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref);
+
+    c.add("a");
+    c.add("bc");
+    c.add("def");
+    c.add("ghij");
+    c.add("klmop");
+
+    CHECK_EQUAL(c.lower_bound_string("baboo"), 1);
+    CHECK_EQUAL(c.upper_bound_string("baboo"), 1);
+    c.add("mnbvcxzlkjhgfdsa");
+    CHECK_EQUAL(c.lower_bound_string("def"), 2);
+    CHECK_EQUAL(c.upper_bound_string("def"), 3);
+    c.add("qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio ");
+    CHECK_EQUAL(c.upper_bound_string("oops"), 6);
+}
+
 TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn c(Allocator::get_default(), ref, nullable);
+    CHECK_EQUAL(c.is_nullable(), nullable);
 
     // Add duplicate values
     for (size_t i = 0; i < 5; ++i) {
@@ -1370,4 +1381,152 @@ TEST_TYPES(ColumnString_Index, non_nullable, nullable)
 
 #endif // !defined DISABLE_INDEX
 
+
+/**
+ * This test ensures that StringColumn::EraseLeafElem is called. It is called when you
+ * have some leaves.
+ */
+TEST(ColumnString_NonLeafRoot)
+{
+    // Small strings
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+            std::string s = util::to_string(i);
+            c.add(s);
+        }
+
+        CHECK_EQUAL(c.count("3"), 1);
+        CHECK_EQUAL(c.find_first("3"), 3);
+        CHECK_EQUAL(c.find_first("5000"), not_found);
+        auto mid_point = util::to_string(REALM_MAX_BPNODE_SIZE/2);
+        CHECK_EQUAL(c.upper_bound_string(mid_point), REALM_MAX_BPNODE_SIZE/2 + 1);
+
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), col_ref);
+        c.find_all(col, "3");
+        CHECK_EQUAL(col.size(), 1);
+        CHECK_EQUAL(col.get(0), 3);
+        col.destroy();
+
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        c.erase(REALM_MAX_BPNODE_SIZE);
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        c.erase(REALM_MAX_BPNODE_SIZE);
+        CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
+
+        c.destroy();
+    }
+    // Medium strings
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        c.add("This is a medium long string");
+        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+            std::string s = util::to_string(i);
+            c.add(s);
+        }
+
+        CHECK_EQUAL(c.count("3"), 1);
+        CHECK_EQUAL(c.find_first("3"), 3);
+
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), col_ref);
+        c.find_all(col, "3");
+        CHECK_EQUAL(col.size(), 1);
+        CHECK_EQUAL(col.get(0), 3);
+        col.destroy();
+
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        c.erase(REALM_MAX_BPNODE_SIZE);
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        c.erase(REALM_MAX_BPNODE_SIZE);
+        CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
+
+        c.destroy();
+    }
+    // Big strings
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        c.add("This is a rather long string, that should not be very much shorter");
+        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+            std::string s = util::to_string(i);
+            c.add(s);
+        }
+
+        CHECK_EQUAL(c.count("3"), 1);
+        CHECK_EQUAL(c.find_first("3"), 3);
+
+        ref_type col_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn col(Allocator::get_default(), col_ref);
+        c.find_all(col, "3");
+        CHECK_EQUAL(col.size(), 1);
+        CHECK_EQUAL(col.get(0), 3);
+        col.destroy();
+
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        c.erase(REALM_MAX_BPNODE_SIZE);
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        c.erase(REALM_MAX_BPNODE_SIZE);
+        CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
+
+        c.destroy();
+    }
+    // Upgrade leaf from medium to big
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+            std::string s = util::to_string(i);
+            c.add(s);
+        }
+        c.set(REALM_MAX_BPNODE_SIZE, "This is a medium long string");
+        c.set(REALM_MAX_BPNODE_SIZE + 1, "This is a rather long string, that should not be very much shorter");
+        CHECK_EQUAL(c.get(0), "0");
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), "This is a medium long string");
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), "This is a rather long string, that should not be very much shorter");
+
+        c.destroy();
+    }
+    // Upgrade leaf from small to big while inserting
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; i++) {
+            std::string s = util::to_string(i);
+            c.add(s);
+        }
+        c.add("This is a rather long string, that should not be very much shorter");
+
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), "This is a rather long string, that should not be very much shorter");
+
+        c.destroy();
+    }
+    // Upgrade leaf from medium to big while inserting
+    {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn c(Allocator::get_default(), ref);
+
+        c.add("This is a medium long string");
+        for (int i = 1; i < REALM_MAX_BPNODE_SIZE + 1; i++) {
+            std::string s = util::to_string(i);
+            c.add(s);
+        }
+        c.add("This is a rather long string, that should not be very much shorter");
+
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), "This is a rather long string, that should not be very much shorter");
+
+        c.destroy();
+    }
+}
 #endif // TEST_COLUMN_STRING

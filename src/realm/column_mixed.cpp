@@ -494,6 +494,7 @@ void MixedColumn::verify(const Table& table, size_t col_ndx) const
     }
 }
 
+
 void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
 {
     m_array->verify();
@@ -513,6 +514,10 @@ void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
     REALM_ASSERT_3(types_len, ==, refs_len);
 }
 
+
+void MixedColumn::leaf_to_dot(MemRef, ArrayParent*, size_t, std::ostream&) const
+{
+}
 
 void MixedColumn::to_dot(std::ostream& out, StringData title) const
 {

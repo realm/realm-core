@@ -301,8 +301,14 @@ TEST(Table_ColumnNameTooLong)
     TableRef table = group.add_table("foo");
     const size_t buf_size = 64;
     std::unique_ptr<char[]> buf(new char[buf_size]);
-    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf.get(), buf_size)),
-                      LogicError::column_name_too_long);
+    std::string errText;
+    try {
+        table->add_column(type_Int, StringData(buf.get(), buf_size));
+    }
+    catch (const LogicError& e) {
+        errText = e.what();
+    }
+    CHECK_EQUAL(errText, "Column name too long");
     CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, StringData(buf.get(), buf_size)),
                       LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column_link(type_Link,
@@ -2326,6 +2332,30 @@ TEST(Table_SpecMoveColumns)
     CHECK(subtable1->is_attached());
     CHECK_EQUAL(subtable0->get_int(1, 0), 123);
     CHECK_EQUAL(subtable1->get_int(1, 0), 456);
+}
+
+
+TEST(Table_SpecMoveLinkColumn)
+{
+    using df = _impl::DescriptorFriend;
+
+    Group group;
+    TableRef target = group.add_table("target");
+    target->add_column(type_Int, "a");
+
+    TableRef origin = group.add_table("origin");
+    origin->add_column_link(type_Link, "a", *target);
+    origin->add_column(type_Int, "b");
+
+    origin->add_empty_row(2);
+    target->add_empty_row(2);
+    origin->set_link(0, 0, 1);
+
+    df::move_column(*origin->get_descriptor(), 0, 1);
+
+    CHECK_EQUAL(origin->get_link(1, 0), 1);
+    CHECK_EQUAL(target->get_backlink_count(0, *origin, 1), 0);
+    CHECK_EQUAL(target->get_backlink_count(1, *origin, 1), 1);
 }
 
 

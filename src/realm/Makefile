@@ -123,7 +123,7 @@ query_expression.hpp
 
 lib_LIBRARIES    = librealm.a
 libexec_PROGRAMS = realmd
-bin_PROGRAMS     = realm-import
+bin_PROGRAMS     = realm-import realm-schema-dump
 DEV_PROGRAMS     = realm-config
 
 librealm_a_SOURCES = \
@@ -173,7 +173,6 @@ impl/continuous_transactions_history.cpp \
 impl/output_stream.cpp \
 impl/transact_log.cpp \
 impl/simulated_failure.cpp \
-importer.cpp \
 index_string.cpp \
 lang_bind_helper.cpp \
 link_view.cpp \
@@ -218,8 +217,11 @@ realm_config_SOURCES = config_tool.cpp
 realmd_SOURCES = realmd.cpp
 realmd_LIBS = librealm.a
 
-realm_import_SOURCES = importer_tool.cpp
+realm_import_SOURCES = importer.cpp importer_tool.cpp
 realm_import_LIBS    = librealm.a
+
+realm_schema_dump_SOURCES = schema_dumper.cpp
+realm_schema_dump_LIBS    = librealm.a
 
 CONFIG_H = util/config.h
 CONFIG_SH = $(CONFIG_H:.h=.sh)

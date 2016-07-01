@@ -731,8 +731,10 @@ bool File::lock(bool exclusive, bool non_blocking)
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking)
         operation |=  LOCK_NB;
-    if (flock(m_fd, operation) == 0)
-        return true;
+    do {
+        if (flock(m_fd, operation) == 0)
+            return true;
+    } while (errno == EINTR);
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
         return false;
@@ -759,7 +761,10 @@ void File::unlock() noexcept
     // unlocking is idempotent, however, we will assume it since there
     // is no mention of the error that would be reported if a
     // non-locked file were unlocked.
-    int r = flock(m_fd, LOCK_UN);
+    int r;
+    do {
+        r = flock(m_fd, LOCK_UN);
+    } while (r != 0 && errno == EINTR);
     REALM_ASSERT_RELEASE(r == 0);
 
 #endif

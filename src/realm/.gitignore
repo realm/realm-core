@@ -52,3 +52,6 @@
 /realm-config-tvos-dbg
 
 /util/config.h
+
+/realm-schema-dump*
+/realm-schema-dump-dbg*
