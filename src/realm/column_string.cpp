@@ -1091,8 +1091,10 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
                         leaf->bptree_leaf_insert_string(row_ndx_2, value, state); // Throws
                     break;
                 }
+                default:
+                    REALM_ASSERT(false);
+                    break;
             }
-            REALM_ASSERT(false);
         }
         else {
             // Non-leaf root
