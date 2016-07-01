@@ -27,7 +27,8 @@ ifeq ($(COMPILER_IS),clang)
 # While -Wunreachable-code is accepted by GCC, it is ignored and will be removed
 # in the future.
   CFLAGS_GENERAL += -Wunreachable-code
-  CFLAGS_GENERAL += -Wshorten-64-to-32 
+  CFLAGS_GENERAL += -Wshorten-64-to-32
+  CFLAGS_GENERAL += -Wold-style-cast
   CFLAGS_GENERAL += -Wconditional-uninitialized
   CFLAGS_GENERAL += -Wextra-semi
 endif

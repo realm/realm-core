@@ -3463,7 +3463,7 @@ TEST(Query_Subtable)
 
 
     Query q4 = table->where();
-    q4.equal(0, (int64_t)333);
+    q4.equal(0, int64_t(333));
     q4.Or();
     q4.subtable(2);
     q4.greater(0, val50);

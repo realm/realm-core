@@ -2800,6 +2800,7 @@
 					"$(inherited)",
 					"-Wextra-semi",
 					"-fno-elide-constructors",
+					"-Wold-style-cast",
 					"-Wundef",
 					"-Wconditional-uninitialized",
 				);
@@ -2847,6 +2848,7 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wextra-semi",
+					"-Wold-style-cast",
 					"-Wundef",
 					"-Wconditional-uninitialized",
 				);
@@ -2867,7 +2869,6 @@
 					"$(PROJECT_DIR)/src/realm",
 				);
 				PRODUCT_NAME = realm;
-				WARNING_CFLAGS = "-Wold-style-cast";
 			};
 			name = Debug;
 		};
@@ -2881,7 +2882,6 @@
 					"$(PROJECT_DIR)/src/realm",
 				);
 				PRODUCT_NAME = realm;
-				WARNING_CFLAGS = "-Wold-style-cast";
 			};
 			name = Release;
 		};
