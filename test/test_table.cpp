@@ -6809,20 +6809,16 @@ TEST(Table_InsertUniqueDuplicate_LinkedColumns)
     CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped back via backlinks
 }
 
-TEST(Table_ColumnSizeFromRef)
-{
-    constexpr bool nullable = true;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-    TimestampColumn c(Allocator::get_default(), ref);
-    ref_type int_ref = IntegerColumn::create(Allocator::get_default(), Array::type_Normal, 0);
-    IntegerColumn int_col(Allocator::get_default(), int_ref);
 
+TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
+{
+    bool nullable = TEST_TYPE::value;
     Group g;
     TableRef t = g.add_table("table");
-    t->add_column(type_Int, "int");
-    t->add_column(type_Bool, "bool");
-    t->add_column(type_String, "string");
-    t->add_column(type_Binary, "binary");
+    t->add_column(type_Int, "int", nullable);
+    t->add_column(type_Bool, "bool", nullable);
+    t->add_column(type_String, "string", nullable);
+    t->add_column(type_Binary, "binary", nullable);
     t->add_column(type_Double, "double");
     t->add_column(type_Float, "float");
     t->add_column(type_Mixed, "mixed");
@@ -6830,21 +6826,41 @@ TEST(Table_ColumnSizeFromRef)
     t->add_column_link(type_Link, "link", *t);
     t->add_column_link(type_LinkList, "LinkList", *t);
 
-    // We know there are 2 hidden backlink columns
-    size_t actual_num_cols = t->get_column_count() + 2;
-    size_t num_items = 10000;
+    auto check_column_sizes = [this, &t](size_t column_size) {
+        using tf = _impl::TableFriend;
+        // We know there are 2 hidden backlink columns
+        size_t actual_num_cols = t->get_column_count() + 2;
+        Spec& t_spec = tf::get_spec(*t);
+        for (size_t col_ndx = 0; col_ndx < actual_num_cols; ++col_ndx) {
+            ColumnType col_type = t_spec.get_column_type(col_ndx);
+            ColumnBase& base = tf::get_column(*t, col_ndx);
+            ref_type col_ref = base.get_ref();
+            size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc());
+            CHECK_EQUAL(col_size, column_size);
+        }
+    };
 
+    // Test leafs
+    size_t num_items = REALM_MAX_BPNODE_SIZE - 1;
     t->add_empty_row(num_items);
+    check_column_sizes(num_items);
 
-    using tf = _impl::TableFriend;
-    Spec& t_spec = tf::get_spec(*t);
-    for (size_t col_ndx = 0; col_ndx < actual_num_cols; ++col_ndx) {
-        ColumnType col_type = t_spec.get_column_type(col_ndx);
-        ColumnBase& base = tf::get_column(*t, col_ndx);
-        ref_type col_ref = base.get_ref();
-        size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc());
-        CHECK_EQUAL(col_size, num_items);
-    }
+    // Test empty
+    t->clear();
+    CHECK_EQUAL(t->size(), 0);
+    check_column_sizes(0);
+
+    // Test internal nodes
+    num_items = REALM_MAX_BPNODE_SIZE + 1;
+    t->add_empty_row(num_items);
+    check_column_sizes(num_items);
+
+    // Test on boundary for good measure
+    t->clear();
+    num_items = REALM_MAX_BPNODE_SIZE;
+    t->add_empty_row(num_items);
+    CHECK_EQUAL(t->size(), num_items);
+    check_column_sizes(num_items);
 }
 
 
