@@ -16,7 +16,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Performance improvements for LinkLIstColumn::get_ptr(). (#1933)
 
 ----------------------------------------------
 
