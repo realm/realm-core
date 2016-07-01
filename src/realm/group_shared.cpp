@@ -1257,11 +1257,13 @@ void SharedGroup::close() noexcept
     m_daemon_becomes_ready.close();
     m_new_commit_available.close();
 #endif
+    // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another thread may
+    // interleave which is not permitted on Windows. It is permitted on *nix.
+    m_file_map.unmap();
+    m_reader_map.unmap();
     m_file.unlock();
     // info->~SharedInfo(); // DO NOT Call destructor
     m_file.close();
-    m_file_map.unmap();
-    m_reader_map.unmap();
 }
 
 bool SharedGroup::has_changed()
