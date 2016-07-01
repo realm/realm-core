@@ -110,7 +110,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
         case mixcol_Float:
         case mixcol_Double:
         case mixcol_DoubleNeg:
-            goto carry_on;
+            break;
         case mixcol_String:
         case mixcol_Binary: {
             // If item is in middle of the column, we just clear it to avoid
@@ -127,7 +127,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
                 // for(;;) { insert_binary(i, ...); erase(i); }
                 m_binary_data->set(data_ndx, BinaryData());
             }
-            goto carry_on;
+            break;
         }
         case mixcol_Timestamp: {
             size_t data_row_ndx = size_t(m_data->get(row_ndx) >> 1);
@@ -140,21 +140,20 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
                 // for(;;) { insert_binary(i, ...); erase(i); }
                 m_timestamp_data->set(data_row_ndx, Timestamp(null{}));
             }
-            goto carry_on;
+            break;
         }
-
         case mixcol_Table: {
             // Delete entire table
             ref_type ref = m_data->get_as_ref(row_ndx);
             Array::destroy_deep(ref, m_data->get_alloc());
-            goto carry_on;
+            break;
         }
         case mixcol_Mixed:
             break;
+        default:
+            REALM_ASSERT(false);
     }
-    REALM_ASSERT(false);
 
-  carry_on:
     if (old_type != new_type)
         m_types->set(row_ndx, new_type);
     m_data->set(row_ndx, 0);

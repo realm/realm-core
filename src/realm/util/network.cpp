@@ -352,17 +352,16 @@ public:
                 REALM_ASSERT(!oper_slot.read_oper);
                 pollfd_slot.events |= POLLRDNORM;
                 oper_slot.read_oper = std::move(op);
-                goto finish;
+                break;
             case io_op_Write:
                 REALM_ASSERT(!oper_slot.write_oper);
                 pollfd_slot.events |= POLLWRNORM;
                 oper_slot.write_oper = std::move(op);
-                goto finish;
+                break;
+            default:
+                REALM_ASSERT(false);
+                return;
         }
-        REALM_ASSERT(false);
-        return;
-
-      finish:
         pollfd_slot.fd = fd;
         ++m_num_active_io_operations;
     }
