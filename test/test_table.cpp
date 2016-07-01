@@ -301,14 +301,8 @@ TEST(Table_ColumnNameTooLong)
     TableRef table = group.add_table("foo");
     const size_t buf_size = 64;
     std::unique_ptr<char[]> buf(new char[buf_size]);
-    std::string errText;
-    try {
-        table->add_column(type_Int, StringData(buf.get(), buf_size));
-    }
-    catch (const LogicError& e) {
-        errText = e.what();
-    }
-    CHECK_EQUAL(errText, "Column name too long");
+    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf.get(), buf_size)),
+                      LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->insert_column(0, type_Int, StringData(buf.get(), buf_size)),
                       LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column_link(type_Link,
@@ -2696,7 +2690,7 @@ TEST(Table_Mixed)
 
     table.insert_empty_row(1);
     table.set_int(0, 1, 43);
-    table.set_mixed(1, 1, (int64_t)12);
+    table.set_mixed(1, 1, int64_t(12));
 
     CHECK_EQUAL(0,  table.get_int(0, ndx));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -3196,7 +3190,7 @@ TEST(Table_DateAndBinary)
 
         const size_t size = 10;
         char data[size];
-        for (size_t i=0; i<size; ++i) data[i] = (char)i;
+        for (size_t i=0; i<size; ++i) data[i] = static_cast<char>(i);
         t.add(8, BinaryData(data, size));
         CHECK_EQUAL(t[0].date, 8);
         CHECK_EQUAL(t[0].bin.size(), size);

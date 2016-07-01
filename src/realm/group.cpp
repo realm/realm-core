@@ -658,6 +658,8 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
+    REALM_ASSERT_EX(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size(),
+                    m_table_accessors.size(), m_tables.size());
     if (from_table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
     if (to_table_ndx >= m_tables.size())
@@ -690,21 +692,23 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
     m_table_names.move_rotate(from_table_ndx, to_table_ndx);
 
     // Move accessors.
-    using iter = decltype(m_table_accessors.begin());
-    iter first, new_first, last;
-    if (from_table_ndx < to_table_ndx) {
-        // Rotate left.
-        first     = m_table_accessors.begin() + from_table_ndx;
-        new_first = first + 1;
-        last      = m_table_accessors.begin() + to_table_ndx + 1;
+    if (!m_table_accessors.empty()) {
+        using iter = decltype(m_table_accessors.begin());
+        iter first, new_first, last;
+        if (from_table_ndx < to_table_ndx) {
+            // Rotate left.
+            first     = m_table_accessors.begin() + from_table_ndx;
+            new_first = first + 1;
+            last      = m_table_accessors.begin() + to_table_ndx + 1;
+        }
+        else { // from_table_ndx > to_table_ndx
+            // Rotate right.
+            first     = m_table_accessors.begin() + to_table_ndx;
+            new_first = m_table_accessors.begin() + from_table_ndx;
+            last      = new_first + 1;
+        }
+        std::rotate(first, new_first, last);
     }
-    else { // from_table_ndx > to_table_ndx
-        // Rotate right.
-        first     = m_table_accessors.begin() + to_table_ndx;
-        new_first = m_table_accessors.begin() + from_table_ndx;
-        last      = new_first + 1;
-    }
-    std::rotate(first, new_first, last);
 
     update_table_indices([&](size_t old_table_ndx) {
         auto it = moves.find(old_table_ndx);

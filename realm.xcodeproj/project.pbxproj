@@ -330,6 +330,12 @@
 		651AEEA61B31945F0048C8EE /* test_upgrade_database_1000_1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */; };
 		651AEEA71B31945F0048C8EE /* test_upgrade_database_1000_2.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */; };
 		651AEEA81B31945F0048C8EE /* test_upgrade_database_1000_3.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */; };
+		651D38B11D254429006DBCC5 /* test_util_event_loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 651D389A1D25440A006DBCC5 /* test_util_event_loop.cpp */; };
+		651D38B21D254429006DBCC5 /* test_util_logger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 651D389B1D25440A006DBCC5 /* test_util_logger.cpp */; };
+		651D38B31D254429006DBCC5 /* test_util_scope_exit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 651D389C1D25440A006DBCC5 /* test_util_scope_exit.cpp */; };
+		651D38B41D25442B006DBCC5 /* test_util_event_loop.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 651D389A1D25440A006DBCC5 /* test_util_event_loop.cpp */; };
+		651D38B51D25442B006DBCC5 /* test_util_logger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 651D389B1D25440A006DBCC5 /* test_util_logger.cpp */; };
+		651D38B61D25442B006DBCC5 /* test_util_scope_exit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 651D389C1D25440A006DBCC5 /* test_util_scope_exit.cpp */; };
 		656341F81C18C508006EE446 /* fuzz_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 484814A51C172F390007CDD7 /* fuzz_group.cpp */; };
 		656341F91C18C50A006EE446 /* fuzz_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 484814A51C172F390007CDD7 /* fuzz_group.cpp */; };
 		6579EEB91B4E89B6004DE3D8 /* disable_sync_to_disk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */; };
@@ -998,6 +1004,9 @@
 		651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_1.realm; sourceTree = "<group>"; };
 		651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_2.realm; sourceTree = "<group>"; };
 		651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_3.realm; sourceTree = "<group>"; };
+		651D389A1D25440A006DBCC5 /* test_util_event_loop.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_event_loop.cpp; sourceTree = "<group>"; };
+		651D389B1D25440A006DBCC5 /* test_util_logger.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_logger.cpp; sourceTree = "<group>"; };
+		651D389C1D25440A006DBCC5 /* test_util_scope_exit.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_scope_exit.cpp; sourceTree = "<group>"; };
 		6546AB4A1BDE41E700F74CF1 /* query_expression.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = query_expression.hpp; path = realm/query_expression.hpp; sourceTree = "<group>"; };
 		6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = disable_sync_to_disk.cpp; path = realm/disable_sync_to_disk.cpp; sourceTree = "<group>"; };
 		6579EEB81B4E898B004DE3D8 /* disable_sync_to_disk.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = disable_sync_to_disk.hpp; path = realm/disable_sync_to_disk.hpp; sourceTree = "<group>"; };
@@ -1346,7 +1355,6 @@
 		3647DFF214209CE600D56FD7 /* test */ = {
 			isa = PBXGroup;
 			children = (
-				B647249B1D225C87006AB240 /* test_util_type_list.cpp */,
 				F4D0FC211B00E1090040956A /* benchmark-common-tasks */,
 				F4D0FC281B00F4010040956A /* benchmark-common-tasks-ios */,
 				52F2E0E017D5F8F500415958 /* large_tests */,
@@ -1406,15 +1414,16 @@
 				65BB22FF1AD80E870097170F /* test_upgrade_database.cpp */,
 				52A32B4717D4E89100DD22CC /* test_utf8.cpp */,
 				65F666EA1BFD012900749FA2 /* test_util_error.cpp */,
-				4B3B03B61D1817D400E86FA2 /* test_util_event_loop.cpp */,
+				651D389A1D25440A006DBCC5 /* test_util_event_loop.cpp */,
 				65F666EB1BFD012900749FA2 /* test_util_inspect.cpp */,
-				4B3B03B71D1817D400E86FA2 /* test_util_logger.cpp */,
+				651D389B1D25440A006DBCC5 /* test_util_logger.cpp */,
 				4852311F1B2E9361003C72AF /* test_util_network.cpp */,
-				4B3B03B81D1817D400E86FA2 /* test_util_scope_exit.cpp */,
+				651D389C1D25440A006DBCC5 /* test_util_scope_exit.cpp */,
 				65F666EC1BFD012900749FA2 /* test_util_stringbuffer.cpp */,
+				B67A2D381D1D5C1F00F0A0E7 /* test_util_to_string.cpp */,
+				B647249B1D225C87006AB240 /* test_util_type_list.cpp */,
 				65F666ED1BFD012900749FA2 /* test_util_uri.cpp */,
 				80ADCCED18A23E2D0049D472 /* test_version.cpp */,
-				B67A2D381D1D5C1F00F0A0E7 /* test_util_to_string.cpp */,
 			);
 			path = test;
 			sourceTree = "<group>";
@@ -2381,6 +2390,7 @@
 				65F35E0F1B32FC5C006AE5A9 /* test_optional.cpp in Sources */,
 				B647249D1D225CA3006AB240 /* test_util_type_list.cpp in Sources */,
 				65F666F31BFD013A00749FA2 /* test_priority_queue.cpp in Sources */,
+				651D38B21D254429006DBCC5 /* test_util_logger.cpp in Sources */,
 				36FD6F3614BDC61A009E0003 /* test_query.cpp in Sources */,
 				523239F81800EF33006E9F13 /* test_replication.cpp in Sources */,
 				B159814E18CF562600E3C5DF /* test_safe_int_ops.cpp in Sources */,
@@ -2394,6 +2404,7 @@
 				52A32B4617D4E88400DD22CC /* test_transactions.cpp in Sources */,
 				52A32B4417D4E87800DD22CC /* test_transactions_lasse.cpp in Sources */,
 				65BB23001AD80EA30097170F /* test_upgrade_database.cpp in Sources */,
+				651D38B11D254429006DBCC5 /* test_util_event_loop.cpp in Sources */,
 				52A32B4817D4E89100DD22CC /* test_utf8.cpp in Sources */,
 				65F666F41BFD013A00749FA2 /* test_util_error.cpp in Sources */,
 				65F666F51BFD013A00749FA2 /* test_util_inspect.cpp in Sources */,
@@ -2401,6 +2412,7 @@
 				B67A2D3A1D1D5D9A00F0A0E7 /* test_util_to_string.cpp in Sources */,
 				65F666F61BFD013A00749FA2 /* test_util_stringbuffer.cpp in Sources */,
 				65F666F71BFD013A00749FA2 /* test_util_uri.cpp in Sources */,
+				651D38B31D254429006DBCC5 /* test_util_scope_exit.cpp in Sources */,
 				80ADCCEE18A23E2D0049D472 /* test_version.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2641,13 +2653,21 @@
 				F45013FA1B01027F00CD4A7E /* test_shared.cpp in Sources */,
 				F45013FB1B01027F00CD4A7E /* test_string_data.cpp in Sources */,
 				F45013FC1B01027F00CD4A7E /* test_table.cpp in Sources */,
+				651D38B51D25442B006DBCC5 /* test_util_logger.cpp in Sources */,
 				F45013FD1B01027F00CD4A7E /* test_table_view.cpp in Sources */,
 				F45013FE1B01027F00CD4A7E /* test_thread.cpp in Sources */,
 				F45013FF1B01027F00CD4A7E /* test_transactions.cpp in Sources */,
 				F45014001B01027F00CD4A7E /* test_transactions_lasse.cpp in Sources */,
 				F45014011B01027F00CD4A7E /* test_upgrade_database.cpp in Sources */,
 				F45014021B01027F00CD4A7E /* test_utf8.cpp in Sources */,
+				651D38B41D25442B006DBCC5 /* test_util_event_loop.cpp in Sources */,
+				65F666F91BFD014000749FA2 /* test_util_error.cpp in Sources */,
+				65F666FA1BFD014000749FA2 /* test_util_inspect.cpp in Sources */,
+				65F35E0C1B32F9FE006AE5A9 /* test_util_network.cpp in Sources */,
+				65F666FB1BFD014000749FA2 /* test_util_stringbuffer.cpp in Sources */,
+				65F666FC1BFD014000749FA2 /* test_util_uri.cpp in Sources */,
 				F45014031B01027F00CD4A7E /* test_version.cpp in Sources */,
+				651D38B61D25442B006DBCC5 /* test_util_scope_exit.cpp in Sources */,
 				F45013BA1B01022800CD4A7E /* ViewController.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2815,6 +2835,7 @@
 					"$(inherited)",
 					"-Wextra-semi",
 					"-fno-elide-constructors",
+					"-Wold-style-cast",
 					"-Wundef",
 					"-Wshadow",
 					"-Wconditional-uninitialized",
@@ -2863,6 +2884,7 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wextra-semi",
+					"-Wold-style-cast",
 					"-Wundef",
 					"-Wshadow",
 					"-Wconditional-uninitialized",
@@ -2884,7 +2906,6 @@
 					"$(PROJECT_DIR)/src/realm",
 				);
 				PRODUCT_NAME = realm;
-				WARNING_CFLAGS = "-Wold-style-cast";
 			};
 			name = Debug;
 		};
@@ -2898,7 +2919,6 @@
 					"$(PROJECT_DIR)/src/realm",
 				);
 				PRODUCT_NAME = realm;
-				WARNING_CFLAGS = "-Wold-style-cast";
 			};
 			name = Release;
 		};

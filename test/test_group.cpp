@@ -568,7 +568,7 @@ TEST(Group_StaticallyTypedTables)
     CHECK_EQUAL(table_1, cgroup.get_table<TestTableGroup>(table_1->get_index_in_group()));
     CHECK_EQUAL(table_2, group.get_table<TestTableGroup2>(table_2->get_index_in_group()));
     CHECK_EQUAL(table_2, cgroup.get_table<TestTableGroup2>(table_2->get_index_in_group()));
-    CHECK_THROW_WHAT(group.get_table<TestTableGroup2>(table_1->get_index_in_group()),  DescriptorMismatch, "Table descriptor mismatch");
+    CHECK_THROW(group.get_table<TestTableGroup2>(table_1->get_index_in_group()),  DescriptorMismatch);
     CHECK_THROW(cgroup.get_table<TestTableGroup2>(table_1->get_index_in_group()), DescriptorMismatch);
     CHECK_THROW(group.get_table<TestTableGroup>(table_2->get_index_in_group()),   DescriptorMismatch);
     CHECK_THROW(cgroup.get_table<TestTableGroup>(table_2->get_index_in_group()),  DescriptorMismatch);
@@ -624,7 +624,7 @@ TEST(Group_BasicRemoveTable)
     CHECK_NOT(delta->is_attached());
     CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
     CHECK_LOGIC_ERROR(group.remove_table(1), LogicError::table_index_out_of_range);
-    CHECK_THROW_WHAT(group.remove_table("epsilon"), NoSuchTable, "No such table exists");
+    CHECK_THROW(group.remove_table("epsilon"), NoSuchTable);
     group.verify();
 }
 
@@ -674,7 +674,7 @@ TEST(Group_RemoveTableWithColumns)
 
     // Try, but fail to remove table which is a target of link columns of other
     // tables.
-    CHECK_THROW_WHAT(group.remove_table("delta"), CrossTableLinkTarget, "Table is target of cross-table link columns");
+    CHECK_THROW(group.remove_table("delta"), CrossTableLinkTarget);
     CHECK_EQUAL(2, group.size());
     CHECK(delta->is_attached());
     CHECK(epsilon->is_attached());
@@ -808,7 +808,7 @@ TEST(Group_RenameTable)
     CHECK_EQUAL("gamma",   gamma->get_name());
     CHECK_LOGIC_ERROR(group.rename_table(3, "zeta"), LogicError::table_index_out_of_range);
     CHECK_THROW(group.rename_table("eta", "theta"), NoSuchTable);
-    CHECK_THROW_WHAT(group.rename_table("epsilon", "alpha"), TableNameInUse, "The specified table name is already in use");
+    CHECK_THROW(group.rename_table("epsilon", "alpha"), TableNameInUse);
     bool require_unique_name = false;
     group.rename_table("epsilon", "alpha", require_unique_name);
     CHECK_EQUAL("alpha", alpha->get_name());
@@ -906,6 +906,21 @@ TEST(Group_MoveTableWithLinks)
     CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(1), a->get_index_in_group());
     CHECK_EQUAL(c_spec.get_opposite_link_table_ndx(1), b->get_index_in_group());
     CHECK_EQUAL(d_spec.get_opposite_link_table_ndx(1), c->get_index_in_group());
+}
+
+
+TEST(Group_MoveTableImmediatelyAfterOpen)
+{
+    Group g1;
+    TableRef a = g1.add_table("a");
+    TableRef b = g1.add_table("b");
+    CHECK_EQUAL(2, g1.size());
+
+    Group g2(g1.write_to_mem());
+    g2.move_table(0, 1);
+    CHECK_EQUAL(2, g2.size());
+    CHECK_EQUAL("b", g2.get_table_name(0));
+    CHECK_EQUAL("a", g2.get_table_name(1));
 }
 
 

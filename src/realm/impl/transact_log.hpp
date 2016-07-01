@@ -1563,9 +1563,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SetIntUnique: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t prior_num_rows = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t prior_num_rows = read_int<size_t>(); // Throws
             // FIXME: Don't depend on the existence of int64_t,
             // but don't allow values to use more than 64 bits
             // either.
@@ -1607,9 +1607,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SetStringUnique: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t prior_num_rows = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t prior_num_rows = read_int<size_t>(); // Throws
             StringData value = read_string(m_string_buffer); // Throws
             if (!handler.set_string_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
                 parser_error();

@@ -2977,7 +2977,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
     }
     sg.close();
 
-    std::vector<std::pair<char*, size_t>> memory_list;
+    std::vector<std::pair<void*, size_t>> memory_list;
     // Reserve enough for 500 Gb, but in practice the vector is only ever around size 10.
     // Do this here to avoid the (small) chance that adding to the vector will request new virtual memory
     memory_list.reserve(500);
@@ -2988,7 +2988,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
             chunk_size /= 2;
         }
         else {
-            memory_list.push_back(std::pair<char*,size_t>((char*)addr, chunk_size));
+            memory_list.push_back(std::pair<void*, size_t>(addr, chunk_size));
         }
     }
 
