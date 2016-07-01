@@ -91,6 +91,18 @@ ref_type TimestampColumn::create(Allocator& alloc, size_t size, bool nullable)
 }
 
 
+size_t TimestampColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept
+{
+    const char* root_header = alloc.translate(root_ref);
+    ref_type seconds_ref = to_ref(Array::get(root_header, 0));
+    const char* seconds_header = alloc.translate(seconds_ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(seconds_header);
+    if (root_is_leaf)
+        return Array::get_size_from_header(seconds_header) - 1; // Nullable
+    return Array::get_bptree_size_from_header(seconds_header);
+}
+
+
 /// Get the number of entries in this column. This operation is relatively
 /// slow.
 size_t TimestampColumn::size() const noexcept

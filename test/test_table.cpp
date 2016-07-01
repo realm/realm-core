@@ -6809,6 +6809,44 @@ TEST(Table_InsertUniqueDuplicate_LinkedColumns)
     CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped back via backlinks
 }
 
+TEST(Table_ColumnSizeFromRef)
+{
+    constexpr bool nullable = true;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
+    TimestampColumn c(Allocator::get_default(), ref);
+    ref_type int_ref = IntegerColumn::create(Allocator::get_default(), Array::type_Normal, 0);
+    IntegerColumn int_col(Allocator::get_default(), int_ref);
+
+    Group g;
+    TableRef t = g.add_table("table");
+    t->add_column(type_Int, "int");
+    t->add_column(type_Bool, "bool");
+    t->add_column(type_String, "string");
+    t->add_column(type_Binary, "binary");
+    t->add_column(type_Double, "double");
+    t->add_column(type_Float, "float");
+    t->add_column(type_Mixed, "mixed");
+    t->add_column(type_Timestamp, "timestamp");
+    t->add_column_link(type_Link, "link", *t);
+    t->add_column_link(type_LinkList, "LinkList", *t);
+
+    // We know there are 2 hidden backlink columns
+    size_t actual_num_cols = t->get_column_count() + 2;
+    size_t num_items = 10000;
+
+    t->add_empty_row(num_items);
+
+    using tf = _impl::TableFriend;
+    Spec& t_spec = tf::get_spec(*t);
+    for (size_t col_ndx = 0; col_ndx < actual_num_cols; ++col_ndx) {
+        ColumnType col_type = t_spec.get_column_type(col_ndx);
+        ColumnBase& base = tf::get_column(*t, col_ndx);
+        ref_type col_ref = base.get_ref();
+        size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc());
+        CHECK_EQUAL(col_size, num_items);
+    }
+}
+
 
 TEST(Table_DetachedAccessor)
 {
