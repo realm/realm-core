@@ -139,6 +139,7 @@ void col_type_deleg(Op& op, ColumnType type)
             return;
         case col_type_Timestamp:
             op.template call<TimestampColumn>();
+            return;
         case col_type_String:
             op.template call<StringColumn>();
             return;
