@@ -165,9 +165,13 @@ void col_type_deleg(Op& op, ColumnType type)
         case col_type_Double:
             op.template call<DoubleColumn>();
             return;
-        case col_type_Reserved4:
         case col_type_LinkList:
+            op.template call<LinkListColumn>();
+            return;
         case col_type_BackLink:
+            op.template call<BacklinkColumn>();
+            return;
+        case col_type_Reserved4:
             break;
     }
     REALM_ASSERT_DEBUG(false);
