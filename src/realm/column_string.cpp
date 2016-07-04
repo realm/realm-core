@@ -1064,7 +1064,7 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, 
 void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
-    ref_type new_sibling_ref;
+    ref_type new_sibling_ref = 0;
     Array::TreeInsert<StringColumn> state;
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
