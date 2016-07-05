@@ -148,8 +148,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             Array::destroy_deep(ref, m_data->get_alloc());
             break;
         }
-        case mixcol_Mixed:
-            break;
+        case mixcol_Mixed: // That's an error, fallthrough and assert
         default:
             REALM_ASSERT(false);
     }
@@ -236,7 +235,9 @@ DataType MixedColumn::get_type(size_t ndx) const noexcept
         case mixcol_Timestamp:   return type_Timestamp;
         case mixcol_Float:       return type_Float;
         case mixcol_Double:      return type_Double;
-        default: return DataType(coltype);
+        default:
+            REALM_ASSERT(false);
+            return DataType(coltype);
     }
 }
 

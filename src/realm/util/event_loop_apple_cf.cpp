@@ -850,6 +850,7 @@ private:
                 return;
             }
             case kCFStreamEventNone:
+                REALM_ASSERT(false);
                 break;
         }
         REALM_ASSERT(false);
@@ -897,6 +898,7 @@ private:
             case kCFStreamEventNone:
             case kCFStreamEventOpenCompleted:
             case kCFStreamEventHasBytesAvailable:
+                REALM_ASSERT(false);
                 break;
         }
         REALM_ASSERT(false);
