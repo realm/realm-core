@@ -2104,14 +2104,14 @@ TEST(TableView_IsInTableOrder)
 }
 
 
-TEST(TableView_SortOrder)
+NONCONCURRENT_TEST(TableView_SortOrder)
 {
     TestTableString table;
 
     // This tests the expected sorting order with STRING_COMPARE_CORE. See utf8_compare() in unicode.cpp. Only characters
     // that have a visual representation are tested (control characters such as line feed are omitted).
     //
-    // NOTE NOTE: Your editor must assume that Core source code is in utf8, and it must save as utf8, else this unit
+    // NOTE: Your editor must assume that Core source code is in utf8, and it must save as utf8, else this unit
     // test will fail.
 
     /*
@@ -2132,6 +2132,8 @@ TEST(TableView_SortOrder)
         }
     }
     */
+
+    set_string_compare_method(STRING_COMPARE_CORE_SIMILAR, nullptr);
 
     table.add(" ");
     table.add("!");
@@ -2669,6 +2671,9 @@ TEST(TableView_SortOrder)
     for (size_t t = 0; t < v1.size(); t++) {
         CHECK_EQUAL(v1.get_source_ndx(t), v2.get_source_ndx(t));
     }
+
+    // Set back to default in case other tests rely on this
+    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
 
 
