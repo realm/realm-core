@@ -973,7 +973,7 @@ void Table::do_set_link_type(size_t col_ndx, LinkType link_type)
 void Table::insert_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx, size_t backlink_col_ndx)
 {
     REALM_ASSERT_3(backlink_col_ndx, <=, m_cols.size());
-    do_insert_root_column(backlink_col_ndx, col_type_BackLink, ""); // Throws
+    do_insert_root_column(backlink_col_ndx, ColumnType::BackLink, ""); // Throws
     adj_insert_column(backlink_col_ndx); // Throws
     m_spec.set_opposite_link_table_ndx(backlink_col_ndx, origin_table_ndx); // Throws
     m_spec.set_backlink_origin_column(backlink_col_ndx, origin_col_ndx); // Throws
@@ -1153,7 +1153,7 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
     REALM_ASSERT_3(col_path_size, >=, 1);
 
     size_t col_ndx = *col_path_begin;
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnType::Table);
 
     SubtableColumn& subtables = get_column_table(col_ndx); // Throws
     size_t num_rows = size();
@@ -1383,21 +1383,21 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
 
     bool nullable = is_nullable(col_ndx);
 
-    REALM_ASSERT_DEBUG(!(nullable && (col_type != col_type_String &&
-                                  col_type != col_type_StringEnum &&
-                                  col_type != col_type_Binary &&
-                                  col_type != col_type_Int &&
-                                  col_type != col_type_Float &&
-                                  col_type != col_type_Double &&
-                                  col_type != col_type_OldDateTime &&
-                                  col_type != col_type_Timestamp &&
-                                  col_type != col_type_Bool &&
-                                  col_type != col_type_Link)));
+    REALM_ASSERT_DEBUG(!(nullable && (col_type != ColumnType::String &&
+                                  col_type != ColumnType::StringEnum &&
+                                  col_type != ColumnType::Binary &&
+                                  col_type != ColumnType::Int &&
+                                  col_type != ColumnType::Float &&
+                                  col_type != ColumnType::Double &&
+                                  col_type != ColumnType::OldDateTime &&
+                                  col_type != ColumnType::Timestamp &&
+                                  col_type != ColumnType::Bool &&
+                                  col_type != ColumnType::Link)));
 
     switch (col_type) {
-        case col_type_Int:
-        case col_type_Bool:
-        case col_type_OldDateTime:
+        case ColumnType::Int:
+        case ColumnType::Bool:
+        case ColumnType::OldDateTime:
             if (nullable) {
                 col = new IntNullColumn(alloc, ref); // Throws
             }
@@ -1405,19 +1405,19 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
                 col = new IntegerColumn(alloc, ref); // Throws
             }
             break;
-        case col_type_Float:
+        case ColumnType::Float:
             col = new FloatColumn(alloc, ref); // Throws
             break;
-        case col_type_Double:
+        case ColumnType::Double:
             col = new DoubleColumn(alloc, ref); // Throws
             break;
-        case col_type_String:
+        case ColumnType::String:
             col = new StringColumn(alloc, ref, nullable); // Throws
             break;
-        case col_type_Binary:
+        case ColumnType::Binary:
             col = new BinaryColumn(alloc, ref, nullable); // Throws
             break;
-        case col_type_StringEnum: {
+        case ColumnType::StringEnum: {
             ArrayParent* keys_parent;
             size_t keys_ndx_in_parent;
             ref_type keys_ref =
@@ -1427,29 +1427,29 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             col = col_2;
             break;
         }
-        case col_type_Table:
+        case ColumnType::Table:
             col = new SubtableColumn(alloc, ref, this, col_ndx); // Throws
             break;
-        case col_type_Mixed:
+        case ColumnType::Mixed:
             col = new MixedColumn(alloc, ref, this, col_ndx); // Throws
             break;
-        case col_type_Link:
+        case ColumnType::Link:
             // Target table will be set by group after entire table has been created
             col = new LinkColumn(alloc, ref, this, col_ndx); // Throws
             break;
-        case col_type_LinkList:
+        case ColumnType::LinkList:
             // Target table will be set by group after entire table has been created
             col = new LinkListColumn(alloc, ref, this, col_ndx); // Throws
             break;
-        case col_type_BackLink:
+        case ColumnType::BackLink:
             // Origin table will be set by group after entire table has been created
             col = new BacklinkColumn(alloc, ref); // Throws
             break;
-        case col_type_Timestamp:
+        case ColumnType::Timestamp:
             // Origin table will be set by group after entire table has been created
             col = new TimestampColumn(alloc, ref); // Throws
             break;
-        case col_type_Reserved4:
+        case ColumnType::Reserved4:
             // These have no function yet and are therefore unexpected.
             break;
     }
@@ -1554,39 +1554,39 @@ void Table::upgrade_file_format()
         }
         ColumnType col_type = get_real_column_type(col_ndx);
         switch (col_type) {
-            case col_type_String: {
+            case ColumnType::String: {
                 StringColumn& col = get_column_string(col_ndx);
                 col.get_search_index()->clear();
                 col.populate_search_index();
                 continue;
             }
-            case col_type_Bool:
-            case col_type_Int:
-            case col_type_OldDateTime: {
-                // FIXME: Do upgrade of col_type_OldDateTime
+            case ColumnType::Bool:
+            case ColumnType::Int:
+            case ColumnType::OldDateTime: {
+                // FIXME: Do upgrade of ColumnType::OldDateTime
                 IntegerColumn& col = get_column(col_ndx);
                 col.get_search_index()->clear();
                 col.populate_search_index();
                 continue;
             }
-            case col_type_StringEnum: {
+            case ColumnType::StringEnum: {
                 StringEnumColumn& col = get_column_string_enum(col_ndx);
                 col.get_search_index()->clear();
                 col.populate_search_index();
                 continue;
             }
-            case col_type_Binary:
-            case col_type_Table:
-            case col_type_Mixed:
-            case col_type_Float:
-            case col_type_Double:
-            case col_type_Reserved4:
-            case col_type_Link:
-            case col_type_LinkList:
-            case col_type_BackLink:
+            case ColumnType::Binary:
+            case ColumnType::Table:
+            case ColumnType::Mixed:
+            case ColumnType::Float:
+            case ColumnType::Double:
+            case ColumnType::Reserved4:
+            case ColumnType::Link:
+            case ColumnType::LinkList:
+            case ColumnType::BackLink:
                 // Indices are not support on these column types
                 break;
-            case col_type_Timestamp:
+            case ColumnType::Timestamp:
                 // Introduced after latest file format upgrade
                 break;
         }
@@ -1602,7 +1602,7 @@ void Table::upgrade_olddatetime()
     for (size_t col = 0; col < get_column_count(); col++) {
         ColumnType col_type = get_real_column_type(col);
 
-        if (col_type == col_type_OldDateTime) {
+        if (col_type == ColumnType::OldDateTime) {
             bool nullable = is_nullable(col);
             StringData name = get_column_name(col);
 
@@ -1638,7 +1638,7 @@ void Table::upgrade_olddatetime()
     for (size_t col = 0; col < get_column_count(); col++) {
         ColumnType col_type = get_real_column_type(col);
         static_cast<void>(col_type);
-        REALM_ASSERT(col_type != col_type_OldDateTime);
+        REALM_ASSERT(col_type != ColumnType::OldDateTime);
     }
 }
 
@@ -1769,7 +1769,7 @@ bool Table::is_nullable(size_t col_ndx) const
 {
     REALM_ASSERT_DEBUG(col_ndx < m_spec.get_column_count());
     return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable) ||
-        m_spec.get_column_type(col_ndx) == col_type_Link;
+        m_spec.get_column_type(col_ndx) == ColumnType::Link;
 }
 
 const ColumnBase& Table::get_column_base(size_t ndx) const noexcept
@@ -1791,109 +1791,109 @@ ColumnBase& Table::get_column_base(size_t ndx)
 
 const IntegerColumn& Table::get_column(size_t ndx) const noexcept
 {
-    return get_column<IntegerColumn, col_type_Int>(ndx);
+    return get_column<IntegerColumn, ColumnType::Int>(ndx);
 }
 
 IntegerColumn& Table::get_column(size_t ndx)
 {
-    return get_column<IntegerColumn, col_type_Int>(ndx);
+    return get_column<IntegerColumn, ColumnType::Int>(ndx);
 }
 
 const IntNullColumn& Table::get_column_int_null(size_t ndx) const noexcept
 {
-    return get_column<IntNullColumn, col_type_Int>(ndx);
+    return get_column<IntNullColumn, ColumnType::Int>(ndx);
 }
 
 IntNullColumn& Table::get_column_int_null(size_t ndx)
 {
-    return get_column<IntNullColumn, col_type_Int>(ndx);
+    return get_column<IntNullColumn, ColumnType::Int>(ndx);
 }
 
 const StringColumn& Table::get_column_string(size_t ndx) const noexcept
 {
-    return get_column<StringColumn, col_type_String>(ndx);
+    return get_column<StringColumn, ColumnType::String>(ndx);
 }
 
 StringColumn& Table::get_column_string(size_t ndx)
 {
-    return get_column<StringColumn, col_type_String>(ndx);
+    return get_column<StringColumn, ColumnType::String>(ndx);
 }
 
 const StringEnumColumn& Table::get_column_string_enum(size_t ndx) const noexcept
 {
-    return get_column<StringEnumColumn, col_type_StringEnum>(ndx);
+    return get_column<StringEnumColumn, ColumnType::StringEnum>(ndx);
 }
 
 StringEnumColumn& Table::get_column_string_enum(size_t ndx)
 {
-    return get_column<StringEnumColumn, col_type_StringEnum>(ndx);
+    return get_column<StringEnumColumn, ColumnType::StringEnum>(ndx);
 }
 
 const FloatColumn& Table::get_column_float(size_t ndx) const noexcept
 {
-    return get_column<FloatColumn, col_type_Float>(ndx);
+    return get_column<FloatColumn, ColumnType::Float>(ndx);
 }
 
 FloatColumn& Table::get_column_float(size_t ndx)
 {
-    return get_column<FloatColumn, col_type_Float>(ndx);
+    return get_column<FloatColumn, ColumnType::Float>(ndx);
 }
 
 const DoubleColumn& Table::get_column_double(size_t ndx) const noexcept
 {
-    return get_column<DoubleColumn, col_type_Double>(ndx);
+    return get_column<DoubleColumn, ColumnType::Double>(ndx);
 }
 
 DoubleColumn& Table::get_column_double(size_t ndx)
 {
-    return get_column<DoubleColumn, col_type_Double>(ndx);
+    return get_column<DoubleColumn, ColumnType::Double>(ndx);
 }
 
 const BinaryColumn& Table::get_column_binary(size_t ndx) const noexcept
 {
-    return get_column<BinaryColumn, col_type_Binary>(ndx);
+    return get_column<BinaryColumn, ColumnType::Binary>(ndx);
 }
 
 BinaryColumn& Table::get_column_binary(size_t ndx)
 {
-    return get_column<BinaryColumn, col_type_Binary>(ndx);
+    return get_column<BinaryColumn, ColumnType::Binary>(ndx);
 }
 
 const SubtableColumn &Table::get_column_table(size_t ndx) const noexcept
 {
-    return get_column<SubtableColumn, col_type_Table>(ndx);
+    return get_column<SubtableColumn, ColumnType::Table>(ndx);
 }
 
 SubtableColumn &Table::get_column_table(size_t ndx)
 {
-    return get_column<SubtableColumn, col_type_Table>(ndx);
+    return get_column<SubtableColumn, ColumnType::Table>(ndx);
 }
 
 const MixedColumn& Table::get_column_mixed(size_t ndx) const noexcept
 {
-    return get_column<MixedColumn, col_type_Mixed>(ndx);
+    return get_column<MixedColumn, ColumnType::Mixed>(ndx);
 }
 
 MixedColumn& Table::get_column_mixed(size_t ndx)
 {
-    return get_column<MixedColumn, col_type_Mixed>(ndx);
+    return get_column<MixedColumn, ColumnType::Mixed>(ndx);
 }
 
 const TimestampColumn& Table::get_column_timestamp(size_t ndx) const noexcept
 {
-    return get_column<TimestampColumn, col_type_Timestamp>(ndx);
+    return get_column<TimestampColumn, ColumnType::Timestamp>(ndx);
 }
 
 TimestampColumn& Table::get_column_timestamp(size_t ndx)
 {
-    return get_column<TimestampColumn, col_type_Timestamp>(ndx);
+    return get_column<TimestampColumn, ColumnType::Timestamp>(ndx);
 }
 
 const LinkColumnBase& Table::get_column_link_base(size_t ndx) const noexcept
 {
     const ColumnBase& col_base = get_column_base(ndx);
-    REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
-                 m_spec.get_column_type(ndx) == col_type_LinkList);
+    REALM_ASSERT(m_spec.get_column_type(ndx) == ColumnType::Link ||
+                 m_spec.get_column_type(ndx) == ColumnType::LinkList);
     const LinkColumnBase& col_link_base = static_cast<const LinkColumnBase&>(col_base);
     return col_link_base;
 }
@@ -1901,49 +1901,49 @@ const LinkColumnBase& Table::get_column_link_base(size_t ndx) const noexcept
 LinkColumnBase& Table::get_column_link_base(size_t ndx)
 {
     ColumnBase& col_base = get_column_base(ndx);
-    REALM_ASSERT(m_spec.get_column_type(ndx) == col_type_Link ||
-                 m_spec.get_column_type(ndx) == col_type_LinkList);
+    REALM_ASSERT(m_spec.get_column_type(ndx) == ColumnType::Link ||
+                 m_spec.get_column_type(ndx) == ColumnType::LinkList);
     LinkColumnBase& col_link_base = static_cast<LinkColumnBase&>(col_base);
     return col_link_base;
 }
 
 const LinkColumn& Table::get_column_link(size_t ndx) const noexcept
 {
-    return get_column<LinkColumn, col_type_Link>(ndx);
+    return get_column<LinkColumn, ColumnType::Link>(ndx);
 }
 
 LinkColumn& Table::get_column_link(size_t ndx)
 {
-    return get_column<LinkColumn, col_type_Link>(ndx);
+    return get_column<LinkColumn, ColumnType::Link>(ndx);
 }
 
 const LinkListColumn& Table::get_column_link_list(size_t ndx) const noexcept
 {
-    return get_column<LinkListColumn, col_type_LinkList>(ndx);
+    return get_column<LinkListColumn, ColumnType::LinkList>(ndx);
 }
 
 LinkListColumn& Table::get_column_link_list(size_t ndx)
 {
-    return get_column<LinkListColumn, col_type_LinkList>(ndx);
+    return get_column<LinkListColumn, ColumnType::LinkList>(ndx);
 }
 
 const BacklinkColumn& Table::get_column_backlink(size_t ndx) const noexcept
 {
-    return get_column<BacklinkColumn, col_type_BackLink>(ndx);
+    return get_column<BacklinkColumn, ColumnType::BackLink>(ndx);
 }
 
 BacklinkColumn& Table::get_column_backlink(size_t ndx)
 {
-    return get_column<BacklinkColumn, col_type_BackLink>(ndx);
+    return get_column<BacklinkColumn, ColumnType::BackLink>(ndx);
 }
 
 
 void Table::validate_column_type(const ColumnBase& column, ColumnType col_type, size_t ndx) const
 {
     ColumnType real_col_type = get_real_column_type(ndx);
-    if (col_type == col_type_Int) {
-        REALM_ASSERT(real_col_type == col_type_Int || real_col_type == col_type_Bool ||
-                       real_col_type == col_type_OldDateTime);
+    if (col_type == ColumnType::Int) {
+        REALM_ASSERT(real_col_type == ColumnType::Int || real_col_type == ColumnType::Bool ||
+                       real_col_type == ColumnType::OldDateTime);
     }
     else {
         REALM_ASSERT_3(col_type, ==, real_col_type);
@@ -1997,37 +1997,37 @@ ref_type Table::create_empty_table(Allocator& alloc)
 ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, Allocator& alloc)
 {
     switch (col_type) {
-        case col_type_Int:
-        case col_type_Bool:
-        case col_type_OldDateTime:
+        case ColumnType::Int:
+        case ColumnType::Bool:
+        case ColumnType::OldDateTime:
             if (nullable) {
                 return IntNullColumn::create(alloc, Array::type_Normal, size); // Throws
             }
             else {
                 return IntegerColumn::create(alloc, Array::type_Normal, size); // Throws
             }
-        case col_type_Timestamp:
+        case ColumnType::Timestamp:
             return TimestampColumn::create(alloc, size, nullable); // Throws
-        case col_type_Float:
+        case ColumnType::Float:
             return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
-        case col_type_Double:
+        case ColumnType::Double:
             return DoubleColumn::create(alloc, Array::type_Normal, size); // Throws
-        case col_type_String:
+        case ColumnType::String:
             return StringColumn::create(alloc, size); // Throws
-        case col_type_Binary:
+        case ColumnType::Binary:
             return BinaryColumn::create(alloc, size, nullable); // Throws
-        case col_type_Table:
+        case ColumnType::Table:
             return SubtableColumn::create(alloc, size); // Throws
-        case col_type_Mixed:
+        case ColumnType::Mixed:
             return MixedColumn::create(alloc, size); // Throws
-        case col_type_Link:
+        case ColumnType::Link:
             return LinkColumn::create(alloc, size); // Throws
-        case col_type_LinkList:
+        case ColumnType::LinkList:
             return LinkListColumn::create(alloc, size); // Throws
-        case col_type_BackLink:
+        case ColumnType::BackLink:
             return BacklinkColumn::create(alloc, size); // Throws
-        case col_type_StringEnum:
-        case col_type_Reserved4:
+        case ColumnType::StringEnum:
+        case ColumnType::Reserved4:
             break;
     }
     REALM_ASSERT(false);
@@ -2326,7 +2326,7 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
     size_t backlink_col_start = m_spec.get_public_column_count();
     size_t backlink_col_end   = m_spec.get_column_count();
     for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
-        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
+        REALM_ASSERT(m_spec.get_column_type(col_ndx) == ColumnType::BackLink);
 
         auto& col = get_column_backlink(col_ndx);
         auto& origin_table = col.get_origin_table();
@@ -2335,10 +2335,10 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
         while (col.get_backlink_count(row_ndx) > 0) {
             size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
 
-            if (origin_col_type == col_type_Link) {
+            if (origin_col_type == ColumnType::Link) {
                 origin_table.do_set_link(origin_col_ndx, origin_row_ndx, new_row_ndx);
             }
-            else if (origin_col_type == col_type_LinkList) {
+            else if (origin_col_type == ColumnType::LinkList) {
                 LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
                 for (size_t j = 0; j < links->size(); ++j) {
                     using llf = _impl::LinkListFriend;
@@ -2432,7 +2432,7 @@ void Table::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Table);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnType::Table);
     REALM_ASSERT_3(row_ndx, <, m_size);
     bump_version();
 
@@ -2448,7 +2448,7 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Mixed);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnType::Mixed);
     REALM_ASSERT_3(row_ndx, <, m_size);
     bump_version();
 
@@ -2515,11 +2515,11 @@ Table* Table::get_subtable_ptr(size_t col_ndx, size_t row_ndx)
     REALM_ASSERT_3(row_ndx, <, m_size);
 
     ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_Table) {
+    if (type == ColumnType::Table) {
         SubtableColumn& subtables = get_column_table(col_ndx);
         return subtables.get_subtable_ptr(row_ndx); // Throws
     }
-    if (type == col_type_Mixed) {
+    if (type == ColumnType::Mixed) {
         MixedColumn& subtables = get_column_mixed(col_ndx);
         return subtables.get_subtable_ptr(row_ndx); // Throws
     }
@@ -2534,11 +2534,11 @@ size_t Table::get_subtable_size(size_t col_ndx, size_t row_ndx) const noexcept
     REALM_ASSERT_3(row_ndx, <, m_size);
 
     ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_Table) {
+    if (type == ColumnType::Table) {
         const SubtableColumn& subtables = get_column_table(col_ndx);
         return subtables.get_subtable_size(row_ndx);
     }
-    if (type == col_type_Mixed) {
+    if (type == ColumnType::Mixed) {
         const MixedColumn& subtables = get_column_mixed(col_ndx);
         return subtables.get_subtable_size(row_ndx);
     }
@@ -2554,14 +2554,14 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
     bump_version();
 
     ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_Table) {
+    if (type == ColumnType::Table) {
         SubtableColumn& subtables = get_column_table(col_ndx);
         subtables.set(row_ndx, 0);
 
         if (Replication* repl = get_repl())
             repl->set_table(this, col_ndx, row_ndx); // Throws
     }
-    else if (type == col_type_Mixed) {
+    else if (type == ColumnType::Mixed) {
         MixedColumn& subtables = get_column_mixed(col_ndx);
         subtables.set_subtable(row_ndx, 0);
 
@@ -2636,7 +2636,7 @@ template<>
 bool Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Bool);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , ColumnType::Bool);
     REALM_ASSERT_3(ndx, <, m_size);
 
     if (is_nullable(col_ndx)) {
@@ -2653,15 +2653,15 @@ template<>
 int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Int);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , ColumnType::Int);
     REALM_ASSERT_3(ndx, <, m_size);
 
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, ColumnType::Int>(col_ndx);
         return column.get(ndx).value_or(0);
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, ColumnType::Int>(col_ndx);
         return column.get(ndx);
     }
 }
@@ -2670,15 +2670,15 @@ template<>
 OldDateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_OldDateTime);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , ColumnType::OldDateTime);
     REALM_ASSERT_3(ndx, <, m_size);
 
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, ColumnType::Int>(col_ndx);
         return column.get(ndx).value_or(0);
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, ColumnType::Int>(col_ndx);
         return column.get(ndx);
     }
 }
@@ -2687,10 +2687,10 @@ template<>
 float Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Float);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , ColumnType::Float);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, ColumnType::Float>(col_ndx);
     float f = column.get(ndx);
     if (null::is_null_float(f))
         return 0.0f;
@@ -2702,10 +2702,10 @@ template<>
 double Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Double);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , ColumnType::Double);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, ColumnType::Double>(col_ndx);
     double d = column.get(ndx);
     if (null::is_null_float(d))
         return 0.0;
@@ -2717,19 +2717,19 @@ template<>
 StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_7(get_real_column_type(col_ndx), == , col_type_String, || ,
-        get_real_column_type(col_ndx), == , col_type_StringEnum);
+    REALM_ASSERT_7(get_real_column_type(col_ndx), == , ColumnType::String, || ,
+        get_real_column_type(col_ndx), == , ColumnType::StringEnum);
     REALM_ASSERT_3(ndx, <, m_size);
 
     StringData sd;
     ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        const StringColumn& column = get_column<StringColumn, col_type_String>(col_ndx);
+    if (type == ColumnType::String) {
+        const StringColumn& column = get_column<StringColumn, ColumnType::String>(col_ndx);
         sd = column.get(ndx);
     }
     else {
-        REALM_ASSERT(type == col_type_StringEnum);
-        const StringEnumColumn& column = get_column<StringEnumColumn, col_type_StringEnum>(col_ndx);
+        REALM_ASSERT(type == ColumnType::StringEnum);
+        const StringEnumColumn& column = get_column<StringEnumColumn, ColumnType::StringEnum>(col_ndx);
         sd = column.get(ndx);
     }
     REALM_ASSERT_DEBUG(!(!is_nullable(col_ndx) && sd.is_null()));
@@ -2740,10 +2740,10 @@ template<>
 BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Binary);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , ColumnType::Binary);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const BinaryColumn& column = get_column<BinaryColumn, col_type_Binary>(col_ndx);
+    const BinaryColumn& column = get_column<BinaryColumn, ColumnType::Binary>(col_ndx);
     return column.get(ndx);
 }
 
@@ -2751,10 +2751,10 @@ template<>
 Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Timestamp);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , ColumnType::Timestamp);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    const TimestampColumn& column = get_column<TimestampColumn, ColumnType::Timestamp>(col_ndx);
     return column.get(ndx);
 }
 
@@ -2863,14 +2863,14 @@ Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept
 void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Timestamp);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), == , ColumnType::Timestamp);
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
 
-    TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    TimestampColumn& column = get_column<TimestampColumn, ColumnType::Timestamp>(col_ndx);
     column.set(ndx, value);
 
     if (Replication* repl = get_repl()) {
@@ -2891,7 +2891,7 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnType::Bool);
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
@@ -2918,7 +2918,7 @@ OldDateTime Table::get_olddatetime(size_t col_ndx, size_t ndx) const noexcept
 void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_OldDateTime);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnType::OldDateTime);
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
@@ -3030,11 +3030,11 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     bump_version();
 
     ColumnType actual_type = get_real_column_type(col_ndx);
-    REALM_ASSERT(actual_type == ColumnType::col_type_String
-                 || actual_type == ColumnType::col_type_StringEnum);
+    REALM_ASSERT(actual_type == ColumnType::String
+                 || actual_type == ColumnType::StringEnum);
 
     //FIXME: String and StringEnum columns should have a common base class
-    if (actual_type == ColumnType::col_type_String) {
+    if (actual_type == ColumnType::String) {
         StringColumn& col = get_column_string(col_ndx);
         do_set_unique(col, ndx, value); // Throws
     }
@@ -3392,7 +3392,7 @@ size_t Table::count_int(size_t col_ndx, int64_t value) const
     if (!m_columns.is_attached())
         return 0;
 
-    const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+    const IntegerColumn& column = get_column<IntegerColumn, ColumnType::Int>(col_ndx);
     return column.count(value);
 }
 size_t Table::count_float(size_t col_ndx, float value) const
@@ -3400,7 +3400,7 @@ size_t Table::count_float(size_t col_ndx, float value) const
     if (!m_columns.is_attached())
         return 0;
 
-    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, ColumnType::Float>(col_ndx);
     return column.count(value);
 }
 size_t Table::count_double(size_t col_ndx, double value) const
@@ -3408,7 +3408,7 @@ size_t Table::count_double(size_t col_ndx, double value) const
     if (!m_columns.is_attached())
         return 0;
 
-    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, ColumnType::Double>(col_ndx);
     return column.count(value);
 }
 size_t Table::count_string(size_t col_ndx, StringData value) const
@@ -3419,12 +3419,12 @@ size_t Table::count_string(size_t col_ndx, StringData value) const
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
+    if (type == ColumnType::String) {
         const StringColumn& column = get_column_string(col_ndx);
         return column.count(value);
     }
     else {
-        REALM_ASSERT_3(type, ==, col_type_StringEnum);
+        REALM_ASSERT_3(type, ==, ColumnType::StringEnum);
         const StringEnumColumn& column = get_column_string_enum(col_ndx);
         return column.count(value);
     }
@@ -3438,11 +3438,11 @@ int64_t Table::sum_int(size_t col_ndx) const
         return 0;
 
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, ColumnType::Int>(col_ndx);
         return column.sum();
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, ColumnType::Int>(col_ndx);
         return column.sum();
     }
 }
@@ -3451,7 +3451,7 @@ double Table::sum_float(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0.f;
 
-    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, ColumnType::Float>(col_ndx);
     return column.sum();
 }
 double Table::sum_double(size_t col_ndx) const
@@ -3459,7 +3459,7 @@ double Table::sum_double(size_t col_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, ColumnType::Double>(col_ndx);
     return column.sum();
 }
 
@@ -3471,11 +3471,11 @@ double Table::average_int(size_t col_ndx, size_t* value_count) const
         return 0;
 
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, ColumnType::Int>(col_ndx);
         return column.average(0, -1, -1, value_count);
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, ColumnType::Int>(col_ndx);
         return column.average(0, -1, -1, value_count);
     }
 }
@@ -3484,7 +3484,7 @@ double Table::average_float(size_t col_ndx, size_t* value_count) const
     if (!m_columns.is_attached())
         return 0.f;
 
-    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, ColumnType::Float>(col_ndx);
     return column.average(0, -1, -1, value_count);
 }
 double Table::average_double(size_t col_ndx, size_t* value_count) const
@@ -3492,7 +3492,7 @@ double Table::average_double(size_t col_ndx, size_t* value_count) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, ColumnType::Double>(col_ndx);
     return column.average(0, -1, -1, value_count);
 }
 
@@ -3507,11 +3507,11 @@ int64_t Table::minimum_int(size_t col_ndx, size_t* return_ndx) const
 
 #if USE_COLUMN_AGGREGATE
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_Int>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, ColumnType::Int>(col_ndx);
         return column.minimum(0, npos, npos, return_ndx);
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_Int>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, ColumnType::Int>(col_ndx);
         return column.minimum(0, npos, npos, return_ndx);
     }
 #else
@@ -3534,7 +3534,7 @@ float Table::minimum_float(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.f;
 
-    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, ColumnType::Float>(col_ndx);
     return column.minimum(0, npos, npos, return_ndx);
 }
 
@@ -3543,7 +3543,7 @@ double Table::minimum_double(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, ColumnType::Double>(col_ndx);
     return column.minimum(0, npos, npos, return_ndx);
 }
 
@@ -3553,11 +3553,11 @@ OldDateTime Table::minimum_olddatetime(size_t col_ndx, size_t* return_ndx) const
         return 0;
 
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, ColumnType::OldDateTime>(col_ndx);
         return column.minimum(0, npos, npos, return_ndx);
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_OldDateTime>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, ColumnType::OldDateTime>(col_ndx);
         return column.minimum(0, npos, npos, return_ndx);
     }
 }
@@ -3567,7 +3567,7 @@ Timestamp Table::minimum_timestamp(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return Timestamp(null{});
 
-    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    const TimestampColumn& column = get_column<TimestampColumn, ColumnType::Timestamp>(col_ndx);
     return column.minimum(return_ndx);
 }
 
@@ -3608,7 +3608,7 @@ float Table::maximum_float(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.f;
 
-    const FloatColumn& column = get_column<FloatColumn, col_type_Float>(col_ndx);
+    const FloatColumn& column = get_column<FloatColumn, ColumnType::Float>(col_ndx);
     return column.maximum(0, npos, npos, return_ndx);
 }
 
@@ -3617,7 +3617,7 @@ double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return 0.;
 
-    const DoubleColumn& column = get_column<DoubleColumn, col_type_Double>(col_ndx);
+    const DoubleColumn& column = get_column<DoubleColumn, ColumnType::Double>(col_ndx);
     return column.maximum(0, npos, npos, return_ndx);
 }
 
@@ -3627,11 +3627,11 @@ OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
         return 0.;
 
     if (is_nullable(col_ndx)) {
-        const IntNullColumn& column = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
+        const IntNullColumn& column = get_column<IntNullColumn, ColumnType::OldDateTime>(col_ndx);
         return column.maximum(0, npos, npos, return_ndx);
     }
     else {
-        const IntegerColumn& column = get_column<IntegerColumn, col_type_OldDateTime>(col_ndx);
+        const IntegerColumn& column = get_column<IntegerColumn, ColumnType::OldDateTime>(col_ndx);
         return column.maximum(0, npos, npos, return_ndx);
     }
 }
@@ -3642,7 +3642,7 @@ Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
     if (!m_columns.is_attached())
         return Timestamp(null{});
 
-    const TimestampColumn& column = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
+    const TimestampColumn& column = get_column<TimestampColumn, ColumnType::Timestamp>(col_ndx);
     return column.maximum(return_ndx);
 }
 
@@ -3719,7 +3719,7 @@ size_t Table::find_first_olddatetime(size_t col_ndx, OldDateTime value) const
 size_t Table::find_first_timestamp(size_t col_ndx, Timestamp value) const
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, ColumnType::Timestamp);
 
     if (!m_columns.is_attached())
         return not_found;
@@ -3745,11 +3745,11 @@ size_t Table::find_first_string(size_t col_ndx, StringData value) const
         return not_found;
 
     ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
+    if (type == ColumnType::String) {
         const StringColumn& column = get_column_string(col_ndx);
         return column.find_first(value);
     }
-    REALM_ASSERT_3(type, ==, col_type_StringEnum);
+    REALM_ASSERT_3(type, ==, ColumnType::StringEnum);
     const StringEnumColumn& column = get_column_string_enum(col_ndx);
     return column.find_first(value);
 }
@@ -3910,15 +3910,15 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
     for (size_t t = 0; t < link_chain.size(); t++) {
         // Link column can be a single Link, LinkList, or BackLink.
         ColumnType type = table->get_real_column_type(link_chain[t]);
-        if (type == col_type_LinkList) {
+        if (type == ColumnType::LinkList) {
             const LinkListColumn& cll = table->get_column_link_list(link_chain[t]);
             table = &cll.get_target_table();
         }
-        else if (type == col_type_Link) {
+        else if (type == ColumnType::Link) {
             const LinkColumn& cl = table->get_column_link(link_chain[t]);
             table = &cl.get_target_table();
         }
-        else if (type == col_type_BackLink) {
+        else if (type == ColumnType::BackLink) {
             const BacklinkColumn& bl = table->get_column_backlink(link_chain[t]);
             table = &bl.get_origin_table();
         }
@@ -4027,7 +4027,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     // to be auto-enumerated (without a lot of duplicates grouping does not
     // make much sense). So we can use this knowledge to optimize the process.
     ColumnType key_type = get_real_column_type(group_by_column);
-    if (key_type == col_type_StringEnum) {
+    if (key_type == ColumnType::StringEnum) {
         const StringEnumColumn& enums = get_column_string_enum(group_by_column);
         size_t key_count = enums.get_keys().size();
 
@@ -4320,11 +4320,11 @@ size_t Table::lower_bound_string(size_t col_ndx, StringData value) const noexcep
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
+    if (type == ColumnType::String) {
         const StringColumn& column = get_column_string(col_ndx);
         return column.lower_bound_string(value);
     }
-    REALM_ASSERT_3(type, ==, col_type_StringEnum);
+    REALM_ASSERT_3(type, ==, ColumnType::StringEnum);
     const StringEnumColumn& column = get_column_string_enum(col_ndx);
     return column.lower_bound_string(value);
 }
@@ -4336,11 +4336,11 @@ size_t Table::upper_bound_string(size_t col_ndx, StringData value) const noexcep
         return 0;
 
     ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
+    if (type == ColumnType::String) {
         const StringColumn& column = get_column_string(col_ndx);
         return column.upper_bound_string(value);
     }
-    REALM_ASSERT_3(type, ==, col_type_StringEnum);
+    REALM_ASSERT_3(type, ==, ColumnType::StringEnum);
     const StringEnumColumn& column = get_column_string_enum(col_ndx);
     return column.upper_bound_string(value);
 }
@@ -4361,7 +4361,7 @@ void Table::optimize(bool enforce)
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
         ColumnType type = get_real_column_type(i);
-        if (type == col_type_String) {
+        if (type == ColumnType::String) {
             StringColumn* column = &get_column_string(i);
 
             ref_type ref, keys_ref;
@@ -4379,7 +4379,7 @@ void Table::optimize(bool enforce)
             // have to update their parent info
             for (size_t c = i+1; c < m_cols.size(); ++c) {
                 ColumnType type = get_real_column_type(c);
-                if (type == col_type_StringEnum) {
+                if (type == ColumnType::StringEnum) {
                     StringEnumColumn& column = get_column_string_enum(c);
                     column.adjust_keys_ndx_in_parent(1);
                 }
@@ -5108,15 +5108,15 @@ bool Table::compare_rows(const Table& t) const
     for (size_t i = 0; i != n; ++i) {
         ColumnType type = get_real_column_type(i);
         bool nullable = is_nullable(i);
-        REALM_ASSERT((type == col_type_String     ||
-                       type == col_type_StringEnum ||
+        REALM_ASSERT((type == ColumnType::String     ||
+                       type == ColumnType::StringEnum ||
                        type == t.get_real_column_type(i)) &&
                      nullable == t.is_nullable(i));
 
         switch (type) {
-            case col_type_Int:
-            case col_type_Bool:
-            case col_type_OldDateTime: {
+            case ColumnType::Int:
+            case ColumnType::Bool:
+            case ColumnType::OldDateTime: {
                 if (nullable) {
                     const IntNullColumn& c1 = get_column_int_null(i);
                     const IntNullColumn& c2 = t.get_column_int_null(i);
@@ -5132,96 +5132,96 @@ bool Table::compare_rows(const Table& t) const
                 }
                 continue;
             }
-            case col_type_Timestamp: {
+            case ColumnType::Timestamp: {
                 const TimestampColumn& c1 = get_column_timestamp(i);
                 const TimestampColumn& c2 = t.get_column_timestamp(i);
                 if (!c1.compare(c2))
                     return false;
                 continue;
             }
-            case col_type_Float: {
+            case ColumnType::Float: {
                 const FloatColumn& c1 = get_column_float(i);
                 const FloatColumn& c2 = t.get_column_float(i);
                 if (!c1.compare(c2))
                     return false;
                 continue;
             }
-            case col_type_Double: {
+            case ColumnType::Double: {
                 const DoubleColumn& c1 = get_column_double(i);
                 const DoubleColumn& c2 = t.get_column_double(i);
                 if (!c1.compare(c2))
                     return false;
                 continue;
             }
-            case col_type_String: {
+            case ColumnType::String: {
                 const StringColumn& c1 = get_column_string(i);
                 ColumnType type2 = t.get_real_column_type(i);
-                if (type2 == col_type_String) {
+                if (type2 == ColumnType::String) {
                     const StringColumn& c2 = t.get_column_string(i);
                     if (!c1.compare_string(c2))
                         return false;
                 }
                 else {
-                    REALM_ASSERT_3(type2, ==, col_type_StringEnum);
+                    REALM_ASSERT_3(type2, ==, ColumnType::StringEnum);
                     const StringEnumColumn& c2 = t.get_column_string_enum(i);
                     if (!c2.compare_string(c1))
                         return false;
                 }
                 continue;
             }
-            case col_type_StringEnum: {
+            case ColumnType::StringEnum: {
                 const StringEnumColumn& c1 = get_column_string_enum(i);
                 ColumnType type2 = t.get_real_column_type(i);
-                if (type2 == col_type_StringEnum) {
+                if (type2 == ColumnType::StringEnum) {
                     const StringEnumColumn& c2 = t.get_column_string_enum(i);
                     if (!c1.compare_string(c2))
                         return false;
                 }
                 else {
-                    REALM_ASSERT_3(type2, ==, col_type_String);
+                    REALM_ASSERT_3(type2, ==, ColumnType::String);
                     const StringColumn& c2 = t.get_column_string(i);
                     if (!c1.compare_string(c2))
                         return false;
                 }
                 continue;
             }
-            case col_type_Binary: {
+            case ColumnType::Binary: {
                 const BinaryColumn& c1 = get_column_binary(i);
                 const BinaryColumn& c2 = t.get_column_binary(i);
                 if (!c1.compare_binary(c2))
                     return false;
                 continue;
             }
-            case col_type_Table: {
+            case ColumnType::Table: {
                 const SubtableColumn& c1 = get_column_table(i);
                 const SubtableColumn& c2 = t.get_column_table(i);
                 if (!c1.compare_table(c2)) // Throws
                     return false;
                 continue;
             }
-            case col_type_Mixed: {
+            case ColumnType::Mixed: {
                 const MixedColumn& c1 = get_column_mixed(i);
                 const MixedColumn& c2 = t.get_column_mixed(i);
                 if (!c1.compare_mixed(c2))
                     return false;
                 continue;
             }
-            case col_type_Link: {
+            case ColumnType::Link: {
                 const LinkColumn& c1 = get_column_link(i);
                 const LinkColumn& c2 = t.get_column_link(i);
                 if (!c1.compare(c2))
                     return false;
                 continue;
             }
-            case col_type_LinkList: {
+            case ColumnType::LinkList: {
                 const LinkListColumn& c1 = get_column_link_list(i);
                 const LinkListColumn& c2 = t.get_column_link_list(i);
                 if (!c1.compare_link_list(c2))
                     return false;
                 continue;
             }
-            case col_type_BackLink:
-            case col_type_Reserved4:
+            case ColumnType::BackLink:
+            case ColumnType::Reserved4:
                 break;
         }
         REALM_ASSERT(false);
@@ -5615,7 +5615,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         // need to replace the accessor with an instance of StringEnumColumn.
         if (dynamic_cast<StringColumn*>(col) != nullptr) {
             ColumnType col_type = m_spec.get_column_type(col_ndx);
-            if (col_type == col_type_StringEnum) {
+            if (col_type == ColumnType::StringEnum) {
                 delete col;
                 col = 0;
                 // We need to store null in `m_cols` to avoid a crash during
@@ -5657,7 +5657,7 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                     connect_opposite_link_columns(col_ndx, target_table, backlink_col_ndx);
                 }
             }
-            else if (col_type == col_type_BackLink) {
+            else if (col_type == ColumnType::BackLink) {
                 Group& group = *get_parent_group();
                 size_t origin_table_ndx = m_spec.get_opposite_link_table_ndx(col_ndx);
                 Table& origin_table = gf::get_table(group, origin_table_ndx); // Throws
@@ -5862,19 +5862,19 @@ void Table::print() const
     for (size_t i = 0; i < column_count; ++i) {
         ColumnType type = get_real_column_type(i);
         switch (type) {
-            case type_Int:
+            case ColumnType::Int:
                 std::cout << "Int        "; break;
-            case type_Float:
+            case ColumnType::Float:
                 std::cout << "Float      "; break;
-            case type_Double:
+            case ColumnType::Double:
                 std::cout << "Double     "; break;
-            case type_Bool:
+            case ColumnType::Bool:
                 std::cout << "Bool       "; break;
-            case type_String:
+            case ColumnType::String:
                 std::cout << "String     "; break;
-            case col_type_StringEnum:
+            case ColumnType::StringEnum:
                 std::cout << "String     "; break;
-            case col_type_Link: {
+            case ColumnType::Link: {
                 size_t target_table_ndx = m_spec.get_opposite_link_table_ndx(i);
                 ConstTableRef target_table = get_parent_group()->get_table(target_table_ndx);
                 const StringData target_name = target_table->get_name();
@@ -5893,37 +5893,37 @@ void Table::print() const
         for (size_t n = 0; n < column_count; ++n) {
             ColumnType type = get_real_column_type(n);
             switch (type) {
-                case type_Int: {
+                case ColumnType::Int: {
                     const IntegerColumn& column = get_column(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
-                case type_Float: {
+                case ColumnType::Float: {
                     const FloatColumn& column = get_column_float(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
-                case type_Double: {
+                case ColumnType::Double: {
                     const DoubleColumn& column = get_column_double(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
-                case type_Bool: {
+                case ColumnType::Bool: {
                     const IntegerColumn& column = get_column(n);
                     std::cout << (column.get(i) == 0 ? "     false " : "      true ");
                     break;
                 }
-                case type_String: {
+                case ColumnType::String: {
                     const StringColumn& column = get_column_string(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
-                case col_type_StringEnum: {
+                case ColumnType::StringEnum: {
                     const StringEnumColumn& column = get_column_string_enum(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;
                 }
-                case col_type_Link: {
+                case ColumnType::Link: {
                     const LinkColumn& column = get_column_link(n);
                     std::cout << std::setw(10) << column.get(i) << " ";
                     break;

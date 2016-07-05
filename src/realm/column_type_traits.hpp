@@ -43,8 +43,8 @@ struct ColumnTypeTraits<int64_t> {
     using sum_type = int64_t;
     using minmax_type = int64_t;
     static const DataType id = type_Int;
-    static const ColumnType column_id = col_type_Int;
-    static const ColumnType real_column_type = col_type_Int;
+    static const ColumnType column_id = ColumnType::Int;
+    static const ColumnType real_column_type = ColumnType::Int;
 };
 
 template<>
@@ -54,8 +54,8 @@ struct ColumnTypeTraits<util::Optional<int64_t>> {
     using sum_type = int64_t;
     using minmax_type = int64_t;
     static const DataType id = type_Int;
-    static const ColumnType column_id = col_type_Int;
-    static const ColumnType real_column_type = col_type_Int;
+    static const ColumnType column_id = ColumnType::Int;
+    static const ColumnType real_column_type = ColumnType::Int;
 };
 
 template<>
@@ -63,7 +63,7 @@ struct ColumnTypeTraits<bool> :
     ColumnTypeTraits<int64_t>
 {
     static const DataType id = type_Bool;
-    static const ColumnType column_id = col_type_Bool;
+    static const ColumnType column_id = ColumnType::Bool;
 };
 
 template<>
@@ -71,7 +71,7 @@ struct ColumnTypeTraits<util::Optional<bool>> :
     ColumnTypeTraits<util::Optional<int64_t>>
 {
     static const DataType id = type_Bool;
-    static const ColumnType column_id = col_type_Bool;
+    static const ColumnType column_id = ColumnType::Bool;
 };
 
 template<>
@@ -81,8 +81,8 @@ struct ColumnTypeTraits<float> {
     using sum_type = double;
     using minmax_type = float;
     static const DataType id = type_Float;
-    static const ColumnType column_id = col_type_Float;
-    static const ColumnType real_column_type = col_type_Float;
+    static const ColumnType column_id = ColumnType::Float;
+    static const ColumnType real_column_type = ColumnType::Float;
 };
 
 template<>
@@ -92,8 +92,8 @@ struct ColumnTypeTraits<double> {
     using sum_type = double;
     using minmax_type = double;
     static const DataType id = type_Double;
-    static const ColumnType column_id = col_type_Double;
-    static const ColumnType real_column_type = col_type_Double;
+    static const ColumnType column_id = ColumnType::Double;
+    static const ColumnType real_column_type = ColumnType::Double;
 };
 
 template<>
@@ -101,7 +101,7 @@ struct ColumnTypeTraits<OldDateTime> :
     ColumnTypeTraits<int64_t>
 {
     static const DataType id = type_OldDateTime;
-    static const ColumnType column_id = col_type_OldDateTime;
+    static const ColumnType column_id = ColumnType::OldDateTime;
 };
 
 template<>
@@ -109,7 +109,7 @@ struct ColumnTypeTraits<util::Optional<OldDateTime>> :
     ColumnTypeTraits<util::Optional<int64_t>>
 {
     static const DataType id = type_OldDateTime;
-    static const ColumnType column_id = col_type_OldDateTime;
+    static const ColumnType column_id = ColumnType::OldDateTime;
 };
 
 template<>
@@ -118,8 +118,8 @@ struct ColumnTypeTraits<StringData> {
     using leaf_type = ArrayInteger;
     using sum_type = int64_t;
     static const DataType id = type_String;
-    static const ColumnType column_id = col_type_String;
-    static const ColumnType real_column_type = col_type_String;
+    static const ColumnType column_id = ColumnType::String;
+    static const ColumnType real_column_type = ColumnType::String;
 };
 
 template<>
@@ -127,8 +127,8 @@ struct ColumnTypeTraits<BinaryData> {
     using column_type = BinaryColumn;
     using leaf_type = ArrayBinary;
     static const DataType id = type_Binary;
-    static const ColumnType column_id = col_type_Binary;
-    static const ColumnType real_column_type = col_type_Binary;
+    static const ColumnType column_id = ColumnType::Binary;
+    static const ColumnType real_column_type = ColumnType::Binary;
 };
 
 template<DataType, bool Nullable>

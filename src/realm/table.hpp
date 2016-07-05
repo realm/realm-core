@@ -1148,7 +1148,7 @@ private:
     /// new top array.
     ref_type clone(Allocator&) const;
 
-    /// True for `col_type_Link` and `col_type_LinkList`.
+    /// True for `ColumnType::Link` and `ColumnType::LinkList`.
     static bool is_link_type(ColumnType) noexcept;
 
     void connect_opposite_link_columns(size_t link_col_ndx, Table& target_table,
@@ -1915,7 +1915,7 @@ inline Table* Table::get_parent_table_ptr(size_t* column_ndx_out) noexcept
 
 inline bool Table::is_link_type(ColumnType col_type) noexcept
 {
-    return col_type == col_type_Link || col_type == col_type_LinkList;
+    return col_type == ColumnType::Link || col_type == ColumnType::LinkList;
 }
 
 inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const noexcept

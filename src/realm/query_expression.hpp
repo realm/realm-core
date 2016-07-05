@@ -1520,21 +1520,21 @@ public:
         for (size_t link_column_index : m_link_column_indexes) {
             // Link column can be either LinkList or single Link
             ColumnType type = table->get_real_column_type(link_column_index);
-            REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
+            REALM_ASSERT(Table::is_link_type(type) || type == ColumnType::BackLink);
             m_link_types.push_back(type);
 
-            if (type == col_type_LinkList) {
+            if (type == ColumnType::LinkList) {
                 const LinkListColumn& cll = table->get_column_link_list(link_column_index);
                 m_link_columns.push_back(&cll);
                 m_only_unary_links = false;
                 table = &cll.get_target_table();
             }
-            else if (type == col_type_Link) {
+            else if (type == ColumnType::Link) {
                 const LinkColumn& cl = table->get_column_link(link_column_index);
                 m_link_columns.push_back(&cl);
                 table = &cl.get_target_table();
             }
-            else if (type == col_type_BackLink) {
+            else if (type == ColumnType::BackLink) {
                 const BacklinkColumn& bl = table->get_column_backlink(link_column_index);
                 m_link_columns.push_back(&bl);
                 m_only_unary_links = false;
@@ -1586,7 +1586,7 @@ private:
     {
         bool last = (column + 1 == m_link_columns.size());
         ColumnType type = m_link_types[column];
-        if (type == col_type_Link) {
+        if (type == ColumnType::Link) {
             const LinkColumn& cl = *static_cast<const LinkColumn*>(m_link_columns[column]);
             size_t r = to_size_t(cl.get(row));
             if (r == 0)
@@ -1600,7 +1600,7 @@ private:
             else
                 map_links(column + 1, r, lm);
         }
-        else if (type == col_type_LinkList) {
+        else if (type == ColumnType::LinkList) {
             const LinkListColumn& cll = *static_cast<const LinkListColumn*>(m_link_columns[column]);
             ConstLinkViewRef lvr = cll.get(row);
             for (size_t t = 0; t < lvr->size(); t++) {
@@ -1614,7 +1614,7 @@ private:
                     map_links(column + 1, r, lm);
             }
         }
-        else if (type == col_type_BackLink) {
+        else if (type == ColumnType::BackLink) {
             const BacklinkColumn& bl = *static_cast<const BacklinkColumn*>(m_link_columns[column]);
             size_t count = bl.get_backlink_count(row);
             for (size_t i = 0; i < count; ++i) {
@@ -2098,8 +2098,8 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
             // We can fall back to Query::links_to for != and == operations on links, but only
             // for == on link lists. This is because negating query.links_to() is equivalent to
             // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
-            if (link_map.m_link_types[0] == col_type_Link ||
-                (link_map.m_link_types[0] == col_type_LinkList && std::is_same<Operator, Equal>::value)) {
+            if (link_map.m_link_types[0] == ColumnType::Link ||
+                (link_map.m_link_types[0] == ColumnType::LinkList && std::is_same<Operator, Equal>::value)) {
                 const Table* t = column->get_base_table();
                 Query query(*t);
 

@@ -127,14 +127,14 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
 {
     REALM_ASSERT(column_ndx <= m_types.size());
 
-    if (type != col_type_BackLink) // backlinks do not have names
+    if (type != ColumnType::BackLink) // backlinks do not have names
         m_names.insert(column_ndx, name); // Throws
-    m_types.insert(column_ndx, type); // Throws
+    m_types.insert(column_ndx, static_cast<int_fast64_t>(type)); // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
 
-    bool is_subspec_type = type == col_type_Table || type == col_type_Link ||
-        type == col_type_LinkList || type == col_type_BackLink;
+    bool is_subspec_type = type == ColumnType::Table || type == ColumnType::Link ||
+        type == ColumnType::LinkList || type == ColumnType::BackLink;
     if (is_subspec_type) {
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
@@ -157,7 +157,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             dg.release();
         }
 
-        if (type == col_type_Table) {
+        if (type == ColumnType::Table) {
             // Add a new empty spec to `m_subspecs`
             MemRef subspec_mem = create_empty_spec(alloc); // Throws
             _impl::DeepArrayRefDestroyGuard dg(subspec_mem.get_ref(), alloc);
@@ -166,14 +166,14 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             m_subspecs.insert(subspec_ndx, v); // Throws
             dg.release();
         }
-        else if (type == col_type_Link || type == col_type_LinkList) {
+        else if (type == ColumnType::Link || type == ColumnType::LinkList) {
             // Store group-level table index of target table. When we set the
             // target it will be as a tagged integer (low bit set) Since we
             // don't know it yet we just store zero (null ref).
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, 0); // Throws
         }
-        else if (type == col_type_BackLink) {
+        else if (type == ColumnType::BackLink) {
             // Store group-level table index of origin table and index of origin
             // column. When we set the target it will be as a tagged integer
             // (low bit set) Since we don't know it yet we just store zero (null
@@ -195,7 +195,7 @@ void Spec::erase_column(size_t column_ndx)
     // If the column is a subtable column, we have to delete
     // the subspec(s) as well
     ColumnType type = ColumnType(m_types.get(column_ndx));
-    if (type == col_type_Table) {
+    if (type == ColumnType::Table) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
         ref_type subspec_ref = m_subspecs.get_as_ref(subspec_ndx);
 
@@ -208,12 +208,12 @@ void Spec::erase_column(size_t column_ndx)
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
         m_subspecs.erase(subspec_ndx); // origin table index  : Throws
     }
-    else if (type == col_type_BackLink) {
+    else if (type == ColumnType::BackLink) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
         m_subspecs.erase(subspec_ndx); // origin table index  : Throws
         m_subspecs.erase(subspec_ndx); // origin column index : Throws
     }
-    else if (type == col_type_StringEnum) {
+    else if (type == ColumnType::StringEnum) {
         // Enum columns do also have a separate key list
         size_t keys_ndx = get_enumkeys_ndx(column_ndx);
         ref_type keys_ref = m_enumkeys.get_as_ref(keys_ndx);
@@ -225,8 +225,8 @@ void Spec::erase_column(size_t column_ndx)
     }
 
     // Delete the actual name and type entries
-    REALM_ASSERT((column_ndx >= m_names.size()) == (type == col_type_BackLink));
-    if (type != col_type_BackLink)
+    REALM_ASSERT((column_ndx >= m_names.size()) == (type == ColumnType::BackLink));
+    if (type != ColumnType::BackLink)
         m_names.erase(column_ndx); // Throws
     m_types.erase(column_ndx);  // Throws
     m_attr.erase(column_ndx);  // Throws
@@ -252,9 +252,9 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
 
     ColumnType type = ColumnType(m_types.get(from_ndx));
 
-    REALM_ASSERT_3(type, !=, col_type_BackLink);
+    REALM_ASSERT_3(type, !=, ColumnType::BackLink);
 
-    if (type == col_type_Table || tf::is_link_type(type)) {
+    if (type == ColumnType::Table || tf::is_link_type(type)) {
         // Table columns and link type columns have a single subspec.
         size_t old_subspec_ndx = get_subspec_ndx(from_ndx);
         size_t new_subspec_ndx = get_subspec_ndx_after(to_ndx, from_ndx);
@@ -263,7 +263,7 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
         }
     }
 
-    if (type != col_type_BackLink)
+    if (type != ColumnType::BackLink)
         m_names.move_rotate(from_ndx, to_ndx);
     m_types.move_rotate(from_ndx, to_ndx);
     m_attr.move_rotate(from_ndx, to_ndx);
@@ -273,10 +273,10 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
 size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx == get_column_count() ||
-                   get_column_type(column_ndx) == col_type_Table    ||
-                   get_column_type(column_ndx) == col_type_Link     ||
-                   get_column_type(column_ndx) == col_type_LinkList ||
-                   get_column_type(column_ndx) == col_type_BackLink );
+                   get_column_type(column_ndx) == ColumnType::Table    ||
+                   get_column_type(column_ndx) == ColumnType::Link     ||
+                   get_column_type(column_ndx) == ColumnType::LinkList ||
+                   get_column_type(column_ndx) == ColumnType::BackLink );
 
     return get_subspec_ndx_after(column_ndx, column_ndx);
 }
@@ -294,10 +294,10 @@ size_t Spec::get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) co
         }
 
         ColumnType type = ColumnType(m_types.get(i));
-        if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
+        if (type == ColumnType::Table || type == ColumnType::Link || type == ColumnType::LinkList) {
             ++subspec_ndx;
         }
-        else if (type == col_type_BackLink) {
+        else if (type == ColumnType::BackLink) {
             subspec_ndx += 2; // table and column refs
         }
     }
@@ -308,7 +308,7 @@ size_t Spec::get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) co
 void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
                                   ArrayParent*& keys_parent, size_t& keys_ndx)
 {
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
+    REALM_ASSERT(get_column_type(column_ndx) == ColumnType::String);
 
     REALM_ASSERT_EX(m_enumkeys.is_attached() == (m_top.size() > 4), m_enumkeys.is_attached(), m_top.size());
     // Create the enumkeys list if needed
@@ -329,7 +329,7 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
     size_t ins_pos = get_enumkeys_ndx(column_ndx);
     m_enumkeys.insert(ins_pos, keys_ref);
 
-    set_column_type(column_ndx, col_type_StringEnum);
+    set_column_type(column_ndx, ColumnType::StringEnum);
 
     // Return parent info
     keys_parent = &m_enumkeys;
@@ -343,7 +343,7 @@ size_t Spec::get_enumkeys_ndx(size_t column_ndx) const noexcept
     // so we need to count up to it's position
     size_t enumkeys_ndx = 0;
     for (size_t i = 0; i < column_ndx; ++i) {
-        if (ColumnType(m_types.get(i)) == col_type_StringEnum)
+        if (ColumnType(m_types.get(i)) == ColumnType::StringEnum)
             ++enumkeys_ndx;
     }
     return enumkeys_ndx;
@@ -368,9 +368,9 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
 size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
-                   get_column_type(column_ndx) == col_type_LinkList ||
-                   get_column_type(column_ndx) == col_type_BackLink);
+    REALM_ASSERT(get_column_type(column_ndx) == ColumnType::Link ||
+                   get_column_type(column_ndx) == ColumnType::LinkList ||
+                   get_column_type(column_ndx) == ColumnType::BackLink);
 
     // Group-level index of opposite table is stored as tagged int in the
     // subspecs array
@@ -388,9 +388,9 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
 void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
 {
     REALM_ASSERT(column_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
-                   get_column_type(column_ndx) == col_type_LinkList ||
-                   get_column_type(column_ndx) == col_type_BackLink);
+    REALM_ASSERT(get_column_type(column_ndx) == ColumnType::Link ||
+                   get_column_type(column_ndx) == ColumnType::LinkList ||
+                   get_column_type(column_ndx) == ColumnType::BackLink);
 
     // position of target table is stored as tagged int
     size_t tagged_ndx = (table_ndx << 1) + 1;
@@ -403,7 +403,7 @@ void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
 void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx)
 {
     REALM_ASSERT(backlink_col_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
+    REALM_ASSERT(get_column_type(backlink_col_ndx) == ColumnType::BackLink);
 
     // position of target table is stored as tagged int
     size_t tagged_ndx = (origin_col_ndx << 1) + 1;
@@ -416,7 +416,7 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col
 size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
 {
     REALM_ASSERT(backlink_col_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(backlink_col_ndx) == col_type_BackLink);
+    REALM_ASSERT(get_column_type(backlink_col_ndx) == ColumnType::BackLink);
 
     // Origin column is stored as second tagged int in the subspecs array
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
@@ -458,7 +458,7 @@ DataType Spec::get_public_column_type(size_t ndx) const noexcept
     ColumnType type = get_column_type(ndx);
 
     // Hide internal types
-    if (type == col_type_StringEnum)
+    if (type == ColumnType::StringEnum)
         return type_String;
 
     return DataType(type);
@@ -502,16 +502,16 @@ bool Spec::operator==(const Spec& spec) const noexcept
         ColumnType col_type = ColumnType(m_types.get(col_ndx));
         switch (col_type)
         {
-            case col_type_String:
-            case col_type_StringEnum:
+            case ColumnType::String:
+            case ColumnType::StringEnum:
             {
-                // These types are considered equal as col_type_StringEnum is used for an internal optimization only
-                const int64_t rhs_type = spec.m_types.get(col_ndx);
-                if (rhs_type != col_type_String && rhs_type != col_type_StringEnum)
+                // These types are considered equal as ColumnType::StringEnum is used for an internal optimization only
+                const ColumnType rhs_type = static_cast<ColumnType>(spec.m_types.get(col_ndx)); // FIXME: Check if valid enum value
+                if (rhs_type != ColumnType::String && rhs_type != ColumnType::StringEnum)
                     return false;
                 break;
             }
-            case col_type_Table:
+            case ColumnType::Table:
             {
                 // Sub tables must be compared recursively
                 const size_t subspec_index = get_subspec_ndx(col_ndx);
@@ -521,8 +521,8 @@ bool Spec::operator==(const Spec& spec) const noexcept
                     return false;
                 break;
             }
-            case col_type_Link:
-            case col_type_LinkList:
+            case ColumnType::Link:
+            case ColumnType::LinkList:
             {
                 // In addition to name and attributes, the link target table must also be compared
                 const size_t lhs_table_ndx = get_opposite_link_table_ndx(col_ndx);
@@ -531,16 +531,16 @@ bool Spec::operator==(const Spec& spec) const noexcept
                     return false;
                 break;
             }
-            case col_type_Int:
-            case col_type_Bool:
-            case col_type_Binary:
-            case col_type_Mixed:
-            case col_type_OldDateTime:
-            case col_type_Timestamp:
-            case col_type_Float:
-            case col_type_Double:
-            case col_type_Reserved4:
-            case col_type_BackLink:
+            case ColumnType::Int:
+            case ColumnType::Bool:
+            case ColumnType::Binary:
+            case ColumnType::Mixed:
+            case ColumnType::OldDateTime:
+            case ColumnType::Timestamp:
+            case ColumnType::Float:
+            case ColumnType::Double:
+            case ColumnType::Reserved4:
+            case ColumnType::BackLink:
                 // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;
@@ -586,8 +586,8 @@ void Spec::to_dot(std::ostream& out, StringData title) const
     bool have_subspecs = false;
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = ColumnType(m_types.get(i));
-        if (type == col_type_Table || type == col_type_Link
-            || type == col_type_LinkList || type == col_type_BackLink) {
+        if (type == ColumnType::Table || type == ColumnType::Link
+            || type == ColumnType::LinkList || type == ColumnType::BackLink) {
             have_subspecs = true;
             break;
         }
@@ -602,7 +602,7 @@ void Spec::to_dot(std::ostream& out, StringData title) const
         // Write out subspecs
         for (size_t i = 0; i < num_cols; ++i) {
             ColumnType type = ColumnType(m_types.get(i));
-            if (type != col_type_Table)
+            if (type != ColumnType::Table)
                 continue;
             size_t subspec_ndx = get_subspec_ndx(i);
             ref_type ref = m_subspecs.get_as_ref(subspec_ndx);

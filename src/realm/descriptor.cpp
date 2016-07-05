@@ -37,7 +37,7 @@ size_t Descriptor::get_num_unique_values(size_t column_ndx) const
 {
     REALM_ASSERT(is_attached());
     ColumnType col_type = m_spec->get_column_type(column_ndx);
-    if (col_type != col_type_StringEnum)
+    if (col_type != ColumnType::StringEnum)
         return 0;
     ref_type ref = m_spec->get_enumkeys_ref(column_ndx);
     StringColumn col(m_spec->get_alloc(), ref); // Throws

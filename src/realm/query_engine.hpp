@@ -923,7 +923,7 @@ public:
         m_condition_column = static_cast<const TimestampColumn*>(&get_column_base(table, m_condition_column_idx));
         REALM_ASSERT(dynamic_cast<const TimestampColumn*>(&get_column_base(table, m_condition_column_idx)));
         m_column_type = get_real_column_type(table, m_condition_column_idx);
-        REALM_ASSERT_3(m_column_type, == , col_type_Timestamp);
+        REALM_ASSERT_3(m_column_type, == , ColumnType::Timestamp);
 
         if (m_child)
             m_child->init(table);
@@ -1045,7 +1045,7 @@ public:
         for (size_t s = start; s < end; ++s) {
             StringData t;
 
-            if (m_column_type == col_type_StringEnum) {
+            if (m_column_type == ColumnType::StringEnum) {
                 // enum
                 t = static_cast<const StringEnumColumn*>(m_condition_column)->get(s);
             }
@@ -1131,7 +1131,7 @@ public:
         m_dD = 10.0;
         StringNodeBase::init(table);
 
-        if (m_column_type == col_type_StringEnum) {
+        if (m_column_type == ColumnType::StringEnum) {
             m_dT = 1.0;
             m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value);
         }
@@ -1147,7 +1147,7 @@ public:
             FindRes fr;
             size_t index_ref;
 
-            if (m_column_type == col_type_StringEnum) {
+            if (m_column_type == ColumnType::StringEnum) {
                 fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
             }
             else {
@@ -1186,7 +1186,7 @@ public:
             }
 
         }
-        else if (m_column_type != col_type_String) {
+        else if (m_column_type != ColumnType::String) {
             REALM_ASSERT_DEBUG(dynamic_cast<const StringEnumColumn*>(m_condition_column));
             m_cse.init(static_cast<const StringEnumColumn*>(m_condition_column));
         }
@@ -1230,7 +1230,7 @@ public:
             return not_found;
         }
 
-        if (m_column_type != col_type_String) {
+        if (m_column_type != ColumnType::String) {
             // Enum string column
             if (m_key_ndx == not_found)
                 return not_found;  // not in key set

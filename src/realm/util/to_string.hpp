@@ -24,6 +24,9 @@
 #include <string>
 
 namespace realm {
+
+enum class ColumnType;
+
 namespace util {
 
 class Printable {
@@ -38,6 +41,7 @@ public:
     Printable(long value) : m_type(Type::Int), m_int(value) { }
     Printable(long long value) : m_type(Type::Int), m_int(value) { }
     Printable(const char* value) : m_type(Type::String), m_string(value) { }
+    Printable(const ColumnType& value) : m_type(Type::Uint), m_uint(static_cast<uintmax_t>(value)) { }
 
     void print(std::ostream& out, bool quote) const;
     std::string str() const;

@@ -131,38 +131,38 @@ template<class Op>
 void col_type_deleg(Op& op, ColumnType type)
 {
     switch (type) {
-        case col_type_Int:
-        case col_type_Bool:
-        case col_type_OldDateTime:
-        case col_type_Link:
+        case ColumnType::Int:
+        case ColumnType::Bool:
+        case ColumnType::OldDateTime:
+        case ColumnType::Link:
             op.template call<IntegerColumn>();
             return;
-        case col_type_Timestamp:
+        case ColumnType::Timestamp:
             op.template call<TimestampColumn>();
-        case col_type_String:
+        case ColumnType::String:
             op.template call<StringColumn>();
             return;
-        case col_type_StringEnum:
+        case ColumnType::StringEnum:
             op.template call<StringEnumColumn>();
             return;
-        case col_type_Binary:
+        case ColumnType::Binary:
             op.template call<BinaryColumn>();
             return;
-        case col_type_Table:
+        case ColumnType::Table:
             op.template call<SubtableColumn>();
             return;
-        case col_type_Mixed:
+        case ColumnType::Mixed:
             op.template call<MixedColumn>();
             return;
-        case col_type_Float:
+        case ColumnType::Float:
             op.template call<FloatColumn>();
             return;
-        case col_type_Double:
+        case ColumnType::Double:
             op.template call<DoubleColumn>();
             return;
-        case col_type_Reserved4:
-        case col_type_LinkList:
-        case col_type_BackLink:
+        case ColumnType::Reserved4:
+        case ColumnType::LinkList:
+        case ColumnType::BackLink:
             break;
     }
     REALM_ASSERT_DEBUG(false);

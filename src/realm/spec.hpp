@@ -273,7 +273,7 @@ inline Spec::Spec(Allocator& alloc) noexcept:
 inline SubspecRef Spec::get_subtable_spec(size_t column_ndx) noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_Table);
+    REALM_ASSERT(get_column_type(column_ndx) == ColumnType::Table);
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     return SubspecRef(&m_subspecs, subspec_ndx);
 }
@@ -281,7 +281,7 @@ inline SubspecRef Spec::get_subtable_spec(size_t column_ndx) noexcept
 inline ConstSubspecRef Spec::get_subtable_spec(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_Table);
+    REALM_ASSERT(get_column_type(column_ndx) == ColumnType::Table);
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     return ConstSubspecRef(&m_subspecs, subspec_ndx);
 }
@@ -370,10 +370,10 @@ inline void Spec::set_column_type(size_t column_ndx, ColumnType type)
     REALM_ASSERT(column_ndx < get_column_count());
 
     // At this point we only support upgrading to string enum
-    REALM_ASSERT(ColumnType(m_types.get(column_ndx)) == col_type_String);
-    REALM_ASSERT(type == col_type_StringEnum);
+    REALM_ASSERT(ColumnType(m_types.get(column_ndx)) == ColumnType::String);
+    REALM_ASSERT(type == ColumnType::StringEnum);
 
-    m_types.set(column_ndx, type); // Throws
+    m_types.set(column_ndx, static_cast<int64_t>(type)); // Throws
 
     update_has_strong_link_columns();
 }
