@@ -220,11 +220,6 @@ namespace realm {
         bool use_internal_sort_order = (string_compare_method == STRING_COMPARE_CORE) || (string_compare_method == STRING_COMPARE_CORE_SIMILAR);
 
         if (use_internal_sort_order) {
-            const uint32_t* internal_collation_order = collation_order_core;
-            if (string_compare_method == STRING_COMPARE_CORE_SIMILAR) {
-                internal_collation_order = collation_order_core_similar;
-            }
-
             // Core-only method. Compares in us_EN locale (sorting may be slightly inaccurate in some countries). Will
             // return arbitrary return value for invalid utf8 (silent error treatment). If one or both strings have
             // unicodes beyond 'Latin Extended 2' (0...591), then the strings are compared by unicode value.
@@ -260,6 +255,10 @@ namespace realm {
                     if (char1 > last_latin_extended_2_unicode || char2 > last_latin_extended_2_unicode)
                         return char1 < char2;
 
+                    const uint32_t* internal_collation_order = collation_order_core;
+                    if (string_compare_method == STRING_COMPARE_CORE_SIMILAR) {
+                        internal_collation_order = collation_order_core_similar;
+                    }
                     uint32_t value1 = internal_collation_order[char1];
                     uint32_t value2 = internal_collation_order[char2];
 
