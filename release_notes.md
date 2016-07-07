@@ -2,19 +2,19 @@
 
 ### Bugfixes
 
-* Fix a crash when Group::move_table() is called before table accessors are
-  initialized.
+* Fix a crash when `Group::move_table()` is called before table accessors are
+  initialized. (#1939)
 
 ### Breaking changes
 
-* Sorting with STRING_COMPARE_CORE now sorts with pre 1.1.2 ordering. Sorting
-  with 1.1.2 order is available by using STRING_COMPARE_CORE_SIMILAR.
+* Sorting with `STRING_COMPARE_CORE` now sorts with pre 1.1.2 ordering. Sorting
+  with 1.1.2 order is available by using `STRING_COMPARE_CORE_SIMILAR`. (#1947)
 
 -----------
 
 ### Internals
 
-* Performance improvements for LinkLIstColumn::get_ptr(). (#1933)
+* Performance improvements for `LinkListColumn::get_ptr()`. (#1933)
 
 ----------------------------------------------
 
