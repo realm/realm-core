@@ -6898,7 +6898,7 @@ TEST(Table_ColumnsSupportStringIndex)
             t->add_search_index(0);
         }
         else {
-            CHECK_THROW(t->add_search_index(0), LogicError);
+            CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
         }
         CHECK_EQUAL(does_support_index, t->has_search_index(0));
         t->remove_column(0);
@@ -6910,7 +6910,7 @@ TEST(Table_ColumnsSupportStringIndex)
     CHECK(!link_col.supports_search_index());
     CHECK(link_col.create_search_index() == nullptr);
     CHECK(!link_col.has_search_index());
-    CHECK_THROW(t->add_search_index(0), LogicError);
+    CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
     t->remove_column(0);
 
     // Check type_LinkList
@@ -6919,7 +6919,7 @@ TEST(Table_ColumnsSupportStringIndex)
     CHECK(!linklist_col.supports_search_index());
     CHECK(linklist_col.create_search_index() == nullptr);
     CHECK(!linklist_col.has_search_index());
-    CHECK_THROW(t->add_search_index(0), LogicError);
+    CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
     t->remove_column(0);
 
     // Check StringEnum
@@ -6942,8 +6942,8 @@ TEST(Table_addRowsToTableWithNoColumns)
     Group g; // type_Link must be part of a group
     TableRef t = g.add_table("t");
 
-    CHECK_THROW(t->add_empty_row(1), LogicError);
-    CHECK_THROW(t->insert_empty_row(0), LogicError);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+    CHECK_LOGIC_ERROR(t->insert_empty_row(0), LogicError::table_has_no_columns);
     CHECK_EQUAL(t->size(), 0);
     t->add_column(type_String, "str_col");
     t->add_empty_row(1);
@@ -6965,7 +6965,7 @@ TEST(Table_addRowsToTableWithNoColumns)
     u->remove_column(0);
     CHECK_EQUAL(u->size(), 0);
     CHECK_EQUAL(t->size(), 0);
-    CHECK_THROW(t->add_empty_row(1), LogicError);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
 
     // Do the exact same as above but with LinkLists
     u->add_column_link(type_LinkList, "link list from u to t", *t);
@@ -6976,14 +6976,14 @@ TEST(Table_addRowsToTableWithNoColumns)
     u->remove_column(0);
     CHECK_EQUAL(u->size(), 0);
     CHECK_EQUAL(t->size(), 0);
-    CHECK_THROW(t->add_empty_row(1), LogicError);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
 
     // Check that links are nulled when connected table is cleared
     u->add_column_link(type_Link, "link from u to t", *t);
     u->add_empty_row(1);
     CHECK_EQUAL(u->size(), 1);
     CHECK_EQUAL(t->size(), 0);
-    CHECK_THROW(u->set_link(0, 0, 0), LogicError);
+    CHECK_LOGIC_ERROR(u->set_link(0, 0, 0), LogicError::target_row_index_out_of_range);
     CHECK(u->is_null_link(0, 0));
     CHECK_EQUAL(t->size(), 0);
     t->add_empty_row();
