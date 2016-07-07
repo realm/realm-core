@@ -62,6 +62,13 @@
             ReferencedContainer = "container:realm.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "UNITTEST_FILTER"
+            value = "Table_ColumnSizeFromRef*"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
       <AdditionalOptions>
       </AdditionalOptions>
    </LaunchAction>

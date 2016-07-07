@@ -7016,63 +7016,56 @@ TEST(Table_getVersionCounterAfterRowAccessor)
     int_fast64_t ver = t.get_version_counter();
     int_fast64_t newVer;
 
-#define _CHECK_VER_BUMP() \
-    newVer = t.get_version_counter();\
-    CHECK_GREATER(newVer, ver); \
-    ver = newVer;
+    auto check_ver_bump = [&]() {
+        newVer = t.get_version_counter();
+        CHECK_GREATER(newVer, ver);
+        ver = newVer;
+    };
 
     t.set_bool(col_bool, 0, true);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_int(col_int, 0, 42);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_string(col_string, 0, "foo");
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_float(col_float, 0, 0.42f);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_double(col_double, 0, 0.42);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_olddatetime(col_date, 0, 1234);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_binary(col_binary, 0, BinaryData("binary", 7));
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_timestamp(col_timestamp, 0, Timestamp(777, 888));
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_null(0, 0);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 }
 
 
-TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
+TEST(Table_ColumnSizeFromRef)
 {
-    constexpr bool nullable = TEST_TYPE::value;
     Group g;
     TableRef t = g.add_table("table");
-    t->add_column(type_Int, "int", nullable);
-    t->add_column(type_Bool, "bool", nullable);
-    t->add_column(type_String, "string", nullable);
-    t->add_column(type_Binary, "binary", nullable);
-    t->add_column(type_Double, "double");
-    t->add_column(type_Float, "float");
-    t->add_column(type_Mixed, "mixed");
-    t->add_column(type_Timestamp, "timestamp");
-    t->add_column_link(type_Link, "link", *t);
-    t->add_column_link(type_LinkList, "LinkList", *t);
+    t->add_column(type_Int, "int", true);
 
     auto check_column_sizes = [this, &t](size_t num_rows) {
         t->clear();
         t->add_empty_row(num_rows);
+        for (size_t i = 0; i < num_rows; ++i) {
+            t->set_int(0, i, i);
+        }
         CHECK_EQUAL(t->size(), num_rows);
         using tf = _impl::TableFriend;
-        // We know there are 2 hidden backlink columns
-        size_t actual_num_cols = t->get_column_count() + 2;
+        size_t actual_num_cols = t->get_column_count();
         Spec& t_spec = tf::get_spec(*t);
         for (size_t col_ndx = 0; col_ndx < actual_num_cols; ++col_ndx) {
             ColumnType col_type = t_spec.get_column_type(col_ndx);
@@ -7083,20 +7076,8 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
         }
     };
 
-    // Test leafs
-    check_column_sizes(REALM_MAX_BPNODE_SIZE - 1);
-
-    // Test empty
-    check_column_sizes(0);
-
     // Test internal nodes
-    check_column_sizes(REALM_MAX_BPNODE_SIZE + 1);
-
-    // Test on boundary for good measure
     check_column_sizes(REALM_MAX_BPNODE_SIZE);
-
-    // Test on more nodes
-    check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
 

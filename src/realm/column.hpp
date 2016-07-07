@@ -440,6 +440,9 @@ public:
     Allocator& get_alloc() const noexcept final;
     ref_type get_ref() const noexcept final;
     MemRef get_mem() const noexcept final;
+
+//    size_t get_size_from_ref(ref_type root_ref, Allocator& alloc);
+
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override;
     size_t get_ndx_in_parent() const noexcept final;
     void set_ndx_in_parent(size_t ndx) noexcept final;
