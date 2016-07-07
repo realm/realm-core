@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 1.3.0 Release notes
 
 ### Bugfixes
 
@@ -9,10 +9,6 @@
 
 * Sorting with STRING_COMPARE_CORE now sorts with pre 1.1.2 ordering. Sorting
   with 1.1.2 order is available by using STRING_COMPARE_CORE_SIMILAR.
-
-### Enhancements
-
-* Lorem ipsum.
 
 -----------
 
