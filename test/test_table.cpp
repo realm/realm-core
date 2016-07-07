@@ -6953,7 +6953,7 @@ TEST(Table_addRowsToTableWithNoColumns)
     CHECK_EQUAL(t->size(), 2);
     t->remove_column(0);
     CHECK_EQUAL(t->size(), 0);
-    CHECK_THROW(t->add_empty_row(1), LogicError);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
 
     // Can add rows to a table with backlinks
     TableRef u = g.add_table("u");
