@@ -162,13 +162,13 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_utf8)
     CHECK_EQUAL(false, utf8_compare(uae, uae));
     CHECK_EQUAL(false, utf8_compare(uAE, uAE));
 
-    CHECK_EQUAL(false, utf8_compare(uae, ua));
-    CHECK_EQUAL(true, utf8_compare(ua, uae));
+    CHECK_EQUAL(true, utf8_compare(uae, ua));
+    CHECK_EQUAL(false, utf8_compare(ua, uae));
 
     CHECK_EQUAL(false, utf8_compare(uAE, uae));
 
-    CHECK_EQUAL(false, utf8_compare(uae, uA));
-    CHECK_EQUAL(true, utf8_compare(uA, uAE));
+    CHECK_EQUAL(true, utf8_compare(uae, uA));
+    CHECK_EQUAL(false, utf8_compare(uA, uAE));
 
     // char needing utf16 surrogate pair (tests mostly windows because *nix uses utf32 as wchar_t). These are symbols
     // that are beyond 'Latin Extended 2' (0...591), where 'compare_method 0' will sort them by unicode value instead.
