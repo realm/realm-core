@@ -717,22 +717,21 @@ void Table::do_erase_column(Descriptor& desc, size_t col_ndx)
     REALM_ASSERT(!root_table.has_shared_type());
     REALM_ASSERT_3(col_ndx, <, desc.get_column_count());
 
-    // For root tables, it is possible that the column to be removed is the last
-    // column that is not a backlink column. If there are no backlink columns,
-    // then the removal of the last column is enough to effectively truncate the
-    // size (number of rows) to zero, since the number of rows is simply the
-    // number of entries in each column. If, on the other hand, there are
-    // additional backlink columns, we need to inject a clear operation before
+    // It is possible that the column to be removed is the last column. If there
+    // are no backlink columns, then the removal of the last column is enough to
+    // effectively truncate the size (number of rows) to zero, since the number of rows
+    // is simply the number of entries in each column. Although the size of the table at
+    // this point will be zero (locally), we need to explicitly inject a clear operation
+    // so that sync can handle conflicts with adding rows. Additionally, if there
+    // are backlink columns, we need to inject a clear operation before
     // the column removal to correctly reproduce the desired effect, namely that
     // the table appears truncated after the removal of the last non-hidden
     // column. The clear operation needs to be submitted to the replication
     // handler as an individual operation, and precede the column removal
     // operation in order to get the right behaviour in
     // Group::advance_transact().
-    if (desc.is_root()) {
-        if (root_table.m_spec.get_public_column_count() == 1 && root_table.m_cols.size() > 1)
-            root_table.clear(); // Throws
-    }
+    if (root_table.m_spec.get_public_column_count() == 1)
+        root_table.clear(); // Throws
 
     if (Replication* repl = root_table.get_repl())
         repl->erase_column(desc, col_ndx); // Throws
@@ -2086,9 +2085,14 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_DEBUG(row_ndx <= m_size);
     REALM_ASSERT_DEBUG(num_rows <= std::numeric_limits<size_t>::max() - row_ndx);
-    bump_version();
 
     size_t num_cols = m_spec.get_column_count();
+    if (REALM_UNLIKELY(num_cols == 0)) {
+        throw LogicError(LogicError::table_has_no_columns);
+    }
+
+    bump_version();
+
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& column = get_column_base(col_ndx);
         bool insert_nulls = is_nullable(col_ndx);

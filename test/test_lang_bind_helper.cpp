@@ -11961,9 +11961,9 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
     g.add_table("t0");
     g.insert_table(1, "t1");
 
+    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
     g.get_table(0)->add_empty_row(2);
     g.get_table(1)->add_empty_row(2);
-    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
     g.get_table(0)->set_link(0, 1, 1);
 
     CHECK_EQUAL(g.get_table(0)->size(), 2);
@@ -12073,9 +12073,9 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
     g.add_table("t0");
     g.insert_table(1, "t1");
 
+    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
     g.get_table(0)->add_empty_row(2);
     g.get_table(1)->add_empty_row(2);
-    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
     g.get_table(0)->set_link(0, 1, 1);
 
     CHECK_EQUAL(g.get_table(0)->size(), 2);
