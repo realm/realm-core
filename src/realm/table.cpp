@@ -5851,9 +5851,12 @@ void Table::print() const
 {
     // Table header
     std::cout << "Table (name = \"" << std::string(get_name()) << "\",  size = " << m_size << ")\n    ";
-    size_t column_count = get_column_count();
+    size_t column_count = m_spec.get_column_count(); // We can print backlinks too.
     for (size_t i = 0; i < column_count; ++i) {
-        StringData name = m_spec.get_column_name(i);
+        std::string name = "backlink";
+        if (i < get_column_count()) {
+            name = m_spec.get_column_name(i);
+        }
         std::cout << std::left << std::setw(10) << std::string(name).substr(0, 10) << " ";
     }
 
@@ -5915,33 +5918,37 @@ void Table::print() const
 
     // Columns
     for (size_t i = 0; i < m_size; ++i) {
-        std::cout << std::setw(3) << i;
+        std::cout << std::setw(4) << i;
         for (size_t n = 0; n < column_count; ++n) {
             ColumnType type = get_real_column_type(n);
+            if (is_nullable(n) && is_null(n, i)) {
+                std::cout << std::setw(10) << "null" << " ";
+                continue;
+            }
             switch (type) {
                 case col_type_Int: {
-                    const IntegerColumn& column = get_column(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    size_t value = get_int(n, i);
+                    std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Float: {
-                    const FloatColumn& column = get_column_float(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    float value = get_float(n, i);
+                    std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Double: {
-                    const DoubleColumn& column = get_column_double(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    double value = get_double(n, i);
+                    std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Bool: {
-                    const IntegerColumn& column = get_column(n);
-                    std::cout << (column.get(i) == 0 ? "     false " : "      true ");
+                    bool value = get_bool(n, i);
+                    std::cout << std::setw(10) << (value ? "true" : "false") << " ";
                     break;
                 }
                 case col_type_String: {
-                    const StringColumn& column = get_column_string(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    std::string value = get_string(n, i);
+                    std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_StringEnum: {
@@ -5950,13 +5957,13 @@ void Table::print() const
                     break;
                 }
                 case col_type_Link: {
-                    const LinkColumn& column = get_column_link(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    size_t value = get_link(n, i);
+                    std::cout << std::setw(10) << value << " ";
                     break;
                 }
                 case col_type_Binary: {
-                    const BinaryColumn& column = get_column_binary(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    BinaryData value = get_binary(n, i);
+                    std::cout << "size:" << std::setw(5) << value.size() << " ";
                     break;
                 }
                 case col_type_Table: {
@@ -5965,18 +5972,19 @@ void Table::print() const
                     break;
                 }
                 case col_type_Timestamp: {
-                    const TimestampColumn& column = get_column_timestamp(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    Timestamp value = get_timestamp(n, i);
+                    std::cout << std::setw(5) << value.get_seconds() << std::setw(5) << value.get_nanoseconds() << " ";
                     break;
                 }
                 case col_type_LinkList: {
-                    const LinkListColumn& column = get_column_link_list(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    size_t value = get_link_count(n, i);
+                    std::cout << "count:" << std::setw(4) << value << " ";
                     break;
                 }
                 case col_type_BackLink: {
                     const BacklinkColumn& column = get_column_backlink(n);
-                    std::cout << std::setw(10) << column.get(i) << " ";
+                    size_t value = column.get_backlink_count(i);
+                    std::cout << "count:" << std::setw(4) << value << " ";
                     break;
                 }
 
