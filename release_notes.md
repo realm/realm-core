@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Increased the verbosity of some exception error messages to help debugging.
 
 -----------
 
