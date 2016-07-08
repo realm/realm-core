@@ -200,7 +200,7 @@ public:
     virtual void detach(void) = 0;
     virtual bool is_attached(void) const noexcept = 0;
 
-    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) noexcept;
+    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&, bool) noexcept;
 
     // These assume that the right column compile-time type has been
     // figured out.
@@ -441,8 +441,6 @@ public:
     ref_type get_ref() const noexcept final;
     MemRef get_mem() const noexcept final;
 
-//    size_t get_size_from_ref(ref_type root_ref, Allocator& alloc);
-
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept override;
     size_t get_ndx_in_parent() const noexcept final;
     void set_ndx_in_parent(size_t ndx) noexcept final;
@@ -453,6 +451,10 @@ public:
     MemRef clone_deep(Allocator&) const override;
 
     void move_assign(Column&);
+
+    static size_t get_size_from_ref(ref_type root_ref, Allocator& alloc) {
+        return ColumnBase::get_size_from_ref(root_ref, alloc);
+    }
 
     size_t size() const noexcept override;
     bool is_empty() const noexcept { return size() == 0; }
@@ -630,6 +632,18 @@ private:
 };
 
 // Implementation:
+
+
+template<>
+inline size_t IntNullColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc)
+{
+    const char* root_header = alloc.translate(root_ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
+    if (root_is_leaf)
+        return Array::get_size_from_header(root_header) - 1; // fuuuuuck
+    return Array::get_bptree_size_from_header(root_header);
+}
+
 
 inline bool ColumnBase::supports_search_index() const noexcept
 {

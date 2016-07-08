@@ -1960,7 +1960,9 @@ size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
     const char* columns_header = alloc.translate(columns_ref);
     REALM_ASSERT_3(Array::get_size_from_header(columns_header), !=, 0);
     ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
-    size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc);
+
+    bool nullable = false;
+    size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc, nullable);
     return size;
 }
 
