@@ -72,7 +72,7 @@ public:
     void append(const char* append_data, size_t append_size);
 
     /// Append a zero-terminated string to this buffer.
-    void append_c_str(const char* string);
+    void append_c_str(const char* c_string);
 
     /// The specified size is understood as not including the
     /// terminating zero. If the specified size is less than the
@@ -150,9 +150,9 @@ inline void StringBuffer::append(const std::string& s)
     return append(s.data(), s.size());
 }
 
-inline void StringBuffer::append_c_str(const char* string)
+inline void StringBuffer::append_c_str(const char* c_string)
 {
-    append(string, std::strlen(string));
+    append(c_string, std::strlen(c_string));
 }
 
 inline void StringBuffer::reserve(size_t min_capacity)
