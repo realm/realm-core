@@ -1641,6 +1641,46 @@ TEST(LinkList_QueryDateTime)
     CHECK_EQUAL(1, tv.size());
 }
 
+ONLY(BackLink_Query_TableViewSyncsWhenNeeded)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    source->add_column(type_Int, "id");
+    size_t col_link = source->add_column_link(type_Link, "link", *target);
+
+    target->add_column(type_Int, "id");
+
+    source->add_empty_row(3);
+    source->set_int(0, 0, 0);
+    source->set_int(0, 1, 0);
+    source->set_int(0, 2, 2);
+
+    target->add_empty_row(3);
+    source->set_link(1, 0, 0);
+    source->set_link(1, 1, 1);
+
+    Query q = target->backlink(*source, col_link).column<Int>(0) > 0;
+    TableView tv = q.find_all();
+    CHECK_TABLE_VIEW(tv, {});
+
+    size_t source_v1 = source->get_version_counter();
+    source->set_int(0, 1, 1);
+    size_t source_v2 = source->get_version_counter();
+    CHECK_EQUAL(false, tv.is_in_sync());  // CHECK_EQUAL(false, tv.is_in_sync()) failed with (0, 1)
+
+    tv.sync_if_needed();
+    CHECK_TABLE_VIEW(tv, {1});            // CHECK_EQUAL(tv.size(), {1}.size()) failed with (0, 1)
+
+    source->set_link(1, 2, 2);
+    CHECK_EQUAL(false, tv.is_in_sync());  // CHECK_EQUAL(false, tv.is_in_sync()) failed with (0, 1)
+
+    tv.sync_if_needed();
+    CHECK_TABLE_VIEW(tv, {1, 2});         // CHECK_EQUAL(tv.size(), {1, 2}.size()) failed with (0, 2)
+}
+
 // Test queries involving the backlinks of a link column.
 TEST(BackLink_Query_Link)
 {
