@@ -212,21 +212,21 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
 }
 
 
-MemRef ArrayBinary::slice(size_t offset, size_t size, Allocator& target_alloc) const
+MemRef ArrayBinary::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
 
-    ArrayBinary slice(target_alloc);
-    _impl::ShallowArrayDestroyGuard dg(&slice);
-    slice.create(); // Throws
+    ArrayBinary array_slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&array_slice);
+    array_slice.create(); // Throws
     size_t begin = offset;
-    size_t end   = offset + size;
+    size_t end   = offset + slice_size;
     for (size_t i = begin; i != end; ++i) {
         BinaryData value = get(i);
-        slice.add(value); // Throws
+        array_slice.add(value); // Throws
     }
     dg.release();
-    return slice.get_mem();
+    return array_slice.get_mem();
 }
 
 

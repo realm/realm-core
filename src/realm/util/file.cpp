@@ -370,11 +370,11 @@ error:
         off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
-        Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(map, pos, size);
-        memcpy(data, map.get_addr() + pos, size);
+        Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
+        realm::util::encryption_read_barrier(read_map, pos, size);
+        memcpy(data, read_map.get_addr() + pos, size);
         lseek(m_fd, size, SEEK_CUR);
-        return map.get_size() - pos;
+        return read_map.get_size() - pos;
     }
 
     char* const data_0 = data;
@@ -431,11 +431,11 @@ void File::write(const char* data, size_t size)
         off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
-        Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
+        Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         // FIXME: Expect this to fail due to assert asking for a read first! This FIXME seems to be made by Finn who does not remember it. 
-        realm::util::encryption_read_barrier(map, pos, size);
-        memcpy(map.get_addr() + pos, data, size);
-        realm::util::encryption_write_barrier(map, pos, size);
+        realm::util::encryption_read_barrier(write_map, pos, size);
+        memcpy(write_map.get_addr() + pos, data, size);
+        realm::util::encryption_write_barrier(write_map, pos, size);
         lseek(m_fd, size, SEEK_CUR);
         return;
     }

@@ -264,13 +264,13 @@ TEST(ArrayBlob_Null)
                 }
 
                 CHECK_EQUAL(a.size(), v.size());
-                for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == "null") {
-                        CHECK(a.is_null(i));
-                        CHECK(a.get(i).data() == nullptr);
+                for (size_t a_i = 0; a_i < a.size(); a_i++) {
+                    if (v[a_i] == "null") {
+                        CHECK(a.is_null(a_i));
+                        CHECK(a.get(a_i).data() == nullptr);
                     }
                     else {
-                        CHECK(a.get(i) == v[i]);
+                        CHECK(a.get(a_i) == v[a_i]);
                     }
                 }
             }

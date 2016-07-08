@@ -548,7 +548,7 @@ end:
     return payload.size() - original_size;
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *scheme2, std::vector<std::string> *column_names,
+size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *import_scheme, std::vector<std::string> *column_names,
                             size_t type_detection_rows, size_t skip_first_rows,
                             size_t import_rows)
 {
@@ -563,7 +563,7 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *sch
     m_file = file;
     m_row = 1;
 
-    if(scheme2 == nullptr) {
+    if(import_scheme == nullptr) {
         // Header detection: 1) If first line is strings-only and next line has at least 1 occurence of non-string, then
         // header is present. 2) If first line has at least one occurence of non-string or empty-field, then header is
         // not present. 3) If first two lines are strings-only, we can't tell, and treat both as payload
@@ -634,11 +634,11 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *sch
     }
     else {
         // Use user provided column names and types
-        scheme = *scheme2;
+        scheme = *import_scheme;
         header = *column_names;
     }
 
-    // Create sheme in Realm table
+    // Create scheme in Realm table
     for(size_t t = 0; t < scheme.size(); t++)
         table.add_column(scheme[t], StringData(header[t]).data());
 

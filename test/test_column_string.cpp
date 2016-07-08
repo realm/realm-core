@@ -880,13 +880,13 @@ TEST(ColumnString_Null)
                 }
 
                 CHECK_EQUAL(a.size(), v.size());
-                for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == "null") {
-                        CHECK(a.is_null(i));
-                        CHECK(a.get(i).data() == nullptr);
+                for (size_t a_i = 0; a_i < a.size(); a_i++) {
+                    if (v[a_i] == "null") {
+                        CHECK(a.is_null(a_i));
+                        CHECK(a.get(a_i).data() == nullptr);
                     }
                     else {
-                        CHECK(a.get(i) == v[i]);
+                        CHECK(a.get(a_i) == v[a_i]);
                     }
                 }
             }
@@ -906,11 +906,11 @@ TEST(ColumnString_SetNullThrowsUnlessNullable)
     size_t keys, values;
     bool res = c.auto_enumerate(keys, values, true);
     CHECK(res);
-    StringEnumColumn e{Allocator::get_default(), values, keys, false};
-    CHECK_LOGIC_ERROR(e.set_null(0), LogicError::column_not_nullable);
+    StringEnumColumn enum_column{Allocator::get_default(), values, keys, false};
+    CHECK_LOGIC_ERROR(enum_column.set_null(0), LogicError::column_not_nullable);
 
     c.destroy();
-    e.destroy();
+    enum_column.destroy();
 }
 
 

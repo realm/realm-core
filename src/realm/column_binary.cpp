@@ -29,8 +29,8 @@ BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable):
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref, alloc);
-    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
-    if (root_is_leaf) {
+    bool array_root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
+    if (array_root_is_leaf) {
         bool is_big = Array::get_context_flag_from_header(header);
         if (!is_big) {
             // Small blobs root leaf
@@ -95,8 +95,8 @@ void BinaryColumn::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <, size());
 
-    bool root_is_leaf = !m_array->is_inner_bptree_node();
-    if (root_is_leaf) {
+    bool array_root_is_leaf = !m_array->is_inner_bptree_node();
+    if (array_root_is_leaf) {
         bool is_big = upgrade_root_leaf(value.size()); // Throws
         if (!is_big) {
             // Small blobs root leaf
@@ -273,8 +273,8 @@ void BinaryColumn::erase(size_t ndx, bool is_last)
     REALM_ASSERT_3(ndx, <, size());
     REALM_ASSERT_3(is_last, ==, (ndx == size() - 1));
 
-    bool root_is_leaf = !m_array->is_inner_bptree_node();
-    if (root_is_leaf) {
+    bool array_root_is_leaf = !m_array->is_inner_bptree_node();
+    if (array_root_is_leaf) {
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
@@ -369,8 +369,8 @@ void BinaryColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
 void BinaryColumn::do_clear()
 {
-    bool root_is_leaf = !m_array->is_inner_bptree_node();
-    if (root_is_leaf) {
+    bool array_root_is_leaf = !m_array->is_inner_bptree_node();
+    if (array_root_is_leaf) {
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf

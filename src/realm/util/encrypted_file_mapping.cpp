@@ -42,8 +42,8 @@
 namespace realm {
 namespace util {
 
-SharedFileInfo::SharedFileInfo(const uint8_t* key, int fd)
-: fd(fd), cryptor(key)
+SharedFileInfo::SharedFileInfo(const uint8_t* key, int file_descriptor)
+: fd(file_descriptor), cryptor(key)
 {
 }
 

@@ -147,8 +147,8 @@ void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 void LinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 {
     int_fast64_t value = LinkColumnBase::get(row_ndx);
-    bool is_null = value == 0;
-    if (is_null)
+    bool value_is_null = value == 0;
+    if (value_is_null)
         return;
 
     // Remove the reciprocal backlink at target_row_ndx that points to row_ndx
@@ -179,8 +179,8 @@ void LinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeSta
     size_t target_table_ndx = m_target_table->get_index_in_group();
     for (size_t i = 0; i < num_rows; ++i) {
         int_fast64_t value = LinkColumnBase::get(i);
-        bool is_null = value == 0;
-        if (is_null)
+        bool value_is_null = value == 0;
+        if (value_is_null)
             continue;
 
         size_t target_row_ndx = to_size_t(value - 1);

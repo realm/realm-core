@@ -47,9 +47,9 @@ void BacklinkColumn::add_backlink(size_t row_ndx, size_t origin_row_ndx)
     // representation.
     if ((value & 1) != 0) {
         // Create new column to hold backlinks
-        size_t size = 1;
+        size_t init_size = 1;
         int_fast64_t value_2 = value >> 1;
-        ref = IntegerColumn::create(get_alloc(), Array::type_Normal, size, value_2); // Throws
+        ref = IntegerColumn::create(get_alloc(), Array::type_Normal, init_size, value_2); // Throws
         IntegerColumn::set_as_ref(row_ndx, ref); // Throws
     }
     else {

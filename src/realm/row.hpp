@@ -193,7 +193,7 @@ private:
     T* m_table; // nullptr if detached.
     size_t m_row_ndx; // Undefined if detached.
 
-    BasicRowExpr(T*, size_t row_ndx) noexcept;
+    BasicRowExpr(T*, size_t init_row_ndx) noexcept;
 
     T* impl_get_table() const noexcept;
     size_t impl_get_row_ndx() const noexcept;
@@ -691,9 +691,9 @@ inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) noexcept:
 }
 
 template<class T>
-inline BasicRowExpr<T>::BasicRowExpr(T* table, size_t row_ndx) noexcept:
-    m_table(table),
-    m_row_ndx(row_ndx)
+inline BasicRowExpr<T>::BasicRowExpr(T* init_table, size_t init_row_ndx) noexcept:
+    m_table(init_table),
+    m_row_ndx(init_row_ndx)
 {
 }
 
@@ -732,24 +732,24 @@ template<class T>
 template<class U>
 inline BasicRow<T>::BasicRow(BasicRowExpr<U> expr) noexcept
 {
-    T* table = expr.m_table; // Check that pointer types are compatible
-    attach(const_cast<Table*>(table), expr.m_row_ndx);
+    T* expr_table = expr.m_table; // Check that pointer types are compatible
+    attach(const_cast<Table*>(expr_table), expr.m_row_ndx);
 }
 
 template<class T>
 template<class U>
 inline BasicRow<T>::BasicRow(const BasicRow<U>& row) noexcept
 {
-    T* table = row.m_table.get(); // Check that pointer types are compatible
-    attach(const_cast<Table*>(table), row.m_row_ndx);
+    T* row_table = row.m_table.get(); // Check that pointer types are compatible
+    attach(const_cast<Table*>(row_table), row.m_row_ndx);
 }
 
 template<class T>
 template<class U>
 inline BasicRow<T>& BasicRow<T>::operator=(BasicRowExpr<U> expr) noexcept
 {
-    T* table = expr.m_table; // Check that pointer types are compatible
-    reattach(const_cast<Table*>(table), expr.m_row_ndx);
+    T* expr_table = expr.m_table; // Check that pointer types are compatible
+    reattach(const_cast<Table*>(expr_table), expr.m_row_ndx);
     return *this;
 }
 
@@ -757,8 +757,8 @@ template<class T>
 template<class U>
 inline BasicRow<T>& BasicRow<T>::operator=(BasicRow<U> row) noexcept
 {
-    T* table = row.m_table.get(); // Check that pointer types are compatible
-    reattach(const_cast<Table*>(table), row.m_row_ndx);
+    T* row_table = row.m_table.get(); // Check that pointer types are compatible
+    reattach(const_cast<Table*>(row_table), row.m_row_ndx);
     return *this;
 }
 

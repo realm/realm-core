@@ -717,19 +717,19 @@ void io_service::recycle_post_oper(impl& impl, post_oper_base* op) noexcept
 }
 
 
-std::error_code resolver::resolve(const query& query, endpoint::list& list, std::error_code& ec)
+std::error_code resolver::resolve(const query& query_info, endpoint::list& list, std::error_code& ec)
 {
     typedef struct addrinfo addrinfo_type;
     addrinfo_type hints = addrinfo_type(); // Clear
-    hints.ai_flags    = query.m_flags;
-    hints.ai_family   = query.m_protocol.m_family;
-    hints.ai_socktype = query.m_protocol.m_socktype;
-    hints.ai_protocol = query.m_protocol.m_protocol;
+    hints.ai_flags    = query_info.m_flags;
+    hints.ai_family   = query_info.m_protocol.m_family;
+    hints.ai_socktype = query_info.m_protocol.m_socktype;
+    hints.ai_protocol = query_info.m_protocol.m_protocol;
 
-    const char* host = query.m_host.empty() ? 0 : query.m_host.c_str();
-    const char* service = query.m_service.empty() ? 0 : query.m_service.c_str();
+    const char* query_host = query_info.m_host.empty() ? 0 : query_info.m_host.c_str();
+    const char* query_service = query_info.m_service.empty() ? 0 : query_info.m_service.c_str();
     struct addrinfo* first = nullptr;
-    int ret = ::getaddrinfo(host, service, &hints, &first);
+    int ret = ::getaddrinfo(query_host, query_service, &hints, &first);
     if (REALM_UNLIKELY(ret != 0)) {
 #ifdef EAI_SYSTEM
         if (ret == EAI_SYSTEM) {
@@ -1325,8 +1325,8 @@ void deadline_timer::cancel() noexcept
         m_wait_oper->cancel();
         if (!m_wait_oper->is_complete()) {
             using wait_oper_base = io_service::wait_oper_base;
-            wait_oper_base* wait_oper = static_cast<wait_oper_base*>(m_wait_oper.get());
-            m_service.m_impl->cancel_incomplete_wait_oper(wait_oper);
+            wait_oper_base* wait_operation = static_cast<wait_oper_base*>(m_wait_oper.get());
+            m_service.m_impl->cancel_incomplete_wait_oper(wait_operation);
         }
     }
 }

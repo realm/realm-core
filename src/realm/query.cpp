@@ -130,8 +130,8 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
     m_groups.reserve(source.m_groups.size());
-    for (const auto& group: source.m_groups) {
-        m_groups.emplace_back(group, patch.m_node_data);
+    for (const auto& cur_group: source.m_groups) {
+        m_groups.emplace_back(cur_group, patch.m_node_data);
     }
 }
 
@@ -150,8 +150,8 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
     m_groups.reserve(source.m_groups.size());
-    for (const auto& group: source.m_groups) {
-        m_groups.emplace_back(group, patch.m_node_data);
+    for (const auto& cur_group: source.m_groups) {
+        m_groups.emplace_back(cur_group, patch.m_node_data);
     }
 }
 
@@ -179,12 +179,12 @@ void Query::set_table(TableRef tr)
 }
 
 
-void Query::apply_patch(HandoverPatch& patch, Group& group)
+void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
 {
     if (m_source_table_view) {
-        m_source_table_view->apply_and_consume_patch(patch.table_view_data, group);
+        m_source_table_view->apply_and_consume_patch(patch.table_view_data, dest_group);
     }
-    m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, group);
+    m_source_link_view = LinkView::create_from_and_consume_patch(patch.link_view_data, dest_group);
     if (m_source_link_view)
         m_view = m_source_link_view.get();
     else if (m_source_table_view)
@@ -194,12 +194,12 @@ void Query::apply_patch(HandoverPatch& patch, Group& group)
     // not going through Table::create_from_and_consume_patch because we need to use
     // set_table() to update all table references
     if (patch.m_table) {
-        set_table(group.get_table(patch.m_table->m_table_num));
+        set_table(dest_group.get_table(patch.m_table->m_table_num));
     }
 
     for (auto it = m_groups.rbegin(); it != m_groups.rend(); ++it) {
-        if (auto& root_node = it->m_root_node)
-            root_node->apply_handover_patch(patch.m_node_data, group);
+        if (auto& cur_root_node = it->m_root_node)
+            cur_root_node->apply_handover_patch(patch.m_node_data, dest_group);
     }
     REALM_ASSERT(patch.m_node_data.empty());
 }
@@ -1026,11 +1026,11 @@ Query& Query::end_group()
         return *this;
     }
 
-    auto root_node = std::move(m_groups.back().m_root_node);
+    auto end_root_node = std::move(m_groups.back().m_root_node);
     m_groups.pop_back();
 
-    if (root_node) {
-        add_node(std::move(root_node));
+    if (end_root_node) {
+        add_node(std::move(end_root_node));
     }
 
     handle_pending_not();

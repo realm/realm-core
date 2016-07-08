@@ -52,10 +52,10 @@ struct RandomPrimeMode: PrimeMode {
     std::mt19937_64 random;
     std::uniform_int_distribution<int> dist;
     int n;
-    RandomPrimeMode(int n, int m, uint_fast64_t seed):
+    RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed):
         random(seed),
         dist(0, m-1),
-        n(n)
+        n(trigger_threshold)
     {
         REALM_ASSERT(n >= 0 && m > 0);
     }

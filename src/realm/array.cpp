@@ -213,22 +213,22 @@ void Array::set_type(Type type)
 
     copy_on_write(); // Throws
 
-    bool is_inner_bptree_node = false, has_refs = false;
+    bool init_is_inner_bptree_node = false, init_has_refs = false;
     switch (type) {
         case type_Normal:
             break;
         case type_InnerBptreeNode:
-            is_inner_bptree_node = true;
-            has_refs = true;
+            init_is_inner_bptree_node = true;
+            init_has_refs = true;
             break;
         case type_HasRefs:
-            has_refs = true;
+            init_has_refs = true;
             break;
     }
-    m_is_inner_bptree_node = is_inner_bptree_node;
-    m_has_refs = has_refs;
-    set_header_is_inner_bptree_node(is_inner_bptree_node);
-    set_header_hasrefs(has_refs);
+    m_is_inner_bptree_node = init_is_inner_bptree_node;
+    m_has_refs = init_has_refs;
+    set_header_is_inner_bptree_node(init_is_inner_bptree_node);
+    set_header_hasrefs(init_has_refs);
 }
 
 
@@ -253,38 +253,38 @@ bool Array::update_from_parent(size_t old_baseline) noexcept
 }
 
 
-MemRef Array::slice(size_t offset, size_t size, Allocator& target_alloc) const
+MemRef Array::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
 
-    Array slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&slice);
+    Array new_slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&new_slice);
     Type type = get_type();
-    slice.create(type, m_context_flag); // Throws
+    new_slice.create(type, m_context_flag); // Throws
     size_t begin = offset;
-    size_t end   = offset + size;
+    size_t end   = offset + slice_size;
     for (size_t i = begin; i != end; ++i) {
         int_fast64_t value = get(i);
-        slice.add(value); // Throws
+        new_slice.add(value); // Throws
     }
     dg.release();
-    return slice.get_mem();
+    return new_slice.get_mem();
 }
 
 
-MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& target_alloc) const
+MemRef Array::slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
     if (!has_refs())
-        return slice(offset, size, target_alloc); // Throws
+        return slice(offset, slice_size, target_alloc); // Throws
 
-    Array slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&slice);
+    Array new_slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&new_slice);
     Type type = get_type();
-    slice.create(type, m_context_flag); // Throws
+    new_slice.create(type, m_context_flag); // Throws
     _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
     size_t begin = offset;
-    size_t end   = offset + size;
+    size_t end   = offset + slice_size;
     for (size_t i = begin; i != end; ++i) {
         int_fast64_t value = get(i);
 
@@ -293,38 +293,38 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
         // are, it means that it should not be interpreted as a ref.
         bool is_subarray = value != 0 && (value & 1) == 0;
         if (!is_subarray) {
-            slice.add(value); // Throws
+            new_slice.add(value); // Throws
             continue;
         }
 
         ref_type ref = to_ref(value);
-        Allocator& alloc = get_alloc();
-        MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
+        Allocator& allocator = get_alloc();
+        MemRef new_mem = clone(MemRef(ref, allocator), allocator, target_alloc); // Throws
         dg_2.reset(new_mem.get_ref());
         value = new_mem.get_ref(); // FIXME: Dangerous cast (unsigned -> signed)
-        slice.add(value); // Throws
+        new_slice.add(value); // Throws
         dg_2.release();
     }
     dg.release();
-    return slice.get_mem();
+    return new_slice.get_mem();
 }
 
 
-// Allocates space for 'size' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
-void Array::preset(size_t width, size_t size)
+// Allocates space for 'num_items' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
+void Array::preset(size_t bitwidth, size_t num_items)
 {
     clear_and_destroy_children();
-    set_width(width);
-    alloc(size, width); // Throws
-    m_size = size;
-    for (size_t i = 0; i != size; ++i)
+    set_width(bitwidth);
+    alloc(num_items, bitwidth); // Throws
+    m_size = num_items;
+    for (size_t i = 0; i != num_items; ++i)
         set(i, 0);
 }
 
-void Array::preset(int64_t min, int64_t max, size_t count)
+void Array::preset(int64_t min, int64_t max, size_t num_items)
 {
     size_t w = std::max(bit_width(max), bit_width(min));
-    preset(w, count);
+    preset(w, num_items);
 }
 
 
@@ -353,9 +353,9 @@ ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
     // Write flat array
     const char* header = get_header_from_data(m_data);
-    size_t size = get_byte_size();
+    size_t byte_size = get_byte_size();
     uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
-    ref_type new_ref = out.write_array(header, size, dummy_checksum); // Throws
+    ref_type new_ref = out.write_array(header, byte_size, dummy_checksum); // Throws
     REALM_ASSERT_3(new_ref % 8, ==, 0); // 8-byte alignment
     return new_ref;
 }
@@ -623,10 +623,10 @@ void Array::insert(size_t ndx, int_fast64_t value)
 }
 
 
-void Array::truncate(size_t size)
+void Array::truncate(size_t new_size)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(size, <=, m_size);
+    REALM_ASSERT_3(new_size, <=, m_size);
 
     // FIXME: BasicArray<> currently does not work if the width is set
     // to zero, so it must override Array::truncate(). In the future
@@ -643,12 +643,12 @@ void Array::truncate(size_t size)
 
     // Update size in accessor and in header. This leaves the capacity
     // unchanged.
-    m_size = size;
-    set_header_size(size);
+    m_size = new_size;
+    set_header_size(new_size);
 
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
-    if (size == 0) {
+    if (new_size == 0) {
         m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
         set_header_width(0);
@@ -656,10 +656,10 @@ void Array::truncate(size_t size)
 }
 
 
-void Array::truncate_and_destroy_children(size_t size)
+void Array::truncate_and_destroy_children(size_t new_size)
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT_3(size, <=, m_size);
+    REALM_ASSERT_3(new_size, <=, m_size);
 
     // FIXME: See FIXME in truncate().
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
@@ -668,18 +668,18 @@ void Array::truncate_and_destroy_children(size_t size)
     copy_on_write(); // Throws
 
     if (m_has_refs) {
-        size_t offset = size;
+        size_t offset = new_size;
         destroy_children(offset);
     }
 
     // Update size in accessor and in header. This leaves the capacity
     // unchanged.
-    m_size = size;
-    set_header_size(size);
+    m_size = new_size;
+    set_header_size(new_size);
 
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
-    if (size == 0) {
+    if (new_size == 0) {
         m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
         set_header_width(0);
@@ -835,21 +835,21 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
         goto exit;
     }
 
-    size_t add;
-    add = 1;
+    size_t test_ndx;
+    test_ndx = 1;
 
-    for (size_t offset = start + add ;; offset = start + add)
+    for (size_t offset = start + test_ndx ;; offset = start + test_ndx)
     {
         if (offset < m_size && get<w>(indirection ? to_size_t(indirection->get(offset)) : offset) < target)
-            start += add;
+            start += test_ndx;
         else
             break;
 
-       add *= 2;
+       test_ndx *= 2;
     }
 
     size_t high;
-    high = start + add + 1;
+    high = start + test_ndx + 1;
 
     if (high > m_size)
         high = m_size;
@@ -1188,7 +1188,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
         if ((w == 8 || w == 16 || w == 32) && end - start > sizeof (__m128i) * 8 / no0(w)) {
             __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
-            __m128i sum = {0};
+            __m128i sum_result = {0};
             __m128i sum2;
 
             size_t chunks = (end - start) * w / 8 / sizeof (__m128i);
@@ -1201,16 +1201,16 @@ int64_t Array::sum(size_t start, size_t end) const
                     __m128i vh = data[t];
                     vh.m128i_i64[0] = vh.m128i_i64[1];
                     vh = _mm_cvtepi8_epi16(vh);
-                    sum = _mm_add_epi16(sum, vl);
-                    sum = _mm_add_epi16(sum, vh);
+                    sum_result = _mm_add_epi16(sum_result, vl);
+                    sum_result = _mm_add_epi16(sum_result, vh);
                     */
 
                     /*
                     // 424 ms
                     __m128i vl = _mm_unpacklo_epi8(data[t], _mm_set1_epi8(0));
                     __m128i vh = _mm_unpackhi_epi8(data[t], _mm_set1_epi8(0));
-                    sum = _mm_add_epi32(sum, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
-                    sum = _mm_add_epi32(sum, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
+                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vl, _mm_set1_epi16(1)));
+                    sum_result = _mm_add_epi32(sum_result, _mm_madd_epi16(vh, _mm_set1_epi16(1)));
                     */
 
                     __m128i vl = _mm_cvtepi8_epi16(data[t]);        // sign extend lower words 8->16
@@ -1221,8 +1221,8 @@ int64_t Array::sum(size_t start, size_t end) const
                     __m128i sumH = _mm_cvtepi16_epi32(sum1);
                     __m128i sumL = _mm_srli_si128(sum1, 8);         // v >>= 64
                     sumL = _mm_cvtepi16_epi32(sumL);
-                    sum = _mm_add_epi32(sum, sumL);
-                    sum = _mm_add_epi32(sum, sumH);
+                    sum_result = _mm_add_epi32(sum_result, sumL);
+                    sum_result = _mm_add_epi32(sum_result, sumH);
                 }
                 else if (w == 16) {
                     // todo, can overflow for array size > 2^32
@@ -1230,29 +1230,29 @@ int64_t Array::sum(size_t start, size_t end) const
                     __m128i vh = data[t];
                     vh = _mm_srli_si128(vh, 8);                     // v >>= 64
                     vh = _mm_cvtepi16_epi32(vh);                    // sign extend lower words 16->32
-                    sum = _mm_add_epi32(sum, vl);
-                    sum = _mm_add_epi32(sum, vh);
+                    sum_result = _mm_add_epi32(sum_result, vl);
+                    sum_result = _mm_add_epi32(sum_result, vh);
                 }
                 else if (w == 32) {
                     __m128i v = data[t];
                     __m128i v0 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
                     v = _mm_srli_si128(v, 8);                       // v >>= 64
                     __m128i v1 = _mm_cvtepi32_epi64(v);             // sign extend lower dwords 32->64
-                    sum = _mm_add_epi64(sum, v0);
-                    sum = _mm_add_epi64(sum, v1);
+                    sum_result = _mm_add_epi64(sum_result, v0);
+                    sum_result = _mm_add_epi64(sum_result, v1);
 
                     /*
                     __m128i m = _mm_set1_epi32(0xc000);             // test if overflow could happen (still need underflow test).
                     __m128i mm = _mm_and_si128(data[t], m);
                     zz = _mm_or_si128(mm, zz);
-                    sum = _mm_add_epi32(sum, data[t]);
+                    sum_result = _mm_add_epi32(sum_result, data[t]);
                     */
                 }
             }
             start += sizeof (__m128i) * 8 / no0(w) * chunks;
 
             // prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-            sum2 = sum;
+            sum2 = sum_result;
 
             // Avoid aliasing bug where sum2 might not yet be initialized when accessed by get_universal
             char sum3[sizeof sum2];
@@ -1277,7 +1277,7 @@ int64_t Array::sum(size_t start, size_t end) const
 size_t Array::count(int64_t value) const noexcept
 {
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
-    size_t count = 0;
+    size_t value_count = 0;
     const size_t end = m_size;
     size_t i = 0;
 
@@ -1310,7 +1310,7 @@ size_t Array::count(int64_t value) const noexcept
             // Could use intrinsic instead:
             // a = __builtin_popcountll(a); // gcc intrinsic
 
-            count += to_size_t(a);
+            value_count += to_size_t(a);
         }
     }
     else if (m_width == 2) {
@@ -1336,7 +1336,7 @@ size_t Array::count(int64_t value) const noexcept
             a = (a + (a >> 4)) & m4;
             a = (a * h01) >> 56;
 
-            count += to_size_t(a);
+            value_count += to_size_t(a);
         }
     }
     else if (m_width == 4) {
@@ -1363,7 +1363,7 @@ size_t Array::count(int64_t value) const noexcept
             a = (a + (a >> 4)) & m4;
             a = (a * h01) >> 56;
 
-            count += to_size_t(a);
+            value_count += to_size_t(a);
         }
     }
     else if (m_width == 8) {
@@ -1391,7 +1391,7 @@ size_t Array::count(int64_t value) const noexcept
             // Population count
             a = (a * h01) >> 56;
 
-            count += to_size_t(a);
+            value_count += to_size_t(a);
         }
     }
     else if (m_width == 16) {
@@ -1421,7 +1421,7 @@ size_t Array::count(int64_t value) const noexcept
             // Population count
             a = (a * h01) >> 56;
 
-            count += to_size_t(a);
+            value_count += to_size_t(a);
         }
     }
     else if (m_width == 32) {
@@ -1429,25 +1429,25 @@ size_t Array::count(int64_t value) const noexcept
         const int32_t* d = reinterpret_cast<int32_t*>(m_data);
         for (; i < end; ++i) {
             if (d[i] == v)
-                ++count;
+                ++value_count;
         }
-        return count;
+        return value_count;
     }
     else if (m_width == 64) {
         const int64_t* d = reinterpret_cast<int64_t*>(m_data);
         for (; i < end; ++i) {
             if (d[i] == value)
-                ++count;
+                ++value_count;
         }
-        return count;
+        return value_count;
     }
 
     // Check remaining elements
     for (; i < end; ++i)
         if (value == get(i))
-            ++count;
+            ++value_count;
 
-    return count;
+    return value_count;
 }
 
 size_t Array::calc_aligned_byte_size(size_t size, int width)
@@ -1477,7 +1477,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
     return aligned_byte_size;
 }
 
-size_t Array::calc_byte_len(size_t count, size_t width) const
+size_t Array::calc_byte_len(size_t num_items, size_t width) const
 {
     REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
 
@@ -1489,7 +1489,7 @@ size_t Array::calc_byte_len(size_t count, size_t width) const
     // changed to always return the aligned byte size.
 
     // FIXME: This arithemtic could overflow. Consider using <realm/util/safe_int_ops.hpp>
-    size_t bits = count * width;
+    size_t bits = num_items * width;
     size_t bytes = (bits+7) / 8; // round up
     return bytes + header_size; // add room for 8 byte header
 }
@@ -1580,16 +1580,16 @@ void Array::copy_on_write()
     if (m_alloc.is_read_only(m_ref)) {
 #endif
         // Calculate size in bytes (plus a bit of matchcount room for expansion)
-        size_t size = calc_byte_len(m_size, m_width);
-        size_t rest = (~size & 0x7) + 1;
+        size_t array_size = calc_byte_len(m_size, m_width);
+        size_t rest = (~array_size & 0x7) + 1;
         if (rest < 8)
-            size += rest; // 64bit blocks
-        size_t new_size = size + 64;
+            array_size += rest; // 64bit blocks
+        size_t new_size = array_size + 64;
 
         // Create new copy of array
         MemRef mref = m_alloc.alloc(new_size); // Throws
         const char* old_begin = get_header_from_data(m_data);
-        const char* old_end = get_header_from_data(m_data) + size;
+        const char* old_end = get_header_from_data(m_data) + array_size;
         char* new_begin = mref.get_addr();
         std::copy(old_begin, old_end, new_begin);
 
@@ -1743,13 +1743,13 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 
 // FIXME: It may be worth trying to combine this with copy_on_write()
 // to avoid two copies.
-void Array::alloc(size_t size, size_t width)
+void Array::alloc(size_t init_size, size_t width)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
     REALM_ASSERT_3(m_capacity, >, 0);
-    if (m_capacity < size || width != m_width) {
-        size_t needed_bytes   = calc_byte_len(size, width);
+    if (m_capacity < init_size || width != m_width) {
+        size_t needed_bytes   = calc_byte_len(init_size, width);
 
         // this method is not public and callers must (and currently do) ensure that
         // needed_bytes are never larger than max_array_payload.
@@ -1784,7 +1784,7 @@ void Array::alloc(size_t size, size_t width)
             
             header = mem_ref.get_addr();
             set_header_width(int(width), header);
-            set_header_size(size, header);
+            set_header_size(init_size, header);
             set_header_capacity(capacity_bytes, header);
 
             // Update this accessor and its ancestors
@@ -1802,7 +1802,7 @@ void Array::alloc(size_t size, size_t width)
     }
 
     // Update header
-    set_header_size(size);
+    set_header_size(init_size);
 }
 
 int_fast64_t Array::lbound_for_width(size_t width) noexcept
@@ -2023,8 +2023,8 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         }
     }
 
-    Allocator& alloc = get_alloc();
-    Array new_sibling(alloc), new_offsets(alloc);
+    Allocator& allocator = get_alloc();
+    Array new_sibling(allocator), new_offsets(allocator);
     new_sibling.create(type_InnerBptreeNode); // Throws
     if (offsets.is_attached()) {
         new_offsets.set_parent(&new_sibling, 0);
@@ -2431,9 +2431,9 @@ private:
 } // anonymous namespace
 
 
-void Array::stats(MemStats& stats) const
+void Array::stats(MemStats& stats_dest) const
 {
-    MemStatsHandler handler(stats);
+    MemStatsHandler handler(stats_dest);
     report_memory_usage(handler);
 }
 
@@ -2469,8 +2469,8 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
         size_t used;
         ref_type ref = to_ref(value);
         char* header = m_alloc.translate(ref);
-        bool has_refs = get_hasrefs_from_header(header);
-        if (has_refs) {
+        bool array_has_refs = get_hasrefs_from_header(header);
+        if (array_has_refs) {
             MemRef mem(header, ref, m_alloc);
             subarray.init_from_mem(mem);
             subarray.report_memory_usage_2(handler);
@@ -2788,7 +2788,7 @@ template<IndexMethod method, class T>
 size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
 {
     bool first(method == index_FindFirst);
-    bool count(method == index_Count);
+    bool get_count(method == index_Count);
     bool all(method == index_FindAll);
     bool allnocopy(method == index_FindAll_nocopy);
 
@@ -2848,7 +2848,7 @@ top:
                 if (all)
                     result.add(row_ref);
 
-                return first ? row_ref : count ? 1 : FindRes_single;
+                return first ? row_ref : get_count ? 1 : FindRes_single;
             }
             return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
         }
@@ -2864,7 +2864,7 @@ top:
             // In most cases the row list will just be an array but there
             // might be so many matches that it has branched into a column
             if (sub_isleaf) {
-                if (count)
+                if (get_count)
                     sub_count = get_size_from_header(sub_header);
                 const uint_least8_t sub_width = get_width_from_header(sub_header);
                 const char* sub_data = get_data_from_header(sub_header);
@@ -2874,7 +2874,7 @@ top:
                 StringIndex::StringConversionBuffer buffer;
                 StringData str = column->get_index_data(first_row_ref, buffer);
                 if (str.is_null() != value.is_null() || str != value) {
-                    if (count)
+                    if (get_count)
                         return 0;
                     return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
                 }
@@ -2899,7 +2899,7 @@ top:
                 const IntegerColumn sub(m_alloc, to_ref(ref));
                 const size_t first_row_ref = to_size_t(sub.get(0));
 
-                if (count)
+                if (get_count)
                     sub_count = sub.size();
 
                 // for integer index, get_index_data fills out 'buffer' and makes str point at it

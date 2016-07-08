@@ -182,11 +182,11 @@ void ArrayString::erase(size_t ndx)
     set_header_size(m_size);
 }
 
-size_t ArrayString::calc_byte_len(size_t count, size_t width) const
+size_t ArrayString::calc_byte_len(size_t num_items, size_t width) const
 {
     // FIXME: This arithemtic could overflow. Consider using one of
     // the functions in <realm/util/safe_int_ops.hpp>
-    return header_size + (count * width);
+    return header_size + (num_items * width);
 }
 
 size_t ArrayString::calc_item_count(size_t bytes, size_t width) const noexcept
@@ -240,9 +240,9 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     else if (value.size() == 0) {
         const char* data = m_data + (m_width - 1);
         for (size_t i = begin; i != end; ++i) {
-            size_t size = (m_width - 1) - data[i * m_width];
+            size_t data_i_size = (m_width - 1) - data[i * m_width];
             // left-hand-side tests if array element is NULL
-            if (REALM_UNLIKELY(size == 0))
+            if (REALM_UNLIKELY(data_i_size == 0))
                 return i;
         }
     }
@@ -255,8 +255,8 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
                     break;
                 ++j;
                 if (REALM_UNLIKELY(j == value.size())) {
-                    size_t size = (m_width - 1) - data[m_width - 1];
-                    if (REALM_LIKELY(size == value.size()))
+                    size_t data_size = (m_width - 1) - data[m_width - 1];
+                    if (REALM_LIKELY(data_size == value.size()))
                         return i;
                     break;
                 }
@@ -322,23 +322,23 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
 }
 
 
-MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) const
+MemRef ArrayString::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
 
     // FIXME: This can be optimized as a single contiguous copy
     // operation.
-    ArrayString slice(target_alloc, m_nullable);
-    _impl::ShallowArrayDestroyGuard dg(&slice);
-    slice.create(); // Throws
+    ArrayString array_slice(target_alloc, m_nullable);
+    _impl::ShallowArrayDestroyGuard dg(&array_slice);
+    array_slice.create(); // Throws
     size_t begin = offset;
-    size_t end = offset + size;
+    size_t end = offset + slice_size;
     for (size_t i = begin; i != end; ++i) {
         StringData value = get(i);
-        slice.add(value); // Throws
+        array_slice.add(value); // Throws
     }
     dg.release();
-    return slice.get_mem();
+    return array_slice.get_mem();
 }
 
 
@@ -351,18 +351,18 @@ void ArrayString::string_stats() const
 
     for (size_t i = 0; i < m_size; ++i) {
         StringData str = get(i);
-        size_t size = str.size() + 1;
-        total += size;
-        if (size > longest) longest = size;
+        size_t str_size = str.size() + 1;
+        total += str_size;
+        if (str_size > longest) longest = str_size;
     }
 
-    size_t size = m_size * m_width;
-    size_t zeroes = size - total;
+    size_t array_size = m_size * m_width;
+    size_t zeroes = array_size - total;
     size_t zavg = zeroes / (m_size ? m_size : 1); // avoid possible div by zero
 
     std::cout << "Size: " << m_size << "\n";
     std::cout << "Width: " << m_width << "\n";
-    std::cout << "Total: " << size << "\n";
+    std::cout << "Total: " << array_size << "\n";
     std::cout << "Capacity: " << m_capacity << "\n\n";
     std::cout << "Bytes string: " << total << "\n";
     std::cout << "     longest: " << longest << "\n";

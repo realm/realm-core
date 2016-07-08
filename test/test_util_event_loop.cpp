@@ -1162,8 +1162,8 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code ec, size_t n) {
-            handle_read_header(ec, n);
+        auto handler = [=](std::error_code handler_ec, size_t n) {
+            handle_read_header(handler_ec, n);
         };
         m_input_stream.async_read_until(m_header_buffer, s_max_header_size, '\n', handler);
     }
@@ -1190,8 +1190,8 @@ private:
         in >> sp >> m_body_size;
         if (!CHECK(in) || !CHECK(in.eof()) || !CHECK_EQUAL(sp, ' '))
             return;
-        auto handler = [=](std::error_code ec, size_t n) {
-            handle_read_body(ec, n);
+        auto handler = [=](std::error_code handler_ec, size_t handler_n) {
+            handle_read_body(handler_ec, handler_n);
         };
         m_body_buffer.reset(new char[m_body_size]);
         m_input_stream.async_read(m_body_buffer.get(), m_body_size, handler);
@@ -1207,8 +1207,8 @@ private:
         MemoryOutputStream out;
         out.set_buffer(m_header_buffer, m_header_buffer+s_max_header_size);
         out << "was " << m_body_size << '\n';
-        auto handler = [=](std::error_code ec, size_t) {
-            handle_write_header(ec);
+        auto handler = [=](std::error_code handler_ec, size_t) {
+            handle_write_header(handler_ec);
         };
         m_socket.async_write(m_header_buffer, out.size(), handler);
     }
@@ -1217,8 +1217,8 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code ec, size_t) {
-            handle_write_body(ec);
+        auto handler = [=](std::error_code handler_ec, size_t) {
+            handle_write_body(handler_ec);
         };
         m_socket.async_write(m_body_buffer.get(), m_body_size, handler);
     }
@@ -1227,8 +1227,8 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code ec, size_t) {
-            handle_read_header_2(ec);
+        auto handler = [=](std::error_code handler_ec, size_t) {
+            handle_read_header_2(handler_ec);
         };
         m_input_stream.async_read_until(m_header_buffer, s_max_header_size, '\n', handler);
     }
@@ -1283,8 +1283,8 @@ private:
         MemoryOutputStream out;
         out.set_buffer(m_header_buffer, m_header_buffer+s_max_header_size);
         out << "echo " << sizeof echo_body << '\n';
-        auto handler = [=](std::error_code ec, size_t) {
-            handle_write_header(ec);
+        auto handler = [=](std::error_code handler_ec, size_t) {
+            handle_write_header(handler_ec);
         };
         m_socket->async_write(m_header_buffer, out.size(), handler);
     }
@@ -1293,8 +1293,8 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code ec, size_t) {
-            handle_write_body(ec);
+        auto handler = [=](std::error_code handler_ec, size_t) {
+            handle_write_body(handler_ec);
         };
         m_socket->async_write(echo_body, sizeof echo_body, handler);
     }
@@ -1303,8 +1303,8 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code ec, size_t n) {
-            handle_read_header(ec, n);
+        auto handler = [=](std::error_code handler_ec, size_t n) {
+            handle_read_header(handler_ec, n);
         };
         m_socket->async_read_until(m_header_buffer, s_max_header_size, '\n', handler);
     }
@@ -1331,8 +1331,8 @@ private:
         in >> sp >> m_body_size;
         if (!CHECK(in) || !CHECK(in.eof()) || !CHECK_EQUAL(sp, ' '))
             return;
-        auto handler = [=](std::error_code ec, size_t n) {
-            handle_read_body(ec, n);
+        auto handler = [=](std::error_code handler_ec, size_t handler_n) {
+            handle_read_body(handler_ec, handler_n);
         };
         m_body_buffer.reset(new char[m_body_size]);
         m_socket->async_read(m_body_buffer.get(), m_body_size, handler);

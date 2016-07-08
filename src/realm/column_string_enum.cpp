@@ -272,9 +272,9 @@ StringIndex* StringEnumColumn::create_search_index()
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         StringData value = get(row_ndx);
-        size_t num_rows = 1;
+        size_t num_rows_to_insert = 1;
         bool is_append = true;
-        index->insert(row_ndx, value, num_rows, is_append); // Throws
+        index->insert(row_ndx, value, num_rows_to_insert, is_append); // Throws
     }
 
     m_search_index = std::move(index);
@@ -348,9 +348,9 @@ void StringEnumColumn::verify(const Table& table, size_t col_ndx) const
     IntegerColumn::verify(table, col_ndx);
 
     ColumnAttr attr = spec.get_column_attr(col_ndx);
-    bool has_search_index = (attr & col_attr_Indexed) != 0;
-    REALM_ASSERT_3(has_search_index, ==, bool(m_search_index));
-    if (has_search_index) {
+    bool column_has_search_index = (attr & col_attr_Indexed) != 0;
+    REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
+    if (column_has_search_index) {
         REALM_ASSERT_3(m_search_index->get_ndx_in_parent(), ==,
                        get_root_array()->get_ndx_in_parent() + 1);
     }

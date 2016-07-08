@@ -361,8 +361,8 @@ public:
             const ReadCount& r = get(old_pos.load(std::memory_order_relaxed));
             if (! atomic_one_if_zero( r.count ))
                 break;
-            auto next = get(old_pos.load(std::memory_order_relaxed)).next;
-            old_pos.store(next, std::memory_order_relaxed);
+            auto next_ndx = get(old_pos.load(std::memory_order_relaxed)).next;
+            old_pos.store(next_ndx, std::memory_order_relaxed);
         }
     }
 
@@ -1246,7 +1246,6 @@ void SharedGroup::close() noexcept
                 }
                 catch(...) {} // ignored on purpose.
             }
-            using gf = _impl::GroupFriend;
             if (Replication* repl = gf::get_replication(m_group))
                 repl->terminate_session();
         }
@@ -1646,10 +1645,8 @@ SharedGroup::VersionID SharedGroup::pin_version()
     REALM_ASSERT(m_transact_stage == transact_Reading);
 
     // Get current version
-    VersionID version_id = VersionID();
-    version_id.version = m_read_lock.m_version;
-    version_id.index   = m_read_lock.m_reader_idx;
-    
+    VersionID version_id(m_read_lock.m_version, m_read_lock.m_reader_idx);
+
     ReadLockInfo read_lock;
     grab_read_lock(read_lock, version_id); // Throws
 

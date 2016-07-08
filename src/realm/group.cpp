@@ -798,8 +798,8 @@ BinaryData Group::write_to_mem() const
         MemoryOutputStream out; // Throws
         out.set_buffer(buffer, buffer + max_size);
         write(out); // Throws
-        size_t size = out.size();
-        return BinaryData(buffer, size);
+        size_t buffer_size = out.size();
+        return BinaryData(buffer, buffer_size);
     }
     catch (...) {
         free(buffer);
@@ -2040,8 +2040,8 @@ void Group::verify() const
                 REALM_ASSERT_3(n, ==, ver.size());
             for (size_t i = 0; i != n; ++i) {
                 ref_type ref  = to_ref(pos.get(i));
-                size_t size = to_size_t(len.get(i));
-                mem_usage_2.add_immutable(ref, size);
+                size_t size_of_i = to_size_t(len.get(i));
+                mem_usage_2.add_immutable(ref, size_of_i);
             }
             mem_usage_2.canonicalize();
             mem_usage_1.add(mem_usage_2);
@@ -2077,8 +2077,8 @@ void Group::verify() const
     REALM_ASSERT_3(immutable_ref_end, <=, baseline);
     if (immutable_ref_end < baseline) {
         ref_type ref = immutable_ref_end;
-        size_t size = baseline - immutable_ref_end;
-        mem_usage_1.add_mutable(ref, size);
+        size_t corrected_size = baseline - immutable_ref_end;
+        mem_usage_1.add_mutable(ref, corrected_size);
         mem_usage_1.canonicalize();
     }
 
@@ -2090,10 +2090,10 @@ void Group::verify() const
 
 MemStats Group::stats()
 {
-    MemStats stats;
-    m_top.stats(stats);
+    MemStats mem_stats;
+    m_top.stats(mem_stats);
 
-    return stats;
+    return mem_stats;
 }
 
 
@@ -2133,8 +2133,8 @@ void Group::print_free() const
     size_t n = pos.size();
     for (size_t i = 0; i != n; ++i) {
         size_t offset = to_size_t(pos[i]);
-        size_t size   = to_size_t(len[i]);
-        std::cout << i << ": " << offset << " " << size;
+        size_t size_of_i   = to_size_t(len[i]);
+        std::cout << i << ": " << offset << " " << size_of_i;
 
         if (has_versions) {
             size_t version = to_size_t(ver[i]);

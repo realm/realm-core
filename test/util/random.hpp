@@ -71,7 +71,7 @@ class Random {
 public:
     Random() noexcept;
 
-    Random(unsigned long seed) noexcept;
+    Random(unsigned long) noexcept;
 
     /// Reseed this pseudorandom number generator.
     void seed(unsigned long) noexcept;
@@ -140,14 +140,14 @@ inline Random::Random() noexcept:
 {
 }
 
-inline Random::Random(unsigned long seed) noexcept:
-    m_engine(std::mt19937::result_type(seed))
+inline Random::Random(unsigned long initial_seed) noexcept:
+    m_engine(std::mt19937::result_type(initial_seed))
 {
 }
 
-inline void Random::seed(unsigned long seed) noexcept
+inline void Random::seed(unsigned long new_seed) noexcept
 {
-    m_engine.seed(std::mt19937::result_type(seed));
+    m_engine.seed(std::mt19937::result_type(new_seed));
 }
 
 template<class T>
@@ -254,11 +254,11 @@ inline T random_int() noexcept
     return random_int(lim::min(), lim::max());
 }
 
-inline void random_seed(unsigned long seed) noexcept
+inline void random_seed(unsigned long initial_seed) noexcept
 {
     _impl::GlobalRandom& r = _impl::GlobalRandom::get();
     util::LockGuard lock(r.m_mutex);
-    return r.m_random.seed(seed);
+    return r.m_random.seed(initial_seed);
 }
 
 

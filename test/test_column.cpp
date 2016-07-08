@@ -1120,12 +1120,12 @@ TEST(ColumnIntNull_Null)
                 }
 
                 CHECK_EQUAL(a.size(), v.size());
-                for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == int64_t(INT_MAX) + 1) {
-                        CHECK(a.is_null(i));
+                for (size_t j = 0; j < a.size(); j++) {
+                    if (v[j] == int64_t(INT_MAX) + 1) {
+                        CHECK(a.is_null(j));
                     }
                     else {
-                        CHECK(a.get(i) == v[i]);
+                        CHECK(a.get(j) == v[j]);
                     }
                 }
             }

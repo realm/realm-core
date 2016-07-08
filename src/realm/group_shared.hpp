@@ -286,10 +286,10 @@ public:
         uint_fast32_t index   = 0;
 
         VersionID() {}
-        VersionID(version_type version, uint_fast32_t index)
+        VersionID(version_type initial_version, uint_fast32_t initial_index)
         {
-            this->version = version;
-            this->index = index;
+            version = initial_version;
+            index = initial_index;
         }
 
         bool operator==(const VersionID& other) { return version == other.version; }
