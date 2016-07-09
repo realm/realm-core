@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Add missing locks when access Table::m_views which may lead to some java
+  crashes since java will not guarantee destruction and construction always
+  happen in the same thread.
 
 ### Breaking changes
 

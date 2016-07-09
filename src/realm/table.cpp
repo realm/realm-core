@@ -2395,6 +2395,8 @@ void Table::clear()
 // directly with broken_reciprocal_backlinks=false.
 void Table::do_clear(bool broken_reciprocal_backlinks)
 {
+    LockGuard lock(m_accessor_mutex);
+
     size_t num_cols = m_spec.get_column_count();
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         ColumnBase& col = get_column_base(col_ndx);
@@ -5327,6 +5329,7 @@ void Table::adj_acc_clear_root_table() noexcept
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConcistencyLevels.
 
+    LockGuard lock(m_accessor_mutex);
     discard_row_accessors();
 
     for (auto& col : m_cols) {
