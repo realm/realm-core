@@ -1641,6 +1641,8 @@ TEST(LinkList_QueryDateTime)
     CHECK_EQUAL(1, tv.size());
 }
 
+// Check that table views created through backlinks are updated correctly
+// (marked as out of sync) when the source table is modified.
 TEST(BackLink_Query_TableViewSyncsWhenNeeded)
 {
     Group group;

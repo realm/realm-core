@@ -193,6 +193,8 @@ inline void LinkColumnBase::mark(int type) noexcept
 
 inline void LinkColumnBase::bump_link_origin_table_version() noexcept
 {
+    // It is important to mark connected tables as modified.
+    // Also see BacklinkColumn::bump_link_origin_table_version().
     typedef _impl::TableFriend tf;
     if (m_target_table) {
         bool bump_global = false;
