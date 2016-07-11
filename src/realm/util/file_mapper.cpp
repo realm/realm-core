@@ -218,7 +218,9 @@ void* mmap_anon(size_t size)
             throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
                 + " size: " + util::to_string(size));
         }
-        throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", err)
+                                 + "size: " + util::to_string(size)
+                                 + "offset is 0");
     }
     return addr;
 }
@@ -278,7 +280,9 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
             + " size: " + util::to_string(size)
             + " offset: " + util::to_string(offset));
     }
-    throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+    throw std::runtime_error(get_errno_msg("mmap() failed: ", err)
+                             + "size: " + util::to_string(size)
+                             + "offset: " + util::to_string(offset));
 }
 
 void munmap(void* addr, size_t size) noexcept
@@ -333,7 +337,9 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
                     + " old size: " + util::to_string(old_size)
                     + " new size: " + util::to_string(new_size));
             }
-            throw std::runtime_error(get_errno_msg("mmap() failed: ", err));
+            throw std::runtime_error(get_errno_msg("_gnu_src mmap() failed: ", err)
+                                     + " old size: " + util::to_string(old_size)
+                                     + " new_size: " + util::to_string(new_size));
         }
     }
 #endif
