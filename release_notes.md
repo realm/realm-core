@@ -5,6 +5,8 @@
 * Add missing locks when access Table::m_views which may lead to some java
   crashes since java will not guarantee destruction and construction always
   happen in the same thread.
+* Fixed a bug where tableviews created via backlinks were not automatically
+  updated when the source table changed. (#1950)
 
 ### Breaking changes
 
