@@ -879,6 +879,7 @@ private:
     mutable Descriptor* m_descriptor;
 
     // Table view instances
+    // Access needs to be protected by m_accessor_mutex
     typedef std::vector<TableViewBase*> views;
     mutable views m_views;
 
@@ -1502,6 +1503,7 @@ inline void Table::unbind_ptr() const noexcept
 
 inline void Table::register_view(const TableViewBase* view)
 {
+    util::LockGuard lock(m_accessor_mutex);
     // Casting away constness here - operations done on tableviews
     // through m_views are all internal and preserving "some" kind
     // of logical constness.

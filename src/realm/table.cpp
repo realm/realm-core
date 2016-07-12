@@ -2404,8 +2404,12 @@ void Table::do_clear(bool broken_reciprocal_backlinks)
 
     discard_row_accessors();
 
-    for (auto& view : m_views) {
-        view->adj_row_acc_clear();
+    {
+        LockGuard lock(m_accessor_mutex);
+
+        for (auto& view : m_views) {
+            view->adj_row_acc_clear();
+        }
     }
 
     bump_version();
@@ -5335,9 +5339,12 @@ void Table::adj_acc_clear_root_table() noexcept
         }
     }
 
-    // Adjust rows in tableviews after removal of all rows
-    for (auto& view : m_views) {
-        view->adj_row_acc_clear();
+    {
+        LockGuard lock(m_accessor_mutex);
+        // Adjust rows in tableviews after removal of all rows
+        for (auto& view : m_views) {
+            view->adj_row_acc_clear();
+        }
     }
 }
 
