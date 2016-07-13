@@ -1,26 +1,16 @@
-# NEXT RELEASE
+# 1.3.1 Release notes
 
 ### Bugfixes
 
-* Add missing locks when access Table::m_views which may lead to some java
+* Add missing locks when access `Table::m_views` which may lead to some java
   crashes since java will not guarantee destruction and construction always
-  happen in the same thread.
+  happen in the same thread. (#1958)
 * Fixed a bug where tableviews created via backlinks were not automatically
   updated when the source table changed. (#1950)
-
-### Breaking changes
-
-* Lorem ipsum.
 
 ### Enhancements
 
 * Increased the verbosity of some exception error messages to help debugging.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 

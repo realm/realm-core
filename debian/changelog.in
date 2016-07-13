@@ -1,3 +1,10 @@
+librealm (1.3.1~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- James Stone <js@realm.io>  Wed, 13 Jul 2016 11:08:46 +0200
+
+
 librealm (1.3.0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.
