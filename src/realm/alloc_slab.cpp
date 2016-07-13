@@ -1,9 +1,22 @@
+#ifdef _WIN32
+#define NOMINMAX
+#  include "windows.h"
+#  include "psapi.h"
+#else 
+#include <unistd.h>
+#endif
+
+
 #include <type_traits>
 #include <exception>
 #include <algorithm>
 #include <memory>
 #include <mutex>
 #include <map>
+#include <iostream>
+#include <fstream>
+
+
 
 #ifdef REALM_DEBUG
 #  include <iostream>
@@ -151,6 +164,12 @@ private:
 
 void SlabAlloc::detach() noexcept
 {
+
+    if (!m_slabs.empty()) {
+     //   std::cerr << m_slabs.back().ref_end << "\n";
+    }
+
+
     switch (m_attach_mode) {
         case attach_None:
         case attach_UsersBuffer:
@@ -204,13 +223,77 @@ SlabAlloc::~SlabAlloc() noexcept
     }
 #endif
 
-    if (is_attached())
+    if (is_attached()) {
+
+
+
         detach();
+
+
+    }
 }
 
 
-MemRef SlabAlloc::do_alloc(size_t size)
+void process_mem_usage(double& vm_usage, double& resident_set)
 {
+    vm_usage = 0.0;
+    resident_set = 0.0;
+
+
+#ifdef _WIN32
+
+    HANDLE hProc = GetCurrentProcess();
+    PROCESS_MEMORY_COUNTERS_EX info;
+    info.cb = sizeof(info);
+    BOOL okay = GetProcessMemoryInfo(hProc, (PROCESS_MEMORY_COUNTERS*)&info, info.cb);
+
+    SIZE_T virtualMemUsedByMe = info.PrivateUsage;
+    resident_set = virtualMemUsedByMe;
+#else
+
+    // the two fields we want
+    unsigned long vsize;
+    long rss;
+    {
+        std::string ignore;
+        std::ifstream ifs("/proc/self/stat", std::ios_base::in);
+        ifs >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
+            >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
+            >> ignore >> ignore >> vsize >> rss;
+    }
+
+    long page_size_kb = sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages
+    vm_usage = vsize / 1024.0;
+    resident_set = rss * page_size_kb;
+
+#endif
+}
+
+MemRef SlabAlloc::do_alloc(const size_t size)
+{
+
+    static int64_t total_user_req = 0;
+    static int64_t total = 0;
+    static int64_t slabs = 0;
+
+    static double resmem = 0;
+    static int64_t resmem_ctr = 0;
+
+    total_user_req += size; 
+
+
+
+    //std::cerr << size << " | ";
+
+
+
+
+    double vm;
+    double res;
+    process_mem_usage(vm, res);
+    resmem += res;
+    resmem_ctr += 1;
+
     REALM_ASSERT_DEBUG(0 < size);
     REALM_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
     REALM_ASSERT_DEBUG(is_attached());
@@ -262,7 +345,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
                 char* addr = translate(ref);
 #if REALM_ENABLE_ALLOC_SET_ZERO
-                std::fill(addr, addr+size, 0);
+                std::fill(addr, addr + size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
@@ -272,8 +355,41 @@ MemRef SlabAlloc::do_alloc(size_t size)
         }
     }
 
+
+#if 1
+
+    // Else, allocate new slab. Smallest Realm file size is around 280 bytes.
+    size_t new_size = size > 512 ? size : 512;
+    ref_type ref;
+    if (m_slabs.empty()) {
+        ref = m_baseline;
+    }
+    else {
+        ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
+        size_t extended = curr_ref_end - m_baseline;
+        size_t min_size;
+        if (extended < 8 * 1024) {
+            min_size = extended;
+        }
+        else {
+            min_size = 0.2 * extended;
+        }
+
+        if (new_size < min_size)
+            new_size = min_size;
+
+        ref = curr_ref_end;
+    }
+
+    // Round up to nearest 256
+    new_size = ((new_size - 1) | (256 - 1)) + 1;
+
+#else
+
+
+#if 0
     // Else, allocate new slab
-    size_t new_size = ((size-1) | 255) + 1; // Round up to nearest multiple of 256
+    size_t new_size = ((size - 1) | 511) + 1; // Round up to nearest multiple of 256
     ref_type ref;
     if (m_slabs.empty()) {
         ref = m_baseline;
@@ -282,15 +398,59 @@ MemRef SlabAlloc::do_alloc(size_t size)
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
         // Make it at least as big as twice the previous slab
         ref_type prev_ref_end = m_slabs.size() == 1 ? m_baseline :
-            to_size_t(m_slabs[m_slabs.size()-2].ref_end);
+            to_size_t(m_slabs[m_slabs.size() - 2].ref_end);
+
+        size_t min_size = 0.5 * curr_ref_end; // (curr_ref_end - prev_ref_end);
+        min_size = ((min_size - 1) | 255) + 1;
+
+        if (new_size < min_size)
+            new_size = min_size;
+
+        ref = curr_ref_end;
+    }
+#else
+    // Else, allocate new slab
+    size_t new_size = ((size - 1) | 255) + 1; // Round up to nearest multiple of 256
+    ref_type ref;
+    if (m_slabs.empty()) {
+        ref = m_baseline;
+    }
+    else {
+        ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
+        // Make it at least as big as twice the previous slab
+        ref_type prev_ref_end = m_slabs.size() == 1 ? m_baseline :
+            to_size_t(m_slabs[m_slabs.size() - 2].ref_end);
         size_t min_size = 2 * (curr_ref_end - prev_ref_end);
         if (new_size < min_size)
             new_size = min_size;
         ref = curr_ref_end;
     }
+#endif
+
+
+
+
+
+
+#endif
+
+
+  //  std::cerr << new_size << "\n";
+
+
+    if ((total + new_size) / 100000 > total / 100000) {
+
+        std::cerr << total + new_size << ", slabs = " << slabs << ", res = " << int64_t(resmem) / resmem_ctr << " MB, ureq = " << total_user_req << ", page_size = " << page_size() << "\n";
+
+    }
+
+    total += new_size;
+    slabs += 1;
+
+
     REALM_ASSERT_DEBUG(0 < new_size);
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
-    std::fill(mem.get(), mem.get()+new_size, 0);
+    std::fill(mem.get(), mem.get() + new_size, 0);
 
     // Add to list of slabs
     Slab slab;
@@ -314,7 +474,7 @@ MemRef SlabAlloc::do_alloc(size_t size)
 #endif
 
 #if REALM_ENABLE_ALLOC_SET_ZERO
-    std::fill(slab.addr, slab.addr+size, 0);
+    std::fill(slab.addr, slab.addr + size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
@@ -322,6 +482,8 @@ MemRef SlabAlloc::do_alloc(size_t size)
 
     return MemRef(slab.addr, ref, *this);
 }
+
+
 
 
 void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
