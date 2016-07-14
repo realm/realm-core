@@ -1,22 +1,10 @@
 # NEXT RELEASE
 
-### Bugfixes
-
-* Lorem ipsum.
-
 ### Breaking changes
 
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
+* Throw a logic error (of type `table_has_no_columns`) if an attempt is made to
+  add rows to a table with no columns. (#1897)
+* S: A clear operation is emitted on removal of the last public column of a table.
 
 ----------------------------------------------
 
@@ -29,6 +17,12 @@
   happen in the same thread. (#1958)
 * Fixed a bug where tableviews created via backlinks were not automatically
   updated when the source table changed. (#1950)
+
+### Breaking changes
+
+* Throw a logic error (of type `table_has_no_columns`) if an attempt is made to
+  add rows to a table with no columns. (#1897)
+* S: A clear operation is emitted on removal of the last public column of a table.
 
 ### Enhancements
 
@@ -85,9 +79,6 @@
 
 ### Breaking changes
 
-* Throw a logic error (of type `table_has_no_columns`) if an attempt is made to
-  add rows to a table with no columns. (#1897)
-* S: A clear operation is emitted on removal of the last public column of a table.
 * Removed the 'stealing' variant of export for handover. It was not a great
   idea. It was not being used and required locking which we'd like to avoid.
 * S: A concept of log levels was added to `util::Logger`. `util::Logger::log()`
