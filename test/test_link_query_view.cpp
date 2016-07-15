@@ -1045,7 +1045,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(2).get_index(), 1);
 
     // Test multi-column sorting
-    std::vector<size_t> v;
+    std::vector<LinkChain> v;
     std::vector<bool> a;
     a.push_back(true);
     a.push_back(true);

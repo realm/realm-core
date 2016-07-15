@@ -683,12 +683,12 @@ void TableViewBase::sync_distinct_view(size_t column)
 
 void TableViewBase::distinct(size_t column)
 {
-    distinct(std::vector<size_t> { column });
+    distinct(std::vector<LinkChain> { LinkChain(column) });
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
-void TableViewBase::distinct(std::vector<size_t> columns)
+void TableViewBase::distinct(std::vector<LinkChain> columns)
 {
     m_distinct_columns.clear();
     const_cast<TableViewBase*>(this)->do_sync();
@@ -719,7 +719,7 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     m_columns_enum.resize(columns.size());
 
     for (size_t i = 0; i < columns.size(); i++) {
-        const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
+        const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i][0]);
         // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting
         // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used
         // in a couple of other places in Core too.
@@ -775,15 +775,24 @@ void TableViewBase::distinct(std::vector<size_t> columns)
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
 {
-    std::vector<size_t> c;
+    std::vector<LinkChain> c;
     std::vector<bool> a;
-    c.push_back(column);
+    c.push_back(LinkChain(column));
+    a.push_back(ascending);
+    sort(c, a);
+}
+
+void TableViewBase::sort(LinkChain chain, bool ascending)
+{
+    std::vector<LinkChain> c;
+    std::vector<bool> a;
+    c.push_back(chain);
     a.push_back(ascending);
     sort(c, a);
 }
 
 // Sort according to multiple columns, user specified order on each column
-void TableViewBase::sort(std::vector<size_t> columns, std::vector<bool> ascending)
+void TableViewBase::sort(std::vector<LinkChain> columns, std::vector<bool> ascending)
 {
     REALM_ASSERT(columns.size() == ascending.size());
     m_auto_sort = true;

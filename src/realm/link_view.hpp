@@ -79,9 +79,9 @@ public:
     void clear();
 
     void sort(size_t column, bool ascending = true);
-    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
+    void sort(std::vector<LinkChain> columns, std::vector<bool> ascending);
 
-    TableView get_sorted_view(std::vector<size_t> column_indexes, std::vector<bool> ascending) const;
+    TableView get_sorted_view(std::vector<LinkChain> column_indexes, std::vector<bool> ascending) const;
     TableView get_sorted_view(size_t column_index, bool ascending = true) const;
 
     /// Remove the target row of the specified link from the target table. This

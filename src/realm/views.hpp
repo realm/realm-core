@@ -10,6 +10,21 @@ namespace realm {
 
 const int64_t detached_ref = -1;
 
+class LinkChain
+{
+public:
+    LinkChain(size_t single_index);
+    LinkChain(std::vector<size_t> chain);
+    ~LinkChain();
+    size_t operator[](size_t index) const { return column_indices[index]; }
+    size_t size() const { return column_indices.size(); }
+    util::Optional<int64_t> translate(size_t index) const;
+    const ColumnBase& init(const ColumnBase* cb);
+private:
+    std::vector<size_t> column_indices;
+    std::shared_ptr<IntNullColumn> link_translator;
+};
+
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting.
 class RowIndexes
@@ -59,39 +74,69 @@ public:
     // Predicate for std::sort
     struct Sorter
     {
-        Sorter(){}
-        Sorter(const std::vector<size_t>& columns, const std::vector<bool>& ascending)
+        Sorter() {}
+
+        Sorter(const std::vector<LinkChain>& columns, const std::vector<bool>& ascending)
             : m_column_indexes(columns), m_ascending(ascending) {}
+
         bool operator()(size_t i, size_t j) const
         {
             for (size_t t = 0; t < m_columns.size(); t++) {
+
+                size_t index_i = i;
+                size_t index_j = j;
+
+                if (m_column_indexes[t].size() > 1) {
+                    util::Optional<int64_t> translated_i = m_column_indexes[t].translate(i);
+                    util::Optional<int64_t> translated_j = m_column_indexes[t].translate(j);
+                    bool valid1 = bool(translated_i);
+                    bool valid2 = bool(translated_j);
+
+                    if (!valid1 && !valid2) {
+                        if (t == m_column_indexes.size() - 1) {
+                            return false; // Two nulls in last sort column
+                        }
+                        else {
+                            continue;   // Check next column for order
+                        }
+                    }
+                    else if (!valid1 || !valid2) {
+                        return valid1;  // Regardless of m_ascending[t] we sort nulls at the end
+                    }
+
+                    index_i = translated_i.value();
+                    index_j = translated_j.value();
+                }
+
                 // todo/fixme, special treatment of StringEnumColumn by calling StringEnumColumn::compare_values()
                 // instead of the general ColumnTemplate::compare_values() becuse it cannot overload inherited
                 // `int64_t get_val()` of Column. Such column inheritance needs to be cleaned up
                 int c;
                 if (const StringEnumColumn* cse = m_string_enum_columns[t])
-                    c = cse->compare_values(i, j);
+                    c = cse->compare_values(index_i, index_j);
                 else
-                    c = m_columns[t]->compare_values(i, j);
+                    c = m_columns[t]->compare_values(index_i, index_j);
 
                 if (c != 0)
                     return m_ascending[t] ? c > 0 : c < 0;
             }
-            return false; // row i == row j
+            return false; // row index1 == row index2
         }
 
         void init(RowIndexes* row_indexes)
         {
             m_columns.clear();
             m_string_enum_columns.clear();
-            m_columns.resize(m_column_indexes.size(), 0);
-            m_string_enum_columns.resize(m_column_indexes.size(), 0);
+            m_columns.resize(m_column_indexes.size(), nullptr);
+            m_string_enum_columns.resize(m_column_indexes.size(), nullptr);
 
             for (size_t i = 0; i < m_column_indexes.size(); i++) {
-                const ColumnBase& cb = row_indexes->get_column_base(m_column_indexes[i]);
-                const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
+                REALM_ASSERT_EX(m_column_indexes[i].size() >= 1, m_column_indexes[i].size());
+                const ColumnBase& cb = row_indexes->get_column_base(m_column_indexes[i][0]);
+                const ColumnBase& end_of_chain = m_column_indexes[i].init(&cb);
+                const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&end_of_chain);
                 REALM_ASSERT(ctb);
-                if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&cb))
+                if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&end_of_chain))
                     m_string_enum_columns[i] = cse;
                 else
                     m_columns[i] = ctb;
@@ -100,7 +145,7 @@ public:
 
         explicit operator bool() const { return !m_column_indexes.empty(); }
 
-        std::vector<size_t> m_column_indexes;
+        std::vector<LinkChain> m_column_indexes;
         std::vector<bool> m_ascending;
         std::vector<const ColumnTemplateBase*> m_columns;
         std::vector<const StringEnumColumn*> m_string_enum_columns;
