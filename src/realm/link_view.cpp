@@ -284,15 +284,15 @@ void LinkView::do_clear(bool broken_reciprocal_backlinks)
 
 void LinkView::sort(size_t column, bool ascending)
 {
-    std::vector<size_t> c;
+    std::vector<LinkChain> c;
     std::vector<bool> a;
-    c.push_back(column);
+    c.push_back(LinkChain(column));
     a.push_back(ascending);
     sort(c, a);
 }
 
 
-void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
+void LinkView::sort(std::vector<LinkChain> columns, std::vector<bool> ascending)
 {
     if (Replication* repl = get_repl()) {
         // todo, write to the replication log that we're doing a sort
@@ -302,7 +302,7 @@ void LinkView::sort(std::vector<size_t> columns, std::vector<bool> ascending)
     RowIndexes::sort(predicate);
 }
 
-TableView LinkView::get_sorted_view(std::vector<size_t> column_indexes, std::vector<bool> ascending) const
+TableView LinkView::get_sorted_view(std::vector<LinkChain> column_indexes, std::vector<bool> ascending) const
 {
     TableView v(m_origin_column.get_target_table()); // sets m_table
     v.m_last_seen_version = m_origin_table->m_version;
@@ -318,9 +318,9 @@ TableView LinkView::get_sorted_view(std::vector<size_t> column_indexes, std::vec
 
 TableView LinkView::get_sorted_view(size_t column_index, bool ascending) const
 {
-    std::vector<size_t> vec;
+    std::vector<LinkChain> vec;
     std::vector<bool> a;
-    vec.push_back(column_index);
+    vec.push_back(LinkChain(column_index));
     a.push_back(ascending);
     TableView v = get_sorted_view(vec, a);
     return v;

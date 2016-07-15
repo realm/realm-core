@@ -10412,7 +10412,7 @@ TEST(LangBindHelper_HandoverDistinctView)
             CHECK_EQUAL(tv2->get_source_ndx(0), 0);
 
             // Remove distinct property
-            tv2->distinct(std::vector<size_t>());
+            tv2->distinct(std::vector<LinkChain>());
             tv2->sync_if_needed();
             CHECK_EQUAL(tv2->size(), 2);
         }

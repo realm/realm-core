@@ -609,8 +609,8 @@ public:
     TableView      get_sorted_view(size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(size_t column_ndx, bool ascending = true) const;
 
-    TableView      get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending);
-    ConstTableView get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending) const;
+    TableView      get_sorted_view(std::vector<LinkChain> column_ndx, std::vector<bool> ascending);
+    ConstTableView get_sorted_view(std::vector<LinkChain> column_ndx, std::vector<bool> ascending) const;
 
     TableView      get_range_view(size_t begin, size_t end);
     ConstTableView get_range_view(size_t begin, size_t end) const;
