@@ -129,16 +129,6 @@ struct GetSizeFromRef {
     }
 };
 
-template<>
-void GetSizeFromRef::call<IntegerColumn>() noexcept
-{
-    if (m_nullable) {
-        m_size = IntNullColumn::get_size_from_ref(m_ref, m_alloc);
-    }
-    else {
-        m_size = IntegerColumn::get_size_from_ref(m_ref, m_alloc);
-    }
-}
 
 template<class Op>
 void col_type_deleg(Op& op, ColumnType type)
@@ -148,7 +138,10 @@ void col_type_deleg(Op& op, ColumnType type)
         case col_type_Bool:
         case col_type_OldDateTime:
         case col_type_Link:
-            op.template call<IntegerColumn>();
+            if(op.m_nullable)
+                op.template call<IntNullColumn>();
+            else
+                op.template call<IntegerColumn>();
             return;
         case col_type_Timestamp:
             op.template call<TimestampColumn>();

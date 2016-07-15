@@ -637,11 +637,11 @@ private:
 template<>
 inline size_t IntNullColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc)
 {
-    const char* root_header = alloc.translate(root_ref);
-    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
-    if (root_is_leaf)
-        return Array::get_size_from_header(root_header) - 1; // fuuuuuck
-    return Array::get_bptree_size_from_header(root_header);
+    // FIXME: Speed improvement possible by not creating instance, but tricky! This slow method is OK so far
+    // because it's only invoked by Table::get_size_from_ref() which is only used for subtables which we
+    // currently 2016) do not expose publicly.
+    IntNullColumn inc(alloc, root_ref);
+    return inc.size();
 }
 
 

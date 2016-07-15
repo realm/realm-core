@@ -7052,18 +7052,21 @@ TEST(Table_getVersionCounterAfterRowAccessor)
 
 
 TEST(Table_ColumnSizeFromRef)
-{
+{        
+    // This test a bug where get_size_from_type_and_ref() returned off-by-one on nullable integer columns. 
+    // It seems to be only invoked from Table::get_size_from_ref() which is fast static method that lets
+    // you find the size of a Table without having to create an instance of it. This seems to be only done
+    // on subtables, so the bug has not been triggered in public.
+
     Group g;
     TableRef t = g.add_table("table");
     t->add_column(type_Int, "int", true);
 
-    auto check_column_sizes = [this, &t](size_t num_rows) {
-        t->clear();
-        t->add_empty_row(num_rows);
-        for (size_t i = 0; i < num_rows; ++i) {
+    auto check_column_sizes = [this, &t](size_t add) {
+        t->add_empty_row(add);
+        for (size_t i = 0; i < add; ++i) {
             t->set_int(0, i, i);
         }
-        CHECK_EQUAL(t->size(), num_rows);
         using tf = _impl::TableFriend;
         size_t actual_num_cols = t->get_column_count();
         Spec& t_spec = tf::get_spec(*t);
@@ -7073,12 +7076,19 @@ TEST(Table_ColumnSizeFromRef)
             ref_type col_ref = base.get_ref();
             bool nullable = (t_spec.get_column_attr(col_ndx) & col_attr_Nullable) == col_attr_Nullable;
             size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc(), nullable);
-            CHECK_EQUAL(col_size, num_rows);
+            CHECK_EQUAL(col_size, t->size());
         }
     };
 
     // Test internal nodes
     check_column_sizes(REALM_MAX_BPNODE_SIZE);
+
+    // clear will enforce arrays to change from "compact" form to "normal" form
+    t->clear();
+    check_column_sizes(REALM_MAX_BPNODE_SIZE);
+
+    // Try with more levels in the tree
+    check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
 
