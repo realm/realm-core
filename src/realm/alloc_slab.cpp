@@ -247,8 +247,8 @@ void process_mem_usage(double& vm_usage, double& resident_set)
     info.cb = sizeof(info);
     BOOL okay = GetProcessMemoryInfo(hProc, (PROCESS_MEMORY_COUNTERS*)&info, info.cb);
 
-    SIZE_T virtualMemUsedByMe = info.PrivateUsage;
-    resident_set = virtualMemUsedByMe;
+    SIZE_T PrivateUsage = info.PrivateUsage;
+    resident_set = PrivateUsage;
 #else
 
     // the two fields we want
@@ -281,12 +281,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 
     total_user_req += size; 
 
-
-
     //std::cerr << size << " | ";
-
-
-
 
     double vm;
     double res;
@@ -356,9 +351,9 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     }
 
 
-#if 1
+#if 1 // Use new method
 
-    // Else, allocate new slab. Smallest Realm file size is around 280 bytes.
+    // Allocate new slab. Smallest Realm file size is around 280 bytes, so we allocate 512 bytes
     size_t new_size = size > 512 ? size : 512;
     ref_type ref;
     if (m_slabs.empty()) {
@@ -368,7 +363,8 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
         size_t extended = curr_ref_end - m_baseline;
         size_t min_size;
-        if (extended < 8 * 1024) {
+
+        if (extended < 16 * 1024) {
             min_size = extended;
         }
         else {
@@ -384,30 +380,6 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     // Round up to nearest 256
     new_size = ((new_size - 1) | (256 - 1)) + 1;
 
-#else
-
-
-#if 0
-    // Else, allocate new slab
-    size_t new_size = ((size - 1) | 511) + 1; // Round up to nearest multiple of 256
-    ref_type ref;
-    if (m_slabs.empty()) {
-        ref = m_baseline;
-    }
-    else {
-        ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
-        // Make it at least as big as twice the previous slab
-        ref_type prev_ref_end = m_slabs.size() == 1 ? m_baseline :
-            to_size_t(m_slabs[m_slabs.size() - 2].ref_end);
-
-        size_t min_size = 0.5 * curr_ref_end; // (curr_ref_end - prev_ref_end);
-        min_size = ((min_size - 1) | 255) + 1;
-
-        if (new_size < min_size)
-            new_size = min_size;
-
-        ref = curr_ref_end;
-    }
 #else
     // Else, allocate new slab
     size_t new_size = ((size - 1) | 255) + 1; // Round up to nearest multiple of 256
@@ -425,12 +397,6 @@ MemRef SlabAlloc::do_alloc(const size_t size)
             new_size = min_size;
         ref = curr_ref_end;
     }
-#endif
-
-
-
-
-
 
 #endif
 
@@ -440,7 +406,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 
     if ((total + new_size) / 100000 > total / 100000) {
 
-        std::cerr << total + new_size << ", slabs = " << slabs << ", res = " << int64_t(resmem) / resmem_ctr << " MB, ureq = " << total_user_req << ", page_size = " << page_size() << "\n";
+        std::cerr << "slabsize = " << (total + new_size) / 1024 << " KB, slabcount = " << slabs << ", rss = " << int64_t(resmem) / resmem_ctr / 1024 << " KB, ureq = " << total_user_req << ", page_size = " << page_size() << "\n";
 
     }
 
