@@ -297,7 +297,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         ref = m_baseline;
     }
     else {
-        // Find memstat_slab_size size of memory that has been modified (through copy-on-write) in current write transaction
+        // Find size of memory that has been modified (through copy-on-write) in current write transaction
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
         size_t copy_on_write = curr_ref_end - m_baseline;
 
