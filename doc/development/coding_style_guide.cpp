@@ -189,11 +189,11 @@ bool is_last = false;
 //   you may have knowledge about a certain planned feature that would
 //   require a more complete solution.
 //
-// A FIXME is generally not about a bug or an error, and is should
+// A FIXME is generally not about a bug or an error, and it should
 // generally not be considered a task either. Is is simply a memo to
 // oneself or to some other developer who is going to work on the code
 // at some later point in time.
 //
 // A FIXME should never be deleted unless by somebody who understands
-// the mening of it and knows that the problem is fixed, or has
-// otherwise diappeard.
+// the meaning of it and knows that the problem is fixed, or has
+// otherwise disappeared.
