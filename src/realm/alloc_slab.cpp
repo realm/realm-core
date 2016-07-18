@@ -364,8 +364,6 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 }
 
 
-
-
 void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 {
     REALM_ASSERT_3(translate(ref), ==, addr);
