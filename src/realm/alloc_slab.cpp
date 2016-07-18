@@ -4,7 +4,6 @@
 #include <memory>
 #include <mutex>
 #include <map>
-#include <iostream>
 
 #ifdef REALM_DEBUG
 #  include <iostream>
@@ -23,7 +22,6 @@
 
 using namespace realm;
 using namespace realm::util;
-
 
 
 namespace {
@@ -153,12 +151,6 @@ private:
 
 void SlabAlloc::detach() noexcept
 {
-
-    if (!m_slabs.empty()) {
-     //   std::cerr << m_slabs.back().ref_end << "\n";
-    }
-
-
     switch (m_attach_mode) {
         case attach_None:
         case attach_UsersBuffer:
@@ -212,14 +204,8 @@ SlabAlloc::~SlabAlloc() noexcept
     }
 #endif
 
-    if (is_attached()) {
-
-
-
+    if (is_attached())
         detach();
-
-
-    }
 }
 
 
