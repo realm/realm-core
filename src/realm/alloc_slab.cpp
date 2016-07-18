@@ -1,11 +1,4 @@
-#ifdef _WIN32
-#define NOMINMAX
-#  include "windows.h"
-#  include "psapi.h"
-#else 
-#include <unistd.h>
-#endif
-
+#define REALM_SLAB_ALLOC_TUNE
 
 #include <type_traits>
 #include <exception>
@@ -14,9 +7,6 @@
 #include <mutex>
 #include <map>
 #include <iostream>
-#include <fstream>
-
-
 
 #ifdef REALM_DEBUG
 #  include <iostream>
@@ -35,6 +25,7 @@
 
 using namespace realm;
 using namespace realm::util;
+
 
 
 namespace {
@@ -234,60 +225,24 @@ SlabAlloc::~SlabAlloc() noexcept
 }
 
 
-void process_mem_usage(double& vm_usage, double& resident_set)
-{
-    vm_usage = 0.0;
-    resident_set = 0.0;
-
-
-#ifdef _WIN32
-
-    HANDLE hProc = GetCurrentProcess();
-    PROCESS_MEMORY_COUNTERS_EX info;
-    info.cb = sizeof(info);
-    BOOL okay = GetProcessMemoryInfo(hProc, (PROCESS_MEMORY_COUNTERS*)&info, info.cb);
-
-    SIZE_T PrivateUsage = info.PrivateUsage;
-    resident_set = PrivateUsage;
-#else
-
-    // the two fields we want
-    unsigned long vsize;
-    long rss;
-    {
-        std::string ignore;
-        std::ifstream ifs("/proc/self/stat", std::ios_base::in);
-        ifs >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
-            >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
-            >> ignore >> ignore >> vsize >> rss;
-    }
-
-    long page_size_kb = sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages
-    vm_usage = vsize / 1024.0;
-    resident_set = rss * page_size_kb;
-
-#endif
-}
-
 MemRef SlabAlloc::do_alloc(const size_t size)
 {
+#ifdef REALM_SLAB_ALLOC_TUNE
+    static int64_t memstat_requested = 0;
+    static int64_t memstat_slab_size = 0;
+    static int64_t memstat_slabs = 0;
+    static int64_t memstat_rss = 0;
+    static int64_t memstat_rss_ctr = 0;
 
-    static int64_t total_user_req = 0;
-    static int64_t total = 0;
-    static int64_t slabs = 0;
-
-    static double resmem = 0;
-    static int64_t resmem_ctr = 0;
-
-    total_user_req += size; 
-
-    //std::cerr << size << " | ";
-
-    double vm;
-    double res;
-    process_mem_usage(vm, res);
-    resmem += res;
-    resmem_ctr += 1;
+    {
+        double vm;
+        double res;
+        process_mem_usage(vm, res);
+        memstat_rss += res;
+        memstat_rss_ctr += 1;
+        memstat_requested += size;
+    }
+#endif
 
     REALM_ASSERT_DEBUG(0 < size);
     REALM_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
@@ -351,25 +306,19 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     }
 
 
-#if 1 // Use new method
-
-    // Allocate new slab. Smallest Realm file size is around 280 bytes, so we allocate 512 bytes
-    size_t new_size = size > 512 ? size : 512;
+    // Allocate new slab. To avoid wasting physical memory, we allocate a page
+    size_t new_size = size > page_size() ? size : page_size();
     ref_type ref;
     if (m_slabs.empty()) {
         ref = m_baseline;
     }
     else {
+        // Find memstat_slab_size size of memory that has been modified (through copy-on-write) in current write transaction
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
-        size_t extended = curr_ref_end - m_baseline;
-        size_t min_size;
+        size_t copy_on_write = curr_ref_end - m_baseline;
 
-        if (extended < 16 * 1024) {
-            min_size = extended;
-        }
-        else {
-            min_size = 0.2 * extended;
-        }
+        // Allocate 20% of that (for the first few number of slabs the math below will just result in 1 page each)
+        size_t min_size = 0.2 * copy_on_write;
 
         if (new_size < min_size)
             new_size = min_size;
@@ -377,42 +326,23 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         ref = curr_ref_end;
     }
 
-    // Round up to nearest 256
-    new_size = ((new_size - 1) | (256 - 1)) + 1;
+    // Round upwards to nearest page size
+    new_size = ((new_size - 1) | (page_size() - 1)) + 1;
 
-#else
-    // Else, allocate new slab
-    size_t new_size = ((size - 1) | 255) + 1; // Round up to nearest multiple of 256
-    ref_type ref;
-    if (m_slabs.empty()) {
-        ref = m_baseline;
+#ifdef REALM_SLAB_ALLOC_TUNE
+    {
+        const size_t update = 5000000;
+        if ((memstat_slab_size + new_size) / update > memstat_slab_size / update) {
+            std::cerr << "Size of all allocated slabs:    " << (memstat_slab_size + new_size) / 1024 << " KB\n" <<
+                "Sum of size for do_alloc(size): " << memstat_requested / 1024 << " KB\n" <<
+                "Average physical memory usage:  " << memstat_rss / memstat_rss_ctr / 1024 << " KB\n" <<
+                "Page size:                      " << page_size() / 1024 << " KB\n" <<
+                "Number of all allocated slabs:  " << memstat_slabs << "\n\n";
+        }
+        memstat_slab_size += new_size;
+        memstat_slabs += 1;
     }
-    else {
-        ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
-        // Make it at least as big as twice the previous slab
-        ref_type prev_ref_end = m_slabs.size() == 1 ? m_baseline :
-            to_size_t(m_slabs[m_slabs.size() - 2].ref_end);
-        size_t min_size = 2 * (curr_ref_end - prev_ref_end);
-        if (new_size < min_size)
-            new_size = min_size;
-        ref = curr_ref_end;
-    }
-
 #endif
-
-
-  //  std::cerr << new_size << "\n";
-
-
-    if ((total + new_size) / 100000 > total / 100000) {
-
-        std::cerr << "slabsize = " << (total + new_size) / 1024 << " KB, slabcount = " << slabs << ", rss = " << int64_t(resmem) / resmem_ctr / 1024 << " KB, ureq = " << total_user_req << ", page_size = " << page_size() << "\n";
-
-    }
-
-    total += new_size;
-    slabs += 1;
-
 
     REALM_ASSERT_DEBUG(0 < new_size);
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws

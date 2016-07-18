@@ -110,6 +110,7 @@ void* round_down(void* p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void millisleep(size_t milliseconds);
+void process_mem_usage(double& vm_usage, double& resident_set);
 
 // popcount
 int fast_popcount32(int32_t x);

@@ -1,7 +1,18 @@
+#define REALM_SLAB_ALLOC_TUNE
+
 #include <cstdlib> // size_t
 #include <string>
 #include <stdint.h>
 #include <atomic>
+#include <fstream>
+
+#ifdef _WIN32
+#define NOMINMAX
+#  include "windows.h"
+#  include "psapi.h"
+#else 
+#include <unistd.h>
+#endif
 
 #include <realm/utilities.hpp>
 #include <realm/unicode.hpp>
@@ -240,6 +251,38 @@ void millisleep(size_t milliseconds)
     nanosleep(&ts, 0);
 #endif
 }
+
+#ifdef REALM_SLAB_ALLOC_TUNE
+void process_mem_usage(double& vm_usage, double& resident_set)
+{
+    vm_usage = 0.0;
+    resident_set = 0.0;
+#ifdef _WIN32
+    HANDLE hProc = GetCurrentProcess();
+    PROCESS_MEMORY_COUNTERS_EX info;
+    info.cb = sizeof(info);
+    BOOL okay = GetProcessMemoryInfo(hProc, (PROCESS_MEMORY_COUNTERS*)&info, info.cb);
+
+    SIZE_T PrivateUsage = info.PrivateUsage;
+    resident_set = PrivateUsage;
+#else
+    // the two fields we want
+    unsigned long vsize;
+    long rss;
+    {
+        std::string ignore;
+        std::ifstream ifs("/proc/self/stat", std::ios_base::in);
+        ifs >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
+            >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
+            >> ignore >> ignore >> vsize >> rss;
+    }
+
+    long page_size_kb = sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages
+    vm_usage = vsize / 1024.0;
+    resident_set = rss * page_size_kb;
+#endif
+}
+#endif
 
 } // namespace realm
 
