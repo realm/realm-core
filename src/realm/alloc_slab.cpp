@@ -1,5 +1,3 @@
-#define REALM_SLAB_ALLOC_TUNE
-
 #include <type_traits>
 #include <exception>
 #include <algorithm>

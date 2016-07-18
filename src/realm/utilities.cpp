@@ -1,5 +1,3 @@
-#define REALM_SLAB_ALLOC_TUNE
-
 #include <cstdlib> // size_t
 #include <string>
 #include <stdint.h>
