@@ -306,7 +306,7 @@ public:
     struct MappedFile;
 
 protected:
-    MemRef do_alloc(size_t size) override;
+    MemRef do_alloc(const size_t size) override;
     MemRef do_realloc(ref_type, const char*, size_t old_size,
                     size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
