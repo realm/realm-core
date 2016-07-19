@@ -37,6 +37,7 @@ Realm::Config::Config(const Config& c)
 , encryption_key(c.encryption_key)
 , schema_version(c.schema_version)
 , migration_function(c.migration_function)
+, delete_realm_if_migration_needed(c.delete_realm_if_migration_needed)
 , read_only(c.read_only)
 , in_memory(c.in_memory)
 , cache(c.cache)
@@ -180,13 +181,13 @@ void Realm::init(std::shared_ptr<RealmCoordinator> coordinator)
             else {
                 update_schema(std::move(target_schema), target_schema_version);
             }
-        }
 
-        // End the read transaction created to validation/update the
-        // schema to avoid pinning the version even if the user never
-        // actually reads data
-        if (!m_config.read_only) {
-            invalidate();
+            if (!m_config.read_only) {
+                // End the read transaction created to validation/update the
+                // schema to avoid pinning the version even if the user never
+                // actually reads data
+                invalidate();
+            }
         }
     }
     catch (...) {
@@ -265,6 +266,11 @@ void Realm::update_schema(std::unique_ptr<Schema> schema, uint64_t version)
             cancel_transaction();
             return;
         }
+    }
+    else if (m_config.delete_realm_if_migration_needed && current_schema_version != ObjectStore::NotVersioned) {
+        // Delete realm rather than run migration if delete_realm_if_migration_needed is set and the Realm file exists.
+        // FIXME: not a schema mismatch exception, but this is the exception used to signal the Realm file deletion.
+        throw SchemaMismatchException(std::vector<ObjectSchemaValidationException>());
     }
 
     Config old_config(m_config);
@@ -494,6 +500,8 @@ uint64_t Realm::get_schema_version(const realm::Realm::Config &config)
 
 void Realm::close()
 {
+    invalidate();
+
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
