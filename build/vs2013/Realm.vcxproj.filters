@@ -124,6 +124,7 @@
     <ClCompile Include="..\..\test\fuzzy\afl.cpp" />
     <ClCompile Include="..\..\src\realm\column_timestamp.cpp" />
     <ClCompile Include="..\..\test\test_column_timestamp.cpp" />
+    <ClCompile Include="..\..\src\realm\util\interprocess_condvar.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
