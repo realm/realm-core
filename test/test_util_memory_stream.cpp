@@ -35,7 +35,7 @@ using namespace realm;
 
 namespace {
 
-TEST(util_Memory_stream_input)
+TEST(MemoryStream_Input)
 {
 	const char buf[] = "123 4567";
 	realm::util::MemoryInputStream in;

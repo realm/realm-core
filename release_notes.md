@@ -2,6 +2,8 @@
 
 ### Bugfixes
 
+* Fixing util::MemoryInputStream to support tellg() and seekg().
+
 * Lorem ipsum.
 
 ### Breaking changes
@@ -10,7 +12,6 @@
 
 ### Enhancements
 
-* Enhancing the util::MemoryInputStream to support tellg() and seekg().
 
 * Lorem ipsum.
 
