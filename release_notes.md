@@ -10,6 +10,8 @@
 
 ### Enhancements
 
+* Enhancing the util::MemoryInputStream to support tellg() and seekg().
+
 * Lorem ipsum.
 
 -----------
