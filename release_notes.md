@@ -3,8 +3,8 @@
 ### Bugfixes
 
 * Fixing util::MemoryInputStream to support tellg() and seekg().
-
-* Lorem ipsum.
+* Fix truncation of the supplied value when querying for a float or double that
+  is less than a column's value.
 
 ### Breaking changes
 
