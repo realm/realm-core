@@ -183,16 +183,12 @@ Query::Query(std::unique_ptr<Expression> expr) : Query()
 
 void Query::set_table(TableRef tr)
 {
-    if (tr == m_table) {
-        return;
-    }
-
+    REALM_ASSERT(!m_table);
     m_table = tr;
     if (m_table) {
         fetch_descriptor();
-    }
-    else {
-        m_current_descriptor.reset();
+        if (ParentNode* root = root_node())
+            root->set_table(*m_table);
     }
 }
 
@@ -209,15 +205,15 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
         m_view = m_source_table_view;
     else
         m_view = nullptr;
-    // not going through Table::create_from_and_consume_patch because we need to use
-    // set_table() to update all table references
-    if (patch.m_table) {
-        set_table(dest_group.get_table(patch.m_table->m_table_num));
-    }
 
     for (auto it = m_groups.rbegin(); it != m_groups.rend(); ++it) {
         if (auto& cur_root_node = it->m_root_node)
             cur_root_node->apply_handover_patch(patch.m_node_data, dest_group);
+    }
+    // not going through Table::create_from_and_consume_patch because we need to use
+    // set_table() to update all table references
+    if (patch.m_table) {
+        set_table(dest_group.get_table(patch.m_table->m_table_num));
     }
     REALM_ASSERT(patch.m_node_data.empty());
 }
@@ -804,7 +800,7 @@ template<Action action, typename T, typename R, class ColType>
     else {
 
         // Aggregate with criteria - goes through the nodes in the query system
-        init(*m_table);
+        init();
         QueryState<R> st;
         st.init(action, nullptr, limit);
 
@@ -856,9 +852,10 @@ template<Action action, typename T, typename R, class ColType>
         size_t td;
 
         while (start < end) {
+            auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
             size_t best = std::distance(pn->m_children.begin(),
                                         std::min_element(pn->m_children.begin(), pn->m_children.end(),
-                                                         ParentNode::score_compare()));
+                                                         score_compare));
 
             // Find a large amount of local matches in best condition
             td = pn->m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
@@ -1116,9 +1113,9 @@ Query& Query::end_subtable()
     auto subtable_node = std::unique_ptr<ParentNode>(new SubtableNode(current_group.m_subtable_column,
                                                                       std::move(current_group.m_root_node)));
     end_group();
+    m_subtable_path.pop_back();
     add_node(std::move(subtable_node));
 
-    m_subtable_path.pop_back();
     fetch_descriptor();
     return *this;
 }
@@ -1131,7 +1128,7 @@ size_t Query::find(size_t begin)
 
     REALM_ASSERT_3(begin, <=, m_table->size());
 
-    init(*m_table);
+    init();
 
     // User created query with no criteria; return first
     if (!has_conditions()) {
@@ -1164,7 +1161,7 @@ void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit)
 
     REALM_ASSERT_3(start, <=, m_table->size());
 
-    init(*m_table);
+    init();
 
     if (end == size_t(-1))
         end = m_view ? m_view->size() : m_table->size();
@@ -1220,7 +1217,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
         return (limit < end - start ? limit : end - start);
     }
 
-    init(*m_table);
+    init();
     size_t cnt = 0;
 
     if (m_view) {
@@ -1257,12 +1254,10 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
             if (start + results == end || results == limit)
                 return results;
 
-            init(*m_table);
+            init();
             size_t r = peek_tableview(start + results);
             if (r != not_found) {
                 m_table->remove(r);
-                // new semantics for tableview means that the remove from m_table is automatically reflected
-                // m_view->m_row_indexes.adjust_ge(m_view->m_row_indexes.get(start + results), -1);
                 results++;
             }
             else {
@@ -1275,7 +1270,7 @@ size_t Query::remove(size_t start, size_t end, size_t limit)
         for (;;) {
             // Every remove invalidates the array cache in the nodes
             // so we have to re-initialize it before searching
-            init(*m_table);
+            init();
 
             r = find_internal(r, end - results);
             if (r == not_found || r == m_table->size() || results == limit)
@@ -1294,7 +1289,7 @@ TableView Query::find_all_multi(size_t start, size_t end)
     static_cast<void>(end);
 
     // Initialization
-    init(*m_table);
+    init();
     ts.next_job = start;
     ts.end_job = end;
     ts.done_job = 0;
@@ -1431,21 +1426,14 @@ std::string Query::validate()
     return root_node()->validate(); // errors detected by QueryEngine
 }
 
-void Query::init(const Table& table) const
+void Query::init() const
 {
+    REALM_ASSERT(m_table);
     if (ParentNode* root = root_node()) {
-        root->init(table);
+        root->init();
         std::vector<ParentNode*> v;
         root->gather_children(v);
     }
-}
-
-bool Query::is_initialized() const
-{
-    if (ParentNode* root = root_node()) {
-        return root->is_initialized();
-    }
-    return true;
 }
 
 size_t Query::find_internal(size_t start, size_t end) const
@@ -1476,6 +1464,9 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 {
     REALM_ASSERT(node);
     using State = QueryGroup::State;
+
+    if (m_table && m_subtable_path.empty() && !m_table->is_degenerate())
+        node->set_table(*m_table);
 
     auto& current_group = m_groups.back();
     switch (current_group.m_state) {

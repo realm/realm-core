@@ -995,7 +995,7 @@ TEST(StringIndex_Null)
 {
     // Create a column with string values
     ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, true);
+    StringColumn col(Allocator::get_default(), ref, npos, true);
 
     col.add("");
     col.add(realm::null());
@@ -1153,7 +1153,7 @@ TEST(StringIndex_Duplicate_Values)
 {
     // Create a column with random values
     ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, true);
+    StringColumn col(Allocator::get_default(), ref, npos, true);
 
     col.add(s1);
     col.add(s2);
@@ -1236,7 +1236,7 @@ void verify_single_move_last_over(TestContext& test_context, StringColumn& col, 
 TEST(StringIndex_MoveLastOver_DoUpdateRef)
 {
     ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, true);
+    StringColumn col(Allocator::get_default(), ref, npos, true);
 
     // create subindex of repeated elements on a leaf
     size_t num_initial_repeats = 100;
@@ -1305,7 +1305,7 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
 TEST(StringIndex_Deny_Duplicates)
 {
     ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, true);
+    StringColumn col(Allocator::get_default(), ref, npos, true);
     StringData duplicate("duplicate");
     // create subindex of repeated elements on a leaf
     size_t num_repeats = 100;

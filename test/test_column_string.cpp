@@ -77,7 +77,7 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, nullable);
+    StringColumn c(Allocator::get_default(), ref, npos, nullable);
 
     // TEST(ColumnString_MultiEmpty)
 
@@ -551,7 +551,7 @@ TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn c(Allocator::get_default(), ref, nullable);
+    StringColumn c(Allocator::get_default(), ref, npos, nullable);
     CHECK_EQUAL(c.is_nullable(), nullable);
 
     // Add duplicate values
@@ -750,7 +750,7 @@ TEST(ColumnString_Null)
 {
     {
         ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        StringColumn a(Allocator::get_default(), ref, npos, true);
 
         a.add("");
         size_t t = a.find_first("");
@@ -761,7 +761,7 @@ TEST(ColumnString_Null)
 
     {
         ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        StringColumn a(Allocator::get_default(), ref, npos, true);
 
         a.add("foo");
         a.add("");
@@ -796,7 +796,7 @@ TEST(ColumnString_Null)
 
     {
         ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        StringColumn a(Allocator::get_default(), ref, npos, true);
 
         a.add(realm::null());
         a.add("");
@@ -824,7 +824,7 @@ TEST(ColumnString_Null)
 
     {
         ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        StringColumn a(Allocator::get_default(), ref, npos, true);
 
         a.add("");
         a.add(realm::null());
@@ -849,7 +849,7 @@ TEST(ColumnString_Null)
 
     for (size_t t = 0; t < 50; t++) {
         ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn a(Allocator::get_default(), ref, true);
+        StringColumn a(Allocator::get_default(), ref, npos, true);
 
         // vector that is kept in sync with the ArrayString so that we can compare with it
         std::vector<std::string> v;
@@ -1169,7 +1169,7 @@ TEST_TYPES(ColumnString_Count, non_nullable, nullable)
 TEST(ColumnString_SetIndexInParent)
 {
     ref_type asc_ref = StringColumn::create(Allocator::get_default());
-    StringColumn sc(Allocator::get_default(), asc_ref, true);
+    StringColumn sc(Allocator::get_default(), asc_ref, npos, true);
 
     StringIndex* ndx = sc.create_search_index();
     CHECK(ndx != nullptr);
@@ -1278,7 +1278,7 @@ TEST(ColumnString_SwapRows)
     // Null values
     {
         ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn c(Allocator::get_default(), ref, true);
+        StringColumn c(Allocator::get_default(), ref, npos, true);
 
         c.add("a");
         c.add("b");
