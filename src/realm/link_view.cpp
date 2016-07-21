@@ -30,7 +30,7 @@ void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Hando
     if (bool(ref) && ref->is_attached()) {
         patch.reset(new HandoverPatch);
         Table::generate_patch(ref->m_origin_table, patch->m_table);
-        patch->m_col_num = ref->m_origin_column.m_column_ndx;
+        patch->m_col_num = ref->m_origin_column.get_column_index();
         patch->m_row_ndx = ref->get_origin_row_index();
     }
     else

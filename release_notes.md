@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix crashes and general brokenness when constructing a Query, inserting a
+  column into the queried table, and then running the query.
 
 ### Breaking changes
 

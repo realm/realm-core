@@ -36,7 +36,7 @@ namespace realm {
 /// there is a single link, a tagged ref encoding the origin row position.
 class BacklinkColumn: public IntegerColumn, public ArrayParent {
 public:
-    BacklinkColumn(Allocator&, ref_type);
+    BacklinkColumn(Allocator&, ref_type, size_t col_ndx = npos);
     ~BacklinkColumn() noexcept override {}
 
     static ref_type create(Allocator&, size_t size = 0);
@@ -115,8 +115,8 @@ private:
 
 // Implementation
 
-inline BacklinkColumn::BacklinkColumn(Allocator& alloc, ref_type ref):
-    IntegerColumn(alloc, ref) // Throws
+inline BacklinkColumn::BacklinkColumn(Allocator& alloc, ref_type ref, size_t col_ndx):
+    IntegerColumn(alloc, ref, col_ndx) // Throws
 {
 }
 

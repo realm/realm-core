@@ -46,7 +46,7 @@ class StringColumn: public ColumnBaseSimple {
 public:
     typedef StringData value_type;
 
-    StringColumn(Allocator&, ref_type, bool nullable = false);
+    StringColumn(Allocator&, ref_type, size_t column_ndx = npos, bool nullable = false);
     ~StringColumn() noexcept override;
 
     void destroy() noexcept override;

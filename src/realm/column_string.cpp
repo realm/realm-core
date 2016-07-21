@@ -68,7 +68,8 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable):
+StringColumn::StringColumn(Allocator& alloc, ref_type ref, size_t column_ndx, bool nullable):
+    ColumnBaseSimple(column_ndx),
     m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
@@ -1005,7 +1006,7 @@ bool StringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool
 {
     Allocator& alloc = m_array->get_alloc();
     ref_type keys_ref_2 = StringColumn::create(alloc); // Throws
-    StringColumn keys(alloc, keys_ref_2, m_nullable); // Throws // FIXME
+    StringColumn keys(alloc, keys_ref_2, npos, m_nullable); // Throws // FIXME
 
     // Generate list of unique values (keys)
     size_t n = size();
@@ -1402,6 +1403,7 @@ ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
 
 void StringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
+    ColumnBaseSimple::refresh_accessor_tree(col_ndx, spec);
     refresh_root_accessor(); // Throws
 
     // Refresh search index

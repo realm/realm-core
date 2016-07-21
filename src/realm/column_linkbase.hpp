@@ -74,9 +74,6 @@ protected:
     // A pointer to the table that this column is part of.
     Table* const m_table;
 
-    // The index of this column within m_table.m_cols.
-    size_t m_column_ndx;
-
     TableRef m_target_table;
     BacklinkColumn* m_backlink_column = nullptr;
     bool m_weak_links = false; // True if these links are weak (not strong)
@@ -94,9 +91,8 @@ protected:
 // Implementation
 
 inline LinkColumnBase::LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx):
-    IntegerColumn(alloc, ref), // Throws
-    m_table(table),
-    m_column_ndx(column_ndx)
+    IntegerColumn(alloc, ref, column_ndx), // Throws
+    m_table(table)
 {
 }
 
