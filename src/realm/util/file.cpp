@@ -95,9 +95,9 @@ bool try_make_dir(const std::string& path)
             return false;
         case EACCES:
         case EROFS:
-            throw File::PermissionDenied(msg, path);
+            throw File::PermissionDenied(msg, path);    // LCOV_EXCL_LINE
         default:
-            throw File::AccessError(msg, path);
+            throw File::AccessError(msg, path);         // LCOV_EXCL_LINE
     }
 }
 
@@ -133,7 +133,7 @@ void remove_dir(const std::string& path)
         case ENOENT:
             throw File::NotFound(msg, path);
         default:
-            throw File::AccessError(msg, path);
+            throw File::AccessError(msg, path);   // LCOV_EXCL_LINE
     }
 }
 
@@ -165,7 +165,7 @@ std::string make_temp_dir()
     StringBuffer buffer;
     buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
     if (mkdtemp(buffer.c_str()) == 0)
-        throw std::runtime_error("mkdtemp() failed");
+        throw std::runtime_error("mkdtemp() failed");   // LCOV_EXCL_LINE
     return buffer.str();
 
 #endif
@@ -305,7 +305,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case EEXIST:
             throw Exists(msg, path);
         default:
-            throw AccessError(msg, path);
+            throw AccessError(msg, path);   // LCOV_EXCL_LINE
     }
 
 #endif
@@ -366,7 +366,7 @@ error:
 
 #else // POSIX version
 
-    if (m_encryption_key) {
+    if (REALM_COVER_NEVER(m_encryption_key)) {
         off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
@@ -385,7 +385,7 @@ error:
         if (r == 0)
             break;
         if (r < 0)
-            goto error;
+            goto error;     // LCOV_EXCL_LINE
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
         data += size_t(r);
@@ -393,10 +393,11 @@ error:
     return data - data_0;
 
 error:
+    // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("read(): failed: ", err);
     throw std::runtime_error(msg);
-
+    // LCOV_EXCL_STOP
 #endif
 }
 
@@ -427,7 +428,7 @@ void File::write(const char* data, size_t size)
 
 #else // POSIX version
 
-    if (m_encryption_key) {
+    if (REALM_COVER_NEVER(m_encryption_key)) {
         off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
@@ -445,7 +446,7 @@ void File::write(const char* data, size_t size)
         size_t n = std::min(size, size_t(SSIZE_MAX));
         ssize_t r = ::write(m_fd, data, n);
         if (r < 0)
-            goto error;
+            goto error;     // LCOV_EXCL_LINE
         REALM_ASSERT_RELEASE(r != 0);
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
@@ -454,9 +455,11 @@ void File::write(const char* data, size_t size)
     return;
 
   error:
+  // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("write(): failed: ", err);
     throw std::runtime_error(msg);
+    // LCOV_EXCL_STOP
 
 #endif
 }
@@ -484,7 +487,7 @@ File::SizeType File::get_size() const
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
             throw std::runtime_error("File size overflow");
-        if (m_encryption_key)
+        if (REALM_COVER_NEVER(m_encryption_key))
             return encrypted_size_to_data_size(size);
         return size;
     }
@@ -512,7 +515,7 @@ void File::resize(SizeType size)
 
 #else // POSIX version
 
-    if (m_encryption_key)
+    if (REALM_COVER_NEVER(m_encryption_key))
         size = data_size_to_encrypted_size(size);
 
     off_t size2;
@@ -557,7 +560,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
-    if (m_encryption_key)
+    if (REALM_COVER_NEVER(m_encryption_key))
         size = data_size_to_encrypted_size(size);
 
     off_t size2;
@@ -628,22 +631,18 @@ void File::seek(SizeType position)
 
 // We might be able to use lseek() with offset=0 as cross platform method, because we fortunatly
 // do not require to operate on files larger than 4 GB on 32-bit platforms
+#ifdef _WIN32 // Windows version
 File::SizeType File::get_file_position()
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
     LARGE_INTEGER liOfs = { 0 };
     LARGE_INTEGER liNew = { 0 };
     if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
         throw std::runtime_error("SetFilePointerEx() failed");
     return liNew.QuadPart;
-#else
-    // POSIX version not needed because it's only used by Windows version of resize().
-    REALM_ASSERT(false);
-    return 0;
-#endif
 }
+#endif
 
 
 // FIXME: The current implementation may not guarantee that data is
