@@ -411,6 +411,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     bool is_equal = c.compare(column);
     CHECK(is_equal);
 
+    CHECK_LOGIC_ERROR(c.set_string(6, "FooBar"), LogicError::type_mismatch);
 
     // TEST(Column_Destroy)
 
