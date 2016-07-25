@@ -69,8 +69,10 @@ void InterprocessCondVar::close() noexcept
 {
     if (uses_emulation) { // true if emulating a process shared condvar
         uses_emulation = false;
+#ifdef REALM_CONDVAR_EMULATION
         ::close(m_fd_read);
         ::close(m_fd_write);
+#endif        
         return; // we don't need to clean up the SharedPart
     }
     // we don't do anything to the shared part, other CondVars may share it
