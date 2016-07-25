@@ -393,7 +393,7 @@ Query create(L left, const Subexpr2<R>& right)
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
 
     if (column &&
-        ((std::numeric_limits<L>::is_integer && std::numeric_limits<L>::is_integer) ||
+        ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
         (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
         (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
         (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
