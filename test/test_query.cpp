@@ -3734,7 +3734,7 @@ TEST(Query_SortLinkChains)
     size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
     size_t t2_int_col = t2->add_column(type_Int, "t2_int");
     size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
-    size_t t3_int_col = t3->add_column(type_Int, "t3_int");
+    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
     size_t t3_str_col = t3->add_column(type_String, "t3_str");
 
     t1->add_empty_row(6);
@@ -3760,7 +3760,7 @@ TEST(Query_SortLinkChains)
     t2->nullify_link(t2_link_col, 4);
     t2->nullify_link(t2_link_col, 5);
 
-    t3->set_int(t3_int_col, 0, 1);
+    t3->set_null(t3_int_col, 0);
     t3->set_int(t3_int_col, 1, 4);
     t3->set_int(t3_int_col, 2, 7);
     t3->set_int(t3_int_col, 3, 3);
@@ -3772,7 +3772,7 @@ TEST(Query_SortLinkChains)
     //  T1                       T2                     T3
     //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
     //  ==============================================================
-    //  0        0           |   5       3          |   1       "b"
+    //  0        0           |   5       3          |   null    "b"
     //  1        2           |   4       2          |   4       "a"
     //  2        3           |   3       0          |   7       "c"
     //  3        5           |   2       1          |   3       "k"
