@@ -470,4 +470,70 @@ TEST(BinaryColumn_MoveLastOver)
     c.destroy();
 }
 
+TEST(BinaryColumn_NonLeafRoot)
+{
+    std::string someBigString = "0123456789012345678901234567890123456789012345678901234567890123456789";
+    std::string anotherBigString = "This is a rather long string, that should not be very much shorter";
+
+    // Small blob
+    {
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+        BinaryColumn c(Allocator::get_default(), ref, true);
+
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+            std::string s = util::to_string(i);
+            c.add(BinaryData(s));
+        }
+
+        c.erase(0);
+        CHECK_EQUAL(std::string(c.get(0)), "1");
+        c.erase(c.size()-1);
+        c.erase(c.size()-1);
+        CHECK_EQUAL(std::string(c.get(c.size()-1)), util::to_string(REALM_MAX_BPNODE_SIZE-1));
+
+        c.destroy();
+    }
+
+    // Big blob
+    {
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+        BinaryColumn c(Allocator::get_default(), ref, true);
+
+        c.add(BinaryData(anotherBigString));
+        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+            std::string s = util::to_string(i);
+            c.add(BinaryData(s));
+        }
+
+        c.erase(0);
+        CHECK_EQUAL(std::string(c.get(0)), "1");
+        c.erase(c.size()-1);
+        c.erase(c.size()-1);
+        CHECK_EQUAL(std::string(c.get(c.size()-1)), util::to_string(REALM_MAX_BPNODE_SIZE-1));
+
+        c.destroy();
+    }
+
+    // Upgrade from small to big
+    {
+        ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+        BinaryColumn c(Allocator::get_default(), ref, true);
+
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+1); i++) {
+            std::string s = util::to_string(i);
+            c.add(BinaryData(s));
+        }
+        c.set(1, BinaryData(someBigString));    // Upgrade when setting
+        c.add(BinaryData(anotherBigString));    // Upgrade when adding
+
+        c.erase(0);
+        CHECK_EQUAL(std::string(c.get(0)), someBigString);
+        c.erase(c.size()-1);
+        c.erase(c.size()-1);
+        CHECK_EQUAL(std::string(c.get(c.size()-1)), util::to_string(REALM_MAX_BPNODE_SIZE-1));
+
+        c.destroy();
+    }
+}
+
 #endif // TEST_COLUMN_BINARY
