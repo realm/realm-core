@@ -414,11 +414,7 @@ bool run_tests(util::Logger* logger)
     }
     else {
         const char* str = getenv("UNITTEST_PROGRESS");
-#ifdef _MSC_VER
-        bool report_progress = true;
-#else
         bool report_progress = str && strlen(str) != 0;
-#endif
         reporter.reset(new CustomReporter(report_progress));
     }
     config.reporter = reporter.get();
