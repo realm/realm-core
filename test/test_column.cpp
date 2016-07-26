@@ -587,11 +587,11 @@ TEST_TYPES(Column_FindAllIntMax, IntegerColumn, IntNullColumn)
 }
 
 
-TEST(Column_LowerUpperBound)
+TEST_TYPES(Column_LowerUpperBound, IntegerColumn, FloatColumn)
 {
     // Create column with sorted members
-    ref_type ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn col(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE col(Allocator::get_default(), ref);
     col.add(5);
     for (size_t i = 5; i < 100; i += 5)
         col.add(i);
