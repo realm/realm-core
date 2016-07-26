@@ -48,7 +48,6 @@ public:
     // Constructor defaults to non-nullable because we use non-nullable ArrayString so many places internally in core
     // (data which isn't user payload) where null isn't needed.
     explicit ArrayString(Allocator&, bool nullable = false) noexcept;
-    explicit ArrayString(no_prealloc_tag) noexcept;
     ~ArrayString() noexcept override {}
 
     bool is_null(size_t ndx) const;
@@ -115,14 +114,6 @@ private:
 // Creates new array (but invalid, call init_from_ref() to init)
 inline ArrayString::ArrayString(Allocator& allocator, bool nullable) noexcept:
 Array(allocator), m_nullable(nullable)
-{
-}
-
-// Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
-// and a few other basic things needed for read-only access. Or for use if you just want a way to call
-// some methods written in ArrayString.*
-inline ArrayString::ArrayString(no_prealloc_tag) noexcept:
-    Array(*static_cast<Allocator*>(nullptr))
 {
 }
 

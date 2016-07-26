@@ -30,7 +30,6 @@ template<class T>
 class BasicArray: public Array {
 public:
     explicit BasicArray(Allocator&) noexcept;
-    explicit BasicArray(no_prealloc_tag) noexcept;
     ~BasicArray() noexcept override {}
 
     T get(size_t ndx) const noexcept;
