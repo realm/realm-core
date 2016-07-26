@@ -1141,7 +1141,7 @@ void SlabAlloc::verify() const
     }
 }
 
-
+// LCOV_EXCL_START
 void SlabAlloc::print() const
 {
     size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
@@ -1195,5 +1195,6 @@ void SlabAlloc::print() const
     }
     std::cout << std::flush;
 }
+// LCOV_EXCL_STOP
 
 #endif // REALM_DEBUG

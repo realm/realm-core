@@ -136,11 +136,13 @@ private:
 
 // Implementation
 
+// LCOV_EXCL_START
 inline StringData BinaryColumn::get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not implemented for BinaryColumn.");
     REALM_UNREACHABLE();
 }
+// LCOV_EXCL_STOP
 
 inline size_t BinaryColumn::size() const noexcept
 {

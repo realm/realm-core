@@ -3,9 +3,9 @@
 
 using namespace realm;
 
+// LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
 const char* LogicError::what() const noexcept
 {
-    // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
     // rely on the contents of these strings, as they are deliberately unspecified.)
     switch (m_kind) {
         case string_too_big:
@@ -68,5 +68,5 @@ const char* LogicError::what() const noexcept
             return "Table has no columns";
     }
     return "Unknown error";
-    // LCOV_EXCL_STOP (LogicError messages)
 }
+// LCOV_EXCL_STOP (LogicError messages)

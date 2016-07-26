@@ -382,14 +382,16 @@ inline void Mixed::set_olddatetime(OldDateTime v) noexcept
     m_date = v.get_olddatetime();
 }
 
+// LCOV_EXCL_START
 inline void Mixed::set_timestamp(Timestamp v) noexcept
 {
     REALM_ASSERT(false && "not yet implemented");
     m_type = type_Timestamp;
     m_timestamp = v;
 }
+// LCOV_EXCL_STOP
 
-
+// LCOV_EXCL_START
 template<class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Mixed& m)
 {
@@ -412,6 +414,7 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
     out << ")";
     return out;
 }
+// LCOV_EXCL_STOP
 
 
 // Compare mixed with integer
