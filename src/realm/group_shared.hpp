@@ -550,12 +550,16 @@ private:
     const char* m_key;
     TransactStage m_transact_stage;
     util::InterprocessMutex m_writemutex;
+#ifdef REALM_ASYNC_DAEMON
     util::InterprocessMutex m_balancemutex;
+#endif
     util::InterprocessMutex m_controlmutex;
 #ifndef _WIN32
+#ifdef REALM_ASYNC_DAEMON
     util::InterprocessCondVar m_room_to_write;
     util::InterprocessCondVar m_work_to_do;
     util::InterprocessCondVar m_daemon_becomes_ready;
+#endif
     util::InterprocessCondVar m_new_commit_available;
 #endif
     std::function<void(int,int)> m_upgrade_callback;
