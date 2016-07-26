@@ -58,28 +58,6 @@ namespace _impl {
 template<class T, bool=std::is_trivially_destructible<T>::value>
 struct OptionalStorage;
 
-// FIXME: Callers should switch to std::move when we adopt C++14
-template<class T>
-inline constexpr typename std::remove_reference<T>::type&& constexpr_move(T&& t) noexcept
-{
-    return static_cast<typename std::remove_reference<T>::type&&>(t);
-}
-
-// FIXME: Callers should switch to std::forward when we adopt C++14
-template<class T>
-inline constexpr T&& constexpr_forward(typename std::remove_reference<T>::type& t) noexcept
-{
-    return static_cast<T&&>(t);
-}
-
-// FIXME: Callers should switch to std::forward when we adopt C++14
-template<class T>
-inline constexpr T&& constexpr_forward(typename std::remove_reference<T>::type&& t) noexcept
-{
-    static_assert(!std::is_lvalue_reference<T>::value, "Can't forward rvalue as lvalue.");
-    return static_cast<T&&>(t);
-}
-
 template<class T, class U>
 struct TypeIsAssignableToOptional {
     // Constraints from [optional.object.assign.18]
@@ -272,7 +250,7 @@ Optional<T>::Optional(const Optional<T>& other): Storage(none)
 }
 
 template<class T>
-constexpr Optional<T>::Optional(T&& r_value): Storage(_impl::constexpr_move(r_value))
+constexpr Optional<T>::Optional(T&& r_value): Storage(std::move(r_value))
 {
 }
 
@@ -425,7 +403,7 @@ template<class T>
 template<class U>
 constexpr T Optional<T>::value_or(U&& otherwise) const&
 {
-    return m_engaged ? T{m_value} : T{_impl::constexpr_forward<U>(otherwise)};
+    return m_engaged ? T{m_value} : T{std::forward<U>(otherwise)};
 }
 
 template<class T>
@@ -614,7 +592,7 @@ struct OptionalStorage<T, true> {
     bool m_engaged = false;
 
     constexpr OptionalStorage(realm::util::None) : m_null_state() { }
-    constexpr OptionalStorage(T&& value) : m_value(constexpr_move(value)), m_engaged(true) { }
+    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) { }
 
     template<class... Args>
     constexpr OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
@@ -630,7 +608,7 @@ struct OptionalStorage<T, false> {
     bool m_engaged = false;
 
     constexpr OptionalStorage(realm::util::None) : m_null_state() { }
-    constexpr OptionalStorage(T&& value) : m_value(constexpr_move(value)), m_engaged(true) { }
+    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) { }
 
     template<class... Args>
     constexpr OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
