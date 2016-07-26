@@ -22,9 +22,12 @@
 
 #include <fcntl.h>
 #include <system_error>
+#include <sstream>
+
+#ifdef REALM_CONDVAR_EMULATION
 #include <unistd.h>
 #include <poll.h>
-#include <sstream>
+#endif
 
 using namespace realm;
 using namespace realm::util;
