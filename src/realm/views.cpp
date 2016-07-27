@@ -17,28 +17,17 @@ LinkChain::LinkChain(std::vector<size_t> chain)
     REALM_ASSERT(m_column_indices.size() >= 1);
 }
 
-LinkChain::~LinkChain()
-{
-    if (m_link_translator && m_link_translator.unique()) {
-        m_link_translator->destroy();
-    }
-}
-
 const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_indexes)
 {
     REALM_ASSERT(cb != nullptr);
     REALM_ASSERT(row_indexes != nullptr);
 
     typedef _impl::TableFriend tf;
-    if (m_link_translator && m_link_translator.unique()) {
-        m_link_translator->destroy();
-    }
 
     if (m_column_indices.size() > 1) {
         size_t num_rows = row_indexes->size();
-        ref_type ref = IntNullColumn::create(cb->get_alloc());
-        m_link_translator.reset(new IntNullColumn(cb->get_alloc(), ref));
-        m_link_translator->insert_rows(0, num_rows, 0, true);
+
+        m_link_translator.reset(new SharedArray(Allocator::get_default(), num_rows));
 
         std::vector<const LinkColumn*> link_cols;
         const Table* linked_table = nullptr;
@@ -54,7 +43,7 @@ const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_index
             next_col = &tf::get_column(*linked_table, m_column_indices[link_ndx + 1]);
         }
 
-            for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
+        for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
             size_t translated_index = row_indexes->get(row_ndx);
             bool set_null = false;
             for (size_t link_ndx = 0; link_ndx < link_cols.size(); link_ndx++) {

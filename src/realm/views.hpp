@@ -5,6 +5,7 @@
 #include <realm/column_string_enum.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/index_string.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 namespace realm {
 
@@ -19,19 +20,36 @@ struct IndexPair {
     size_t index_in_view;
 };
 
+class SharedArray {
+public:
+    SharedArray(Allocator& alloc, size_t array_size)
+    : m_storage(alloc), m_guard(alloc)
+    {
+        MemRef mem = ArrayIntNull::create_array(Array::Type::type_Normal, false, array_size, 0, alloc);
+        m_storage.init_from_mem(mem);
+        m_guard.reset(mem.get_ref());
+    }
+    size_t size() { return m_storage.size(); }
+    ArrayIntNull::value_type get_val(size_t ndx) { return m_storage.get(ndx); }
+    void set(size_t ndx, size_t value) { m_storage.set(ndx, value); }
+    void set_null(size_t ndx) { m_storage.set_null(ndx); }
+private:
+    ArrayIntNull m_storage;
+    realm::_impl::DeepArrayRefDestroyGuard m_guard;
+};
+
 class LinkChain
 {
 public:
     LinkChain(size_t single_index);
     LinkChain(std::vector<size_t> chain);
-    ~LinkChain();
     size_t operator[](size_t index) const { return m_column_indices[index]; }
     size_t size() const { return m_column_indices.size(); }
     util::Optional<int64_t> translate(size_t index) const;
     const ColumnBase& init(const ColumnBase* cb, IntegerColumn* row_indexes);
 private:
     std::vector<size_t> m_column_indices;
-    std::shared_ptr<IntNullColumn> m_link_translator;
+    std::shared_ptr<SharedArray> m_link_translator;
 };
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
