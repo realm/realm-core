@@ -25,13 +25,13 @@ public:
     LinkChain(size_t single_index);
     LinkChain(std::vector<size_t> chain);
     ~LinkChain();
-    size_t operator[](size_t index) const { return column_indices[index]; }
-    size_t size() const { return column_indices.size(); }
+    size_t operator[](size_t index) const { return m_column_indices[index]; }
+    size_t size() const { return m_column_indices.size(); }
     util::Optional<int64_t> translate(size_t index) const;
     const ColumnBase& init(const ColumnBase* cb, IntegerColumn* row_indexes);
 private:
-    std::vector<size_t> column_indices;
-    std::shared_ptr<IntNullColumn> link_translator;
+    std::vector<size_t> m_column_indices;
+    std::shared_ptr<IntNullColumn> m_link_translator;
 };
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
