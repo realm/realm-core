@@ -3,6 +3,7 @@
 ### Bugfixes
 
 * Fixing util::MemoryInputStream to support tellg() and seekg().
+* Fix a bug with the local mutex for the robust mutex emulation.
 
 * Lorem ipsum.
 

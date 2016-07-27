@@ -31,6 +31,7 @@
 #include <realm/util/file.hpp>
 #include <realm/utilities.hpp>
 #include <mutex>
+#include <map>
 
 namespace realm {
 namespace util {
@@ -86,9 +87,18 @@ public:
     }
 private:
 #ifdef REALM_ROBUST_MUTEX_EMULATION
+    /// Same m_filename shares the same m_local_mutex which is stored in the map as a weak_ptr.
+    /// Operations on the map need to be protected by s_mutex -- Just use init_local_mutex() and
+    /// free_local_mutex() with the right m_filename has been set.
+    static std::map<std::string, std::weak_ptr<Mutex>> s_mutex_map;
+    static Mutex s_mutex;
+
     std::string m_filename;
     File m_file;
-    Mutex m_local_mutex;
+    std::shared_ptr<Mutex> m_local_mutex;
+
+    void init_local_mutex();
+    void free_local_mutex();
 #else
     SharedPart* m_shared_part = 0;
 #endif
@@ -103,11 +113,41 @@ inline InterprocessMutex::InterprocessMutex()
 inline InterprocessMutex::~InterprocessMutex() noexcept
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    m_local_mutex.lock();
+    m_local_mutex->lock();
     m_file.close();
-    m_local_mutex.unlock();
+    m_local_mutex->unlock();
+
+    free_local_mutex();
 #endif
 }
+
+#ifdef REALM_ROBUST_MUTEX_EMULATION
+inline void InterprocessMutex::init_local_mutex()
+{
+    // The m_local_mutex is not supposed to be inited twice.
+    REALM_ASSERT(!m_local_mutex);
+
+    std::lock_guard<Mutex> guard(s_mutex);
+    auto result = s_mutex_map.find(m_filename);
+    if (result == s_mutex_map.end()) {
+        m_local_mutex = std::make_shared<Mutex>();
+        s_mutex_map[m_filename] = m_local_mutex;
+    } else {
+        m_local_mutex = result->second.lock();
+    }
+}
+
+inline void InterprocessMutex::free_local_mutex()
+{
+    REALM_ASSERT(m_local_mutex);
+
+    std::lock_guard<Mutex> guard(s_mutex);
+    m_local_mutex.reset();
+    if (s_mutex_map[m_filename].expired()) {
+        s_mutex_map.erase(m_filename);
+    }
+}
+#endif
 
 inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
                                                const std::string& path,
@@ -119,7 +159,10 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
         m_file.close();
     }
     m_filename = path + "." + mutex_name + ".mx";
-    std::lock_guard<Mutex> guard(m_local_mutex);
+
+    init_local_mutex();
+
+    std::lock_guard<Mutex> guard(*m_local_mutex);
     m_file.open(m_filename, File::mode_Write);
 #else
     m_shared_part = &shared_part;
@@ -137,7 +180,10 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
         m_file.close();
     }
     m_filename.clear();
-    std::lock_guard<Mutex> guard(m_local_mutex);
+
+    init_local_mutex();
+
+    std::lock_guard<Mutex> guard(*m_local_mutex);
     m_file = std::move(lock_file);
 #else
     m_shared_part = &shared_part;
@@ -172,7 +218,7 @@ inline void InterprocessMutex::unlock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     m_file.unlock();
-    m_local_mutex.unlock();
+    m_local_mutex->unlock();
 #else
     REALM_ASSERT(m_shared_part);
     m_shared_part->unlock();
