@@ -132,8 +132,9 @@ public:
                         return valid1;  // Regardless of m_ascending[t] we sort nulls at the end
                     }
 
-                    index_i = translated_i.value();
-                    index_j = translated_j.value();
+                    // We stored unsigned index values from a size_t type so cast is harmless.
+                    index_i = static_cast<size_t>(translated_i.value());
+                    index_j = static_cast<size_t>(translated_j.value());
                 }
 
                 // todo/fixme, special treatment of StringEnumColumn by calling StringEnumColumn::compare_values()
