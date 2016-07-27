@@ -3,6 +3,7 @@
 ### Bugfixes
 
 * Fixing util::MemoryInputStream to support tellg() and seekg().
+* Workaround for the Blackberry mkfifo bug.
 
 * Lorem ipsum.
 

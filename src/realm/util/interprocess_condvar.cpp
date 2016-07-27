@@ -120,9 +120,20 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
             ret = mkfifo(m_resource_path.c_str(), 0600);
             err = errno;
         }
+
         // the fifo already existing isn't an error
         if (ret == -1 && err != EEXIST) {
-            throw std::system_error(err, std::system_category());
+            // Workaround for a mkfifo bug on Blackberry devices:
+            // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
+            // In this case, we use stat to check if the path exists and it is a fifo.
+            struct stat stat_buf;
+            if (stat(m_resource_path.c_str(), &stat_buf) == 0) {
+                if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
+                    throw std::runtime_error(m_resource_path + " exsits and it is not a fifo.");
+                }
+            } else {
+                throw std::system_error(err, std::system_category());
+            }
         }
     }
 
