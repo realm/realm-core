@@ -86,7 +86,7 @@ public:
         Sorter() {}
 
         Sorter(const std::vector<LinkChain>& columns, const std::vector<bool>& ascending)
-            : m_column_indexes(columns), m_ascending(ascending) {}
+            : m_link_chains(columns), m_ascending(ascending) {}
 
         bool operator()(IndexPair i, IndexPair j) const
         {
@@ -95,14 +95,14 @@ public:
                 size_t index_i = i.index_in_column;
                 size_t index_j = j.index_in_column;
 
-                if (m_column_indexes[t].size() > 1) {
-                    util::Optional<int64_t> translated_i = m_column_indexes[t].translate(i.index_in_view);
-                    util::Optional<int64_t> translated_j = m_column_indexes[t].translate(j.index_in_view);
+                if (m_link_chains[t].size() > 1) {
+                    util::Optional<int64_t> translated_i = m_link_chains[t].translate(i.index_in_view);
+                    util::Optional<int64_t> translated_j = m_link_chains[t].translate(j.index_in_view);
                     bool valid1 = bool(translated_i);
                     bool valid2 = bool(translated_j);
 
                     if (!valid1 && !valid2) {
-                        if (t == m_column_indexes.size() - 1) {
+                        if (t == m_link_chains.size() - 1) {
                             return false; // Two nulls in last sort column
                         }
                         else {
@@ -137,13 +137,13 @@ public:
             REALM_ASSERT(row_indexes);
             m_columns.clear();
             m_string_enum_columns.clear();
-            m_columns.resize(m_column_indexes.size(), nullptr);
-            m_string_enum_columns.resize(m_column_indexes.size(), nullptr);
+            m_columns.resize(m_link_chains.size(), nullptr);
+            m_string_enum_columns.resize(m_link_chains.size(), nullptr);
 
-            for (size_t i = 0; i < m_column_indexes.size(); i++) {
-                REALM_ASSERT_EX(m_column_indexes[i].size() >= 1, m_column_indexes[i].size());
-                const ColumnBase& cb = row_indexes->get_column_base(m_column_indexes[i][0]);
-                const ColumnBase& end_of_chain = m_column_indexes[i].init(&cb, &(row_indexes->m_row_indexes));
+            for (size_t i = 0; i < m_link_chains.size(); i++) {
+                REALM_ASSERT_EX(m_link_chains[i].size() >= 1, m_link_chains[i].size());
+                const ColumnBase& cb = row_indexes->get_column_base(m_link_chains[i][0]);
+                const ColumnBase& end_of_chain = m_link_chains[i].init(&cb, &(row_indexes->m_row_indexes));
                 const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&end_of_chain);
                 REALM_ASSERT(ctb);
                 if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&end_of_chain))
@@ -153,9 +153,9 @@ public:
             }
         }
 
-        explicit operator bool() const { return !m_column_indexes.empty(); }
+        explicit operator bool() const { return !m_link_chains.empty(); }
 
-        std::vector<LinkChain> m_column_indexes;
+        std::vector<LinkChain> m_link_chains;
         std::vector<bool> m_ascending;
         std::vector<const ColumnTemplateBase*> m_columns;
         std::vector<const StringEnumColumn*> m_string_enum_columns;
