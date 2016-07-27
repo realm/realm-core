@@ -3737,21 +3737,23 @@ TEST(Query_SortLinkChains)
     size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
     size_t t3_str_col = t3->add_column(type_String, "t3_str");
 
-    t1->add_empty_row(6);
+    t1->add_empty_row(7);
     t2->add_empty_row(6);
     t3->add_empty_row(4);
 
-    for (size_t i = 0; i < t1->size(); i++) {
-        t1->set_int(t1_int_col, i, i);
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t2->size(); i++) {
+        t1->set_int(t1_int_col, i + 1, i);
         t2->set_int(t2_int_col, i, t1->size() - i);
     }
 
-    t1->set_link(t1_link_col, 0, 0);
-    t1->set_link(t1_link_col, 1, 2);
-    t1->set_link(t1_link_col, 2, 3);
-    t1->set_link(t1_link_col, 3, 5);
-    t1->set_link(t1_link_col, 4, 4);
-    t1->set_link(t1_link_col, 5, 1);
+    t1->set_link(t1_link_col, 0, 1);
+    t1->set_link(t1_link_col, 1, 0);
+    t1->set_link(t1_link_col, 2, 2);
+    t1->set_link(t1_link_col, 3, 3);
+    t1->set_link(t1_link_col, 4, 5);
+    t1->set_link(t1_link_col, 5, 4);
+    t1->set_link(t1_link_col, 6, 1);
 
     t2->set_link(t2_link_col, 0, 3);
     t2->set_link(t2_link_col, 1, 2);
@@ -3772,14 +3774,15 @@ TEST(Query_SortLinkChains)
     //  T1                       T2                     T3
     //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
     //  ==============================================================
-    //  0        0           |   5       3          |   null    "b"
-    //  1        2           |   4       2          |   4       "a"
-    //  2        3           |   3       0          |   7       "c"
-    //  3        5           |   2       1          |   3       "k"
-    //  4        4           |   1       null       |
-    //  5        1           |   0       null       |
+    //  99       1           |   5       3          |   null    "b"
+    //  0        0           |   4       2          |   4       "a"
+    //  1        2           |   3       0          |   7       "c"
+    //  2        3           |   2       1          |   3       "k"
+    //  3        5           |   1       null       |
+    //  4        4           |   0       null       |
+    //  5        1           |                      |
 
-    TableView tv = t1->where().find_all();
+    TableView tv = t1->where().less(t1_int_col, 6).find_all();
 
     // Test original funcionality through chain class
     std::vector<size_t> link_chain1 = { t1_int_col };

@@ -10,6 +10,15 @@ namespace realm {
 
 const int64_t detached_ref = -1;
 
+class RowIndexes;
+
+struct IndexPair {
+    IndexPair(size_t col_ndx, size_t view_ndx)
+        : index_in_column(col_ndx), index_in_view(view_ndx) {}
+    size_t index_in_column;
+    size_t index_in_view;
+};
+
 class LinkChain
 {
 public:
@@ -19,7 +28,7 @@ public:
     size_t operator[](size_t index) const { return column_indices[index]; }
     size_t size() const { return column_indices.size(); }
     util::Optional<int64_t> translate(size_t index) const;
-    const ColumnBase& init(const ColumnBase* cb);
+    const ColumnBase& init(const ColumnBase* cb, IntegerColumn* row_indexes);
 private:
     std::vector<size_t> column_indices;
     std::shared_ptr<IntNullColumn> link_translator;
@@ -79,16 +88,16 @@ public:
         Sorter(const std::vector<LinkChain>& columns, const std::vector<bool>& ascending)
             : m_column_indexes(columns), m_ascending(ascending) {}
 
-        bool operator()(size_t i, size_t j) const
+        bool operator()(IndexPair i, IndexPair j) const
         {
             for (size_t t = 0; t < m_columns.size(); t++) {
 
-                size_t index_i = i;
-                size_t index_j = j;
+                size_t index_i = i.index_in_column;
+                size_t index_j = j.index_in_column;
 
                 if (m_column_indexes[t].size() > 1) {
-                    util::Optional<int64_t> translated_i = m_column_indexes[t].translate(i);
-                    util::Optional<int64_t> translated_j = m_column_indexes[t].translate(j);
+                    util::Optional<int64_t> translated_i = m_column_indexes[t].translate(i.index_in_view);
+                    util::Optional<int64_t> translated_j = m_column_indexes[t].translate(j.index_in_view);
                     bool valid1 = bool(translated_i);
                     bool valid2 = bool(translated_j);
 
@@ -120,11 +129,12 @@ public:
                 if (c != 0)
                     return m_ascending[t] ? c > 0 : c < 0;
             }
-            return false; // row index1 == row index2
+            return false; // row(index1) == row(index2)
         }
 
         void init(RowIndexes* row_indexes)
         {
+            REALM_ASSERT(row_indexes);
             m_columns.clear();
             m_string_enum_columns.clear();
             m_columns.resize(m_column_indexes.size(), nullptr);
@@ -133,7 +143,7 @@ public:
             for (size_t i = 0; i < m_column_indexes.size(); i++) {
                 REALM_ASSERT_EX(m_column_indexes[i].size() >= 1, m_column_indexes[i].size());
                 const ColumnBase& cb = row_indexes->get_column_base(m_column_indexes[i][0]);
-                const ColumnBase& end_of_chain = m_column_indexes[i].init(&cb);
+                const ColumnBase& end_of_chain = m_column_indexes[i].init(&cb, &(row_indexes->m_row_indexes));
                 const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&end_of_chain);
                 REALM_ASSERT(ctb);
                 if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&end_of_chain))

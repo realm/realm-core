@@ -24,16 +24,18 @@ LinkChain::~LinkChain()
     }
 }
 
-const ColumnBase& LinkChain::init(const ColumnBase* cb)
+const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_indexes)
 {
     REALM_ASSERT(cb != nullptr);
+    REALM_ASSERT(row_indexes != nullptr);
+
     typedef _impl::TableFriend tf;
     if (link_translator && link_translator.unique()) {
         link_translator->destroy();
     }
 
     if (column_indices.size() > 1) {
-        size_t num_rows = cb->size();
+        size_t num_rows = row_indexes->size();
         ref_type ref = IntNullColumn::create(cb->get_alloc());
         link_translator.reset(new IntNullColumn(cb->get_alloc(), ref));
         link_translator->insert_rows(0, num_rows, 0, true);
@@ -52,8 +54,8 @@ const ColumnBase& LinkChain::init(const ColumnBase* cb)
             next_col = &tf::get_column(*linked_table, column_indices[link_ndx + 1]);
         }
 
-        for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
-            size_t translated_index = row_ndx;
+            for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
+            size_t translated_index = row_indexes->get(row_ndx);
             bool set_null = false;
             for (size_t link_ndx = 0; link_ndx < link_cols.size(); link_ndx++) {
                 if (link_cols[link_ndx]->is_null(translated_index)) {
@@ -82,7 +84,7 @@ util::Optional<int64_t> LinkChain::translate(size_t index) const
 {
     util::Optional<int64_t> value(index);
     if (link_translator) {
-        REALM_ASSERT(index < link_translator->size());
+        REALM_ASSERT_EX(index < link_translator->size(), index, link_translator->size());
         value = link_translator->get_val(index);
     }
     return value;
@@ -96,7 +98,7 @@ void RowIndexes::sort(Sorter& sorting_predicate)
     if (sz == 0)
         return;
 
-    std::vector<size_t> v;
+    std::vector<IndexPair> v;
     v.reserve(sz);
     // always put any detached refs at the end of the sort
     // FIXME: reconsider if this is the right thing to do
@@ -106,7 +108,7 @@ void RowIndexes::sort(Sorter& sorting_predicate)
     for (size_t t = 0; t < sz; t++) {
         int64_t ndx = m_row_indexes.get(t);
         if (ndx != detached_ref) {
-            v.push_back(ndx);
+            v.push_back(IndexPair(ndx, t));
         }
         else
             ++detached_ref_count;
@@ -115,7 +117,7 @@ void RowIndexes::sort(Sorter& sorting_predicate)
     std::stable_sort(v.begin(), v.end(), sorting_predicate);
     m_row_indexes.clear();
     for (size_t t = 0; t < sz - detached_ref_count; t++)
-        m_row_indexes.add(v[t]);
+        m_row_indexes.add(v[t].index_in_column);
     for (size_t t = 0; t < detached_ref_count; ++t)
         m_row_indexes.add(-1);
 }
