@@ -47,6 +47,7 @@ public:
     size_t size() const { return m_column_indices.size(); }
     util::Optional<int64_t> translate(size_t index) const;
     const ColumnBase& init(const ColumnBase* cb, IntegerColumn* row_indexes);
+    void cleanup() { m_link_translator.reset(); }
 private:
     std::vector<size_t> m_column_indices;
     std::shared_ptr<SharedArray> m_link_translator;
@@ -168,6 +169,13 @@ public:
                     m_string_enum_columns[i] = cse;
                 else
                     m_columns[i] = ctb;
+            }
+        }
+
+        void cleanup()
+        {
+            for (size_t i = 0; i < m_link_chains.size(); i++) {
+                m_link_chains[i].cleanup();
             }
         }
 
