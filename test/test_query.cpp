@@ -3820,9 +3820,10 @@ TEST(Query_SortLinkChains)
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
     }
     tv.sort(link_chain3, false);
+    // No guarantees about nullified links except they are at the beginning.
     size_t num_nulls = tv.size() - results3.size();
-    for (size_t i = 0; i < results3.size(); ++i) {
-        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results2.size() - 1 - i - num_nulls]);
+    for (size_t i = num_nulls; i < results3.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results2.size() - 1 - i]);
     }
 
     // Test link chain with nulls and a single local column
@@ -3841,13 +3842,13 @@ TEST(Query_SortLinkChains)
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev[i]);
     }
-    std::vector<size_t> results4_rev2 = { 5, 2, 0, 1, 3, 4 };
+    std::vector<size_t> results4_rev2 = { 3, 4, 5, 2, 0, 1 };
     std::vector<bool> order4_rev2 = { false, true };
     tv.sort(chain4, order4_rev2);
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev2[i]);
     }
-    std::vector<size_t> results4_rev3 = { 5, 2, 0, 1, 4, 3 };
+    std::vector<size_t> results4_rev3 = { 4, 3, 5, 2, 0, 1 };
     std::vector<bool> order4_rev3 = { false, false };
     tv.sort(chain4, order4_rev3);
     for (size_t i = 0; i < tv.size(); ++i) {

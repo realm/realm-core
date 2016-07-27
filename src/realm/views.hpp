@@ -129,7 +129,8 @@ public:
                         }
                     }
                     else if (!valid1 || !valid2) {
-                        return valid1;  // Regardless of m_ascending[t] we sort nulls at the end
+                        // Sort null links at the end if m_ascending[t], else at beginning
+                        return valid1 ? m_ascending[t] : !m_ascending[t];
                     }
 
                     // We stored unsigned index values from a size_t type so cast is harmless.
