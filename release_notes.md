@@ -2,6 +2,8 @@
 
 ### Bugfixes
 
+* Fixing util::MemoryInputStream to support tellg() and seekg().
+
 * Lorem ipsum.
 
 ### Breaking changes
@@ -9,6 +11,7 @@
 * Lorem ipsum.
 
 ### Enhancements
+
 
 * Lorem ipsum.
 
@@ -18,6 +21,7 @@
 
 * Removed `realm::util::network` library.
 * Removed event loop library.
+* Reduced the number of open files on Android.
 
 ----------------------------------------------
 

@@ -38,7 +38,11 @@ using namespace realm;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-static int magic = 0;
+
+// In order to check that some static functions are called they must have
+// a side-effect on a static variable.
+static util::Mutex magicMutex;
+static int magic;
 
 struct Person {
     void set_name(std::string name) { m_name = name; }
@@ -131,10 +135,14 @@ TEST(TypeList_Basic)
     using Dummy2   = util::TypeAppend< Dummy1, int>::type;
     using TypeList = util::TypeAppend< Dummy2, bool>::type;
 
-    int type_cnt = util::TypeCount<TypeList>::value;
-    CHECK_EQUAL(type_cnt, 3);
-    util::ForEachType<TypeList, DoSomething, 1>::exec();
-    CHECK_EQUAL(magic, 14); // 1 + 2*2 + 3*3
+    {
+        util::LockGuard lk(magicMutex);
+        magic = 0;
+        int type_cnt = util::TypeCount<TypeList>::value;
+        CHECK_EQUAL(type_cnt, 3);
+        util::ForEachType<TypeList, DoSomething, 1>::exec();
+        CHECK_EQUAL(magic, 14); // 1 + 2*2 + 3*3
+    }
 
     util::ForEachType<TypeList, DoSomething, 1>::exec(&person);
     CHECK_EQUAL(person.m_name, "John Doe");
