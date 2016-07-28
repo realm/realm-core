@@ -21,17 +21,17 @@
 #ifndef REALM_UTIL_INTERPROCESS_MUTEX
 #define REALM_UTIL_INTERPROCESS_MUTEX
 
-// Enable this only on platforms where it might be needed
-#if REALM_PLATFORM_APPLE || REALM_ANDROID
-#define REALM_ROBUST_MUTEX_EMULATION
-#endif
-
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/file.hpp>
 #include <realm/utilities.hpp>
 #include <mutex>
 #include <map>
+
+// Enable this only on platforms where it might be needed
+#if REALM_PLATFORM_APPLE || REALM_ANDROID
+#define REALM_ROBUST_MUTEX_EMULATION
+#endif
 
 namespace realm {
 namespace util {
