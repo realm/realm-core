@@ -87,18 +87,25 @@ public:
     }
 private:
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    /// Same m_filename shares the same m_local_mutex which is stored in the map as a weak_ptr.
-    /// Operations on the map need to be protected by s_mutex -- Just use init_local_mutex() and
-    /// free_local_mutex() with the right m_filename has been set.
-    static std::map<std::string, std::weak_ptr<Mutex>> s_mutex_map;
+    struct LockInfo {
+        File m_file;
+        Mutex m_local_mutex;
+        ~LockInfo() noexcept;
+    };
+    /// InterprocessMutex created on the same file (same inode on POSIX) share the same LockInfo.
+    /// LockInfo will be saved in a static map as a weak ptr and use the UniqueID as the key.
+    /// Operations on the map need to be protected by s_mutex
+    static std::map<File::UniqueID, std::weak_ptr<LockInfo>> s_info_map;
     static Mutex s_mutex;
 
+    /// Only used for release_shared_part
     std::string m_filename;
-    File m_file;
-    std::shared_ptr<Mutex> m_local_mutex;
+    File::UniqueID m_fileuid;
+    std::shared_ptr<LockInfo> m_lock_info;
 
-    void init_local_mutex();
-    void free_local_mutex();
+    /// Free the lock info hold by this instance.
+    /// If it is the last reference, underly resources will be freed as well.
+    void free_lock_info();
 #else
     SharedPart* m_shared_part = 0;
 #endif
@@ -113,39 +120,29 @@ inline InterprocessMutex::InterprocessMutex()
 inline InterprocessMutex::~InterprocessMutex() noexcept
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    m_local_mutex->lock();
-    m_file.close();
-    m_local_mutex->unlock();
-
-    free_local_mutex();
+    free_lock_info();
 #endif
 }
 
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-inline void InterprocessMutex::init_local_mutex()
+inline InterprocessMutex::LockInfo::~LockInfo() noexcept
 {
-    // The m_local_mutex is not supposed to be inited twice.
-    REALM_ASSERT(!m_local_mutex);
-
-    std::lock_guard<Mutex> guard(s_mutex);
-    auto result = s_mutex_map.find(m_filename);
-    if (result == s_mutex_map.end()) {
-        m_local_mutex = std::make_shared<Mutex>();
-        s_mutex_map[m_filename] = m_local_mutex;
-    } else {
-        m_local_mutex = result->second.lock();
+    if (m_file.is_attached()) {
+        m_file.close();
     }
 }
 
-inline void InterprocessMutex::free_local_mutex()
+inline void InterprocessMutex::free_lock_info()
 {
-    REALM_ASSERT(m_local_mutex);
+    // It has not been inited yet.
+    if (!m_lock_info) return;
 
     std::lock_guard<Mutex> guard(s_mutex);
-    m_local_mutex.reset();
-    if (s_mutex_map[m_filename].expired()) {
-        s_mutex_map.erase(m_filename);
+    m_lock_info.reset();
+    if (s_info_map[m_fileuid].expired()) {
+        s_info_map.erase(m_fileuid);
     }
+    m_filename.clear();
 }
 #endif
 
@@ -155,15 +152,29 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     static_cast<void>(shared_part);
-    if (m_file.is_attached()) {
-        m_file.close();
-    }
+
+    free_lock_info();
+
     m_filename = path + "." + mutex_name + ".mx";
 
-    init_local_mutex();
+    std::lock_guard<Mutex> guard(s_mutex);
+    bool file_exists = File::get_unique_id(m_filename, m_fileuid);
+    if (file_exists) {
+        auto result = s_info_map.find(m_fileuid);
+        if (result != s_info_map.end()) {
+            // File exists and the lock info has been created in the map.
+            m_lock_info = result->second.lock();
+            return;
+        }
+    }
 
-    std::lock_guard<Mutex> guard(*m_local_mutex);
-    m_file.open(m_filename, File::mode_Write);
+    // LockInfo has not been created yet.
+    m_lock_info = std::make_shared<LockInfo>();
+    m_lock_info->m_file.open(m_filename, file_exists ? File::mode_Update : File::mode_Write);
+    if (!file_exists) {
+        m_fileuid = m_lock_info->m_file.get_unique_id();
+    }
+    s_info_map[m_fileuid] = m_lock_info;
 #else
     m_shared_part = &shared_part;
     static_cast<void>(path);
@@ -176,15 +187,22 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     static_cast<void>(shared_part);
-    if (m_file.is_attached()) {
-        m_file.close();
+
+    free_lock_info();
+
+    std::lock_guard<Mutex> guard(s_mutex);
+    m_fileuid = lock_file.get_unique_id();
+
+    auto result = s_info_map.find(m_fileuid);
+    if (result == s_info_map.end()) {
+        m_lock_info = std::make_shared<LockInfo>();
+        m_lock_info->m_file = std::move(lock_file);
+        s_info_map[m_fileuid] = m_lock_info;
+    } else {
+        // File exists and the lock info has been created in the map.
+        m_lock_info = result->second.lock();
+        lock_file.close();
     }
-    m_filename.clear();
-
-    init_local_mutex();
-
-    std::lock_guard<Mutex> guard(*m_local_mutex);
-    m_file = std::move(lock_file);
 #else
     m_shared_part = &shared_part;
     static_cast<void>(lock_file);
@@ -194,8 +212,12 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
 inline void InterprocessMutex::release_shared_part()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
+    if (!m_lock_info) return;
+
     if (!m_filename.empty())
         File::try_remove(m_filename);
+
+    free_lock_info();
 #else
     m_shared_part = nullptr;
 #endif
@@ -204,8 +226,8 @@ inline void InterprocessMutex::release_shared_part()
 inline void InterprocessMutex::lock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    std::unique_lock<Mutex> mutex_lock(m_local_mutex);
-    m_file.lock_exclusive();
+    std::unique_lock<Mutex> mutex_lock(m_lock_info->m_local_mutex);
+    m_lock_info->m_file.lock_exclusive();
     mutex_lock.release();
 #else
     REALM_ASSERT(m_shared_part);
@@ -217,8 +239,8 @@ inline void InterprocessMutex::lock()
 inline void InterprocessMutex::unlock()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    m_file.unlock();
-    m_local_mutex->unlock();
+    m_lock_info->m_file.unlock();
+    m_lock_info->m_local_mutex.unlock();
 #else
     REALM_ASSERT(m_shared_part);
     m_shared_part->unlock();

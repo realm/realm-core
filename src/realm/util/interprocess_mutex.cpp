@@ -24,7 +24,7 @@
 
 using namespace realm::util;
 
-std::map<std::string, std::weak_ptr<Mutex>> InterprocessMutex::s_mutex_map;
+std::map<File::UniqueID, std::weak_ptr<InterprocessMutex::LockInfo>> InterprocessMutex::s_info_map;
 Mutex InterprocessMutex::s_mutex;
 
 #endif
