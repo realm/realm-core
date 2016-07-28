@@ -129,7 +129,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
             struct stat stat_buf;
             if (stat(m_resource_path.c_str(), &stat_buf) == 0) {
                 if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
-                    throw std::runtime_error(m_resource_path + " exsits and it is not a fifo.");
+                    throw std::runtime_error(m_resource_path + " exists and it is not a fifo.");
                 }
             } else {
                 throw std::system_error(err, std::system_category());
