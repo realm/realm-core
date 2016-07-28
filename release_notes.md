@@ -2,6 +2,83 @@
 
 ### Bugfixes
 
+* Fixing util::MemoryInputStream to support tellg() and seekg().
+
+* Lorem ipsum.
+
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Reduced the number of open files on Android.
+
+----------------------------------------------
+
+# 1.4.0 Release notes
+
+### Breaking changes
+
+* Throw a logic error (of type `table_has_no_columns`) if an attempt is made to
+  add rows to a table with no columns. (#1897)
+* S: A clear operation is emitted on removal of the last public column of a table.
+
+----------------------------------------------
+
+# 1.3.1 Release notes
+
+### Bugfixes
+
+* Add missing locks when access `Table::m_views` which may lead to some java
+  crashes since java will not guarantee destruction and construction always
+  happen in the same thread. (#1958)
+* Fixed a bug where tableviews created via backlinks were not automatically
+  updated when the source table changed. (#1950)
+
+### Breaking changes
+
+* Throw a logic error (of type `table_has_no_columns`) if an attempt is made to
+  add rows to a table with no columns. (#1897)
+* S: A clear operation is emitted on removal of the last public column of a table.
+
+### Enhancements
+
+* Increased the verbosity of some exception error messages to help debugging.
+
+----------------------------------------------
+
+# 1.3.0 Release notes
+
+### Bugfixes
+
+* Fix a crash when `Group::move_table()` is called before table accessors are
+  initialized. (#1939)
+
+### Breaking changes
+
+* Sorting with `STRING_COMPARE_CORE` now sorts with pre 1.1.2 ordering. Sorting
+  with 1.1.2 order is available by using `STRING_COMPARE_CORE_SIMILAR`. (#1947)
+
+-----------
+
+### Internals
+
+* Performance improvements for `LinkListColumn::get_ptr()`. (#1933)
+
+----------------------------------------------
+
+# 1.2.0 Release notes
+
+### Bugfixes
+
 * Update table views so that rows are not attached after calling Table::clear() (#1837)
 * The SlabAlloctor was not correctly releasing all its stale memory mappings
   when it was detached. If a SharedGroup was reused to access a database
@@ -53,6 +130,7 @@
   (#1478)
 * New feature in the unit test framework: Ability to specify log level
   threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
+* Switch from `-O3` to `-Os` to compile OpenSSL: https://github.com/android-ndk/ndk/issues/110
 
 ----------------------------------------------
 

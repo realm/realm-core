@@ -106,9 +106,9 @@ public:
             REALM_ASSERT(!*sec);
             *sec = ec;
             auto handler_2 = [handler=std::move(handler), sec=std::move(sec)] {
-                std::error_code ec = *sec;
+                std::error_code handler_ec = *sec;
                 *sec = std::error_code();
-                handler(ec); // Throws
+                handler(handler_ec); // Throws
             };
             m_socket.service().post(std::move(handler_2)); // Throws
             return;

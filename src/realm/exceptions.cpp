@@ -64,6 +64,8 @@ const char* LogicError::what() const noexcept
         case mixed_history_type:
             return "History type (as specified by the Replication implementation passed to "
                 "the SharedGroup constructor) was not consistent across the session";
+        case table_has_no_columns:
+            return "Table has no columns";
     }
     return "Unknown error";
     // LCOV_EXCL_STOP (LogicError messages)

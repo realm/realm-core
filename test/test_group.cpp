@@ -909,6 +909,21 @@ TEST(Group_MoveTableWithLinks)
 }
 
 
+TEST(Group_MoveTableImmediatelyAfterOpen)
+{
+    Group g1;
+    TableRef a = g1.add_table("a");
+    TableRef b = g1.add_table("b");
+    CHECK_EQUAL(2, g1.size());
+
+    Group g2(g1.write_to_mem());
+    g2.move_table(0, 1);
+    CHECK_EQUAL(2, g2.size());
+    CHECK_EQUAL("b", g2.get_table_name(0));
+    CHECK_EQUAL("a", g2.get_table_name(1));
+}
+
+
 namespace {
 
 void setup_table(TestTableGroup::Ref t)
@@ -2392,8 +2407,8 @@ TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
     Group g;
     g.insert_table(0, "A");
     g.add_table("B");
-    g.get_table(1)->insert_empty_row(0, 17);
     g.get_table(0)->add_column_link(type_LinkList, "link", *g.get_table(1));
+    g.get_table(1)->insert_empty_row(0, 17);
     g.get_table(1)->insert_empty_row(17, 1);
 
     // Triggers "alloc.hpp:213: Assertion failed: v % 8 == 0"

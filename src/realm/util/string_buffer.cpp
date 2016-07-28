@@ -13,13 +13,13 @@ using namespace realm::util;
 char StringBuffer::m_zero = 0;
 
 
-void StringBuffer::append(const char* data, size_t size)
+void StringBuffer::append(const char* append_data, size_t append_data_size)
 {
     size_t new_size = m_size;
-    if (int_add_with_overflow_detect(new_size, size))
+    if (int_add_with_overflow_detect(new_size, append_data_size))
         throw util::BufferSizeOverflow();
     reserve(new_size); // Throws
-    std::copy(data, data+size, m_buffer.data()+m_size);
+    std::copy(append_data, append_data+append_data_size, m_buffer.data()+m_size);
     m_size = new_size;
     m_buffer[new_size] = 0; // Add zero termination
 }

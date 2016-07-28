@@ -1189,20 +1189,20 @@ TEST(Many_ConcurrentReaders)
     const std::string path_str = path;
 
     // setup
-    SharedGroup sg(path_str);
-    WriteTransaction wt(sg);
+    SharedGroup sg_w(path_str);
+    WriteTransaction wt(sg_w);
     TableRef t = wt.add_table("table");
     size_t col_ndx = t->add_column(type_String, "column");
     t->add_empty_row(1);
     t->set_string(col_ndx, 0, StringData("string"));
     wt.commit();
-    sg.close();
+    sg_w.close();
 
     auto reader = [path_str]() {
         try {
             for (int i = 0; i < 1000; ++i) {
-                SharedGroup sg(path_str);
-                ReadTransaction rt(sg);
+                SharedGroup sg_r(path_str);
+                ReadTransaction rt(sg_r);
                 rt.get_group().verify();
             }
         } catch (...) {
@@ -2528,16 +2528,18 @@ TEST(Shared_ReserveDiskSpace)
         sg.reserve(reserve_size_4);
         size_t new_file_size_4 = size_t(File(path).get_size());
         CHECK(new_file_size_4 >= reserve_size_4);
-        WriteTransaction wt(sg);
-        wt.get_group().verify();
-        wt.add_table<TestTableShared>("table_2")->add_empty_row(2000);
-        orig_file_size = size_t(File(path).get_size());
-        size_t reserve_size_5 = orig_file_size + 333;
-        sg.reserve(reserve_size_5);
-        size_t new_file_size_5 = size_t(File(path).get_size());
-        CHECK(new_file_size_5 >= reserve_size_5);
-        wt.add_table<TestTableShared>("table_3")->add_empty_row(2000);
-        wt.commit();
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().verify();
+            wt.add_table<TestTableShared>("table_2")->add_empty_row(2000);
+            orig_file_size = size_t(File(path).get_size());
+            size_t reserve_size_5 = orig_file_size + 333;
+            sg.reserve(reserve_size_5);
+            size_t new_file_size_5 = size_t(File(path).get_size());
+            CHECK(new_file_size_5 >= reserve_size_5);
+            wt.add_table<TestTableShared>("table_3")->add_empty_row(2000);
+            wt.commit();
+        }
         orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_6 = orig_file_size + 459;
         sg.reserve(reserve_size_6);
@@ -2975,7 +2977,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
     }
     sg.close();
 
-    std::vector<std::pair<char*, size_t>> memory_list;
+    std::vector<std::pair<void*, size_t>> memory_list;
     // Reserve enough for 500 Gb, but in practice the vector is only ever around size 10.
     // Do this here to avoid the (small) chance that adding to the vector will request new virtual memory
     memory_list.reserve(500);
@@ -2986,7 +2988,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
             chunk_size /= 2;
         }
         else {
-            memory_list.push_back(std::pair<char*,size_t>((char*)addr, chunk_size));
+            memory_list.push_back(std::pair<void*, size_t>(addr, chunk_size));
         }
     }
 
@@ -3032,7 +3034,6 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     //std::string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
     //std::string filename = "d:/crash3";
 
-    std::string instr;
     if (filename != "") {
         const char* tmp[] = { "", filename.c_str(), "--log" };
         run_fuzzy(sizeof(tmp) / sizeof(tmp[0]), tmp);

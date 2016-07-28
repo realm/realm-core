@@ -22,9 +22,12 @@
 
 #include <fcntl.h>
 #include <system_error>
+#include <sstream>
+
+#ifdef REALM_CONDVAR_EMULATION
 #include <unistd.h>
 #include <poll.h>
-#include <sstream>
+#endif
 
 using namespace realm;
 using namespace realm::util;
@@ -69,8 +72,10 @@ void InterprocessCondVar::close() noexcept
 {
     if (uses_emulation) { // true if emulating a process shared condvar
         uses_emulation = false;
+#ifdef REALM_CONDVAR_EMULATION
         ::close(m_fd_read);
         ::close(m_fd_write);
+#endif        
         return; // we don't need to clean up the SharedPart
     }
     // we don't do anything to the shared part, other CondVars may share it

@@ -2046,9 +2046,9 @@ public:
     }
 
     template<typename C>
-    SubColumns<C> column(size_t column) const
+    SubColumns<C> column(size_t column_ndx) const
     {
-        return SubColumns<C>(Columns<C>(column, m_link_map.target_table()), m_link_map);
+        return SubColumns<C>(Columns<C>(column_ndx, m_link_map.target_table()), m_link_map);
     }
 
     LinkMap link_map() const { return m_link_map; }
@@ -2073,10 +2073,10 @@ public:
     }
 
 private:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}) :
+    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links={}) :
         m_link_map(table, links)
     {
-        static_cast<void>(column);
+        static_cast<void>(column_ndx);
     }
 
     LinkMap m_link_map;

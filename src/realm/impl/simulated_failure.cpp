@@ -9,7 +9,7 @@
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE || REALM_ANDROID
 #  define USE_PTHREADS_IMPL 1
 #else
 #  define USE_PTHREADS_IMPL 0
@@ -52,10 +52,10 @@ struct RandomPrimeMode: PrimeMode {
     std::mt19937_64 random;
     std::uniform_int_distribution<int> dist;
     int n;
-    RandomPrimeMode(int n, int m, uint_fast64_t seed):
+    RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed):
         random(seed),
         dist(0, m-1),
-        n(n)
+        n(trigger_threshold)
     {
         REALM_ASSERT(n >= 0 && m > 0);
     }

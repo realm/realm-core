@@ -241,9 +241,7 @@
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">$(ProjectName)64</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">$(ProjectName)32d</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">$(ProjectName)32</TargetName>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(LibraryPath)</LibraryPath>
@@ -639,6 +637,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\src\realm\util\file_mapper.cpp" />
+    <ClCompile Include="..\..\src\realm\util\interprocess_condvar.cpp" />
     <ClCompile Include="..\..\src\realm\util\memory_stream.cpp" />
     <ClCompile Include="..\..\src\realm\util\misc_errors.cpp" />
     <ClCompile Include="..\..\src\realm\util\thread.cpp" />
@@ -1161,6 +1160,7 @@
     <ClInclude Include="..\..\src\realm\util\priority_queue.hpp" />
     <ClInclude Include="..\..\src\realm\util\shared_ptr.hpp" />
     <ClInclude Include="..\..\src\realm\util\terminate.hpp" />
+    <ClInclude Include="..\..\src\realm\util\to_string.hpp" />
     <ClInclude Include="..\..\src\realm\util\unique_ptr.hpp" />
     <ClInclude Include="..\..\src\realm\util\bind_ptr.hpp" />
     <ClInclude Include="..\..\src\realm\column.hpp" />

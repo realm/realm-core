@@ -670,13 +670,13 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
 
     ReadTransaction rt(sg);
     const Group& group = rt.get_group();
-    ConstTableRef a = rt.get_table("a");
+    ConstTableRef a_r = rt.get_table("a");
 
     {
         WriteTransaction wt(sg_w);
-        TableRef a = wt.get_table("a");
-        TableRef b = wt.get_or_add_table("b");
-        b->add_column_link(type_Link, "foo", *a);
+        TableRef a_w = wt.get_table("a");
+        TableRef b_w = wt.get_or_add_table("b");
+        b_w->add_column_link(type_Link, "foo", *a_w);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -975,8 +975,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
         subtab_w->set_int(0, 0, value);
     };
 
-    auto check_subtab = [this](ConstTableRef table, size_t col_ndx, size_t row_ndx, int_type value) {
-        ConstTableRef subtab = table->get_subtable(col_ndx, row_ndx);
+    auto check_subtab = [this](ConstTableRef table_r, size_t col_ndx, size_t row_ndx, int_type value) {
+        ConstTableRef subtab = table_r->get_subtable(col_ndx, row_ndx);
         return CHECK_EQUAL(1, subtab->get_column_count()) &&
             CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
             CHECK_EQUAL(1, subtab->size()) &&
@@ -3524,7 +3524,7 @@ namespace {
 template<typename T>
 class ConcurrentQueue {
 public:
-    ConcurrentQueue(size_t sz) : sz(sz)
+    ConcurrentQueue(size_t size) : sz(size)
     {
         data.reset(new T[sz]);
     }
@@ -7490,7 +7490,7 @@ namespace {
 // the entire interface
 class NoOpTransactionLogParser {
 public:
-    NoOpTransactionLogParser(TestContext& test_context) : test_context(test_context) { }
+    NoOpTransactionLogParser(TestContext& context) : test_context(context) { }
 
     size_t get_current_table() const
     {
@@ -8758,9 +8758,9 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     SHARED_GROUP_TEST_PATH(path);
     // we hold on to write log collector and registry across a complete
     // shutdown/initialization of shared group.
-    std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist1(make_client_history(path, crypt_key()));
     {
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist1, SharedGroup::durability_Full, crypt_key());
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("table");
@@ -8772,8 +8772,8 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
         // no valid shared group anymore
     }
     {
-        std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        std::unique_ptr<Replication> hist2(make_client_history(path, crypt_key()));
+        SharedGroup sg(*hist2, SharedGroup::durability_Full, crypt_key());
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.get_table("table");
@@ -11271,17 +11271,17 @@ TEST(LangBindHelper_HandoverFuzzyTest)
 
         for (size_t i = 0; i < numberOfOwner; i++) {
 
-            size_t r = owner->add_empty_row();
+            size_t r_i = owner->add_empty_row();
             std::string owner_str(std::string("owner") + to_string(i));
-            owner->set_string(0, r, owner_str);
+            owner->set_string(0, r_i, owner_str);
 
             for (size_t j = 0; j < numberOfDogsPerOwner; j++) {
-                size_t r = dog->add_empty_row();
+                size_t r_j = dog->add_empty_row();
                 std::string dog_str(std::string("dog") + to_string(i * numberOfOwner + j));
-                dog->set_string(0, r, dog_str);
-                dog->set_link(1, r, i);
+                dog->set_string(0, r_j, dog_str);
+                dog->set_link(1, r_j, i);
                 LinkViewRef ll = owner->get_linklist(1, i);
-                ll->add(r);
+                ll->add(r_j);
             }
         }
 
@@ -11961,9 +11961,9 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
     g.add_table("t0");
     g.insert_table(1, "t1");
 
+    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
     g.get_table(0)->add_empty_row(2);
     g.get_table(1)->add_empty_row(2);
-    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
     g.get_table(0)->set_link(0, 1, 1);
 
     CHECK_EQUAL(g.get_table(0)->size(), 2);
@@ -12073,9 +12073,9 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
     g.add_table("t0");
     g.insert_table(1, "t1");
 
+    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
     g.get_table(0)->add_empty_row(2);
     g.get_table(1)->add_empty_row(2);
-    g.get_table(0)->add_column_link(type_Link, "t0_link_to_t1", *g.get_table(1));
     g.get_table(0)->set_link(0, 1, 1);
 
     CHECK_EQUAL(g.get_table(0)->size(), 2);
@@ -12204,6 +12204,7 @@ TEST(LangbindHelper_BoolSearchIndexCommitPromote)
     t->remove(8);
 }
 
+
 TEST(LangbindHelper_GetDataTypeName)
 {
     CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_Int), "int"));
@@ -12220,5 +12221,38 @@ TEST(LangbindHelper_GetDataTypeName)
     CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(type_LinkList), "linklist"));
     CHECK_EQUAL(0, strcmp(LangBindHelper::get_data_type_name(static_cast<DataType>(42)), "unknown"));
 }
+
+
+// Found by AFL.
+TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    g.add_table("dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbterse");
+    g.add_table("pknglaqnckqbffehqfgjnrepcfohoedkhiqsiedlotmaqitm");
+    g.get_table(0)->add_column(type_Double, "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
+    g.get_table(1)->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr", *g.get_table(0));
+    g.get_table(0)->add_empty_row(375);
+    g.add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
+    sg_r.close();
+    sg_w.commit();
+    REALM_ASSERT_RELEASE(sg_w.compact());
+    sg_w.begin_write();
+    sg_r.open(path);
+    sg_r.begin_read();
+    g_r.verify();
+    g.add_table("citdgiaclkfbbksfaqegcfiqcserceaqmttkilnlbknoadtb");
+    g.add_table("tqtnnikpggeakeqcqhfqtshmimtjqkchgbnmbpttbetlahfi");
+    g.add_table("hkesaecjqbkemmmkffctacsnskekjbtqmpoetjnqkpactenf");
+    sg_r.close();
+    sg_w.commit();
+}
+
 
 #endif

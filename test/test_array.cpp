@@ -891,9 +891,11 @@ TEST(Array_Greater)
         for (size_t i = 0; i < items; ++i) {
             a.add(0);
         }
-        size_t t = a.find_first<Greater>(0, 0, size_t(-1));
-        CHECK_EQUAL(size_t(-1), t);
 
+        {
+            size_t t = a.find_first<Greater>(0, 0, size_t(-1));
+            CHECK_EQUAL(size_t(-1), t);
+        }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
@@ -1017,9 +1019,11 @@ TEST(Array_Less)
         for (size_t i = 0; i < items; ++i) {
             a.add(0);
         }
-        size_t t = a.find_first<Less>(0, 0, size_t(-1));
-        CHECK_EQUAL(size_t(-1), t);
 
+        {
+            size_t t = a.find_first<Less>(0, 0, size_t(-1));
+            CHECK_EQUAL(size_t(-1), t);
+        }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
@@ -1152,9 +1156,11 @@ TEST(Array_NotEqual)
         for (size_t i = 0; i < items; ++i) {
             a.add(0);
         }
-        size_t t = a.find_first<NotEqual>(0, 0, size_t(-1));
-        CHECK_EQUAL(size_t(-1), t);
 
+        {
+            size_t t = a.find_first<NotEqual>(0, 0, size_t(-1));
+            CHECK_EQUAL(size_t(-1), t);
+        }
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {

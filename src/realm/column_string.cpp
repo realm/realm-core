@@ -189,9 +189,9 @@ void StringColumn::populate_search_index()
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         StringData value = get(row_ndx);
-        size_t num_rows = 1;
+        size_t num_rows_to_insert = 1;
         bool is_append = true;
-        m_search_index->insert(row_ndx, value, num_rows, is_append); // Throws
+        m_search_index->insert(row_ndx, value, num_rows_to_insert, is_append); // Throws
     }
 }
 
@@ -365,8 +365,8 @@ void StringColumn::set(size_t ndx, StringData value)
         m_search_index->set(ndx, value); // Throws
     }
 
-    bool root_is_leaf = !m_array->is_inner_bptree_node();
-    if (root_is_leaf) {
+    bool array_root_is_leaf = !m_array->is_inner_bptree_node();
+    if (array_root_is_leaf) {
         LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
         switch (leaf_type) {
             case leaf_type_Small: {
@@ -504,8 +504,8 @@ void StringColumn::do_erase(size_t ndx, bool is_last)
         m_search_index->erase<StringData>(ndx, is_last);
     }
 
-    bool root_is_leaf = !m_array->is_inner_bptree_node();
-    if (root_is_leaf) {
+    bool array_root_is_leaf = !m_array->is_inner_bptree_node();
+    if (array_root_is_leaf) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
@@ -568,8 +568,8 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
             m_search_index->update_ref(copy_of_value, last_row_ndx, row_ndx); // Throws
     }
 
-    bool root_is_leaf = !m_array->is_inner_bptree_node();
-    if (root_is_leaf) {
+    bool array_root_is_leaf = !m_array->is_inner_bptree_node();
+    if (array_root_is_leaf) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
@@ -1557,9 +1557,9 @@ void StringColumn::verify(const Table& table, size_t col_ndx) const
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
     ColumnAttr attr = spec.get_column_attr(col_ndx);
-    bool has_search_index = (attr & col_attr_Indexed) != 0;
-    REALM_ASSERT_3(has_search_index, ==, bool(m_search_index));
-    if (has_search_index) {
+    bool column_has_search_index = (attr & col_attr_Indexed) != 0;
+    REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
+    if (column_has_search_index) {
         REALM_ASSERT(m_search_index->get_ndx_in_parent() ==
                        get_root_array()->get_ndx_in_parent() + 1);
     }

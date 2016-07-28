@@ -358,23 +358,42 @@ std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
     REALM_ASSERT_3(row_ndx, <, size());
     validate_list_accessors();
 
-    // Check if we already have a linkview for this row
+    auto create_view = [this, row_ndx](list_entry& entry) {
+        entry.m_row_ndx = row_ndx;
+        auto ptr = LinkView::create(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
+        entry.m_list = ptr;
+        return ptr;
+    };
+
+    // Check if we already have a LinkView for this row.
     list_entry key;
     key.m_row_ndx = row_ndx;
     auto it = std::lower_bound(m_list_accessors.begin(), m_list_accessors.end(), key);
-    if (it != m_list_accessors.end() && it->m_row_ndx == row_ndx) {
-        std::shared_ptr<LinkView> p = it->m_list.lock();
-        if (p)
-            return p;
-    }
-    if (it == m_list_accessors.end() || it->m_row_ndx != row_ndx) {
-        it = m_list_accessors.insert(it, key); // Throws
+    if (it != m_list_accessors.end()) {
+        if (it->m_row_ndx == row_ndx) {
+            // If we have an existing LinkView, return it.
+            if (auto p = it->m_list.lock())
+                return p;
+        }
+        if (it->m_list.expired()) {
+            // We found an expired entry at the appropriate position. Reuse it with a new LinkView.
+            return create_view(*it);
+        }
     }
 
-    it->m_row_ndx = row_ndx;
-    auto ptr = LinkView::create(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
-    it->m_list = ptr;
-    return ptr;
+    // No existing entry for this row. If the entry prior to the insertion point has expired we can reuse it
+    // as doing so preserves the desired ordering of m_list_accessors.
+    if (it != m_list_accessors.begin()) {
+        auto previous = std::prev(it);
+        if (previous->m_list.expired()) {
+            // We found an expired entry at the previous position. Reuse it with a new LinkView.
+            return create_view(*previous);
+        }
+    }
+
+    // Could not find an entry to reuse, so insert a new one.
+    it = m_list_accessors.insert(it, std::move(key)); // Throws
+    return create_view(*it);
 }
 
 void LinkListColumn::update_child_ref(size_t child_ndx, ref_type new_ref)

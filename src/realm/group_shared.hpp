@@ -286,10 +286,10 @@ public:
         uint_fast32_t index   = 0;
 
         VersionID() {}
-        VersionID(version_type version, uint_fast32_t index)
+        VersionID(version_type initial_version, uint_fast32_t initial_index)
         {
-            this->version = version;
-            this->index = index;
+            version = initial_version;
+            index = initial_index;
         }
 
         bool operator==(const VersionID& other) { return version == other.version; }
@@ -550,12 +550,16 @@ private:
     const char* m_key;
     TransactStage m_transact_stage;
     util::InterprocessMutex m_writemutex;
+#ifdef REALM_ASYNC_DAEMON
     util::InterprocessMutex m_balancemutex;
+#endif
     util::InterprocessMutex m_controlmutex;
 #ifndef _WIN32
+#ifdef REALM_ASYNC_DAEMON
     util::InterprocessCondVar m_room_to_write;
     util::InterprocessCondVar m_work_to_do;
     util::InterprocessCondVar m_daemon_becomes_ready;
+#endif
     util::InterprocessCondVar m_new_commit_available;
 #endif
     std::function<void(int,int)> m_upgrade_callback;

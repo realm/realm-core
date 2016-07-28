@@ -194,7 +194,7 @@ protected:
         std::string name;
         mutable util::File::Map<CommitLogHeader> map;
         mutable uint64_t last_seen_mmap_counter = 0;
-        CommitLogMetadata(std::string name): name(name) {}
+        CommitLogMetadata(std::string log_name): name(log_name) {}
     };
 
     class MergingIndexTranslator;

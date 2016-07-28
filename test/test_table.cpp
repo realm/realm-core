@@ -2690,7 +2690,7 @@ TEST(Table_Mixed)
 
     table.insert_empty_row(1);
     table.set_int(0, 1, 43);
-    table.set_mixed(1, 1, (int64_t)12);
+    table.set_mixed(1, 1, int64_t(12));
 
     CHECK_EQUAL(0,  table.get_int(0, ndx));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -3190,7 +3190,7 @@ TEST(Table_DateAndBinary)
 
         const size_t size = 10;
         char data[size];
-        for (size_t i=0; i<size; ++i) data[i] = (char)i;
+        for (size_t i=0; i<size; ++i) data[i] = static_cast<char>(i);
         t.add(8, BinaryData(data, size));
         CHECK_EQUAL(t[0].date, 8);
         CHECK_EQUAL(t[0].bin.size(), size);
@@ -6898,7 +6898,7 @@ TEST(Table_ColumnsSupportStringIndex)
             t->add_search_index(0);
         }
         else {
-            CHECK_THROW(t->add_search_index(0), LogicError);
+            CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
         }
         CHECK_EQUAL(does_support_index, t->has_search_index(0));
         t->remove_column(0);
@@ -6910,7 +6910,7 @@ TEST(Table_ColumnsSupportStringIndex)
     CHECK(!link_col.supports_search_index());
     CHECK(link_col.create_search_index() == nullptr);
     CHECK(!link_col.has_search_index());
-    CHECK_THROW(t->add_search_index(0), LogicError);
+    CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
     t->remove_column(0);
 
     // Check type_LinkList
@@ -6919,7 +6919,7 @@ TEST(Table_ColumnsSupportStringIndex)
     CHECK(!linklist_col.supports_search_index());
     CHECK(linklist_col.create_search_index() == nullptr);
     CHECK(!linklist_col.has_search_index());
-    CHECK_THROW(t->add_search_index(0), LogicError);
+    CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
     t->remove_column(0);
 
     // Check StringEnum
@@ -6937,7 +6937,70 @@ TEST(Table_ColumnsSupportStringIndex)
     t->remove_column(0);
 }
 
-TEST(Table_getVersionCounterAfterRowAccessor) {
+TEST(Table_addRowsToTableWithNoColumns)
+{
+    Group g; // type_Link must be part of a group
+    TableRef t = g.add_table("t");
+
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+    CHECK_LOGIC_ERROR(t->insert_empty_row(0), LogicError::table_has_no_columns);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_column(type_String, "str_col");
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    t->add_search_index(0);
+    t->insert_empty_row(0);
+    CHECK_EQUAL(t->size(), 2);
+    t->remove_column(0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+
+    // Can add rows to a table with backlinks
+    TableRef u = g.add_table("u");
+    u->add_column_link(type_Link, "link from u to t", *t);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    u->remove_column(0);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+
+    // Do the exact same as above but with LinkLists
+    u->add_column_link(type_LinkList, "link list from u to t", *t);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    u->remove_column(0);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+
+    // Check that links are nulled when connected table is cleared
+    u->add_column_link(type_Link, "link from u to t", *t);
+    u->add_empty_row(1);
+    CHECK_EQUAL(u->size(), 1);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_LOGIC_ERROR(u->set_link(0, 0, 0), LogicError::target_row_index_out_of_range);
+    CHECK(u->is_null_link(0, 0));
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row();
+    u->set_link(0, 0, 0);
+    CHECK_EQUAL(u->get_link(0, 0), 0);
+    CHECK(!u->is_null_link(0, 0));
+    CHECK_EQUAL(t->size(), 1);
+    t->add_column(type_Int, "int column");
+    CHECK_EQUAL(t->size(), 1);
+    t->remove_column(0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_EQUAL(u->size(), 1);
+    CHECK(u->is_null_link(0, 0));
+}
+
+TEST(Table_getVersionCounterAfterRowAccessor)
+{
     Table t;
     size_t col_bool    = t.add_column(type_Bool,     "bool",    true);
     size_t col_int     = t.add_column(type_Int,      "int",     true);

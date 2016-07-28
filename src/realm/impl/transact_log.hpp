@@ -1406,7 +1406,7 @@ inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list
 inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
 {
     struct iter {
-        iter(const IntegerColumn& values, size_t ndx): m_values(&values), m_ndx(ndx) {}
+        iter(const IntegerColumn& iter_values, size_t ndx): m_values(&iter_values), m_ndx(ndx) {}
         const IntegerColumn* m_values;
         size_t m_ndx;
         bool operator==(const iter& i) const { return m_ndx == i.m_ndx; }
@@ -1563,9 +1563,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SetIntUnique: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t prior_num_rows = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t prior_num_rows = read_int<size_t>(); // Throws
             // FIXME: Don't depend on the existence of int64_t,
             // but don't allow values to use more than 64 bits
             // either.
@@ -1607,9 +1607,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_SetStringUnique: {
-            std::size_t col_ndx = read_int<std::size_t>(); // Throws
-            std::size_t row_ndx = read_int<std::size_t>(); // Throws
-            std::size_t prior_num_rows = read_int<std::size_t>(); // Throws
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            size_t prior_num_rows = read_int<size_t>(); // Throws
             StringData value = read_string(m_string_buffer); // Throws
             if (!handler.set_string_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
                 parser_error();

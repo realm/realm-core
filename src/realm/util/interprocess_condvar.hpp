@@ -115,8 +115,8 @@ private:
 #endif
     bool uses_emulation = false;
     // pipe used for emulation
-    int m_fd_read = -1;
-    int m_fd_write = -1;
+    int m_fd_read;
+    int m_fd_write;
 };
 
 

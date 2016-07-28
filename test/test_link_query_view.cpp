@@ -1641,6 +1641,84 @@ TEST(LinkList_QueryDateTime)
     CHECK_EQUAL(1, tv.size());
 }
 
+// Check that table views created through backlinks are updated correctly
+// (marked as out of sync) when the source table is modified.
+TEST(BackLink_Query_TableViewSyncsWhenNeeded)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    size_t col_int = source->add_column(type_Int, "id");
+    size_t col_link = source->add_column_link(type_Link, "link", *target);
+    size_t col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
+
+    target->add_column(type_Int, "id");
+
+    source->add_empty_row(3);
+    source->set_int(col_int, 0, 0);
+    source->set_int(col_int, 1, 0);
+    source->set_int(col_int, 2, 2);
+
+    target->add_empty_row(3);
+    source->set_link(col_link, 0, 0);
+    source->set_link(col_link, 1, 1);
+
+    Query q = target->backlink(*source, col_link).column<Int>(col_int) > 0;
+    TableView tv = q.find_all();
+    CHECK_TABLE_VIEW(tv, {});
+
+    source->set_int(col_int, 1, 1);
+    CHECK_EQUAL(false, tv.is_in_sync());
+
+    tv.sync_if_needed();
+    CHECK_TABLE_VIEW(tv, {1});
+
+    source->set_link(col_link, 2, 2);
+    CHECK_EQUAL(false, tv.is_in_sync());
+
+    tv.sync_if_needed();
+    CHECK_TABLE_VIEW(tv, {1, 2});
+
+    Query list_query = target->backlink(*source, col_linklist).column<Int>(col_int) > 0;
+    TableView list_tv = list_query.find_all();
+    CHECK_TABLE_VIEW(list_tv, {});
+
+    CHECK_EQUAL(0, source->get_link_count(col_linklist, 0));
+    LinkViewRef list = source->get_linklist(col_linklist, 0);
+
+    list->add(0);
+    list->add(0);
+
+    CHECK_EQUAL(false, list_tv.is_in_sync());
+    list_tv.sync_if_needed();
+    CHECK_EQUAL(true, list_tv.is_in_sync());
+
+    CHECK_EQUAL(2, source->get_link_count(col_linklist, 0));
+    CHECK_TABLE_VIEW(list_tv, {});
+
+    list->add(2);
+
+    CHECK_EQUAL(false, list_tv.is_in_sync());
+    list_tv.sync_if_needed();
+    CHECK_EQUAL(true, list_tv.is_in_sync());
+
+    CHECK_EQUAL(3, source->get_link_count(col_linklist, 0));
+    CHECK_TABLE_VIEW(list_tv, {});
+
+    LinkViewRef list2 = source->get_linklist(col_linklist, 2);
+    list2->add(0);
+
+    CHECK_EQUAL(1, source->get_link_count(col_linklist, 2));
+    CHECK_TABLE_VIEW(list_tv, {});
+    CHECK_EQUAL(false, list_tv.is_in_sync());
+    list_tv.sync_if_needed();
+    CHECK_EQUAL(true, list_tv.is_in_sync());
+
+    CHECK_TABLE_VIEW(list_tv, {0});
+}
+
 // Test queries involving the backlinks of a link column.
 TEST(BackLink_Query_Link)
 {
