@@ -16,7 +16,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Removed `realm::util::network` library.
+* Removed event loop library.
 
 ----------------------------------------------
 
