@@ -31,7 +31,6 @@ class ArrayInteger: public Array {
 public:
     typedef int64_t value_type;
 
-    explicit ArrayInteger(no_prealloc_tag) noexcept;
     explicit ArrayInteger(Allocator&) noexcept;
     ~ArrayInteger() noexcept override {}
 
@@ -74,7 +73,6 @@ class ArrayIntNull: public Array {
 public:
     using value_type = util::Optional<int64_t>;
 
-    explicit ArrayIntNull(no_prealloc_tag) noexcept;
     explicit ArrayIntNull(Allocator&) noexcept;
     ~ArrayIntNull() noexcept override;
 
@@ -191,12 +189,6 @@ private:
 
 // Implementation:
 
-inline ArrayInteger::ArrayInteger(Array::no_prealloc_tag) noexcept:
-    Array(Array::no_prealloc_tag())
-{
-    m_is_inner_bptree_node = false;
-}
-
 inline ArrayInteger::ArrayInteger(Allocator& allocator) noexcept:
     Array(allocator)
 {
@@ -283,11 +275,6 @@ inline size_t ArrayInteger::upper_bound(int64_t value) const noexcept
     return upper_bound_int(value);
 }
 
-
-inline
-ArrayIntNull::ArrayIntNull(no_prealloc_tag tag) noexcept: Array(tag)
-{
-}
 
 inline
 ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept: Array(allocator)

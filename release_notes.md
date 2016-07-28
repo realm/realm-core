@@ -22,7 +22,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Reduced the number of open files on Android.
 
 ----------------------------------------------
 
