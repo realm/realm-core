@@ -1251,9 +1251,11 @@ void SharedGroup::close() noexcept
         }
     }
 #ifndef _WIN32
+#ifdef REALM_ASYNC_DAEMON
     m_room_to_write.close();
     m_work_to_do.close();
     m_daemon_becomes_ready.close();
+#endif
     m_new_commit_available.close();
 #endif
     // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another thread may
