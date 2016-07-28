@@ -23,19 +23,20 @@ struct IndexPair {
 class SharedArray {
 public:
     SharedArray(Allocator& alloc, size_t array_size)
-    : m_storage(alloc), m_guard(alloc)
+    : m_storage(alloc)
     {
         MemRef mem = ArrayIntNull::create_array(Array::Type::type_Normal, false, array_size, 0, alloc);
         m_storage.init_from_mem(mem);
-        m_guard.reset(mem.get_ref());
+        m_guard.reset(&m_storage);
     }
     size_t size() { return m_storage.size(); }
     ArrayIntNull::value_type get_val(size_t ndx) { return m_storage.get(ndx); }
     void set(size_t ndx, size_t value) { m_storage.set(ndx, value); }
     void set_null(size_t ndx) { m_storage.set_null(ndx); }
 private:
+    // The order of the following variables matters for destruction.
     ArrayIntNull m_storage;
-    realm::_impl::DeepArrayRefDestroyGuard m_guard;
+    realm::_impl::DestroyGuard<ArrayIntNull> m_guard;
 };
 
 class LinkChain
