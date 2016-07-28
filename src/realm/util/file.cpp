@@ -1071,7 +1071,7 @@ File::UniqueID File::get_unique_id() const {
 #else // POSIX version
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0) {
-        return {statbuf.st_dev, statbuf.st_ino};
+        return {static_cast<dev_t>(statbuf.st_dev), static_cast<ino_t>(statbuf.st_ino)};
     }
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("fstat() failed: ", err);
