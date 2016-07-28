@@ -29,8 +29,8 @@ public:
         m_storage.init_from_mem(mem);
         m_guard.reset(&m_storage);
     }
-    size_t size() { return m_storage.size(); }
-    ArrayIntNull::value_type get_val(size_t ndx) { return m_storage.get(ndx); }
+    size_t size() const { return m_storage.size(); }
+    ArrayIntNull::value_type get_val(size_t ndx) const { return m_storage.get(ndx); }
     void set(size_t ndx, size_t value) { m_storage.set(ndx, value); }
     void set_null(size_t ndx) { m_storage.set_null(ndx); }
 private:
@@ -105,8 +105,8 @@ public:
     {
         Sorter() {}
 
-        Sorter(const std::vector<LinkChain>& columns, const std::vector<bool>& ascending)
-            : m_link_chains(columns), m_ascending(ascending) {}
+        Sorter(std::vector<LinkChain> columns, std::vector<bool> ascending)
+            : m_link_chains(std::move(columns)), m_ascending(std::move(ascending)) {}
 
         bool operator()(IndexPair i, IndexPair j) const
         {
@@ -118,20 +118,20 @@ public:
                 if (m_link_chains[t].size() > 1) {
                     util::Optional<int64_t> translated_i = m_link_chains[t].translate(i.index_in_view);
                     util::Optional<int64_t> translated_j = m_link_chains[t].translate(j.index_in_view);
-                    bool valid1 = bool(translated_i);
-                    bool valid2 = bool(translated_j);
+                    bool valid_i = bool(translated_i);
+                    bool valid_j = bool(translated_j);
 
-                    if (!valid1 && !valid2) {
+                    if (!valid_i && !valid_j) {
                         if (t == m_link_chains.size() - 1) {
-                            return false; // Two nulls in last sort column
+                            return false; // Two nulls in last sort column, treat as equals.
                         }
                         else {
-                            continue;   // Check next column for order
+                            continue;   // Two nulls in non-last column, check next column for order.
                         }
                     }
-                    else if (!valid1 || !valid2) {
-                        // Sort null links at the end if m_ascending[t], else at beginning
-                        return valid1 ? m_ascending[t] : !m_ascending[t];
+                    else if (!valid_i || !valid_j) {
+                        // Sort null links at the end if m_ascending[t], else at beginning.
+                        return m_ascending[t] == valid_i;
                     }
 
                     // We stored unsigned index values from a size_t type so cast is harmless.
@@ -151,7 +151,7 @@ public:
                 if (c != 0)
                     return m_ascending[t] ? c > 0 : c < 0;
             }
-            return false; // row(index1) == row(index2)
+            return false; // row(index_i) == row(index_j)
         }
 
         void init(RowIndexes* row_indexes)
@@ -177,8 +177,8 @@ public:
 
         void cleanup()
         {
-            for (size_t i = 0; i < m_link_chains.size(); i++) {
-                m_link_chains[i].cleanup();
+            for (auto& link_chain : m_link_chains) {
+                link_chain.cleanup();
             }
         }
 

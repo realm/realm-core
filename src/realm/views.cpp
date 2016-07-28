@@ -6,13 +6,11 @@
 using namespace realm;
 
 LinkChain::LinkChain(size_t single_index)
-    : m_link_translator(nullptr)
-{
-    m_column_indices.push_back(single_index);
-}
+    : m_column_indices{single_index}
+{}
 
 LinkChain::LinkChain(std::vector<size_t> chain)
-    : m_column_indices(chain), m_link_translator(nullptr)
+    : m_column_indices(std::move(chain))
 {
     REALM_ASSERT(m_column_indices.size() >= 1);
 }
@@ -27,7 +25,7 @@ const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_index
     if (m_column_indices.size() > 1) {
         size_t num_rows = row_indexes->size();
 
-        m_link_translator.reset(new SharedArray(Allocator::get_default(), num_rows));
+        m_link_translator = std::make_shared<SharedArray>(Allocator::get_default(), num_rows);
 
         std::vector<const LinkColumn*> link_cols;
         const Table* linked_table = nullptr;
@@ -46,13 +44,13 @@ const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_index
         for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
             size_t translated_index = row_indexes->get(row_ndx);
             bool set_null = false;
-            for (size_t link_ndx = 0; link_ndx < link_cols.size(); link_ndx++) {
-                if (link_cols[link_ndx]->is_null(translated_index)) {
+            for (const LinkColumn* link_col : link_cols) {
+                if (link_col->is_null(translated_index)) {
                     set_null = true;
                     break;
                 }
                 else {
-                    translated_index = link_cols[link_ndx]->get_link(translated_index);
+                    translated_index = link_col->get_link(translated_index);
                 }
             }
             if (set_null) {
@@ -63,7 +61,7 @@ const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_index
             }
         }
         REALM_ASSERT(linked_table);
-        const ColumnBase& last_col_in_chain = tf::get_column(*linked_table, m_column_indices[m_column_indices.size() - 1]);
+        const ColumnBase& last_col_in_chain = tf::get_column(*linked_table, m_column_indices.back());
         return last_col_in_chain;
     }
     return *cb; // no link chain, return original column

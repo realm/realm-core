@@ -775,20 +775,12 @@ void TableViewBase::distinct(std::vector<LinkChain> columns)
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
 {
-    std::vector<LinkChain> c;
-    std::vector<bool> a;
-    c.push_back(LinkChain(column));
-    a.push_back(ascending);
-    sort(c, a);
+    sort({LinkChain(column)}, std::vector<bool>{ascending});
 }
 
 void TableViewBase::sort(LinkChain chain, bool ascending)
 {
-    std::vector<LinkChain> c;
-    std::vector<bool> a;
-    c.push_back(chain);
-    a.push_back(ascending);
-    sort(c, a);
+    sort({chain}, std::vector<bool>{ascending});
 }
 
 // Sort according to multiple columns, user specified order on each column
