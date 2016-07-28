@@ -36,13 +36,6 @@ inline BasicArray<T>::BasicArray(Allocator& allocator) noexcept:
 }
 
 template<class T>
-inline BasicArray<T>::BasicArray(no_prealloc_tag) noexcept:
-    Array(no_prealloc_tag())
-{
-}
-
-
-template<class T>
 inline MemRef BasicArray<T>::create_array(size_t init_size, Allocator& allocator)
 {
     size_t byte_size_0 = calc_aligned_byte_size(init_size); // Throws
