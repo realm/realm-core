@@ -112,11 +112,11 @@ private:
 #ifdef REALM_CONDVAR_EMULATION
     // keep the path to allocated system resource so we can remove them again
     std::string m_resource_path;
-#endif
-    bool uses_emulation = false;
     // pipe used for emulation
     int m_fd_read;
     int m_fd_write;
+#endif
+    bool uses_emulation = false;
 };
 
 

@@ -23,11 +23,11 @@
 #endif
 
 #include <realm/util/errno.hpp>
-#include <realm/util/file.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/features.h>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 using namespace realm::util;
