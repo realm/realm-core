@@ -1203,7 +1203,7 @@ void File::set_encryption_key(const char* key)
 
 #ifndef _WIN32
 
-DirScanner::DirScanner(const std::string& path)
+DirScanner::DirScanner(const std::string& path, bool allow_missing)
 {
     m_dirp = opendir(path.c_str());
     if (!m_dirp) {
@@ -1213,6 +1213,8 @@ DirScanner::DirScanner(const std::string& path)
             case EACCES:
                 throw File::PermissionDenied(msg, path);
             case ENOENT:
+                if (allow_missing)
+                    return;
                 throw File::NotFound(msg, path);
             default:
                 throw File::AccessError(msg, path);
@@ -1222,12 +1224,17 @@ DirScanner::DirScanner(const std::string& path)
 
 DirScanner::~DirScanner() noexcept
 {
-    int r = closedir(m_dirp);
-    REALM_ASSERT_RELEASE(r == 0);
+    if (m_dirp) {
+        int r = closedir(m_dirp);
+        REALM_ASSERT_RELEASE(r == 0);
+    }
 }
 
 bool DirScanner::next(std::string& name)
 {
+    if (!m_dirp)
+        return false;
+
     const size_t min_dirent_size = offsetof(struct dirent, d_name) + NAME_MAX + 1;
     union {
         struct dirent m_dirent;
@@ -1253,7 +1260,7 @@ bool DirScanner::next(std::string& name)
 
 #else
 
-DirScanner::DirScanner(const std::string&)
+DirScanner::DirScanner(const std::string&, bool)
 {
     throw std::runtime_error("Not yet supported");
 }

@@ -132,7 +132,7 @@ TestDirGuard::~TestDirGuard() noexcept
 namespace {
 void do_clean_dir(const std::string& path, const std::string& guard_string)
 {
-    DirScanner ds(path);
+    DirScanner ds(path, true);
     std::string name;
     while (ds.next(name)) {
         std::string subpath = File::resolve(name, path);
@@ -160,23 +160,22 @@ void TestDirGuard::clean_dir(const std::string& path)
 SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
     TestPathGuard(path)
 {
-    try {
-        do_clean_dir(path+ ".management", ".management");
-        remove_dir(path+ ".management");
-        File::try_remove(get_lock_path());
-    } catch (...) {
-        // exception ignored
-    }
+    cleanup();
 }
 
 
 SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
 {
-    if (keep_files)
-        return;
+    if (!keep_files)
+        cleanup();
+}
+
+void SharedGroupTestPathGuard::cleanup() const noexcept
+{
     try {
         do_clean_dir(m_path+ ".management", ".management");
-        remove_dir(m_path+ ".management");
+        if (File::is_dir(m_path+".manamgement"))
+            remove_dir(m_path+ ".management");
         File::try_remove(get_lock_path());
     }
     catch (...) {
