@@ -110,8 +110,10 @@ void* round_down(void* p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void millisleep(size_t milliseconds);
-void process_mem_usage(double& vm_usage, double& resident_set);
 
+#ifdef REALM_SLAB_ALLOC_TUNE
+    void process_mem_usage(double& vm_usage, double& resident_set);
+#endif
 // popcount
 int fast_popcount32(int32_t x);
 int fast_popcount64(int64_t x);
