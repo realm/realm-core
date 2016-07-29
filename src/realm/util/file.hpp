@@ -463,8 +463,10 @@ public:
     typedef ino_t UniqueID;
 #else
     struct UniqueID {
-        dev_t device;
-        ino_t inode;
+        // NDK r10e has a bug in sys/stat.h dev_t ino_t are 4 bytes,
+        // but stat.st_dev and st_ino are 8 bytes. So we just use uint64 instead.
+        uint_fast64_t device;
+        uint_fast64_t inode;
     };
 #endif
     // Return the unique id for the current opened file descriptor.
