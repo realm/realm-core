@@ -849,6 +849,9 @@ private:
                 m_event_loop.process_completed_operations(); // Throws
                 return;
             }
+            case kCFStreamEventNone:
+                REALM_ASSERT(false);
+                break;
         }
         REALM_ASSERT(false);
     }
@@ -892,6 +895,11 @@ private:
                 m_event_loop.process_completed_operations(); // Throws
                 return;
             }
+            case kCFStreamEventNone:
+            case kCFStreamEventOpenCompleted:
+            case kCFStreamEventHasBytesAvailable:
+                REALM_ASSERT(false);
+                break;
         }
         REALM_ASSERT(false);
     }

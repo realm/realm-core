@@ -110,7 +110,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
         case mixcol_Float:
         case mixcol_Double:
         case mixcol_DoubleNeg:
-            goto carry_on;
+            break;
         case mixcol_String:
         case mixcol_Binary: {
             // If item is in middle of the column, we just clear it to avoid
@@ -127,7 +127,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
                 // for(;;) { insert_binary(i, ...); erase(i); }
                 m_binary_data->set(data_ndx, BinaryData());
             }
-            goto carry_on;
+            break;
         }
         case mixcol_Timestamp: {
             size_t data_row_ndx = size_t(m_data->get(row_ndx) >> 1);
@@ -140,21 +140,19 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
                 // for(;;) { insert_binary(i, ...); erase(i); }
                 m_timestamp_data->set(data_row_ndx, Timestamp(null{}));
             }
-            goto carry_on;
+            break;
         }
-
         case mixcol_Table: {
             // Delete entire table
             ref_type ref = m_data->get_as_ref(row_ndx);
             Array::destroy_deep(ref, m_data->get_alloc());
-            goto carry_on;
-        }
-        case mixcol_Mixed:
             break;
+        }
+        case mixcol_Mixed: // That's an error, fallthrough and assert
+        default:
+            REALM_ASSERT(false);
     }
-    REALM_ASSERT(false);
 
-  carry_on:
     if (old_type != new_type)
         m_types->set(row_ndx, new_type);
     m_data->set(row_ndx, 0);
@@ -225,9 +223,21 @@ DataType MixedColumn::get_type(size_t ndx) const noexcept
     REALM_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
     switch (coltype) {
-        case mixcol_IntNeg:    return type_Int;
-        case mixcol_DoubleNeg: return type_Double;
-        default: return DataType(coltype);   // all others must be in sync with ColumnType
+        case mixcol_IntNeg:      return type_Int;
+        case mixcol_DoubleNeg:   return type_Double;
+        case mixcol_Int:         return type_Int;
+        case mixcol_Bool:        return type_Bool;
+        case mixcol_String:      return type_String;
+        case mixcol_Binary:      return type_Binary;
+        case mixcol_Table:       return type_Table;
+        case mixcol_Mixed:       return type_Mixed;
+        case mixcol_OldDateTime: return type_OldDateTime;
+        case mixcol_Timestamp:   return type_Timestamp;
+        case mixcol_Float:       return type_Float;
+        case mixcol_Double:      return type_Double;
+        default:
+            REALM_ASSERT(false);
+            return DataType(coltype);
     }
 }
 

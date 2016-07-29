@@ -1064,7 +1064,7 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, 
 void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
-    ref_type new_sibling_ref;
+    ref_type new_sibling_ref = 0;
     Array::TreeInsert<StringColumn> state;
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
@@ -1076,36 +1076,37 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
                     // Small strings root leaf
                     ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
                     new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
-                    goto insert_done;
+                    break;
                 }
                 case leaf_type_Medium: {
                     // Medium strings root leaf
                     ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
                     new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
-                    goto insert_done;
+                    break;
                 }
                 case leaf_type_Big: {
                     // Big strings root leaf
                     ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
                     new_sibling_ref =
                         leaf->bptree_leaf_insert_string(row_ndx_2, value, state); // Throws
-                    goto insert_done;
+                    break;
                 }
+                default:
+                    REALM_ASSERT(false);
+                    break;
             }
-            REALM_ASSERT(false);
-        }
-
-        // Non-leaf root
-        state.m_value = value;
-        state.m_nullable = m_nullable;
-        if (row_ndx_2 == realm::npos) {
-            new_sibling_ref = m_array->bptree_append(state); // Throws
         }
         else {
-            new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
+            // Non-leaf root
+            state.m_value = value;
+            state.m_nullable = m_nullable;
+            if (row_ndx_2 == realm::npos) {
+                new_sibling_ref = m_array->bptree_append(state); // Throws
+            }
+            else {
+                new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
+            }
         }
-
-      insert_done:
         if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws

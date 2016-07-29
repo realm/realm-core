@@ -731,6 +731,14 @@ protected:
             case act_Min: return get_specialized_callback_2<act_Min>(col_id, nullable);
             case act_FindAll: return get_specialized_callback_2_int<act_FindAll>(col_id, nullable);
             case act_CallbackIdx: return get_specialized_callback_2_int<act_CallbackIdx>(col_id, nullable);
+
+            // Not supported
+            case act_ReturnFirst:
+            case act_CallIdx:
+            case act_CallbackVal:
+            case act_CallbackNone:
+            case act_CallbackBoth:
+            case act_Average:
             default: break;
         }
         REALM_ASSERT(false); // Invalid aggregate function
@@ -744,6 +752,17 @@ protected:
             case type_Int: return get_specialized_callback_3<TAction, type_Int>(nullable);
             case type_Float: return get_specialized_callback_3<TAction, type_Float>(nullable);
             case type_Double: return get_specialized_callback_3<TAction, type_Double>(nullable);
+
+            // Not supported
+            case type_Bool:
+            case type_String:
+            case type_Binary:
+            case type_OldDateTime:
+            case type_Timestamp:
+            case type_Table:
+            case type_Mixed:
+            case type_Link:
+            case type_LinkList:
             default: break;
         }
         REALM_ASSERT(false); // Invalid aggregate source column

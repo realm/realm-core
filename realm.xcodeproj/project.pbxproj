@@ -2814,6 +2814,7 @@
 					"-Wundef",
 					"-Wshadow",
 					"-Wconditional-uninitialized",
+					"-Wswitch-enum",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
@@ -2863,6 +2864,7 @@
 					"-Wundef",
 					"-Wshadow",
 					"-Wconditional-uninitialized",
+					"-Wswitch-enum",
 				);
 				SDKROOT = macosx;
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
