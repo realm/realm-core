@@ -5,6 +5,7 @@
 * Fixing util::MemoryInputStream to support tellg() and seekg().
 * Fix truncation of the supplied value when querying for a float or double that
   is less than a column's value.
+* Workaround for the Blackberry mkfifo bug.
 
 ### Breaking changes
 
