@@ -267,11 +267,6 @@ public:
     /// Create an array accessor in the unattached state.
     explicit Array(Allocator&) noexcept;
 
-    // Fastest way to instantiate an array, if you just want to utilize its
-    // methods
-    struct no_prealloc_tag {};
-    explicit Array(no_prealloc_tag) noexcept;
-
     ~Array() noexcept override {}
 
     enum Type {
@@ -1540,15 +1535,6 @@ inline Array::Array(Allocator& allocator) noexcept:
     m_alloc(allocator)
 {
 }
-
-// Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
-// and a few other basic things needed for read-only access. Or for use if you just want a way to call
-// some methods written in Array.*
-inline Array::Array(no_prealloc_tag) noexcept:
-    m_alloc(*static_cast<Allocator*>(0))
-{
-}
-
 
 inline void Array::create(Type type, bool context_flag, size_t length, int_fast64_t value)
 {
