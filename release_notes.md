@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 1.4.1 Release notes
 
 ### Bugfixes
 
@@ -6,15 +6,6 @@
 * Fix truncation of the supplied value when querying for a float or double that
   is less than a column's value.
 * Workaround for the Blackberry mkfifo bug.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-
-* Lorem ipsum.
 
 -----------
 
