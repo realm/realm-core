@@ -1643,6 +1643,20 @@ TEST(Query_Expressions0)
     match = (power(second) < 9.001 && power(second) > 8.999).find();
     CHECK_EQUAL(0, match);
 
+    // For `float < int_column` we had a bug where the float truncated to int, and the int_column remained int
+    // (correct behaviour would be that the float remained float and int_column converted to float). This test
+    // exposes such a bug because 1000000001 should convert to the nearest float value which is `1000000000.`
+    // (gap between floats is bigger than 1 and cannot represent 1000000001).
+    table.clear();
+    table.add_empty_row(1);
+    table.set_int(0, 0, 1000000001);
+
+    match = (1000000000.f < first).find();
+    CHECK_EQUAL(match, not_found);
+
+    match = (first > 1000000000.f).find();
+    CHECK_EQUAL(match, not_found);
+
 }
 
 TEST(Query_LimitUntyped2)

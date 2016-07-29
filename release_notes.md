@@ -3,11 +3,12 @@
 ### Bugfixes
 
 * Fixing util::MemoryInputStream to support tellg() and seekg().
+* Fix truncation of the supplied value when querying for a float or double that
+  is less than a column's value.
+* Workaround for the Blackberry mkfifo bug.
 * Fix a bug with the local mutex for the robust mutex emulation.
 * Reduce the number of file descriptors used in robust mutex emulation,
   multi instances of InterprocessMutex share the same descriptor. (#3199)
-
-* Lorem ipsum.
 
 ### Breaking changes
 

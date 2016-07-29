@@ -380,7 +380,7 @@ class ColumnAccessorBase;
 
 
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
-template<class L, class Cond, class R>
+template<class Cond, class L, class R>
 Query create(L left, const Subexpr2<R>& right)
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
@@ -393,7 +393,7 @@ Query create(L left, const Subexpr2<R>& right)
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
 
     if (column &&
-        ((std::numeric_limits<L>::is_integer && std::numeric_limits<L>::is_integer) ||
+        ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
         (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
         (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
         (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
@@ -508,27 +508,27 @@ public:
     // Compare, right side constant
     Query operator > (R right)
     {
-        return create<R, Less, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Less>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator < (R right)
     {
-        return create<R, Greater, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Greater>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator >= (R right)
     {
-        return create<R, LessEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<LessEqual>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator <= (R right)
     {
-        return create<R, GreaterEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<GreaterEqual>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator == (R right)
     {
-        return create<R, Equal, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Equal>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator != (R right)
     {
-        return create<R, NotEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<NotEqual>(right, static_cast<Subexpr2<L>&>(*this));
     }
 
     // Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
@@ -1239,124 +1239,124 @@ private:
 // Compare numeric values
 template<class R>
 Query operator > (double left, const Subexpr2<R>& right) {
-    return create<double, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 template<class R>
 Query operator > (float left, const Subexpr2<R>& right) {
-    return create<float, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 template<class R>
 Query operator > (int left, const Subexpr2<R>& right) {
-    return create<int, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 template<class R>
 Query operator > (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 template<class R>
 Query operator > (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 
 template<class R>
 Query operator < (double left, const Subexpr2<R>& right) {
-    return create<float, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator < (float left, const Subexpr2<R>& right) {
-    return create<int, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator < (int left, const Subexpr2<R>& right) {
-    return create<int, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator < (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator < (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator == (double left, const Subexpr2<R>& right) {
-    return create<double, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator == (float left, const Subexpr2<R>& right) {
-    return create<float, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator == (int left, const Subexpr2<R>& right) {
-    return create<int, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator == (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator == (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator >= (double left, const Subexpr2<R>& right) {
-    return create<double, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator >= (float left, const Subexpr2<R>& right) {
-    return create<float, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator >= (int left, const Subexpr2<R>& right) {
-    return create<int, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator >= (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator >= (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator <= (double left, const Subexpr2<R>& right) {
-    return create<double, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator <= (float left, const Subexpr2<R>& right) {
-    return create<float, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator <= (int left, const Subexpr2<R>& right) {
-    return create<int, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator <= (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator <= (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator != (double left, const Subexpr2<R>& right) {
-    return create<double, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 template<class R>
 Query operator != (float left, const Subexpr2<R>& right) {
-    return create<float, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 template<class R>
 Query operator != (int left, const Subexpr2<R>& right) {
-    return create<int, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 template<class R>
 Query operator != (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 template<class R>
 Query operator != (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 
 // Arithmetic
@@ -1816,9 +1816,9 @@ Query string_compare(const Columns<StringData>& left, T right, bool case_sensiti
 {
     StringData sd(right);
     if (case_sensitive)
-        return create<StringData, S, StringData>(sd, left);
+        return create<S>(sd, left);
     else
-        return create<StringData, I, StringData>(sd, left);
+        return create<I>(sd, left);
 }
 
 template<class S, class I>
@@ -1867,19 +1867,19 @@ Query operator != (const Columns<StringData>& left, T right) {
 
 
 inline Query operator==(const Columns<BinaryData>& left, BinaryData right) {
-    return create<BinaryData, Equal, BinaryData>(right, left);
+    return create<Equal>(right, left);
 }
 
 inline Query operator==(BinaryData left, const Columns<BinaryData>& right) {
-    return create<BinaryData, Equal, BinaryData>(left, right);
+    return create<Equal>(left, right);
 }
 
 inline Query operator!=(const Columns<BinaryData>& left, BinaryData right) {
-    return create<BinaryData, NotEqual, BinaryData>(right, left);
+    return create<NotEqual>(right, left);
 }
 
 inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
-    return create<BinaryData, NotEqual, BinaryData>(left, right);
+    return create<NotEqual>(left, right);
 }
 
 
