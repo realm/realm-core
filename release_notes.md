@@ -20,6 +20,8 @@
 
 ### Internals
 
+* Removed `realm::util::network` library.
+* Removed event loop library.
 * Reduced the number of open files on Android.
 
 ----------------------------------------------

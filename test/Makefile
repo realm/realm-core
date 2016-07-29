@@ -10,7 +10,6 @@ benchmark-prealloc \
 benchmark-index \
 benchmark-transaction \
 benchmark-row-accessor \
-benchmark-util-network \
 benchmark-history-types \
 experiments \
 fuzzy \
@@ -92,11 +91,6 @@ benchmark-row-accessor: check-norun/subdir/util
 .PHONY: benchmark-common-tasks
 benchmark-common-tasks: check-norun/subdir/util
 	@$(MAKE) -C benchmark-common-tasks check
-
-# Build and run the "util networks" benchmarking program
-.PHONY: benchmark-util-network
-benchmark-util-network: check-norun/subdir/util
-	@$(MAKE) -C benchmark-util-network check
 
 # Build and run the "history types" benchmarking program
 .PHONY: benchmark-history-types
