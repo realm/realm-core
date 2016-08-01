@@ -138,6 +138,7 @@ inline void InterprocessMutex::free_lock_info()
     if (!m_lock_info) return;
 
     std::lock_guard<Mutex> guard(s_mutex);
+
     m_lock_info.reset();
     if (s_info_map[m_fileuid].expired()) {
         s_info_map.erase(m_fileuid);
@@ -158,8 +159,9 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
     m_filename = path + "." + mutex_name + ".mx";
 
     std::lock_guard<Mutex> guard(s_mutex);
-    bool file_exists = File::get_unique_id(m_filename, m_fileuid);
-    if (file_exists) {
+
+    // Try to get the file uid if the file exists
+    if (File::get_unique_id(m_filename, m_fileuid)) {
         auto result = s_info_map.find(m_fileuid);
         if (result != s_info_map.end()) {
             // File exists and the lock info has been created in the map.
@@ -170,10 +172,11 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
 
     // LockInfo has not been created yet.
     m_lock_info = std::make_shared<LockInfo>();
-    m_lock_info->m_file.open(m_filename, file_exists ? File::mode_Update : File::mode_Write);
-    if (!file_exists) {
-        m_fileuid = m_lock_info->m_file.get_unique_id();
-    }
+    // Always use mod_Write to open file and retreive the uid in case other process
+    // deletes the file.
+    m_lock_info->m_file.open(m_filename, File::mode_Write);
+    m_fileuid = m_lock_info->m_file.get_unique_id();
+
     s_info_map[m_fileuid] = m_lock_info;
 #else
     m_shared_part = &shared_part;
@@ -191,8 +194,8 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
     free_lock_info();
 
     std::lock_guard<Mutex> guard(s_mutex);
-    m_fileuid = lock_file.get_unique_id();
 
+    m_fileuid = lock_file.get_unique_id();
     auto result = s_info_map.find(m_fileuid);
     if (result == s_info_map.end()) {
         m_lock_info = std::make_shared<LockInfo>();
@@ -212,8 +215,6 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
 inline void InterprocessMutex::release_shared_part()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    if (!m_lock_info) return;
-
     if (!m_filename.empty())
         File::try_remove(m_filename);
 
