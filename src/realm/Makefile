@@ -19,7 +19,6 @@ util/basic_system_errors.hpp \
 util/thread.hpp \
 util/file.hpp \
 util/optional.hpp \
-util/uri.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/interprocess_condvar.hpp \
@@ -134,7 +133,6 @@ util/memory_stream.cpp \
 util/string_buffer.cpp \
 util/terminate.cpp \
 util/thread.cpp \
-util/uri.cpp \
 util/interprocess_condvar.cpp \
 util/to_string.cpp \
 alloc.cpp \
