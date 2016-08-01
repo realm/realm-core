@@ -54,6 +54,11 @@ struct QueryHandoverPatch {
     QueryNodeHandoverPatches m_node_data;
 };
 
+struct SortDescriptorHandoverPatch {
+    std::vector<std::vector<size_t>> columns;
+    std::vector<bool> ascending;
+};
+
 struct TableViewHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
     std::unique_ptr<TableHandoverPatch> linked_table;
@@ -61,6 +66,8 @@ struct TableViewHandoverPatch {
     bool was_in_sync;
     QueryHandoverPatch query_patch;
     std::unique_ptr<LinkViewHandoverPatch> linkview_patch;
+    std::unique_ptr<SortDescriptorHandoverPatch> sort_patch;
+    std::unique_ptr<SortDescriptorHandoverPatch> distinct_patch;
 };
 
 

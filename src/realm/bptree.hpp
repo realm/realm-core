@@ -21,6 +21,7 @@
 
 #include <memory> // std::unique_ptr
 #include <realm/array.hpp>
+#include <realm/array_basic.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/impl/output_stream.hpp>

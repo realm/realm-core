@@ -1312,16 +1312,11 @@ TEST(Table_Multi_Sort)
     table.set_int(0, 4, 1);
     table.set_int(1, 4, 14);
 
-    std::vector<LinkChain> col_ndx1;
-    col_ndx1.push_back(0);
-    col_ndx1.push_back(1);
-
-    std::vector<bool> asc;
-    asc.push_back(true);
-    asc.push_back(true);
+    std::vector<std::vector<size_t>> col_ndx1 = {{0}, {1}};
+    std::vector<bool> asc = {true, true};
 
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
-    TableView v_sorted1 = table.get_sorted_view(col_ndx1, asc);
+    TableView v_sorted1 = table.get_sorted_view(SortDescriptor{table, col_ndx1, asc});
     CHECK_EQUAL(table.size(), v_sorted1.size());
     CHECK_EQUAL(2, v_sorted1.get_source_ndx(0));
     CHECK_EQUAL(0, v_sorted1.get_source_ndx(1));
@@ -1329,12 +1324,10 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(1, v_sorted1.get_source_ndx(3));
     CHECK_EQUAL(3, v_sorted1.get_source_ndx(4));
 
-    std::vector<LinkChain> col_ndx2;
-    col_ndx2.push_back(1);
-    col_ndx2.push_back(0);
+    std::vector<std::vector<size_t>> col_ndx2 = {{1}, {0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
-    TableView v_sorted2 = table.get_sorted_view(col_ndx2, asc);
+    TableView v_sorted2 = table.get_sorted_view(SortDescriptor{table, col_ndx2, asc});
     CHECK_EQUAL(table.size(), v_sorted2.size());
     CHECK_EQUAL(2, v_sorted2.get_source_ndx(0));
     CHECK_EQUAL(0, v_sorted2.get_source_ndx(1));

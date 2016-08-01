@@ -27,8 +27,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#include <realm/util/tuple.hpp>
-#include <realm/column_fwd.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/row.hpp>
@@ -37,21 +35,22 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
-#include <realm/column_binary.hpp>
-#include <realm/column_timestamp.hpp>
 
 namespace realm {
 
-class TableView;
-class LinkView;
-class TableViewBase;
-class ConstTableView;
-class StringIndex;
-class Group;
-class LinkColumnBase;
-class LinkColumn;
-class LinkListColumn;
 class BacklinkColumn;
+class BinaryColumy;
+class ConstTableView;
+class Group;
+class LinkColumn;
+class LinkColumnBase;
+class LinkListColumn;
+class LinkView;
+class SortDescriptor;
+class StringIndex;
+class TableView;
+class TableViewBase;
+class TimestampColumn;
 template<class>
 class Columns;
 template<class>
@@ -609,8 +608,8 @@ public:
     TableView      get_sorted_view(size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(size_t column_ndx, bool ascending = true) const;
 
-    TableView      get_sorted_view(std::vector<LinkChain> column_ndx, std::vector<bool> ascending);
-    ConstTableView get_sorted_view(std::vector<LinkChain> column_ndx, std::vector<bool> ascending) const;
+    TableView      get_sorted_view(SortDescriptor order);
+    ConstTableView get_sorted_view(SortDescriptor order) const;
 
     TableView      get_range_view(size_t begin, size_t end);
     ConstTableView get_range_view(size_t begin, size_t end) const;

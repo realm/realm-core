@@ -1500,35 +1500,24 @@ TEST(TableView_MultiColSort)
 
     TableView tv = table.where().find_all();
 
-    std::vector<LinkChain> v;
-    v.push_back(0);
-    v.push_back(1);
+    std::vector<std::vector<size_t>> v = {{0}, {1}};
+    std::vector<bool> a = {true, true};
 
-    std::vector<bool> a;
-    a.push_back(true);
-    a.push_back(true);
-
-    tv.sort(v, a);
+    tv.sort(SortDescriptor{table, v, a});
 
     CHECK_EQUAL(tv.get_float(1, 0), 0.f);
     CHECK_EQUAL(tv.get_float(1, 1), 1.f);
     CHECK_EQUAL(tv.get_float(1, 2), 2.f);
 
-    std::vector<bool> a_descending;
-    a_descending.push_back(false);
-    a_descending.push_back(false);
-
-    tv.sort(v, a_descending);
+    std::vector<bool> a_descending = {false, false};
+    tv.sort(SortDescriptor{table, v, a_descending});
 
     CHECK_EQUAL(tv.get_float(1, 0), 2.f);
     CHECK_EQUAL(tv.get_float(1, 1), 1.f);
     CHECK_EQUAL(tv.get_float(1, 2), 0.f);
 
-    std::vector<bool> a_ascdesc;
-    a_ascdesc.push_back(true);
-    a_ascdesc.push_back(false);
-
-    tv.sort(v, a_ascdesc);
+    std::vector<bool> a_ascdesc = {true, false};
+    tv.sort(SortDescriptor{table, v, a_ascdesc});
 
     CHECK_EQUAL(tv.get_float(1, 0), 0.f);
     CHECK_EQUAL(tv.get_float(1, 1), 2.f);
@@ -1953,7 +1942,7 @@ TEST(TableView_Distinct)
 
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<LinkChain>{0});
+    tv.distinct(0);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 6);
     CHECK_EQUAL(tv.get_source_ndx(2), 0);
@@ -1962,7 +1951,7 @@ TEST(TableView_Distinct)
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<LinkChain>{0, 1});
+    tv.distinct(SortDescriptor(t, {{0}, {1}}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -1975,7 +1964,7 @@ TEST(TableView_Distinct)
     // so the result should equal the test above
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<LinkChain>{0, 1});
+    tv.distinct(SortDescriptor(t, {{0}, {1}}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -1988,7 +1977,7 @@ TEST(TableView_Distinct)
     t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<LinkChain>{0, 1});
+    tv.distinct(SortDescriptor(t, {{0}, {1}}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -2013,7 +2002,7 @@ TEST(TableView_Distinct)
     CHECK(tv.get_string(0, 5).is_null());
     CHECK(tv.get_string(0, 6).is_null());
 
-    tv.distinct(std::vector<LinkChain>{0});
+    tv.distinct(SortDescriptor(t, {{0}}));
     // "foo", "bar", "", null
 
     t.remove(6); // remove "bar"
@@ -2029,7 +2018,7 @@ TEST(TableView_Distinct)
 
     // Remove distinct property by providing empty column list. Now TableView should look like it
     // did just after our last tv.sort(0, false) above, but after having executed table.remove(6)
-    tv.distinct(std::vector<LinkChain>{});
+    tv.distinct(SortDescriptor{});
     // "foo", "foo", "", "", null, null
     CHECK_EQUAL(tv.size(), 6);
     CHECK_EQUAL(tv.get_string(0, 0), "foo");
@@ -3283,6 +3272,28 @@ TEST(TableView_Copy)
     copy_2.sync_if_needed();
     CHECK_EQUAL(1, copy_2.size());
     CHECK_EQUAL(1, copy_2.get_source_ndx(0));
+}
+
+TEST(TableView_InsertColumnsAfterSort)
+{
+    Table table;
+    table.add_column(type_Int, "value");
+    table.add_empty_row(10);
+    for (size_t i = 0; i < 10; ++i)
+        table.set_int(0, i, i);
+
+    SortDescriptor desc(table, {{0}}, {false}); // sort by the one column in descending order
+
+    table.insert_column(0, type_String, "0");
+    auto tv = table.get_sorted_view(desc);
+    CHECK_EQUAL(tv.get_int(1, 0), 9);
+    CHECK_EQUAL(tv.get_int(1, 9), 0);
+
+    table.insert_column(0, type_String, "1");
+    table.add_empty_row();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.get_int(2, 0), 9);
+    CHECK_EQUAL(tv.get_int(2, 10), 0);
 }
 
 #endif // TEST_TABLE_VIEW

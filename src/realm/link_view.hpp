@@ -78,10 +78,10 @@ public:
     void clear();
 
     void sort(size_t column, bool ascending = true);
-    void sort(std::vector<LinkChain> columns, std::vector<bool> ascending);
+    void sort(const SortDescriptor& order);
 
-    TableView get_sorted_view(std::vector<LinkChain> column_indexes, std::vector<bool> ascending) const;
     TableView get_sorted_view(size_t column_index, bool ascending = true) const;
+    TableView get_sorted_view(SortDescriptor order) const;
 
     /// Remove the target row of the specified link from the target table. This
     /// also removes the specified link from this link list, and any other link

@@ -3909,16 +3909,16 @@ ConstTableView Table::get_sorted_view(size_t col_ndx, bool ascending) const
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }
 
-TableView Table::get_sorted_view(std::vector<LinkChain> col_ndx, std::vector<bool> ascending)
+TableView Table::get_sorted_view(SortDescriptor order)
 {
     TableView tv = where().find_all();
-    tv.sort(col_ndx, ascending);
+    tv.sort(std::move(order));
     return tv;
 }
 
-ConstTableView Table::get_sorted_view(std::vector<LinkChain> col_ndx, std::vector<bool> ascending) const
+ConstTableView Table::get_sorted_view(SortDescriptor order) const
 {
-    return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
+    return const_cast<Table*>(this)->get_sorted_view(std::move(order));
 }
 
 const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain) const

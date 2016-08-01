@@ -3804,41 +3804,38 @@ TEST(Query_SortLinkChains)
     TableView tv = t1->where().less(t1_int_col, 6).find_all();
 
     // Test original funcionality through chain class
-    std::vector<size_t> link_chain1 = { t1_int_col };
     std::vector<size_t> results1 = { 0, 1, 2, 3, 4, 5 };
-    tv.sort(link_chain1);
+    tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results1.size());
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
     }
-    tv.sort(link_chain1, false);
+    tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]);
     }
 
     // Test basic one link chain
-    std::vector<size_t> link_chain2 = { t1_link_col, t2_int_col };
     std::vector<size_t> results2 = { 3, 4, 2, 1, 5, 0 };
-    tv.sort(link_chain2);
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results2.size());
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
     }
-    tv.sort(link_chain2, false);
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[results2.size() - 1 - i]);
     }
 
     // Test link chain through two links with nulls
-    std::vector<size_t> link_chain3 = { t1_link_col, t2_link_col, t3_int_col };
     std::vector<size_t> results3 = { 1, 0, 2, 5 };
-    tv.sort(link_chain3);
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {true}));
     // No guarantees about nullified links except they are at the end.
     CHECK(tv.size() >= results3.size());
     for (size_t i = 0; i < results3.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
     }
-    tv.sort(link_chain3, false);
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
     // No guarantees about nullified links except they are at the beginning.
     size_t num_nulls = tv.size() - results3.size();
     for (size_t i = num_nulls; i < results3.size(); ++i) {
@@ -3846,35 +3843,28 @@ TEST(Query_SortLinkChains)
     }
 
     // Test link chain with nulls and a single local column
-    std::vector<size_t> link_chain4 = { t1_int_col };
     std::vector<size_t> results4 = { 1, 0, 2, 5, 3, 4 };
-    std::vector<LinkChain> chain4 = { link_chain3, link_chain4 };
-    std::vector<bool> order4 = { true, true };
-    tv.sort(chain4, order4);
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, true}));
     CHECK_EQUAL(tv.size(), results4.size());
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4[i]);
     }
     std::vector<size_t> results4_rev = { 1, 0, 2, 5, 4, 3 };
-    std::vector<bool> order4_rev = { true, false };
-    tv.sort(chain4, order4_rev);
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev[i]);
     }
     std::vector<size_t> results4_rev2 = { 3, 4, 5, 2, 0, 1 };
-    std::vector<bool> order4_rev2 = { false, true };
-    tv.sort(chain4, order4_rev2);
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, true}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev2[i]);
     }
     std::vector<size_t> results4_rev3 = { 4, 3, 5, 2, 0, 1 };
-    std::vector<bool> order4_rev3 = { false, false };
-    tv.sort(chain4, order4_rev3);
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev3[i]);
     }
 }
-
 
 TEST(Query_LinkChainSortErrors)
 {
@@ -3887,24 +3877,11 @@ TEST(Query_LinkChainSortErrors)
     size_t t2_string_col = t2->add_column(type_String, "t2_string");
     t2->add_column_link(type_Link, "t2_link_t1", *t1); // add a backlink to t1
 
-    t1->add_empty_row();
-    t2->add_empty_row();
-    LinkViewRef lv = t1->get_linklist(t1_linklist_col, 0);
-    lv->add(0);
-    lv->add(0);
-    t1->set_int(t1_int_col, 0, 0);
-    t2->set_string(t2_string_col, 0, "zero");
-
-    TableView tv = t1->where().find_all();
-
     // Disallow backlinks, linklists, other non-link column types.
-    std::vector<size_t> linklist = { t1_linklist_col, t2_string_col };
-    CHECK_LOGIC_ERROR(tv.sort(LinkChain(linklist)), LogicError::type_mismatch);
     size_t backlink_ndx = 2;
-    std::vector<size_t> backlink = { backlink_ndx, t2_string_col };
-    CHECK_LOGIC_ERROR(tv.sort(LinkChain(backlink)), LogicError::type_mismatch);
-    std::vector<size_t> not_link = { t1_int_col, t2_string_col };
-    CHECK_LOGIC_ERROR(tv.sort(LinkChain(not_link)), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_linklist_col, t2_string_col}}), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{backlink_ndx, t2_string_col}}), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_int_col, t2_string_col}}), LogicError::type_mismatch);
 }
 
 TEST(Query_Sort_And_Requery_Typed1)

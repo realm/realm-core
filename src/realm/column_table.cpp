@@ -20,6 +20,10 @@
 
 #include <realm/util/miscellaneous.hpp>
 
+#ifdef REALM_DEBUG
+#include <iomanip>
+#endif
+
 using namespace realm;
 using namespace realm::util;
 
