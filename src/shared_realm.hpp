@@ -24,6 +24,9 @@
 #include <thread>
 #include <vector>
 
+#include <realm/util/optional.hpp>
+#include <realm/handover_defs.hpp>
+
 namespace realm {
     class BinaryData;
     class BindingContext;
@@ -35,6 +38,10 @@ namespace realm {
     class StringData;
     typedef std::shared_ptr<Realm> SharedRealm;
     typedef std::weak_ptr<Realm> WeakRealm;
+
+    namespace util {
+        class RootLogger;
+    }
 
     namespace _impl {
         class CollectionNotifier;
@@ -55,6 +62,10 @@ namespace realm {
             std::string path;
             // User-supplied encryption key. Must be either empty or 64 bytes.
             std::vector<char> encryption_key;
+            util::Optional<std::string> sync_server_url;
+            util::Optional<std::string> sync_user_token;
+
+            util::RootLogger *logger = nullptr;
 
             // Optional schema for the file. If nullptr, the existing schema
             // from the file opened will be used. If present, the file will be
@@ -104,6 +115,8 @@ namespace realm {
         // the the existing Realm.
         static SharedRealm get_shared_realm(Config config);
 
+        static bool refresh_sync_access_token(std::string access_token, StringData path);
+
         // Updates a Realm to a given target schema/version creating tables and
         // updating indexes as necessary. Uses the existing migration function
         // on the Config, and the resulting Schema and version with updated
@@ -143,6 +156,11 @@ namespace realm {
 
         // returns the file format version upgraded from if an upgrade took place
         util::Optional<int> file_format_upgraded_from_version() const;
+
+        void notify_others() const;
+
+        // FIXME: Consider whether this method should exist here.
+        void refresh_sync_access_token(std::string access_token);
 
         ~Realm();
 

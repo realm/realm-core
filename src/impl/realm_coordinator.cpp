@@ -30,12 +30,57 @@
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/string_data.hpp>
+#include <realm/sync/client.hpp>
+#include <realm/sync/history.hpp>
 
 #include <unordered_map>
 #include <algorithm>
 
 using namespace realm;
 using namespace realm::_impl;
+
+namespace realm {
+namespace _impl {
+
+struct SyncClient {
+    sync::Client client;
+
+    SyncClient(sync::Client client)
+    : client(std::move(client))
+    , m_thread([this]{ this->client.run(); })
+    {
+    }
+
+    ~SyncClient()
+    {
+        client.stop();
+        m_thread.join();
+    }
+
+private:
+    std::thread m_thread;
+};
+
+}
+}
+
+static std::shared_ptr<SyncClient> get_sync_client(Realm::Config const& config)
+{
+    static std::weak_ptr<SyncClient> weak_client;
+    static std::mutex s_sync_client_mutex;
+
+    std::lock_guard<std::mutex> lock(s_sync_client_mutex);
+
+    if (auto client = weak_client.lock()) {
+        return client;
+    }
+
+    sync::Client::Config client_config;
+    client_config.logger = config.logger;
+    auto client = std::make_shared<SyncClient>(sync::Client(client_config));
+    weak_client = client;
+    return client;
+}
 
 static std::mutex s_coordinator_mutex;
 static std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>> s_coordinators_per_path;
@@ -88,6 +133,12 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         if (m_config.schema_version != config.schema_version && config.schema_version != ObjectStore::NotVersioned) {
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
+        if (m_config.sync_user_token != config.sync_user_token) {
+            throw MismatchedConfigException("Realm at path already opened with different user token.", config.path);
+        }
+        if (m_config.sync_server_url != config.sync_server_url) {
+            throw MismatchedConfigException("Realm at path already opened with different server url.", config.path);
+        }
         // FIXME: verify that schema is compatible
         // Needs to verify that all tables present in both are identical, and
         // then updated m_config with any tables present in config but not in
@@ -108,6 +159,25 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
                     return realm;
                 }
             }
+        }
+    }
+
+    if (config.sync_server_url && !m_sync_session) {
+        m_sync_client = get_sync_client(config);
+
+        m_sync_session = std::make_unique<sync::Session>(m_sync_client->client, config.path);
+        m_sync_session->set_sync_transact_callback([this] (sync::Session::version_type) {
+            if (m_notifier)
+                m_notifier->notify_others();
+        });
+
+        if (config.sync_user_token) {
+            // We already have a user token, so BIND immediately
+            m_sync_session->bind(*config.sync_server_url, *config.sync_user_token);
+        }
+        else {
+            // No user token yet, so just register the URL
+            m_sync_awaits_user_token = true;
         }
     }
 
@@ -207,11 +277,23 @@ void RealmCoordinator::clear_all_caches()
     }
 }
 
-void RealmCoordinator::send_commit_notifications()
+void RealmCoordinator::send_commit_notifications(Realm& source_realm)
 {
     REALM_ASSERT(!m_config.read_only);
     if (m_notifier) {
         m_notifier->notify_others();
+    }
+    if (m_sync_session) {
+        auto& sg = Realm::Internal::get_shared_group(source_realm);
+        auto version = LangBindHelper::get_version_of_latest_snapshot(sg);
+        if (!m_sync_awaits_user_token) {
+            // Fully ready sync session, notify immediately.
+            m_sync_session->nonsync_transact_notify(version);
+        }
+        else {
+            // FIXME: This deference might be moved into the sync::Session object.
+            m_sync_deferred_commit_notification = version;
+        }
     }
 }
 
@@ -596,5 +678,29 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
     for (auto& notifier : notifiers) {
         notifier->call_callbacks();
+    }
+}
+
+void RealmCoordinator::notify_others()
+{
+    m_notifier->notify_others();
+}
+
+void RealmCoordinator::refresh_sync_access_token(std::string access_token)
+{
+    if (m_sync_awaits_user_token) {
+        m_sync_awaits_user_token = false;
+
+        // Since the sync session was previously unbound, it's safe to do this from the
+        // calling thread.
+        m_sync_session->bind(*m_config.sync_server_url, std::move(access_token));
+
+        if (m_sync_deferred_commit_notification) {
+            m_sync_session->nonsync_transact_notify(*m_sync_deferred_commit_notification);
+            m_sync_deferred_commit_notification = util::none;
+        }
+    }
+    else {
+        m_sync_session->refresh(std::move(access_token));
     }
 }

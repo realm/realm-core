@@ -26,8 +26,9 @@
 #include "schema.hpp"
 #include "util/format.hpp"
 
-#include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
+#include <realm/commit_log.hpp>
+#include <realm/sync/history.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -35,6 +36,9 @@ using namespace realm::_impl;
 Realm::Config::Config(const Config& c)
 : path(c.path)
 , encryption_key(c.encryption_key)
+, sync_server_url(c.sync_server_url)
+, sync_user_token(c.sync_user_token)
+, logger(c.logger)
 , schema_version(c.schema_version)
 , migration_function(c.migration_function)
 , delete_realm_if_migration_needed(c.delete_realm_if_migration_needed)
@@ -133,7 +137,17 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            history = realm::make_client_history(config.path, config.encryption_key.data());
+            // FIXME: The SharedGroup constructor, when called below, will
+            // throw a C++ exception if server_synchronization_mode is
+            // inconsistent with the accessed Realm file. This exception
+            // probably has to be transmuted to an NSError.
+            bool server_synchronization_mode = bool(config.sync_server_url);
+            if (server_synchronization_mode) {
+                history = realm::sync::make_sync_history(config.path);
+            }
+            else {
+                history = realm::make_client_history(config.path, config.encryption_key.data());
+            }
             SharedGroup::DurabilityLevel durability = config.in_memory ? SharedGroup::durability_MemOnly :
                                                                            SharedGroup::durability_Full;
             shared_group = std::make_unique<SharedGroup>(*history, durability, config.encryption_key.data(), !config.disable_format_upgrade,
@@ -358,7 +372,7 @@ void Realm::commit_transaction()
     }
 
     transaction::commit(*m_shared_group, m_binding_context.get());
-    m_coordinator->send_commit_notifications();
+    m_coordinator->send_commit_notifications(*this);
 }
 
 void Realm::cancel_transaction()
@@ -486,6 +500,25 @@ bool Realm::can_deliver_notifications() const noexcept
     }
 
     return true;
+}
+
+void Realm::notify_others() const
+{
+    m_coordinator->notify_others();
+}
+
+bool Realm::refresh_sync_access_token(std::string access_token, StringData path) {
+    auto coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(path);
+    if (coordinator) {
+        coordinator->refresh_sync_access_token(std::move(access_token));
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void Realm::refresh_sync_access_token(std::string access_token) {
+    m_coordinator->refresh_sync_access_token(std::move(access_token));
 }
 
 uint64_t Realm::get_schema_version(const realm::Realm::Config &config)

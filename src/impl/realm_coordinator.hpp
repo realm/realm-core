@@ -29,10 +29,15 @@ class Schema;
 class SharedGroup;
 class StringData;
 
+namespace sync {
+class Session;
+}
+
 namespace _impl {
 class CollectionNotifier;
 class ExternalCommitHelper;
 class WeakRealmNotifier;
+struct SyncClient;
 
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
@@ -57,7 +62,7 @@ public:
 
     // Asynchronously call notify() on every Realm instance for this coordinator's
     // path, including those in other processes
-    void send_commit_notifications();
+    void send_commit_notifications(Realm&);
 
     // Clear the weak Realm cache for all paths
     // Should only be called in test code, as continuing to use the previously
@@ -88,6 +93,11 @@ public:
     void advance_to_ready(Realm& realm);
     void process_available_async(Realm& realm);
 
+    void notify_others();
+
+    // FIXME: Consider whether this function should live here
+    void refresh_sync_access_token(std::string access_token);
+
 private:
     Realm::Config m_config;
 
@@ -111,6 +121,11 @@ private:
     std::exception_ptr m_async_error;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
+
+    std::shared_ptr<SyncClient> m_sync_client;
+    std::unique_ptr<sync::Session> m_sync_session;
+    bool m_sync_awaits_user_token = false;
+    util::Optional<int_fast64_t> m_sync_deferred_commit_notification;
 
     // must be called with m_notifier_mutex locked
     void pin_version(uint_fast64_t version, uint_fast32_t index);
