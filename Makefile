@@ -66,11 +66,6 @@ benchmark-row-accessor: check-norun/subdir/src
 benchmark-common-tasks: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-common-tasks
 
-# Build and run the "util network" benchmarking program
-.PHONY: benchmark-util-network
-benchmark-util-network: check-norun/subdir/src
-	@$(MAKE) -C test benchmark-util-network
-
 # Build and run the "history types" benchmarking program
 .PHONY: benchmark-history-types
 benchmark-history-types: check-norun/subdir/src
