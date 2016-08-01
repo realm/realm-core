@@ -16,7 +16,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Updated the header license to prepare for open sourcing the code.
 
 ----------------------------------------------
 
