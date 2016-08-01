@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a bug with the local mutex for the robust mutex emulation.
+* Reduce the number of file descriptors used in robust mutex emulation,
+  multi instances of InterprocessMutex share the same descriptor. (#3199)
 
 ### Breaking changes
 

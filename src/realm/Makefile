@@ -134,6 +134,7 @@ util/string_buffer.cpp \
 util/terminate.cpp \
 util/thread.cpp \
 util/interprocess_condvar.cpp \
+util/interprocess_mutex.cpp \
 util/to_string.cpp \
 alloc.cpp \
 alloc_slab.cpp \

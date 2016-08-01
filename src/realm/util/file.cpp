@@ -23,11 +23,11 @@
 #endif
 
 #include <realm/util/errno.hpp>
-#include <realm/util/file.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/features.h>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -1064,6 +1064,39 @@ bool File::is_same_file(const File& f) const
 #endif
 }
 
+File::UniqueID File::get_unique_id() const {
+    REALM_ASSERT_RELEASE(is_attached());
+#ifdef _WIN32 // Windows version
+    throw std::runtime_error("Not yet supported");
+#else // POSIX version
+    struct stat statbuf;
+    if (::fstat(m_fd, &statbuf) == 0) {
+        return {static_cast<uint_fast64_t>(statbuf.st_dev), static_cast<uint_fast64_t>(statbuf.st_ino)};
+    }
+    int err = errno; // Eliminate any risk of clobbering
+    std::string msg = get_errno_msg("fstat() failed: ", err);
+    throw std::runtime_error(msg);
+#endif
+}
+
+bool File::get_unique_id(const std::string& path, File::UniqueID& uid) {
+#ifdef _WIN32 // Windows version
+    throw std::runtime_error("Not yet supported");
+#else // POSIX version
+    struct stat statbuf;
+    if (::stat(path.c_str(), &statbuf) == 0) {
+        uid.device = statbuf.st_dev;
+        uid.inode = statbuf.st_ino;
+        return true;
+    }
+    int err = errno; // Eliminate any risk of clobbering
+    // File doesn't exist
+    if (err == ENOENT ) return false;
+
+    std::string msg = get_errno_msg("fstat() failed: ", err);
+    throw std::runtime_error(msg);
+#endif
+}
 
 bool File::is_removed() const
 {
