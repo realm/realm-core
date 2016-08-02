@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a race condition that could result in a crash if a `LinkView` was
+  destroyed while another thread was adjusting accessors on a `LinkListColumn`.
 
 ### Breaking changes
 
