@@ -1482,7 +1482,7 @@ TEST(TableView_MultiColSort)
 
     TableView tv = table.where().find_all();
 
-    std::vector<size_t> v;
+    std::vector<LinkChain> v;
     v.push_back(0);
     v.push_back(1);
 
@@ -1935,7 +1935,7 @@ TEST(TableView_Distinct)
 
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0});
+    tv.distinct(std::vector<LinkChain>{0});
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 6);
     CHECK_EQUAL(tv.get_source_ndx(2), 0);
@@ -1944,7 +1944,7 @@ TEST(TableView_Distinct)
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0, 1});
+    tv.distinct(std::vector<LinkChain>{0, 1});
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -1957,7 +1957,7 @@ TEST(TableView_Distinct)
     // so the result should equal the test above
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0, 1});
+    tv.distinct(std::vector<LinkChain>{0, 1});
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -1970,7 +1970,7 @@ TEST(TableView_Distinct)
     t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0, 1});
+    tv.distinct(std::vector<LinkChain>{0, 1});
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -1995,7 +1995,7 @@ TEST(TableView_Distinct)
     CHECK(tv.get_string(0, 5).is_null());
     CHECK(tv.get_string(0, 6).is_null());
 
-    tv.distinct(std::vector<size_t>{0});
+    tv.distinct(std::vector<LinkChain>{0});
     // "foo", "bar", "", null
 
     t.remove(6); // remove "bar"
@@ -2011,7 +2011,7 @@ TEST(TableView_Distinct)
 
     // Remove distinct property by providing empty column list. Now TableView should look like it
     // did just after our last tv.sort(0, false) above, but after having executed table.remove(6)
-    tv.distinct(std::vector<size_t>{});
+    tv.distinct(std::vector<LinkChain>{});
     // "foo", "foo", "", "", null, null
     CHECK_EQUAL(tv.size(), 6);
     CHECK_EQUAL(tv.get_string(0, 0), "foo");

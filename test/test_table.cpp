@@ -1294,7 +1294,7 @@ TEST(Table_Multi_Sort)
     table.set_int(0, 4, 1);
     table.set_int(1, 4, 14);
 
-    std::vector<size_t> col_ndx1;
+    std::vector<LinkChain> col_ndx1;
     col_ndx1.push_back(0);
     col_ndx1.push_back(1);
 
@@ -1311,7 +1311,7 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(1, v_sorted1.get_source_ndx(3));
     CHECK_EQUAL(3, v_sorted1.get_source_ndx(4));
 
-    std::vector<size_t> col_ndx2;
+    std::vector<LinkChain> col_ndx2;
     col_ndx2.push_back(1);
     col_ndx2.push_back(0);
 

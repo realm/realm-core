@@ -8,7 +8,7 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Added support for sorting table views through a chain of links. (#1030)
 
 ### Enhancements
 

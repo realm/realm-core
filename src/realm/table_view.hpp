@@ -297,9 +297,10 @@ public:
 
     // Sort m_row_indexes according to one column
     void sort(size_t column, bool ascending = true);
+    void sort(LinkChain chain, bool ascending = true);
 
     // Sort m_row_indexes according to multiple columns
-    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
+    void sort(std::vector<LinkChain> columns, std::vector<bool> ascending);
 
     // Remove rows that are duplicated with respect to the column set passed as argument.
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
@@ -308,7 +309,7 @@ public:
     // Each time you call distinct() it will first fetch the full original TableView contents and then apply
     // distinct() on that. So it distinct() does not filter the result of the previous distinct().
     void distinct(size_t column);
-    void distinct(std::vector<size_t> columns);
+    void distinct(std::vector<LinkChain> columns);
 
     // Returns whether the rows are guaranteed to be in table order.
     // This is true only of unsorted TableViews created from either:
@@ -357,7 +358,7 @@ protected:
 
     // If m_distinct_columns.size() > 0, it means that this TableView has had called TableView::distinct() and
     // must only contain unique rows with respect to that column set of the parent table
-    std::vector<size_t> m_distinct_columns;
+    std::vector<LinkChain> m_distinct_columns;
 
     Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
     bool m_auto_sort = false;
