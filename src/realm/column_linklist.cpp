@@ -351,7 +351,7 @@ void LinkListColumn::unregister_linkview()
 }
 
 
-std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
+LinkViewRef LinkListColumn::get_ptr(size_t row_ndx) const
 {
     REALM_ASSERT_3(row_ndx, <, size());
     validate_list_accessors();
@@ -370,8 +370,8 @@ std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
     if (it != m_list_accessors.end()) {
         if (it->m_row_ndx == row_ndx) {
             // If we have an existing LinkView, return it.
-            if (auto p = it->m_list.lock())
-                return p;
+            if (LinkViewRef list = it->m_list.lock())
+                return list;
         }
         if (it->m_list.expired()) {
             // We found an expired entry at the appropriate position. Reuse it with a new LinkView.
@@ -422,9 +422,8 @@ void LinkListColumn::discard_child_accessors() noexcept
 {
     validate_list_accessors();
     for (auto& entry : m_list_accessors) {
-        std::shared_ptr<LinkView> p = entry.m_list.lock();
-        if (p)
-            p->detach();
+        if (LinkViewRef list = entry.m_list.lock())
+            list->detach();
     }
     m_list_accessors.clear();
 }
@@ -436,9 +435,8 @@ void LinkListColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 
     LinkColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     for (auto& entry : m_list_accessors) {
-        std::shared_ptr<LinkView> p = entry.m_list.lock();
-        if (p)
-            p->refresh_accessor_tree(entry.m_row_ndx);
+        if (LinkViewRef list = entry.m_list.lock())
+            list->refresh_accessor_tree(entry.m_row_ndx);
     }
 }
 
@@ -490,9 +488,8 @@ void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) n
     for (; it != end; ++it) {
         it->m_row_ndx += num_rows_inserted;
         if (fix_ndx_in_parent) {
-            std::shared_ptr<LinkView> p = it->m_list.lock();
-            if (p)
-                p->set_origin_row_index(it->m_row_ndx);
+            if (LinkViewRef list = it->m_list.lock())
+                list->set_origin_row_index(it->m_row_ndx);
         }
     }
 
@@ -517,9 +514,8 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
     for (auto it = erased_end; it != end; ++it) {
         it->m_row_ndx -= num_rows_erased;
         if (fix_ndx_in_parent) {
-            std::shared_ptr<LinkView> p = it->m_list.lock();
-            if (p)
-                p->set_origin_row_index(it->m_row_ndx);
+            if (LinkViewRef list = it->m_list.lock())
+                list->set_origin_row_index(it->m_row_ndx);
         }
     }
 
@@ -557,9 +553,8 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
     if (from != end && from->m_row_ndx == from_row_ndx) {
         from->m_row_ndx = to_row_ndx;
         if (fix_ndx_in_parent) {
-            std::shared_ptr<LinkView> p = from->m_list.lock();
-            if (p)
-                p->set_origin_row_index(to_row_ndx);
+            if (LinkViewRef list = from->m_list.lock())
+                list->set_origin_row_index(to_row_ndx);
         }
 
         if (to_is_valid) {
@@ -588,7 +583,7 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
 
     auto it_1 = std::lower_bound(begin, end, list_entry{ row_ndx_1, std::weak_ptr<LinkView>() });
     bool row_1_found = (it_1 != end && it_1->m_row_ndx == row_ndx_1);
-    std::shared_ptr<LinkView> ptr_1;
+    LinkViewRef ptr_1;
     if (row_1_found) {
         ptr_1 = it_1->m_list.lock();
         if (!bool(ptr_1))
@@ -596,7 +591,7 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
     }
     auto it_2 = std::lower_bound(begin, end, list_entry{ row_ndx_2, std::weak_ptr<LinkView>() });
     bool row_2_found = (it_2 != end && it_2->m_row_ndx == row_ndx_2);
-    std::shared_ptr<LinkView> ptr_2;
+    LinkViewRef ptr_2;
     if (row_2_found) {
         ptr_2 = it_2->m_list.lock();
         if (!bool(ptr_2))
@@ -655,9 +650,8 @@ void LinkListColumn::update_from_parent(size_t old_baseline) noexcept
     prune_list_accessor_tombstones();
 
     for (auto& list_accessor : m_list_accessors) {
-        std::shared_ptr<LinkView> p = list_accessor.m_list.lock();
-        if (p)
-            p->update_from_parent(old_baseline);
+        if (LinkViewRef list = list_accessor.m_list.lock())
+            list->update_from_parent(old_baseline);
     }
 }
 
