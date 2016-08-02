@@ -14,9 +14,13 @@ doc/html
 *.user
 !Realm.vcxproj.user
 
-#ignore thumbnails created by windows
+# Ignore user folder attributes created by Apple
+*.DS_Store
+
+# Ignore thumbnails created by windows
 Thumbs.db
-#Ignore files build by Visual Studio
+
+# Ignore files build by Visual Studio
 *.obj
 *.exe
 *.pdb
