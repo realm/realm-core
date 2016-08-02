@@ -57,7 +57,7 @@ public:
     void destroy() noexcept override;
     MemRef clone_deep(Allocator& alloc) const override;
 
-    int compare_values(size_t row1, size_t row2) const override
+    int compare_values(size_t row1, size_t row2) const noexcept override
     {
         StringData a = get(row1);
         StringData b = get(row2);

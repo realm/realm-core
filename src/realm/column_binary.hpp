@@ -65,6 +65,8 @@ public:
     /// Compare two binary columns for equality.
     bool compare_binary(const BinaryColumn&) const;
 
+    int compare_values(size_t row1, size_t row2) const noexcept override;
+
     static ref_type create(Allocator&, size_t size, bool nullable);
 
     static size_t get_size_from_ref(ref_type root_ref, Allocator&) noexcept;

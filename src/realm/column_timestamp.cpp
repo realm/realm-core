@@ -396,6 +396,11 @@ bool TimestampColumn::compare(const TimestampColumn& c) const noexcept
     return true;
 }
 
+int TimestampColumn::compare_values(size_t row1, size_t row2) const noexcept
+{
+    return ColumnBase::compare_values(this, row1, row2);
+}
+
 Timestamp TimestampColumn::maximum(size_t* result_index) const
 {
     return minmax<Greater>(result_index);

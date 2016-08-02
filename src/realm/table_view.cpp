@@ -711,24 +711,10 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     sort(s);
 
     // Step 3: Create column accessors for all columns in the column set.
-    std::vector<const ColumnTemplateBase*> m_columns;
-    std::vector<const StringEnumColumn*> m_columns_enum;
+    std::vector<const ColumnBase*> m_columns;
     m_columns.resize(columns.size());
-    m_columns_enum.resize(columns.size());
-
     for (size_t i = 0; i < columns.size(); i++) {
-        const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
-        // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting
-        // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used
-        // in a couple of other places in Core too.
-        const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
-        REALM_ASSERT(ctb);
-        if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&cb))
-            m_columns_enum[i] = cse;
-        else
-            m_columns[i] = ctb;
-
-        REALM_ASSERT(ctb);
+        m_columns[i] = &m_table->get_column_base(m_distinct_columns[i]);
     }
 
     // Step 4: Build a list of all duplicated rows that need to be removed
@@ -737,16 +723,12 @@ void TableViewBase::distinct(std::vector<size_t> columns)
         bool identical = true;
         for (size_t c = 0; c < m_distinct_columns.size(); c++) {
 
-            int cmp;
             int64_t r1_64 = m_row_indexes.get(r);
             int64_t r2_64 = m_row_indexes.get(r - 1);
             REALM_ASSERT(!util::int_cast_has_overflow<size_t>(r1_64) && !util::int_cast_has_overflow<size_t>(r2_64));
             size_t r1 = size_t(r1_64);
             size_t r2 = size_t(r2_64);
-            if (const StringEnumColumn* cse = m_columns_enum[c])
-                cmp = cse->compare_values(r1, r2);
-            else
-                cmp = m_columns[c]->compare_values(r1, r2);
+            int cmp = m_columns[c]->compare_values(r1, r2);
 
             if (cmp != 0) {
                 identical = false;

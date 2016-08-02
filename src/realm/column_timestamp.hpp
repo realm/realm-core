@@ -26,7 +26,7 @@ namespace realm {
 
 // Inherits from ColumnTemplate to get a compare_values() that can be called without knowing the
 // column type
-class TimestampColumn : public ColumnBaseSimple, public ColumnTemplate<Timestamp> {
+class TimestampColumn : public ColumnBaseSimple {
 public:
     TimestampColumn(Allocator& alloc, ref_type ref);
     ~TimestampColumn() noexcept override;
@@ -76,9 +76,9 @@ public:
 #endif
     void add(const Timestamp& ts = Timestamp{});
     Timestamp get(size_t row_ndx) const noexcept;
-    Timestamp get_val(size_t row_ndx) const noexcept override { return get(row_ndx); }
     void set(size_t row_ndx, const Timestamp& ts);
     bool compare(const TimestampColumn& c) const noexcept;
+    int compare_values(size_t row1, size_t row2) const noexcept override;
 
     Timestamp maximum(size_t* result_index) const;
     Timestamp minimum(size_t* result_index) const;

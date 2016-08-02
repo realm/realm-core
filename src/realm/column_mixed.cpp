@@ -397,6 +397,13 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
 }
 
 
+int MixedColumn::compare_values(size_t, size_t) const noexcept
+{
+    REALM_ASSERT(false); // querying Mixed is not supported
+    return 0;
+}
+
+
 void MixedColumn::do_discard_child_accessors() noexcept
 {
     discard_child_accessors();
