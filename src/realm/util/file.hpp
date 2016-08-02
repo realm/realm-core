@@ -458,17 +458,16 @@ public:
     static std::string resolve(const std::string& path, const std::string& base_dir);
 
 
-#ifdef _WIN32 // Windows version
-    // FIXME: This is not implemented for Windows
-    typedef ino_t UniqueID;
-#else
     struct UniqueID {
+#ifdef _WIN32 // Windows version
+        // FIXME: This is not implemented for Windows
+#else
         // NDK r10e has a bug in sys/stat.h dev_t ino_t are 4 bytes,
         // but stat.st_dev and st_ino are 8 bytes. So we just use uint64 instead.
         uint_fast64_t device;
         uint_fast64_t inode;
-    };
 #endif
+    };
     // Return the unique id for the current opened file descriptor.
     // Same UniqueID means they are the same file.
     UniqueID get_unique_id() const;
@@ -1104,10 +1103,14 @@ inline bool operator!=(const File::UniqueID& lhs, const File::UniqueID& rhs)
 
 inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
+#ifdef _WIN32 // Windows version
+    throw std::runtime_error("Not yet supported");
+#else // POSIX version
     if (lhs.device < rhs.device) return true;
     if (lhs.device > rhs.device) return false;
     if (lhs.inode < rhs.inode) return true;
     return false;
+#endif
 }
 
 inline bool operator>(const File::UniqueID& lhs, const File::UniqueID& rhs)
