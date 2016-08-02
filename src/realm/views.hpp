@@ -20,25 +20,6 @@ struct IndexPair {
     size_t index_in_view;
 };
 
-class SharedArray {
-public:
-    SharedArray(Allocator& alloc, size_t array_size)
-    : m_storage(alloc)
-    {
-        MemRef mem = ArrayIntNull::create_array(Array::Type::type_Normal, false, array_size, 0, alloc);
-        m_storage.init_from_mem(mem);
-        m_guard.reset(&m_storage);
-    }
-    size_t size() const { return m_storage.size(); }
-    ArrayIntNull::value_type get_val(size_t ndx) const { return m_storage.get(ndx); }
-    void set(size_t ndx, size_t value) { m_storage.set(ndx, value); }
-    void set_null(size_t ndx) { m_storage.set_null(ndx); }
-private:
-    // The order of the following variables matters for destruction.
-    ArrayIntNull m_storage;
-    realm::_impl::DestroyGuard<ArrayIntNull> m_guard;
-};
-
 class LinkChain
 {
 public:
@@ -46,12 +27,13 @@ public:
     LinkChain(std::vector<size_t> chain);
     size_t operator[](size_t index) const { return m_column_indices[index]; }
     size_t size() const { return m_column_indices.size(); }
-    util::Optional<int64_t> translate(size_t index) const;
+    util::Optional<size_t> translate(size_t index) const;
     const ColumnBase& init(const ColumnBase* cb, IntegerColumn* row_indexes);
     void cleanup() { m_link_translator.reset(); }
 private:
+    typedef std::vector<util::Optional<size_t>> NullableVector;
     std::vector<size_t> m_column_indices;
-    std::shared_ptr<SharedArray> m_link_translator;
+    std::shared_ptr<NullableVector> m_link_translator;
 };
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
@@ -116,8 +98,8 @@ public:
                 size_t index_j = j.index_in_column;
 
                 if (m_link_chains[t].size() > 1) {
-                    util::Optional<int64_t> translated_i = m_link_chains[t].translate(i.index_in_view);
-                    util::Optional<int64_t> translated_j = m_link_chains[t].translate(j.index_in_view);
+                    util::Optional<size_t> translated_i = m_link_chains[t].translate(i.index_in_view);
+                    util::Optional<size_t> translated_j = m_link_chains[t].translate(j.index_in_view);
                     bool valid_i = bool(translated_i);
                     bool valid_j = bool(translated_j);
 
@@ -134,9 +116,8 @@ public:
                         return m_ascending[t] == valid_i;
                     }
 
-                    // We stored unsigned index values from a size_t type so cast is harmless.
-                    index_i = static_cast<size_t>(translated_i.value());
-                    index_j = static_cast<size_t>(translated_j.value());
+                    index_i = translated_i.value();
+                    index_j = translated_j.value();
                 }
 
                 // todo/fixme, special treatment of StringEnumColumn by calling StringEnumColumn::compare_values()

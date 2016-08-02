@@ -25,7 +25,7 @@ const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_index
     if (m_column_indices.size() > 1) {
         size_t num_rows = row_indexes->size();
 
-        m_link_translator = std::make_shared<SharedArray>(Allocator::get_default(), num_rows);
+        m_link_translator = std::make_shared<NullableVector>(num_rows);
 
         std::vector<const LinkColumn*> link_cols;
         const Table* linked_table = nullptr;
@@ -53,11 +53,12 @@ const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_index
                     translated_index = link_col->get_link(translated_index);
                 }
             }
+            REALM_ASSERT_EX(row_ndx < m_link_translator->size(), row_ndx, m_link_translator->size());
             if (set_null) {
-                m_link_translator->set_null(row_ndx);
+                (*m_link_translator)[row_ndx] = {};
             }
             else {
-                m_link_translator->set(row_ndx, translated_index);
+                (*m_link_translator)[row_ndx] = { translated_index };
             }
         }
         REALM_ASSERT(linked_table);
@@ -67,12 +68,12 @@ const ColumnBase& LinkChain::init(const ColumnBase* cb, IntegerColumn* row_index
     return *cb; // no link chain, return original column
 }
 
-util::Optional<int64_t> LinkChain::translate(size_t index) const
+util::Optional<size_t> LinkChain::translate(size_t index) const
 {
-    util::Optional<int64_t> value(index);
+    util::Optional<size_t> value(index);
     if (m_link_translator) {
         REALM_ASSERT_EX(index < m_link_translator->size(), index, m_link_translator->size());
-        value = m_link_translator->get_val(index);
+        value = (*m_link_translator)[index];
     }
     return value;
 }
