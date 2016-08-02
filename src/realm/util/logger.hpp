@@ -214,7 +214,8 @@ struct Logger::State {
         m_message(s),
         m_search(m_message)
     {
-        m_formatter.imbue(std::locale::classic());
+        static std::locale loc = std::locale::classic();
+        m_formatter.imbue(loc);
     }
 };
 

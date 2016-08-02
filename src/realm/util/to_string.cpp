@@ -71,8 +71,9 @@ void Printable::print_all(std::ostream& out, const std::initializer_list<Printab
 
 std::string Printable::str() const
 {
+    static std::locale loc = std::locale::classic();
     std::ostringstream ss;
-    ss.imbue(std::locale::classic());
+    ss.imbue(loc);
     ss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     print(ss, true);
     return ss.str();
