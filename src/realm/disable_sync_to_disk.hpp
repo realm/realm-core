@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_DISABLE_SYNC_TO_DISK_HPP
 #define REALM_DISABLE_SYNC_TO_DISK_HPP
 

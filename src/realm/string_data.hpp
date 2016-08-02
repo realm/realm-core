@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_STRING_HPP
 #define REALM_STRING_HPP
 

@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_OWNED_DATA_HPP
 #define REALM_OWNED_DATA_HPP
 

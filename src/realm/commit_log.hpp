@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_COMMIT_LOG_HPP
 #define REALM_COMMIT_LOG_HPP
 

@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #include <algorithm>
 
 #include "verified_string.hpp"

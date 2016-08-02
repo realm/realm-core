@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_ARRAY_STRING_LONG_HPP
 #define REALM_ARRAY_STRING_LONG_HPP
 

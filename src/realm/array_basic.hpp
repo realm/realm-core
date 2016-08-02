@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_ARRAY_BASIC_HPP
 #define REALM_ARRAY_BASIC_HPP
 

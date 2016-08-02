@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_SHARED_PTR_HPP
 #define REALM_SHARED_PTR_HPP
 

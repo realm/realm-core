@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_UTIL_MISCELLANEOUS_HPP
 #define REALM_UTIL_MISCELLANEOUS_HPP
 

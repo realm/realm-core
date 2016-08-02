@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_LANG_BIND_HELPER_HPP
 #define REALM_LANG_BIND_HELPER_HPP
 

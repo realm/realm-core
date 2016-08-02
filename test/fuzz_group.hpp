@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_FUZZ_GROUP_HPP
 #define REALM_FUZZ_GROUP_HPP
 

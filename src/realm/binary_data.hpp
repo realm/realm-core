@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_BINARY_DATA_HPP
 #define REALM_BINARY_DATA_HPP
 

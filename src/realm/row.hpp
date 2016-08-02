@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_ROW_HPP
 #define REALM_ROW_HPP
 

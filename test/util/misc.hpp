@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TEST_UTIL_MISC_HPP
 #define REALM_TEST_UTIL_MISC_HPP
 

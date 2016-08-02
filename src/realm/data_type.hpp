@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_DATA_TYPE_HPP
 #define REALM_DATA_TYPE_HPP
 

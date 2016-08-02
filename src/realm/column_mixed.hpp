@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_COLUMN_MIXED_HPP
 #define REALM_COLUMN_MIXED_HPP
 

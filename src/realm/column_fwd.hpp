@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_COLUMN_FWD_HPP
 #define REALM_COLUMN_FWD_HPP
 

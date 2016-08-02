@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_IMPL_OUTPUT_STREAM_HPP
 #define REALM_IMPL_OUTPUT_STREAM_HPP
 

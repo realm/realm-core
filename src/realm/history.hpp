@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_HISTORY_HPP
 #define REALM_HISTORY_HPP
 

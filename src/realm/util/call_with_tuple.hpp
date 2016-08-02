@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_UTIL_CALL_WITH_TUPLE_HPP
 #define REALM_UTIL_CALL_WITH_TUPLE_HPP
 

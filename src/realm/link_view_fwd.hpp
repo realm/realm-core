@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_LINK_VIEW_FWD_HPP
 #define REALM_LINK_VIEW_FWD_HPP
 

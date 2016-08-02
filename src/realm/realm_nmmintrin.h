@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_NMMINTRIN_H
 #define REALM_NMMINTRIN_H
 

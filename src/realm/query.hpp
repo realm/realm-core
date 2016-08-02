@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_QUERY_HPP
 #define REALM_QUERY_HPP
 

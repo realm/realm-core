@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_UTIL_FEATURES_H
 #define REALM_UTIL_FEATURES_H
 

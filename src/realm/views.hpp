@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_VIEWS_HPP
 #define REALM_VIEWS_HPP
 

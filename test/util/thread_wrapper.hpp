@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TEST_UTIL_THREAD_WRAPPER_HPP
 #define REALM_TEST_UTIL_THREAD_WRAPPER_HPP
 

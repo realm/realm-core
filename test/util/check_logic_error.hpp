@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TEST_UTIL_CHECK_LOGIC_ERROR_HPP
 #define REALM_TEST_UTIL_CHECK_LOGIC_ERROR_HPP
 

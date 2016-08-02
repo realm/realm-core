@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef TESTSETTINGS_H
 #define TESTSETTINGS_H
 

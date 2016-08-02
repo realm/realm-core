@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TABLE_BASIC_HPP
 #define REALM_TABLE_BASIC_HPP
 

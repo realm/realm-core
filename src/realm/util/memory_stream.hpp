@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_UTIL_MEMORY_STREAM_HPP
 #define REALM_UTIL_MEMORY_STREAM_HPP
 

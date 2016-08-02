@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_UNICODE_HPP
 #define REALM_UNICODE_HPP
 

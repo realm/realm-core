@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TIMESTAMP_HPP
 #define REALM_TIMESTAMP_HPP
 
