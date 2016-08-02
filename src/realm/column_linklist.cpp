@@ -510,9 +510,8 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
     auto erased_end = std::lower_bound(erased_begin, end, list_entry{ row_ndx + num_rows_erased, std::weak_ptr<LinkView>() });
 
     for (auto it = erased_begin; it != erased_end; ++it) {
-        // Must hold a counted reference while detaching
-        LinkViewRef list(it->m_list);
-        list->detach();
+        if (LinkViewRef list = it->m_list.lock())
+            list->detach();
     }
 
     for (auto it = erased_end; it != end; ++it) {
@@ -543,11 +542,11 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
     if (to != end && to->m_row_ndx == to_row_ndx) {
         to_is_valid = true;
 
-        // Must hold a counted reference while detaching
-        LinkViewRef list(to->m_list);
-        list->detach();
-        to->m_list.reset();
-        m_list_accessors_contains_tombstones = true;
+        if (LinkViewRef list = to->m_list.lock()) {
+            list->detach();
+            to->m_list.reset();
+            m_list_accessors_contains_tombstones = true;
+        }
     }
     if (from_row_ndx == to_row_ndx) {
         validate_list_accessors();
