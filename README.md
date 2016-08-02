@@ -64,6 +64,10 @@ then:
     cd Cheetah-2.4.4/
     sudo python setup.py install
 
+or alternatively using brew and pip:
+
+    brew install python
+    pip install cheetah
 
 
 Configure, build, install
