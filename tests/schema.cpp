@@ -65,13 +65,16 @@ struct SchemaChangePrinter {
 };
 
 namespace Catch {
-std::string toString(SchemaChange const& sc)
-{
-    std::stringstream ss;
-    sc.visit(SchemaChangePrinter{ss});
-    return ss.str();
-}
-}
+template<>
+struct StringMaker<SchemaChange> {
+    static std::string convert(SchemaChange const& sc)
+    {
+        std::stringstream ss;
+        sc.visit(SchemaChangePrinter{ss});
+        return ss.str();
+    }
+};
+} // namespace Catch
 
 TEST_CASE("ObjectSchema") {
     SECTION("from a Group") {
