@@ -1009,6 +1009,7 @@ EOF
         temp_dir="$(mktemp -d /tmp/realm.build-android.XXXX)" || exit 1
         (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$REALM_HOME/$ANDROID_DIR/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        rm -rf "$temp_dir" || exit 1
 
         realm_version="$(sh build.sh get-version)" || exit
         dir_name="core-$realm_version"
@@ -1107,6 +1108,7 @@ EOF
         temp_dir="$(mktemp -d /tmp/realm.build-node.XXXX)" || exit 1
         (cd "src/realm" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
         (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
+        rm -rf "$temp_dir" || exit 1
 
         cp tools/LICENSE "$node_directory" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
