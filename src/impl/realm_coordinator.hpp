@@ -21,6 +21,8 @@
 
 #include "shared_realm.hpp"
 
+#include <realm/sync/client.hpp>
+
 #include <mutex>
 
 namespace realm {
@@ -72,6 +74,9 @@ public:
     // Clears all caches on existing coordinators
     static void clear_all_caches();
 
+    // FIXME: this should be moved out of the coordinator once we separate sync from the object store
+    static void setup_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger);
+
     // Explicit constructor/destructor needed for the unique_ptrs to forward-declared types
     RealmCoordinator();
     ~RealmCoordinator();
@@ -96,7 +101,7 @@ public:
     void notify_others();
 
     // FIXME: Consider whether this function should live here
-    void refresh_sync_access_token(std::string access_token);
+    void refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url);
 
 private:
     Realm::Config m_config;
