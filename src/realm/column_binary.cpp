@@ -525,9 +525,9 @@ ref_type BinaryColumn::write(size_t slice_offset, size_t slice_size,
 
 void BinaryColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
 {
+    ColumnBaseSimple::refresh_accessor_tree(new_col_ndx, spec);
     ref_type ref = m_array->get_ref_from_parent();
     update_from_ref(ref); // Throws
-    ColumnBaseSimple::refresh_accessor_tree(new_col_ndx, spec);
 }
 
 
