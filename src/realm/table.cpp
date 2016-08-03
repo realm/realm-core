@@ -1304,7 +1304,7 @@ void Table::detach() noexcept
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_attached() to return false.
-    m_columns.set_parent(0, 0);
+    m_columns.set_parent(nullptr, 0);
 
     discard_child_accessors();
     destroy_column_accessors();
@@ -2588,7 +2588,7 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
     }
     else if (type == col_type_Mixed) {
         MixedColumn& subtables = get_column_mixed(col_ndx);
-        subtables.set_subtable(row_ndx, 0);
+        subtables.set_subtable(row_ndx, nullptr);
 
         if (Replication* repl = get_repl())
             repl->set_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
@@ -3256,7 +3256,7 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
             col.set_binary(ndx, value.get_binary()); // Throws
             break;
         case type_Table:
-            col.set_subtable(ndx, 0); // Throws
+            col.set_subtable(ndx, nullptr); // Throws
             break;
         case type_Mixed:
         case type_Link:
