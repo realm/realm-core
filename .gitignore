@@ -85,3 +85,6 @@ Static library*/
 /debian/debhelper.log
 /debian/librealm.debhelper.lo
 /debian/librealm-dev.debhelper.log
+
+# Ignore python compiled files
+*.pyc
