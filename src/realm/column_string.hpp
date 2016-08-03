@@ -42,7 +42,7 @@ class StringIndex;
 /// it is, then the root ref of the index is stored in
 /// Table::m_columns immediately after the root ref of the string
 /// column.
-class StringColumn: public ColumnBaseSimple, public ColumnTemplate<StringData> {
+class StringColumn: public ColumnBaseSimple {
 public:
     typedef StringData value_type;
 
@@ -73,7 +73,7 @@ public:
     void find_all(IntegerColumn& result, StringData value, size_t begin = 0,
                   size_t end = npos) const;
 
-    int compare_values(size_t, size_t) const override;
+    int compare_values(size_t, size_t) const noexcept override;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -142,9 +142,6 @@ public:
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
 #endif
-
-protected:
-    StringData get_val(size_t row) const override { return get(row); }
 
 private:
     std::unique_ptr<StringIndex> m_search_index;
@@ -281,7 +278,7 @@ inline void StringColumn::clear()
     do_clear(); // Throws
 }
 
-inline int StringColumn::compare_values(size_t row1, size_t row2) const
+inline int StringColumn::compare_values(size_t row1, size_t row2) const noexcept
 {
     StringData a = get(row1);
     StringData b = get(row2);

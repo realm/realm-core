@@ -123,6 +123,8 @@ public:
     /// Compare two mixed columns for equality.
     bool compare_mixed(const MixedColumn&) const;
 
+    int compare_values(size_t row1, size_t row2) const noexcept override;
+
     void discard_child_accessors() noexcept;
 
     static ref_type create(Allocator&, size_t size = 0);

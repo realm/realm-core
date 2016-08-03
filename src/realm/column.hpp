@@ -67,39 +67,9 @@ struct ImplicitNull<double> {
 
 // FIXME: Add specialization for ImplicitNull for float, double, StringData, BinaryData.
 
-struct ColumnTemplateBase
-{
-    virtual int compare_values(size_t row1, size_t row2) const = 0;
-};
-
 template<class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, size_t start, size_t end,
                 size_t limit, size_t* return_ndx);
-
-template<class T>
-struct ColumnTemplate : public ColumnTemplateBase
-{
-    // Overridden in column_string.* because == operator of StringData isn't yet locale aware; todo
-    virtual int compare_values(size_t row1, size_t row2) const
-    {
-        // we negate nullability such that the two ternary statements in this method can look identical to reduce
-        // risk of bugs
-        bool v1 = !is_null(row1);
-        bool v2 = !is_null(row2);
-
-        if (!v1 || !v2)
-            return v1 == v2 ? 0 : v1 < v2 ? 1 : -1;
-
-        T a = get_val(row1);
-        T b = get_val(row2);
-        return a == b ? 0 : a < b ? 1 : -1;
-    }
-
-    // We cannot use already-existing get() methods because StringEnumColumn and LinkList inherit from
-    // Column and overload get() with different return type than int64_t. Todo, find a way to simplify
-    virtual T get_val(size_t row) const = 0;
-    virtual bool is_null(size_t row) const = 0;
-};
 
 /// Base class for all column types.
 class ColumnBase {
@@ -269,6 +239,8 @@ public:
 
     virtual void bump_link_origin_table_version() noexcept;
 
+    virtual int compare_values(size_t row1, size_t row2) const noexcept = 0;
+
     /// Refresh the dirty part of the accessor subtree rooted at this column
     /// accessor.
     ///
@@ -335,6 +307,9 @@ protected:
     virtual void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                              std::ostream&) const = 0;
 #endif
+
+    template<class Column>
+    static int compare_values(const Column* column, size_t row1, size_t row2) noexcept;
 
 private:
     static ref_type build(size_t* rest_size_ptr, size_t fixed_height,
@@ -414,7 +389,7 @@ protected:
 /// A column (Column) is a single B+-tree, and the root of
 /// the column is the root of the B+-tree. All leaf nodes are arrays.
 template<class T>
-class Column : public ColumnBaseWithIndex, public ColumnTemplate<T> {
+class Column : public ColumnBaseWithIndex {
 public:
     using value_type = T;
     using LeafInfo = typename BpTree<T>::LeafInfo;
@@ -472,7 +447,6 @@ public:
         LeafInfo& inout_leaf) const noexcept;
 
     // Getting and setting values
-    T get_val(size_t ndx) const noexcept final { return get(ndx); }
     T get(size_t ndx) const noexcept;
     bool is_null(size_t ndx) const noexcept override;
     T back() const noexcept;
@@ -543,6 +517,7 @@ public:
     size_t find_gte(T target, size_t start) const;
 
     bool compare(const Column&) const noexcept;
+    int compare_values(size_t row1, size_t row2) const noexcept override;
 
     static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
                            size_t size = 0, T value = T{});
@@ -713,6 +688,22 @@ inline void ColumnBase::mark(int) noexcept
 inline void ColumnBase::bump_link_origin_table_version() noexcept
 {
     // Noop
+}
+
+template<class Column>
+int ColumnBase::compare_values(const Column* column, size_t row1, size_t row2) noexcept
+{
+    // we negate nullability such that the two ternary statements in this method can look identical to reduce
+    // risk of bugs
+    bool v1 = !column->is_null(row1);
+    bool v2 = !column->is_null(row2);
+
+    if (!v1 || !v2)
+        return v1 == v2 ? 0 : v1 < v2 ? 1 : -1;
+
+    auto a = column->get(row1);
+    auto b = column->get(row2);
+    return a == b ? 0 : a < b ? 1 : -1;
 }
 
 template<class T>
@@ -1375,6 +1366,12 @@ bool Column<T>::compare(const Column<T>& c) const noexcept
         }
     }
     return true;
+}
+
+template<class T>
+int Column<T>::compare_values(size_t row1, size_t row2) const noexcept
+{
+    return ColumnBase::compare_values(this, row1, row2);
 }
 
 template<class T>

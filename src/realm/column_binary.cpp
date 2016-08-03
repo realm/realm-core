@@ -147,6 +147,12 @@ bool BinaryColumn::compare_binary(const BinaryColumn& c) const
 }
 
 
+int BinaryColumn::compare_values(size_t row1, size_t row2) const noexcept
+{
+    return ColumnBase::compare_values(this, row1, row2);
+}
+
+
 void BinaryColumn::do_insert(size_t row_ndx, BinaryData value, bool add_zero_term, size_t num_rows)
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
