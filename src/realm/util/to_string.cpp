@@ -23,6 +23,10 @@
 #include <locale>
 #include <sstream>
 
+namespace {
+    std::locale locale_classic = std::locale::classic();
+}
+
 namespace realm {
 namespace util {
 
@@ -72,7 +76,7 @@ void Printable::print_all(std::ostream& out, const std::initializer_list<Printab
 std::string Printable::str() const
 {
     std::ostringstream ss;
-    ss.imbue(std::locale::classic());
+    ss.imbue(locale_classic);
     ss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     print(ss, true);
     return ss.str();

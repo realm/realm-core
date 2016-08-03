@@ -108,7 +108,7 @@ public:
     void unlock() noexcept;
 
 protected:
-    pthread_mutex_t m_impl;
+    pthread_mutex_t m_impl = PTHREAD_MUTEX_INITIALIZER;
 
     struct no_init_tag {};
     Mutex(no_init_tag) {}

@@ -220,6 +220,10 @@ int fast_popcount64(int64_t x)
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
 uint64_t fastrand(uint64_t max, bool is_seed)
 {
+    // Mutex only to make Helgrind happy
+    static util::Mutex m;
+    util::LockGuard lg(m);
+
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
     static std::atomic<uint64_t> state(is_seed ? max : 1);
 

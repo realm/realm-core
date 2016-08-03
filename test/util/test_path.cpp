@@ -27,6 +27,8 @@ std::string sanitize_for_file_name(std::string str)
 std::string sanitize_for_file_name(const std::string& str) { return str; }
 #endif
 
+std::locale locale_classic = std::locale::classic();
+
 } // anonymous namespace
 
 namespace realm {
@@ -43,7 +45,7 @@ std::string get_test_path(const TestContext& context, const std::string& suffix)
     std::string  test_name = context.test_details.test_name;
     int recurrence_index = context.recurrence_index;
     std::ostringstream out;
-    out.imbue(std::locale::classic());
+    out.imbue(locale_classic);
     out << path_prefix << sanitize_for_file_name(test_name) << '.' << (recurrence_index+1) <<
         suffix;
     return out.str();
