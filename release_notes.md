@@ -1,24 +1,10 @@
-# NEXT RELEASE
+# 1.4.2 Release notes
 
 ### Bugfixes
 
 * Fix a bug with the local mutex for the robust mutex emulation.
 * Reduce the number of file descriptors used in robust mutex emulation,
-  multi instances of InterprocessMutex share the same descriptor. (#3199)
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
+  multi instances of InterprocessMutex share the same descriptor. (#1986)
 
 ----------------------------------------------
 
