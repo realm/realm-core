@@ -61,7 +61,7 @@ using namespace realm;
 TEST(BinaryColumn_Basic)
 {
     ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
-    BinaryColumn c(Allocator::get_default(), ref, npos, true);
+    BinaryColumn c(Allocator::get_default(), ref, true);
 
     // TEST(BinaryColumn_MultiEmpty)
 
@@ -307,7 +307,7 @@ TEST(BinaryColumn_Basic)
 TEST(BinaryColumn_Nulls)
 {
     ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
-    BinaryColumn c(Allocator::get_default(), ref, npos, true);
+    BinaryColumn c(Allocator::get_default(), ref, true);
 
     c.add(BinaryData());
     c.add(BinaryData("", 0));
@@ -454,7 +454,7 @@ TEST(BinaryColumn_SwapRows)
     {
         bool nullable = true;
         ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
-        BinaryColumn c(Allocator::get_default(), ref, npos, nullable);
+        BinaryColumn c(Allocator::get_default(), ref, nullable);
 
         c.add(BinaryData("foo"));
         c.add(BinaryData("bar"));
@@ -475,7 +475,7 @@ TEST(BinaryColumn_SwapRows)
 TEST(BinaryColumn_MoveLastOver)
 {
     ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
-    BinaryColumn c(Allocator::get_default(), ref, npos, true);
+    BinaryColumn c(Allocator::get_default(), ref, true);
 
     c.add({});
     c.add({});

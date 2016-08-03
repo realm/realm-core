@@ -42,7 +42,7 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, size_t column_ndx, bool nullable):
+BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable, size_t column_ndx):
     ColumnBaseSimple(column_ndx),
     m_nullable(nullable)
 {

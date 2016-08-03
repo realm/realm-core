@@ -1429,10 +1429,10 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             col = new DoubleColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_String:
-            col = new StringColumn(alloc, ref, col_ndx, nullable); // Throws
+            col = new StringColumn(alloc, ref, nullable, col_ndx); // Throws
             break;
         case col_type_Binary:
-            col = new BinaryColumn(alloc, ref, col_ndx, nullable); // Throws
+            col = new BinaryColumn(alloc, ref, nullable, col_ndx); // Throws
             break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
