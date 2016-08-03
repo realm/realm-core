@@ -15,7 +15,7 @@ doc/html
 !Realm.vcxproj.user
 
 # Ignore user folder attributes created by Apple
-*.DS_Store
+.DS_Store
 
 # Ignore thumbnails created by windows
 Thumbs.db
