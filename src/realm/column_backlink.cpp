@@ -396,6 +396,12 @@ void BacklinkColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
     m_origin_column_ndx = origin_col_ndx;
 }
 
+int BacklinkColumn::compare_values(size_t, size_t) const noexcept
+{
+    REALM_ASSERT(false); // backlinks can only be queried over and not on directly
+    return 0;
+}
+
 #ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {

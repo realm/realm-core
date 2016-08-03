@@ -80,6 +80,8 @@ public:
     void cascade_break_backlinks_to(size_t row_ndx, CascadeState& state) override;
     void cascade_break_backlinks_to_all_rows(size_t num_rows, CascadeState&) override;
 
+    int compare_values(size_t, size_t) const noexcept override;
+
 #ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
