@@ -240,7 +240,7 @@ protected:
 ///
 /// FIXME: This class currently has fragments of ownership, in particular the
 /// constructors that allocate underlying memory. On the other hand, the
-/// destructor never frees the memory. This is a disastrous situation, because
+/// destructor never frees the memory. This is a problematic situation, because
 /// it so easily becomes an obscure source of leaks. There are three options for
 /// a fix of which the third is most attractive but hardest to implement: (1)
 /// Remove all traces of ownership semantics, that is, remove the constructors
@@ -3087,9 +3087,8 @@ bool Array::find_sse(int64_t value, __m128i *data, size_t items, QueryState<int6
 {
     __m128i search = {0};
 
-    // FIXME: Lasse, should these casts not be to int8_t, int16_t, int32_t respecitvely?
     if (width == 8)
-        search = _mm_set1_epi8(static_cast<char>(value)); // FIXME: Lasse, Should this not be a cast to 'signed char'?
+        search = _mm_set1_epi8(static_cast<char>(value)); 
     else if (width == 16)
         search = _mm_set1_epi16(static_cast<short int>(value));
     else if (width == 32)
