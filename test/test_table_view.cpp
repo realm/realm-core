@@ -1876,7 +1876,65 @@ TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
 }
 
 
-TEST(TableView_Distinct)
+namespace {
+struct DistinctDirect {
+    Table& table;
+    DistinctDirect(TableRef, TableRef t) : table(*t) { }
+
+    SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    {
+        std::vector<std::vector<size_t>> column_indices;
+        for (size_t col : columns)
+            column_indices.push_back({col});
+        return SortDescriptor(table, column_indices, ascending);
+    }
+
+    size_t get_source_ndx(const TableView& tv, size_t ndx) const
+    {
+        return tv.get_source_ndx(ndx);
+    }
+
+    StringData get_string(const TableView& tv, size_t col, size_t row) const
+    {
+        return tv.get_string(col, row);
+    }
+
+    TableView find_all() const
+    {
+        return table.where().find_all();
+    }
+};
+
+struct DistinctOverLink {
+    Table& table;
+    DistinctOverLink(TableRef t, TableRef) : table(*t) { }
+
+    SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    {
+        std::vector<std::vector<size_t>> column_indices;
+        for (size_t col : columns)
+            column_indices.push_back({0, col});
+        return SortDescriptor(table, column_indices, ascending);
+    }
+
+    size_t get_source_ndx(const TableView& tv, size_t ndx) const
+    {
+        return tv.get_link(0, ndx);
+    }
+
+    StringData get_string(const TableView& tv, size_t col, size_t row) const
+    {
+        return tv.get_link_target(0)->get_string(col, tv.get_link(0, row));
+    }
+
+    TableView find_all() const
+    {
+        return table.where().find_all();
+    }
+};
+} // anonymous namespace
+
+TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
 {
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
     // If multiple rows are indentical for the given set of distinct-columns, then only the first is kept.
@@ -1887,7 +1945,13 @@ TEST(TableView_Distinct)
     // distinct() is internally based on the existing sort() method which is well tested. Hence it's not required
     // to test distinct() with all possible Realm data types.
 
-    Table t;
+
+    Group g;
+    TableRef target = g.add_table("target");
+    TableRef origin = g.add_table("origin");
+    origin->add_column_link(type_Link, "link", *target);
+
+    Table& t = *target;
     t.add_column(type_String, "s", true);
     t.add_column(type_Int, "i", true);
     t.add_column(type_Float, "f", true);
@@ -1921,112 +1985,119 @@ TEST(TableView_Distinct)
     t.set_int(1, 6, 500);
     t.set_float(2, 6, 500.);
 
+    origin->add_empty_row(t.size());
+    for (size_t i = 0; i < t.size(); ++i)
+        origin->set_link(0, i, i);
+
+    TEST_TYPE h(origin, target);
 
     TableView tv;
-    tv = t.where().find_all();
-    tv.distinct(0);
+    tv = h.find_all();
+    tv.distinct(h({0}));
     CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(tv.get_source_ndx(0), 0);
-    CHECK_EQUAL(tv.get_source_ndx(1), 1);
-    CHECK_EQUAL(tv.get_source_ndx(2), 4);
-    CHECK_EQUAL(tv.get_source_ndx(3), 6);
+    CHECK_EQUAL(h.get_source_ndx(tv, 0), 0);
+    CHECK_EQUAL(h.get_source_ndx(tv, 1), 1);
+    CHECK_EQUAL(h.get_source_ndx(tv, 2), 4);
+    CHECK_EQUAL(h.get_source_ndx(tv, 3), 6);
 
-    tv = t.where().find_all();
-    tv.sort(0);
-    tv.distinct(0);
+    tv = h.find_all();
+    tv.sort(h({0}));
+    tv.distinct(h({0}));
     CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(tv.get_source_ndx(0), 1);
-    CHECK_EQUAL(tv.get_source_ndx(1), 0);
-    CHECK_EQUAL(tv.get_source_ndx(2), 6);
-    CHECK_EQUAL(tv.get_source_ndx(3), 4);
+    CHECK_EQUAL(h.get_source_ndx(tv, 0), 1);
+    CHECK_EQUAL(h.get_source_ndx(tv, 1), 0);
+    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
+    CHECK_EQUAL(h.get_source_ndx(tv, 3), 4);
 
-    tv = t.where().find_all();
-    tv.sort(0, false);
-    tv.distinct(0);
-    CHECK_EQUAL(tv.get_source_ndx(0), 4);
-    CHECK_EQUAL(tv.get_source_ndx(1), 6);
-    CHECK_EQUAL(tv.get_source_ndx(2), 0);
-    CHECK_EQUAL(tv.get_source_ndx(3), 1);
+    tv = h.find_all();
+    tv.sort(h({0}, {false}));
+    tv.distinct(h({0}));
+    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
+    CHECK_EQUAL(h.get_source_ndx(tv, 1), 6);
+    CHECK_EQUAL(h.get_source_ndx(tv, 2), 0);
+    CHECK_EQUAL(h.get_source_ndx(tv, 3), 1);
 
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
-    tv = t.where().find_all();
-    tv.sort(0, false);
-    tv.distinct(SortDescriptor(t, {{0}, {1}}));
+    tv = h.find_all();
+    tv.sort(h({0}, {false}));
+    tv.distinct(h({0, 1}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(tv.get_source_ndx(0), 4);
-    CHECK_EQUAL(tv.get_source_ndx(1), 5);
-    CHECK_EQUAL(tv.get_source_ndx(2), 6);
-    CHECK_EQUAL(tv.get_source_ndx(3), 0);
-    CHECK_EQUAL(tv.get_source_ndx(4), 1);
+    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
+    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
+    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
+    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
+    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
 
 
     // Now try distinct on string+float column. The float column has the same values as the int column
     // so the result should equal the test above
-    tv = t.where().find_all();
-    tv.sort(0, false);
-    tv.distinct(SortDescriptor(t, {{0}, {1}}));
+    tv = h.find_all();
+    tv.sort(h({0}, {false}));
+    tv.distinct(h({0, 1}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(tv.get_source_ndx(0), 4);
-    CHECK_EQUAL(tv.get_source_ndx(1), 5);
-    CHECK_EQUAL(tv.get_source_ndx(2), 6);
-    CHECK_EQUAL(tv.get_source_ndx(3), 0);
-    CHECK_EQUAL(tv.get_source_ndx(4), 1);
+    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
+    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
+    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
+    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
+    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
 
 
     // Same as previous test, but with string column being Enum
     t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
-    tv = t.where().find_all();
-    tv.sort(0, false);
-    tv.distinct(SortDescriptor(t, {{0}, {1}}));
+    tv = h.find_all();
+    tv.sort(h({0}, {false}));
+    tv.distinct(h({0, 1}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(tv.get_source_ndx(0), 4);
-    CHECK_EQUAL(tv.get_source_ndx(1), 5);
-    CHECK_EQUAL(tv.get_source_ndx(2), 6);
-    CHECK_EQUAL(tv.get_source_ndx(3), 0);
-    CHECK_EQUAL(tv.get_source_ndx(4), 1);
+    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
+    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
+    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
+    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
+    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
 
 
     // Now test sync_if_needed()
-    tv = t.where().find_all();
+    tv = h.find_all();
     // "", null, "", null, "foo", "foo", "bar"
 
-    tv.sort(0, false);
+    tv.sort(h({0}, {false}));
     // "foo", "foo", "bar", "", "", null, null
 
     CHECK_EQUAL(tv.size(), 7);
-    CHECK_EQUAL(tv.get_string(0, 0), "foo");
-    CHECK_EQUAL(tv.get_string(0, 1), "foo");
-    CHECK_EQUAL(tv.get_string(0, 2), "bar");
-    CHECK_EQUAL(tv.get_string(0, 3), "");
-    CHECK_EQUAL(tv.get_string(0, 4), "");
-    CHECK(tv.get_string(0, 5).is_null());
-    CHECK(tv.get_string(0, 6).is_null());
+    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, 0, 1), "foo");
+    CHECK_EQUAL(h.get_string(tv, 0, 2), "bar");
+    CHECK_EQUAL(h.get_string(tv, 0, 3), "");
+    CHECK_EQUAL(h.get_string(tv, 0, 4), "");
+    CHECK(h.get_string(tv, 0, 5).is_null());
+    CHECK(h.get_string(tv, 0, 6).is_null());
 
-    tv.distinct(SortDescriptor(t, {{0}}));
+    tv.distinct(h({0}));
     // "foo", "bar", "", null
 
-    t.remove(6); // remove "bar"
+    // remove "bar"
+    origin->remove(6);
+    target->remove(6);
     // access to tv undefined; may crash
 
     tv.sync_if_needed();
     // "foo", "", null
 
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_string(0, 0), "foo");
-    CHECK_EQUAL(tv.get_string(0, 1), "");
-    CHECK(tv.get_string(0, 2).is_null());
+    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, 0, 1), "");
+    CHECK(h.get_string(tv, 0, 2).is_null());
 
     // Remove distinct property by providing empty column list. Now TableView should look like it
     // did just after our last tv.sort(0, false) above, but after having executed table.remove(6)
     tv.distinct(SortDescriptor{});
     // "foo", "foo", "", "", null, null
     CHECK_EQUAL(tv.size(), 6);
-    CHECK_EQUAL(tv.get_string(0, 0), "foo");
-    CHECK_EQUAL(tv.get_string(0, 1), "foo");
-    CHECK_EQUAL(tv.get_string(0, 2), "");
-    CHECK_EQUAL(tv.get_string(0, 3), "");
-    CHECK(tv.get_string(0, 4).is_null());
-    CHECK(tv.get_string(0, 5).is_null());
+    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, 0, 1), "foo");
+    CHECK_EQUAL(h.get_string(tv, 0, 2), "");
+    CHECK_EQUAL(h.get_string(tv, 0, 3), "");
+    CHECK(h.get_string(tv, 0, 4).is_null());
+    CHECK(h.get_string(tv, 0, 5).is_null());
 }
 
 TEST(TableView_IsRowAttachedAfterClear)

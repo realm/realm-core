@@ -3844,7 +3844,7 @@ TEST(Query_SortLinkChains)
 
     // Test link chain with nulls and a single local column
     std::vector<size_t> results4 = { 1, 0, 2, 5, 3, 4 };
-    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, true}));
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}));
     CHECK_EQUAL(tv.size(), results4.size());
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4[i]);
