@@ -318,7 +318,7 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
     link_col.set_target_table(target_table);
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
-    backlink_col.set_origin_column(link_col, link_col_ndx);
+    backlink_col.set_origin_column(link_col);
 }
 
 
