@@ -223,7 +223,7 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
 
 inline bool BinaryColumn::is_null(size_t ndx) const noexcept
 {
-    return get(ndx).is_null();
+    return m_nullable && get(ndx).is_null();
 }
 
 inline StringData BinaryColumn::get_string(size_t ndx) const noexcept
