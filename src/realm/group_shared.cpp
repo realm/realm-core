@@ -1,31 +1,29 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
-#include <cerrno>
-#include <type_traits>
 #include <algorithm>
-#include <iostream>
-
-#include <fcntl.h>
 #include <atomic>
+#include <cerrno>
+#include <fcntl.h>
+#include <iostream>
 #include <mutex>
+#include <sstream>
+#include <type_traits>
 
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
@@ -361,8 +359,8 @@ public:
             const ReadCount& r = get(old_pos.load(std::memory_order_relaxed));
             if (! atomic_one_if_zero( r.count ))
                 break;
-            auto next = get(old_pos.load(std::memory_order_relaxed)).next;
-            old_pos.store(next, std::memory_order_relaxed);
+            auto next_ndx = get(old_pos.load(std::memory_order_relaxed)).next;
+            old_pos.store(next_ndx, std::memory_order_relaxed);
         }
     }
 
@@ -743,8 +741,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     SlabAlloc& alloc = m_group.m_alloc;
 
     Replication::HistoryType history_type = Replication::hist_None;
-    if (Replication* repl = m_group.get_replication())
+    if (Replication* repl = m_group.get_replication()) {
+        repl->commit_log_close();
         history_type = repl->get_history_type();
+    }
 
     int target_file_format_version;
 
@@ -947,6 +947,12 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             catch (SlabAlloc::Retry&) {
                 continue;
             }
+            // If we fail in any way, we must detach the allocator. Failure to do so
+            // will retain memory mappings in the mmap cache shared between allocators.
+            // This would allow other SharedGroups to reuse the mappings even in
+            // situations, where the database has been re-initialised (e.g. through
+            // compact()). This could render the mappings (partially) undefined.
+            SlabAlloc::DetachGuard alloc_detach_guard(alloc);
 
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
@@ -1017,8 +1023,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                     throw LogicError(LogicError::mixed_history_type);
 
 #ifndef _WIN32
-                if (encryption_key && info->session_initiator_pid != uint64_t(getpid()))
-                    throw std::runtime_error(path + ": Encrypted interprocess sharing is currently unsupported");
+                if (encryption_key && info->session_initiator_pid != uint64_t(getpid())) {
+                    std::stringstream ss;
+                    ss << path << ": Encrypted interprocess sharing is currently unsupported." <<
+                        "SharedGroup has been opened by pid: " << info->session_initiator_pid <<
+                        ". Current pid is " << getpid() << ".";
+                    throw std::runtime_error(ss.str());
+                }
 #endif
 
                 // We need per session agreement among all participants on the
@@ -1075,6 +1086,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             m_wait_for_change_enabled = true;
 
             // Keep the mappings and file open:
+            alloc_detach_guard.release();
             fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
             fcg.release(); // Do not close
@@ -1133,64 +1145,49 @@ bool SharedGroup::compact()
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    std::string tmp_path = m_db_path + ".tmp_compaction_space";
-    SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-    if (info->num_participants > 1)
-        return false;
-
-    // group::write() will throw if the file already exists.
-    // To prevent this, we have to remove the file (should it exist)
-    // before calling group::write().
-    File::try_remove(tmp_path);
-
-    // Using begin_read here ensures that we have access to the latest entry
-    // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
-    begin_read(); // Throws
-
-    // Compact by writing a new file holding only live data, then renaming the new file
-    // so it becomes the database file, replacing the old one in the process.
-    File file;
-    file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
-    m_group.write(file, m_key, info->latest_version_number);
-    // Data needs to be flushed to the disk before renaming.
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        file.sync(); // Throws
-    // FIXME: Forgetting to check the return value of standard library
-    // rename(). Solve the problem by using `util::File::move()` instead.
-    rename(tmp_path.c_str(), m_db_path.c_str());
+    DurabilityLevel dura;
     {
-        SharedInfo* r_info = m_reader_map.get_addr();
-        Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
-        REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
-        static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
+        std::string tmp_path = m_db_path + ".tmp_compaction_space";
+        SharedInfo* info = m_file_map.get_addr();
+        std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
+        if (info->num_participants > 1)
+            return false;
+
+        // group::write() will throw if the file already exists.
+        // To prevent this, we have to remove the file (should it exist)
+        // before calling group::write().
+        File::try_remove(tmp_path);
+
+        // Using begin_read here ensures that we have access to the latest entry
+        // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
+        // This is also needed to attach the group (get the proper top pointer, etc)
+        begin_read(); // Throws
+
+        // Compact by writing a new file holding only live data, then renaming the new file
+        // so it becomes the database file, replacing the old one in the process.
+        File file;
+        file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
+        m_group.write(file, m_key, info->latest_version_number);
+        // Data needs to be flushed to the disk before renaming.
+        bool disable_sync = get_disable_sync_to_disk();
+        if (!disable_sync)
+            file.sync(); // Throws
+        util::File::move(tmp_path.c_str(), m_db_path.c_str());
+        {
+            SharedInfo* r_info = m_reader_map.get_addr();
+            Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
+            REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
+            static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
+        }
+        end_read();
+        dura = DurabilityLevel(info->durability);
+        // We need to release any shared mapping *before* releasing the control mutex.
+        // When someone attaches to the new database file, they *must* *not* see and
+        // reuse any existing memory mapping of the stale file.
+        m_group.m_alloc.detach();
     }
-    end_read();
-
-    SlabAlloc& alloc = m_group.m_alloc;
-
-    // close and reopen the database file.
-    alloc.detach();
-    SlabAlloc::Config cfg;
-    cfg.skip_validate = true;
-    cfg.no_create = true;
-    cfg.is_shared = true;
-    cfg.session_initiator = true;
-    cfg.encryption_key = m_key;
-    ref_type top_ref = alloc.attach_file(m_db_path, cfg);
-    size_t file_size = alloc.get_baseline();
-    using gf = _impl::GroupFriend;
-    REALM_ASSERT(gf::get_file_format_version(m_group) == 0 ||
-                 gf::get_file_format_version(m_group) == info->file_format_version);
-    gf::set_file_format_version(m_group, info->file_format_version);
-
-    // update the versioning info to match
-    SharedInfo* r_info = m_reader_map.get_addr();
-    Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
-    REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
-    rc.filesize = file_size;
-    rc.current_top = top_ref;
+    close();
+    do_open(m_db_path, true, dura, false, m_key, false);
     return true;
 }
 
@@ -1222,6 +1219,10 @@ void SharedGroup::close() noexcept
             break;
     }
     m_group.detach();
+    using gf = _impl::GroupFriend;
+    if (Replication* repl = gf::get_replication(m_group))
+        repl->commit_log_close();
+
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
@@ -1243,22 +1244,25 @@ void SharedGroup::close() noexcept
                 }
                 catch(...) {} // ignored on purpose.
             }
-            using gf = _impl::GroupFriend;
             if (Replication* repl = gf::get_replication(m_group))
                 repl->terminate_session();
         }
     }
 #ifndef _WIN32
+#ifdef REALM_ASYNC_DAEMON
     m_room_to_write.close();
     m_work_to_do.close();
     m_daemon_becomes_ready.close();
+#endif
     m_new_commit_available.close();
 #endif
+    // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another thread may
+    // interleave which is not permitted on Windows. It is permitted on *nix.
+    m_file_map.unmap();
+    m_reader_map.unmap();
     m_file.unlock();
     // info->~SharedInfo(); // DO NOT Call destructor
     m_file.close();
-    m_file_map.unmap();
-    m_reader_map.unmap();
 }
 
 bool SharedGroup::has_changed()
@@ -1445,9 +1449,18 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
             if (!allow_file_format_upgrade)
                 throw FileFormatUpgradeRequired();
             gf::upgrade_file_format(m_group, target_file_format_version); // Throws
-            // Note: The file format version stored in in the Realm file will be
+            // Note: The file format version stored in the Realm file will be
             // updated to the new file format version as part of the following
             // commit operation. This happens in GroupWriter::commit().
+            if (m_upgrade_callback) {
+                try {
+                    m_upgrade_callback(current_file_format_version_2, target_file_format_version); // Throws
+                }
+                catch(...) {
+                    rollback();
+                    throw;
+                }
+            }
             commit(); // Throws
         }
         else {
@@ -1468,6 +1481,11 @@ SharedGroup::VersionID SharedGroup::get_version_of_current_transaction()
 
 void SharedGroup::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
+    // The release may be tried on a version imported from a different thread,
+    // hence generated on a different shared group, which may have memory mapped
+    // a larger ringbuffer than we - so make sure we've mapped enough of the
+    // ringbuffer to access the chosen ringbuffer entry.
+    grow_reader_mapping(read_lock.m_reader_idx);
     SharedInfo* r_info = m_reader_map.get_addr();
     const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
@@ -1622,6 +1640,27 @@ void SharedGroup::rollback() noexcept
     m_transact_stage = transact_Ready;
 }
 
+SharedGroup::VersionID SharedGroup::pin_version()
+{
+    REALM_ASSERT(m_transact_stage == transact_Reading);
+
+    // Get current version
+    VersionID version_id(m_read_lock.m_version, m_read_lock.m_reader_idx);
+
+    ReadLockInfo read_lock;
+    grab_read_lock(read_lock, version_id); // Throws
+
+    return version_id;
+}
+
+void SharedGroup::unpin_version(VersionID token)
+{
+    ReadLockInfo read_lock;
+    read_lock.m_reader_idx = token.index;
+
+    release_read_lock(read_lock);
+}
+
 
 void SharedGroup::do_begin_read(VersionID version_id, bool writable)
 {
@@ -1728,7 +1767,6 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    util::LockGuard lg(m_handover_lock);
     version_type version = do_commit(); // Throws
 
     // advance read lock but dont update accessors:
@@ -1906,7 +1944,6 @@ void SharedGroup::reserve(size_t size)
 std::unique_ptr<SharedGroup::Handover<LinkView>>
 SharedGroup::export_linkview_for_handover(const LinkViewRef& accessor)
 {
-    LockGuard lg(m_handover_lock);
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
     }
@@ -1931,7 +1968,6 @@ LinkViewRef SharedGroup::import_linkview_from_handover(std::unique_ptr<Handover<
 
 std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_handover(const TableRef& accessor)
 {
-    LockGuard lg(m_handover_lock);
     if (m_transact_stage != transact_Reading) {
         throw LogicError(LogicError::wrong_transact_state);
     }

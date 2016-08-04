@@ -1,8 +1,22 @@
-#include <algorithm>
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
-#ifdef _WIN32
-#include <win32/types.h>
-#endif
+#include <algorithm>
 
 #include <realm/array_blobs_big.hpp>
 #include <realm/column.hpp>
@@ -183,7 +197,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayBigBlobs::verify() const
 {
@@ -198,6 +212,7 @@ void ArrayBigBlobs::verify() const
         }
     }
 }
+
 
 void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
 {
@@ -224,4 +239,4 @@ void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif
+#endif // LCOV_EXCL_STOP ignore debug functions

@@ -1,20 +1,18 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
@@ -47,9 +45,9 @@ void BacklinkColumn::add_backlink(size_t row_ndx, size_t origin_row_ndx)
     // representation.
     if ((value & 1) != 0) {
         // Create new column to hold backlinks
-        size_t size = 1;
+        size_t init_size = 1;
         int_fast64_t value_2 = value >> 1;
-        ref = IntegerColumn::create(get_alloc(), Array::type_Normal, size, value_2); // Throws
+        ref = IntegerColumn::create(get_alloc(), Array::type_Normal, init_size, value_2); // Throws
         IntegerColumn::set_as_ref(row_ndx, ref); // Throws
     }
     else {
@@ -398,7 +396,13 @@ void BacklinkColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
     m_origin_column_ndx = origin_col_ndx;
 }
 
-#ifdef REALM_DEBUG
+int BacklinkColumn::compare_values(size_t, size_t) const noexcept
+{
+    REALM_ASSERT(false); // backlinks can only be queried over and not on directly
+    return 0;
+}
+
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -455,11 +459,10 @@ void BacklinkColumn::get_backlinks(std::vector<VerifyPair>& pairs)
     sort(pairs.begin(), pairs.end());
 }
 
-
 std::pair<ref_type, size_t> BacklinkColumn::get_to_dot_parent(size_t ndx_in_parent) const
 {
     std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

@@ -12,8 +12,10 @@ clean_binaries() {
     rm -rf usr/{lib64,libexec,bin}/*-dbg*
 
     for file in usr/{lib64,libexec,bin}/*; do
-        strip --strip-debug --strip-unneeded "$file"
-        chrpath -d "$file" || true
+        if [ -f "$file"  ];then
+            strip --strip-debug --strip-unneeded "$file"
+            chrpath -d "$file" || true
+        fi
     done
 
     cd - >/dev/null
@@ -26,18 +28,27 @@ cp -a /source /tmp/build
 cd /tmp/build
 
 # Configure the build
-sh build.sh config /usr
+REALM_ENABLE_ENCRYPTION=yes sh build.sh config /usr
 # Build and install
 sh build.sh build
+sh build.sh build-node
 DESTDIR=/prod sh build.sh install-prod
 DESTDIR=/devel sh build.sh install-devel
 
-clean_binaries /prod /devel
+mkdir -p /node-devel/usr/lib64
+cp src/realm/librealm-node* /node-devel/usr/lib64
+
+clean_binaries /prod /devel /node-devel
 
 # Reorganise a few files
 mkdir -p /utils/usr/bin
 mv /prod/usr/bin/realm-import /utils/usr/bin
 mv /prod/usr/lib64/*.so /devel/usr/lib64
+
+# Realm-node package
+doc_folder=usr/share/doc/realm-node-$VERSION
+mkdir -p /node/$doc_folder
+echo "The realm-node package is empty at the moment." > /node/$doc_folder/README
 
 echo "ldconfig" > /tmp/post-ldconf
 echo "echo >/dev/null" >> /tmp/post-ldconf
@@ -61,6 +72,7 @@ fpm \
     --maintainer "Realm <help@realm.io>" \
     --after-install /tmp/post-ldconf \
     --after-remove /tmp/post-ldconf \
+    -d "openssl" \
     -C /prod \
     usr/lib64 usr/libexec
 
@@ -78,8 +90,42 @@ fpm \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
     -d "realm = ${VERSION}-${BUILD_NUMBER}.el6" \
+    -d "openssl-devel" \
     -C /devel \
     usr/lib64 usr/include usr/bin
+
+fpm \
+    -t rpm \
+    -s dir \
+    -n realm-node \
+    --rpm-dist el6 \
+    --license "Realm License" \
+    --version ${VERSION} \
+    --iteration ${BUILD_NUMBER} \
+    --description "Realm-core C++ library for node" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    -C /node \
+    $doc_folder
+
+fpm \
+    -t rpm \
+    -s dir \
+    -n realm-node-devel \
+    --rpm-dist el6 \
+    --license "Realm License" \
+    --version ${VERSION} \
+    --iteration ${BUILD_NUMBER} \
+    --description "Development realm-core C++ library for node" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    -d "realm-devel = ${VERSION}-${BUILD_NUMBER}.el6" \
+    -C /node-devel \
+    usr/lib64
 
 fpm \
     -t rpm \

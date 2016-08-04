@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_LINK_VIEW
 
@@ -1641,6 +1659,84 @@ TEST(LinkList_QueryDateTime)
     CHECK_EQUAL(1, tv.size());
 }
 
+// Check that table views created through backlinks are updated correctly
+// (marked as out of sync) when the source table is modified.
+TEST(BackLink_Query_TableViewSyncsWhenNeeded)
+{
+    Group group;
+
+    TableRef source = group.add_table("source");
+    TableRef target = group.add_table("target");
+
+    size_t col_int = source->add_column(type_Int, "id");
+    size_t col_link = source->add_column_link(type_Link, "link", *target);
+    size_t col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
+
+    target->add_column(type_Int, "id");
+
+    source->add_empty_row(3);
+    source->set_int(col_int, 0, 0);
+    source->set_int(col_int, 1, 0);
+    source->set_int(col_int, 2, 2);
+
+    target->add_empty_row(3);
+    source->set_link(col_link, 0, 0);
+    source->set_link(col_link, 1, 1);
+
+    Query q = target->backlink(*source, col_link).column<Int>(col_int) > 0;
+    TableView tv = q.find_all();
+    CHECK_TABLE_VIEW(tv, {});
+
+    source->set_int(col_int, 1, 1);
+    CHECK_EQUAL(false, tv.is_in_sync());
+
+    tv.sync_if_needed();
+    CHECK_TABLE_VIEW(tv, {1});
+
+    source->set_link(col_link, 2, 2);
+    CHECK_EQUAL(false, tv.is_in_sync());
+
+    tv.sync_if_needed();
+    CHECK_TABLE_VIEW(tv, {1, 2});
+
+    Query list_query = target->backlink(*source, col_linklist).column<Int>(col_int) > 0;
+    TableView list_tv = list_query.find_all();
+    CHECK_TABLE_VIEW(list_tv, {});
+
+    CHECK_EQUAL(0, source->get_link_count(col_linklist, 0));
+    LinkViewRef list = source->get_linklist(col_linklist, 0);
+
+    list->add(0);
+    list->add(0);
+
+    CHECK_EQUAL(false, list_tv.is_in_sync());
+    list_tv.sync_if_needed();
+    CHECK_EQUAL(true, list_tv.is_in_sync());
+
+    CHECK_EQUAL(2, source->get_link_count(col_linklist, 0));
+    CHECK_TABLE_VIEW(list_tv, {});
+
+    list->add(2);
+
+    CHECK_EQUAL(false, list_tv.is_in_sync());
+    list_tv.sync_if_needed();
+    CHECK_EQUAL(true, list_tv.is_in_sync());
+
+    CHECK_EQUAL(3, source->get_link_count(col_linklist, 0));
+    CHECK_TABLE_VIEW(list_tv, {});
+
+    LinkViewRef list2 = source->get_linklist(col_linklist, 2);
+    list2->add(0);
+
+    CHECK_EQUAL(1, source->get_link_count(col_linklist, 2));
+    CHECK_TABLE_VIEW(list_tv, {});
+    CHECK_EQUAL(false, list_tv.is_in_sync());
+    list_tv.sync_if_needed();
+    CHECK_EQUAL(true, list_tv.is_in_sync());
+
+    CHECK_TABLE_VIEW(list_tv, {0});
+}
+
 // Test queries involving the backlinks of a link column.
 TEST(BackLink_Query_Link)
 {
@@ -1872,6 +1968,49 @@ TEST(BackLink_Query_MultipleLevels)
     // All links are not equal to a detached row accessor so this will match all rows with backlinks.
     Query q15 = people->column<BackLink>(*people, col_children) != Row();
     CHECK_TABLE_VIEW(q15.find_all(), {hannah, elijah, mark, jason, diane, carol});
+}
+
+// Test queries involving the multiple levels of backlinks across multiple tables.
+TEST(BackLink_Query_MultipleLevelsAndTables)
+{
+    Group group;
+
+    TableRef a = group.add_table("a");
+    TableRef b = group.add_table("b");
+    TableRef c = group.add_table("c");
+    TableRef d = group.add_table("d");
+
+    size_t col_id = a->add_column(type_Int, "id");
+    size_t col_a_to_b = a->add_column_link(type_Link, "link", *b);
+
+    size_t col_b_to_c = b->add_column_link(type_Link, "link", *c);
+    size_t col_c_to_d = c->add_column_link(type_Link, "link", *d);
+
+    d->add_column(type_Int, "id");
+
+    auto add_row = [&](Table& table, std::vector<size_t> values, util::Optional<size_t> link) {
+        size_t row = table.add_empty_row();
+        size_t i = 0;
+        for (; i < values.size(); ++i)
+            table.set_int(i, row, values[i]);
+        if (link)
+            table.set_link(i, row, *link);
+    };
+
+    add_row(*d, {0}, util::none);
+    add_row(*d, {1}, util::none);
+
+    add_row(*c, {}, 0);
+    add_row(*c, {}, 1);
+
+    add_row(*b, {}, 0);
+    add_row(*b, {}, 1);
+
+    add_row(*a, {0}, 0);
+    add_row(*a, {1}, 1);
+
+    Query q = d->backlink(*c, col_c_to_d).backlink(*b, col_b_to_c).backlink(*a, col_a_to_b).column<Int>(col_id) == 1;
+    CHECK_TABLE_VIEW(q.find_all(), {1});
 }
 
 #endif

@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_GROUP
 
@@ -23,25 +41,7 @@
 using namespace realm;
 using namespace realm::util;
 
-// First iteration of an automatic read / upgrade test
-// When in core version <= 89 / file version 2, this test will write files and
-// when in core version > 89 / file version 3, it will read / upgrade the
-// previously written files version 2 files.
-
-#if REALM_VERSION_MINOR > 89
-#  define TEST_READ_UPGRADE_MODE 1
-#else
-#  define TEST_READ_UPGRADE_MODE 0
-#endif
-
-
-// FIXME: This will not work when we hit 1.0, but we should also consider
-// testing the half matrix of all possible upgrade paths. E.g.:
-// 0.88.5->0.88.6->0.89.0->0.89.1->0.90.0->... and 0.88.5->0.90.0 directly etc.
-#if REALM_VERSION_MAJOR != 0
-#  error FIXME
-#endif
-
+#define TEST_READ_UPGRADE_MODE 1 // set to 0 when using this in an older version of core to write new tests files
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -809,6 +809,119 @@ TEST(Upgrade_InRealmHistory)
     }
 }
 
+TEST(Upgrade_DatabaseWithCallback)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+    util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+
+    CHECK_OR_RETURN(File::exists(path));
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 4 database so that we keep the original file intact and unmodified
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+    // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
+    // in version 3
+    bool no_create = false;
+    SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
+    const char* encryption_key = nullptr;
+    bool allow_file_format_upgrade = true;
+    std::function<void(int,int)> upgrade_callback;
+
+    bool did_upgrade = false;
+    int old_version, new_version;
+    auto callback = [&](int from, int to)
+    {
+        did_upgrade = true;
+        old_version = from;
+        new_version = to;
+    };
+
+    upgrade_callback = callback;
+
+    SharedGroup sg(temp_copy,
+                   no_create,
+                   durability,
+                   encryption_key,
+                   allow_file_format_upgrade,
+                   upgrade_callback);
+
+    CHECK(did_upgrade);
+    CHECK_EQUAL(old_version, 3);
+    CHECK(new_version >= 5);
+}
+
+TEST(Upgrade_DatabaseWithCallbackWithException)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+    util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+
+    CHECK_OR_RETURN(File::exists(path));
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 4 database so that we keep the original file intact and unmodified
+    CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+    // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
+    // in version 3
+    bool no_create = false;
+    SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
+    const char* encryption_key = nullptr;
+    bool allow_file_format_upgrade = true;
+    std::function<void(int,int)> upgrade_callback;
+
+    bool did_upgrade = false;
+    int old_version, new_version;
+    auto exception_callback = [&](int, int)
+    {
+        throw std::exception();
+    };
+    auto successful_callback = [&](int from, int to)
+    {
+        did_upgrade = true;
+        old_version = from;
+        new_version = to;
+    };
+
+    // Callback that throws should revert the upgrade
+    upgrade_callback = exception_callback;
+    bool exception_thrown = false;
+    try {
+        SharedGroup sg1(temp_copy,
+                        no_create,
+                        durability,
+                        encryption_key,
+                        allow_file_format_upgrade,
+                        upgrade_callback);
+    }
+    catch(...) {
+        exception_thrown = true;
+    }
+    CHECK(exception_thrown);
+    CHECK(!did_upgrade);
+
+    // Callback should be triggered here because the file still needs to be upgraded
+    upgrade_callback = successful_callback;
+    SharedGroup sg2(temp_copy,
+                   no_create,
+                   durability,
+                   encryption_key,
+                   allow_file_format_upgrade,
+                   upgrade_callback);
+    CHECK(did_upgrade);
+    CHECK_EQUAL(old_version, 3);
+    CHECK(new_version >= 5);
+
+    // Callback should not be triggered here because the file is already upgraded
+    did_upgrade = false;
+    SharedGroup sg3(temp_copy,
+                    no_create,
+                    durability,
+                    encryption_key,
+                    allow_file_format_upgrade,
+                    upgrade_callback);
+    CHECK(!did_upgrade);
+}
 
 // Open an existing database-file-format-version 4 file and check that it automatically upgrades to version 5.
 // The upgrade will change all OldDateTime columns into TimeStamp columns.
@@ -817,7 +930,7 @@ TEST(Upgrade_Database_4_5_DateTime1)
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
         util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
 
-#if 1// TEST_READ_UPGRADE_MODE
+#if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
     {

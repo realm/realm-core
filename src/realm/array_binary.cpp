@@ -1,6 +1,20 @@
-#ifdef _MSC_VER
-#  include <win32/types.h>
-#endif
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 #include <utility> // pair
 
@@ -55,12 +69,12 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    size_t current_end = to_size_t(m_offsets.get(ndx));
+    int_fast64_t start = ndx ? m_offsets.get(ndx-1) : 0;
+    int_fast64_t current_end = m_offsets.get(ndx);
     size_t stored_size = value.size();
     if (add_zero_term)
         ++stored_size;
-    ssize_t diff =  (start + stored_size) - current_end;
+    int_fast64_t diff = (start + stored_size) - current_end;
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
 
@@ -184,16 +198,16 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
         bool context_flag = false;
         int64_t value = 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v = from_ref(mem.m_ref);
+        dg_2.reset(mem.get_ref());
+        int64_t v = from_ref(mem.get_ref());
         top.add(v); // Throws
         dg_2.release();
     }
     {
         size_t blobs_size = 0;
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v = from_ref(mem.m_ref);
+        dg_2.reset(mem.get_ref());
+        int64_t v = from_ref(mem.get_ref());
         top.add(v); // Throws
         dg_2.release();
     }
@@ -205,8 +219,8 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
         bool context_flag = false;
         int64_t value = values.is_null() ? 1 : 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v = from_ref(mem.m_ref);
+        dg_2.reset(mem.get_ref());
+        int64_t v = from_ref(mem.get_ref());
         top.add(v); // Throws
         dg_2.release();
     }
@@ -216,25 +230,25 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
 }
 
 
-MemRef ArrayBinary::slice(size_t offset, size_t size, Allocator& target_alloc) const
+MemRef ArrayBinary::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
 
-    ArrayBinary slice(target_alloc);
-    _impl::ShallowArrayDestroyGuard dg(&slice);
-    slice.create(); // Throws
+    ArrayBinary array_slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&array_slice);
+    array_slice.create(); // Throws
     size_t begin = offset;
-    size_t end   = offset + size;
+    size_t end   = offset + slice_size;
     for (size_t i = begin; i != end; ++i) {
         BinaryData value = get(i);
-        slice.add(value); // Throws
+        array_slice.add(value); // Throws
     }
     dg.release();
-    return slice.get_mem();
+    return array_slice.get_mem();
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayBinary::to_dot(std::ostream& out, bool, StringData title) const
 {
@@ -253,4 +267,4 @@ void ArrayBinary::to_dot(std::ostream& out, bool, StringData title) const
     out << "}" << std::endl;
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

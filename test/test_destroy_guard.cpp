@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <map>
 
 #include <realm/array.hpp>
@@ -76,7 +94,14 @@ public:
         REALM_ASSERT(!addr);
         addr = new char[size]; // Throws
         m_offset += size;
-        return MemRef(addr, ref);
+        return MemRef(addr, ref, *this);
+    }
+
+    MemRef do_realloc(ref_type, const char*, size_t, size_t) override
+    {
+        throw std::runtime_error("Not implemented");
+
+        return {};
     }
 
     void do_free(ref_type ref, const char* addr) noexcept override
@@ -181,7 +206,7 @@ TEST(DestroyGuard_ArrayShallow)
         {
             bool context_flag = false;
             MemRef child_mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
-            int_fast64_t v(child_mem.m_ref);
+            int_fast64_t v(child_mem.get_ref());
             root.add(v);
         }
     }
@@ -240,7 +265,7 @@ TEST(DestroyGuard_ArrayDeep)
                 bool context_flag = false;
                 MemRef child_mem =
                     Array::create_empty_array(Array::type_Normal, context_flag, alloc);
-                int_fast64_t v(child_mem.m_ref);
+                int_fast64_t v(child_mem.get_ref());
                 root.add(v);
             }
         }
@@ -258,8 +283,8 @@ TEST(DestroyGuard_ArrayRefDeep)
         {
             bool context_flag = false;
             MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
-            DeepArrayRefDestroyGuard dg(mem.m_ref, alloc);
-            CHECK_EQUAL(mem.m_ref, dg.get());
+            DeepArrayRefDestroyGuard dg(mem.get_ref(), alloc);
+            CHECK_EQUAL(mem.get_ref(), dg.get());
         }
         CHECK(alloc.empty());
     }
@@ -269,8 +294,8 @@ TEST(DestroyGuard_ArrayRefDeep)
         {
             bool context_flag = false;
             MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
-            DeepArrayRefDestroyGuard dg(mem.m_ref, alloc);
-            CHECK_EQUAL(mem.m_ref, dg.release());
+            DeepArrayRefDestroyGuard dg(mem.get_ref(), alloc);
+            CHECK_EQUAL(mem.get_ref(), dg.release());
         }
         CHECK(!alloc.empty());
         alloc.clear();
@@ -282,9 +307,9 @@ TEST(DestroyGuard_ArrayRefDeep)
             bool context_flag = false;
             DeepArrayRefDestroyGuard dg(alloc);
             MemRef mem_1 = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
-            dg.reset(mem_1.m_ref);
+            dg.reset(mem_1.get_ref());
             MemRef mem_2 = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
-            dg.reset(mem_2.m_ref);
+            dg.reset(mem_2.get_ref());
         }
         CHECK(alloc.empty());
     }
@@ -299,7 +324,7 @@ TEST(DestroyGuard_ArrayRefDeep)
                 bool context_flag = false;
                 MemRef child_mem =
                     Array::create_empty_array(Array::type_Normal, context_flag, alloc);
-                int_fast64_t v(child_mem.m_ref);
+                int_fast64_t v(child_mem.get_ref());
                 root.add(v);
                 root_ref = root.get_ref();
             }

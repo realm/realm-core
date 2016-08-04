@@ -1,20 +1,18 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
@@ -380,7 +378,7 @@ class ColumnAccessorBase;
 
 
 // Handle cases where left side is a constant (int, float, int64_t, double, StringData)
-template<class L, class Cond, class R>
+template<class Cond, class L, class R>
 Query create(L left, const Subexpr2<R>& right)
 {
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
@@ -393,7 +391,7 @@ Query create(L left, const Subexpr2<R>& right)
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
 
     if (column &&
-        ((std::numeric_limits<L>::is_integer && std::numeric_limits<L>::is_integer) ||
+        ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
         (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
         (std::is_same<L, float>::value && std::is_same<R, float>::value) ||
         (std::is_same<L, Timestamp>::value && std::is_same<R, Timestamp>::value) ||
@@ -508,27 +506,27 @@ public:
     // Compare, right side constant
     Query operator > (R right)
     {
-        return create<R, Less, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Less>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator < (R right)
     {
-        return create<R, Greater, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Greater>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator >= (R right)
     {
-        return create<R, LessEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<LessEqual>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator <= (R right)
     {
-        return create<R, GreaterEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<GreaterEqual>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator == (R right)
     {
-        return create<R, Equal, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Equal>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator != (R right)
     {
-        return create<R, NotEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<NotEqual>(right, static_cast<Subexpr2<L>&>(*this));
     }
 
     // Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
@@ -651,7 +649,7 @@ Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t>, 
 public Overloads<T, bool>, public Overloads<T, Timestamp>, public Overloads<T, OldDateTime>, public Overloads<T, null>
 {
 public:
-    virtual ~Subexpr2() {};
+    virtual ~Subexpr2() {}
 
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
 #define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(OldDateTime, o) RLM_U2(Timestamp, o) RLM_U2(null, o)
@@ -701,7 +699,7 @@ struct NullableVector
     using t_storage  = typename std::conditional<std::is_same<Underlying, bool>::value
         || std::is_same<Underlying, int>::value, int64_t, Underlying>::type;
 
-    NullableVector() {};
+    NullableVector() {}
 
     NullableVector& operator= (const NullableVector& other)
     {
@@ -1239,124 +1237,124 @@ private:
 // Compare numeric values
 template<class R>
 Query operator > (double left, const Subexpr2<R>& right) {
-    return create<double, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 template<class R>
 Query operator > (float left, const Subexpr2<R>& right) {
-    return create<float, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 template<class R>
 Query operator > (int left, const Subexpr2<R>& right) {
-    return create<int, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 template<class R>
 Query operator > (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 template<class R>
 Query operator > (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, Greater, R>(left, right);
+    return create<Greater>(left, right);
 }
 
 template<class R>
 Query operator < (double left, const Subexpr2<R>& right) {
-    return create<float, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator < (float left, const Subexpr2<R>& right) {
-    return create<int, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator < (int left, const Subexpr2<R>& right) {
-    return create<int, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator < (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator < (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, Less, R>(left, right);
+    return create<Less>(left, right);
 }
 template<class R>
 Query operator == (double left, const Subexpr2<R>& right) {
-    return create<double, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator == (float left, const Subexpr2<R>& right) {
-    return create<float, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator == (int left, const Subexpr2<R>& right) {
-    return create<int, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator == (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator == (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, Equal, R>(left, right);
+    return create<Equal>(left, right);
 }
 template<class R>
 Query operator >= (double left, const Subexpr2<R>& right) {
-    return create<double, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator >= (float left, const Subexpr2<R>& right) {
-    return create<float, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator >= (int left, const Subexpr2<R>& right) {
-    return create<int, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator >= (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator >= (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, GreaterEqual, R>(left, right);
+    return create<GreaterEqual>(left, right);
 }
 template<class R>
 Query operator <= (double left, const Subexpr2<R>& right) {
-    return create<double, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator <= (float left, const Subexpr2<R>& right) {
-    return create<float, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator <= (int left, const Subexpr2<R>& right) {
-    return create<int, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator <= (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator <= (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, LessEqual, R>(left, right);
+    return create<LessEqual>(left, right);
 }
 template<class R>
 Query operator != (double left, const Subexpr2<R>& right) {
-    return create<double, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 template<class R>
 Query operator != (float left, const Subexpr2<R>& right) {
-    return create<float, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 template<class R>
 Query operator != (int left, const Subexpr2<R>& right) {
-    return create<int, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 template<class R>
 Query operator != (int64_t left, const Subexpr2<R>& right) {
-    return create<int64_t, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 template<class R>
 Query operator != (Timestamp left, const Subexpr2<R>& right) {
-    return create<Timestamp, NotEqual, R>(left, right);
+    return create<NotEqual>(left, right);
 }
 
 // Arithmetic
@@ -1436,7 +1434,7 @@ UnaryOperator<Pow<T>> power (const Subexpr2<T>& left) {
 // Classes used for LinkMap (see below).
 struct LinkMapFunction
 {
-    // Your consume() method is given row index of the linked-to table as argument, and you must return wether or
+    // Your consume() method is given row index of the linked-to table as argument, and you must return whether or
     // not you want the LinkMapFunction to exit (return false) or continue (return true) harvesting the link tree
     // for the current main table row index (it will be a link tree if you have multiple type_LinkList columns
     // in a link()->link() query.
@@ -1445,7 +1443,7 @@ struct LinkMapFunction
 
 struct FindNullLinks : public LinkMapFunction
 {
-    FindNullLinks() : m_has_link(false) {};
+    FindNullLinks() : m_has_link(false) {}
 
     bool consume(size_t row_index) override
     {
@@ -1816,9 +1814,9 @@ Query string_compare(const Columns<StringData>& left, T right, bool case_sensiti
 {
     StringData sd(right);
     if (case_sensitive)
-        return create<StringData, S, StringData>(sd, left);
+        return create<S>(sd, left);
     else
-        return create<StringData, I, StringData>(sd, left);
+        return create<I>(sd, left);
 }
 
 template<class S, class I>
@@ -1867,19 +1865,19 @@ Query operator != (const Columns<StringData>& left, T right) {
 
 
 inline Query operator==(const Columns<BinaryData>& left, BinaryData right) {
-    return create<BinaryData, Equal, BinaryData>(right, left);
+    return create<Equal>(right, left);
 }
 
 inline Query operator==(BinaryData left, const Columns<BinaryData>& right) {
-    return create<BinaryData, Equal, BinaryData>(left, right);
+    return create<Equal>(left, right);
 }
 
 inline Query operator!=(const Columns<BinaryData>& left, BinaryData right) {
-    return create<BinaryData, NotEqual, BinaryData>(right, left);
+    return create<NotEqual>(right, left);
 }
 
 inline Query operator!=(BinaryData left, const Columns<BinaryData>& right) {
-    return create<BinaryData, NotEqual, BinaryData>(left, right);
+    return create<NotEqual>(left, right);
 }
 
 
@@ -2046,9 +2044,9 @@ public:
     }
 
     template<typename C>
-    SubColumns<C> column(size_t column) const
+    SubColumns<C> column(size_t column_ndx) const
     {
-        return SubColumns<C>(Columns<C>(column, m_link_map.target_table()), m_link_map);
+        return SubColumns<C>(Columns<C>(column_ndx, m_link_map.target_table()), m_link_map);
     }
 
     LinkMap link_map() const { return m_link_map; }
@@ -2073,10 +2071,10 @@ public:
     }
 
 private:
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links={}) :
+    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links={}) :
         m_link_map(table, links)
     {
-        static_cast<void>(column);
+        static_cast<void>(column_ndx);
     }
 
     LinkMap m_link_map;
@@ -2096,7 +2094,7 @@ Query compare(const Subexpr2<Link>& left, const ConstRow& row)
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.m_link_columns.size() == 1) {
             // We can fall back to Query::links_to for != and == operations on links, but only
-            // for == on link lists. This is because negating query.links_to(…) is equivalent to
+            // for == on link lists. This is because negating query.links_to() is equivalent to
             // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
             if (link_map.m_link_types[0] == col_type_Link ||
                 (link_map.m_link_types[0] == col_type_LinkList && std::is_same<Operator, Equal>::value)) {

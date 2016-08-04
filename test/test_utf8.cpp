@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_UTF8
 
@@ -156,9 +174,6 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_ASCII)
 
 NONCONCURRENT_TEST(UTF8_Compare_Core_utf8)
 {
-    // Useful line for creating new unit test cases:
-    // bool ret = std::locale("us_EN")(string("a"), std::string("b"));
-
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     // single utf16 code points (tests mostly Windows)

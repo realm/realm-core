@@ -1,20 +1,18 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
@@ -358,23 +356,42 @@ std::shared_ptr<LinkView> LinkListColumn::get_ptr(size_t row_ndx) const
     REALM_ASSERT_3(row_ndx, <, size());
     validate_list_accessors();
 
-    // Check if we already have a linkview for this row
+    auto create_view = [this, row_ndx](list_entry& entry) {
+        entry.m_row_ndx = row_ndx;
+        auto ptr = LinkView::create(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
+        entry.m_list = ptr;
+        return ptr;
+    };
+
+    // Check if we already have a LinkView for this row.
     list_entry key;
     key.m_row_ndx = row_ndx;
     auto it = std::lower_bound(m_list_accessors.begin(), m_list_accessors.end(), key);
-    if (it != m_list_accessors.end() && it->m_row_ndx == row_ndx) {
-        std::shared_ptr<LinkView> p = it->m_list.lock();
-        if (p)
-            return p;
-    }
-    if (it == m_list_accessors.end() || it->m_row_ndx != row_ndx) {
-        it = m_list_accessors.insert(it, key); // Throws
+    if (it != m_list_accessors.end()) {
+        if (it->m_row_ndx == row_ndx) {
+            // If we have an existing LinkView, return it.
+            if (auto p = it->m_list.lock())
+                return p;
+        }
+        if (it->m_list.expired()) {
+            // We found an expired entry at the appropriate position. Reuse it with a new LinkView.
+            return create_view(*it);
+        }
     }
 
-    it->m_row_ndx = row_ndx;
-    auto ptr = LinkView::create(m_table, const_cast<LinkListColumn&>(*this), row_ndx); // Throws
-    it->m_list = ptr;
-    return ptr;
+    // No existing entry for this row. If the entry prior to the insertion point has expired we can reuse it
+    // as doing so preserves the desired ordering of m_list_accessors.
+    if (it != m_list_accessors.begin()) {
+        auto previous = std::prev(it);
+        if (previous->m_list.expired()) {
+            // We found an expired entry at the previous position. Reuse it with a new LinkView.
+            return create_view(*previous);
+        }
+    }
+
+    // Could not find an entry to reuse, so insert a new one.
+    it = m_list_accessors.insert(it, std::move(key)); // Throws
+    return create_view(*it);
 }
 
 void LinkListColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
@@ -678,7 +695,7 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -744,7 +761,7 @@ void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 std::pair<ref_type, size_t> LinkListColumn::get_to_dot_parent(size_t ndx_in_parent) const
 {
     std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

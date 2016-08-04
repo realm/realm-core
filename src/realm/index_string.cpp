@@ -1,5 +1,27 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <cstdio>
 #include <iomanip>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
 
 #include <realm/exceptions.hpp>
 #include <realm/index_string.hpp>
@@ -29,12 +51,14 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
         return null{};
     
     int64_t s = dt.get_seconds();
-    uint32_t ns = dt.get_nanoseconds();
+    int32_t ns = dt.get_nanoseconds();
+    constexpr size_t index_size = sizeof(s) + sizeof(ns);
+    static_assert(index_size <= StringIndex::string_conversion_buffer_size, "Index string conversion buffer too small");
     const char* s_buf = reinterpret_cast<const char*>(&s);
     const char* ns_buf = reinterpret_cast<const char*>(&ns);
-    std::copy(s_buf, s_buf + sizeof(int64_t), buffer.data());
-    std::copy(ns_buf, ns_buf + sizeof(uint32_t), buffer.data() + sizeof(int64_t));
-    return StringData{buffer.data(), 12};
+    std::copy(s_buf, s_buf + sizeof(s), buffer.data());
+    std::copy(ns_buf, ns_buf + sizeof(ns), buffer.data() + sizeof(s));
+    return StringData{buffer.data(), index_size};
 }
 } // namespace realm
 
@@ -224,8 +248,8 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
                 // Move items after split to new node
                 size_t len = m_array->size();
                 for (size_t i = refs_ndx; i < len; ++i) {
-                    ref_type ref = m_array->get_as_ref(i);
-                    new_node.node_add_key(ref);
+                    ref_type ref_i = m_array->get_as_ref(i);
+                    new_node.node_add_key(ref_i);
                 }
                 offsets.truncate(node_ndx);
                 m_array->truncate(refs_ndx);
@@ -236,10 +260,10 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         // Is there room in the list?
         Array old_offsets(m_array->get_alloc());
         get_child(*m_array, 0, old_offsets);
-        REALM_ASSERT(m_array->size() == old_offsets.size()+1);
+        const size_t old_offsets_size = old_offsets.size();
+        REALM_ASSERT(m_array->size() == old_offsets_size + 1);
 
-        size_t count = old_offsets.size();
-        bool noextend = count >= REALM_MAX_BPNODE_SIZE;
+        bool noextend = old_offsets_size >= REALM_MAX_BPNODE_SIZE;
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
@@ -258,14 +282,14 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
             return NodeChange(NodeChange::insert_before, new_list.get_ref());
 
         // insert after
-        if (ndx == old_offsets.size())
+        if (ndx == old_offsets_size)
             return NodeChange(NodeChange::insert_after, new_list.get_ref());
 
         // split
         Array new_offsets(alloc);
         get_child(*new_list.m_array, 0, new_offsets);
         // Move items after split to new list
-        for (size_t i = ndx; i < count; ++i) {
+        for (size_t i = ndx; i < old_offsets_size; ++i) {
             int64_t v2 = old_offsets.get(i);
             int64_t v3 = m_array->get(i+1);
 
@@ -373,7 +397,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     // This leaf already has a slot for for the key
 
     int_fast64_t slot_value = m_array->get(ins_pos+1);
-    size_t suboffset = offset + 4;
+    size_t suboffset = offset + s_index_key_length;
 
     // Single match (lowest bit set indicates literal row_ndx)
     if ((slot_value & 1) != 0) {
@@ -382,6 +406,8 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         StringConversionBuffer buffer;
         StringData v2 = get(row_ndx2, buffer);
         if (v2 == value) {
+            // Strings are equal but this is not a list. Create a list and add both rows.
+
             if (m_deny_duplicate_values)
                 throw LogicError(LogicError::unique_constraint_violation);
             // convert to list (in sorted order)
@@ -392,10 +418,12 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             m_array->set(ins_pos_refs, row_list.get_ref());
         }
         else {
-            // convert to subindex
+            // These strings have the same prefix up to this point but they are actually not
+            // equal. Extend the tree recursivly until the prefix of these strings is different.
             StringIndex subindex(m_target_column, m_array->get_alloc());
             subindex.insert_with_offset(row_ndx2, v2, suboffset);
             subindex.insert_with_offset(row_ndx, value, suboffset);
+            // Join the string of SubIndices to the current position of m_array
             m_array->set(ins_pos_refs, subindex.get_ref());
         }
         return true;
@@ -442,7 +470,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         return true;
     }
 
-    // subindex
+    // The key matches, but there is a subindex here so go down a level in the tree.
     StringIndex subindex(ref, m_array.get(), ins_pos_refs, m_target_column,
                          m_deny_duplicate_values, alloc);
     subindex.insert_with_offset(row_ndx, value, suboffset);
@@ -450,14 +478,15 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     return true;
 }
 
+
 void StringIndex::distinct(IntegerColumn& result) const
 {
     Allocator& alloc = m_array->get_alloc();
-    const size_t count = m_array->size();
+    const size_t array_size = m_array->size();
 
     // Get first matching row for every key
     if (m_array->is_inner_bptree_node()) {
-        for (size_t i = 1; i < count; ++i) {
+        for (size_t i = 1; i < array_size; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, 0, 0, m_target_column,
                             m_deny_duplicate_values, alloc);
@@ -465,7 +494,7 @@ void StringIndex::distinct(IntegerColumn& result) const
         }
     }
     else {
-        for (size_t i = 1; i < count; ++i) {
+        for (size_t i = 1; i < array_size; ++i) {
             int64_t ref = m_array->get(i);
 
             // low bit set indicate literal ref (shifted)
@@ -501,10 +530,10 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
     REALM_ASSERT(diff == 1 || diff == -1); // only used by insert and delete
 
     Allocator& alloc = m_array->get_alloc();
-    const size_t count = m_array->size();
+    const size_t array_size = m_array->size();
 
     if (m_array->is_inner_bptree_node()) {
-        for (size_t i = 1; i < count; ++i) {
+        for (size_t i = 1; i < array_size; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, m_array.get(), i, m_target_column,
                             m_deny_duplicate_values, alloc);
@@ -512,7 +541,7 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
         }
     }
     else {
-        for (size_t i = 1; i < count; ++i) {
+        for (size_t i = 1; i < array_size; ++i) {
             int64_t ref = m_array->get(i);
 
             // low bit set indicate literal ref (shifted)
@@ -603,7 +632,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
             if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
-                subindex.do_delete(row_ndx, value, offset+4);
+                subindex.do_delete(row_ndx, value, offset + s_index_key_length);
 
                 if (subindex.is_empty()) {
                     values.erase(pos);
@@ -615,8 +644,8 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
                 size_t r = sub.lower_bound(row_ndx);
-                REALM_ASSERT(r != not_found);
                 size_t sub_size = sub.size(); // Slow
+                REALM_ASSERT(r != sub_size);
                 bool is_last = r == sub_size - 1;
                 sub.erase(r, is_last);
 
@@ -664,7 +693,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
             if (Array::get_context_flag_from_header(header)) {
                 StringIndex subindex(to_ref(ref), m_array.get(), pos_refs, m_target_column,
                                      m_deny_duplicate_values, alloc);
-                subindex.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
+                subindex.do_update_ref(value, row_ndx, new_row_ndx, offset + s_index_key_length);
             }
             else {
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
@@ -672,7 +701,8 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
                 size_t old_pos = sub.lower_bound(row_ndx);
                 size_t new_pos = sub.lower_bound(new_row_ndx);
-                REALM_ASSERT(old_pos != not_found);
+                size_t sub_size = sub.size();
+                REALM_ASSERT(old_pos != sub_size);
                 REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
 
                 // The payload-value exists in multiple rows, and these rows indexes are stored in an IntegerColumn.
@@ -783,9 +813,7 @@ void StringIndex::node_add_key(ref_type ref)
 }
 
 
-#ifdef REALM_DEBUG
-
-// LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void StringIndex::verify() const
 {
@@ -801,8 +829,8 @@ void StringIndex::verify_entries(const StringColumn& column) const
     ref_type results_ref = IntegerColumn::create(alloc); // Throws
     IntegerColumn results(alloc, results_ref); // Throws
 
-    size_t count = column.size();
-    for (size_t i = 0; i < count; ++i) {
+    const size_t column_size = column.size();
+    for (size_t i = 0; i < column_size; ++i) {
         StringData value = column.get(i);
 
         find_all(results, value);
@@ -883,6 +911,12 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
 void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
 {
     dump_node_structure(*m_array, out, level);
+}
+
+
+void StringIndex::to_dot() const
+{
+    to_dot(std::cerr);
 }
 
 
@@ -1000,6 +1034,4 @@ void StringIndex::keys_to_dot(std::ostream& out, const Array& array, StringData 
     out << std::endl;
 }
 
-// LCOV_EXCL_STOP ignore debug functions
-
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

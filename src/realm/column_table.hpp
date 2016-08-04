@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_COLUMN_TABLE_HPP
 #define REALM_COLUMN_TABLE_HPP
 
@@ -56,6 +55,8 @@ public:
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
+    bool supports_search_index() const noexcept override { return false; }
+    StringIndex* create_search_index() override { return nullptr; }
 
 #ifdef REALM_DEBUG
     void verify() const override;
@@ -104,11 +105,11 @@ protected:
         void recursive_mark() noexcept;
         void refresh_accessor_tree(size_t spec_ndx_in_parent);
     private:
-        struct entry {
+        struct SubtableEntry {
             size_t m_subtable_ndx;
             Table* m_table;
         };
-        typedef std::vector<entry> entries;
+        typedef std::vector<SubtableEntry> entries;
         entries m_entries;
     };
 
@@ -398,7 +399,7 @@ inline void SubtableColumnBase::discard_subtable_accessor(size_t row_ndx) noexce
 
 inline void SubtableColumnBase::SubtableMap::add(size_t subtable_ndx, Table* table)
 {
-    entry e;
+    SubtableEntry e;
     e.m_subtable_ndx = subtable_ndx;
     e.m_table        = table;
     m_entries.push_back(e);
@@ -462,7 +463,7 @@ bool SubtableColumnBase::SubtableMap::adj_move_over(size_t from_row_ndx,
         return false;
 
     while (i < n) {
-        entry& e = m_entries[i];
+        SubtableEntry& e = m_entries[i];
         if (REALM_UNLIKELY(e.m_subtable_ndx == to_row_ndx)) {
             // Must hold a counted reference while detaching
             TableRef table(e.m_table);

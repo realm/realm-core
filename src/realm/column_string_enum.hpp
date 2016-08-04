@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_COLUMN_STRING_ENUM_HPP
 #define REALM_COLUMN_STRING_ENUM_HPP
 
@@ -30,7 +29,7 @@ class StringIndex;
 
 /// From the point of view of the application, an enumerated strings column
 /// (StringEnumColumn) is like a string column (StringColumn), yet it manages
-/// its stings in such a way that each unique string is stored only once. In
+/// its strings in such a way that each unique string is stored only once. In
 /// fact, an enumerated strings column is a combination of two subcolumns; a
 /// regular string column (StringColumn) that stores the unique strings, and an
 /// integer column that stores one unique string index for each entry in the
@@ -58,7 +57,7 @@ public:
     void destroy() noexcept override;
     MemRef clone_deep(Allocator& alloc) const override;
 
-    int compare_values(size_t row1, size_t row2) const override
+    int compare_values(size_t row1, size_t row2) const noexcept override
     {
         StringData a = get(row1);
         StringData b = get(row2);
@@ -114,6 +113,7 @@ public:
     // Search index
     StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     void set_search_index_allow_duplicate_values(bool) noexcept override;
+    bool supports_search_index() const noexcept final { return true; }
     StringIndex* create_search_index() override;
     void install_search_index(std::unique_ptr<StringIndex>) noexcept;
     void destroy_search_index() noexcept override;
@@ -208,10 +208,10 @@ inline void StringEnumColumn::insert(size_t row_ndx)
 inline void StringEnumColumn::insert(size_t row_ndx, StringData value)
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
-    size_t size = this->size();
-    REALM_ASSERT_3(row_ndx, <=, size);
+    size_t column_size = this->size();
+    REALM_ASSERT_3(row_ndx, <=, column_size);
     size_t num_rows = 1;
-    bool is_append = row_ndx == size;
+    bool is_append = row_ndx == column_size;
     do_insert(row_ndx, value, num_rows, is_append); // Throws
 }
 

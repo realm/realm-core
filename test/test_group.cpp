@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_GROUP
 
@@ -906,6 +924,21 @@ TEST(Group_MoveTableWithLinks)
     CHECK_EQUAL(b_spec.get_opposite_link_table_ndx(1), a->get_index_in_group());
     CHECK_EQUAL(c_spec.get_opposite_link_table_ndx(1), b->get_index_in_group());
     CHECK_EQUAL(d_spec.get_opposite_link_table_ndx(1), c->get_index_in_group());
+}
+
+
+TEST(Group_MoveTableImmediatelyAfterOpen)
+{
+    Group g1;
+    TableRef a = g1.add_table("a");
+    TableRef b = g1.add_table("b");
+    CHECK_EQUAL(2, g1.size());
+
+    Group g2(g1.write_to_mem());
+    g2.move_table(0, 1);
+    CHECK_EQUAL(2, g2.size());
+    CHECK_EQUAL("b", g2.get_table_name(0));
+    CHECK_EQUAL("a", g2.get_table_name(1));
 }
 
 
@@ -2392,8 +2425,8 @@ TEST_IF(Group_AddEmptyRowCrash_3, REALM_MAX_BPNODE_SIZE == 4)
     Group g;
     g.insert_table(0, "A");
     g.add_table("B");
-    g.get_table(1)->insert_empty_row(0, 17);
     g.get_table(0)->add_column_link(type_LinkList, "link", *g.get_table(1));
+    g.get_table(1)->insert_empty_row(0, 17);
     g.get_table(1)->insert_empty_row(17, 1);
 
     // Triggers "alloc.hpp:213: Assertion failed: v % 8 == 0"
@@ -2535,6 +2568,28 @@ TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::
     table->add_search_index(0);
     table->add_empty_row(5);
     CHECK_EQUAL(table->size(), 5);
+}
+
+TEST(Group_SharedMappingsForReadOnlyStreamingForm)
+{
+    GROUP_TEST_PATH(path);
+    {
+        Group g;
+        auto table = g.add_table("table");
+        table->add_column(type_Int, "col");
+        table->add_empty_row();
+        g.write(path, crypt_key());
+    }
+
+    {
+        Group g1(path, crypt_key(), Group::mode_ReadOnly);
+        auto table1 = g1.get_table("table");
+        CHECK(table1 && table1->size() == 1);
+
+        Group g2(path, crypt_key(), Group::mode_ReadOnly);
+        auto table2 = g2.get_table("table");
+        CHECK(table2 && table2->size() == 1);
+    }
 }
 
 #endif // TEST_GROUP

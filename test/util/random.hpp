@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TEST_UTIL_RANDOM_HPP
 #define REALM_TEST_UTIL_RANDOM_HPP
 
@@ -71,7 +70,7 @@ class Random {
 public:
     Random() noexcept;
 
-    Random(unsigned long seed) noexcept;
+    Random(unsigned long) noexcept;
 
     /// Reseed this pseudorandom number generator.
     void seed(unsigned long) noexcept;
@@ -140,14 +139,14 @@ inline Random::Random() noexcept:
 {
 }
 
-inline Random::Random(unsigned long seed) noexcept:
-    m_engine(std::mt19937::result_type(seed))
+inline Random::Random(unsigned long initial_seed) noexcept:
+    m_engine(std::mt19937::result_type(initial_seed))
 {
 }
 
-inline void Random::seed(unsigned long seed) noexcept
+inline void Random::seed(unsigned long new_seed) noexcept
 {
-    m_engine.seed(std::mt19937::result_type(seed));
+    m_engine.seed(std::mt19937::result_type(new_seed));
 }
 
 template<class T>
@@ -254,11 +253,11 @@ inline T random_int() noexcept
     return random_int(lim::min(), lim::max());
 }
 
-inline void random_seed(unsigned long seed) noexcept
+inline void random_seed(unsigned long initial_seed) noexcept
 {
     _impl::GlobalRandom& r = _impl::GlobalRandom::get();
     util::LockGuard lock(r.m_mutex);
-    return r.m_random.seed(seed);
+    return r.m_random.seed(initial_seed);
 }
 
 

@@ -1,8 +1,34 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <cstdlib> // size_t
 #include <string>
-#include <iostream>
 #include <stdint.h>
 #include <atomic>
+#include <fstream>
+
+#ifdef _WIN32
+#define NOMINMAX
+#  include "windows.h"
+#  include "psapi.h"
+#else 
+#include <unistd.h>
+#endif
 
 #include <realm/utilities.hpp>
 #include <realm/unicode.hpp>
@@ -18,7 +44,7 @@
 namespace {
 
 #ifdef REALM_COMPILER_SSE
-#  if !defined __clang__ && ((_MSC_FULL_VER >= 160040219) || defined __GNUC__)
+#  if !defined __clang__ && ((defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219) || defined __GNUC__)
 #    if defined REALM_COMPILER_AVX && defined __GNUC__
 #      define _XCR_XFEATURE_ENABLED_MASK 0
 
@@ -82,7 +108,7 @@ void cpuid_init()
     bool avxSupported = false;
 
 // seems like in jenkins builds, __GNUC__ is defined for clang?! todo fixme
-#  if !defined __clang__ && ((_MSC_FULL_VER >= 160040219) || defined __GNUC__)
+#  if !defined __clang__ && ((defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219) || defined __GNUC__)
     bool osUsesXSAVE_XRSTORE = cret & (1 << 27) || false;
     bool cpuAVXSuport = cret & (1 << 28) || false;
 
@@ -136,71 +162,6 @@ size_t round_down(size_t p, size_t align)
 {
     size_t r = p;
     return r & (~(align - 1));
-}
-
-
-void checksum_init(checksum_t* t)
-{
-    t->remainder = 0;
-    t->remainder_len = 0;
-    t->b_val = 0x794e80091e8f2bc7ULL;
-    t->a_val = 0xc20f9a8b761b7e4cULL;
-    t->result = 0;
-}
-
-unsigned long long checksum(unsigned char* data, size_t len)
-{
-    checksum_t t;
-    checksum_init(&t);
-    checksum_rolling(data, len, &t);
-    return t.result;
-}
-
-void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
-{
-    while (t->remainder_len < 8 && len > 0) {
-        t->remainder = t->remainder >> 8;
-        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7*8);
-        t->remainder_len++;
-        data++;
-        len--;
-    }
-
-    if (t->remainder_len < 8) {
-        t->result = t->a_val + t->b_val;
-        return;
-    }
-
-    t->a_val += t->remainder * t->b_val;
-    t->b_val++;
-    t->remainder_len = 0;
-    t->remainder = 0;
-
-    while (len >= 8) {
-#ifdef REALM_X86_OR_X64
-        t->a_val += (*reinterpret_cast<unsigned long long*>(data)) * t->b_val;
-#else
-        unsigned long long l = 0;
-        for (unsigned int i = 0; i < 8; i++) {
-            l = l >> 8;
-            l = l | static_cast<unsigned long long>(*(data + i)) << (7*8);
-        }
-        t->a_val += l * t->b_val;
-#endif
-        t->b_val++;
-        len -= 8;
-        data += 8;
-    }
-
-    while (len > 0) {
-        t->remainder = t->remainder >> 8;
-        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7*8);
-        t->remainder_len++;
-        data++;
-        len--;
-    }
-
-    t->result = t->a_val + t->b_val;
 }
 
 } // namespace realm
@@ -306,6 +267,38 @@ void millisleep(size_t milliseconds)
     nanosleep(&ts, 0);
 #endif
 }
+
+#ifdef REALM_SLAB_ALLOC_TUNE
+void process_mem_usage(double& vm_usage, double& resident_set)
+{
+    vm_usage = 0.0;
+    resident_set = 0.0;
+#ifdef _WIN32
+    HANDLE hProc = GetCurrentProcess();
+    PROCESS_MEMORY_COUNTERS_EX info;
+    info.cb = sizeof(info);
+    BOOL okay = GetProcessMemoryInfo(hProc, (PROCESS_MEMORY_COUNTERS*)&info, info.cb);
+
+    SIZE_T PrivateUsage = info.PrivateUsage;
+    resident_set = PrivateUsage;
+#else
+    // the two fields we want
+    unsigned long vsize;
+    long rss;
+    {
+        std::string ignore;
+        std::ifstream ifs("/proc/self/stat", std::ios_base::in);
+        ifs >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
+            >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
+            >> ignore >> ignore >> vsize >> rss;
+    }
+
+    long page_size_kb = sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages
+    vm_usage = vsize / 1024.0;
+    resident_set = rss * page_size_kb;
+#endif
+}
+#endif
 
 } // namespace realm
 

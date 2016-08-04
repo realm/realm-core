@@ -1,10 +1,31 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <type_traits>
 #include <exception>
 #include <algorithm>
 #include <memory>
-#include <iostream>
 #include <mutex>
 #include <map>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
 #  include <cstdlib>
@@ -151,19 +172,30 @@ void SlabAlloc::detach() noexcept
     switch (m_attach_mode) {
         case attach_None:
         case attach_UsersBuffer:
-            goto found;
+            break;
         case attach_OwnedBuffer:
             ::free(m_data);
-            goto found;
+            break;
         case attach_SharedFile:
         case attach_UnsharedFile:
             m_data = 0;
-            m_file_mappings = nullptr;
-            goto found;
+            m_file_mappings.reset();
+            m_local_mappings.reset();
+            m_num_local_mappings = 0;
+            break;
+        default:
+            REALM_UNREACHABLE();
     }
-    REALM_ASSERT(false);
-  found:
     invalidate_cache();
+
+    // Release all allocated memory - this forces us to create new
+    // slabs after re-attaching thereby ensuring that the slabs are
+    // placed correctly (logically) after the end of the file.
+    for (auto& slab : m_slabs) {
+        delete[] slab.addr;
+    }
+    m_slabs.clear();
+
     m_attach_mode = attach_None;
 }
 
@@ -176,7 +208,7 @@ SlabAlloc::~SlabAlloc() noexcept
         if (m_attach_mode != attach_SharedFile) {
             // No point inchecking if free space info is invalid
             if (m_free_space_state != free_space_Invalid) {
-                if (!is_all_free()) {
+                if (REALM_COVER_NEVER(!is_all_free())) {
                     print();
 #  ifndef REALM_SLAB_ALLOC_DEBUG
                     std::cerr << "To get the stack-traces of the corresponding allocations,"
@@ -190,26 +222,39 @@ SlabAlloc::~SlabAlloc() noexcept
     }
 #endif
 
-    // Release all allocated memory
-    for (auto& slab : m_slabs) {
-        delete[] slab.addr;
-    }
-
     if (is_attached())
         detach();
 }
 
 
-MemRef SlabAlloc::do_alloc(size_t size)
+MemRef SlabAlloc::do_alloc(const size_t size)
 {
+#ifdef REALM_SLAB_ALLOC_TUNE
+    static int64_t memstat_requested = 0;
+    static int64_t memstat_slab_size = 0;
+    static int64_t memstat_slabs = 0;
+    static int64_t memstat_rss = 0;
+    static int64_t memstat_rss_ctr = 0;
+
+    {
+        double vm;
+        double res;
+        process_mem_usage(vm, res);
+        memstat_rss += res;
+        memstat_rss_ctr += 1;
+        memstat_requested += size;
+    }
+#endif
+
     REALM_ASSERT_DEBUG(0 < size);
     REALM_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
     REALM_ASSERT_DEBUG(is_attached());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
+
     m_free_space_state = free_space_Dirty;
 
     // Do we have a free space we can reuse?
@@ -218,6 +263,19 @@ MemRef SlabAlloc::do_alloc(size_t size)
         iter rend = m_free_space.rend();
         for (iter i = m_free_space.rbegin(); i != rend; ++i) {
             if (size <= i->size) {
+
+#if REALM_ENABLE_MEMDEBUG
+                // Pick a *random* match instead of just the first. This will increase the chance of catching
+                // use-after-free bugs in Core. It's chosen such that the mathematical average of all picked 
+                // positions is the middle of the list. 
+                iter j = i;
+                while (j != rend && (size > j->size || fastrand() % (m_free_space.size() / 2 + 1) != 0)) {
+                    j++;
+                }
+                if (j != rend)
+                    i = j;
+#endif
+
                 ref_type ref = i->ref;
                 size_t rest = i->size - size;
 
@@ -233,41 +291,64 @@ MemRef SlabAlloc::do_alloc(size_t size)
                 }
 
 #ifdef REALM_DEBUG
-                if (m_debug_out)
+                if (REALM_COVER_NEVER(m_debug_out))
                     std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
                 char* addr = translate(ref);
 #if REALM_ENABLE_ALLOC_SET_ZERO
-                std::fill(addr, addr+size, 0);
+                std::fill(addr, addr + size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
-                return MemRef(addr, ref);
+                return MemRef(addr, ref, *this);
             }
         }
     }
 
-    // Else, allocate new slab
-    size_t new_size = ((size-1) | 255) + 1; // Round up to nearest multiple of 256
+
+    // Allocate new slab. To avoid wasting physical memory, we allocate a page
+    size_t new_size = size > page_size() ? size : page_size();
     ref_type ref;
     if (m_slabs.empty()) {
         ref = m_baseline;
     }
     else {
+        // Find size of memory that has been modified (through copy-on-write) in current write transaction
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
-        // Make it at least as big as twice the previous slab
-        ref_type prev_ref_end = m_slabs.size() == 1 ? m_baseline :
-            to_size_t(m_slabs[m_slabs.size()-2].ref_end);
-        size_t min_size = 2 * (curr_ref_end - prev_ref_end);
+        size_t copy_on_write = curr_ref_end - m_baseline;
+
+        // Allocate 20% of that (for the first few number of slabs the math below will just result in 1 page each)
+        size_t min_size = 0.2 * copy_on_write;
+
         if (new_size < min_size)
             new_size = min_size;
+
         ref = curr_ref_end;
     }
+
+    // Round upwards to nearest page size
+    new_size = ((new_size - 1) | (page_size() - 1)) + 1;
+
+#ifdef REALM_SLAB_ALLOC_TUNE
+    {
+        const size_t update = 5000000;
+        if ((memstat_slab_size + new_size) / update > memstat_slab_size / update) {
+            std::cerr << "Size of all allocated slabs:    " << (memstat_slab_size + new_size) / 1024 << " KB\n" <<
+                "Sum of size for do_alloc(size): " << memstat_requested / 1024 << " KB\n" <<
+                "Average physical memory usage:  " << memstat_rss / memstat_rss_ctr / 1024 << " KB\n" <<
+                "Page size:                      " << page_size() / 1024 << " KB\n" <<
+                "Number of all allocated slabs:  " << memstat_slabs << "\n\n";
+        }
+        memstat_slab_size += new_size;
+        memstat_slabs += 1;
+    }
+#endif
+
     REALM_ASSERT_DEBUG(0 < new_size);
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
-    std::fill(mem.get(), mem.get()+new_size, 0);
+    std::fill(mem.get(), mem.get() + new_size, 0);
 
     // Add to list of slabs
     Slab slab;
@@ -286,18 +367,18 @@ MemRef SlabAlloc::do_alloc(size_t size)
     }
 
 #ifdef REALM_DEBUG
-    if (m_debug_out)
+    if (REALM_COVER_NEVER(m_debug_out))
         std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
 #if REALM_ENABLE_ALLOC_SET_ZERO
-    std::fill(slab.addr, slab.addr+size, 0);
+    std::fill(slab.addr, slab.addr + size, 0);
 #endif
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
 #endif
 
-    return MemRef(slab.addr, ref);
+    return MemRef(slab.addr, ref, *this);
 }
 
 
@@ -319,11 +400,11 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     ref_type ref_end = ref + size;
 
 #ifdef REALM_DEBUG
-    if (m_debug_out)
+    if (REALM_COVER_NEVER(m_debug_out))
         std::cerr << "Free ref: " << ref << " size: " << size << "\n";
 #endif
 
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         return;
 
     // Mutable memory cannot be freed unless it has first been allocated, and
@@ -350,7 +431,6 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     // Check if we can merge with adjacent preceeding free block (not if that
     // would cross slab boundary)
     if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref)) == m_slabs.end()) {
-        typedef chunks::iterator iter;
         iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEndEq(ref));
         if (i != free_space.end()) {
             if (merged_with != free_space.end()) {
@@ -395,16 +475,16 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
     MemRef new_mem = do_alloc(new_size); // Throws
 
     // Copy existing segment
-    char* new_addr = new_mem.m_addr;
+    char* new_addr = new_mem.get_addr();
     std::copy(addr, addr+old_size, new_addr);
 
     // Add old segment to freelist
     do_free(ref, addr);
 
 #ifdef REALM_DEBUG
-    if (m_debug_out) {
+    if (REALM_COVER_NEVER(m_debug_out)) {
         std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
-            "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
+            "new_ref: " << new_mem.get_ref() << " new_size: " << new_size << "\n";
     }
 #endif // REALM_DEBUG
 
@@ -484,6 +564,22 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
     return file_format_version;
 }
 
+ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
+{
+    const Header& header = reinterpret_cast<const Header&>(*buffer);
+    int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+    m_file_format_version = header.m_file_format[slot_selector];
+    uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+    m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+    if (m_file_on_streaming_form) {
+        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(buffer + len) - 1);
+        return ref_type(footer.m_top_ref);
+    }
+    else {
+        return ref_type(ref);
+    }
+}
+
 namespace {
 
 std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>> all_files;
@@ -516,18 +612,27 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     {
         std::lock_guard<Mutex> lock(all_files_mutex);
         std::shared_ptr<SlabAlloc::MappedFile> p = all_files[path].lock();
-        if (!bool(p)) {
+        // In case we're the session initiator, we'll need a new mapping in any case.
+        // NOTE: normally, it should not be possible to find an old mapping while being
+        // the session initiator, since by definition the session initiator is the first
+        // to attach the file. If, however, the user is deleting the .lock file while he
+        // has one or more shared groups attached to the database, a session initiator
+        // *will* see a stale mapping. From versions 0.99 to 1.1.0 we asserted when detecting
+        // this situation, and this lead to many bug reports. It is likely that many of these
+        // would otherwise *not* have lead to observable bugs, because the user would not
+        // actually touch the stale database anymore, it was just a case of delayed deallocation
+        // of a shared group.
+        if (cfg.session_initiator || !bool(p)) {
             p = std::make_shared<MappedFile>();
             all_files[path] = p;
         }
         m_file_mappings = p;
     }
-    std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
+    std::unique_lock<Mutex> lock(m_file_mappings->m_mutex);
 
     // If the file has already been mapped by another thread, reuse all relevant data
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
-        REALM_ASSERT(!cfg.session_initiator);
         m_data = m_file_mappings->m_initial_mapping.get_addr();
         m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
@@ -547,7 +652,10 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         else {
             m_baseline = m_file_mappings->m_initial_mapping.get_size();
         }
-        return 0;
+        ref_type top_ref = 0;
+        if (cfg.read_only)
+            top_ref = get_top_ref(m_data, m_file_mappings->m_file.get_size());
+        return top_ref;
     }
     // Even though we're the first to map the file, we cannot assume that we're
     // the session initiator. Another process may have the session initiator.
@@ -585,9 +693,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         // Pre-alloc initial space
         size_t initial_size = m_initial_section_size;
         m_file_mappings->m_file.prealloc(0, initial_size); // Throws
+
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             m_file_mappings->m_file.sync(); // Throws
+
         size = initial_size;
     }
     ref_type top_ref;
@@ -602,21 +712,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             validate_buffer(map.get_addr(), size, path, cfg.is_shared); // Throws
         }
 
-        {
-            const Header& header = reinterpret_cast<const Header&>(*map.get_addr());
-            int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-            m_file_format_version = header.m_file_format[slot_selector];
-            uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
-            m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
-            if (m_file_on_streaming_form) {
-                const StreamingFooter& footer =
-                    *(reinterpret_cast<StreamingFooter*>(map.get_addr()+size) - 1);
-                top_ref = ref_type(footer.m_top_ref);
-            }
-            else {
-                top_ref = ref_type(ref);
-            }
-        }
+        top_ref = get_top_ref(map.get_addr(), size);
 
         m_data = map.get_addr();
         m_file_mappings->m_initial_mapping = std::move(map);
@@ -634,6 +730,11 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
 
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
+    // ensure that the lock is released before destruction of the mutex, in case
+    // an exception is thrown. Since lock2 is constructed after the detach guard,
+    // it will be destructed first, releasing the lock before the detach guard
+    // releases the MappedFile structure containing the mutex.
+    std::unique_lock<Mutex> lock2(move(lock));
 
     // make sure the database is not on streaming format. If we did not do this, 
     // a later commit would have to do it. That would require coordination with
@@ -729,7 +830,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             }
         }
     }
-    dg.release();
+    dg.release(); // Do not detach
     fcg.release(); // Do not close
     m_file_mappings->m_success = true;
     return top_ref;
@@ -747,21 +848,7 @@ ref_type SlabAlloc::attach_buffer(char* data, size_t size)
     bool is_shared = false;
     validate_buffer(data, size, path, is_shared); // Throws
 
-    ref_type top_ref;
-    {
-        const Header& header = reinterpret_cast<const Header&>(*data);
-        int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-        m_file_format_version = header.m_file_format[slot_selector];
-        uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
-        m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
-        if (m_file_on_streaming_form) {
-            const StreamingFooter& footer = *(reinterpret_cast<StreamingFooter*>(data+size) - 1);
-            top_ref = ref_type(footer.m_top_ref);
-        }
-        else {
-            top_ref = ref_type(ref);
-        }
-    }
+    ref_type top_ref = get_top_ref(data, size);
 
     m_data        = data;
     m_baseline    = size;
@@ -972,7 +1059,7 @@ void SlabAlloc::remap(size_t file_size)
 
 const SlabAlloc::chunks& SlabAlloc::get_free_read_only() const
 {
-    if (m_free_space_state == free_space_Invalid)
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
         throw InvalidFreeSpace();
     return m_free_read_only;
 }
@@ -1047,7 +1134,9 @@ size_t SlabAlloc::find_section_in_range(size_t start_pos,
 void SlabAlloc::resize_file(size_t new_file_size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
+    REALM_ASSERT(matches_section_boundary(new_file_size));
     m_file_mappings->m_file.prealloc(0, new_file_size); // Throws
+
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
@@ -1056,7 +1145,10 @@ void SlabAlloc::resize_file(size_t new_file_size)
 void SlabAlloc::reserve_disk_space(size_t size)
 {
     std::lock_guard<Mutex> lock(m_file_mappings->m_mutex);
+    if (!matches_section_boundary(size))
+        size = get_upper_section_boundary(size);
     m_file_mappings->m_file.prealloc_if_supported(0, size); // Throws
+
     bool disable_sync = get_disable_sync_to_disk();
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws

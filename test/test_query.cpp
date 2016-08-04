@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_QUERY
 
@@ -780,7 +798,7 @@ TEST(Query_NextGenSyntaxMonkey0)
 TEST(Query_NextGenSyntaxMonkey)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (int iter = 1; iter < 10 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
+    for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
             1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
@@ -1643,6 +1661,20 @@ TEST(Query_Expressions0)
     match = (power(second) < 9.001 && power(second) > 8.999).find();
     CHECK_EQUAL(0, match);
 
+    // For `float < int_column` we had a bug where the float truncated to int, and the int_column remained int
+    // (correct behaviour would be that the float remained float and int_column converted to float). This test
+    // exposes such a bug because 1000000001 should convert to the nearest float value which is `1000000000.`
+    // (gap between floats is bigger than 1 and cannot represent 1000000001).
+    table.clear();
+    table.add_empty_row(1);
+    table.set_int(0, 0, 1000000001);
+
+    match = (1000000000.f < first).find();
+    CHECK_EQUAL(match, not_found);
+
+    match = (first > 1000000000.f).find();
+    CHECK_EQUAL(match, not_found);
+
 }
 
 TEST(Query_LimitUntyped2)
@@ -2339,7 +2371,7 @@ TEST(Query_OnTableView_where)
 {
     Random random;
 
-    for (int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
+    for (int iter = 0; iter < 50 * (1 + TEST_DURATION * TEST_DURATION); iter++) {
         random.seed(164);
         OneIntTable oti;
         size_t cnt1 = 0;
@@ -3463,7 +3495,7 @@ TEST(Query_Subtable)
 
 
     Query q4 = table->where();
-    q4.equal(0, (int64_t)333);
+    q4.equal(0, int64_t(333));
     q4.Or();
     q4.subtable(2);
     q4.greater(0, val50);
@@ -3984,6 +4016,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         // Test if sort order is the same as original
         for (size_t t = 0; t < tv2.size(); t++) {
             size_t a = tv2.get_source_ndx(t);
+            REALM_ASSERT_EX(b < tv.size(), b, tv.size());
             while (a != tv.get_source_ndx(b)) {
                 b++;
             }
@@ -4003,6 +4036,7 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         // Test if sort order is the same as original
         for (size_t t = 0; t < tv3.size(); t++) {
             size_t a = tv3.get_source_ndx(t);
+            REALM_ASSERT_EX(b < tv2.size(), b, tv2.size());
             while (a != tv2.get_source_ndx(b)) {
                 b++;
                 CHECK(b < tv2.size());
@@ -4016,8 +4050,8 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
         Query q5 = table.where(&tv4).not_equal(0, 2);
         TableView tv5 = q5.find_all();
 
-        for (size_t t = 0; t < tv5.size() - 1; t++) {
-            CHECK(tv5.get_source_ndx(t) < tv5.get_source_ndx(t + 1));
+        for (size_t t = 1; t < tv5.size(); t++) {
+            CHECK(tv5.get_source_ndx(t - 1) < tv5.get_source_ndx(t));
         }
 
         // Test that tv5 is ordered the same way as tv4 (tv5 is subset of tv4)
@@ -5666,12 +5700,12 @@ TEST(Query_DeepCopy)
     // Attempt to overwrite memory of the deleted q3 by allocating various sized objects so that a spurious execution
     // of methods on q3 can be detected (by making unit test crash).
     char* tmp[1000];
-    for (size_t t = 0; t < sizeof(tmp) / sizeof(tmp[0]); t++) {
-        tmp[t] = new char[t];
-        memset(tmp[t], 0, t);
+    for (size_t i = 0; i < sizeof(tmp) / sizeof(tmp[0]); i++) {
+        tmp[i] = new char[i];
+        memset(tmp[i], 0, i);
     }
-    for (size_t t = 0; t < sizeof(tmp) / sizeof(tmp[0]); t++) {
-        delete[] tmp[t];
+    for (size_t i = 0; i < sizeof(tmp) / sizeof(tmp[0]); i++) {
+        delete[] tmp[i];
     }
 
     CHECK_EQUAL(2, q4->find());
@@ -5976,11 +6010,11 @@ TEST(Query_Nulls_Fuzzy)
                         }
                         else {
                             // random string
-                            for (size_t t = 0; t < len; t++) {
+                            for (size_t s = 0; s < len; s++) {
                                 if (fastrand(100) > 20)
-                                    buf2[t] = 0;                        // zero byte
+                                    buf2[s] = 0;                        // zero byte
                                 else
-                                    buf2[t] = static_cast<char>(fastrand(255));  // random byte
+                                    buf2[s] = static_cast<char>(fastrand(255));  // random byte
                             }
                             // no generated string can equal "null" (our vector magic value for null) because
                             // len == 4 is not possible
@@ -6006,12 +6040,12 @@ TEST(Query_Nulls_Fuzzy)
 
 
                 CHECK_EQUAL(table.size(), v.size());
-                for (size_t i = 0; i < table.size(); i++) {
-                    if (v[i] == "null") {
-                        CHECK(table.get_string(0, i).is_null());
+                for (size_t j = 0; j < table.size(); j++) {
+                    if (v[j] == "null") {
+                        CHECK(table.get_string(0, j).is_null());
                     }
                     else {
-                        CHECK(table.get_string(0, i) == v[i]);
+                        CHECK(table.get_string(0, j) == v[j]);
                     }
                 }
 
@@ -8861,4 +8895,60 @@ TEST(Query_SyncViewIfNeeded)
         CHECK_EQUAL(bool(version), false);
     }
 }
+
+// Ensure that two queries can be combined via Query::and_query, &&, and || even if one of them has no conditions.
+TEST(Query_CombineWithEmptyQueryDoesntCrash)
+{
+    Table table;
+    size_t col_id = table.add_column(type_Int, "id");
+    table.add_empty_row(3);
+    table.set_int(col_id, 0, 0);
+    table.set_int(col_id, 1, 1);
+    table.set_int(col_id, 2, 2);
+
+    {
+        Query q = table.where().equal(col_id, 1);
+        q.and_query(table.where());
+        CHECK_EQUAL(1, q.find_all().size());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = table.where();
+        q1.and_query(q2);
+        CHECK_EQUAL(1, q1.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = table.where();
+        q2.and_query(q1);
+        CHECK_EQUAL(1, q2.count());
+    }
+
+    {
+        Query q = table.where();
+        q.and_query(table.where().equal(col_id, 1));
+        CHECK_EQUAL(1, q.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = q1 && table.where();
+        CHECK_EQUAL(1, q2.count());
+
+        Query q3 = table.where() && q1;
+        CHECK_EQUAL(1, q3.count());
+    }
+
+    {
+        Query q1 = table.where().equal(col_id, 1);
+        Query q2 = q1 || table.where();
+        CHECK_EQUAL(1, q2.count());
+
+        Query q3 = table.where() || q1;
+        CHECK_EQUAL(1, q3.count());
+    }
+}
+
 #endif // TEST_QUERY

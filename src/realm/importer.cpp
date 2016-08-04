@@ -1,29 +1,28 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
 // Test tool in test/test_csv/test.pl
 
-#include <stdint.h>
+#include <iostream>
 #include <limits>
-#include <vector>
 #include <sstream>
+#include <stdint.h>
+#include <vector>
 
 #include <realm/util/assert.hpp>
 #include <realm/importer.hpp>
@@ -100,7 +99,7 @@ void print_row(Table& table, size_t r)
         if(table.get_column_type(c) == type_Int)
             sprintf(buf, "%lld", static_cast<long long>(table.get_int(c, r)));
         if(table.get_column_type(c) == type_String) {
-#if _MSC_VER
+#if defined(_MSC_VER) && _MSC_VER
             _snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
 #else
             snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
@@ -547,7 +546,7 @@ end:
     return payload.size() - original_size;
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *scheme2, std::vector<std::string> *column_names,
+size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *import_scheme, std::vector<std::string> *column_names,
                             size_t type_detection_rows, size_t skip_first_rows,
                             size_t import_rows)
 {
@@ -562,7 +561,7 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *sch
     m_file = file;
     m_row = 1;
 
-    if(scheme2 == nullptr) {
+    if(import_scheme == nullptr) {
         // Header detection: 1) If first line is strings-only and next line has at least 1 occurence of non-string, then
         // header is present. 2) If first line has at least one occurence of non-string or empty-field, then header is
         // not present. 3) If first two lines are strings-only, we can't tell, and treat both as payload
@@ -633,11 +632,11 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *sch
     }
     else {
         // Use user provided column names and types
-        scheme = *scheme2;
+        scheme = *import_scheme;
         header = *column_names;
     }
 
-    // Create sheme in Realm table
+    // Create scheme in Realm table
     for(size_t t = 0; t < scheme.size(); t++)
         table.add_column(scheme[t], StringData(header[t]).data());
 

@@ -1,20 +1,18 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
@@ -64,7 +62,7 @@ public:
     ref_type create_leaf(size_t size) override
     {
         MemRef mem = BT::create_leaf(Array::type_Normal, size, m_value, m_alloc); // Throws
-        return mem.m_ref;
+        return mem.get_ref();
     }
 private:
     const typename BT::value_type m_value;
@@ -209,9 +207,9 @@ void TimestampColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     if (has_search_index()) {
         auto value_1 = get(row_ndx_1);
         auto value_2 = get(row_ndx_2);
-        size_t size = this->size();
-        bool row_ndx_1_is_last = row_ndx_1 == size - 1;
-        bool row_ndx_2_is_last = row_ndx_2 == size - 1;
+        size_t column_size = this->size();
+        bool row_ndx_1_is_last = row_ndx_1 == column_size - 1;
+        bool row_ndx_2_is_last = row_ndx_2 == column_size - 1;
         m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last); // Throws
         m_search_index->insert(row_ndx_1, value_2, 1, row_ndx_1_is_last); // Throws
         m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last); // Throws
@@ -314,7 +312,7 @@ void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
     }
 }
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void TimestampColumn::verify() const
 {
@@ -327,6 +325,7 @@ void TimestampColumn::verify() const
     m_seconds->verify();
     m_nanoseconds->verify();
 }
+
 
 void TimestampColumn::to_dot(std::ostream&, StringData /*title*/) const
 {
@@ -343,13 +342,13 @@ void TimestampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/
     // FIXME: Dummy implementation
 }
 
-#endif
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 void TimestampColumn::add(const Timestamp& ts)
 {
-    bool is_null = ts.is_null();
-    util::Optional<int64_t> seconds = is_null ? util::none : util::make_optional(ts.get_seconds());
-    int32_t nanoseconds = is_null ? 0 : ts.get_nanoseconds();
+    bool ts_is_null = ts.is_null();
+    util::Optional<int64_t> seconds = ts_is_null ? util::none : util::make_optional(ts.get_seconds());
+    int32_t nanoseconds = ts_is_null ? 0 : ts.get_nanoseconds();
     m_seconds->insert(npos, seconds); // Throws
     m_nanoseconds->insert(npos, nanoseconds); // Throws
 
@@ -395,6 +394,11 @@ bool TimestampColumn::compare(const TimestampColumn& c) const noexcept
         }
     }
     return true;
+}
+
+int TimestampColumn::compare_values(size_t row1, size_t row2) const noexcept
+{
+    return ColumnBase::compare_values(this, row1, row2);
 }
 
 Timestamp TimestampColumn::maximum(size_t* result_index) const

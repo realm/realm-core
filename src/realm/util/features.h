@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *************************************************************************/
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #ifndef REALM_UTIL_FEATURES_H
 #define REALM_UTIL_FEATURES_H
 
@@ -33,6 +32,9 @@
 #  define REALM_MAX_BPNODE_SIZE 1000
 #endif
 
+
+#define REALM_QUOTE_2(x) #x
+#define REALM_QUOTE(x) REALM_QUOTE_2(x)
 
 /* See these links for information about feature check macroes in GCC,
  * Clang, and MSVC:
@@ -58,7 +60,7 @@
 #endif
 
 #if defined(__GNUC__) // clang or GCC
-#  define REALM_PRAGMA(v) _Pragma(REALM_QUOTE2(v))
+#  define REALM_PRAGMA(v) _Pragma(REALM_QUOTE_2(v))
 #elif defined(_MSC_VER) // VS
 #  define REALM_PRAGMA(v) __pragma(v)
 #else
@@ -84,14 +86,20 @@
 #  define REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE()
 #endif
 
+#ifdef _MSC_VER
+#  define REALM_DIAG_IGNORE_UNSIGNED_MINUS() REALM_PRAGMA(warning(disable:4146)) 
+#else
+#  define REALM_DIAG_IGNORE_UNSIGNED_MINUS() 
+#endif
+
 /* Compiler is MSVC (Microsoft Visual C++) */
-#if _MSC_VER >= 1600
+#if defined(_MSC_VER) && _MSC_VER >= 1600
 #  define REALM_HAVE_AT_LEAST_MSVC_10_2010 1
 #endif
-#if _MSC_VER >= 1700
+#if defined(_MSC_VER) && _MSC_VER >= 1700
 #  define REALM_HAVE_AT_LEAST_MSVC_11_2012 1
 #endif
-#if _MSC_VER >= 1800
+#if defined(_MSC_VER) && _MSC_VER >= 1800
 #  define REALM_HAVE_AT_LEAST_MSVC_12_2013 1
 #endif
 
@@ -101,7 +109,7 @@
 #  define REALM_NORETURN [[noreturn]]
 #elif __GNUC__
 #  define REALM_NORETURN __attribute__((noreturn))
-#elif _MSC_VER
+#elif defined(_MSC_VER)
 #  define REALM_NORETURN __declspec(noreturn)
 #else
 #  define REALM_NORETURN
@@ -154,6 +162,8 @@
 
 #if defined __ANDROID__
 #  define REALM_ANDROID 1
+#else
+#  define REALM_ANDROID 0
 #endif
 
 // Some documentation of the defines provided by Apple:
@@ -165,6 +175,8 @@
 #  if TARGET_OS_IPHONE == 1
 /* Device (iPhone or iPad) or simulator. */
 #    define REALM_IOS 1
+#  else
+#    define REALM_IOS 0
 #  endif
 #  if TARGET_OS_WATCH == 1
 /* Device (Apple Watch) or simulator. */
@@ -172,13 +184,20 @@
 /* The necessary signal handling / mach exception APIs are all unavailable */
 #    undef  REALM_ENABLE_ENCRYPTION
 #    define REALM_ENABLE_ENCRYPTION 0
+#  else
+#    define REALM_WATCHOS 0
 #  endif
 #  if TARGET_OS_TV
 /* Device (Apple TV) or simulator. */
 #    define REALM_TVOS 1
+#  else
+#    define REALM_TVOS 0
 #  endif
 #else
 #  define REALM_PLATFORM_APPLE 0
+#  define REALM_IOS 0
+#  define REALM_WATCHOS 0
+#  define REALM_TVOS 0
 #endif
 
 
@@ -191,7 +210,7 @@
 #  define REALM_COOKIE_CHECK
 #endif
 
-#if !REALM_IOS && !REALM_WATCHOS && !REALM_TVOS && !defined(_WIN32)
+#if !REALM_IOS && !REALM_WATCHOS && !REALM_TVOS && !defined(_WIN32) && !REALM_ANDROID
 #  define REALM_ASYNC_DAEMON
 #endif
 

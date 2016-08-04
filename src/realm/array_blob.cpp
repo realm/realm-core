@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <algorithm>
 
 #include <realm/array_blob.hpp>
@@ -5,17 +23,17 @@
 using namespace realm;
 
 
-void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size, bool add_zero_term)
+void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term)
 {
     REALM_ASSERT_3(begin, <=, end);
     REALM_ASSERT_3(end, <=, m_size);
-    REALM_ASSERT(size == 0 || data);
+    REALM_ASSERT(data_size == 0 || data);
 
     copy_on_write(); // Throws
 
     // Reallocate if needed
     size_t remove_size = end - begin;
-    size_t add_size = size;
+    size_t add_size = data_size;
     if (add_zero_term)
         ++add_size;
     size_t new_size = m_size - remove_size + add_size;
@@ -40,7 +58,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
     }
 
     // Insert the data
-    modify_begin = std::copy(data, data+size, modify_begin);
+    modify_begin = std::copy(data, data+data_size, modify_begin);
     if (add_zero_term)
         *modify_begin = 0;
 
@@ -48,7 +66,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayBlob::verify() const
 {
@@ -86,4 +104,4 @@ void ArrayBlob::to_dot(std::ostream& out, StringData title) const
     to_dot_parent_edge(out);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

@@ -1,12 +1,33 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
 
 #include <streambuf>
 #include <fstream>
+#include <tuple>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
 #  include <unistd.h>
+#  include <sys/mman.h>
+#  include <sys/types.h>
 #  include <sys/wait.h>
 #  include <signal.h>
 #  include <sched.h>
@@ -30,7 +51,7 @@
 
 #include "test.hpp"
 
-extern uint64_t unit_test_random_seed;
+extern unsigned long unit_test_random_seed;
 
 using namespace realm;
 using namespace realm::util;
@@ -176,7 +197,7 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !defined(REALM_ANDROID)
+#if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !REALM_ANDROID
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -940,9 +961,9 @@ TEST(Shared_ManyReaders)
 
 #if TEST_DURATION < 1
     // Mac OS X 10.8 cannot handle more than 15 due to its default ulimit settings.
-    int rounds[] = { 3, 5, 7, 9, 11, 13, 15 };
+    int rounds[] = { 3, 5, 7, 9, 11, 13 };
 #else
-    int rounds[] = { 3, 5, 11, 17, 23, 27, 31, 47, 59 };
+    int rounds[] = { 3, 5, 11, 15, 17, 23, 27, 31, 47, 59 };
 #endif
     const int num_rounds = sizeof rounds / sizeof *rounds;
 
@@ -1177,6 +1198,7 @@ TEST(Shared_ManyReaders)
     }
 }
 
+#ifndef _WIN32 // FIXME: Some times crashes on Windows
 
 // This test is a minimal repro. of core issue #842.
 TEST(Many_ConcurrentReaders)
@@ -1185,20 +1207,20 @@ TEST(Many_ConcurrentReaders)
     const std::string path_str = path;
 
     // setup
-    SharedGroup sg(path_str);
-    WriteTransaction wt(sg);
+    SharedGroup sg_w(path_str);
+    WriteTransaction wt(sg_w);
     TableRef t = wt.add_table("table");
     size_t col_ndx = t->add_column(type_String, "column");
     t->add_empty_row(1);
     t->set_string(col_ndx, 0, StringData("string"));
     wt.commit();
-    sg.close();
+    sg_w.close();
 
     auto reader = [path_str]() {
         try {
             for (int i = 0; i < 1000; ++i) {
-                SharedGroup sg(path_str);
-                ReadTransaction rt(sg);
+                SharedGroup sg_r(path_str);
+                ReadTransaction rt(sg_r);
                 rt.get_group().verify();
             }
         } catch (...) {
@@ -1216,6 +1238,7 @@ TEST(Many_ConcurrentReaders)
     }
 }
 
+#endif // #ifndef _WIN32
 
 namespace {
 
@@ -2523,16 +2546,18 @@ TEST(Shared_ReserveDiskSpace)
         sg.reserve(reserve_size_4);
         size_t new_file_size_4 = size_t(File(path).get_size());
         CHECK(new_file_size_4 >= reserve_size_4);
-        WriteTransaction wt(sg);
-        wt.get_group().verify();
-        wt.add_table<TestTableShared>("table_2")->add_empty_row(2000);
-        orig_file_size = size_t(File(path).get_size());
-        size_t reserve_size_5 = orig_file_size + 333;
-        sg.reserve(reserve_size_5);
-        size_t new_file_size_5 = size_t(File(path).get_size());
-        CHECK(new_file_size_5 >= reserve_size_5);
-        wt.add_table<TestTableShared>("table_3")->add_empty_row(2000);
-        wt.commit();
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().verify();
+            wt.add_table<TestTableShared>("table_2")->add_empty_row(2000);
+            orig_file_size = size_t(File(path).get_size());
+            size_t reserve_size_5 = orig_file_size + 333;
+            sg.reserve(reserve_size_5);
+            size_t new_file_size_5 = size_t(File(path).get_size());
+            CHECK(new_file_size_5 >= reserve_size_5);
+            wt.add_table<TestTableShared>("table_3")->add_empty_row(2000);
+            wt.commit();
+        }
         orig_file_size = size_t(File(path).get_size());
         size_t reserve_size_6 = orig_file_size + 459;
         sg.reserve(reserve_size_6);
@@ -2949,6 +2974,74 @@ TEST(Shared_VersionOfBoundSnapshot)
     }
 }
 
+
+// This test is valid, but because it requests all available memory,
+// it does not play nicely with valgrind and so is disabled.
+/*
+#if !defined(_WIN32)
+// Check what happens when Realm cannot allocate more virtual memory
+// We should throw an AddressSpaceExhausted exception.
+// This will try to use all available memory allowed for this process
+// so don't run it concurrently with other tests.
+NONCONCURRENT_TEST(Shared_OutOfMemory)
+{
+    size_t string_length = 1024 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_String, "string_col");
+        std::string long_string(string_length, 'a');
+        table->add_empty_row();
+        table->set_string(0, 0, long_string);
+        wt.commit();
+    }
+    sg.close();
+
+    std::vector<std::pair<void*, size_t>> memory_list;
+    // Reserve enough for 5*100000 Gb, but in practice the vector is only ever around size 10.
+    // Do this here to avoid the (small) chance that adding to the vector will request new virtual memory
+    memory_list.reserve(500);
+    size_t chunk_size = size_t(1024) * 1024 * 1024 * 100000;
+    while (chunk_size > string_length) {
+        void* addr = ::mmap(nullptr, chunk_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+        if (addr == MAP_FAILED) {
+            chunk_size /= 2;
+        }
+        else {
+            memory_list.push_back(std::pair<void*, size_t>(addr, chunk_size));
+        }
+    }
+
+    bool expected_exception_caught = false;
+    // Attempt to open Realm, should fail because we hold too much already.
+    try {
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    }
+    catch (AddressSpaceExhausted& e) {
+        expected_exception_caught = true;
+    }
+    CHECK(expected_exception_caught);
+
+    // Release memory manually.
+    for (auto it = memory_list.begin(); it != memory_list.end(); ++it) {
+        ::munmap(it->first, it->second);
+    }
+
+    // Realm should succeed to open now.
+    expected_exception_caught = false;
+    try {
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    }
+    catch (AddressSpaceExhausted& e) {
+        expected_exception_caught = true;
+    }
+    CHECK(!expected_exception_caught);
+}
+#endif // !win32
+*/
+
 // Run some (repeatable) random checks through the fuzz tester.
 // For a comprehensive fuzz test, afl should be run. To do this see test/fuzzy/README.md
 // If this check fails for some reason, you can find the problem by changing
@@ -2962,7 +3055,6 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     //std::string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
     //std::string filename = "d:/crash3";
 
-    std::string instr;
     if (filename != "") {
         const char* tmp[] = { "", filename.c_str(), "--log" };
         run_fuzzy(sizeof(tmp) / sizeof(tmp[0]), tmp);
@@ -3011,5 +3103,127 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     }
 }
 
+// Scaled down stress test. (Use string length ~15MB for max stress)
+NONCONCURRENT_TEST(Shared_BigAllocations)
+{
+    size_t string_length = 64 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    std::string long_string(string_length, 'a');
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("table");
+        table->add_column(type_String, "string_col");
+        wt.commit();
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("table");
+        for (int i = 0; i < 32; ++i) {
+            table->add_empty_row();
+            table->set_string(0, i, long_string);
+        }
+        wt.commit();
+    }
+    for (int k = 0; k < 10; ++k) {
+        //sg.compact(); // <--- enable this if you want to stress with compact()
+        for (int j = 0; j < 20; ++j) {
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("table");
+            for (int i = 0; i < 20; ++i) {
+                table->set_string(0, i, long_string);
+            }
+            wt.commit();
+        }
+    }
+    sg.close();
+}
+
+// Repro case for: Assertion failed: top_size == 3 || top_size == 5 || top_size == 7 [0, 3, 0, 5, 0, 7]
+NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
+{
+    // String length at 2K will not trigger the error.
+    // all lengths >= 4K (that were tried) trigger the error
+    size_t string_length = 4 * 1024;
+    SHARED_GROUP_TEST_PATH(path);
+    std::string long_string(string_length, 'a');
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    {
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.add_table("table");
+            table->add_column(type_String, "string_col");
+            table->add_empty_row();
+            table->set_string(0, 0, long_string);
+            wt.commit();
+        }
+        sg.compact(); // <- required to provoke subsequent failures
+        {
+            WriteTransaction wt(sg);
+            wt.get_group().verify();
+            TableRef table = wt.get_table("table");
+            table->set_string(0, 0, long_string);
+            wt.get_group().verify();
+            wt.commit();
+        }
+    }
+    {
+        WriteTransaction wt(sg); // <---- fails here
+        wt.get_group().verify();
+        TableRef table = wt.get_table("table");
+        table->set_string(0, 0, long_string);
+        wt.get_group().verify();
+        wt.commit();
+    }
+    sg.close();
+}
+
+// Found by AFL (on a heavy hint from Finn that we should add a compact() instruction
+NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg.begin_write());
+
+    TableRef t = g.add_table("");
+    t->add_column(type_Double, "");
+    t->add_empty_row(241);
+    sg.commit();
+    REALM_ASSERT_RELEASE(sg.compact());
+    SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+    sg2.begin_write();
+    sg2.commit();
+    sg2.begin_read(); // <- does not fail
+    SharedGroup sg3(path, false, SharedGroup::durability_Full, crypt_key());
+    sg3.begin_read(); // <- does not fail
+    sg.begin_read(); // <- does fail
+}
+
+// Found by AFL after adding the compact instruction
+// after further manual simplification, this test no longer triggers
+// the double free, but crashes in a different way
+TEST(Shared_Bptree_insert_failure)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg_w(path, false, SharedGroup::durability_Full, crypt_key());
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    g.add_table("");
+    g.get_table(0)->add_column(type_Double, "dgrpn", true);
+    g.get_table(0)->add_empty_row(246);
+    sg_w.commit();
+    REALM_ASSERT_RELEASE(sg_w.compact());
+    #if 0
+    {
+        // This intervening sg can do the same operation as the one doing compact,
+        // but without failing:
+        SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
+        Group& g2 = const_cast<Group&>(sg2.begin_write());
+        g2.get_table(0)->add_empty_row(396);
+    }
+    #endif
+    sg_w.begin_write();
+    g.get_table(0)->add_empty_row(396);
+}
 
 #endif // TEST_SHARED

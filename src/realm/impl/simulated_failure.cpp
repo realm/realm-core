@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <memory>
 #include <algorithm>
 #include <stdexcept>
@@ -9,7 +27,7 @@
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/impl/simulated_failure.hpp>
 
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE || REALM_ANDROID
 #  define USE_PTHREADS_IMPL 1
 #else
 #  define USE_PTHREADS_IMPL 0
@@ -52,10 +70,10 @@ struct RandomPrimeMode: PrimeMode {
     std::mt19937_64 random;
     std::uniform_int_distribution<int> dist;
     int n;
-    RandomPrimeMode(int n, int m, uint_fast64_t seed):
+    RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed):
         random(seed),
         dist(0, m-1),
-        n(n)
+        n(trigger_threshold)
     {
         REALM_ASSERT(n >= 0 && m > 0);
     }

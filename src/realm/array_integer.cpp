@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <vector>
 
 #include <realm/array_integer.hpp>
@@ -56,8 +74,8 @@ bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t *min
 std::vector<int64_t> ArrayInteger::to_vector() const
 {
     std::vector<int64_t> v;
-    const size_t count = size();
-    for (size_t t = 0; t < count; ++t)
+    const size_t array_size = size();
+    for (size_t t = 0; t < array_size; ++t)
         v.push_back(Array::get(t));
     return v;
 }
@@ -88,7 +106,7 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, val
         }
     }
     dg.release();
-    return r;
+    return arr.get_mem();
 }
 
 
@@ -96,7 +114,7 @@ void ArrayIntNull::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
-    init_from_mem(MemRef{header, ref});
+    init_from_mem(MemRef{header, ref, m_alloc});
 }
 
 void ArrayIntNull::init_from_mem(MemRef mem) noexcept
@@ -278,33 +296,33 @@ ref_type ArrayIntNull::bptree_leaf_insert(size_t ndx, value_type value, Array::T
     return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, value, state);
 }
 
-MemRef ArrayIntNull::slice(size_t offset, size_t size, Allocator& target_alloc) const
+MemRef ArrayIntNull::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     // NOTE: It would be nice to consolidate this with Array::slice somehow.
 
     REALM_ASSERT(is_attached());
 
-    Array slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&slice);
+    Array array_slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&array_slice);
     Type type = get_type();
-    slice.create(type, m_context_flag); // Throws
-    slice.add(null_value());
+    array_slice.create(type, m_context_flag); // Throws
+    array_slice.add(null_value());
 
     size_t begin = offset + 1;
-    size_t end   = offset + size + 1;
+    size_t end   = offset + slice_size + 1;
     for (size_t i = begin; i != end; ++i) {
         int_fast64_t value = Array::get(i);
-        slice.add(value); // Throws
+        array_slice.add(value); // Throws
     }
     dg.release();
-    return slice.get_mem();
+    return array_slice.get_mem();
 }
 
-MemRef ArrayIntNull::slice_and_clone_children(size_t offset, size_t size, Allocator& target_alloc) const
+MemRef ArrayIntNull::slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     // NOTE: It would be nice to consolidate this with Array::slice_and_clone_children somehow.
 
     REALM_ASSERT(is_attached());
     REALM_ASSERT(!has_refs());
-    return slice(offset, size, target_alloc);
+    return slice(offset, slice_size, target_alloc);
 }

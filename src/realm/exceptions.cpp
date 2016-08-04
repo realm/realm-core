@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <realm/exceptions.hpp>
 #include <realm/version.hpp>
 
@@ -51,7 +69,7 @@ const char* LogicError::what() const noexcept
         case column_not_nullable:
             return "Attempted to insert null into non-nullable column";
         case wrong_group_state:
-            return "Wrong state og group accessor (already attached, "
+            return "Wrong state or group accessor (already attached, "
                 "or managed by a SharedGroup object)";
         case wrong_transact_state:
             return "Wrong transactional state (no active transaction, wrong type of transaction, "
@@ -64,6 +82,8 @@ const char* LogicError::what() const noexcept
         case mixed_history_type:
             return "History type (as specified by the Replication implementation passed to "
                 "the SharedGroup constructor) was not consistent across the session";
+        case table_has_no_columns:
+            return "Table has no columns";
     }
     return "Unknown error";
     // LCOV_EXCL_STOP (LogicError messages)

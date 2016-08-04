@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_INDEX_STRING
 
@@ -906,11 +924,14 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     char tmp[MAX_LENGTH]; // this is a bit of a hack, that relies on the string being copied in column.add()
 
     for (size_t length = 1; length <= MAX_LENGTH; ++length) {
-        Random random(42);
-        const size_t combinations = 1 << length;
-        for (size_t i = 0; i < combinations; ++i) {
-            StringData str = create_string_with_nuls(i, length, tmp, random);
-            col.add(str);
+
+        {
+            Random random(42);
+            const size_t combinations = 1 << length;
+            for (size_t i = 0; i < combinations; ++i) {
+                StringData str = create_string_with_nuls(i, length, tmp, random);
+                col.add(str);
+            }
         }
 
         // check index up to this length
@@ -1326,5 +1347,6 @@ TEST(StringIndex_Deny_Duplicates)
 
     col.destroy();
 }
+
 
 #endif // TEST_INDEX_STRING

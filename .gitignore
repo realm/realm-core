@@ -22,11 +22,15 @@ CMakeScripts
 
 # Ignore all user files except one which includes execution path for test
 *.user
-!tighdb.vcxproj.user
+!Realm.vcxproj.user
 
-#ignore thumbnails created by windows
+# Ignore user folder attributes created by Apple
+.DS_Store
+
+# Ignore thumbnails created by windows
 Thumbs.db
-#Ignore files build by Visual Studio
+
+# Ignore files build by Visual Studio
 *.obj
 *.exe
 *.pdb
@@ -66,6 +70,25 @@ Static library*/
 build.make.*
 build.apple
 
+# sh build.sh config
+/src/config.mk
+
+# sh build.sh build-cocoa
+/core-*.zip
+/macosx-lib/
+/ios-lib/
+/ios-no-bitcode-lib/
+/watchos-lib/
+/tvos-lib/
+
+# sh build.sh build-dotnet-cocoa
+/realm-core-dotnet-cocoa*.zip
+
+# sh build.sh build-android
+/android-lib/
+/openssl/
+/realm-core-android-*.tar.gz
+
 # debian/ubuntu builds
 /debian/realm/*
 /debian/librealm/*
@@ -78,3 +101,6 @@ build.apple
 /debian/debhelper.log
 /debian/librealm.debhelper.lo
 /debian/librealm-dev.debhelper.log
+
+# Ignore python compiled files
+*.pyc

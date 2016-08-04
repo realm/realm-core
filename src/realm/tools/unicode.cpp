@@ -1,44 +1,20 @@
-
-
-/*
-// This code snippet will generate the collation_order[] table in unicode.cpp::utf8_compare() method. See
-// further documentation there.
-
-const wchar_t end = 0x250;    // up to and including Latin Extended B
-std::vector<wchar_t> vec;
-std::locale l = std::locale("");
-for (size_t t = 0; t < end; t++) {
-    wstring s;
-    s.push_back(wchar_t(t));
-    size_t j;
-    for (j = 0; j < vec.size(); j++) {
-        wstring s2;
-        s2.push_back(vec[j]);
-        bool less = l(s, s2);
-        if (less) {
-            break;
-        }
-    }
-    vec.insert(vec.begin() + j, wchar_t(t));
-}
-
-uint32_t inverse[end];
-for (size_t t = 0; t < end; t++) {
-    int v = vec[t];
-    inverse[v] = t;
-}
-
-std::cout << "static const uint32_t collation_order[] = {\n";
-for (size_t t = 0; t < end; t++) {
-    std::cout << (t == 0 ? "" : ", ") << inverse[t];
-    if (t != 0 && t % 100 == 0)
-        std::cerr << "\n";
-}
-std::cout << "};";
-*/
-
-
-
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 // This snippet generates the lowers[] array in unicode.cpp::to_lower(). See further documentation there
 /*

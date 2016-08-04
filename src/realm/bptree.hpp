@@ -1,20 +1,18 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
@@ -106,7 +104,7 @@ public:
     BpTree();
     explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
-    explicit BpTree(std::unique_ptr<Array> root) : BpTreeBase(std::move(root)) {}
+    explicit BpTree(std::unique_ptr<Array> init_root) : BpTreeBase(std::move(init_root)) {}
     BpTree(BpTree&&) = default;
     BpTree& operator=(BpTree&&) = default;
     void init_from_ref(Allocator& alloc, ref_type ref);
@@ -184,7 +182,7 @@ private:
 
 /// Implementation:
 
-inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> root) : m_root(std::move(root))
+inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> init_root) : m_root(std::move(init_root))
 {
 }
 
@@ -279,7 +277,7 @@ BpTree<T>::BpTree(BpTreeBase::unattached_tag) : BpTreeBase(nullptr)
 template<class T>
 std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef mem)
 {
-    const char* header = mem.m_addr;
+    const char* header = mem.get_addr();
     std::unique_ptr<Array> new_root;
     bool is_inner_bptree_node = Array::get_is_inner_bptree_node_from_header(header);
 
@@ -312,7 +310,7 @@ std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef 
 template<class T>
 std::unique_ptr<Array> BpTree<T>::create_root_from_ref(Allocator& alloc, ref_type ref)
 {
-    MemRef mem = MemRef{alloc.translate(ref), ref};
+    MemRef mem = MemRef{alloc.translate(ref), ref, alloc};
     return create_root_from_mem(alloc, mem);
 }
 
@@ -424,14 +422,14 @@ bool BpTree<T>::is_null(size_t ndx) const noexcept
 template<class T>
 T BpTree<T>::get(size_t ndx) const noexcept
 {
-    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG_EX(ndx < size(), ndx, size());
     if (root_is_leaf()) {
         return root_as_leaf().get(ndx);
     }
 
     // Use direct getter to avoid initializing leaf array:
     std::pair<MemRef, size_t> p = root().get_bptree_leaf(ndx);
-    const char* leaf_header = p.first.m_addr;
+    const char* leaf_header = p.first.get_addr();
     size_t ndx_in_leaf = p.second;
     return LeafType::get(leaf_header, ndx_in_leaf);
 }
@@ -614,7 +612,7 @@ struct BpTree<T>::EraseHandler : Array::EraseHandler {
 template<class T>
 void BpTree<T>::erase(size_t ndx, bool is_last)
 {
-    REALM_ASSERT_DEBUG(ndx < size());
+    REALM_ASSERT_DEBUG_EX(ndx < size(), ndx, size());
     REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
     if (root_is_leaf()) {
         root_as_leaf().erase(ndx);

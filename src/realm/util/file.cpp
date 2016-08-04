@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <climits>
 #include <limits>
 #include <algorithm>
@@ -23,11 +41,11 @@
 #endif
 
 #include <realm/util/errno.hpp>
-#include <realm/util/file.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/features.h>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -96,14 +114,8 @@ bool try_make_dir(const std::string& path)
         case EACCES:
         case EROFS:
             throw File::PermissionDenied(msg, path);
-        case ELOOP:
-        case EMLINK:
-        case ENAMETOOLONG:
-        case ENOENT:
-        case ENOTDIR:
-            throw File::AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw File::AccessError(msg, path);
     }
 }
 
@@ -138,13 +150,8 @@ void remove_dir(const std::string& path)
             throw File::PermissionDenied(msg, path);
         case ENOENT:
             throw File::NotFound(msg, path);
-        case ELOOP:
-        case ENAMETOOLONG:
-        case EINVAL:
-        case ENOTDIR:
-            throw File::AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw File::AccessError(msg, path);
     }
 }
 
@@ -259,7 +266,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case ERROR_FILE_EXISTS:
             throw Exists(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 
 #else // POSIX version
@@ -315,14 +322,8 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             throw NotFound(msg, path);
         case EEXIST:
             throw Exists(msg, path);
-        case EISDIR:
-        case ELOOP:
-        case ENAMETOOLONG:
-        case ENOTDIR:
-        case ENXIO:
-            throw AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 
 #endif
@@ -387,11 +388,11 @@ error:
         off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
-        Map<char> map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(map, pos, size);
-        memcpy(data, map.get_addr() + pos, size);
+        Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
+        realm::util::encryption_read_barrier(read_map, pos, size);
+        memcpy(data, read_map.get_addr() + pos, size);
         lseek(m_fd, size, SEEK_CUR);
-        return map.get_size() - pos;
+        return read_map.get_size() - pos;
     }
 
     char* const data_0 = data;
@@ -448,11 +449,11 @@ void File::write(const char* data, size_t size)
         off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
-        Map<char> map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
+        Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         // FIXME: Expect this to fail due to assert asking for a read first! This FIXME seems to be made by Finn who does not remember it. 
-        realm::util::encryption_read_barrier(map, pos, size);
-        memcpy(map.get_addr() + pos, data, size);
-        realm::util::encryption_write_barrier(map, pos, size);
+        realm::util::encryption_read_barrier(write_map, pos, size);
+        memcpy(write_map.get_addr() + pos, data, size);
+        realm::util::encryption_write_barrier(write_map, pos, size);
         lseek(m_fd, size, SEEK_CUR);
         return;
     }
@@ -551,7 +552,7 @@ void File::prealloc(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     prealloc_if_supported(offset, size);
 
@@ -570,7 +571,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
@@ -608,7 +609,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
 bool File::is_prealloc_supported()
 {
-#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
     return true;
 #else
     return false;
@@ -748,8 +749,10 @@ bool File::lock(bool exclusive, bool non_blocking)
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking)
         operation |=  LOCK_NB;
-    if (flock(m_fd, operation) == 0)
-        return true;
+    do {
+        if (flock(m_fd, operation) == 0)
+            return true;
+    } while (errno == EINTR);
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
         return false;
@@ -776,7 +779,10 @@ void File::unlock() noexcept
     // unlocking is idempotent, however, we will assume it since there
     // is no mention of the error that would be reported if a
     // non-locked file were unlocked.
-    int r = flock(m_fd, LOCK_UN);
+    int r;
+    do {
+        r = flock(m_fd, LOCK_UN);
+    } while (r != 0 && errno == EINTR);
     REALM_ASSERT_RELEASE(r == 0);
 
 #endif
@@ -966,13 +972,8 @@ bool File::try_remove(const std::string& path)
             throw PermissionDenied(msg, path);
         case ENOENT:
             return false;
-        case ELOOP:
-        case ENAMETOOLONG:
-        case EISDIR: // Returned by Linux when path refers to a directory
-        case ENOTDIR:
-            throw AccessError(msg, path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, path);
     }
 }
 
@@ -995,15 +996,8 @@ void File::move(const std::string& old_path, const std::string& new_path)
             throw PermissionDenied(msg, old_path);
         case ENOENT:
             throw File::NotFound(msg, old_path);
-        case ELOOP:
-        case EMLINK:
-        case ENAMETOOLONG:
-        case EINVAL:
-        case EISDIR:
-        case ENOTDIR:
-            throw AccessError(msg, old_path);
         default:
-            throw std::runtime_error(msg);
+            throw AccessError(msg, old_path);
     }
 }
 
@@ -1088,6 +1082,39 @@ bool File::is_same_file(const File& f) const
 #endif
 }
 
+File::UniqueID File::get_unique_id() const {
+    REALM_ASSERT_RELEASE(is_attached());
+#ifdef _WIN32 // Windows version
+    throw std::runtime_error("Not yet supported");
+#else // POSIX version
+    struct stat statbuf;
+    if (::fstat(m_fd, &statbuf) == 0) {
+        return {static_cast<uint_fast64_t>(statbuf.st_dev), static_cast<uint_fast64_t>(statbuf.st_ino)};
+    }
+    int err = errno; // Eliminate any risk of clobbering
+    std::string msg = get_errno_msg("fstat() failed: ", err);
+    throw std::runtime_error(msg);
+#endif
+}
+
+bool File::get_unique_id(const std::string& path, File::UniqueID& uid) {
+#ifdef _WIN32 // Windows version
+    throw std::runtime_error("Not yet supported");
+#else // POSIX version
+    struct stat statbuf;
+    if (::stat(path.c_str(), &statbuf) == 0) {
+        uid.device = statbuf.st_dev;
+        uid.inode = statbuf.st_ino;
+        return true;
+    }
+    int err = errno; // Eliminate any risk of clobbering
+    // File doesn't exist
+    if (err == ENOENT ) return false;
+
+    std::string msg = get_errno_msg("fstat() failed: ", err);
+    throw std::runtime_error(msg);
+#endif
+}
 
 bool File::is_removed() const
 {
@@ -1185,12 +1212,8 @@ DirScanner::DirScanner(const std::string& path)
                 throw File::PermissionDenied(msg, path);
             case ENOENT:
                 throw File::NotFound(msg, path);
-            case ELOOP:
-            case ENAMETOOLONG:
-            case ENOTDIR:
-                throw File::AccessError(msg, path);
             default:
-                throw std::runtime_error(msg);
+                throw File::AccessError(msg, path);
         }
     }
 }

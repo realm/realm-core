@@ -1,5 +1,20 @@
-#include <iostream>
-#include <iomanip>
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 #include <realm/column_table.hpp>
 
@@ -240,16 +255,15 @@ void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_p
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_parent) const
 {
     std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.m_ref, p.second);
+    return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif
-
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 size_t SubtableColumn::get_subtable_size(size_t ndx) const noexcept
 {
@@ -287,9 +301,9 @@ void SubtableColumn::insert(size_t row_ndx, const Table* subtable)
     if (subtable && !subtable->is_empty())
         columns_ref = clone_table_columns(subtable); // Throws
 
-    size_t size = this->size(); // Slow
-    REALM_ASSERT_3(row_ndx, <=, size);
-    size_t row_ndx_2 = row_ndx == size ? realm::npos : row_ndx;
+    size_t column_size = this->size(); // Slow
+    REALM_ASSERT_3(row_ndx, <=, column_size);
+    size_t row_ndx_2 = row_ndx == column_size ? realm::npos : row_ndx;
     int_fast64_t value = int_fast64_t(columns_ref);
     size_t num_rows = 1;
     do_insert(row_ndx_2, value, num_rows); // Throws
@@ -377,7 +391,7 @@ void SubtableColumn::do_discard_child_accessors() noexcept
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void SubtableColumn::verify(const Table& table, size_t col_ndx) const
 {
@@ -400,6 +414,7 @@ void SubtableColumn::verify(const Table& table, size_t col_ndx) const
         subtable->verify();
     }
 }
+
 
 void SubtableColumn::to_dot(std::ostream& out, StringData title) const
 {
@@ -438,4 +453,4 @@ void SubtableColumn::do_dump_node_structure(std::ostream& out, int level) const
     get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

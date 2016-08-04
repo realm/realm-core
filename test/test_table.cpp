@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_TABLE
 
@@ -1467,8 +1485,9 @@ TEST(Table_SetIntUnique)
 }
 
 
-TEST(Table_SetStringUnique)
+TEST_TYPES(Table_SetStringUnique, std::true_type, std::false_type)
 {
+    bool string_enum_column = TEST_TYPE::value;
     Table table;
     table.add_column(type_Int, "ints");
     table.add_column(type_String, "strings");
@@ -1479,6 +1498,11 @@ TEST(Table_SetStringUnique)
     CHECK_LOGIC_ERROR(table.set_string_unique(2, 0, "foo"), LogicError::no_search_index);
     table.add_search_index(1);
     table.add_search_index(2);
+
+    if (string_enum_column) {
+        bool force = true;
+        table.optimize(force);
+    }
 
     table.set_string_unique(1, 0, "bar");
 
@@ -2323,6 +2347,30 @@ TEST(Table_SpecMoveColumns)
 }
 
 
+TEST(Table_SpecMoveLinkColumn)
+{
+    using df = _impl::DescriptorFriend;
+
+    Group group;
+    TableRef target = group.add_table("target");
+    target->add_column(type_Int, "a");
+
+    TableRef origin = group.add_table("origin");
+    origin->add_column_link(type_Link, "a", *target);
+    origin->add_column(type_Int, "b");
+
+    origin->add_empty_row(2);
+    target->add_empty_row(2);
+    origin->set_link(0, 0, 1);
+
+    df::move_column(*origin->get_descriptor(), 0, 1);
+
+    CHECK_EQUAL(origin->get_link(1, 0), 1);
+    CHECK_EQUAL(target->get_backlink_count(0, *origin, 1), 0);
+    CHECK_EQUAL(target->get_backlink_count(1, *origin, 1), 1);
+}
+
+
 TEST(Table_SpecMoveColumnsWithIndexes)
 {
     using df = _impl::DescriptorFriend;
@@ -2660,7 +2708,7 @@ TEST(Table_Mixed)
 
     table.insert_empty_row(1);
     table.set_int(0, 1, 43);
-    table.set_mixed(1, 1, (int64_t)12);
+    table.set_mixed(1, 1, int64_t(12));
 
     CHECK_EQUAL(0,  table.get_int(0, ndx));
     CHECK_EQUAL(43, table.get_int(0, 1));
@@ -3160,7 +3208,7 @@ TEST(Table_DateAndBinary)
 
         const size_t size = 10;
         char data[size];
-        for (size_t i=0; i<size; ++i) data[i] = (char)i;
+        for (size_t i=0; i<size; ++i) data[i] = static_cast<char>(i);
         t.add(8, BinaryData(data, size));
         CHECK_EQUAL(t[0].date, 8);
         CHECK_EQUAL(t[0].bin.size(), size);
@@ -3966,7 +4014,12 @@ TEST(Table_WriteSlice)
     // Run through a 3-D matrix of table sizes, slice offsets, and
     // slice sizes. Each test involves a table with columns of each
     // possible type.
+#if TEST_DURATION > 0
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187, 6561 };
+#else
+    int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187 };
+#endif
+
     int num_sizes = sizeof table_sizes / sizeof *table_sizes;
     for (int table_size_i = 0; table_size_i != num_sizes; ++table_size_i) {
         int table_size = table_sizes[table_size_i];
@@ -6824,7 +6877,148 @@ TEST(Table_StaleLinkIndexOnTableRemove)
     CHECK_EQUAL(t2->get_link(0, 0), realm::npos); // no link
 }
 
-TEST(Table_getVersionCounterAfterRowAccessor) {
+TEST(Table_ColumnsSupportStringIndex)
+{
+    std::vector<DataType> all_types {
+        type_Int,
+        type_Bool,
+        type_Float,
+        type_Double,
+        type_String,
+        type_Binary,
+        type_OldDateTime,
+        type_Timestamp,
+        type_Table,
+        type_Mixed
+    };
+
+    std::vector<DataType> supports_index {
+        type_Int,
+        type_Bool,
+        type_String,
+        type_OldDateTime,
+        type_Timestamp
+    };
+
+    Group g; // type_Link must be part of a group
+    TableRef t = g.add_table("t1");
+    for (auto it = all_types.begin(); it != all_types.end(); ++it) {
+        t->add_column(*it, "");
+        ColumnBase& col = _impl::TableFriend::get_column(*t, 0);
+        bool does_support_index = col.supports_search_index();
+        auto found_pos = std::find(supports_index.begin(), supports_index.end(), *it);
+        CHECK_EQUAL(does_support_index, (found_pos != supports_index.end()));
+        CHECK_EQUAL(does_support_index, (col.create_search_index() != nullptr));
+        CHECK_EQUAL(does_support_index, col.has_search_index());
+        col.destroy_search_index();
+        CHECK(!col.has_search_index());
+        if (does_support_index) {
+            t->add_search_index(0);
+        }
+        else {
+            CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
+        }
+        CHECK_EQUAL(does_support_index, t->has_search_index(0));
+        t->remove_column(0);
+    }
+
+    // Check type_Link
+    t->add_column_link(type_Link, "", *t);
+    ColumnBase& link_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(!link_col.supports_search_index());
+    CHECK(link_col.create_search_index() == nullptr);
+    CHECK(!link_col.has_search_index());
+    CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
+    t->remove_column(0);
+
+    // Check type_LinkList
+    t->add_column_link(type_LinkList, "", *t);
+    ColumnBase& linklist_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(!linklist_col.supports_search_index());
+    CHECK(linklist_col.create_search_index() == nullptr);
+    CHECK(!linklist_col.has_search_index());
+    CHECK_LOGIC_ERROR(t->add_search_index(0), LogicError::illegal_combination);
+    t->remove_column(0);
+
+    // Check StringEnum
+    t->add_column(type_String, "");
+    bool force = true;
+    t->optimize(force);
+    ColumnBase& enum_col = _impl::TableFriend::get_column(*t, 0);
+    CHECK(enum_col.supports_search_index());
+    CHECK(enum_col.create_search_index() != nullptr);
+    CHECK(enum_col.has_search_index());
+    enum_col.destroy_search_index();
+    CHECK(!enum_col.has_search_index());
+    t->add_search_index(0);
+    CHECK(enum_col.has_search_index());
+    t->remove_column(0);
+}
+
+TEST(Table_addRowsToTableWithNoColumns)
+{
+    Group g; // type_Link must be part of a group
+    TableRef t = g.add_table("t");
+
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+    CHECK_LOGIC_ERROR(t->insert_empty_row(0), LogicError::table_has_no_columns);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_column(type_String, "str_col");
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    t->add_search_index(0);
+    t->insert_empty_row(0);
+    CHECK_EQUAL(t->size(), 2);
+    t->remove_column(0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+
+    // Can add rows to a table with backlinks
+    TableRef u = g.add_table("u");
+    u->add_column_link(type_Link, "link from u to t", *t);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    u->remove_column(0);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+
+    // Do the exact same as above but with LinkLists
+    u->add_column_link(type_LinkList, "link list from u to t", *t);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row(1);
+    CHECK_EQUAL(t->size(), 1);
+    u->remove_column(0);
+    CHECK_EQUAL(u->size(), 0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_LOGIC_ERROR(t->add_empty_row(1), LogicError::table_has_no_columns);
+
+    // Check that links are nulled when connected table is cleared
+    u->add_column_link(type_Link, "link from u to t", *t);
+    u->add_empty_row(1);
+    CHECK_EQUAL(u->size(), 1);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_LOGIC_ERROR(u->set_link(0, 0, 0), LogicError::target_row_index_out_of_range);
+    CHECK(u->is_null_link(0, 0));
+    CHECK_EQUAL(t->size(), 0);
+    t->add_empty_row();
+    u->set_link(0, 0, 0);
+    CHECK_EQUAL(u->get_link(0, 0), 0);
+    CHECK(!u->is_null_link(0, 0));
+    CHECK_EQUAL(t->size(), 1);
+    t->add_column(type_Int, "int column");
+    CHECK_EQUAL(t->size(), 1);
+    t->remove_column(0);
+    CHECK_EQUAL(t->size(), 0);
+    CHECK_EQUAL(u->size(), 1);
+    CHECK(u->is_null_link(0, 0));
+}
+
+TEST(Table_getVersionCounterAfterRowAccessor)
+{
     Table t;
     size_t col_bool    = t.add_column(type_Bool,     "bool",    true);
     size_t col_int     = t.add_column(type_Int,      "int",     true);

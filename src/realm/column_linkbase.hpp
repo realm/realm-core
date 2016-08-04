@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_COLUMN_LINKBASE_HPP
 #define REALM_COLUMN_LINKBASE_HPP
 
@@ -38,6 +37,7 @@ public:
     void set_null(size_t) override = 0;
     bool is_null(size_t) const noexcept override = 0;
 
+    bool supports_search_index() const noexcept final { return false; }
     StringIndex* create_search_index() override;
 
     bool get_weak_links() const noexcept;
@@ -63,6 +63,7 @@ public:
     void adj_acc_clear_root_table() noexcept override;
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
+    void bump_link_origin_table_version() noexcept override;
 
 #ifdef REALM_DEBUG
     void verify(const Table&, size_t) const override;
@@ -188,6 +189,18 @@ inline void LinkColumnBase::mark(int type) noexcept
         tf::mark(*m_target_table);
     }
 }
+
+inline void LinkColumnBase::bump_link_origin_table_version() noexcept
+{
+    // It is important to mark connected tables as modified.
+    // Also see BacklinkColumn::bump_link_origin_table_version().
+    typedef _impl::TableFriend tf;
+    if (m_target_table) {
+        bool bump_global = false;
+        tf::bump_version(*m_target_table, bump_global);
+    }
+}
+
 
 
 } // namespace realm

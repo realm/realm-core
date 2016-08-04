@@ -1,24 +1,414 @@
 # NEXT RELEASE
 
-### Bugfixes:
-
-* S: Assertion was sometimes dereferencing a dangling pointer in
-  `util::network::buffered_input_stream::read_oper<H>::recycle_and_execute()`.
-
-### API breaking changes:
+### Bugfixes
 
 * Lorem ipsum.
+
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Updated the header license to prepare for open sourcing the code.
+
+----------------------------------------------
+
+# 1.4.2 Release notes
+
+### Bugfixes
+
+* Fix a bug with the local mutex for the robust mutex emulation.
+* Reduce the number of file descriptors used in robust mutex emulation,
+  multi instances of InterprocessMutex share the same descriptor. (#1986)
+
+----------------------------------------------
+
+# 1.4.1 Release notes
+
+### Bugfixes
+
+* Fixing util::MemoryInputStream to support tellg() and seekg().
+* Fix truncation of the supplied value when querying for a float or double that
+  is less than a column's value.
+* Workaround for the Blackberry mkfifo bug.
+
+-----------
+
+### Internals
+
+* Removed `realm::util::network` library.
+* Removed event loop library.
+* Reduced the number of open files on Android.
+
+----------------------------------------------
+
+# 1.4.0 Release notes
+
+### Breaking changes
+
+* Throw a logic error (of type `table_has_no_columns`) if an attempt is made to
+  add rows to a table with no columns. (#1897)
+* S: A clear operation is emitted on removal of the last public column of a table.
+
+----------------------------------------------
+
+# 1.3.1 Release notes
+
+### Bugfixes
+
+* Add missing locks when access `Table::m_views` which may lead to some java
+  crashes since java will not guarantee destruction and construction always
+  happen in the same thread. (#1958)
+* Fixed a bug where tableviews created via backlinks were not automatically
+  updated when the source table changed. (#1950)
+
+### Breaking changes
+
+* Throw a logic error (of type `table_has_no_columns`) if an attempt is made to
+  add rows to a table with no columns. (#1897)
+* S: A clear operation is emitted on removal of the last public column of a table.
+
+### Enhancements
+
+* Increased the verbosity of some exception error messages to help debugging.
+
+----------------------------------------------
+
+# 1.3.0 Release notes
+
+### Bugfixes
+
+* Fix a crash when `Group::move_table()` is called before table accessors are
+  initialized. (#1939)
+
+### Breaking changes
+
+* Sorting with `STRING_COMPARE_CORE` now sorts with pre 1.1.2 ordering. Sorting
+  with 1.1.2 order is available by using `STRING_COMPARE_CORE_SIMILAR`. (#1947)
+
+-----------
+
+### Internals
+
+* Performance improvements for `LinkListColumn::get_ptr()`. (#1933)
+
+----------------------------------------------
+
+# 1.2.0 Release notes
+
+### Bugfixes
+
+* Update table views so that rows are not attached after calling Table::clear() (#1837)
+* The SlabAlloctor was not correctly releasing all its stale memory mappings
+  when it was detached. If a SharedGroup was reused to access a database
+  following both a call of compact() and a commit() (the latter potentially
+  by a different SharedGroup), the stale memory mappings would shadow part
+  of the database. This would look like some form of corruption. Specifically
+  issues #1092 and #1601 are known to be symptoms of this bug, but issues
+  #1506 and #1769 are also likely to be caused by it. Note that even though
+  this bug looks like corruption, the database isn't corrupted at all.
+  Reopening it by a different SharedGroup will work fine; Only the SharedGroup
+  that executed the compact() will have a stale view of the file.
+* Check and retry if flock() returns EINTR (issue #1916)
+* The slabs (regions of memory used for temporary storage during a write transaction),
+  did not correctly track changes in file size, if the allocator was detached, the
+  file shrunk and the allocator was re-attached. This scenario can be triggered by
+  compact, or by copying/creating a new realm file which is then smaller than the
+  old one when you re-attach. The bug led to possible allocation of overlapping
+  memory chunks, one of which would then later corrupt the other. To a user this
+  would look like file corruption. It is theoretically possibly, but not likely,
+  that the corrupted datastructure could be succesfully committed leading to a real
+  corruption of the database. The fix is to release all slabs when the allocator
+  is detached. Fixes #1898, #1915, #1918, very likely #1337 and possibly #1822.
+
+### Breaking changes
+
+* Removed the 'stealing' variant of export for handover. It was not a great
+  idea. It was not being used and required locking which we'd like to avoid.
+* S: A concept of log levels was added to `util::Logger`. `util::Logger::log()`
+  now takes a log level argument, and new shorthand methods were added
+  (`debug()`, `info()`, `warn()`, ...). All loggers now have a `level_threshold`
+  property through which they efficiently query for the current log level
+  threshold.
+
+### Enhancements
+
+* Allow SharedGroups to pin specific versions for handover
+* Reduced the object-size overhead of assertions.
+* Fixed a spelling mistake in the message of the `LogicError::wrong_group_state`.
+
+-----------
+
+### Internals
+
+* Non concurrent tests are run on the main process thread. (#1862)
+* S: `REALM_QUOTE()` macro moved from `<realm/version.hpp>` to
+  `<realm/util/features.h>`. This also fixes a dangling reference to
+  `REALM_QUOTE_2()` in `<realm/util/features.h>`.
+* Minimize the amount of additional virtual address space used during Commit().
+  (#1478)
+* New feature in the unit test framework: Ability to specify log level
+  threshold for custom intra test logging (`UNITTEST_LOG_LEVEL`).
+* Switch from `-O3` to `-Os` to compile OpenSSL: https://github.com/android-ndk/ndk/issues/110
+
+----------------------------------------------
+
+
+# 1.1.2 Release notes
+
+### Bugfixes
+
+* S: In the network API (namespace `util::network`), do not report an error to
+  the application if system calls `read()`, `write()`, or `accept()` fail with
+  `EAGAIN` on a socket in nonblocking mode after `poll()` has signalled
+  readiness. Instead, go back and wait for `poll()` to signal readiness again.
+
+### Breaking changes
+
+* Sorting order of strings is now according to more common scheme for special
+  characters (space, dash, etc), and for letters it's now such that visually
+  similiar letters (that is, those that differ only by diacritics, etc) are
+  grouped together. (#1639)
+
+-----------
+
+### Internals
+
+* S: New unit tests `Network_ReadWriteLargeAmount` and
+  `Network_AsyncReadWriteLargeAmount`.
+
+----------------------------------------------
+
+
+# 1.1.1 Release notes
+
+### Bugfixes
+
+* Fixed a recently introduced crash bug on indexed columns (#1869)
+* Implement `TableViewBase`'s copy-assignment operator to prevent link errors when it is used.
+* No longer assert on a "!cfg.session_initiator" in SlabAlloc::attach_file(). This makes issue
+  #1784 go away, but also removes an option to detect and flag if the ".lock" file is deleted
+  while a SharedGroup is attached to the file. Please note: Removal of the ".lock" file while
+  the database is attached may lead to corruption of the database.
+
+### Enhancements
+
+* Improve performance of opening Realm files and making commits when using
+  external writelogs by eliminating some unneeded `fsync()`s.
+
+----------------------------------------------
+
+# 1.1.0 Release notes
+
+### Bugfixes
+
+* Fix for #1846: If an exception is thrown from SlabAlloc::attach_file(), it
+  forgot to unlock a mutex protecting the shared memory mapping. In cases
+  where the last reference to the memory mapping goes out of scope, it would
+  cause the assert "Destruction of mutex in use". Fix is to use unique_lock
+  to ensure the mutex is unlocked before destruction.
+* Fix a crash when `Table::set_string_unique()` is called but the underlying
+  column is actually a StringEnumColumn.
+* Fix an assertion failure when combining a `Query` with no conditions with another `Query`.
+
+### Breaking changes
+
+* S: Type of completion handler arguments changed from `const H&` to `H` for all
+  asynchronous operations offered by the networking API (namespace
+  `util::network`).
+* S: `util::network::deadline_timer::async_wait()` no longer declared `noexcept`
+  (it never should have been).
+
+### Enhancements
+
+* Strictly enforce not allowing search indexes to be created on unsupported column types.
+* S: Event loop API reworked to more closely align with the `util::network` API,
+  and to better provide for multiple alternative implementations (not considered
+  breaking because the event loop API was not yet in use).
+* S: Bugs fixed in the POSIX based implementation (not listed under bug fixes
+  because the event loop API was not yet in use).
+* S: A new Apple CoreFoundation implementation of event loop API was added.
+* S: Movable completion handler objects are no longer copied by the networking
+  API (namespace `util::network`).
+
+-----------
+
+### Internals
+
+* Upgrade build scripts to build as C++14 by default.
+* Corrected two usages of undefined REALM_PLATFORM_ANDROID to REALM_ANDROID.
+  This correctly enables Android log output on termination and allows using
+  robust mutexes on Android platforms. (#1834)
+
+
+----------------------------------------------
+
+# 1.0.2 Release notes
+
+### Internals
+
+* This is functionally the same as 1.0.1. For Xamarin we now do a specialized
+  cocoa build with only iOS support and without bitcode.
+
+----------------------------------------------
+
+# 1.0.1 Release notes
+
+### Bugfixes
+
+* Fix a situation where a failure during SharedGroup::open() could cause stale
+  memory mappings to become accessible for later:
+  In case one of the following exceptions are thrown from SharedGroup::open():
+  - "Bad or incompatible history type",
+  - LogicError::mixed_durability,
+  - LogicError::mixed_history_type,
+  - "File format version deosn't match: "
+  - "Encrypted interprocess sharing is currently unsupported"
+  Then:
+  a) In a single process setting a later attempt to open the file would
+     hit the assert "!cfg.session_initiator" reported in issue #1782.
+  b) In a multiprocess setting, another process would be allowed to run
+     compact(), but the current process would retain its mapping of the
+     old file and attempt to reuse those mappings when a new SharedGroup
+     is opened, which would likely lead to a crash later. In that case, the
+     !cfg.session_initiator would not be triggered.
+  May fix issue #1782.
+
+**Note: This is a hotfix release built on top of 1.0.0
+
+----------------------------------------------
+
+# 1.0.0 Release notes
+
+### Bugfixes
+
+* Fixed move_last_over() replacing null values for binary columns in the moved
+  row with zero-length values.
+
+### Enhancements
+
+* File operations would previously throw `std::runtime_error` for error cases without a
+  specialized exception. They now throw `AccessError` instead and include path information.
+
+-----------
+
+### Internals
+
+* Fixed an error in Query_Sort_And_Requery_Untyped_Monkey2 test which would cause
+  this test to fail sometimes.
+
+----------------------------------------------
+
+# 0.100.4 Release notes
+
+### Bugfixes
+
+* Fix queries over multiple levels of backlinks to work when the tables involved have
+  their backlink columns at different indices.
+
+### Breaking changes
+
+* Reverting the breaking changes wrongly introduced by 0.100.3, so that
+  this release does NOT have breaking changes with respect to 0.100.2
+
+
+----------------------------------------------
+
+# 0.100.3 Release notes (This is a faulty release and should not be used)
+
+### Bugfixes
+
+* Fix initialization of read-only Groups which are sharing file mappings with
+  other read-only Groups for the same path.
+* Fix TableView::clear() to work in imperative mode (issue #1803, #827)
+* Fixed issue with Timestamps before the UNIX epoch not being read correctly in
+  the `TransactLogParser`. Rollbacks and advances with such Timestamps would
+  throw a `BadTransactLog` exception. (#1802)
+
+### Breaking changes
+
+* Search indexes no longer support strings with lengths greater than
+  `Table::max_indexed_string_length`. If you try to add a string with a longer length
+  (through the Table interface), then a `realm::LogicError` will be thrown with type
+  `string_too_long_for_index`. Calling `Table::add_search_index()` will now return a
+  boolean value indicating whether or not the index could be created on the column. If
+  the column contains strings that exceed the maximum allowed length, then
+  `Table::add_search_index()` will return false and the index will not be created, but the data
+  in the underlying column will remain unaffected. This is so that bindings can attempt to
+  create a search index on a column without knowing the lengths of the strings in the column.
+  Realm will continue to operate as before on any search index that already stores strings longer
+  than the maximum allowed length meaning that this change is not file breaking (no upgrade is
+  required). However, as stated above, any new strings that exceed the maximum length will
+  not be allowed into a search index, to insert long strings just turn off the search index
+  (although this could be left up to the user).
+
+### Enhancements
+
+* Distinct is now supported for columns without a search index. Bindings no longer
+  need to ensure that a column has a search index before calling distinct. (#1739)
+
+-----------
+
+### Internals
+
+* Upgrading to OpenSSL 1.0.1t.
+
+----------------------------------------------
+
+# 0.100.2 Release notes
+
+### Bugfixes
+
+* Fix handing over an out of sync TableView that depends on a deleted link list or
+  row so that it doesn't remain perpetually out of sync (#1770).
+* Fix a use-after-free when using a column which was added to an existing table
+  with rows in the same transaction as it was added, which resulted in the
+  automatic migration from DateTime to Timestamp crashing with a stack overflow
+  in some circumstances.
+
+----------------------------------------------
+
+# 0.100.1 Release notes
+
+### Bugfixes:
+
+* Fix for: The commit logs were not properly unmapped and closed when a SharedGroup
+  was closed. If one thread closed and reopened a SharedGroup which was the sole
+  session participant at the time it was closed, while a different SharedGroup opened
+  and closed the database in between, the first SharedGroup could end up reusing it's
+  memory mappings for the commit logs, while the later accesses through a different
+  SharedGroup would operate on a different set of files. This could cause inconsistency
+  between the commit log and the database. In turn, this could lead to crashes during
+  advance_read(), promote_to_write() and possibly commit_and_continue_as_read().
+  Worse, It could also silently lead to accessors pointing to wrong objects which might
+  later open for changes to the database that would be percieved as corrupting. (#1762)
+* Fix for: When commitlogs change in size, all readers (and writers) must update their
+  memory mmapings accordingly. The old mechanism was based on comparing the size of
+  the log file with the previous size and remapping if they differ. Unfortunately, this
+  is not good enough, as the commitlog may first be shrunk, then expanded back to the
+  original size and in this case, the existing mechanism will not trigger remapping.
+  Without remapping in such situations, POSIX considers accesses to the part of the
+  mapping corresponding to deleted/added sections of the file to be undefined. Consequences
+  of this bug could be crashes in advance_read(), promote_to_write() or
+  commit_and_continue_as_read(). Conceivably it could also cause wrong accessor updates
+  leading to accessors pointing to wrong database objects. This, in turn, could lead
+  to what would be percieved as database corruption. (#1764)
+* S: Assertion was sometimes dereferencing a dangling pointer in
+  `util::network::buffered_input_stream::read_oper<H>::recycle_and_execute()`.
 
 ### Enhancements:
 
 * S: `util::bind_ptr<>` extended with capability to adopt and release naked
   pointers.
-
------------
-
-### Internals:
-
-* Lorem ipsum.
+* The `SharedGroup` constructor now takes an optional callback function so bindings can
+  be notified when a Realm is upgraded. (#1740)
 
 ----------------------------------------------
 
@@ -26,7 +416,7 @@
 
 ### Bugfixes:
 
-* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most 
+* Fix of #1605 (LinkView destruction/creation should be thread-safe) and most
   likely also #1566 (crash below LinkListColumn::discard_child_accessors...) and
   possibly also #1164 (crash in SharedGroup destructor on OS X).
 * Copying a `Query` restricted by a `TableView` will now avoid creating a dangling

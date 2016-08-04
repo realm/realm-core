@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 // #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
 #  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
@@ -30,12 +48,24 @@
 #include "test.hpp"
 #include "test_all.hpp"
 
+// Need to disable file descriptor leak checks on Apple platforms, as it seems
+// like an unknown number of file descriptors can be left behind, presumably due
+// the way asynchronous DNS lookup is implemented.
+#if !defined _WIN32 && !REALM_PLATFORM_APPLE
+#  define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+#endif
+
+#ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+#  include <unistd.h>
+#  include <fcntl.h>
+#endif
+
 using namespace realm;
 using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
 // Random seed for various random number generators used by fuzzying unit tests.
-uint64_t unit_test_random_seed;
+unsigned long unit_test_random_seed;
 
 namespace {
 
@@ -80,8 +110,6 @@ const char* file_order[] = {
     "test_link_query_view.cpp",
     "test_json.cpp",
     "test_replication*.cpp",
-    "test_transform.cpp",
-    "test_sync.cpp",
 
     "test_lang_bind_helper.cpp",
 
@@ -105,6 +133,31 @@ void fix_max_open_files()
             }
         }
     }
+}
+
+
+long get_num_open_files()
+{
+#ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+    if (system_has_rlimit(resource_NumOpenFiles)) {
+        long soft_limit = get_soft_rlimit(resource_NumOpenFiles);
+        if (soft_limit >= 0) {
+            long num_open_files = 0;
+            for (long i = 0; i < soft_limit; ++i) {
+                int fildes = int(i);
+                int ret = fcntl(fildes, F_GETFD);
+                if (ret != -1) {
+                    ++num_open_files;
+                    continue;
+                }
+                if (errno != EBADF)
+                    throw std::runtime_error("fcntl() failed");
+            }
+            return num_open_files;
+        }
+    }
+#endif
+    return -1;
 }
 
 
@@ -173,6 +226,12 @@ void display_build_config()
     const char* with_debug =
         Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
 
+#if REALM_ENABLE_MEMDEBUG
+    const char* memdebug = "Enabled";
+#else
+    const char* memdebug = "Disabled";
+#endif
+
 #if REALM_ENABLE_ENCRYPTION
     bool always_encrypt = is_always_encrypt_enabled();
     const char* encryption = always_encrypt ?
@@ -205,6 +264,7 @@ void display_build_config()
         "Encryption: "<<encryption<<"\n"
         "\n"
         "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
+        "REALM_MEMDEBUG = " << memdebug << "\n"
         "\n"
         // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
         // We decide to print size_t here
@@ -242,9 +302,9 @@ public:
         SimpleReporter::end(context, elapsed_seconds);
     }
 
-    void summary(const SharedContext& context, const Summary& summary) override
+    void summary(const SharedContext& context, const Summary& results_summary) override
     {
-        SimpleReporter::summary(context, summary);
+        SimpleReporter::summary(context, results_summary);
 
         size_t max_n = 5;
         size_t n = std::min<size_t>(max_n, m_results.size());
@@ -372,11 +432,7 @@ bool run_tests(util::Logger* logger)
     }
     else {
         const char* str = getenv("UNITTEST_PROGRESS");
-#ifdef _MSC_VER
-        bool report_progress = true;
-#else
         bool report_progress = str && strlen(str) != 0;
-#endif
         reporter.reset(new CustomReporter(report_progress));
     }
     config.reporter = reporter.get();
@@ -390,6 +446,20 @@ bool run_tests(util::Logger* logger)
     if (filter_str && strlen(filter_str) != 0)
         filter.reset(create_wildcard_filter(filter_str));
     config.filter = filter.get();
+
+    // Set intra test log level threshold
+    {
+        const char* str = getenv("UNITTEST_LOG_LEVEL");
+        if (str && strlen(str) != 0) {
+            std::istringstream in(str);
+            in.imbue(std::locale::classic());
+            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+            in >> config.intra_test_log_level;
+            bool bad = !in || in.get() != std::char_traits<char>::eof();
+            if (bad)
+                throw std::runtime_error("Bad intra test log level");
+        }
+    }
 
     // Set up per-thread file logging
     {
@@ -438,10 +508,12 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     // error messages.
     std::cout.setf(std::ios::unitbuf);
 
+#ifndef REALM_COVER
     // No need to synchronize file changes to physical medium in the test suite,
     // as that would only make a difference if the entire system crashes,
     // e.g. due to power off.
     disable_sync_to_disk();
+#endif
 
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
@@ -459,7 +531,19 @@ int test_all(int argc, char* argv[], util::Logger* logger)
 
     display_build_config();
 
+    long num_open_files = get_num_open_files();
+
     bool success = run_tests(logger);
+
+    if (num_open_files >= 0) {
+        long num_open_files_2 = get_num_open_files();
+        REALM_ASSERT(num_open_files_2 >= 0);
+        if (num_open_files_2 > num_open_files) {
+            long n = num_open_files_2 - num_open_files;
+            std::cerr << "ERROR: "<<n<<" file descriptors were leaked\n";
+            success = false;
+        }
+    }
 
 #ifdef _MSC_VER
     getchar(); // wait for key

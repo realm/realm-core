@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_GROUP_WRITER_HPP
 #define REALM_GROUP_WRITER_HPP
 
@@ -52,6 +51,7 @@ public:
     // information to the group, if it is not already present (6th and 7th entry
     // in Group::m_top).
     GroupWriter(Group&);
+    ~GroupWriter();
 
     void set_versions(uint64_t current, uint64_t read_lock) noexcept;
 
@@ -78,6 +78,7 @@ public:
 #endif
 
 private:
+    class MapWindow;
     Group&     m_group;
     SlabAlloc& m_alloc;
     ArrayInteger m_free_positions; // 4th slot in Group::m_top
@@ -85,7 +86,23 @@ private:
     ArrayInteger m_free_versions;  // 6th slot in Group::m_top
     uint64_t   m_current_version;
     uint64_t   m_readlock_version;
-    util::File::Map<char> m_file_map;
+
+    // Currently cached memory mappings. We keep as many as 16 1MB windows
+    // open for writing. The allocator will favor sequential allocation
+    // from a modest number of windows, depending upon fragmentation, so
+    // 16 windows should be more than enough. If more than 16 windows are
+    // needed, the least recently used is sync'ed and closed to make room
+    // for a new one. The windows are kept in MRU (most recently used) order.
+    const static int num_map_windows = 16;
+    std::vector<MapWindow*> m_map_windows;
+
+    // Get a suitable memory mapping for later access:
+    // potentially adding it to the cache, potentially closing
+    // the least recently used and sync'ing it to disk
+    MapWindow* get_window(ref_type start_ref, size_t size);
+
+    // Sync all cached memory mappings
+    void sync_all_mappings();
 
     // Merge adjacent chunks
     void merge_free_space();
@@ -129,7 +146,7 @@ private:
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<size_t, size_t> extend_free_space(size_t requested_size);
 
-    void write_array_at(ref_type, const char* data, size_t size);
+    void write_array_at(MapWindow* window, ref_type, const char* data, size_t size);
     size_t split_freelist_chunk(size_t index, size_t start_pos,
                                 size_t alloc_pos, size_t chunk_size, bool is_shared);
 };
@@ -138,11 +155,6 @@ private:
 
 
 // Implementation:
-
-inline size_t GroupWriter::get_file_size() const noexcept
-{
-    return m_file_map.get_size();
-}
 
 inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noexcept
 {

@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_STRING_LONG
 
@@ -427,13 +445,13 @@ TEST(ArrayStringLong_Null)
                 }
 
                 CHECK_EQUAL(a.size(), v.size());
-                for (size_t i = 0; i < a.size(); i++) {
-                    if (v[i] == "realm::null()") {
-                        CHECK(a.is_null(i));
-                        CHECK(a.get(i).data() == nullptr);
+                for (size_t a_i = 0; a_i < a.size(); a_i++) {
+                    if (v[a_i] == "realm::null()") {
+                        CHECK(a.is_null(a_i));
+                        CHECK(a.get(a_i).data() == nullptr);
                     }
                     else {
-                        CHECK(a.get(i) == v[i]);
+                        CHECK(a.get(a_i) == v[a_i]);
                     }
                 }
             }

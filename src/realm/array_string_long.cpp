@@ -1,8 +1,20 @@
-#ifdef _MSC_VER
-#include <win32/types.h> //ssize_t
-#endif
-
-#include <iostream>
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 #include <realm/array_string_long.hpp>
 #include <realm/array_blob.hpp>
@@ -232,16 +244,16 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         bool context_flag = false;
         int_fast64_t value = 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
     {
         size_t blobs_size = 0;
         MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
@@ -250,8 +262,8 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         bool context_flag = false;
         int64_t value = 0; // initialize all rows to realm::null()
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
-        dg_2.reset(mem.m_ref);
-        int64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        dg_2.reset(mem.get_ref());
+        int64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
         top.add(v); // Throws
         dg_2.release();
     }
@@ -261,25 +273,25 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
 }
 
 
-MemRef ArrayStringLong::slice(size_t offset, size_t size, Allocator& target_alloc) const
+MemRef ArrayStringLong::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     REALM_ASSERT(is_attached());
 
-    ArrayStringLong slice(target_alloc, m_nullable);
-    _impl::ShallowArrayDestroyGuard dg(&slice);
-    slice.create(); // Throws
+    ArrayStringLong array_slice(target_alloc, m_nullable);
+    _impl::ShallowArrayDestroyGuard dg(&array_slice);
+    array_slice.create(); // Throws
     size_t begin = offset;
-    size_t end   = offset + size;
+    size_t end   = offset + slice_size;
     for (size_t i = begin; i != end; ++i) {
         StringData value = get(i);
-        slice.add(value); // Throws
+        array_slice.add(value); // Throws
     }
     dg.release();
-    return slice.get_mem();
+    return array_slice.get_mem();
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void ArrayStringLong::to_dot(std::ostream& out, StringData title) const
 {
@@ -298,4 +310,4 @@ void ArrayStringLong::to_dot(std::ostream& out, StringData title) const
     out << "}" << std::endl;
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

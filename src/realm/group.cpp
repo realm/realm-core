@@ -1,9 +1,30 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <new>
 #include <algorithm>
 #include <set>
-#include <iostream>
-#include <iomanip>
 #include <fstream>
+
+#ifdef REALM_DEBUG
+#  include <iostream>
+#  include <iomanip>
+#endif
 
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/memory_stream.hpp>
@@ -94,7 +115,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
 
     static_cast<void>(current_file_format_version);
     static_cast<void>(requested_history_type_2);
-    return 5;
+    return Allocator::CURRENT_FILE_FORMAT_VERSION;
 }
 
 
@@ -655,6 +676,8 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
+    REALM_ASSERT_EX(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size(),
+                    m_table_accessors.size(), m_tables.size());
     if (from_table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
     if (to_table_ndx >= m_tables.size())
@@ -687,21 +710,23 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
     m_table_names.move_rotate(from_table_ndx, to_table_ndx);
 
     // Move accessors.
-    using iter = decltype(m_table_accessors.begin());
-    iter first, new_first, last;
-    if (from_table_ndx < to_table_ndx) {
-        // Rotate left.
-        first     = m_table_accessors.begin() + from_table_ndx;
-        new_first = first + 1;
-        last      = m_table_accessors.begin() + to_table_ndx + 1;
+    if (!m_table_accessors.empty()) {
+        using iter = decltype(m_table_accessors.begin());
+        iter first, new_first, last;
+        if (from_table_ndx < to_table_ndx) {
+            // Rotate left.
+            first     = m_table_accessors.begin() + from_table_ndx;
+            new_first = first + 1;
+            last      = m_table_accessors.begin() + to_table_ndx + 1;
+        }
+        else { // from_table_ndx > to_table_ndx
+            // Rotate right.
+            first     = m_table_accessors.begin() + to_table_ndx;
+            new_first = m_table_accessors.begin() + from_table_ndx;
+            last      = new_first + 1;
+        }
+        std::rotate(first, new_first, last);
     }
-    else { // from_table_ndx > to_table_ndx
-        // Rotate right.
-        first     = m_table_accessors.begin() + to_table_ndx;
-        new_first = m_table_accessors.begin() + from_table_ndx;
-        last      = new_first + 1;
-    }
-    std::rotate(first, new_first, last);
 
     update_table_indices([&](size_t old_table_ndx) {
         auto it = moves.find(old_table_ndx);
@@ -791,8 +816,8 @@ BinaryData Group::write_to_mem() const
         MemoryOutputStream out; // Throws
         out.set_buffer(buffer, buffer + max_size);
         write(out); // Throws
-        size_t size = out.size();
-        return BinaryData(buffer, size);
+        size_t buffer_size = out.size();
+        return BinaryData(buffer, buffer_size);
     }
     catch (...) {
         free(buffer);
@@ -1853,7 +1878,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -2033,8 +2058,8 @@ void Group::verify() const
                 REALM_ASSERT_3(n, ==, ver.size());
             for (size_t i = 0; i != n; ++i) {
                 ref_type ref  = to_ref(pos.get(i));
-                size_t size = to_size_t(len.get(i));
-                mem_usage_2.add_immutable(ref, size);
+                size_t size_of_i = to_size_t(len.get(i));
+                mem_usage_2.add_immutable(ref, size_of_i);
             }
             mem_usage_2.canonicalize();
             mem_usage_1.add(mem_usage_2);
@@ -2070,8 +2095,8 @@ void Group::verify() const
     REALM_ASSERT_3(immutable_ref_end, <=, baseline);
     if (immutable_ref_end < baseline) {
         ref_type ref = immutable_ref_end;
-        size_t size = baseline - immutable_ref_end;
-        mem_usage_1.add_mutable(ref, size);
+        size_t corrected_size = baseline - immutable_ref_end;
+        mem_usage_1.add_mutable(ref, corrected_size);
         mem_usage_1.canonicalize();
     }
 
@@ -2083,10 +2108,10 @@ void Group::verify() const
 
 MemStats Group::stats()
 {
-    MemStats stats;
-    m_top.stats(stats);
+    MemStats mem_stats;
+    m_top.stats(mem_stats);
 
-    return stats;
+    return mem_stats;
 }
 
 
@@ -2126,8 +2151,8 @@ void Group::print_free() const
     size_t n = pos.size();
     for (size_t i = 0; i != n; ++i) {
         size_t offset = to_size_t(pos[i]);
-        size_t size   = to_size_t(len[i]);
-        std::cout << i << ": " << offset << " " << size;
+        size_t size_of_i   = to_size_t(len[i]);
+        std::cout << i << ": " << offset << " " << size_of_i;
 
         if (has_versions) {
             size_t version = to_size_t(ver[i]);
@@ -2174,9 +2199,10 @@ void Group::to_dot(const char* file_path) const
     to_dot(out);
 }
 
+
 std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 {
     return std::make_pair(m_tables.get_ref(), ndx_in_parent);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

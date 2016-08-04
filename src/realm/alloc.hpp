@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_ALLOC_HPP
 #define REALM_ALLOC_HPP
 
@@ -41,13 +40,26 @@ ref_type to_ref(int_fast64_t) noexcept;
 
 class MemRef {
 public:
-    char* m_addr;
-    ref_type m_ref;
 
     MemRef() noexcept;
     ~MemRef() noexcept;
-    MemRef(char* addr, ref_type ref) noexcept;
+
+    MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept;
     MemRef(ref_type ref, Allocator& alloc) noexcept;
+
+    char* get_addr();
+    ref_type get_ref();
+    void set_ref(ref_type ref);
+    void set_addr(char* addr);
+
+private:
+    char* m_addr;
+    ref_type m_ref;
+#if REALM_ENABLE_MEMDEBUG
+    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call 
+    // get_ref()/get_addr and that it e.g. has not been free'ed
+    const Allocator* m_alloc = nullptr;
+#endif
 };
 
 
@@ -67,6 +79,8 @@ public:
 /// \sa SlabAlloc
 class Allocator {
 public:
+	static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
+
     /// The specified size must be divisible by 8, and must not be
     /// zero.
     ///
@@ -86,7 +100,7 @@ public:
     /// would conflict with a macro on the Windows platform.
     void free_(ref_type, const char* addr) noexcept;
 
-    /// Shorthand for free_(mem.m_ref, mem.m_addr).
+    /// Shorthand for free_(mem.get_ref(), mem.get_addr()).
     void free_(MemRef mem) noexcept;
 
     /// Calls do_translate().
@@ -214,7 +228,7 @@ protected:
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
     virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size,
-                              size_t new_size);
+                              size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
     virtual void do_free(ref_type, const char* addr) noexcept = 0;
@@ -295,18 +309,57 @@ inline MemRef::~MemRef() noexcept
 {
 }
 
-inline MemRef::MemRef(char* addr, ref_type ref) noexcept:
+inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept:
     m_addr(addr),
     m_ref(ref)
 {
+    static_cast<void>(alloc);
+#if REALM_ENABLE_MEMDEBUG
+    m_alloc = &alloc;
+#endif
 }
 
 inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept:
     m_addr(alloc.translate(ref)),
     m_ref(ref)
 {
+    static_cast<void>(alloc);
+#if REALM_ENABLE_MEMDEBUG
+    m_alloc = &alloc;
+#endif
 }
 
+inline char* MemRef::get_addr()
+{
+#if REALM_ENABLE_MEMDEBUG
+    // Asserts if the ref has been freed
+    m_alloc->translate(m_ref);
+#endif
+    return m_addr;
+}
+
+inline ref_type MemRef::get_ref()
+{
+#if REALM_ENABLE_MEMDEBUG
+    // Asserts if the ref has been freed
+    m_alloc->translate(m_ref);
+#endif
+    return m_ref;
+}
+
+inline void MemRef::set_ref(ref_type ref)
+{
+#if REALM_ENABLE_MEMDEBUG
+    // Asserts if the ref has been freed
+    m_alloc->translate(ref);
+#endif
+    m_ref = ref;
+}
+
+inline void MemRef::set_addr(char* addr)
+{
+    m_addr = addr;
+}
 
 inline MemRef Allocator::alloc(size_t size)
 {
@@ -334,7 +387,7 @@ inline void Allocator::free_(ref_type ref, const char* addr) noexcept
 
 inline void Allocator::free_(MemRef mem) noexcept
 {
-    free_(mem.m_ref, mem.m_addr);
+    free_(mem.get_ref(), mem.get_addr());
 }
 
 inline char* Allocator::translate(ref_type ref) const noexcept

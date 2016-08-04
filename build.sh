@@ -8,4 +8,3 @@ case "$1" in
         rake $@
         ;;
 esac
-

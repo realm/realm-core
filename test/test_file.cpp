@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_FILE
 
@@ -386,5 +404,50 @@ TEST(File_Move)
     CHECK(file_1.is_attached());
     CHECK_NOT(file_2.is_attached());
 }
+
+#ifndef _WIN32
+TEST(File_GetUniqueID)
+{
+    TEST_PATH(path_1);
+    TEST_PATH(path_2);
+    TEST_PATH(path_3);
+
+    File file1_1;
+    File file1_2;
+    File file2_1;
+    file1_1.open(path_1, File::mode_Write);
+    file1_2.open(path_1, File::mode_Read);
+    file2_1.open(path_2, File::mode_Write);
+
+    File::UniqueID uid1_1 = file1_1.get_unique_id();
+    File::UniqueID uid1_2 = file1_2.get_unique_id();
+    File::UniqueID uid2_1 = file2_1.get_unique_id();
+    File::UniqueID uid2_2;
+    CHECK(File::get_unique_id(path_2, uid2_2));
+
+    CHECK(uid1_1 == uid1_2);
+    CHECK(uid2_1 == uid2_2);
+    CHECK(uid1_1 != uid2_1);
+
+    // Path doesn't exist
+    File::UniqueID uid3_1;
+    CHECK_NOT(File::get_unique_id(path_3, uid3_1));
+
+    // Test operator<
+    File::UniqueID uid4_1{0, 5};
+    File::UniqueID uid4_2{1, 42};
+    CHECK(uid4_1 < uid4_2);
+    CHECK_NOT(uid4_2 < uid4_1);
+
+    uid4_1 = {0, 1};
+    uid4_2 = {0, 2};
+    CHECK(uid4_1 < uid4_2);
+    CHECK_NOT(uid4_2 < uid4_1);
+
+    uid4_1 = uid4_2;
+    CHECK_NOT(uid4_1 < uid4_2);
+    CHECK_NOT(uid4_2 < uid4_1);
+}
+#endif
 
 #endif // TEST_FILE

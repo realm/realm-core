@@ -1,5 +1,23 @@
-#include <iostream>
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <iomanip>
+#include <ostream>
 
 #include <memory>
 #include <realm/column_mixed.hpp>
@@ -379,6 +397,13 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
 }
 
 
+int MixedColumn::compare_values(size_t, size_t) const noexcept
+{
+    REALM_ASSERT(false); // querying Mixed is not supported
+    return 0;
+}
+
+
 void MixedColumn::do_discard_child_accessors() noexcept
 {
     discard_child_accessors();
@@ -471,7 +496,7 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void MixedColumn::verify() const
 {
@@ -494,6 +519,7 @@ void MixedColumn::verify(const Table& table, size_t col_ndx) const
     }
 }
 
+
 void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
 {
     m_array->verify();
@@ -511,6 +537,11 @@ void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
     size_t types_len = m_types->size();
     size_t refs_len  = m_data->size();
     REALM_ASSERT_3(types_len, ==, refs_len);
+}
+
+
+void MixedColumn::leaf_to_dot(MemRef, ArrayParent*, size_t, std::ostream&) const
+{
 }
 
 void MixedColumn::to_dot(std::ostream& out, StringData title) const
@@ -546,4 +577,4 @@ void MixedColumn::do_dump_node_structure(std::ostream& out, int level) const
     m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

@@ -1,11 +1,27 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <cerrno>
 #include <cstdlib>
 #include <stdexcept>
 #include <algorithm>
 
 #include <realm/alloc_slab.hpp>
-#include <realm/group.hpp>
-#include <realm/replication.hpp>
 
 using namespace realm;
 
@@ -42,30 +58,27 @@ public:
     DefaultAllocator()
     {
         m_baseline = 1; // Zero is not available
-
-        using gf = _impl::GroupFriend;
-        Replication::HistoryType history_type = Replication::hist_None;
-        m_file_format_version = gf::get_target_file_format_version_for_session(0, history_type);
+        m_file_format_version = CURRENT_FILE_FORMAT_VERSION;
     }
 
     MemRef do_alloc(size_t size) override
     {
         char* addr = static_cast<char*>(::malloc(size));
-        if (REALM_UNLIKELY(!addr)) {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!addr))) {
             REALM_ASSERT_DEBUG(errno == ENOMEM);
             throw std::bad_alloc();
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
         std::fill(addr, addr+size, 0);
 #endif
-        return MemRef(addr, reinterpret_cast<size_t>(addr));
+        return MemRef(addr, reinterpret_cast<size_t>(addr), *this);
     }
 
     MemRef do_realloc(ref_type, const char* addr, size_t old_size,
                       size_t new_size) override
     {
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
-        if (REALM_UNLIKELY(!new_addr)) {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
             REALM_ASSERT_DEBUG(errno == ENOMEM);
             throw std::bad_alloc();
         }
@@ -74,7 +87,7 @@ public:
 #else
         static_cast<void>(old_size);
 #endif
-        return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
+        return MemRef(new_addr, reinterpret_cast<size_t>(new_addr), *this);
     }
 
     void do_free(ref_type, const char* addr) noexcept override
@@ -100,20 +113,4 @@ Allocator& Allocator::get_default() noexcept
 {
     static DefaultAllocator default_alloc;
     return default_alloc;
-}
-
-MemRef Allocator::do_realloc(ref_type ref, const char* addr, size_t old_size,
-                             size_t new_size)
-{
-    // Allocate new space
-    MemRef new_mem = do_alloc(new_size); // Throws
-
-    // Copy existing contents
-    char* new_addr = new_mem.m_addr;
-    std::copy(addr, addr+old_size, new_addr);
-
-    // Free old chunk
-    do_free(ref, addr);
-
-    return new_mem;
 }

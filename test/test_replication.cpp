@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_REPLICATION
 
@@ -56,10 +74,10 @@ public:
     {
     }
 
-    void replay_transacts(SharedGroup& target, util::Logger* replay_logger = nullptr)
+    void replay_transacts(SharedGroup& target, util::Logger& replay_logger)
     {
         for (const Buffer<char>& changeset: m_changesets)
-            apply_changeset(changeset.data(), changeset.size(), target, replay_logger);
+            apply_changeset(changeset.data(), changeset.size(), target, &replay_logger);
         m_changesets.clear();
     }
 
@@ -80,7 +98,7 @@ public:
 
     _impl::History* get_history() override
     {
-        return 0;
+        return nullptr;
     }
 
 private:
@@ -108,7 +126,7 @@ private:
 };
 
 REALM_TABLE_1(MySubsubsubtable,
-              i, Int)
+              first, Int)
 
 REALM_TABLE_3(MySubsubtable,
               a, Int,
@@ -189,8 +207,7 @@ TEST(Replication_General)
         wt.commit();
     }
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
     SharedGroup sg_2(path_2);
     repl.replay_transacts(sg_2, replay_logger);
 
@@ -236,7 +253,7 @@ TEST(Replication_Timestamp)
 
         // Add nullable Timestamp column
         table->add_column(type_Timestamp, "ts", true);
-        
+
         wt.commit();
     }
     {
@@ -256,8 +273,8 @@ TEST(Replication_Timestamp)
     {
         WriteTransaction wt(sg_1);
         TableRef table = wt.get_table("t");
-        
-        // Overwrite non-null with null to test that 
+
+        // Overwrite non-null with null to test that
         // TransactLogParser::parse_one(InstructionHandler& handler) correctly will see a set_null instruction
         // and not a set_new_date instruction
         table->set_timestamp(0, 1, Timestamp(null{}));
@@ -274,9 +291,9 @@ TEST(Replication_Timestamp)
         wt.commit();
     }
 
-    std::unique_ptr<util::Logger> replay_logger;
+    util::Logger& replay_logger = test_context.logger;
     SharedGroup sg_2(path_2);
-    repl.replay_transacts(sg_2, replay_logger.get());
+    repl.replay_transacts(sg_2, replay_logger);
     {
         ReadTransaction rt_1(sg_1);
         rt_1.get_group().verify();
@@ -318,8 +335,7 @@ TEST(Replication_Links)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3121,8 +3137,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     SharedGroup sg(path_1);
     MyTrivialReplication repl(path_2);
@@ -3226,8 +3241,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     SharedGroup sg(path_1);
     MyTrivialReplication repl(path_2);
@@ -3339,8 +3353,7 @@ TEST(Replication_NullStrings)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3389,8 +3402,7 @@ TEST(Replication_NullInteger)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3428,8 +3440,7 @@ TEST(Replication_SetUnique)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3471,8 +3482,7 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3516,8 +3526,7 @@ TEST(Replication_ChangeLinkTargets)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3556,8 +3565,7 @@ TEST(Replication_Substrings)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);
@@ -3598,8 +3606,7 @@ TEST(Replication_MoveSelectedLinkView)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    util::Logger* replay_logger = nullptr;
-//    replay_logger = &test_context.thread_context.logger;
+    util::Logger& replay_logger = test_context.logger;
 
     MyTrivialReplication repl(path_1);
     SharedGroup sg_1(repl);

@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_ALLOC
 
@@ -77,23 +95,23 @@ TEST(Alloc_1)
     MemRef mr3 = alloc.alloc(256);
 
     // Set size in headers (needed for Alloc::free())
-    set_capacity(mr1.m_addr, 8);
-    set_capacity(mr2.m_addr, 16);
-    set_capacity(mr3.m_addr, 256);
+    set_capacity(mr1.get_addr(), 8);
+    set_capacity(mr2.get_addr(), 16);
+    set_capacity(mr3.get_addr(), 256);
 
     // Are pointers 64bit aligned
-    CHECK_EQUAL(0, intptr_t(mr1.m_addr) & 0x7);
-    CHECK_EQUAL(0, intptr_t(mr2.m_addr) & 0x7);
-    CHECK_EQUAL(0, intptr_t(mr3.m_addr) & 0x7);
+    CHECK_EQUAL(0, intptr_t(mr1.get_addr()) & 0x7);
+    CHECK_EQUAL(0, intptr_t(mr2.get_addr()) & 0x7);
+    CHECK_EQUAL(0, intptr_t(mr3.get_addr()) & 0x7);
 
     // Do refs translate correctly
-    CHECK_EQUAL(static_cast<void*>(mr1.m_addr), alloc.translate(mr1.m_ref));
-    CHECK_EQUAL(static_cast<void*>(mr2.m_addr), alloc.translate(mr2.m_ref));
-    CHECK_EQUAL(static_cast<void*>(mr3.m_addr), alloc.translate(mr3.m_ref));
+    CHECK_EQUAL(static_cast<void*>(mr1.get_addr()), alloc.translate(mr1.get_ref()));
+    CHECK_EQUAL(static_cast<void*>(mr2.get_addr()), alloc.translate(mr2.get_ref()));
+    CHECK_EQUAL(static_cast<void*>(mr3.get_addr()), alloc.translate(mr3.get_ref()));
 
-    alloc.free_(mr3.m_ref, mr3.m_addr);
-    alloc.free_(mr2.m_ref, mr2.m_addr);
-    alloc.free_(mr1.m_ref, mr1.m_addr);
+    alloc.free_(mr3.get_ref(), mr3.get_addr());
+    alloc.free_(mr2.get_ref(), mr2.get_addr());
+    alloc.free_(mr1.get_ref(), mr1.get_addr());
 
     // SlabAlloc destructor will verify that all is free'd
 }
@@ -249,15 +267,15 @@ TEST(Alloc_Fuzzy)
             siz *= 8;
             MemRef r = alloc.alloc(siz);
             refs.push_back(r);
-            set_capacity(r.m_addr, siz);
+            set_capacity(r.get_addr(), siz);
 
             // write some data to the allcoated area so that we can verify it later
-            memset(r.m_addr + 3, static_cast<char>(reinterpret_cast<intptr_t>(r.m_addr)), siz - 3);
+            memset(r.get_addr() + 3, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 3);
         }
         else if(refs.size() > 0) {
             // free random entry
             size_t entry = rand() % refs.size();
-            alloc.free_(refs[entry].m_ref, refs[entry].m_addr);
+            alloc.free_(refs[entry].get_ref(), refs[entry].get_addr());
             refs.erase(refs.begin() + entry);
         }
 
@@ -265,17 +283,17 @@ TEST(Alloc_Fuzzy)
             // free everything when we have 10 allocations, or when we exit, to not leak
             while(refs.size() > 0) {
                 MemRef r = refs[0];
-                size_t siz = get_capacity(r.m_addr);
+                size_t siz = get_capacity(r.get_addr());
 
                 // verify that all the data we wrote during allocation is intact
                 for (size_t c = 3; c < siz; c++) {
-                    if (r.m_addr[c] != static_cast<char>(reinterpret_cast<intptr_t>(r.m_addr))) {
+                    if (r.get_addr()[c] != static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr()))) {
                         // faster than using 'CHECK' for each character, which is slow
                         CHECK(false);
                     }
                 }
 
-                alloc.free_(r.m_ref, r.m_addr);
+                alloc.free_(r.get_ref(), r.get_addr());
                 refs.erase(refs.begin());
             }
 

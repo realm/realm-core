@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TEST_UTIL_UNIT_TEST_HPP
 #define REALM_TEST_UTIL_UNIT_TEST_HPP
 
@@ -51,7 +50,8 @@
     TEST_EX(name, realm::test_util::unit_test::get_default_test_list(), enabled, true)
 
 /// Add a test that must neither execute concurrently with other tests, nor with
-/// itself.
+/// itself. These tests will always be executed by the thread that calls
+/// TestList::run().
 #define NONCONCURRENT_TEST(name) \
     NONCONCURRENT_TEST_IF(name, true)
 
@@ -272,8 +272,17 @@ public:
         /// No reporting by default.
         Reporter* reporter = nullptr;
 
-        /// Logging to \ref std::cerr by default.
+        /// The base logger to use for constructing loggers for reporting and
+        /// for custom intra test logging. If no base logger is specified, an
+        /// instance of util::StderrLogger will be used with the log level set
+        /// to util::Logger::Level::info. The log level threshold selected for a
+        /// specified base logger will be ignored. The specified base logger
+        /// does not have to be thread safe.
         util::Logger* logger = nullptr;
+
+        /// The log level threshold to use for the intra test loggers
+        /// (TestContext::logger).
+        util::Logger::Level intra_test_log_level = util::Logger::Level::off;
 
         /// By default, all test threads send log messages through a single
         /// shared logger (\ref logger), but if \ref per_thread_log_path is set
@@ -411,6 +420,12 @@ public:
     /// number of requested repetitions.
     const int recurrence_index;
 
+    /// The intra test logger. That is, a logger that is available for custom
+    /// use inside the associated unit test. The log level of this logger is
+    /// specified via TestList::Config::intra_test_log_level. See also
+    /// ThreadContext::report_logger.
+    util::Logger& logger;
+
     bool check_cond(bool cond, const char* file, long line, const char* macro_name,
                     const char* cond_text);
 
@@ -511,7 +526,9 @@ public:
     /// threads.
     const int thread_index;
 
-    util::Logger& logger;
+    /// The thread specific logger to be used by custom reporters. See also
+    /// SharedContext::report_logger and TestContext::logger.
+    util::Logger& report_logger;
 
     ThreadContext(const ThreadContext&) = delete;
     ThreadContext& operator=(const ThreadContext&) = delete;
@@ -526,7 +543,10 @@ public:
     const TestList& test_list;
     const int num_recurrences;
     const int num_threads;
-    util::Logger& logger;
+
+    /// The thread non-specific logger to be used by custom reporters. See also
+    /// ThreadContext::report_logger.
+    util::Logger& report_logger;
 
     SharedContext(const SharedContext&) = delete;
     SharedContext& operator=(const SharedContext&) = delete;
@@ -536,13 +556,14 @@ protected:
 };
 
 
-class TestBase: public util::Logger {
+class TestBase {
 protected:
     TestContext& test_context;
 
-    TestBase(TestContext&);
+    /// Short hand for test_context.logger.info().
+    template<class... Params> void log(const char* message, Params...);
 
-    void do_log(std::string) override;
+    TestBase(TestContext&);
 };
 
 
@@ -848,18 +869,18 @@ inline bool TestContext::check_definitely_greater(long double a, long double b,
                                  a_text, b_text, eps_text);
 }
 
-inline ThreadContext::ThreadContext(SharedContext& sc, int ti, util::Logger& l):
+inline ThreadContext::ThreadContext(SharedContext& sc, int ti, util::Logger& rl):
     shared_context(sc),
     thread_index(ti),
-    logger(l)
+    report_logger(rl)
 {
 }
 
-inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, util::Logger& l):
+inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, util::Logger& rl):
     test_list(tl),
     num_recurrences(nr),
     num_threads(nt),
-    logger(l)
+    report_logger(rl)
 {
 }
 
@@ -868,10 +889,11 @@ inline TestBase::TestBase(TestContext& context):
 {
 }
 
-inline void TestBase::do_log(std::string message)
+template<class... Params> inline void TestBase::log(const char* message, Params... params)
 {
-    Logger::do_log(test_context.thread_context.logger, message);
+    test_context.logger.info(message, params...); // Throws
 }
+
 
 } // namespace unit_test
 } // namespace test_util

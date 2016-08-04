@@ -1,5 +1,23 @@
-#include <iostream>
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <iomanip>
+#include <ostream>
 
 #include <memory>
 
@@ -272,9 +290,9 @@ StringIndex* StringEnumColumn::create_search_index()
     size_t num_rows = size();
     for (size_t row_ndx = 0; row_ndx != num_rows; ++row_ndx) {
         StringData value = get(row_ndx);
-        size_t num_rows = 1;
+        size_t num_rows_to_insert = 1;
         bool is_append = true;
-        index->insert(row_ndx, value, num_rows, is_append); // Throws
+        index->insert(row_ndx, value, num_rows_to_insert, is_append); // Throws
     }
 
     m_search_index = std::move(index);
@@ -324,7 +342,7 @@ void StringEnumColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-#ifdef REALM_DEBUG
+#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
 void StringEnumColumn::verify() const
 {
@@ -348,9 +366,9 @@ void StringEnumColumn::verify(const Table& table, size_t col_ndx) const
     IntegerColumn::verify(table, col_ndx);
 
     ColumnAttr attr = spec.get_column_attr(col_ndx);
-    bool has_search_index = (attr & col_attr_Indexed) != 0;
-    REALM_ASSERT_3(has_search_index, ==, bool(m_search_index));
-    if (has_search_index) {
+    bool column_has_search_index = (attr & col_attr_Indexed) != 0;
+    REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
+    if (column_has_search_index) {
         REALM_ASSERT_3(m_search_index->get_ndx_in_parent(), ==,
                        get_root_array()->get_ndx_in_parent() + 1);
     }
@@ -393,4 +411,4 @@ void StringEnumColumn::do_dump_node_structure(std::ostream& out, int level) cons
     m_search_index->do_dump_node_structure(out, level+1);
 }
 
-#endif // REALM_DEBUG
+#endif // LCOV_EXCL_STOP ignore debug functions

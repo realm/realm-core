@@ -1,20 +1,18 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
@@ -45,7 +43,7 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
     Row::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     m_table = TableRef();
-    src.m_last_seen_version = -1; // bring source out-of-sync, now that it has lost its data
+    src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
     m_distinct_column_source = src.m_distinct_column_source;
     m_sorting_predicate = src.m_sorting_predicate;
@@ -96,7 +94,7 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
     if (patch.was_in_sync)
         m_last_seen_version = outside_version();
     else
-        m_last_seen_version = -1;
+        m_last_seen_version = util::none;
 }
 
 // Searching
@@ -216,10 +214,13 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     }
 
     for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
-        row_ndx = to_size_t(m_row_indexes.get(ss));
+
+        int64_t signed_row_ndx = m_row_indexes.get(ss);
 
         // skip detached references:
-        if (row_ndx == detached_ref) continue;
+        if (signed_row_ndx == detached_ref) continue;
+
+        row_ndx = to_size_t(signed_row_ndx);
 
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
@@ -422,7 +423,7 @@ void TableViewBase::to_json(std::ostream& out) const
 
     const size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
-        const size_t real_row_index = get_source_ndx(r);
+        const int64_t real_row_index = get_source_ndx(r);
         if (real_row_index != detached_ref) {
             if (r > 0)
                 out << ",";
@@ -451,7 +452,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     size_t i = 0;
     size_t count = out_count;
     while (count) {
-        const size_t real_row_index = get_source_ndx(i);
+        const int64_t real_row_index = get_source_ndx(i);
         if (real_row_index != detached_ref) {
             m_table->to_string_row(real_row_index, out, widths);
             --count;
@@ -476,7 +477,7 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     m_table->to_string_header(out, widths);
 
     // Print row contents
-    size_t real_ndx = get_source_ndx(row_ndx);
+    int64_t real_ndx = get_source_ndx(row_ndx);
     REALM_ASSERT(real_ndx != detached_ref);
     m_table->to_string_row(real_ndx, out, widths);
 }
@@ -554,7 +555,7 @@ uint_fast64_t TableViewBase::sync_if_needed() const
         // FIXME: Is this a reasonable handling of constness?
         const_cast<TableViewBase*>(this)->do_sync();
     }
-    return m_last_seen_version;
+    return *m_last_seen_version;
 }
 
 
@@ -604,7 +605,7 @@ void TableViewBase::adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx
 void TableViewBase::adj_row_acc_clear() noexcept
 {
     m_num_detached_refs = m_row_indexes.size();
-    for (size_t i = 0, size = m_row_indexes.size(); i < size; ++i)
+    for (size_t i = 0, num_rows = m_row_indexes.size(); i < num_rows; ++i)
         m_row_indexes.set(i, -1);
 }
 
@@ -710,24 +711,10 @@ void TableViewBase::distinct(std::vector<size_t> columns)
     sort(s);
 
     // Step 3: Create column accessors for all columns in the column set.
-    std::vector<const ColumnTemplateBase*> m_columns;
-    std::vector<const StringEnumColumn*> m_columns_enum;
+    std::vector<const ColumnBase*> m_columns;
     m_columns.resize(columns.size());
-    m_columns_enum.resize(columns.size());
-
     for (size_t i = 0; i < columns.size(); i++) {
-        const ColumnBase& cb = m_table->get_column_base(m_distinct_columns[i]);
-        // FIXME: If we decide to keep StringEnumColumn (see Table::optimize()), then below conditional type casting
-        // should be removed in favor for a more elegant/generalized solution, because this casting pattern is used
-        // in a couple of other places in Core too.
-        const ColumnTemplateBase* ctb = dynamic_cast<const ColumnTemplateBase*>(&cb);
-        REALM_ASSERT(ctb);
-        if (const StringEnumColumn* cse = dynamic_cast<const StringEnumColumn*>(&cb))
-            m_columns_enum[i] = cse;
-        else
-            m_columns[i] = ctb;
-
-        REALM_ASSERT(ctb);
+        m_columns[i] = &m_table->get_column_base(m_distinct_columns[i]);
     }
 
     // Step 4: Build a list of all duplicated rows that need to be removed
@@ -736,16 +723,12 @@ void TableViewBase::distinct(std::vector<size_t> columns)
         bool identical = true;
         for (size_t c = 0; c < m_distinct_columns.size(); c++) {
 
-            int cmp;
             int64_t r1_64 = m_row_indexes.get(r);
             int64_t r2_64 = m_row_indexes.get(r - 1);
             REALM_ASSERT(!util::int_cast_has_overflow<size_t>(r1_64) && !util::int_cast_has_overflow<size_t>(r2_64));
             size_t r1 = size_t(r1_64);
             size_t r2 = size_t(r2_64);
-            if (const StringEnumColumn* cse = m_columns_enum[c])
-                cmp = cse->compare_values(r1, r2);
-            else
-                cmp = m_columns[c]->compare_values(r1, r2);
+            int cmp = m_columns[c]->compare_values(r1, r2);
 
             if (cmp != 0) {
                 identical = false;

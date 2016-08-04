@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <ctime>
 #include <cstring>
 #include <algorithm>
@@ -120,30 +138,30 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
 {
     Result r;
 
-    std::vector<double> samples = this->samples;
+    std::vector<double> samples_copy = samples;
     // Sort to simplify calculating min/max/median.
-    std::sort(samples.begin(), samples.end());
+    std::sort(samples_copy.begin(), samples_copy.end());
 
     // Compute total:
     r.total = 0;
-    for (double s : samples) {
+    for (double s : samples_copy) {
         r.total += s;
     }
 
     // Compute min/max/median
-    r.rep = samples.size();
+    r.rep = samples_copy.size();
     if (r.rep > 0) {
-        r.min = samples.front();
-        r.max = samples.back();
+        r.min = samples_copy.front();
+        r.max = samples_copy.back();
 
         if (r.rep % 2 == 0) {
             // Equal number of elements: median is the average of the
             // two middle elements.
-            r.median = (samples[r.rep / 2] + samples[r.rep / 2 + 1]) / 2;
+            r.median = (samples_copy[r.rep / 2] + samples_copy[r.rep / 2 + 1]) / 2;
         }
         else {
             // Odd number of elements: median is the middle element.
-            r.median = samples[r.rep / 2];
+            r.median = samples_copy[r.rep / 2];
         }
     }
 
@@ -151,7 +169,7 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
     if (r.rep > 1) {
         double mean = r.avg();
         double sum_variance = 0.0;
-        for (double s : samples) {
+        for (double s : samples_copy) {
             double x = s - mean;
             sum_variance += x * x;
         }

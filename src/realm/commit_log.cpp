@@ -1,20 +1,18 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
 
@@ -95,8 +93,9 @@ public:
     version_type do_prepare_commit(version_type) override;
     void do_finalize_commit() noexcept override;
     void do_abort_transact() noexcept override;
-    void do_interrupt() noexcept override {};
-    void do_clear_interrupt() noexcept override {};
+    void do_interrupt() noexcept override {}
+    void do_clear_interrupt() noexcept override {}
+    void commit_log_close() noexcept override;
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
     HistoryType get_history_type() const noexcept override;
@@ -167,11 +166,15 @@ protected:
         CommitLogPreamble preamble_a;
         CommitLogPreamble preamble_b;
 
+        // memory mapping counter, increased whenever a log is resized
+        uint64_t mmap_counter;
+
         CommitLogHeader(uint_fast64_t version):
             preamble_a(version),
             preamble_b(version)
         {
             use_preamble_a = true;
+            mmap_counter = 1;
         }
     };
 
@@ -188,8 +191,8 @@ protected:
         mutable util::File file;
         std::string name;
         mutable util::File::Map<CommitLogHeader> map;
-        mutable util::File::SizeType last_seen_size;
-        CommitLogMetadata(std::string name): name(name) {}
+        mutable uint64_t last_seen_mmap_counter = 0;
+        CommitLogMetadata(std::string log_name): name(log_name) {}
     };
 
     class MergingIndexTranslator;
@@ -368,15 +371,13 @@ void WriteLogCollector::remap_if_needed(const CommitLogMetadata& log) const
 {
     if (log.map.is_attached() == false) {
         open_if_needed(log);
-        log.last_seen_size = log.file.get_size();
-        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(log.last_seen_size));
-        log.map.map(log.file, File::access_ReadWrite, size_t(log.last_seen_size));
+        log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
+        log.map.map(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
         return;
     }
-    if (log.last_seen_size != log.file.get_size()) {
-        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(log.last_seen_size));
+    if (log.last_seen_mmap_counter != m_header.get_addr()->mmap_counter) {
+        log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
         log.map.remap(log.file, File::access_ReadWrite, size_t(log.file.get_size()));
-        log.last_seen_size = log.file.get_size();
     }
 }
 
@@ -387,11 +388,8 @@ void WriteLogCollector::reset_file(CommitLogMetadata& log)
     File::try_remove(log.name);
     log.file.open(log.name, File::mode_Write);
     log.file.resize(minimal_pages * page_size); // Throws
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        log.file.sync(); // Throws
+    log.last_seen_mmap_counter = m_header.get_addr()->mmap_counter;
     log.map.map(log.file, File::access_ReadWrite, minimal_pages * page_size);
-    log.last_seen_size = minimal_pages * page_size;
 }
 
 void WriteLogCollector::reset_header()
@@ -401,13 +399,22 @@ void WriteLogCollector::reset_header()
 
     File header_file(m_header_name, File::mode_Write);
     header_file.resize(sizeof (CommitLogHeader)); // Throws
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        header_file.sync(); // Throws
     m_header.map(header_file, File::access_ReadWrite, sizeof (CommitLogHeader));
     m_lock.set_shared_part(m_header.get_addr()->shared_part_of_lock, std::move(header_file));
 }
 
+void WriteLogCollector::commit_log_close() noexcept
+{
+    m_header.unmap();
+    m_log_a.map.unmap();
+    m_log_a.file.close();
+    m_log_b.map.unmap();
+    m_log_b.file.close();
+    // ensure we do not accidentally have a counter matching
+    // a later mmap.
+    m_log_a.last_seen_mmap_counter = 0;
+    m_log_b.last_seen_mmap_counter = 0;
+}
 
 
 // Helper methods for adding and cleaning up commit log entries:
@@ -437,11 +444,10 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         if (size > 4) {
             size -= size/4;
             size *= page_size * minimal_pages;
+            // indicate change of log size, forcing readers to remap to new size
+            m_header.get_addr()->mmap_counter++;
             active_log->map.unmap();
             active_log->file.resize(size); // Throws
-            bool disable_sync = get_disable_sync_to_disk();
-            if (!disable_sync)
-                active_log->file.sync(); // Throws
         }
     }
 }
@@ -464,10 +470,8 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
         aligned_to(sizeof (uint64_t), preamble->write_offset + sizeof(EntryHeader) + entry.changeset.size());
     size_needed = aligned_to(page_size, size_needed);
     if (size_needed > active_log->file.get_size()) {
+        m_header.get_addr()->mmap_counter++;
         active_log->file.resize(size_needed); // Throws
-        bool disable_sync = get_disable_sync_to_disk();
-        if (!disable_sync)
-            active_log->file.sync(); // Throws
     }
 
     // create/update mapping so that we are sure it covers the file we are about
@@ -528,9 +532,6 @@ void WriteLogCollector::initiate_session(version_type version)
     // This protects us against deadlock when we restart after crash on a
     // platform without support for robust mutexes.
     new (& m_header.get_addr()->shared_part_of_lock) InterprocessMutex::SharedPart();
-    bool disable_sync = get_disable_sync_to_disk();
-    if (!disable_sync)
-        m_header.sync(); // Throws
 }
 
 

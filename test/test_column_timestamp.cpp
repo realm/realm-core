@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_TIMESTAMP
 
@@ -97,8 +115,8 @@ TEST_TYPES(TimestampColumn_Compare, std::true_type, std::false_type)
     CHECK(c.compare(c));
 
     {
-        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
-        TimestampColumn c2(Allocator::get_default(), ref);
+        ref_type ref2 = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
+        TimestampColumn c2(Allocator::get_default(), ref2);
         CHECK_NOT(c.compare(c2));
         c2.destroy();
     }
@@ -588,7 +606,9 @@ TEST(TimestampColumn_AddColumnAfterRows)
 
     Table t;
     t.add_column(type_Int, "1", non_nullable);
-    t.add_empty_row();
+    t.add_empty_row(REALM_MAX_BPNODE_SIZE * 2 + 1);
+    t.set_int(0, 0, 100);
+
     t.add_column(type_Timestamp, "2", non_nullable);
     t.add_column(type_Timestamp, "3", nullable);
     CHECK_EQUAL(t.get_timestamp(1, 0).get_seconds(), 0);

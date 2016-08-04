@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TABLE_ACCESSORS_HPP
 #define REALM_TABLE_ACCESSORS_HPP
 
@@ -517,9 +516,9 @@ private:
     // FIXME: Need BasicTableView::Cursor and BasicTableView::ConstCursor if Cursors should exist at all.
     struct SubtabRowAccessor: Subtab::RowAccessor {
     public:
-        SubtabRowAccessor(Subtab* subtab, size_t row_idx):
-            Subtab::RowAccessor(std::make_pair(subtab, row_idx)),
-            m_owner(subtab->get_table_ref()) {}
+        SubtabRowAccessor(Subtab* subtable, size_t row_idx):
+            Subtab::RowAccessor(std::make_pair(subtable, row_idx)),
+            m_owner(subtable->get_table_ref()) {}
 
     private:
         typename Subtab::Ref const m_owner;
@@ -568,9 +567,9 @@ private:
     // FIXME: Dangerous slicing posibility as long as Cursor is same as RowAccessor.
     struct SubtabRowAccessor: Subtab::ConstRowAccessor {
     public:
-        SubtabRowAccessor(const Subtab* subtab, size_t row_idx):
-            Subtab::ConstRowAccessor(std::make_pair(subtab, row_idx)),
-            m_owner(subtab->get_table_ref()) {}
+        SubtabRowAccessor(const Subtab* subtable, size_t row_idx):
+            Subtab::ConstRowAccessor(std::make_pair(subtable, row_idx)),
+            m_owner(subtable->get_table_ref()) {}
 
     private:
         typename Subtab::ConstRef const m_owner;
@@ -1347,7 +1346,7 @@ public:
     {
         Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
-    };
+    }
 
     int64_t sum(size_t* resultcount = nullptr, size_t start = 0,
                 size_t end = size_t(-1), size_t limit=size_t(-1)) const
@@ -1418,7 +1417,7 @@ public:
     {
         Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
-    };
+    }
 
     double sum(size_t* resultcount = nullptr, size_t start = 0,
                size_t end = size_t(-1), size_t limit=size_t(-1)) const
@@ -1489,7 +1488,7 @@ public:
     {
         Base::m_query->m_impl.between(col_idx, from, to);
         return *Base::m_query;
-    };
+    }
 
     double sum(size_t* resultcount = nullptr, size_t start = 0,
                size_t end = size_t(-1), size_t limit=size_t(-1)) const
@@ -1599,7 +1598,7 @@ public:
     {
         Base::m_query->m_impl.between_olddatetime(col_idx, from, to);
         return *Base::m_query;
-    };
+    }
 
     OldDateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
                  size_t end = size_t(-1), size_t limit=size_t(-1),

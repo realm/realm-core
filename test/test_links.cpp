@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "testsettings.hpp"
 #ifdef TEST_LINKS
 
@@ -1219,8 +1237,8 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     Group group;
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    target->add_empty_row();
     origin->add_column_link(type_LinkList, "", *target);
+    target->add_empty_row();
     origin->add_empty_row();
     LinkViewRef link_list = origin->get_linklist(0,0);
     for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE+1; ++i)

@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_TABLE_HPP
 #define REALM_TABLE_HPP
 
@@ -242,7 +241,6 @@ public:
     /// \param column_ndx The index of a column of this table.
 
     bool has_search_index(size_t column_ndx) const noexcept;
-//    void remove_search_index(size_t col_ndx);
     void add_search_index(size_t column_ndx);
     void remove_search_index(size_t column_ndx);
 
@@ -488,7 +486,7 @@ public:
     void set_null(size_t column_ndx, size_t row_ndx);
 
     void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
-    void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size = realm::npos);
+    void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);
 
     //@}
 
@@ -726,12 +724,12 @@ public:
     /// (see add_search_index()) will not be carried over to the new
     /// table.
     ///
-    /// \param offset Index of first row to include (if `size >
+    /// \param offset Index of first row to include (if `slice_size >
     /// 0`). Must be less than, or equal to size().
     ///
-    /// \param size Number of rows to include. May be zero. If `size >
-    /// size() - offset`, then the effective size of the written slice
-    /// will be `size() - offset`.
+    /// \param slice_size Number of rows to include. May be zero. If 
+    /// `slice_size > size() - offset`, then the effective size of 
+    /// the written slice will be `size() - offset`.
     ///
     /// \throw std::out_of_range If `offset > size()`.
     ///
@@ -740,7 +738,7 @@ public:
     /// of general utility. This is unfortunate, because it pulls
     /// quite a large amount of code into the core library to support
     /// it.
-    void write(std::ostream&, size_t offset = 0, size_t size = npos,
+    void write(std::ostream&, size_t offset = 0, size_t slice_size = npos,
                StringData override_table_name = StringData()) const;
 
     // Conversion
@@ -784,7 +782,7 @@ public:
 
     // Debug
 #ifdef REALM_DEBUG
-    void verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void verify() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
@@ -880,6 +878,7 @@ private:
     mutable Descriptor* m_descriptor;
 
     // Table view instances
+    // Access needs to be protected by m_accessor_mutex
     typedef std::vector<TableViewBase*> views;
     mutable views m_views;
 
@@ -974,7 +973,7 @@ private:
     struct MoveSubtableColumns;
 
     void insert_root_column(size_t col_ndx, DataType type, StringData name,
-                            LinkTargetInfo& link, bool nullable = false);
+                            LinkTargetInfo& link_target, bool nullable = false);
     void erase_root_column(size_t col_ndx);
     void move_root_column(size_t from, size_t to);
     void do_insert_root_column(size_t col_ndx, ColumnType, StringData name, bool nullable = false);
@@ -1118,7 +1117,7 @@ private:
     BacklinkColumn& get_column_backlink(size_t ndx);
 
     void instantiate_before_change();
-    void validate_column_type(const ColumnBase& column, ColumnType expected_type,
+    void validate_column_type(const ColumnBase& col, ColumnType expected_type,
                               size_t ndx) const;
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
@@ -1448,15 +1447,15 @@ inline void Table::bump_version(bool bump_global) const noexcept
         if (const Table* parent = get_parent_table_ptr())
             parent->bump_version(false);
         // Recurse through linked tables, use m_mark to avoid infinite recursion
-        for (auto& column : m_cols) {
+        for (auto& column_ptr : m_cols) {
             // We may meet a null pointer in place of a backlink column, pending
             // replacement with a new one. This can happen ONLY when creation of
             // the corresponding forward link column in the origin table is
             // pending as well. In this case it is ok to just ignore the zeroed
             // backlink column, because the origin table is guaranteed to also
             // be refreshed/marked dirty and hence have it's version bumped.
-            if (column != nullptr)
-                column->bump_link_origin_table_version();
+            if (column_ptr != nullptr)
+                column_ptr->bump_link_origin_table_version();
         }
     }
 }
@@ -1503,6 +1502,7 @@ inline void Table::unbind_ptr() const noexcept
 
 inline void Table::register_view(const TableViewBase* view)
 {
+    util::LockGuard lock(m_accessor_mutex);
     // Casting away constness here - operations done on tableviews
     // through m_views are all internal and preserving "some" kind
     // of logical constness.
@@ -1697,7 +1697,7 @@ inline TableRef Table::copy(Allocator& alloc) const
 
 // For use by queries
 template<class T>
-inline Columns<T> Table::column(size_t column)
+inline Columns<T> Table::column(size_t column_ndx)
 {
     std::vector<size_t> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
@@ -1706,7 +1706,7 @@ inline Columns<T> Table::column(size_t column)
     // type traits (all the is_same() cases below).
     const Table* table = get_link_chain_target(link_chain);
 
-    realm::DataType ct = table->get_column_type(column);
+    realm::DataType ct = table->get_column_type(column_ndx);
     if (std::is_same<T, int64_t>::value && ct != type_Int)
         throw(LogicError::type_mismatch);
     else if (std::is_same<T, bool>::value && ct != type_Bool)
@@ -1719,10 +1719,10 @@ inline Columns<T> Table::column(size_t column)
         throw(LogicError::type_mismatch);
 
     if (std::is_same<T, Link>::value || std::is_same<T, LinkList>::value || std::is_same<T, BackLink>::value) {
-        link_chain.push_back(column);
+        link_chain.push_back(column_ndx);
     }
 
-    return Columns<T>(column, this, std::move(link_chain));
+    return Columns<T>(column_ndx, this, std::move(link_chain));
 }
 
 template<class T>
@@ -1731,7 +1731,8 @@ inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
     static_assert(std::is_same<T, BackLink>::value, "");
 
     size_t origin_table_ndx = origin.get_index_in_group();
-    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+    const Table& current_target_table = *get_link_chain_target(m_link_chain);
+    size_t backlink_col_ndx = current_target_table.m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
 
     std::vector<size_t> link_chain = std::move(m_link_chain);
     m_link_chain.clear();
@@ -1764,7 +1765,8 @@ inline Table& Table::link(size_t link_column)
 inline Table& Table::backlink(const Table& origin, size_t origin_col_ndx)
 {
     size_t origin_table_ndx = origin.get_index_in_group();
-    size_t backlink_col_ndx = m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
+    const Table& current_target_table = *get_link_chain_target(m_link_chain);
+    size_t backlink_col_ndx = current_target_table.m_spec.find_backlink_column(origin_table_ndx, origin_col_ndx);
     return link(backlink_col_ndx);
 }
 

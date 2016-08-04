@@ -1,22 +1,21 @@
 /*************************************************************************
  *
- * REALM CONFIDENTIAL
- * __________________
+ * Copyright 2016 Realm Inc.
  *
- *  [2011] - [2015] Realm Inc
- *  All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * NOTICE:  All information contained herein is, and remains
- * the property of Realm Incorporated and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Realm Incorporated
- * and its suppliers and may be covered by U.S. and Foreign Patents,
- * patents in process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Realm Incorporated.
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  **************************************************************************/
+
 #ifndef REALM_ARRAY_BINARY_HPP
 #define REALM_ARRAY_BINARY_HPP
 
@@ -87,7 +86,7 @@ public:
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
     void insert(size_t ndx, BinaryData value, bool add_zero_term = false);
     void erase(size_t ndx);
-    void truncate(size_t size);
+    void truncate(size_t new_size);
     void clear();
     void destroy();
 
@@ -111,7 +110,7 @@ public:
 
     /// Construct a copy of the specified slice of this binary array
     /// using the specified target allocator.
-    MemRef slice(size_t offset, size_t size, Allocator& target_alloc) const;
+    MemRef slice(size_t offset, size_t slice_size, Allocator& target_alloc) const;
 
 #ifdef REALM_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
@@ -130,9 +129,9 @@ private:
 
 // Implementation:
 
-inline ArrayBinary::ArrayBinary(Allocator& alloc) noexcept:
-    Array(alloc), m_offsets(alloc), m_blob(alloc),
-    m_nulls(alloc)
+inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept:
+    Array(allocator), m_offsets(allocator), m_blob(allocator),
+    m_nulls(allocator)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
@@ -141,9 +140,9 @@ inline ArrayBinary::ArrayBinary(Allocator& alloc) noexcept:
 
 inline void ArrayBinary::create()
 {
-    size_t size = 0;
+    size_t init_size = 0;
     BinaryData defaults = BinaryData(0, 0); // This init value is ignored because size = 0
-    MemRef mem = create_array(size, get_alloc(), defaults); // Throws
+    MemRef mem = create_array(init_size, get_alloc(), defaults); // Throws
     init_from_mem(mem);
 }
 
@@ -151,7 +150,7 @@ inline void ArrayBinary::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
-    init_from_mem(MemRef(header, ref));
+    init_from_mem(MemRef(header, ref, m_alloc));
 }
 
 inline void ArrayBinary::init_from_parent() noexcept
@@ -202,16 +201,16 @@ inline BinaryData ArrayBinary::get(size_t ndx) const noexcept
     }
 }
 
-inline void ArrayBinary::truncate(size_t size)
+inline void ArrayBinary::truncate(size_t new_size)
 {
-    REALM_ASSERT_3(size, <, m_offsets.size());
+    REALM_ASSERT_3(new_size, <, m_offsets.size());
 
-    size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
+    size_t blob_size = new_size ? to_size_t(m_offsets.get(new_size-1)) : 0;
 
-    m_offsets.truncate(size);
+    m_offsets.truncate(new_size);
     m_blob.truncate(blob_size);
     if (!legacy_array_type())
-        m_nulls.truncate(size);
+        m_nulls.truncate(new_size);
 }
 
 inline void ArrayBinary::clear()

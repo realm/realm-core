@@ -5,6 +5,8 @@
 
 // Lines should never exceed 118 characters --------------------------------------------------------------------------
 
+// Code should only include regular ASCII encoded characters.
+// Comments may include UTF-8 encoded characters.
 
 // Macro names use uppercase and have "REALM_" as prefix. Non-macro
 // names never use all uppercase.
@@ -93,6 +95,10 @@ namespace my_namespace {
 template<class T>
 class MyClass: public Base {
 public:
+
+    // Public member variables do not have a 'm_' prefix.
+    int baz;
+
     MyClass(...):
         Base(...),
         m_bar(7),
@@ -149,6 +155,13 @@ private:
 
 
 
+// Use literals when possible
+
+char* str = nullptr; // don't use 0, NULL
+bool enable_feature = true;
+bool is_last = false;
+
+
 
 // Use of 'auto' keyword:
 //
@@ -176,11 +189,11 @@ private:
 //   you may have knowledge about a certain planned feature that would
 //   require a more complete solution.
 //
-// A FIXME is generally not about a bug or an error, and is should
+// A FIXME is generally not about a bug or an error, and it should
 // generally not be considered a task either. Is is simply a memo to
 // oneself or to some other developer who is going to work on the code
 // at some later point in time.
 //
 // A FIXME should never be deleted unless by somebody who understands
-// the mening of it and knows that the problem is fixed, or has
-// otherwise diappeard.
+// the meaning of it and knows that the problem is fixed, or has
+// otherwise disappeared.
