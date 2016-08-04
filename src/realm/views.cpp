@@ -215,9 +215,7 @@ void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& dist
     }
 
     if (distinct) {
-        // Sort by the columns to distinct on
         auto sorting_predicate = distinct.sorter(m_row_indexes);
-        std::sort(v.begin(), v.end(), std::ref(sorting_predicate));
 
         // Remove all rows which have a null link along the way to the distinct columns
         if (sorting_predicate.has_links()) {
@@ -225,6 +223,9 @@ void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& dist
                 return sorting_predicate.any_is_null(index);
             }), v.end());
         }
+
+        // Sort by the columns to distinct on
+        std::sort(v.begin(), v.end(), std::ref(sorting_predicate));
 
         // Remove all duplicates
         v.erase(std::unique(v.begin(), v.end(), [&](auto&& a, auto&& b) {
