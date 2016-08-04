@@ -167,10 +167,6 @@ public:
         SyncErrorHandler sync_error_handler;
 
         util::RootLogger *logger = nullptr;
-
-        // FIXME: This probably doesn't belong here; move it somewhere appropriate.
-        // The verified, resolved URL of the remote synced Realm. Should not be set by binding.
-        util::Optional<std::string> sync_server_url;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists

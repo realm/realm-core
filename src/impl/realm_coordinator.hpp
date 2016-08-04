@@ -75,7 +75,7 @@ public:
     static void clear_all_caches();
 
     // FIXME: this should be moved out of the coordinator once we separate sync from the object store
-    static void set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger);
+    static void set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger* logger);
 
     // Explicit constructor/destructor needed for the unique_ptrs to forward-declared types
     RealmCoordinator();
@@ -133,6 +133,9 @@ private:
     std::unique_ptr<sync::Session> m_sync_session;
     bool m_sync_awaits_user_token = false;
     util::Optional<int_fast64_t> m_sync_deferred_commit_notification;
+
+    // The fully-resolved URL of this Realm if it's synced, including the server and the path.
+    util::Optional<std::string> sync_server_url;
 
     // must be called with m_notifier_mutex locked
     void pin_version(uint_fast64_t version, uint_fast32_t index);

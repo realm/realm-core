@@ -69,29 +69,27 @@ private:
 }
 }
 
-static std::mutex _sync_client_mutex;
-static std::weak_ptr<SyncClient> _sync_weak_client;
+static std::mutex g_sync_client_mutex;
+static std::weak_ptr<SyncClient> g_sync_weak_client;
 
 static std::shared_ptr<SyncClient> get_sync_client()
 {
-    std::lock_guard<std::mutex> lock(_sync_client_mutex);
-    if (auto client = _sync_weak_client.lock()) {
+    std::lock_guard<std::mutex> lock(g_sync_client_mutex);
+    if (auto client = g_sync_weak_client.lock()) {
         return client;
     }
-    throw std::runtime_error("Must create the client before returning it...");
+    REALM_ASSERT(false);    // Object store should never call this before creating the client first.
 }
 
 static std::shared_ptr<SyncClient> create_sync_client(std::function<sync::Client::ErrorHandler> handler,
-                                                      realm::util::Logger *logger)
+                                                      realm::util::Logger* logger)
 {
-    std::lock_guard<std::mutex> lock(_sync_client_mutex);
-    if (auto client = _sync_weak_client.lock()) {
-        throw std::runtime_error("The client already exists...");
-    }
+    std::lock_guard<std::mutex> lock(g_sync_client_mutex);
+    REALM_ASSERT(!g_sync_weak_client.lock());   // Object store should never call this more than once.
     sync::Client::Config client_config;
     client_config.logger = logger;
     auto client = std::make_shared<SyncClient>(sync::Client(client_config), std::move(handler));
-    _sync_weak_client = client;
+    g_sync_weak_client = client;
     return client;
 }
 
@@ -142,10 +140,10 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
         if (m_config.sync_user_id && config.in_memory) {
-            throw MismatchedConfigException("Realm configuration is invalid: cannot open a synced Realm without a file path", config.path);
+            throw MismatchedConfigException("Realm at path '%1' cannot be opened for Sync with a misconfigured user.", config.path);
         }
         if (m_config.sync_user_id != config.sync_user_id) {
-            throw MismatchedConfigException("Realm configuration is invalid: cannot change user ID.", config.path);
+            throw MismatchedConfigException("Realm at path '%1' already opened with a different user.", config.path);
         }
         // Realm::update_schema() handles complaining about schema mismatches
     }
@@ -217,7 +215,7 @@ void RealmCoordinator::update_schema(Schema const& schema, uint64_t schema_versi
 }
 
 void RealmCoordinator::set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler,
-                                         realm::util::Logger *logger) {
+                                         realm::util::Logger* logger) {
     create_sync_client(errorHandler, logger);
 }
 
@@ -707,7 +705,7 @@ void RealmCoordinator::notify_others()
 
 void RealmCoordinator::refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url)
 {
-    if (!server_url && !m_config.sync_server_url) {
+    if (!server_url && !sync_server_url) {
         return;
     }
     if (m_sync_awaits_user_token) {
@@ -715,11 +713,11 @@ void RealmCoordinator::refresh_sync_access_token(std::string access_token, util:
 
         // Since the sync session was previously unbound, it's safe to do this from the
         // calling thread.
-        if (!m_config.sync_server_url) {
+        if (!sync_server_url) {
             // First time calling this -- move the resolved URL into the configuration
-            m_config.sync_server_url = std::move(server_url);
+            sync_server_url = std::move(server_url);
         }
-        m_sync_session->bind(*m_config.sync_server_url, std::move(access_token));
+        m_sync_session->bind(*sync_server_url, std::move(access_token));
 
         if (m_sync_deferred_commit_notification) {
             m_sync_session->nonsync_transact_notify(*m_sync_deferred_commit_notification);
