@@ -39,14 +39,19 @@ public:
     SortDescriptor& operator=(SortDescriptor const&) = default;
     SortDescriptor& operator=(SortDescriptor&&) = default;
 
-    SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices, std::vector<bool> ascending={});
+    // Create a sort descriptor for the given columns on the given table.
+    // Each vector in `column_indices` represents a chain of columns, where
+    // all but the last are Link columns (n.b.: LinkList and Backlink are not
+    // supported), and the final is any column type that can be sorted on.
+    // `column_indices` must be non-empty, and each vector within it must also
+    // be non-empty. `ascending` must either be empty or have one entry for each
+    // column index chain.
+    SortDescriptor(Table const& table,
+                   std::vector<std::vector<size_t>> column_indices,
+                   std::vector<bool> ascending={});
 
+    // returns whether this descriptor is valid and can be used to sort
     explicit operator bool() const noexcept { return !m_columns.empty(); }
-
-    // Get the updated column indices which could be used to create an identical
-    // SortDescriptor (and not the column indices originally passed to the constructor)
-    std::vector<std::vector<size_t>> get_column_indices() const;
-    std::vector<bool> get_ascending() const { return m_ascending; }
 
     // handover support
     using HandoverPatch = std::unique_ptr<SortDescriptorHandoverPatch>;

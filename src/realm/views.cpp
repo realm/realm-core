@@ -46,6 +46,8 @@ SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_
     for (size_t i = 0; i < m_columns.size(); ++i) {
         auto& columns = m_columns[i];
         auto& indices = column_indices[i];
+        REALM_ASSERT(!column_indices.empty());
+
         columns.reserve(indices.size());
         const Table* cur_table = &table;
         for (auto index : indices) {
@@ -62,25 +64,21 @@ SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_
     }
 }
 
-std::vector<std::vector<size_t>> SortDescriptor::get_column_indices() const
-{
-    std::vector<std::vector<size_t>> ret;
-    ret.reserve(m_columns.size());
-    for (auto& cols : m_columns) {
-        std::vector<size_t> indices;
-        indices.reserve(cols.size());
-        for (const ColumnBase* col : cols)
-            indices.push_back(col->get_column_index());
-        ret.push_back(std::move(indices));
-    }
-    return ret;
-}
-
-
 void SortDescriptor::generate_patch(SortDescriptor const& desc, HandoverPatch& patch)
 {
-    if (desc)
-        patch.reset(new SortDescriptorHandoverPatch{desc.get_column_indices(), desc.get_ascending()});
+    if (desc) {
+        std::vector<std::vector<size_t>> column_indices;
+        column_indices.reserve(desc.m_columns.size());
+        for (auto& cols : desc.m_columns) {
+            std::vector<size_t> indices;
+            indices.reserve(cols.size());
+            for (const ColumnBase* col : cols)
+                indices.push_back(col->get_column_index());
+            column_indices.push_back(std::move(indices));
+        }
+
+        patch.reset(new SortDescriptorHandoverPatch{std::move(column_indices), desc.m_ascending});
+    }
 }
 
 SortDescriptor SortDescriptor::create_from_and_consume_patch(HandoverPatch& patch, Table const& table)
@@ -113,11 +111,13 @@ private:
 SortDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> const& columns,
                                std::vector<bool> const& ascending, IntegerColumn const& row_indexes)
 {
+    REALM_ASSERT(!columns.empty());
     size_t num_rows = row_indexes.size();
 
     m_columns.reserve(columns.size());
     for (size_t i = 0; i < columns.size(); ++i) {
         m_columns.push_back({{}, {}, columns[i].back(), ascending[i]});
+        REALM_ASSERT_EX(!columns[i].empty(), i);
         if (columns[i].size() == 1) { // no link chain
             continue;
         }
@@ -130,7 +130,8 @@ SortDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> const
         for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
             size_t translated_index = row_indexes.get(row_ndx);
             for (size_t j = 0; j + 1 < columns[i].size(); ++j) {
-                auto link_col = static_cast<const LinkColumn*>(columns[i][j]); // type was checked when creating the SortDescriptor
+                // type was checked when creating the SortDescriptor
+                auto link_col = static_cast<const LinkColumn*>(columns[i][j]);
                 if (link_col->is_null(translated_index)) {
                     is_null[row_ndx] = true;
                     break;
