@@ -2100,6 +2100,31 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK(h.get_string(tv, 0, 5).is_null());
 }
 
+TEST(TableView_DistinctOverNullLink)
+{
+    Group g;
+    TableRef target = g.add_table("target");
+    target->add_column(type_Int, "value");
+    target->add_empty_row(2);
+    target->set_int(0, 0, 1);
+    target->set_int(0, 0, 2);
+
+    TableRef origin = g.add_table("origin");
+    origin->add_column_link(type_Link, "link", *target);
+    origin->add_empty_row(5);
+    origin->set_link(0, 0, 0);
+    origin->set_link(0, 1, 1);
+    origin->set_link(0, 2, 0);
+    origin->set_link(0, 3, 1);
+    // 4 is null
+
+    auto tv = origin->where().find_all();
+    tv.distinct(SortDescriptor(*origin, {{0, 0}}));
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_source_ndx(0), 0);
+    CHECK_EQUAL(tv.get_source_ndx(1), 1);
+}
+
 TEST(TableView_IsRowAttachedAfterClear)
 {
     Table t;

@@ -98,6 +98,18 @@ public:
 
     bool operator()(IndexPair i, IndexPair j, bool total_ordering = true) const;
 
+    bool has_links() const
+    {
+        return std::any_of(m_columns.begin(), m_columns.end(),
+                           [](auto&& col) { return !col.translated_row.empty(); });
+    }
+
+    bool any_is_null(IndexPair i) const
+    {
+        return std::any_of(m_columns.begin(), m_columns.end(),
+                           [=](auto&& col) { return col.is_null[i.index_in_view]; });
+    }
+
 private:
     struct SortColumn {
         std::vector<bool> is_null;
@@ -206,6 +218,13 @@ void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& dist
         // Sort by the columns to distinct on
         auto sorting_predicate = distinct.sorter(m_row_indexes);
         std::sort(v.begin(), v.end(), std::ref(sorting_predicate));
+
+        // Remove all rows which have a null link along the way to the distinct columns
+        if (sorting_predicate.has_links()) {
+            v.erase(std::remove_if(v.begin(), v.end(), [&](auto&& index) {
+                return sorting_predicate.any_is_null(index);
+            }), v.end());
+        }
 
         // Remove all duplicates
         v.erase(std::unique(v.begin(), v.end(), [&](auto&& a, auto&& b) {
