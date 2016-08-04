@@ -257,7 +257,7 @@ size_t BasicArray<T>::calc_byte_len(size_t for_size, size_t) const
     // is done by returning the aligned version, and most callers of
     // calc_byte_len() will actually benefit if calc_byte_len() was
     // changed to always return the aligned byte size.
-    return header_size + for_size * sizeof (T); // FIXME: Prone to overflow
+    return header_size + for_size * sizeof (T); 
 }
 
 template<class T>
