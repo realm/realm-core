@@ -520,8 +520,9 @@ bool Realm::refresh()
     return true;
 }
 
-void Realm::setup_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger) {
-    RealmCoordinator::setup_sync_client(std::move(errorHandler), logger);
+void Realm::set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger)
+{
+    RealmCoordinator::set_up_sync_client(std::move(errorHandler), logger);
 }
 
 bool Realm::can_deliver_notifications() const noexcept
@@ -574,7 +575,8 @@ void Realm::notify_others() const
     m_coordinator->notify_others();
 }
 
-bool Realm::refresh_sync_access_token(std::string access_token, StringData path, util::Optional<std::string> sync_url) {
+bool Realm::refresh_sync_access_token(std::string access_token, StringData path, util::Optional<std::string> sync_url)
+{
     auto coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(path);
     if (coordinator) {
         coordinator->refresh_sync_access_token(std::move(access_token), std::move(sync_url));

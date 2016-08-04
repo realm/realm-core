@@ -216,7 +216,7 @@ void RealmCoordinator::update_schema(Schema const& schema, uint64_t schema_versi
     // FIXME: notify realms of the schema change
 }
 
-void RealmCoordinator::setup_sync_client(std::function<sync::Client::ErrorHandler> errorHandler,
+void RealmCoordinator::set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler,
                                          realm::util::Logger *logger) {
     create_sync_client(errorHandler, logger);
 }
@@ -707,7 +707,7 @@ void RealmCoordinator::notify_others()
 
 void RealmCoordinator::refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url)
 {
-    if (server_url == util::none && m_config.sync_server_url == util::none) {
+    if (!server_url && !m_config.sync_server_url) {
         return;
     }
     if (m_sync_awaits_user_token) {
@@ -715,9 +715,9 @@ void RealmCoordinator::refresh_sync_access_token(std::string access_token, util:
 
         // Since the sync session was previously unbound, it's safe to do this from the
         // calling thread.
-        if (m_config.sync_server_url == util::none) {
+        if (!m_config.sync_server_url) {
             // First time calling this -- move the resolved URL into the configuration
-            m_config.sync_server_url = move(server_url);
+            m_config.sync_server_url = std::move(server_url);
         }
         m_sync_session->bind(*m_config.sync_server_url, std::move(access_token));
 

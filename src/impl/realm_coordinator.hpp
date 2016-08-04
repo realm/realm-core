@@ -75,7 +75,7 @@ public:
     static void clear_all_caches();
 
     // FIXME: this should be moved out of the coordinator once we separate sync from the object store
-    static void setup_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger);
+    static void set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger);
 
     // Explicit constructor/destructor needed for the unique_ptrs to forward-declared types
     RealmCoordinator();

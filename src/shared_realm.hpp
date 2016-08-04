@@ -22,8 +22,6 @@
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
-
-#include <realm/util/logger.hpp>
 #include <realm/sync/client.hpp>
 
 #include <memory>
@@ -119,7 +117,7 @@ public:
     // migration function is only required if you wish to use the ObjectStore
     // functions which take a Schema from within the migration function.
     using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
-    using LoginFunction = std::function<void(std::string&)>;
+    using LoginFunction = std::function<void(const std::string&)>;
     using SyncErrorHandler = std::function<sync::Client::ErrorHandler>;
 
     struct Config {
@@ -160,7 +158,7 @@ public:
 
         // The user ID of the Realm Sync user. The presence of a value is the source of truth indicating that the Realm
         // should be synced.
-        util::Optional<std::string> sync_user_id = util::none;
+        util::Optional<std::string> sync_user_id;
         // A function that is used to ask the binding to commence the login process. The binding is responsible for
         // calling the `bind()` API on the shared Realm once the login process is complete. This may happen
         // asynchronously.
@@ -170,8 +168,9 @@ public:
 
         util::RootLogger *logger = nullptr;
 
-        // The verified, resolved URL of the remote synced Realm. DO NOT SET THIS YOURSELF.
-        util::Optional<std::string> sync_server_url = util::none;
+        // FIXME: This probably doesn't belong here; move it somewhere appropriate.
+        // The verified, resolved URL of the remote synced Realm. Should not be set by binding.
+        util::Optional<std::string> sync_server_url;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
@@ -255,7 +254,7 @@ public:
                                           util::Optional<std::string> sync_url);
 
     // FIXME: this should be moved out of the Realm code once we separate sync from the object store
-    static void setup_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger);
+    static void set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger);
 
 private:
     Config m_config;
