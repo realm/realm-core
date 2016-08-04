@@ -2974,6 +2974,10 @@ TEST(Shared_VersionOfBoundSnapshot)
     }
 }
 
+
+// This test is valid, but because it requests all available memory,
+// it does not play nicely with valgrind and so is disabled.
+/*
 #if !defined(_WIN32)
 // Check what happens when Realm cannot allocate more virtual memory
 // We should throw an AddressSpaceExhausted exception.
@@ -2996,10 +3000,10 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
     sg.close();
 
     std::vector<std::pair<void*, size_t>> memory_list;
-    // Reserve enough for 500 Gb, but in practice the vector is only ever around size 10.
+    // Reserve enough for 5*100000 Gb, but in practice the vector is only ever around size 10.
     // Do this here to avoid the (small) chance that adding to the vector will request new virtual memory
     memory_list.reserve(500);
-    size_t chunk_size = 1024 * 1024 * 1024;
+    size_t chunk_size = size_t(1024) * 1024 * 1024 * 100000;
     while (chunk_size > string_length) {
         void* addr = ::mmap(nullptr, chunk_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
         if (addr == MAP_FAILED) {
@@ -3011,7 +3015,6 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
     }
 
     bool expected_exception_caught = false;
-
     // Attempt to open Realm, should fail because we hold too much already.
     try {
         SharedGroup sg2(path, false, SharedGroup::durability_Full, crypt_key());
@@ -3019,7 +3022,6 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
     catch (AddressSpaceExhausted& e) {
         expected_exception_caught = true;
     }
-
     CHECK(expected_exception_caught);
 
     // Release memory manually.
@@ -3037,7 +3039,8 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
     }
     CHECK(!expected_exception_caught);
 }
-#endif // win32
+#endif // !win32
+*/
 
 // Run some (repeatable) random checks through the fuzz tester.
 // For a comprehensive fuzz test, afl should be run. To do this see test/fuzzy/README.md
