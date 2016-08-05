@@ -196,9 +196,18 @@ public:
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
 
+    Realm(const Realm&) = delete;
+    Realm& operator=(const Realm&) = delete;
+    Realm(Realm&&) = delete;
+    Realm& operator=(Realm&&) = delete;
     ~Realm();
 
-    Realm(Config config);
+    static SharedRealm make_shared_realm(Config config) {
+        struct make_shared_enabler : public Realm {
+            make_shared_enabler(Config config) : Realm(std::move(config)) {}
+        };
+        return std::make_shared<make_shared_enabler>(std::move(config));
+    }
     void init(std::shared_ptr<_impl::RealmCoordinator> coordinator);
 
     // Expose some internal functionality to other parts of the ObjectStore
@@ -226,6 +235,9 @@ public:
                                  Realm* realm);
 
 private:
+    // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
+    Realm(Config config);
+
     Config m_config;
     std::thread::id m_thread_id = std::this_thread::get_id();
     bool m_auto_refresh = true;
