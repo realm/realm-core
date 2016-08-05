@@ -3609,8 +3609,6 @@ void deleter_thread(TestContext& test_context,
         // after the potentially synchronizing locking
         // operation inside queue.get()
         while (delay > 0) delay--;
-        if (!closed)
-            CHECK(r->is_attached());
         // just let 'r' die
     }
 }
@@ -3676,12 +3674,23 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
         TableRef target = g.get_table("target");
         int ndx = random.draw_int_mod(table_size);
         LinkViewRef lw = origin->get_linklist(0,ndx);
-        bool will_modify = 
-            change_frequency_per_mill > random.draw_int_mod(1000000);
+        bool will_modify = change_frequency_per_mill > random.draw_int_mod(1000000);
         if (will_modify) {
-            LangBindHelper::promote_to_write(sg);
-            lw->add(ndx);
-            LangBindHelper::commit_and_continue_as_read(sg);
+            int modification_type = random.draw_int_mod(2);
+            switch (modification_type) {
+                case 0: {
+                    LangBindHelper::promote_to_write(sg);
+                    lw->add(ndx);
+                    LangBindHelper::commit_and_continue_as_read(sg);
+                    break;
+                }
+                case 1: {
+                    LangBindHelper::promote_to_write(sg);
+                    origin->move_last_over(random.draw_int_mod(table_size));
+                    origin->add_empty_row();
+                    LangBindHelper::commit_and_continue_as_read(sg);
+                }
+            }
         }
         queue.put(lw);
     }
