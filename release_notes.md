@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Improve performance of sorting on non-nullable int columns.
+* Improve performance of sorting on non-nullable columns.
 
 -----------
 
