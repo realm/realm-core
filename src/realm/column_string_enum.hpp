@@ -184,7 +184,7 @@ inline StringData StringEnumColumn::get(size_t ndx) const noexcept
 
 inline bool StringEnumColumn::is_null(size_t ndx) const noexcept
 {
-    return is_nullable() ? get(ndx).is_null() : false;
+    return is_nullable() && get(ndx).is_null();
 }
 
 inline void StringEnumColumn::add()

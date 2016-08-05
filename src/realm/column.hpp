@@ -1084,7 +1084,7 @@ T Column<T>::get(size_t ndx) const noexcept
 template<class T>
 bool Column<T>::is_null(size_t ndx) const noexcept
 {
-    return m_tree.is_null(ndx);
+    return nullable && m_tree.is_null(ndx);
 }
 
 template<class T>
