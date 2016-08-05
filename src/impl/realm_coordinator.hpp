@@ -131,7 +131,7 @@ private:
 
     std::shared_ptr<SyncClient> m_sync_client;
     std::unique_ptr<sync::Session> m_sync_session;
-    bool m_sync_awaits_user_token = false;
+    bool m_sync_awaits_user_token = true;
     util::Optional<int_fast64_t> m_sync_deferred_commit_notification;
 
     // The fully-resolved URL of this Realm if it's synced, including the server and the path.

@@ -70,27 +70,23 @@ private:
 }
 
 static std::mutex g_sync_client_mutex;
-static std::weak_ptr<SyncClient> g_sync_weak_client;
+static std::shared_ptr<SyncClient> g_sync_client;
 
 static std::shared_ptr<SyncClient> get_sync_client()
 {
     std::lock_guard<std::mutex> lock(g_sync_client_mutex);
-    if (auto client = g_sync_weak_client.lock()) {
-        return client;
-    }
-    REALM_ASSERT(false);    // Object store should never call this before creating the client first.
+    REALM_ASSERT(g_sync_client);
+    return g_sync_client;
 }
 
-static std::shared_ptr<SyncClient> create_sync_client(std::function<sync::Client::ErrorHandler> handler,
+static void create_sync_client(std::function<sync::Client::ErrorHandler> handler,
                                                       realm::util::Logger* logger)
 {
     std::lock_guard<std::mutex> lock(g_sync_client_mutex);
-    REALM_ASSERT(!g_sync_weak_client.lock());   // Object store should never call this more than once.
+    REALM_ASSERT(!g_sync_client);   // Object store should never call this more than once.
     sync::Client::Config client_config;
     client_config.logger = logger;
-    auto client = std::make_shared<SyncClient>(sync::Client(client_config), std::move(handler));
-    g_sync_weak_client = client;
-    return client;
+    g_sync_client = std::make_shared<SyncClient>(sync::Client(client_config), std::move(handler));
 }
 
 static std::mutex s_coordinator_mutex;
