@@ -70,17 +70,17 @@ private:
 class RowIndexes {
 public:
     RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc) :
-#ifdef REALM_COOKIE_CHECK
-        cookie(cookie_expected),
-#endif
         m_row_indexes(urt, alloc)
+#ifdef REALM_COOKIE_CHECK
+        , cookie(cookie_expected)
+#endif
     {}
 
     RowIndexes(IntegerColumn&& col) :
-#ifdef REALM_COOKIE_CHECK
-        cookie(cookie_expected),
-#endif
         m_row_indexes(std::move(col))
+#ifdef REALM_COOKIE_CHECK
+        , cookie(cookie_expected)
+#endif
     {}
 
     RowIndexes(const RowIndexes& source, ConstSourcePayload mode);
