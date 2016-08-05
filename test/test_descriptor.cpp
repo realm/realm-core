@@ -262,8 +262,8 @@ TEST(Descriptor_SubtableColumn)
         CHECK_EQUAL(subdesc, subdesc_2);
     }
     {
-        DescriptorRef desc_2 = subdesc->get_parent();
-        CHECK_EQUAL(desc, desc_2);
+        Descriptor* desc_2 = subdesc->get_parent();
+        CHECK_EQUAL(desc.get(), desc_2);
     }
     {
         TableRef table_2 = desc->get_root_table();
@@ -279,29 +279,29 @@ TEST(Descriptor_SubtableColumn)
     CHECK(subdesc->is_attached());
     desc.reset();
     CHECK(subdesc->is_attached());
-    desc = subdesc->get_parent();
-    CHECK(desc->is_attached());
+    Descriptor* desc_ptr = subdesc->get_parent();
+    CHECK(desc_ptr->is_attached());
     CHECK(subdesc->is_attached());
-    CHECK(desc->is_root());
+    CHECK(desc_ptr->is_root());
     CHECK(!subdesc->is_root());
-    table = desc->get_root_table();
+    table = desc_ptr->get_root_table();
     CHECK(table->is_attached());
-    CHECK(desc->is_attached());
+    CHECK(desc_ptr->is_attached());
     CHECK(subdesc->is_attached());
     CHECK(!table->has_shared_type());
-    CHECK(desc->is_root());
+    CHECK(desc_ptr->is_root());
     CHECK(!subdesc->is_root());
-    CHECK(!desc->get_parent());
+    CHECK(!desc_ptr->get_parent());
     {
         DescriptorRef desc_2 = table->get_descriptor();
-        CHECK_EQUAL(desc, desc_2);
-        desc_2 = subdesc->get_parent();
-        CHECK_EQUAL(desc, desc_2);
+        CHECK_EQUAL(desc_ptr, desc_2.get());
+        Descriptor* desc_ptr_2 = subdesc->get_parent();
+        CHECK_EQUAL(desc_ptr, desc_ptr_2);
     }
     {
         DescriptorRef subdesc_2 = table->get_subdescriptor(1);
         CHECK_EQUAL(subdesc, subdesc_2);
-        subdesc_2 = desc->get_subdescriptor(1);
+        subdesc_2 = desc_ptr->get_subdescriptor(1);
         CHECK_EQUAL(subdesc, subdesc_2);
     }
 
@@ -310,16 +310,16 @@ TEST(Descriptor_SubtableColumn)
     subdesc->add_column(type_String, "bar");
     subdesc->remove_column(1);
     CHECK(table->is_attached());
-    CHECK(desc->is_attached());
+    CHECK(desc_ptr->is_attached());
     CHECK(subdesc->is_attached());
-    CHECK_EQUAL(2, desc->get_column_count());
-    CHECK_EQUAL(type_Int,   desc->get_column_type(0));
-    CHECK_EQUAL(type_Table, desc->get_column_type(1));
-    CHECK_EQUAL("alpha", desc->get_column_name(0));
-    CHECK_EQUAL("beta",  desc->get_column_name(1));
-    CHECK_EQUAL(not_found, desc->get_column_index("foo"));
-    CHECK_EQUAL(0, desc->get_column_index("alpha"));
-    CHECK_EQUAL(1, desc->get_column_index("beta"));
+    CHECK_EQUAL(2, desc_ptr->get_column_count());
+    CHECK_EQUAL(type_Int,   desc_ptr->get_column_type(0));
+    CHECK_EQUAL(type_Table, desc_ptr->get_column_type(1));
+    CHECK_EQUAL("alpha", desc_ptr->get_column_name(0));
+    CHECK_EQUAL("beta",  desc_ptr->get_column_name(1));
+    CHECK_EQUAL(not_found, desc_ptr->get_column_index("foo"));
+    CHECK_EQUAL(0, desc_ptr->get_column_index("alpha"));
+    CHECK_EQUAL(1, desc_ptr->get_column_index("beta"));
     CHECK_EQUAL(1, subdesc->get_column_count());
     CHECK_EQUAL(type_Int, subdesc->get_column_type(0));
     CHECK_EQUAL("foo", subdesc->get_column_name(0));
@@ -327,47 +327,47 @@ TEST(Descriptor_SubtableColumn)
     CHECK_EQUAL(0, subdesc->get_column_index("foo"));
 
     // Test rename of subtable column
-    desc->rename_column(0, "alpha_2");
-    desc->rename_column(1, "beta_2");
+    desc_ptr->rename_column(0, "alpha_2");
+    desc_ptr->rename_column(1, "beta_2");
     CHECK(table->is_attached());
-    CHECK(desc->is_attached());
+    CHECK(desc_ptr->is_attached());
     CHECK(subdesc->is_attached());
-    CHECK_EQUAL(2, desc->get_column_count());
-    CHECK_EQUAL(type_Int,   desc->get_column_type(0));
-    CHECK_EQUAL(type_Table, desc->get_column_type(1));
-    CHECK_EQUAL("alpha_2", desc->get_column_name(0));
-    CHECK_EQUAL("beta_2",  desc->get_column_name(1));
-    CHECK_EQUAL(not_found, desc->get_column_index("alpha"));
-    CHECK_EQUAL(not_found, desc->get_column_index("beta"));
-    CHECK_EQUAL(0, desc->get_column_index("alpha_2"));
-    CHECK_EQUAL(1, desc->get_column_index("beta_2"));
+    CHECK_EQUAL(2, desc_ptr->get_column_count());
+    CHECK_EQUAL(type_Int,   desc_ptr->get_column_type(0));
+    CHECK_EQUAL(type_Table, desc_ptr->get_column_type(1));
+    CHECK_EQUAL("alpha_2", desc_ptr->get_column_name(0));
+    CHECK_EQUAL("beta_2",  desc_ptr->get_column_name(1));
+    CHECK_EQUAL(not_found, desc_ptr->get_column_index("alpha"));
+    CHECK_EQUAL(not_found, desc_ptr->get_column_index("beta"));
+    CHECK_EQUAL(0, desc_ptr->get_column_index("alpha_2"));
+    CHECK_EQUAL(1, desc_ptr->get_column_index("beta_2"));
 
     // Remove integer column and see that the subtable column still
     // works
-    desc->remove_column(0);
+    desc_ptr->remove_column(0);
     CHECK(table->is_attached());
-    CHECK(desc->is_attached());
+    CHECK(desc_ptr->is_attached());
     CHECK(subdesc->is_attached());
-    CHECK_EQUAL(1, desc->get_column_count());
-    CHECK_EQUAL(type_Table, desc->get_column_type(0));
-    CHECK_EQUAL("beta_2",  desc->get_column_name(0));
-    CHECK_EQUAL(not_found, desc->get_column_index("alpha_2"));
-    CHECK_EQUAL(0, desc->get_column_index("beta_2"));
+    CHECK_EQUAL(1, desc_ptr->get_column_count());
+    CHECK_EQUAL(type_Table, desc_ptr->get_column_type(0));
+    CHECK_EQUAL("beta_2",  desc_ptr->get_column_name(0));
+    CHECK_EQUAL(not_found, desc_ptr->get_column_index("alpha_2"));
+    CHECK_EQUAL(0, desc_ptr->get_column_index("beta_2"));
     {
-        DescriptorRef subdesc_2 = desc->get_subdescriptor(0);
+        DescriptorRef subdesc_2 = desc_ptr->get_subdescriptor(0);
         CHECK_EQUAL(subdesc, subdesc_2);
     }
     subdesc->add_column(type_String, "bar");
     subdesc->add_column(type_Float,  "baz");
     subdesc->remove_column(2);
     CHECK(table->is_attached());
-    CHECK(desc->is_attached());
+    CHECK(desc_ptr->is_attached());
     CHECK(subdesc->is_attached());
-    CHECK_EQUAL(1, desc->get_column_count());
-    CHECK_EQUAL(type_Table, desc->get_column_type(0));
-    CHECK_EQUAL("beta_2",  desc->get_column_name(0));
-    CHECK_EQUAL(not_found, desc->get_column_index("foo"));
-    CHECK_EQUAL(0, desc->get_column_index("beta_2"));
+    CHECK_EQUAL(1, desc_ptr->get_column_count());
+    CHECK_EQUAL(type_Table, desc_ptr->get_column_type(0));
+    CHECK_EQUAL("beta_2",  desc_ptr->get_column_name(0));
+    CHECK_EQUAL(not_found, desc_ptr->get_column_index("foo"));
+    CHECK_EQUAL(0, desc_ptr->get_column_index("beta_2"));
     CHECK_EQUAL(2, subdesc->get_column_count());
     CHECK_EQUAL(type_Int,    subdesc->get_column_type(0));
     CHECK_EQUAL(type_String, subdesc->get_column_type(1));
@@ -425,8 +425,8 @@ TEST(Descriptor_Subtables)
     subtab_2.reset();
     subtab_3.reset();
     desc.reset();
-    desc = subdesc->get_parent();
-    table = desc->get_root_table();
+    Descriptor* desc_ptr = subdesc->get_parent();
+    table = desc_ptr->get_root_table();
     subtab_1 = table->get_subtable(0,0);
     subtab_2 = table->get_subtable(0,1);
     subtab_3 = table->get_subtable(0,2);
@@ -459,6 +459,7 @@ TEST(Descriptor_DeeplyNested)
     // Build a long branch of subtable columns
     TableRef table = Table::create();
     DescriptorRef desc = table->get_descriptor(), subdesc;
+    Descriptor* desc_ptr;
     for (int i = 0; i != 128; ++i) {
         desc->add_column(type_Int,   "foo");
         desc->add_column(type_Table, "bar", &subdesc);
@@ -466,23 +467,25 @@ TEST(Descriptor_DeeplyNested)
         CHECK(!subdesc->is_root());
         desc = subdesc;
     }
+    desc_ptr = desc.get();
 
     // Check that parents are correct
     for (int i = 0; i != 128; ++i) {
-        desc = desc->get_parent();
-        CHECK(desc);
+        desc_ptr = desc_ptr->get_parent();
+        CHECK(desc_ptr);
     }
-    CHECK(desc->is_root());
+    CHECK(desc_ptr->is_root());
 
     // Add many more columns at each nesting level
     for (int i = 0; i != 128; ++i) {
-        desc->insert_column(0, type_Int, "a");
-        desc->insert_column(2, type_Int, "b");
-        desc->insert_column(4, type_Int, "c");
-        desc->add_column(type_Table, "baz", &subdesc);
+        desc_ptr->insert_column(0, type_Int, "a");
+        desc_ptr->insert_column(2, type_Int, "b");
+        desc_ptr->insert_column(4, type_Int, "c");
+        desc_ptr->add_column(type_Table, "baz", &subdesc);
         for (int i_2 = 0; i_2 != i; ++i_2)
             subdesc->add_column(type_Bool, "dummy");
-        desc = desc->get_subdescriptor(3); // bar
+        desc = desc_ptr->get_subdescriptor(3); // bar
+        desc_ptr = desc.get();
     }
 
     // Check that everything is all right
@@ -518,7 +521,7 @@ TEST(Descriptor_DeeplyNested)
         CHECK_EQUAL(i == 0 ? not_found : 0,
                     subdesc->get_column_index("dummy"));
         subdesc = desc->get_subdescriptor(3); // bar
-        CHECK_EQUAL(desc, subdesc->get_parent());
+        CHECK_EQUAL(desc.get(), subdesc->get_parent());
         desc = subdesc;
     }
 }

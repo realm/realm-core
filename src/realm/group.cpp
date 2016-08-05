@@ -1510,11 +1510,11 @@ public:
         if (m_table) {
             REALM_ASSERT(!m_table->has_shared_type());
             typedef _impl::TableFriend tf;
-            Descriptor* desc = tf::get_root_table_desc_accessor(*m_table);
+            DescriptorRef desc = tf::get_root_table_desc_accessor(*m_table);
             int i = 0;
             while (desc) {
                 if (i >= levels) {
-                    m_desc.reset(desc);
+                    m_desc = desc;
                     break;
                 }
                 typedef _impl::DescriptorFriend df;
@@ -1539,8 +1539,9 @@ public:
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
         typedef _impl::DescriptorFriend df;
-        if (m_desc)
-            df::adj_insert_column(*m_desc, col_ndx);
+        DescriptorRef desc = m_desc.lock();
+        if (desc)
+            df::adj_insert_column(*desc, col_ndx);
 
         m_schema_changed = true;
 
@@ -1570,9 +1571,10 @@ public:
                 tf::mark(*target);
             }
         }
-        if (m_desc) {
+        DescriptorRef desc = m_desc.lock();
+        if (desc) {
             using df = _impl::DescriptorFriend;
-            df::adj_insert_column(*m_desc, col_ndx);
+            df::adj_insert_column(*desc, col_ndx);
         }
 
         m_schema_changed = true;
@@ -1587,9 +1589,11 @@ public:
             EraseColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        typedef _impl::DescriptorFriend df;
-        if (m_desc)
-            df::adj_erase_column(*m_desc, col_ndx);
+        DescriptorRef desc = m_desc.lock();
+        if (desc) {
+            using df = _impl::DescriptorFriend;
+            df::adj_erase_column(*desc, col_ndx);
+        }
 
         m_schema_changed = true;
 
@@ -1617,9 +1621,10 @@ public:
             using tf = _impl::TableFriend;
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        if (m_desc) {
+        DescriptorRef desc = m_desc.lock();
+        if (desc) {
             using df = _impl::DescriptorFriend;
-            df::adj_erase_column(*m_desc, col_ndx);
+            df::adj_erase_column(*desc, col_ndx);
         }
 
         m_schema_changed = true;
@@ -1640,9 +1645,10 @@ public:
             MoveColumnUpdater updater(col_ndx_1, col_ndx_2);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
+        DescriptorRef desc = m_desc.lock();
         typedef _impl::DescriptorFriend df;
-        if (m_desc)
-            df::adj_move_column(*m_desc, col_ndx_1, col_ndx_2);
+        if (desc)
+            df::adj_move_column(*desc, col_ndx_1, col_ndx_2);
 
         m_schema_changed = true;
 
@@ -1728,7 +1734,8 @@ public:
 private:
     Group& m_group;
     TableRef m_table;
-    DescriptorRef m_desc;
+    // Table has the ownership of Descriptor. Use weak ref to avoid circular refs.
+    std::weak_ptr<Descriptor> m_desc;
     const size_t* m_desc_path_begin;
     const size_t* m_desc_path_end;
     bool& m_schema_changed;

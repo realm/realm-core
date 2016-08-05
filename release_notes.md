@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Use shared_ptr for Descriptor to ensure the thread safety of destructors.
 
 ### Breaking changes
 
