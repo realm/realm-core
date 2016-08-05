@@ -316,6 +316,8 @@ simulator_pairs = {
     end
 end
 
+# alias to make CI happy. Ideally we should agree on a single name for iOS and use it everywhere.
+task 'build-iphone' => 'build-iphoneos'
 
 apple_static_library_targets = (['-dbg', ''].map do |dbg|
     REALM_COCOA_PLATFORMS.map {|p| p == 'iphone' ? ['ios-bitcode', 'ios-no-bitcode'] : p}.
