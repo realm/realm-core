@@ -439,6 +439,28 @@ public:
     // which means it won't be freed here.
     Descriptor(Table* table, Spec* spec) noexcept;
 
+    // Called by the descriptor that becomes its parent to create a
+    // sub descriptor.
+    //
+    // Puts this descriptor accessor into the attached state. This
+    // attaches it to the underlying structure of array nodes. It does
+    // not establish the parents reference to this descriptor, that is
+    // the job of the parent. When this function returns,
+    // is_attached() will return true.
+    //
+    // Not idempotent.
+    //
+    // The specified table is not allowed to be a subtable with a
+    // shareable spec. That is, Table::has_shared_spec() must return
+    // false.
+    //
+    // The specified spec must be the spec of one of its direct or
+    // indirect subtable columns.
+    //
+    // The created descriptor owns the specified spec which means it
+    // will free it.
+    Descriptor(Table* table, Descriptor* parent, Spec* spec) noexcept;
+
     ~Descriptor() noexcept;
 
 
@@ -466,28 +488,6 @@ private:
     // concurrent operations on the map anymore.
     // If it is a sub destructor, no operation on its parent's map.
     mutable subdesc_map m_subdesc_map;
-
-    // Called by the descriptor that becomes its parent to create a
-    // sub descriptor.
-    //
-    // Puts this descriptor accessor into the attached state. This
-    // attaches it to the underlying structure of array nodes. It does
-    // not establish the parents reference to this descriptor, that is
-    // the job of the parent. When this function returns,
-    // is_attached() will return true.
-    //
-    // Not idempotent.
-    //
-    // The specified table is not allowed to be a subtable with a
-    // shareable spec. That is, Table::has_shared_spec() must return
-    // false.
-    //
-    // The specified spec must be the spec of one of its direct or
-    // indirect subtable columns.
-    //
-    // The created descriptor owns the specified spec which means it
-    // will free it.
-    Descriptor(Table* table, Descriptor* parent, Spec* spec) noexcept;
 
     // Detach accessor from underlying descriptor.
     //
@@ -518,14 +518,6 @@ private:
     // indexes will be stored between `begin_2`and `end`, where
     // `begin_2` is the returned pointer.
     size_t* record_subdesc_path(size_t* begin, size_t* end) const noexcept;
-
-    // Returns a pointer to the accessor of the specified
-    // subdescriptor if that accessor exists, otherwise this function
-    // return null.
-    // The parent descriptor creates and owns the sub descriptor. Don't hold
-    // a shared ref to the returned descriptor if the caller has been holding
-    // a TableRef already.
-    DescriptorRef get_subdesc_accessor(size_t column_ndx) noexcept;
 
     void move_column(size_t from_ndx, size_t to_ndx);
 
@@ -807,11 +799,6 @@ public:
                                             size_t* end) noexcept
     {
         return desc.record_subdesc_path(begin, end);
-    }
-
-    static DescriptorRef get_subdesc_accessor(Descriptor& desc, size_t column_ndx) noexcept
-    {
-        return desc.get_subdesc_accessor(column_ndx);
     }
 
     static void move_column(Descriptor& desc, size_t from_ndx, size_t to_ndx)

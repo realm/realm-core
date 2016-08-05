@@ -1517,9 +1517,8 @@ public:
                     m_desc = desc;
                     break;
                 }
-                typedef _impl::DescriptorFriend df;
                 size_t col_ndx = path[i];
-                desc = df::get_subdesc_accessor(*desc, col_ndx);
+                desc = desc->get_subdescriptor(col_ndx);
                 ++i;
             }
             m_desc_path_begin = path;

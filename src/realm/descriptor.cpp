@@ -28,16 +28,19 @@ using namespace realm::util;
 
 DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 {
+    REALM_ASSERT(is_attached());
+
     // Reuse the the descriptor accessor if it is already in the map
-    DescriptorRef subdesc = get_subdesc_accessor(column_ndx);
-    if (subdesc) {
-        return subdesc;
+    for (const auto& it: m_subdesc_map) {
+        if (it.m_column_ndx == column_ndx)
+            return it.m_subdesc;
     }
 
     // Create a new descriptor accessor
     SubspecRef subspec_ref = m_spec->get_subtable_spec(column_ndx);
     std::unique_ptr<Spec> subspec(new Spec(subspec_ref));
-    subdesc.reset(new Descriptor(m_root_table.get(), this, subspec.get()));
+    DescriptorRef subdesc =
+        std::make_shared<Descriptor>(m_root_table.get(), this, subspec.get());
     m_subdesc_map.push_back(subdesc_entry(column_ndx, subdesc));
     subspec.release();
 
@@ -113,18 +116,6 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const noexce
         desc = parent;
     }
 }
-
-DescriptorRef Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
-{
-    REALM_ASSERT(is_attached());
-
-    for (const auto& subdesc : m_subdesc_map) {
-        if (subdesc.m_column_ndx == column_ndx)
-            return subdesc.m_subdesc;
-    }
-    return DescriptorRef();
-}
-
 
 void Descriptor::adj_insert_column(size_t col_ndx) noexcept
 {

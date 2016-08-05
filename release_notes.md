@@ -3,6 +3,7 @@
 ### Bugfixes
 
 * Use shared_ptr for Descriptor to ensure the thread safety of destructors.
+* Fix a misusing of get_subdesc_accessor in group.
 
 ### Breaking changes
 
