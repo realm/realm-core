@@ -17,6 +17,8 @@
 ### Internals
 
 * Updated the header license to prepare for open sourcing the code.
+* Changed instruction log format of Set instructions to be more amenable to the
+  addition of future variants.
 
 ----------------------------------------------
 
