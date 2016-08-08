@@ -239,7 +239,9 @@ void SubtableColumnBase::SubtableMap::recursive_mark() noexcept
 
 void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_parent)
 {
-    for (const auto& entry : m_entries) {
+    // iterate backwards by index because entries may be removed during iteration
+    for (size_t i = m_entries.size(); i > 0; --i) {
+        const auto& entry = m_entries[i - 1];
         // Must hold a counted reference while refreshing
         TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
