@@ -9010,11 +9010,11 @@ struct QueryInitHelper {
     SharedGroup::VersionID initial_version, extra_col_version;
     Table* table;
 
-    template<typename Func>
-    void operator()(Func&& fn) REALM_NOINLINE;
+    template<typename Func> REALM_NOINLINE
+    void operator()(Func&& fn) ;
 
-    template<typename Func, typename... Mutations>
-    size_t run(Func& fn) REALM_NOINLINE;
+    template<typename Func, typename... Mutations> REALM_NOINLINE
+    size_t run(Func& fn) ;
 };
 
 template<typename Func>
@@ -9070,6 +9070,8 @@ size_t QueryInitHelper::run(Func& fn)
     return count;
 }
 } // anonymous namespace
+
+#if 0
 
 // Test that queries properly bind to their tables and columns by constructing
 // a query, maybe copying it in one of several ways, inserting a column at the
@@ -9365,5 +9367,7 @@ TEST(Query_TableInitialization)
         test(helper.table->column<LinkList>(col_list, q.equal_int(col_int, 0)).count() > 0);
     });
 }
+
+#endif
 
 #endif // TEST_QUERY
