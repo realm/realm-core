@@ -62,8 +62,8 @@ size_t Descriptor::get_num_unique_values(size_t column_ndx) const
 
 Descriptor::~Descriptor() noexcept
 {
-    // Called when m_subdesc_map.clear()
     if (m_parent) {
+        // Sub descriptor own the m_spec
         delete m_spec;
     }
     // Detach the sub descriptors in case there are others holding
@@ -72,12 +72,15 @@ Descriptor::~Descriptor() noexcept
     m_root_table.reset();
 }
 
-void Descriptor::detach() noexcept
+void Descriptor::detach(bool is_root) noexcept
 {
     REALM_ASSERT(is_attached());
+    REALM_ASSERT((is_root && this->is_root()) || (!is_root && !(this->is_root())));
+    (void)is_root; // Unused warning for release build
+
     detach_subdesc_accessors();
     // Detach will only reset the m_root_table to make the is_attached
-    // return false. It is the desctructor's responsibility to free other
+    // return false. It is the destructor's responsibility to free other
     // resources.
     m_root_table.reset();
 }
@@ -86,7 +89,7 @@ void Descriptor::detach() noexcept
 void Descriptor::detach_subdesc_accessors() noexcept
 {
     for (const auto& subdesc : m_subdesc_map) {
-        subdesc.m_subdesc->detach();
+        subdesc.m_subdesc->detach(false);
     }
     m_subdesc_map.clear();
 }
@@ -139,7 +142,7 @@ void Descriptor::adj_erase_column(size_t col_ndx) noexcept
     for (iter i = m_subdesc_map.begin(); i != end; ++i) {
         if (i->m_column_ndx == col_ndx) {
             // Detach it in case there are others holding refs to it.
-            i->m_subdesc->detach();
+            i->m_subdesc->detach(false);
             erase = i;
         }
         else if (i->m_column_ndx > col_ndx) {

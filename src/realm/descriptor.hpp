@@ -504,7 +504,7 @@ private:
     // outside to detach a sub descriptor.
     //
     // Not idempotent.
-    void detach() noexcept;
+    void detach(bool is_root) noexcept;
 
     // Recursively detach all subtable descriptor accessors that
     // exist, that is, all subtable descriptor accessors that have
@@ -773,7 +773,7 @@ public:
 
     static void detach(Descriptor& desc) noexcept
     {
-        desc.detach();
+        desc.detach(true);
     }
     static Table& get_root_table(Descriptor& desc) noexcept
     {
