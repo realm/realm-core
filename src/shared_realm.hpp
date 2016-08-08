@@ -22,6 +22,7 @@
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
+#include <realm/sync/client.hpp>
 
 #include <memory>
 #include <thread>
@@ -116,6 +117,8 @@ public:
     // migration function is only required if you wish to use the ObjectStore
     // functions which take a Schema from within the migration function.
     using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
+    using LoginFunction = std::function<void(const std::string&)>;
+    using SyncErrorHandler = std::function<sync::Client::ErrorHandler>;
 
     struct Config {
         std::string path;
@@ -153,8 +156,15 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
-        util::Optional<std::string> sync_server_url;
-        util::Optional<std::string> sync_user_token;
+        // The user ID of the Realm Sync user. The presence of a value is the source of truth indicating that the Realm
+        // should be synced.
+        util::Optional<std::string> sync_user_id;
+        // A function that is used to ask the binding to commence the login process. The binding is responsible for
+        // calling the `bind()` API on the shared Realm once the login process is complete. This may happen
+        // asynchronously.
+        LoginFunction sync_login_function;
+
+        SyncErrorHandler sync_error_handler;
 
         util::RootLogger *logger = nullptr;
     };
@@ -235,10 +245,12 @@ public:
                                  std::unique_ptr<Group>& read_only_group,
                                  Realm* realm);
 
-    static bool refresh_sync_access_token(std::string access_token, StringData path);
+    static bool refresh_sync_access_token(std::string access_token,
+                                          StringData path,
+                                          util::Optional<std::string> sync_url);
 
-    // FIXME: Consider whether this method should exist here.
-    void refresh_sync_access_token(std::string access_token);
+    // FIXME: this should be moved out of the Realm code once we separate sync from the object store
+    static void set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger);
 
 private:
     Config m_config;

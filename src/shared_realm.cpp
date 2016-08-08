@@ -145,7 +145,7 @@ void Realm::open_with_config(const Config& config,
             // throw a C++ exception if server_synchronization_mode is
             // inconsistent with the accessed Realm file. This exception
             // probably has to be transmuted to an NSError.
-            bool server_synchronization_mode = bool(config.sync_server_url);
+            bool server_synchronization_mode = bool(config.sync_user_id);
             if (server_synchronization_mode) {
                 history = realm::sync::make_sync_history(config.path);
             }
@@ -520,6 +520,11 @@ bool Realm::refresh()
     return true;
 }
 
+void Realm::set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger)
+{
+    RealmCoordinator::set_up_sync_client(std::move(errorHandler), logger);
+}
+
 bool Realm::can_deliver_notifications() const noexcept
 {
     if (m_config.read_only()) {
@@ -570,18 +575,15 @@ void Realm::notify_others() const
     m_coordinator->notify_others();
 }
 
-bool Realm::refresh_sync_access_token(std::string access_token, StringData path) {
+bool Realm::refresh_sync_access_token(std::string access_token, StringData path, util::Optional<std::string> sync_url)
+{
     auto coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(path);
     if (coordinator) {
-        coordinator->refresh_sync_access_token(std::move(access_token));
+        coordinator->refresh_sync_access_token(std::move(access_token), std::move(sync_url));
         return true;
     } else {
         return false;
     }
-}
-
-void Realm::refresh_sync_access_token(std::string access_token) {
-    m_coordinator->refresh_sync_access_token(std::move(access_token));
 }
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
