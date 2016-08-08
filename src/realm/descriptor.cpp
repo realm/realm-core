@@ -72,11 +72,11 @@ Descriptor::~Descriptor() noexcept
     m_root_table.reset();
 }
 
-void Descriptor::detach(bool is_root) noexcept
+void Descriptor::detach(bool root_desc) noexcept
 {
     REALM_ASSERT(is_attached());
-    REALM_ASSERT((is_root && this->is_root()) || (!is_root && !(this->is_root())));
-    (void)is_root; // Unused warning for release build
+    REALM_ASSERT((root_desc && this->is_root()) || (!root_desc && !(this->is_root())));
+    (void)root_desc; // Unused warning for release build
 
     detach_subdesc_accessors();
     // Detach will only reset the m_root_table to make the is_attached

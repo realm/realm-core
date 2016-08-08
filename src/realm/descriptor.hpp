@@ -499,8 +499,11 @@ private:
     // on a sub descriptor. Thus this is not supposed to be called
     // outside to detach a sub descriptor.
     //
+    // root_desc is for checking purpose. If this descriptor is not root
+    // descriptor, then this function is not supposed to be called outside.
+    //
     // Not idempotent.
-    void detach(bool is_root) noexcept;
+    void detach(bool root_desc) noexcept;
 
     // Recursively detach all subtable descriptor accessors that
     // exist, that is, all subtable descriptor accessors that have
