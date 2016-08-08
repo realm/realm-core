@@ -9011,10 +9011,10 @@ struct QueryInitHelper {
     Table* table;
 
     template<typename Func>
-    void operator()(Func&& fn) REALM_NOINLINE;
+    REALM_NOINLINE void operator()(Func&& fn);
 
     template<typename Func, typename... Mutations>
-    size_t run(Func& fn) REALM_NOINLINE;
+    REALM_NOINLINE size_t run(Func& fn);
 };
 
 template<typename Func>
