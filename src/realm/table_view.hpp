@@ -633,7 +633,6 @@ private:
     friend class Table;
     friend class Query;
     friend class TableViewBase;
-    friend class ListviewNode;
     friend class LinkView;
     template<typename, typename, typename>
     friend class BasicTableViewBase;

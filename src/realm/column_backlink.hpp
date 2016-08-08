@@ -36,7 +36,7 @@ namespace realm {
 /// there is a single link, a tagged ref encoding the origin row position.
 class BacklinkColumn: public IntegerColumn, public ArrayParent {
 public:
-    BacklinkColumn(Allocator&, ref_type);
+    BacklinkColumn(Allocator&, ref_type, size_t col_ndx = npos);
     ~BacklinkColumn() noexcept override {}
 
     static ref_type create(Allocator&, size_t size = 0);
@@ -60,7 +60,7 @@ public:
     void set_origin_table(Table&) noexcept;
     LinkColumnBase& get_origin_column() const noexcept;
     size_t get_origin_column_index() const noexcept;
-    void set_origin_column(LinkColumnBase& column, size_t col_ndx) noexcept;
+    void set_origin_column(LinkColumnBase& column) noexcept;
 
     void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
@@ -73,7 +73,6 @@ public:
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void adj_acc_clear_root_table() noexcept override;
     void mark(int) noexcept override;
-    void refresh_accessor_tree(size_t, const Spec&) override;
 
     void bump_link_origin_table_version() noexcept override;
 
@@ -104,7 +103,6 @@ protected:
 private:
     TableRef        m_origin_table;
     LinkColumnBase* m_origin_column = nullptr;
-    size_t     m_origin_column_ndx = npos;
 
     template<typename Func>
     size_t for_each_link(size_t row_ndx, bool do_destroy, Func&& f);
@@ -115,8 +113,8 @@ private:
 
 // Implementation
 
-inline BacklinkColumn::BacklinkColumn(Allocator& alloc, ref_type ref):
-    IntegerColumn(alloc, ref) // Throws
+inline BacklinkColumn::BacklinkColumn(Allocator& alloc, ref_type ref, size_t col_ndx):
+    IntegerColumn(alloc, ref, col_ndx) // Throws
 {
 }
 
@@ -148,13 +146,12 @@ inline LinkColumnBase& BacklinkColumn::get_origin_column() const noexcept
 
 inline size_t BacklinkColumn::get_origin_column_index() const noexcept
 {
-    return m_origin_column_ndx;
+    return m_origin_column ? m_origin_column->get_column_index() : npos;
 }
 
-inline void BacklinkColumn::set_origin_column(LinkColumnBase& column, size_t col_ndx) noexcept
+inline void BacklinkColumn::set_origin_column(LinkColumnBase& column) noexcept
 {
     m_origin_column = &column;
-    m_origin_column_ndx = col_ndx;
 }
 
 inline void BacklinkColumn::add_row()

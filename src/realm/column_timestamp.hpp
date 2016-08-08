@@ -28,8 +28,7 @@ namespace realm {
 // column type
 class TimestampColumn : public ColumnBaseSimple {
 public:
-    TimestampColumn(Allocator& alloc, ref_type ref);
-    ~TimestampColumn() noexcept override;
+    TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx = npos);
 
     static ref_type create(Allocator& alloc, size_t size, bool nullable);
 

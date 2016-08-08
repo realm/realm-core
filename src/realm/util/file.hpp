@@ -760,7 +760,7 @@ public:
 
 class DirScanner {
 public:
-    DirScanner(const std::string& path);
+    DirScanner(const std::string& path, bool allow_missing=false);
     ~DirScanner() noexcept;
     bool next(std::string& name);
 private:

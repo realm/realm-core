@@ -61,7 +61,6 @@ void SubtableColumnBase::verify(const Table& table, size_t col_ndx) const
     IntegerColumn::verify(table, col_ndx);
 
     REALM_ASSERT(m_table == &table);
-    REALM_ASSERT_3(m_column_ndx, ==, col_ndx);
 }
 
 #endif
@@ -137,7 +136,7 @@ void SubtableColumnBase::child_accessor_destroyed(Table* child) noexcept
 Table* SubtableColumnBase::get_parent_table(size_t* column_ndx_out) noexcept
 {
     if (column_ndx_out)
-        *column_ndx_out = m_column_ndx;
+        *column_ndx_out = get_column_index();
     return m_table;
 }
 
