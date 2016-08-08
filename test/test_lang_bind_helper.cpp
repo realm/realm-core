@@ -3595,8 +3595,7 @@ private:
 };
 
 // Background thread for test below.
-void deleter_thread(TestContext& test_context,
-                    ConcurrentQueue<LinkViewRef>& queue)
+void deleter_thread(ConcurrentQueue<LinkViewRef>& queue)
 {
     Random random(random_int<unsigned long>());
     bool closed = false;
@@ -3668,7 +3667,7 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // later deletion.
     util::Thread deleter;
     ConcurrentQueue<LinkViewRef> queue(buffer_size);
-    deleter.start([&] { deleter_thread(test_context, queue); });
+    deleter.start([&] { deleter_thread(queue); });
     for (int i=0; i<max_refs; ++i) {
         TableRef origin = g.get_table("origin");
         TableRef target = g.get_table("target");
