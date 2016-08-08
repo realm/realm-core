@@ -70,6 +70,16 @@ namespace _impl { class DescriptorFriend; }
 ///
 /// \sa Table::get_descriptor()
 class Descriptor {
+    // So the constructor can only be called privately but still works with
+    // make_shared().
+    struct ConcretDescriptor {
+        Table* const m_table;
+        Descriptor* const m_parent;
+        Spec* const m_spec;
+        explicit ConcretDescriptor(Table* table, Descriptor* parent, Spec* spec)
+            :m_table(table), m_parent(parent), m_spec(spec) {}
+    };
+
 public:
     /// Get the number of columns in the associated tables.
     size_t get_column_count() const noexcept;
@@ -417,13 +427,21 @@ public:
     /// debugging purposes.
     size_t get_num_unique_values(size_t column_ndx) const;
 
-
-    // Public for make_shared. Use DescriptorFriend::create() instead for creating new
-    // instances.
+    // Use DescriptorFriend::create() instead for creating new instances outside.
     //
-    // Called by the root table to create the root descriptor.
+    // When it is called by the root table to create the root descriptors,
+    // con_desc.m_parent needs to be null. The specified spec must be the spec
+    // of the specified table.
+    // The created descriptor doesn't own the specified spec which means it won't
+    // free it.
     //
-    // Puts this descriptor accessor into the attached state. This
+    // When it called by the descriptor that becomes its parent to create a
+    // sub descriptor, con_desc.m_parent needs to be non-null value which points
+    // to the parent descriptor. The specified spec must be the spec of
+    // one of its direct or indirect subtable columns.
+    // The created descriptor owns the specified spec which means it will free it.
+    //
+    // This also puts this descriptor accessor into the attached state. This
     // attaches it to the underlying structure of array nodes. When
     // this function returns, is_attached() will return true.
     //
@@ -433,36 +451,14 @@ public:
     // shareable spec. That is, Table::has_shared_spec() must return
     // false.
     //
-    // The specified spec must be the spec of the specified table.
-    //
     // The specified spec here is not owned by the created descriptor,
     // which means it won't be freed here.
-    Descriptor(Table* table, Spec* spec) noexcept;
-
-    // Called by the descriptor that becomes its parent to create a
-    // sub descriptor.
-    //
-    // Puts this descriptor accessor into the attached state. This
-    // attaches it to the underlying structure of array nodes. It does
-    // not establish the parents reference to this descriptor, that is
-    // the job of the parent. When this function returns,
-    // is_attached() will return true.
-    //
-    // Not idempotent.
-    //
-    // The specified table is not allowed to be a subtable with a
-    // shareable spec. That is, Table::has_shared_spec() must return
-    // false.
-    //
-    // The specified spec must be the spec of one of its direct or
-    // indirect subtable columns.
-    //
-    // The created descriptor owns the specified spec which means it
-    // will free it.
-    Descriptor(Table* table, Descriptor* parent, Spec* spec) noexcept;
-
+    Descriptor(const ConcretDescriptor& con_desc) noexcept;
     ~Descriptor() noexcept;
 
+protected:
+    Descriptor(const Descriptor &) = delete;
+    const Descriptor &operator =(const Descriptor&) = delete;
 
 private:
     TableRef m_root_table; // Table associated with root descriptor. Detached if null.
@@ -723,19 +719,12 @@ inline bool Descriptor::is_root() const noexcept
     return !m_parent;
 }
 
-inline Descriptor::Descriptor(Table* table, Spec* spec) noexcept
-:m_parent(nullptr), m_spec(spec)
+inline Descriptor::Descriptor(const ConcretDescriptor& con_desc) noexcept
+:m_parent(con_desc.m_parent), m_spec(con_desc.m_spec)
 {
-    REALM_ASSERT(!table->has_shared_type());
-    m_root_table.reset(table);
-}
-
-inline Descriptor::Descriptor(Table* table, Descriptor* parent, Spec* spec) noexcept
-:m_parent(parent), m_spec(spec)
-{
-    REALM_ASSERT(parent);
-    REALM_ASSERT(!table->has_shared_type());
-    m_root_table.reset(table);
+    REALM_ASSERT(con_desc.m_spec);
+    REALM_ASSERT(!con_desc.m_table->has_shared_type());
+    m_root_table.reset(con_desc.m_table);
 }
 
 
@@ -768,7 +757,7 @@ class _impl::DescriptorFriend {
 public:
     static Descriptor* create(Table* table, Spec* spec) noexcept
     {
-        return new Descriptor(table, spec);
+        return new Descriptor(Descriptor::ConcretDescriptor{table, nullptr, spec});
     }
 
     static void detach(Descriptor& desc) noexcept

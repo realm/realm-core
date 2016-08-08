@@ -38,9 +38,9 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 
     // Create a new descriptor accessor
     SubspecRef subspec_ref = m_spec->get_subtable_spec(column_ndx);
-    std::unique_ptr<Spec> subspec(new Spec(subspec_ref));
-    DescriptorRef subdesc =
-        std::make_shared<Descriptor>(m_root_table.get(), this, subspec.get());
+    auto subspec = std::make_unique<Spec>(subspec_ref);
+    auto subdesc = std::make_shared<Descriptor>(
+            ConcretDescriptor{m_root_table.get(), this, subspec.get()});
     m_subdesc_map.push_back(subdesc_entry(column_ndx, subdesc));
     subspec.release();
 
