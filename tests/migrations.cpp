@@ -556,6 +556,8 @@ TEST_CASE("migration: Automatic") {
         VERIFY_SCHEMA(*old_realm); \
         VERIFY_SCHEMA(*new_realm); \
     }); \
+    REQUIRE(realm->schema() == new_schema); \
+    VERIFY_SCHEMA(*realm); \
 } while (false)
 
         SECTION("add new table") {
@@ -568,6 +570,9 @@ TEST_CASE("migration: Automatic") {
         }
         SECTION("remove property from table") {
             VERIFY_SCHEMA_IN_MIGRATION(remove_property(schema, "object", "value"));
+        }
+        SECTION("remove multiple properties from table") {
+            VERIFY_SCHEMA_IN_MIGRATION(remove_property(remove_property(schema, "object", "value"), "object", "optional"));
         }
         SECTION("add primary key to table") {
             VERIFY_SCHEMA_IN_MIGRATION(set_primary_key(schema, "link origin", "not a pk"));
