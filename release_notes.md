@@ -11,7 +11,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Improve performance of sorting on non-nullable columns.
 
 -----------
 
