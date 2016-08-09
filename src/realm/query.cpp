@@ -772,11 +772,10 @@ size_t Query::peek_tableview(size_t tv_index) const
     return tablerow;
 }
 
-template<Action action, typename T, typename R, class ColType>
-    R Query::aggregate(R(ColType::*aggregateMethod)(size_t start, size_t end, size_t limit,
-                                                    size_t* return_ndx) const,
-                       size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                       size_t* return_ndx) const
+template <Action action, typename T, typename R, class ColType>
+R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit, size_t* return_ndx) const,
+                   size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                   size_t* return_ndx) const
 {
     if(limit == 0 || m_table->is_degenerate()) {
         if (resultcount)

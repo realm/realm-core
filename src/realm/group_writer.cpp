@@ -254,8 +254,8 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 {
     MapWindow* found_window = nullptr;
     for (unsigned int i = 0; i < m_map_windows.size(); ++i) {
-        if (m_map_windows[i]->matches(start_ref, size)
-            || m_map_windows[i]->extends_to_match(m_alloc.get_file(), start_ref, size)) {
+        if (m_map_windows[i]->matches(start_ref, size) ||
+            m_map_windows[i]->extends_to_match(m_alloc.get_file(), start_ref, size)) {
             found_window = m_map_windows[i];
             // move matching window to top (to keep LRU order):
             for (int k = i; k; --k)

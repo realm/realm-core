@@ -107,8 +107,10 @@ int main()
 
     // @@Example: advanced_search @@
     // Create query (current employees between 20 and 30 years old)
-    MyTable::Query q = table.where().hired.equal(true)    // implicit logical-AND
-                                    .age.between(20, 30);
+    MyTable::Query q = table.where()
+                           .hired
+                           .equal(true) // implicit logical-AND
+                           .age.between(20, 30);
 
     // Get number of matching entries
     std::cout << q.count() << std::endl;      // => 2

@@ -1157,25 +1157,23 @@ int64_t Array::sum(size_t start, size_t end) const
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
 
-/*
+#if 0
 #if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
-                    s += __popcnt64(data[t]);
+                s += __popcnt64(data[t]);
 #elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
-                    s += __builtin_popcountll(data[t]);
+                s += __builtin_popcountll(data[t]);
 #else
-                    uint64_t a = data[t];
-                    const uint64_t m1  = 0x5555555555555555ULL;
-                    a -= (a >> 1) & m1;
-                    a = (a & m2) + ((a >> 2) & m2);
-                    a = (a + (a >> 4)) & m4;
-                    a = (a * h01) >> 56;
-                    s += a;
+                uint64_t a = data[t];
+                const uint64_t m1  = 0x5555555555555555ULL;
+                a -= (a >> 1) & m1;
+                a = (a & m2) + ((a >> 2) & m2);
+                a = (a + (a >> 4)) & m4;
+                a = (a * h01) >> 56;
+                s += a;
 #endif
-*/
+#endif
 
                 s += fast_popcount64(data[t]);
-
-
             }
             else if (w == 2) {
                 uint64_t a = data[t];
@@ -3090,10 +3088,9 @@ inline std::pair<ref_type, size_t> find_bptree_child(const char* data, size_t nd
 // foreach_bptree_leaf(const array::NodeInfo&, Handler, size_t
 // start_offset). This will allow for a number of minor (but
 // important) improvements.
-template<class Handler>
-bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
-                         Handler handler, size_t start_offset)
-    noexcept(noexcept(handler(Array::NodeInfo())))
+template <class Handler>
+bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size, Handler handler,
+                         size_t start_offset) noexcept(noexcept(handler(Array::NodeInfo())))
 {
     REALM_ASSERT(node.is_inner_bptree_node());
 
@@ -3181,9 +3178,8 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
 // `Array::NodeInfo::m_offset` and `Array::NodeInfo::m_size` are not
 // calculated. With these simplification it is possible to avoid any
 // access to the `offsets` array.
-template<class Handler>
-void simplified_foreach_bptree_leaf(Array& node, Handler handler)
-    noexcept(noexcept(handler(Array::NodeInfo())))
+template <class Handler>
+void simplified_foreach_bptree_leaf(Array& node, Handler handler) noexcept(noexcept(handler(Array::NodeInfo())))
 {
     REALM_ASSERT(node.is_inner_bptree_node());
 
