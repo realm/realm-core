@@ -7,6 +7,7 @@ set(HEADERS
 
 set(SOURCES
     collection_change_indices.cpp
+    handover.cpp
     index_set.cpp
     list.cpp
     main.cpp

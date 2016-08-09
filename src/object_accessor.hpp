@@ -51,9 +51,9 @@ namespace realm {
         template<typename ValueType, typename ContextType>
         static Object get_for_primary_key(ContextType ctx, SharedRealm realm, const ObjectSchema &object_schema, ValueType primary_value);
 
-        SharedRealm realm() { return m_realm; }
-        const ObjectSchema &get_object_schema() { return *m_object_schema; }
-        Row row() { return m_row; }
+        SharedRealm realm() const { return m_realm; }
+        const ObjectSchema &get_object_schema() const { return *m_object_schema; }
+        Row row() const { return m_row; }
 
         bool is_valid() const { return m_row.is_attached(); }
 

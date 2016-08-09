@@ -49,6 +49,8 @@ public:
     std::shared_ptr<Realm> get_realm(Realm::Config config);
     std::shared_ptr<Realm> get_realm();
 
+    Realm::Config get_config() const { return m_config; }
+
     const Schema* get_schema() const noexcept;
     uint64_t get_schema_version() const noexcept { return m_schema_version; }
     const std::string& get_path() const noexcept { return m_config.path; }
