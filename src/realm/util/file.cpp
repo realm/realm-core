@@ -95,7 +95,7 @@ bool try_make_dir(const std::string& path)
             return false;
         case EACCES:
         case EROFS:
-            throw File::PermissionDenied(msg, path);    // LCOV_EXCL_LINE
+            throw File::PermissionDenied(msg, path);
         default:
             throw File::AccessError(msg, path);         // LCOV_EXCL_LINE
     }
@@ -366,7 +366,7 @@ error:
 
 #else // POSIX version
 
-    if (REALM_COVER_NEVER(m_encryption_key)) {
+    if (m_encryption_key) {
         off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
@@ -428,7 +428,7 @@ void File::write(const char* data, size_t size)
 
 #else // POSIX version
 
-    if (REALM_COVER_NEVER(m_encryption_key)) {
+    if (m_encryption_key) {
         off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
@@ -487,7 +487,7 @@ File::SizeType File::get_size() const
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
             throw std::runtime_error("File size overflow");
-        if (REALM_COVER_NEVER(m_encryption_key))
+        if (m_encryption_key)
             return encrypted_size_to_data_size(size);
         return size;
     }
@@ -515,7 +515,7 @@ void File::resize(SizeType size)
 
 #else // POSIX version
 
-    if (REALM_COVER_NEVER(m_encryption_key))
+    if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
     off_t size2;
@@ -560,7 +560,7 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
     REALM_ASSERT_RELEASE(is_prealloc_supported());
 
-    if (REALM_COVER_NEVER(m_encryption_key))
+    if (m_encryption_key)
         size = data_size_to_encrypted_size(size);
 
     off_t size2;

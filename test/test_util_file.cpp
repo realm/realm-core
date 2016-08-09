@@ -44,7 +44,7 @@ TEST(Utils_File_dir)
 
     // Create directory
     bool dir_exists = File::is_dir(dir_name);
-    CHECK_EQUAL(dir_exists, false);
+    CHECK_NOT(dir_exists);
 
     make_dir(dir_name);
     try {
@@ -54,7 +54,27 @@ TEST(Utils_File_dir)
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = File::is_dir(dir_name);
     }
-    CHECK_EQUAL(dir_exists, true);
+    CHECK(dir_exists);
+
+    bool perm_denied = false;
+    try {
+        make_dir("/foobar");
+    }
+    catch (const File::AccessError& e) {
+        CHECK_EQUAL(e.get_path(), "/foobar");
+        perm_denied = true;
+    }
+    CHECK(perm_denied);
+
+    perm_denied = false;
+    try {
+        remove_dir("/usr");
+    }
+    catch (const File::AccessError& e) {
+        CHECK_EQUAL(e.get_path(), "/usr");
+        perm_denied = true;
+    }
+    CHECK(perm_denied);
 
     // Remove directory
     remove_dir(dir_name);
@@ -65,7 +85,7 @@ TEST(Utils_File_dir)
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = false;
     }
-    CHECK_EQUAL(dir_exists, false);
+    CHECK_NOT(dir_exists);
 
 }
 
