@@ -49,6 +49,7 @@ private:
     // the query was (re)run since the last time the handover object was created
     TableView m_tv;
     std::unique_ptr<SharedGroup::Handover<TableView>> m_tv_handover;
+    std::unique_ptr<SharedGroup::Handover<TableView>> m_tv_to_deliver;
 
     // The table version from the last time the query was run. Used to avoid
     // rerunning the query when there's no chance of it changing.
@@ -67,11 +68,12 @@ private:
 
     bool need_to_run();
     void calculate_changes();
+    void deliver(SharedGroup&) override;
 
     void run() override;
     void do_prepare_handover(SharedGroup&) override;
-    bool do_deliver(SharedGroup& sg) override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
+    bool prepare_to_deliver() override;
 
     void release_data() noexcept override;
     void do_attach_to(SharedGroup& sg) override;

@@ -660,3 +660,10 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> c
 
     return ret;
 }
+
+CollectionChangeSet CollectionChangeBuilder::finalize() &&
+{
+    modifications.erase_at(insertions);
+    modifications.shift_for_insert_at(deletions);
+    return {std::move(deletions), std::move(insertions), std::move(modifications), std::move(moves)};
+}
