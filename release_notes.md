@@ -13,11 +13,12 @@
 
 ### Breaking changes
 
-* Added support for sorting table views through a chain of links. (#1030)
+* Added support for sorting and distincting table views through a chain of links. (#1030)
 
 ### Enhancements
 
 * Improve performance of sorting on non-nullable columns.
+* Improve overall sort performance.
 
 -----------
 
