@@ -135,11 +135,8 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         if (m_config.schema_version != config.schema_version && config.schema_version != ObjectStore::NotVersioned) {
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
-        if (m_config.sync_user_id && config.in_memory) {
+        if (m_config.sync_login_function && config.in_memory) {
             throw MismatchedConfigException("Realm at path '%1' cannot be opened for Sync with a misconfigured user.", config.path);
-        }
-        if (m_config.sync_user_id != config.sync_user_id) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with a different user.", config.path);
         }
         // Realm::update_schema() handles complaining about schema mismatches
     }
