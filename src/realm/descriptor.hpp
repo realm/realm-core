@@ -72,11 +72,11 @@ namespace _impl { class DescriptorFriend; }
 class Descriptor {
     // So the constructor can only be called privately but still works with
     // make_shared().
-    struct ConcretDescriptor {
+    struct ConcreteDescriptor {
         Table* const m_table;
         Descriptor* const m_parent;
         Spec* const m_spec;
-        explicit ConcretDescriptor(Table* table, Descriptor* parent, Spec* spec)
+        explicit ConcreteDescriptor(Table* table, Descriptor* parent, Spec* spec)
             :m_table(table), m_parent(parent), m_spec(spec) {}
     };
 
@@ -453,7 +453,7 @@ public:
     //
     // The specified spec here is not owned by the created descriptor,
     // which means it won't be freed here.
-    Descriptor(const ConcretDescriptor& con_desc) noexcept;
+    Descriptor(const ConcreteDescriptor& con_desc) noexcept;
     ~Descriptor() noexcept;
 
 protected:
@@ -480,9 +480,9 @@ private:
     };
     typedef std::vector<subdesc_entry> subdesc_map;
     // No lock is needed for this map to guarantee the destructor's thread safety.
-    // If it is a root destructor, the map will be cleared and there won't be
+    // If it is a root descriptor, the map will be cleared and there won't be
     // concurrent operations on the map anymore.
-    // If it is a sub destructor, no operation on its parent's map.
+    // If it is a sub descriptor, no operation on its parent's map.
     mutable subdesc_map m_subdesc_map;
 
     // Detach accessor from underlying descriptor.
@@ -722,7 +722,7 @@ inline bool Descriptor::is_root() const noexcept
     return !m_parent;
 }
 
-inline Descriptor::Descriptor(const ConcretDescriptor& con_desc) noexcept
+inline Descriptor::Descriptor(const ConcreteDescriptor& con_desc) noexcept
 :m_parent(con_desc.m_parent), m_spec(con_desc.m_spec)
 {
     REALM_ASSERT(con_desc.m_spec);
@@ -760,7 +760,7 @@ class _impl::DescriptorFriend {
 public:
     static Descriptor* create(Table* table, Spec* spec) noexcept
     {
-        return new Descriptor(Descriptor::ConcretDescriptor{table, nullptr, spec});
+        return new Descriptor(Descriptor::ConcreteDescriptor{table, nullptr, spec});
     }
 
     static void detach(Descriptor& desc) noexcept
