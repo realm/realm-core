@@ -399,7 +399,9 @@ private:
     // Used to access schema while building query:
     std::vector<size_t> m_subtable_path;
 
-    ConstDescriptorRef m_current_descriptor;
+    // Query doesn't own the Descriptor, Table does. To avoid the circular refs,
+    // hold a weak ref only. It is valid as long as the TableRef is not released.
+    std::weak_ptr<const Descriptor> m_current_descriptor;
     TableRef m_table;
 
     // points to the base class of the restricting view. If the restricting

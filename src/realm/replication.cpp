@@ -385,8 +385,9 @@ public:
 
     bool set_link_type(size_t col_ndx, LinkType link_type)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
+        DescriptorRef desc = m_desc.lock();
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < desc->get_column_count()))) {
                 using tf = _impl::TableFriend;
                 DataType type = m_table->get_column_type(col_ndx);
                 static_cast<void>(type);
@@ -403,13 +404,14 @@ public:
 
     bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_desc->get_column_count()))) {
+        DescriptorRef desc = m_desc.lock();
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= desc->get_column_count()))) {
                 log("desc->insert_column(%1, %2, \"%3\", %4);", col_ndx, data_type_to_str(type),
                     name, nullable); // Throws
                 LinkTargetInfo invalid_link;
                 using tf = _impl::TableFriend;
-                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, invalid_link, nullable); // Throws
+                tf::insert_column_unless_exists(*desc, col_ndx, type, name, invalid_link, nullable); // Throws
                 return true;
             }
         }
@@ -419,15 +421,16 @@ public:
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
                        size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_desc->get_column_count()))) {
+        DescriptorRef desc = m_desc.lock();
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= desc->get_column_count()))) {
                 log("desc->insert_column_link(%1, %2, \"%3\", LinkTargetInfo(group->get_table(%4), %5));",
                     col_ndx, data_type_to_str(type), name, link_target_table_ndx, backlink_col_ndx); // Throws
                 using gf = _impl::GroupFriend;
                 using tf = _impl::TableFriend;
                 Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
                 LinkTargetInfo link(link_target_table, backlink_col_ndx);
-                tf::insert_column(*m_desc, col_ndx, type, name, link); // Throws
+                tf::insert_column(*desc, col_ndx, type, name, link); // Throws
                 return true;
             }
         }
@@ -436,11 +439,12 @@ public:
 
     bool erase_column(size_t col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
+        DescriptorRef desc = m_desc.lock();
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < desc->get_column_count()))) {
                 log("desc->remove_column(%1);", col_ndx); // Throws
                 typedef _impl::TableFriend tf;
-                tf::erase_column(*m_desc, col_ndx); // Throws
+                tf::erase_column(*desc, col_ndx); // Throws
                 return true;
             }
         }
@@ -449,11 +453,12 @@ public:
 
     bool erase_link_column(size_t col_ndx, size_t, size_t)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
+        DescriptorRef desc = m_desc.lock();
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < desc->get_column_count()))) {
                 log("desc->remove_column(%1);", col_ndx); // Throws
                 typedef _impl::TableFriend tf;
-                tf::erase_column(*m_desc, col_ndx); // Throws
+                tf::erase_column(*desc, col_ndx); // Throws
                 return true;
             }
         }
@@ -462,11 +467,12 @@ public:
 
     bool rename_column(size_t col_ndx, StringData name)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
+        DescriptorRef desc = m_desc.lock();
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < desc->get_column_count()))) {
                 log("desc->rename_column(%1, \"%2\");", col_ndx, name); // Throws
                 typedef _impl::TableFriend tf;
-                tf::rename_column(*m_desc, col_ndx, name); // Throws
+                tf::rename_column(*desc, col_ndx, name); // Throws
                 return true;
             }
         }
@@ -475,13 +481,14 @@ public:
 
     bool move_column(size_t col_ndx_1, size_t col_ndx_2)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
-            size_t column_count = m_desc->get_column_count();
+        DescriptorRef desc = m_desc.lock();
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
+            size_t column_count = desc->get_column_count();
             static_cast<void>(column_count);
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx_1 < column_count && col_ndx_2 < column_count))) {
                 log("desc->move_column(%1, %2);", col_ndx_1, col_ndx_2); // Throws
                 typedef _impl::TableFriend tf;
-                tf::move_column(*m_desc, col_ndx_1, col_ndx_2); // Throws
+                tf::move_column(*desc, col_ndx_1, col_ndx_2); // Throws
                 return true;
             }
         }
@@ -498,16 +505,17 @@ public:
             return false;
         log("desc = table->get_descriptor();"); // Throws
         m_link_list.reset();
-        m_desc = m_table->get_descriptor(); // Throws
+        DescriptorRef desc = m_table->get_descriptor(); // Throws
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[i];
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= m_desc->get_column_count())))
+            if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= desc->get_column_count())))
                 return false;
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(m_desc->get_column_type(col_ndx) != type_Table)))
+            if (REALM_UNLIKELY(REALM_COVER_NEVER(desc->get_column_type(col_ndx) != type_Table)))
                 return false;
             log("desc = desc->get_subdescriptor(%1);", col_ndx); // Throws
-            m_desc = m_desc->get_subdescriptor(col_ndx);
+            desc = desc->get_subdescriptor(col_ndx);
         }
+        m_desc = desc;
         return true;
     }
 
@@ -685,7 +693,8 @@ public:
 private:
     Group& m_group;
     TableRef m_table;
-    DescriptorRef m_desc;
+    // Table has the ownership of Descriptor. Use weak ref to avoid circular refs.
+    std::weak_ptr<Descriptor> m_desc;
     LinkViewRef m_link_list;
     util::Logger* m_logger = nullptr;
 

@@ -192,7 +192,7 @@ void Query::set_table(TableRef tr)
         fetch_descriptor();
     }
     else {
-        m_current_descriptor.reset(nullptr);
+        m_current_descriptor.reset();
     }
 }
 
@@ -368,8 +368,9 @@ void Query::fetch_descriptor()
 template<typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
-    REALM_ASSERT_DEBUG(m_current_descriptor);
-    auto node = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
+    ConstDescriptorRef desc = m_current_descriptor.lock();
+    REALM_ASSERT_DEBUG(desc);
+    auto node = make_condition_node<TConditionFunction>(*desc, column_ndx, value);
     add_node(std::move(node));
     return *this;
 }
