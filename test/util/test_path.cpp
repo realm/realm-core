@@ -174,7 +174,7 @@ void SharedGroupTestPathGuard::cleanup() const noexcept
 {
     try {
         do_clean_dir(m_path+ ".management", ".management");
-        if (File::is_dir(m_path+".manamgement"))
+        if (File::is_dir(m_path+".management"))
             remove_dir(m_path+ ".management");
         File::try_remove(get_lock_path());
     }
