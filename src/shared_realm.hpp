@@ -156,12 +156,10 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
-        // The user ID of the Realm Sync user. The presence of a value is the source of truth indicating that the Realm
-        // should be synced.
-        util::Optional<std::string> sync_user_id;
         // A function that is used to ask the binding to commence the login process. The binding is responsible for
         // calling the `bind()` API on the shared Realm once the login process is complete. This may happen
-        // asynchronously.
+        // asynchronously. The presence of a value is the source of truth indicating that the Realm
+        // should be synced.
         LoginFunction sync_login_function;
 
         SyncErrorHandler sync_error_handler;
