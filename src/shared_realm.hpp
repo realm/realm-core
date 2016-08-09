@@ -28,6 +28,8 @@
 #include <memory>
 #include <thread>
 
+#include <realm/group_shared.hpp>
+
 namespace realm {
 class AnyThreadConfined;
 class BinaryData;
@@ -47,6 +49,7 @@ namespace _impl {
     class ListNotifier;
     class RealmCoordinator;
     class ResultsNotifier;
+    class RealmFriend;
 }
 
 // How to handle update_schema() being called on a file which has
@@ -338,6 +341,8 @@ public:
 
     // FIXME private
     Group& read_group();
+
+    friend class _impl::RealmFriend;
 };
 
 class RealmFileException : public std::runtime_error {
@@ -395,6 +400,24 @@ class InvalidEncryptionKeyException : public std::logic_error {
 public:
     InvalidEncryptionKeyException() : std::logic_error("Encryption key must be 64 bytes.") {}
 };
+
+// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
+class _impl::RealmFriend {
+public:
+    static SharedGroup& get_shared_group(Realm& realm) { return *realm.m_shared_group; }
+    static Group& read_group_to(Realm& realm, SharedGroup::VersionID& version) {
+        if (!realm.m_group) {
+            realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+            realm.add_schema_change_handler();
+        }
+        else if (version != realm.m_shared_group->get_version_of_current_transaction()) {
+            realm.m_shared_group->end_read();
+            realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+        }
+        return *realm.m_group;
+    }
+};
+
 } // namespace realm
 
 #endif /* defined(REALM_REALM_HPP) */
