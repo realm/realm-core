@@ -46,7 +46,7 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
         subspec.release();
     }
 
-  out:
+out:
     return subdesc;
 }
 

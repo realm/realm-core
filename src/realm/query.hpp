@@ -29,9 +29,9 @@
 #define REALM_MULTITHREAD_QUERY 0
 
 #if REALM_MULTITHREAD_QUERY
-// FIXME: Use our C++ thread abstraction API since it provides a much
-// higher level of encapsulation and safety.
-#include <pthread.h>
+    // FIXME: Use our C++ thread abstraction API since it provides a much
+    // higher level of encapsulation and safety.
+    #include <pthread.h>
 #endif
 
 #include <realm/views.hpp>
@@ -146,7 +146,7 @@ public:
     Query& less_float(size_t column_ndx1, size_t column_ndx2);
     Query& less_equal_float(size_t column_ndx1, size_t column_ndx2);
 
-     // Conditions: double
+    // Conditions: double
     Query& equal(size_t column_ndx, double value);
     Query& not_equal(size_t column_ndx, double value);
     Query& greater(size_t column_ndx, double value);
@@ -264,15 +264,15 @@ public:
                           size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
     OldDateTime maximum_olddatetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
-                              size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
+                                    size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
     OldDateTime minimum_olddatetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
-                              size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
+                                    size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
     Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start = 0, size_t end = size_t(-1),
                                 size_t limit = size_t(-1));
 
-    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start = 0, size_t end = size_t(-1), 
+    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start = 0, size_t end = size_t(-1),
                                 size_t limit = size_t(-1));
 
     // Deletion

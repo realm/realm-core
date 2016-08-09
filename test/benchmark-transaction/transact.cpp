@@ -48,8 +48,8 @@ using namespace realm;
 
 
 REALM_TABLE_2(TestTable,
-                x, Int,
-                y, Int)
+              x, Int,
+              y, Int)
 
 
 struct thread_info {
@@ -560,32 +560,32 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     clock_gettime(CLOCK_REALTIME, &ts_1);
     for(int i=0; i<n_readers; ++i) {
         switch (database) {
-        case DB_REALM:
-            pthread_create(&tinfo[i].thread_id, &attr, &realm_reader, &tinfo[i]);
-            break;
-        case DB_SQLITE:
-        case DB_SQLITE_WAL:
-            pthread_create(&
-            tinfo[i].thread_id, &attr, &sqlite_reader, &tinfo[i]);
-            break;
-        case DB_MYSQL:
-            pthread_create(&tinfo[i].thread_id, &attr, &mysql_reader, &tinfo[i]);
-            break;
+            case DB_REALM:
+                pthread_create(&tinfo[i].thread_id, &attr, &realm_reader, &tinfo[i]);
+                break;
+            case DB_SQLITE:
+            case DB_SQLITE_WAL:
+                pthread_create(&
+                               tinfo[i].thread_id, &attr, &sqlite_reader, &tinfo[i]);
+                break;
+            case DB_MYSQL:
+                pthread_create(&tinfo[i].thread_id, &attr, &mysql_reader, &tinfo[i]);
+                break;
         }
     }
     for(int i=0; i<n_writers; ++i) {
         int j = i+n_readers;
         switch (database) {
-        case DB_REALM:
-            pthread_create(&tinfo[j].thread_id, &attr, &realm_writer, &tinfo[j]);
-            break;
-        case DB_SQLITE:
-        case DB_SQLITE_WAL:
-            pthread_create(&tinfo[j].thread_id, &attr, &sqlite_writer, &tinfo[j]);
-            break;
-        case DB_MYSQL:
-            pthread_create(&tinfo[j].thread_id, &attr, &mysql_writer, &tinfo[j]);
-            break;
+            case DB_REALM:
+                pthread_create(&tinfo[j].thread_id, &attr, &realm_writer, &tinfo[j]);
+                break;
+            case DB_SQLITE:
+            case DB_SQLITE_WAL:
+                pthread_create(&tinfo[j].thread_id, &attr, &sqlite_writer, &tinfo[j]);
+                break;
+            case DB_MYSQL:
+                pthread_create(&tinfo[j].thread_id, &attr, &mysql_writer, &tinfo[j]);
+                break;
         }
     }
 
@@ -631,45 +631,45 @@ int main(int argc, char *argv[])
     verbose = false;
     while ((c = getopt(argc, argv, "hr:w:f:n:t:d:vs")) != EOF) {
         switch (c) {
-        case 'h':
-            usage("");
-        case 'r':
-            n_readers = atoi(optarg);
-            break;
-        case 'w':
-            n_writers = atoi(optarg);
-            break;
-        case 'f':
-            datfile = strdup(optarg);
-            break;
-        case 'n':
-            n_records = atoi(optarg);
-            break;
-        case 't':
-            duration = atoi(optarg);
-            break;
-        case 'd':
-            if (strcmp(optarg, "realm") == 0) {
-                database = DB_REALM;
-            }
-            if (strcmp(optarg, "sqlite") == 0) {
-                database = DB_SQLITE;
-            }
-            if (strcmp(optarg, "sqlite-wal") == 0) {
-                database = DB_SQLITE_WAL;
-            }
-            if (strcmp(optarg, "mysql") == 0) {
-                database = DB_MYSQL;
-            }
-            break;
-        case 'v':
-            verbose = true;
-            break;
-        case 's':
-            single = true;
-            break;
-        default:
-            usage("Wrong option");
+            case 'h':
+                usage("");
+            case 'r':
+                n_readers = atoi(optarg);
+                break;
+            case 'w':
+                n_writers = atoi(optarg);
+                break;
+            case 'f':
+                datfile = strdup(optarg);
+                break;
+            case 'n':
+                n_records = atoi(optarg);
+                break;
+            case 't':
+                duration = atoi(optarg);
+                break;
+            case 'd':
+                if (strcmp(optarg, "realm") == 0) {
+                    database = DB_REALM;
+                }
+                if (strcmp(optarg, "sqlite") == 0) {
+                    database = DB_SQLITE;
+                }
+                if (strcmp(optarg, "sqlite-wal") == 0) {
+                    database = DB_SQLITE_WAL;
+                }
+                if (strcmp(optarg, "mysql") == 0) {
+                    database = DB_MYSQL;
+                }
+                break;
+            case 'v':
+                verbose = true;
+                break;
+            case 's':
+                single = true;
+                break;
+            default:
+                usage("Wrong option");
         }
     }
 
@@ -692,16 +692,16 @@ int main(int argc, char *argv[])
 
     if (verbose) std::cout << "Creating test data for " << database << std::endl;
     switch (database) {
-    case DB_REALM:
-        realm_create(datfile, n_records);
-        break;
-    case DB_SQLITE:
-    case DB_SQLITE_WAL:
-        sqlite_create(datfile, n_records, database == DB_SQLITE_WAL);
-        break;
-    case DB_MYSQL:
-        mysql_create(datfile, n_records);
-        break;
+        case DB_REALM:
+            realm_create(datfile, n_records);
+            break;
+        case DB_SQLITE:
+        case DB_SQLITE_WAL:
+            sqlite_create(datfile, n_records, database == DB_SQLITE_WAL);
+            break;
+        case DB_MYSQL:
+            mysql_create(datfile, n_records);
+            break;
     }
 
     // SQLite WAL is used
@@ -712,7 +712,7 @@ int main(int argc, char *argv[])
     if (single) {
         benchmark(true, database, datfile, n_readers, n_writers, duration);
         std::cout << wall_time << " " << iteration_readers << " " << dt_readers
-             << " " << iteration_writers << " " << dt_writers << std::endl;
+                  << " " << iteration_writers << " " << dt_writers << std::endl;
     }
     else {
         std::cout << "# Columns: "                   << std::endl;
@@ -728,8 +728,8 @@ int main(int argc, char *argv[])
                 benchmark(false, database, "test_db", i, j, duration);
                 std::cout << i << " " << j << " ";
                 std::cout << wall_time << " " << iteration_readers
-                     << " " << dt_readers << " " << iteration_writers
-                     << " " << dt_writers << std::endl;
+                          << " " << dt_readers << " " << iteration_writers
+                          << " " << dt_writers << std::endl;
             }
         }
     }

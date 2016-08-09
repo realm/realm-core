@@ -25,16 +25,16 @@
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
-#  include <unistd.h>
-#  include <sys/mman.h>
-#  include <sys/types.h>
-#  include <sys/wait.h>
-#  include <signal.h>
-#  include <sched.h>
-#  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+    #include <unistd.h>
+    #include <sys/mman.h>
+    #include <sys/types.h>
+    #include <sys/wait.h>
+    #include <signal.h>
+    #include <sched.h>
+    #define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
-#  define NOMINMAX
-#  include <windows.h>
+    #define NOMINMAX
+    #include <windows.h>
 #endif
 
 #include <realm.hpp>
@@ -100,11 +100,11 @@ namespace {
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 // Also: async requires interprocess communication, which does not work with our current encryption support.
 #if !defined(_WIN32) && !REALM_PLATFORM_APPLE
-#  if REALM_ANDROID || defined DISABLE_ASYNC || REALM_ENABLE_ENCRYPTION
-bool allow_async = false;
-#  else
-bool allow_async = true;
-#  endif
+    #if REALM_ANDROID || defined DISABLE_ASYNC || REALM_ENABLE_ENCRYPTION
+        bool allow_async = false;
+    #else
+        bool allow_async = true;
+    #endif
 #endif
 
 
@@ -115,11 +115,11 @@ REALM_TABLE_4(TestTableShared,
               fourth, String)
 
 REALM_TABLE_5(TestTableSharedTimestamp,
-                  first,  Int,
-                  second, Int,
-                  third,  Bool,
-                  fourth, String,
-                  fifth, Timestamp)
+              first,  Int,
+              second, Int,
+              third,  Bool,
+              fourth, String,
+              fifth, Timestamp)
 
 void writer(std::string path, int id)
 {
@@ -219,8 +219,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
         // Create table entries
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-        for (int i = 0; i < num_processes; ++i)
-        {
+        for (int i = 0; i < num_processes; ++i) {
             t1->add(0, i, false, "test");
         }
         wt.commit();
@@ -1223,7 +1222,8 @@ TEST(Many_ConcurrentReaders)
                 ReadTransaction rt(sg_r);
                 rt.get_group().verify();
             }
-        } catch (...) {
+        }
+        catch (...) {
             REALM_ASSERT(false);
         }
     };
@@ -2036,9 +2036,9 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
     threads.reset(new test_util::ThreadWrapper[num_threads]);
 
     // Start threads
-    for (size_t i = 0; i != num_threads; ++i)
-        threads[i].start([&test_context, &path, base, i]
-                         { multiprocess_thread(test_context, path, base+i); });
+    for (size_t i = 0; i != num_threads; ++i) {
+        threads[i].start([&test_context, &path, base, i] { multiprocess_thread(test_context, path, base+i); });
+    }
 
     // Wait for threads to finish
     for (size_t i = 0; i != num_threads; ++i) {
@@ -3067,8 +3067,7 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
         // Changing this strongly affects the test suite run time
         const size_t instructions = 200;
 
-        for (size_t counter = 0; counter < iterations; counter++)
-        {
+        for (size_t counter = 0; counter < iterations; counter++) {
             // You can use your own seed if you have observed a crashing unit test that
             // printed out some specific seed (the "Unit test random seed:" part that appears).
             //fastrand(534653645, true);
@@ -3213,7 +3212,7 @@ TEST(Shared_Bptree_insert_failure)
     g.get_table(0)->add_empty_row(246);
     sg_w.commit();
     REALM_ASSERT_RELEASE(sg_w.compact());
-    #if 0
+#if 0
     {
         // This intervening sg can do the same operation as the one doing compact,
         // but without failing:
@@ -3221,7 +3220,7 @@ TEST(Shared_Bptree_insert_failure)
         Group& g2 = const_cast<Group&>(sg2.begin_write());
         g2.get_table(0)->add_empty_row(396);
     }
-    #endif
+#endif
     sg_w.begin_write();
     g.get_table(0)->add_empty_row(396);
 }

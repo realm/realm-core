@@ -23,17 +23,18 @@
 using namespace realm;
 
 REALM_TABLE_7(IndexTable,
-                s1, String,
-                n1, Int,
-                n2, Int,
-                n3, Int,
-                n4, Int,
-                n5, Int,
-                s2, String)
+              s1, String,
+              n1, Int,
+              n2, Int,
+              n3, Int,
+              n4, Int,
+              n5, Int,
+              s2, String)
 
 
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     Group *g = new Group();
 
     BasicTableRef<IndexTable> t = g->add_table<IndexTable>("test");

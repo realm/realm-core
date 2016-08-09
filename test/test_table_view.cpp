@@ -611,7 +611,8 @@ TEST(TableView_Distinct_Follows_Changes)
 }
 
 
-TEST(TableView_SyncAfterCopy) {
+TEST(TableView_SyncAfterCopy)
+{
     Table table;
     table.add_column(type_Int, "first");
     table.add_empty_row();
@@ -952,8 +953,12 @@ TEST(TableView_Stacked)
     t.add_column(type_Int,"i2");
     t.add_column(type_String,"S1");
     t.add_empty_row(2);
-    t.set_int(0,0,1);    t.set_int(1,0,2); t.set_string(2,0,"A");    //   1 2   "A"
-    t.set_int(0,1,2);    t.set_int(1,1,2); t.set_string(2,1,"B");    //   2 2   "B"
+    t.set_int(0,0,1);           // 1
+    t.set_int(1,0,2);           // 2
+    t.set_string(2,0,"A");      // "A"
+    t.set_int(0,1,2);           // 2
+    t.set_int(1,1,2);           // 2
+    t.set_string(2,1,"B");      // "B"
 
     TableView tv = t.find_all_int(0,2);
     TableView tv2 = tv.find_all_int(1,2);
@@ -1601,7 +1606,8 @@ TEST(TableView_UnderlyingRowRemoval)
     struct Fixture {
         Table table;
         TableView view;
-        Fixture() {
+        Fixture()
+        {
             table.add_column(type_Int, "a");
             table.add_column(type_Int, "b");
             table.add_empty_row(5);
@@ -1744,7 +1750,8 @@ TEST(TableView_Backlinks)
 
     source->add_empty_row(3);
 
-    { // Links
+    {
+        // Links
         TableView tv = source->get_backlink_view(2, links.get(), 0);
 
         CHECK_EQUAL(tv.size(), 0);
@@ -1756,7 +1763,8 @@ TEST(TableView_Backlinks)
         CHECK_EQUAL(tv.size(), 1);
         CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
     }
-    { // LinkViews
+    {
+        // LinkViews
         TableView tv = source->get_backlink_view(2, links.get(), 1);
 
         CHECK_EQUAL(tv.size(), 0);
@@ -1787,7 +1795,8 @@ TEST(TableView_BacklinksAfterMoveAssign)
 
     source->add_empty_row(3);
 
-    { // Links
+    {
+        // Links
         TableView tv_source = source->get_backlink_view(2, links.get(), 0);
         TableView tv;
         tv = std::move(tv_source);
@@ -1801,7 +1810,8 @@ TEST(TableView_BacklinksAfterMoveAssign)
         CHECK_EQUAL(tv.size(), 1);
         CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
     }
-    { // LinkViews
+    {
+        // LinkViews
         TableView tv_source = source->get_backlink_view(2, links.get(), 1);
         TableView tv;
         tv = std::move(tv_source);
@@ -1863,7 +1873,7 @@ TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
     CHECK(!tv_linklist.depends_on_deleted_object());
 
     source->move_last_over(0);
-    
+
     CHECK(tv_link.depends_on_deleted_object());
     CHECK(tv_linklist.depends_on_deleted_object());
 
@@ -1953,7 +1963,7 @@ TEST(TableView_Distinct)
 
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0});
+    tv.distinct(std::vector<size_t> {0});
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 6);
     CHECK_EQUAL(tv.get_source_ndx(2), 0);
@@ -1962,7 +1972,7 @@ TEST(TableView_Distinct)
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0, 1});
+    tv.distinct(std::vector<size_t> {0, 1});
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -1975,7 +1985,7 @@ TEST(TableView_Distinct)
     // so the result should equal the test above
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0, 1});
+    tv.distinct(std::vector<size_t> {0, 1});
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -1988,7 +1998,7 @@ TEST(TableView_Distinct)
     t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
     tv = t.where().find_all();
     tv.sort(0, false);
-    tv.distinct(std::vector<size_t>{0, 1});
+    tv.distinct(std::vector<size_t> {0, 1});
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(tv.get_source_ndx(0), 4);
     CHECK_EQUAL(tv.get_source_ndx(1), 5);
@@ -2013,7 +2023,7 @@ TEST(TableView_Distinct)
     CHECK(tv.get_string(0, 5).is_null());
     CHECK(tv.get_string(0, 6).is_null());
 
-    tv.distinct(std::vector<size_t>{0});
+    tv.distinct(std::vector<size_t> {0});
     // "foo", "bar", "", null
 
     t.remove(6); // remove "bar"
@@ -2029,7 +2039,7 @@ TEST(TableView_Distinct)
 
     // Remove distinct property by providing empty column list. Now TableView should look like it
     // did just after our last tv.sort(0, false) above, but after having executed table.remove(6)
-    tv.distinct(std::vector<size_t>{});
+    tv.distinct(std::vector<size_t> {});
     // "foo", "foo", "", "", null, null
     CHECK_EQUAL(tv.size(), 6);
     CHECK_EQUAL(tv.get_string(0, 0), "foo");
@@ -2679,7 +2689,7 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
     table.add("ǂ");
     table.add("ǃ");
     table.add("µ");
-    
+
     // Core-only is default comparer
     TestTableString::View v1 = table.where().find_all();
     TestTableString::View v2 = table.where().find_all();

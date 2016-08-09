@@ -27,9 +27,7 @@ using namespace realm;
 
 namespace {
 
-class InRealmHistoryImpl:
-        public TrivialReplication,
-        private _impl::InRealmHistory {
+class InRealmHistoryImpl : public TrivialReplication, private _impl::InRealmHistory {
 public:
     using version_type = TrivialReplication::version_type;
 

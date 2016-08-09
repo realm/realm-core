@@ -26,7 +26,7 @@ using namespace realm;
 namespace {
 
 REALM_TABLE_1(MyTable,
-                text, String)
+              text, String)
 
 } // namespace
 

@@ -31,7 +31,8 @@ std::string number_name(size_t n)
 {
     static const char* ones[] = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
                                  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
-                                 "eighteen", "nineteen"};
+                                 "eighteen", "nineteen"
+                                };
     static const char* tens[] = {"", "ten", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"};
 
     std::string txt;

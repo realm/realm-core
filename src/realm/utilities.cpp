@@ -23,11 +23,11 @@
 #include <fstream>
 
 #ifdef _WIN32
-#define NOMINMAX
-#  include "windows.h"
-#  include "psapi.h"
-#else 
-#include <unistd.h>
+    #define NOMINMAX
+    #include "windows.h"
+    #include "psapi.h"
+#else
+    #include <unistd.h>
 #endif
 
 #include <realm/utilities.hpp>
@@ -35,9 +35,9 @@
 #include <realm/util/thread.hpp>
 
 #ifdef REALM_COMPILER_SSE
-#  ifdef _MSC_VER
-#    include <intrin.h>
-#  endif
+    #ifdef _MSC_VER
+        #include <intrin.h>
+    #endif
 #endif
 
 
@@ -86,12 +86,12 @@ void cpuid_init()
 #  else
     int a = 1;
     __asm ( "mov %1, %%eax; "            // a into eax
-          "cpuid;"
-          "mov %%ecx, %0;"             // ecx into b
-          :"=r"(cret)                     // output
-          :"r"(a)                      // input
-          :"%eax","%ebx","%ecx","%edx" // clobbered register
-         );
+            "cpuid;"
+            "mov %%ecx, %0;"             // ecx into b
+            :"=r"(cret)                     // output
+            :"r"(a)                      // input
+            :"%eax","%ebx","%ecx","%edx" // clobbered register
+          );
 #  endif
 
 // Byte is atomic. Race can/will occur but that's fine

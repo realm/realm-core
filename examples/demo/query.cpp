@@ -21,12 +21,13 @@
 using namespace realm;
 
 REALM_TABLE_3(People,
-                name, String,
-                age,  Int,
-                hired, Bool)
+              name, String,
+              age,  Int,
+              hired, Bool)
 
 
-int main(int, char*[]) {
+int main(int, char*[])
+{
     // Create table
     People t;
 

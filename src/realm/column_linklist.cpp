@@ -299,7 +299,7 @@ void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
 
 
 void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf,
-                                                               CascadeState& state)
+        CascadeState& state)
 {
     size_t target_table_ndx = m_target_table->get_index_in_group();
 
@@ -519,7 +519,7 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
         }
     }
 
-     m_list_accessors.erase(erased_begin, erased_end);
+    m_list_accessors.erase(erased_begin, erased_end);
 
     validate_list_accessors();
 }
@@ -682,7 +682,7 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
     // have been removed. It is merely a best effort at reducing the size of the
     // vector.
     auto remove_from = std::remove_if(m_list_accessors.begin(), m_list_accessors.end(), [](const list_entry& e) {
-            return e.m_list.expired();
+        return e.m_list.expired();
     });
     m_list_accessors.erase(remove_from, m_list_accessors.end());
 }

@@ -1127,7 +1127,7 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
             new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
         }
 
-      insert_done:
+insert_done:
         if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
@@ -1257,7 +1257,7 @@ std::unique_ptr<const ArrayParent> StringColumn::get_leaf(size_t ndx, size_t& ou
 }
 
 StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, size_t& off,
-                                              bool use_retval) const
+                                               bool use_retval) const
 {
     static_cast<void>(use_retval);
     REALM_ASSERT_3(use_retval, ==, false); // retval optimization not supported. See Array on how to implement
@@ -1398,7 +1398,7 @@ ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
     else {
         SliceHandler handler(get_alloc(), m_nullable);
         ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
+                                      table_size, handler, out); // Throws
     }
     return ref;
 }
@@ -1439,8 +1439,8 @@ void StringColumn::refresh_root_accessor()
     bool old_root_is_medium = !m_array->get_context_flag();
 
     bool root_type_changed = old_root_is_leaf != new_root_is_leaf ||
-        (old_root_is_leaf && (old_root_is_small != new_root_is_small ||
-                              (!old_root_is_small && old_root_is_medium != new_root_is_medium)));
+                             (old_root_is_leaf && (old_root_is_small != new_root_is_small ||
+                                                   (!old_root_is_small && old_root_is_medium != new_root_is_medium)));
     if (!root_type_changed) {
         // Keep, but refresh old root accessor
         if (old_root_is_leaf) {
@@ -1582,7 +1582,7 @@ void StringColumn::verify(const Table& table, size_t col_ndx) const
     REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
     if (column_has_search_index) {
         REALM_ASSERT(m_search_index->get_ndx_in_parent() ==
-                       get_root_array()->get_ndx_in_parent() + 1);
+                     get_root_array()->get_ndx_in_parent() + 1);
     }
 }
 
@@ -1600,7 +1600,7 @@ void StringColumn::to_dot(std::ostream& out, StringData title) const
 }
 
 void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                                       std::ostream& out) const
+                               std::ostream& out) const
 {
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
     if (!long_strings) {

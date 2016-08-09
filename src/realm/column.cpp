@@ -22,9 +22,9 @@
 #include <climits>
 
 #ifdef REALM_DEBUG
-#   include <iostream>
-#   include <iomanip>
-#   include <sstream>
+    #include <iostream>
+    #include <iomanip>
+    #include <sstream>
 #endif
 
 #include <realm/column.hpp>
@@ -201,14 +201,14 @@ size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
 
 
 ref_type ColumnBaseSimple::write(const Array* root, size_t slice_offset, size_t slice_size,
-                           size_t table_size, SliceHandler& handler, _impl::OutputStream& out)
+                                 size_t table_size, SliceHandler& handler, _impl::OutputStream& out)
 {
     return BpTreeBase::write_subtree(*root, slice_offset, slice_size, table_size, handler, out);
 }
 
 
 void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
-                                    bool is_append)
+                                          bool is_append)
 {
     // At this point the original root and its new sibling is either
     // both leaves, or both inner nodes on the same form, compact or
@@ -349,11 +349,11 @@ void ColumnBaseWithIndex::destroy_search_index() noexcept
 }
 
 void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent,
-    size_t ndx_in_parent, bool allow_duplicate_valaues)
+                                               size_t ndx_in_parent, bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
     m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
-        !allow_duplicate_valaues, get_alloc())); // Throws
+                                         !allow_duplicate_valaues, get_alloc())); // Throws
 }
 
 

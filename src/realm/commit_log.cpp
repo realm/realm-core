@@ -79,9 +79,7 @@ namespace _impl {
 // FIXME: we should not use size_t for memory mapped members, but one where the
 // size is guaranteed
 
-class WriteLogCollector:
-        public Replication,
-        private _impl::History {
+class WriteLogCollector : public Replication, private _impl::History {
 public:
     using version_type = _impl::History::version_type;
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
@@ -337,8 +335,8 @@ inline void WriteLogCollector::map_header_if_needed() const
 // convenience methods for getting to buffers and logs.
 
 void WriteLogCollector::get_maps_in_order(const CommitLogPreamble* preamble,
-                           const util::File::Map<CommitLogHeader>*& first,
-                           const util::File::Map<CommitLogHeader>*& second) const
+                                          const util::File::Map<CommitLogHeader>*& first,
+                                          const util::File::Map<CommitLogHeader>*& second) const
 {
     if (preamble->active_file_is_log_a) {
         first  = &m_log_b.map;
@@ -770,10 +768,10 @@ void WriteLogCollector::verify() const
 
 
 std::unique_ptr<Replication> make_client_history(const std::string& database_name,
-                                                   const char* encryption_key)
+                                                 const char* encryption_key)
 {
     return std::unique_ptr<Replication>(new _impl::WriteLogCollector(database_name,
-                                                                     encryption_key));
+                                        encryption_key));
 }
 
 } // namespace realm

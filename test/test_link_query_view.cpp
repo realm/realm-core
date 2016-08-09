@@ -979,7 +979,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(0).get_index(), 1);
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 0);
-    
+
     lvr = table2->get_linklist(col_link2, 1);
     lvr->clear();
     lvr->add(2);
@@ -1550,7 +1550,7 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
     const size_t count = round_up(std::max(REALM_MAX_BPNODE_SIZE * 8, 100), 4);
     data_table->add_empty_row(count);
     for (size_t i = 0; i < count; ++i) {
-        char str[2]{};
+        char str[2] {};
         str[0] = 'a' + (i % 4);
         data_table->set_string(0, i, StringData(str, 1));
     }

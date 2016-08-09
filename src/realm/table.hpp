@@ -727,8 +727,8 @@ public:
     /// \param offset Index of first row to include (if `slice_size >
     /// 0`). Must be less than, or equal to size().
     ///
-    /// \param slice_size Number of rows to include. May be zero. If 
-    /// `slice_size > size() - offset`, then the effective size of 
+    /// \param slice_size Number of rows to include. May be zero. If
+    /// `slice_size > size() - offset`, then the effective size of
     /// the written slice will be `size() - offset`.
     ///
     /// \throw std::out_of_range If `offset > size()`.
@@ -909,7 +909,7 @@ private:
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
-    
+
     // Upgrades OldDateTime columns to Timestamp columns
     void upgrade_olddatetime();
 
@@ -1122,7 +1122,7 @@ private:
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                         Allocator&) noexcept;
+                                    Allocator&) noexcept;
 
     const Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) const noexcept;
     Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) noexcept;
@@ -2095,7 +2095,7 @@ public:
     }
 
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                         Allocator& alloc) noexcept
+                                    Allocator& alloc) noexcept
     {
         return Table::get_size_from_ref(spec_ref, columns_ref, alloc);
     }
@@ -2150,7 +2150,7 @@ public:
     }
 
     static size_t get_num_strong_backlinks(const Table& table,
-                                                size_t row_ndx) noexcept
+                                           size_t row_ndx) noexcept
     {
         return table.get_num_strong_backlinks(row_ndx);
     }
@@ -2167,7 +2167,7 @@ public:
     }
 
     static size_t* record_subtable_path(const Table& table, size_t* begin,
-                                             size_t* end) noexcept
+                                        size_t* end) noexcept
     {
         return table.record_subtable_path(begin, end);
     }

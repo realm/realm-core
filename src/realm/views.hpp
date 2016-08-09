@@ -30,8 +30,7 @@ const int64_t detached_ref = -1;
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting.
-class RowIndexes
-{
+class RowIndexes {
 public:
     RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc) :
 #ifdef REALM_COOKIE_CHECK
@@ -75,9 +74,8 @@ public:
     }
 
     // Predicate for std::sort
-    struct Sorter
-    {
-        Sorter(){}
+    struct Sorter {
+        Sorter() {}
         Sorter(const std::vector<size_t>& columns, const std::vector<bool>& ascending)
             : m_column_indexes(columns), m_ascending(ascending) {}
         bool operator()(size_t i, size_t j) const

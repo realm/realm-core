@@ -172,7 +172,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
     }
     REALM_ASSERT(false);
 
-  carry_on:
+carry_on:
     if (old_type != new_type)
         m_types->set(row_ndx, new_type);
     m_data->set(row_ndx, 0);
@@ -243,9 +243,12 @@ DataType MixedColumn::get_type(size_t ndx) const noexcept
     REALM_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
     switch (coltype) {
-        case mixcol_IntNeg:    return type_Int;
-        case mixcol_DoubleNeg: return type_Double;
-        default: return DataType(coltype);   // all others must be in sync with ColumnType
+        case mixcol_IntNeg:
+            return type_Int;
+        case mixcol_DoubleNeg:
+            return type_Double;
+        default:
+            return DataType(coltype);   // all others must be in sync with ColumnType
     }
 }
 

@@ -267,8 +267,7 @@ struct CastToUnsigned {
     }
 };
 template<>
-struct CastToUnsigned<bool>
-{
+struct CastToUnsigned<bool> {
     template<class From>
     static bool cast(From value) noexcept
     {
@@ -339,12 +338,12 @@ struct SafeIntBinopsImpl<L, R, false, true> {
     static bool equal(L l, R r) noexcept
     {
         return (lim_l::digits > lim_r::digits) ?
-            r >= 0 && l == util::cast_to_unsigned<L>(r) : R(l) == r;
+               r >= 0 && l == util::cast_to_unsigned<L>(r) : R(l) == r;
     }
     static bool less(L l, R r) noexcept
     {
         return (lim_l::digits > lim_r::digits) ?
-            r >= 0 && l < util::cast_to_unsigned<L>(r) : R(l) < r;
+               r >= 0 && l < util::cast_to_unsigned<L>(r) : R(l) < r;
     }
     static bool add(L& lval, R rval) noexcept
     {
@@ -390,12 +389,12 @@ struct SafeIntBinopsImpl<L, R, true, false> {
     static bool equal(L l, R r) noexcept
     {
         return (lim_l::digits < lim_r::digits) ?
-            l >= 0 && util::cast_to_unsigned<R>(l) == r : l == L(r);
+               l >= 0 && util::cast_to_unsigned<R>(l) == r : l == L(r);
     }
     static bool less(L l, R r) noexcept
     {
         return (lim_l::digits < lim_r::digits) ?
-            l < 0 || util::cast_to_unsigned<R>(l) < r : l < L(r);
+               l < 0 || util::cast_to_unsigned<R>(l) < r : l < L(r);
     }
     static bool add(L& lval, R rval) noexcept
     {
@@ -474,8 +473,7 @@ struct SafeIntBinopsImpl<L, R, true, true> {
 
 template<class L, class R>
 struct SafeIntBinops: SafeIntBinopsImpl<L, R, std::numeric_limits<L>::is_signed,
-                                        std::numeric_limits<R>::is_signed>
-{
+    std::numeric_limits<R>::is_signed> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
     static_assert(lim_l::is_specialized && lim_r::is_specialized,

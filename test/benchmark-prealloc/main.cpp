@@ -29,8 +29,8 @@ using namespace realm::util;
 namespace {
 
 REALM_TABLE_2(Alpha,
-                foo, Int,
-                bar, Int)
+              foo, Int,
+              bar, Int)
 
 } // anonymous namespace
 

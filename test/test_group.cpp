@@ -24,17 +24,17 @@
 
 #include <sys/stat.h>
 #ifndef _WIN32
-#  include <unistd.h>
-#  include <sys/types.h>
+    #include <unistd.h>
+    #include <sys/types.h>
 #endif
 
 // File permissions for Windows
 // http://stackoverflow.com/questions/592448/c-how-to-set-file-permissions-cross-platform
 #ifdef _WIN32
-#  include <io.h>
-typedef int mode_t2;
-static const mode_t2 S_IWUSR = mode_t2(_S_IWRITE);
-static const mode_t2 MS_MODE_MASK = 0x0000ffff;
+    #include <io.h>
+    typedef int mode_t2;
+    static const mode_t2 S_IWUSR = mode_t2(_S_IWRITE);
+    static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #endif
 
 #include <realm.hpp>
@@ -1935,7 +1935,7 @@ TEST(Group_IndexString)
     size_t r2 = table->column().first.find_first("jeff");
     size_t r3 = table->column().first.find_first("jim");
     size_t r4 = table->column().first.find_first("jimbo");
-     size_t r5 = table->column().first.find_first("johnny");
+    size_t r5 = table->column().first.find_first("johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);

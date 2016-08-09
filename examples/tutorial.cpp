@@ -26,9 +26,9 @@ using namespace realm;
 // defining a table
 REALM_TABLE_3(MyTable,
 //              columns: types:
-                name,    String,
-                age,     Int,
-                hired,   Bool)
+              name,    String,
+              age,     Int,
+              hired,   Bool)
 
 int main()
 {

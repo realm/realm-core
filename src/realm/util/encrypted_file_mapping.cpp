@@ -25,8 +25,8 @@
 #include <algorithm>
 
 #ifdef REALM_DEBUG
-#  include <cstdio>
-#  include <iostream>
+    #include <cstdio>
+    #include <iostream>
 #endif
 
 #include <cstring>
@@ -41,7 +41,7 @@ namespace realm {
 namespace util {
 
 SharedFileInfo::SharedFileInfo(const uint8_t* key, int file_descriptor)
-: fd(file_descriptor), cryptor(key)
+    : fd(file_descriptor), cryptor(key)
 {
 }
 
@@ -127,7 +127,7 @@ size_t check_read(int fd, off_t pos, void *dst, size_t len)
 } // anonymous namespace
 
 AESCryptor::AESCryptor(const uint8_t* key)
-: m_rw_buffer(new char[block_size])
+    : m_rw_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
@@ -139,7 +139,8 @@ AESCryptor::AESCryptor(const uint8_t* key)
     memcpy(m_hmacKey, key + 32, 32);
 }
 
-AESCryptor::~AESCryptor() noexcept {
+AESCryptor::~AESCryptor() noexcept
+{
 #if REALM_PLATFORM_APPLE
     CCCryptorRelease(m_encr);
     CCCryptorRelease(m_decr);
@@ -258,7 +259,8 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) noexcept
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
-        } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
+        }
+        while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
 
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
         check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
@@ -270,7 +272,7 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) noexcept
 }
 
 void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
-                         const char* src, const char* stored_iv) noexcept
+                       const char* src, const char* stored_iv) noexcept
 {
     uint8_t iv[aes_block_size] = {0};
     memcpy(iv, stored_iv, 4);
@@ -322,12 +324,12 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 
 EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size,
                                            File::AccessMode access)
-: m_file(file)
-, m_page_shift(log2(realm::util::page_size()))
-, m_blocks_per_page((1<<m_page_shift) / block_size)
-, m_access(access)
+    : m_file(file)
+    , m_page_shift(log2(realm::util::page_size()))
+    , m_blocks_per_page((1<<m_page_shift) / block_size)
+    , m_access(access)
 #ifdef REALM_DEBUG
-, m_validate_buffer(new char[1<<m_page_shift])
+    , m_validate_buffer(new char[1<<m_page_shift])
 #endif
 {
     REALM_ASSERT(m_blocks_per_page * block_size == (1ULL << m_page_shift));

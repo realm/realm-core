@@ -19,7 +19,7 @@
 #include <algorithm>
 
 #ifdef REALM_DEBUG
-#  include <iostream>
+    #include <iostream>
 #endif
 
 #include <realm/util/miscellaneous.hpp>
@@ -357,7 +357,7 @@ ref_type GroupWriter::write_group()
     if (is_shared)
         ++max_top_size; // database version (a.k.a. transaction number)
     size_t max_free_space_needed = Array::get_max_byte_size(max_top_size) +
-        num_free_lists * Array::get_max_byte_size(max_free_list_size);
+                                   num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
     // Reserve space for remaining arrays. We ask for one extra byte beyond the
     // maximum number that is required. This ensures that even if we end up
@@ -556,8 +556,8 @@ size_t GroupWriter::get_free_space(size_t size)
 
 
 inline size_t GroupWriter::split_freelist_chunk(size_t index, size_t start_pos,
-                                                     size_t alloc_pos, size_t chunk_size,
-                                                     bool is_shared)
+                                                size_t alloc_pos, size_t chunk_size,
+                                                bool is_shared)
 {
     m_free_positions.insert(index, start_pos);
     m_free_lengths.insert(index, alloc_pos - start_pos);
@@ -800,17 +800,16 @@ void GroupWriter::dump()
 
     size_t count = m_free_lengths.size();
     std::cout << "count: " << count << ", m_size = " << m_alloc.get_file().get_size() << ", "
-        "version >= " << m_readlock_version << "\n";
+              << "version >= " << m_readlock_version << "\n";
     if (!is_shared) {
         for (size_t i = 0; i < count; ++i) {
-            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) <<
-                "\n";
+            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) << "\n";
         }
     }
     else {
         for (size_t i = 0; i < count; ++i) {
-            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) <<
-                " - " << m_free_versions.get(i) << "\n";
+            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i)
+                      << " - " << m_free_versions.get(i) << "\n";
         }
     }
 }

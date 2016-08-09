@@ -35,7 +35,7 @@ using namespace realm::test_util;
 namespace {
 
 REALM_TABLE_1(IntTable,
-                i, Int)
+              i, Int)
 
 
 inline int_fast64_t read(IntTable& table, const std::vector<size_t> order)

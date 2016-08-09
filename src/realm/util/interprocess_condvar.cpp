@@ -23,8 +23,8 @@
 #include <sstream>
 
 #ifdef REALM_CONDVAR_EMULATION
-#include <unistd.h>
-#include <poll.h>
+    #include <unistd.h>
+    #include <poll.h>
 #endif
 
 using namespace realm;
@@ -73,7 +73,7 @@ void InterprocessCondVar::close() noexcept
 #ifdef REALM_CONDVAR_EMULATION
         ::close(m_fd_read);
         ::close(m_fd_write);
-#endif        
+#endif
         return; // we don't need to clean up the SharedPart
     }
     // we don't do anything to the shared part, other CondVars may share it
@@ -129,7 +129,8 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
                 if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
                     throw std::runtime_error(m_resource_path + " exists and it is not a fifo.");
                 }
-            } else {
+            }
+            else {
                 throw std::system_error(err, std::system_category());
             }
         }
@@ -177,7 +178,8 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 }
 
 
-void InterprocessCondVar::init_shared_part(SharedPart& shared_part) {
+void InterprocessCondVar::init_shared_part(SharedPart& shared_part)
+{
 #ifdef REALM_CONDVAR_EMULATION
     shared_part.wait_counter = 0;
     shared_part.signal_counter = 0;
@@ -187,7 +189,8 @@ void InterprocessCondVar::init_shared_part(SharedPart& shared_part) {
 }
 
 
-void InterprocessCondVar::release_shared_part() {
+void InterprocessCondVar::release_shared_part()
+{
 #ifdef REALM_CONDVAR_EMULATION
     File::try_remove(m_resource_path);
 #else
@@ -295,7 +298,7 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         return;
     }
 #else
-    m_shared_part->wait(*m.m_shared_part, [](){}, tp);
+    m_shared_part->wait(*m.m_shared_part, []() {}, tp);
 #endif
 }
 

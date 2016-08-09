@@ -85,12 +85,11 @@ const size_t print_width = 25;
 
 namespace realm {
 
-class Importer
-{
+class Importer {
 public:
     Importer();
     size_t import_csv_auto(FILE* file, Table& table, size_t type_detection_rows = 1000,
-                            size_t import_rows = static_cast<size_t>(-1));
+                           size_t import_rows = static_cast<size_t>(-1));
 
     size_t import_csv_manual(FILE* file, Table& table, std::vector<DataType> scheme, std::vector<std::string> column_names,
                              size_t skip_first_rows = 0, size_t import_rows = static_cast<size_t>(-1));

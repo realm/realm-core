@@ -463,7 +463,7 @@ inline ConstSubspecRef::ConstSubspecRef(const Array* parent,
 }
 
 inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) noexcept:
-        m_parent(r.m_parent),
+    m_parent(r.m_parent),
     m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }

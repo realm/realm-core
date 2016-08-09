@@ -406,8 +406,8 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     CHECK_EQUAL(10, c.find_first(4294967296LL));
 
 
-// Partial find is not fully implemented yet
-/*
+    // Partial find is not fully implemented yet
+    /*
     // TEST(Column_PartialFind1)
 
     c.clear();
@@ -419,7 +419,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     CHECK_EQUAL(-1, c.find_first(partial_count+1, 0, partial_count));
     CHECK_EQUAL(-1, c.find_first(0, 1, partial_count));
     CHECK_EQUAL(partial_count-1, c.find_first(partial_count-1, partial_count-1, partial_count));
-*/
+    */
 
 
     // TEST(Column_HeaderParse)

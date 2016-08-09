@@ -45,17 +45,17 @@ const size_t rounds = 1000;
 //const size_t rounds = 1;
 
 REALM_TABLE_11(TestTable,
-                bits_0,    Int,
-                bits_1,    Int,
-                bits_2,    Int,
-                bits_4,    Int,
-                bits_8,    Int,
-                bits_16,   Int,
-                bits_32,   Int,
-                bits_64,   Int,
-                short_str, String,
-                long_str,  String,
-                enum_str,  String)
+               bits_0,    Int,
+               bits_1,    Int,
+               bits_2,    Int,
+               bits_4,    Int,
+               bits_8,    Int,
+               bits_16,   Int,
+               bits_32,   Int,
+               bits_64,   Int,
+               short_str, String,
+               long_str,  String,
+               enum_str,  String)
 
 
 test_util::Timer timer;
@@ -471,9 +471,12 @@ int main()
                     {
                         for (size_t n = 0; n < rounds; ++n) {
                             size_t res;
-                            if      (i == 0) res = len -table.column().short_str.count("bottom");
-                            else if (i == 1) res = len -table.column().long_str.count("long bottom");
-                            else if (i == 2) res = table.column().enum_str.count("monday");
+                            if (i == 0)
+                                res = len -table.column().short_str.count("bottom");
+                            else if (i == 1)
+                                res = len -table.column().long_str.count("long bottom");
+                            else if (i == 2)
+                                res = table.column().enum_str.count("monday");
                             if (res != expected) {
                                 std::cout << "error\n";
                             }

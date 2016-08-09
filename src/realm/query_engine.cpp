@@ -133,7 +133,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
 
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    SequentialGetterBase* source_column)
-    {
+{
     // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
     // integer version, because find_first_local() is relatively slower here (because it's non-integers).
     //

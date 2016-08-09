@@ -76,7 +76,8 @@ using realm::test_util::crypt_key;
 namespace {
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
-              kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
+              kumi_na_moja, kumi_na_mbili, kumi_na_tatu
+            };
 
 REALM_TABLE_2(MySubsubtable,
               value,  Int,

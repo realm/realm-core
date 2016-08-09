@@ -55,8 +55,7 @@ int main(int argc, char* argv [])
         for (size_t round = 0; round < 20; ++round) {
 
             for (size_t i = 0; i < 1000000; ++i) {
-                if (reads_per_write != 0 && (i % reads_per_write) == 0)
-                {
+                if (reads_per_write != 0 && (i % reads_per_write) == 0) {
                     WriteTransaction trx(db);
 
                     TableRef t = trx.get_table("test");

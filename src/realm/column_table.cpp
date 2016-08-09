@@ -336,7 +336,7 @@ void SubtableColumn::set(size_t row_ndx, const Table* subtable)
 
 
 void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
-                             bool broken_reciprocal_backlinks)
+                                bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
@@ -351,7 +351,7 @@ void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 
 
 void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                     bool broken_reciprocal_backlinks)
+                                        bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx < prior_num_rows);

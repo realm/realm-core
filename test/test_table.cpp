@@ -99,16 +99,14 @@ REALM_TABLE_7(MainTableType,
 TEST(Table_ManyColumnsCrash2)
 {
     // Trying to reproduce Java crash.
-    for (int a = 0; a < 10; a++)
-    {
+    for (int a = 0; a < 10; a++) {
         Group group;
 
         MainTableType::Ref mainTable = group.add_table<MainTableType>("PatientTable");
         TableRef dynPatientTable = group.add_table("PatientTable");
         dynPatientTable->add_empty_row();
 
-        for (int counter = 0; counter < 20000; counter++)
-        {
+        for (int counter = 0; counter < 20000; counter++) {
 #if 0
             // Add row to subtable through typed interface
             SubtableType::Ref subtable = mainTable[0].events->get_table_ref();
@@ -124,8 +122,8 @@ TEST(Table_ManyColumnsCrash2)
             REALM_ASSERT(subtable2->is_attached());
 
 #endif
-            if((counter % 1000) == 0){
-           //     std::cerr << counter << "\n";
+            if((counter % 1000) == 0) {
+                //     std::cerr << counter << "\n";
             }
         }
     }
@@ -3150,20 +3148,20 @@ TEST(Table_HighLevelSubtables)
     CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                              6);
     CHECK_EQUAL(ct.column().subtab[0]->column().subtab[0]->column().val[0], 6);
 
-/*
-  Idea for compile time failure tests:
+    /*
+      Idea for compile time failure tests:
 
-    const MyTable2 t;
-#if    TEST_INDEX == 0
-    t[0].val = 7;
-#elsif TEST_INDEX == 1
-    t.column().val[0] = 7;
-#elsif TEST_INDEX == 2
-    t[0].subtab[0].val = 7;
-#elsif TEST_INDEX == 3
-    t[0].subtab->column().val[0] = 7;
-#endif
-*/
+        const MyTable2 t;
+    #if    TEST_INDEX == 0
+        t[0].val = 7;
+    #elsif TEST_INDEX == 1
+        t.column().val[0] = 7;
+    #elsif TEST_INDEX == 2
+        t[0].subtab[0].val = 7;
+    #elsif TEST_INDEX == 3
+        t[0].subtab->column().val[0] = 7;
+    #endif
+    */
 }
 
 
@@ -3414,13 +3412,13 @@ REALM_TABLE_3(TableAgg,
               c_float, Float,
               c_double, Double)
 
-                // TODO: Bool? OldDateTime
+// TODO: Bool? OldDateTime
 } // anonymous namespace
 
 #if TEST_DURATION > 0
-#define TBL_SIZE REALM_MAX_BPNODE_SIZE*10
+    #define TBL_SIZE REALM_MAX_BPNODE_SIZE*10
 #else
-#define TBL_SIZE 10
+    #define TBL_SIZE 10
 #endif
 
 TEST(Table_Aggregates)
@@ -3690,22 +3688,22 @@ TEST(Table_EmptyMinmax)
 
 TEST(Table_LanguageBindings)
 {
-   Table* table = LangBindHelper::new_table();
-   CHECK(table->is_attached());
+    Table* table = LangBindHelper::new_table();
+    CHECK(table->is_attached());
 
-   table->add_column(type_Int, "i");
-   table->insert_empty_row(0);
-   table->set_int(0, 0, 10);
-   table->insert_empty_row(1);
-   table->set_int(0, 1, 12);
+    table->add_column(type_Int, "i");
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 10);
+    table->insert_empty_row(1);
+    table->set_int(0, 1, 12);
 
-   Table* table2 = LangBindHelper::copy_table(*table);
-   CHECK(table2->is_attached());
+    Table* table2 = LangBindHelper::copy_table(*table);
+    CHECK(table2->is_attached());
 
-   CHECK(*table == *table2);
+    CHECK(*table == *table2);
 
-   LangBindHelper::unbind_table_ptr(table);
-   LangBindHelper::unbind_table_ptr(table2);
+    LangBindHelper::unbind_table_ptr(table);
+    LangBindHelper::unbind_table_ptr(table2);
 }
 
 TEST(Table_MultipleColumn)
@@ -4643,8 +4641,8 @@ TEST(Table_MixedSubtablesRetain)
     parent->insert_column(2, type_Int, "dummy_2");
     parent->insert_empty_row(2);
     parent->set_mixed(3, 2, "Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphio"
-                        "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
-                        "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
+                      "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
+                      "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
     subtab_0_0->set_int    (0, 0, 10002);
     subtab_0_0->set_float  (1, 0, 10012.0f);
     subtab_1_1->set_int    (0, 0, 11102);
@@ -6276,12 +6274,12 @@ TEST(Table_Nulls)
         t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
 
         CHECK_EQUAL(1, t.count_string(0,
-            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
+                                      "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
         CHECK_EQUAL(1, t.count_string(0, ""));
         CHECK_EQUAL(1, t.count_string(0, realm::null()));
 
         CHECK_EQUAL(0, t.find_first_string(0,
-            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
+                                           "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
         CHECK_EQUAL(1, t.find_first_string(0, ""));
         CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
 

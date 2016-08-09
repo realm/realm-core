@@ -30,7 +30,7 @@ public:
     typedef StringData value_type;
 
     explicit ArrayStringLong(Allocator&, bool nullable) noexcept;
-    ~ArrayStringLong() noexcept override{}
+    ~ArrayStringLong() noexcept override {}
 
     /// Create a new empty long string array and attach this accessor to
     /// it. This does not modify the parent reference information of
@@ -65,9 +65,9 @@ public:
     void set_null(size_t ndx);
 
     size_t count(StringData value, size_t begin = 0,
-                      size_t end = npos) const noexcept;
+                 size_t end = npos) const noexcept;
     size_t find_first(StringData value, size_t begin = 0,
-                           size_t end = npos) const noexcept;
+                      size_t end = npos) const noexcept;
     void find_all(IntegerColumn &result, StringData value, size_t add_offset = 0,
                   size_t begin = 0, size_t end = npos) const;
 
@@ -213,7 +213,7 @@ inline bool ArrayStringLong::update_from_parent(size_t old_baseline) noexcept
 }
 
 inline size_t ArrayStringLong::get_size_from_header(const char* header,
-                                                         Allocator& alloc) noexcept
+                                                    Allocator& alloc) noexcept
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);

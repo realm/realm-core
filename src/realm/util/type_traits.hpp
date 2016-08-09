@@ -134,7 +134,7 @@ private:
     template<int>
     struct dummy {
         template<class T>
-    struct pred {
+        struct pred {
             static const bool value = std::numeric_limits<T>::digits >= bits;
         };
     };

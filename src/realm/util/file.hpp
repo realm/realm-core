@@ -27,7 +27,7 @@
 #include <streambuf>
 
 #ifndef _WIN32
-#  include <dirent.h> // POSIX.1-2001
+    #include <dirent.h> // POSIX.1-2001
 #endif
 
 #include <realm/util/features.h>
@@ -834,10 +834,19 @@ inline void File::open(const std::string& path, Mode m)
     CreateMode c = create_Auto;
     int flags = 0;
     switch (m) {
-        case mode_Read:   a = access_ReadOnly; c = create_Never; break;
-        case mode_Update:                      c = create_Never; break;
-        case mode_Write:  flags = flag_Trunc;                    break;
-        case mode_Append: flags = flag_Append;                   break;
+        case mode_Read:
+            a = access_ReadOnly;
+            c = create_Never;
+            break;
+        case mode_Update:
+            c = create_Never;
+            break;
+        case mode_Write:
+            flags = flag_Trunc;
+            break;
+        case mode_Append:
+            flags = flag_Append;
+            break;
     }
     open(path, a, c, flags);
 }

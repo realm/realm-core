@@ -22,7 +22,8 @@
 
 using namespace realm;
 
-int main(int, char*[]) {
+int main(int, char*[])
+{
     Table t;
 
     t.add_column(type_String, "name");

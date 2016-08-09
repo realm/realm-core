@@ -164,7 +164,7 @@ public:
                        DescriptorRef* subdesc = nullptr, bool nullable = false);
 
     size_t add_column_link(DataType type, StringData name, Table& target,
-                                LinkType = link_Weak);
+                           LinkType = link_Weak);
     void insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
                             LinkType = link_Weak);
     //@}
@@ -793,7 +793,7 @@ public:
     }
 
     static size_t* record_subdesc_path(const Descriptor& desc, size_t* begin,
-                                            size_t* end) noexcept
+                                       size_t* end) noexcept
     {
         return desc.record_subdesc_path(begin, end);
     }

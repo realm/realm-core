@@ -162,7 +162,8 @@ SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
         do_clean_dir(path+ ".management", ".management");
         remove_dir(path+ ".management");
         File::try_remove(get_lock_path());
-    } catch (...) {
+    }
+    catch (...) {
         // exception ignored
     }
 }

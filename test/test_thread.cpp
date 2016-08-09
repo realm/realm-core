@@ -26,14 +26,14 @@
 #include <mutex>
 
 #ifndef _WIN32
-#include <unistd.h>
+    #include <unistd.h>
 #endif
 
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-#include <realm/util/interprocess_condvar.hpp>
+    #include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 
@@ -568,7 +568,7 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
 }
 
 
-void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, 
+void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter,
                        InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);

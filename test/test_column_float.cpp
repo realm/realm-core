@@ -269,7 +269,7 @@ void BasicColumn_Aggregates(TestContext& test_context, T values[], size_t num_va
     // todo: add tests for minimum, maximum,
     // todo !!!
 
-   c.destroy();
+    c.destroy();
 }
 TEST(FloatColumn_Aggregates)
 {

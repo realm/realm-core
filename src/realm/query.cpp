@@ -66,7 +66,7 @@ Query::Query(const Table& table, TableViewBase* tv)
 
 Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
     : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv.get()), m_source_table_view(tv.get()),
-    m_owned_source_table_view(std::move(tv))
+      m_owned_source_table_view(std::move(tv))
 {
 #ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(m_view == nullptr || m_view->cookie == m_view->cookie_expected);
@@ -261,19 +261,19 @@ template<class Node>
 struct MakeConditionNode {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, typename Node::TConditionValue value)
     {
-        return std::unique_ptr<ParentNode>{new Node(std::move(value), col_ndx)};
+        return std::unique_ptr<ParentNode> {new Node(std::move(value), col_ndx)};
     }
 
     static std::unique_ptr<ParentNode> make(size_t col_ndx, null)
     {
-        return std::unique_ptr<ParentNode>{new Node(null{}, col_ndx)};
+        return std::unique_ptr<ParentNode> {new Node(null{}, col_ndx)};
     }
 
     template<class T = typename Node::TConditionValue>
     static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value, std::unique_ptr<ParentNode>>::type
-    make(size_t col_ndx, typename util::RemoveOptional<T>::type value)
+            make(size_t col_ndx, typename util::RemoveOptional<T>::type value)
     {
-        return std::unique_ptr<ParentNode>{new Node(std::move(value), col_ndx)};
+        return std::unique_ptr<ParentNode> {new Node(std::move(value), col_ndx)};
     }
 
     template<class T>
@@ -287,7 +287,7 @@ template<class Cond>
 struct MakeConditionNode<IntegerNode<IntegerColumn, Cond>> {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, int64_t value)
     {
-        return std::unique_ptr<ParentNode>{new IntegerNode<IntegerColumn, Cond>(std::move(value), col_ndx)};
+        return std::unique_ptr<ParentNode> {new IntegerNode<IntegerColumn, Cond>(std::move(value), col_ndx)};
     }
 
     template<class T>
@@ -301,12 +301,12 @@ template<class Cond>
 struct MakeConditionNode<StringNode<Cond>> {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, StringData value)
     {
-        return std::unique_ptr<ParentNode>{new StringNode<Cond>(std::move(value), col_ndx)};
+        return std::unique_ptr<ParentNode> {new StringNode<Cond>(std::move(value), col_ndx)};
     }
 
     static std::unique_ptr<ParentNode> make(size_t col_ndx, null)
     {
-        return std::unique_ptr<ParentNode>{new StringNode<Cond>(null{}, col_ndx)};
+        return std::unique_ptr<ParentNode> {new StringNode<Cond>(null{}, col_ndx)};
     }
 
     template<class T>
@@ -835,56 +835,56 @@ template<Action action, typename T, typename R, class ColType>
     }
 }
 
-    /**************************************************************************************************************
-    *                                                                                                             *
-    * Main entry point of a query. Schedules calls to aggregate_local                                             *
-    * Return value is the result of the query, or Array pointer for FindAll.                                      *
-    *                                                                                                             *
-    **************************************************************************************************************/
+/**************************************************************************************************************
+*                                                                                                             *
+* Main entry point of a query. Schedules calls to aggregate_local                                             *
+* Return value is the result of the query, or Array pointer for FindAll.                                      *
+*                                                                                                             *
+**************************************************************************************************************/
 
-    void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable,
-                                   ParentNode* pn, QueryStateBase* st,
-                                   size_t start, size_t end, SequentialGetterBase* source_column) const
-    {
-        if (end == not_found)
-            end = m_table->size();
+void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable,
+                               ParentNode* pn, QueryStateBase* st,
+                               size_t start, size_t end, SequentialGetterBase* source_column) const
+{
+    if (end == not_found)
+        end = m_table->size();
 
-        for (size_t c = 0; c < pn->m_children.size(); c++)
-            pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn, nullable);
+    for (size_t c = 0; c < pn->m_children.size(); c++)
+        pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn, nullable);
 
-        size_t td;
+    size_t td;
 
-        while (start < end) {
-            size_t best = std::distance(pn->m_children.begin(),
-                                        std::min_element(pn->m_children.begin(), pn->m_children.end(),
-                                                         ParentNode::score_compare()));
+    while (start < end) {
+        size_t best = std::distance(pn->m_children.begin(),
+                                    std::min_element(pn->m_children.begin(), pn->m_children.end(),
+                                                     ParentNode::score_compare()));
 
-            // Find a large amount of local matches in best condition
-            td = pn->m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
+        // Find a large amount of local matches in best condition
+        td = pn->m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
 
-            // Executes start...end range of a query and will stay inside the condition loop of the node it was called
-            // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
-            // condition of called node has evaluated to true local_matches number of times.
-            // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
-            start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
+        // Executes start...end range of a query and will stay inside the condition loop of the node it was called
+        // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
+        // condition of called node has evaluated to true local_matches number of times.
+        // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
+        start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
 
-            // Make remaining conditions compute their m_dD (statistics)
-            for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
-                if (c == best)
-                    continue;
+        // Make remaining conditions compute their m_dD (statistics)
+        for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
+            if (c == best)
+                continue;
 
-                // Skip test if there is no way its cost can ever be better than best node's
-                double cost = pn->m_children[c]->cost();
-                if (pn->m_children[c]->m_dT < cost) {
+            // Skip test if there is no way its cost can ever be better than best node's
+            double cost = pn->m_children[c]->cost();
+            if (pn->m_children[c]->m_dT < cost) {
 
-                    // Limit to bestdist in order not to skip too large parts of index nodes
-                    size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
-                    td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = pn->m_children[c]->aggregate_local(st, start, td, probe_matches, source_column);
-                }
+                // Limit to bestdist in order not to skip too large parts of index nodes
+                size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
+                td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
+                start = pn->m_children[c]->aggregate_local(st, start, td, probe_matches, source_column);
             }
         }
     }
+}
 
 
 // Sum
@@ -917,7 +917,7 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
 }
 
 OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
-                                 size_t limit, size_t* return_ndx) const
+                                       size_t limit, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
@@ -961,7 +961,7 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
 }
 
 OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                                 size_t* return_ndx) const
+                                       size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
         return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
@@ -1113,7 +1113,7 @@ Query& Query::end_subtable()
     }
 
     auto subtable_node = std::unique_ptr<ParentNode>(new SubtableNode(current_group.m_subtable_column,
-                                                                      std::move(current_group.m_root_node)));
+                                                     std::move(current_group.m_root_node)));
     end_group();
     add_node(std::move(subtable_node));
 
@@ -1494,7 +1494,8 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
         default: {
             if (!current_group.m_root_node) {
                 current_group.m_root_node = std::move(node);
-            } else {
+            }
+            else {
                 current_group.m_root_node->add_child(std::move(node));
             }
         }

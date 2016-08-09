@@ -40,9 +40,9 @@ public:
     void destroy();
 
     size_t count(BinaryData value, bool is_string = false, size_t begin = 0,
-                      size_t end = npos) const noexcept;
+                 size_t end = npos) const noexcept;
     size_t find_first(BinaryData value, bool is_string = false, size_t begin = 0,
-                           size_t end = npos) const noexcept;
+                      size_t end = npos) const noexcept;
     void find_all(IntegerColumn& result, BinaryData value, bool is_string = false,
                   size_t add_offset = 0,
                   size_t begin = 0, size_t end = npos);
@@ -94,7 +94,7 @@ private:
 // Implementation:
 
 inline ArrayBigBlobs::ArrayBigBlobs(Allocator& allocator, bool nullable) noexcept:
-                                    Array(allocator), m_nullable(nullable)
+    Array(allocator), m_nullable(nullable)
 {
 }
 

@@ -38,12 +38,12 @@
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
-#  include <unistd.h>
-#  include <sys/wait.h>
-#  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+    #include <unistd.h>
+    #include <sys/wait.h>
+    #define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
-#  define NOMINMAX
-#  include <windows.h>
+    #define NOMINMAX
+    #include <windows.h>
 #endif
 
 
@@ -978,8 +978,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     ConstTableRef table = group.get_table("t");
     for (size_t row_ndx = 0; row_ndx < 3; ++row_ndx) {
         for (size_t col_ndx = 0; col_ndx < 3; ++col_ndx) {
-            CHECK_EQUAL(type_Int, table->get_mixed_type(col_ndx, row_ndx)) &&
-                CHECK_EQUAL(0, table->get_mixed(col_ndx, row_ndx).get_int());
+            CHECK_EQUAL(type_Int, table->get_mixed_type(col_ndx, row_ndx))&&
+            CHECK_EQUAL(0, table->get_mixed(col_ndx, row_ndx).get_int());
         }
     }
 
@@ -996,9 +996,9 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     auto check_subtab = [this](ConstTableRef table_r, size_t col_ndx, size_t row_ndx, int_type value) {
         ConstTableRef subtab = table_r->get_subtable(col_ndx, row_ndx);
         return CHECK_EQUAL(1, subtab->get_column_count()) &&
-            CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
-            CHECK_EQUAL(1, subtab->size()) &&
-            CHECK_EQUAL(value, subtab->get_int(0, 0));
+               CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
+               CHECK_EQUAL(1, subtab->size()) &&
+               CHECK_EQUAL(value, subtab->get_int(0, 0));
     };
 
     // Change value types (round 1 of 2)
@@ -1019,24 +1019,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
-        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1)) &&
-        CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(0, 2)) &&
-        CHECK_EQUAL(OldDateTime(3), table->get_mixed(0, 2).get_olddatetime());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) &&
-        CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) &&
-        CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(1, 2)) &&
-        CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_1), table->get_mixed(2, 0).get_binary());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(2, 1)) &&
-        check_subtab(table, 2, 1, 6);
-    CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2)) &&
-        CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0))&&
+    CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1))&&
+    CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(0, 2))&&
+    CHECK_EQUAL(OldDateTime(3), table->get_mixed(0, 2).get_olddatetime());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0))&&
+    CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1))&&
+    CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(1, 2))&&
+    CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0))&&
+    CHECK_EQUAL(BinaryData(bin_1), table->get_mixed(2, 0).get_binary());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(2, 1))&&
+    check_subtab(table, 2, 1, 6);
+    CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2))&&
+    CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
 
     // Change value types (round 2 of 2)
     char bin_2[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
@@ -1055,24 +1055,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
-        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 1)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0, 1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) &&
-        CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) &&
-        check_subtab(table, 1, 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 1)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
-        CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0))&&
+    CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 1))&&
+    CHECK_EQUAL(20.0f, table->get_mixed(0, 1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2))&&
+    CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0))&&
+    check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 1))&&
+    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2))&&
+    CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0))&&
+    CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 1))&&
+    CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2))&&
+    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
 
     // Insert rows before
     {
@@ -1083,24 +1083,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8+0)) &&
-        CHECK_EQUAL(2, table->get_mixed(0, 8+0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 8+1)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0, 8+1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 8+2)) &&
-        CHECK_EQUAL(false, table->get_mixed(0, 8+2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 8+0)) &&
-        check_subtab(table, 1, 8+0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 8+1)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 8+1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 8+2)) &&
-        CHECK_EQUAL(40, table->get_mixed(1, 8+2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 8+0)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2, 8+0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 8+1)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 8+1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 8+2)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 8+2).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8+0))&&
+    CHECK_EQUAL(2, table->get_mixed(0, 8+0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 8+1))&&
+    CHECK_EQUAL(20.0f, table->get_mixed(0, 8+1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 8+2))&&
+    CHECK_EQUAL(false, table->get_mixed(0, 8+2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 8+0))&&
+    check_subtab(table, 1, 8+0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 8+1))&&
+    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 8+1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 8+2))&&
+    CHECK_EQUAL(40, table->get_mixed(1, 8+2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 8+0))&&
+    CHECK_EQUAL(50.0, table->get_mixed(2, 8+0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 8+1))&&
+    CHECK_EQUAL("Banach", table->get_mixed(2, 8+1).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 8+2))&&
+    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 8+2).get_olddatetime());
 
     // Move rows by remove() (ordered removal)
     {
@@ -1112,24 +1112,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6+0)) &&
-        CHECK_EQUAL(2, table->get_mixed(0, 6+0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 6+1)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0, 6+1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 6+2)) &&
-        CHECK_EQUAL(false, table->get_mixed(0, 6+2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 6+0)) &&
-        check_subtab(table, 1, 6+0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 6+1)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 6+1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 6+2)) &&
-        CHECK_EQUAL(40, table->get_mixed(1, 6+2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 6+0)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2, 6+0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 6+1)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 6+1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 6+2)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 6+2).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6+0))&&
+    CHECK_EQUAL(2, table->get_mixed(0, 6+0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 6+1))&&
+    CHECK_EQUAL(20.0f, table->get_mixed(0, 6+1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 6+2))&&
+    CHECK_EQUAL(false, table->get_mixed(0, 6+2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 6+0))&&
+    check_subtab(table, 1, 6+0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 6+1))&&
+    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 6+1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 6+2))&&
+    CHECK_EQUAL(40, table->get_mixed(1, 6+2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 6+0))&&
+    CHECK_EQUAL(50.0, table->get_mixed(2, 6+0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 6+1))&&
+    CHECK_EQUAL("Banach", table->get_mixed(2, 6+1).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 6+2))&&
+    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 6+2).get_olddatetime());
 
     // Move rows by move_last_over() (unordered removal)
     {
@@ -1142,24 +1142,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) &&
-        CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 4)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0, 4).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) &&
-        CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) &&
-        check_subtab(table, 1, 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 4)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 4).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) &&
-        CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 4)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0))&&
+    CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 4))&&
+    CHECK_EQUAL(20.0f, table->get_mixed(0, 4).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2))&&
+    CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0))&&
+    check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 4))&&
+    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 4).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2))&&
+    CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0))&&
+    CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 4))&&
+    CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2))&&
+    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
 
     // Swap rows
     {
@@ -1171,24 +1171,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4)) &&
-        CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 0)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 5)) &&
-        CHECK_EQUAL(false, table->get_mixed(0, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 4)) &&
-        check_subtab(table, 1, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 5)) &&
-        CHECK_EQUAL(40, table->get_mixed(1, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 4)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 5).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4))&&
+    CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 0))&&
+    CHECK_EQUAL(20.0f, table->get_mixed(0, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 5))&&
+    CHECK_EQUAL(false, table->get_mixed(0, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 4))&&
+    check_subtab(table, 1, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 0))&&
+    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 5))&&
+    CHECK_EQUAL(40, table->get_mixed(1, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 4))&&
+    CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 0))&&
+    CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 5))&&
+    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 5).get_olddatetime());
 
     // Insert columns before
     {
@@ -1206,24 +1206,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0+8, 4)) &&
-        CHECK_EQUAL(2, table->get_mixed(0+8, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0+8, 0)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0+8, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0+8, 5)) &&
-        CHECK_EQUAL(false, table->get_mixed(0+8, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1+8, 4)) &&
-        check_subtab(table, 1+8, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1+8, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1+8, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1+8, 5)) &&
-        CHECK_EQUAL(40, table->get_mixed(1+8, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2+8, 4)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2+8, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2+8, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2+8, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2+8, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2+8, 5).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0+8, 4))&&
+    CHECK_EQUAL(2, table->get_mixed(0+8, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0+8, 0))&&
+    CHECK_EQUAL(20.0f, table->get_mixed(0+8, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0+8, 5))&&
+    CHECK_EQUAL(false, table->get_mixed(0+8, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1+8, 4))&&
+    check_subtab(table, 1+8, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1+8, 0))&&
+    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1+8, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1+8, 5))&&
+    CHECK_EQUAL(40, table->get_mixed(1+8, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2+8, 4))&&
+    CHECK_EQUAL(50.0, table->get_mixed(2+8, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2+8, 0))&&
+    CHECK_EQUAL("Banach", table->get_mixed(2+8, 0).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2+8, 5))&&
+    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2+8, 5).get_olddatetime());
 
     // Remove columns before
     {
@@ -1235,24 +1235,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0+6, 4)) &&
-        CHECK_EQUAL(2, table->get_mixed(0+6, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0+6, 0)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(0+6, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0+6, 5)) &&
-        CHECK_EQUAL(false, table->get_mixed(0+6, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1+6, 4)) &&
-        check_subtab(table, 1+6, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1+6, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1+6, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1+6, 5)) &&
-        CHECK_EQUAL(40, table->get_mixed(1+6, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2+6, 4)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(2+6, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2+6, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(2+6, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2+6, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2+6, 5).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0+6, 4))&&
+    CHECK_EQUAL(2, table->get_mixed(0+6, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0+6, 0))&&
+    CHECK_EQUAL(20.0f, table->get_mixed(0+6, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0+6, 5))&&
+    CHECK_EQUAL(false, table->get_mixed(0+6, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1+6, 4))&&
+    check_subtab(table, 1+6, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1+6, 0))&&
+    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1+6, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1+6, 5))&&
+    CHECK_EQUAL(40, table->get_mixed(1+6, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2+6, 4))&&
+    CHECK_EQUAL(50.0, table->get_mixed(2+6, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2+6, 0))&&
+    CHECK_EQUAL("Banach", table->get_mixed(2+6, 0).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2+6, 5))&&
+    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2+6, 5).get_olddatetime());
 
     // Move columns around
     {
@@ -1267,24 +1267,24 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4)) &&
-        CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(8, 0)) &&
-        CHECK_EQUAL(20.0f, table->get_mixed(8, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(8, 5)) &&
-        CHECK_EQUAL(false, table->get_mixed(8, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(7, 4)) &&
-        check_subtab(table, 7, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(7, 0)) &&
-        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(7, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(7, 5)) &&
-        CHECK_EQUAL(40, table->get_mixed(7, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(3, 4)) &&
-        CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(3, 0)) &&
-        CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(3, 5)) &&
-        CHECK_EQUAL(OldDateTime(60), table->get_mixed(3, 5).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4))&&
+    CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(8, 0))&&
+    CHECK_EQUAL(20.0f, table->get_mixed(8, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(8, 5))&&
+    CHECK_EQUAL(false, table->get_mixed(8, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(7, 4))&&
+    check_subtab(table, 7, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(7, 0))&&
+    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(7, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(7, 5))&&
+    CHECK_EQUAL(40, table->get_mixed(7, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(3, 4))&&
+    CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(3, 0))&&
+    CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(3, 5))&&
+    CHECK_EQUAL(OldDateTime(60), table->get_mixed(3, 5).get_olddatetime());
 }
 
 
@@ -3663,7 +3663,7 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
 
     // Create accessors for random entries in the table.
     // occasionally modify the database through the accessor.
-    // feed the accessor refs to the background thread for 
+    // feed the accessor refs to the background thread for
     // later deletion.
     util::Thread deleter;
     ConcurrentQueue<LinkViewRef> queue(buffer_size);
@@ -7638,7 +7638,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
     sg.begin_read();
 
-    { // With no changes, the handler should not be called at all
+    {
+        // With no changes, the handler should not be called at all
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
             void parse_complete()
@@ -7652,7 +7653,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
 
-    { // With an empty change, parse_complete() and nothing else should be called
+    {
+        // With an empty change, parse_complete() and nothing else should be called
         WriteTransaction wt(sg_w);
         wt.commit();
 
@@ -7669,7 +7671,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         CHECK(parser.called);
     }
 
-    { // Make a simple modification and verify that the appropriate handler is called
+    {
+        // Make a simple modification and verify that the appropriate handler is called
         WriteTransaction wt(sg_w);
         wt.get_table("table 1")->add_empty_row();
         wt.get_table("table 2")->add_empty_row();
@@ -7698,7 +7701,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         CHECK_EQUAL(2, parser.expected_table);
     }
 
-    { // Add a table with some links
+    {
+        // Add a table with some links
         WriteTransaction wt(sg_w);
         TableRef table = wt.add_table("link origin");
         table->add_column_link(type_Link, "link", *wt.get_table("table 1"));
@@ -7711,7 +7715,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         LangBindHelper::advance_read(sg);
     }
 
-    { // Verify that deleting the targets of the links logs link nullifications
+    {
+        // Verify that deleting the targets of the links logs link nullifications
         WriteTransaction wt(sg_w);
         wt.get_table("table 1")->move_last_over(0);
         wt.get_table("table 2")->move_last_over(0);
@@ -7751,7 +7756,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         TEST_TYPE::call(sg, parser);
     }
 
-    { // Verify that clear() logs the correct rows
+    {
+        // Verify that clear() logs the correct rows
         WriteTransaction wt(sg_w);
         wt.get_table("table 2")->add_empty_row(10);
 
@@ -7898,7 +7904,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
-       {
+        {
             LangBindHelper::promote_to_write(sg);
             TableRef origin = group->get_or_add_table("origin");
             origin->add_column(type_Int, "");
@@ -8628,7 +8634,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     TableRef table1 = g.get_table("table 1");
     TableRef table2 = g.get_table("table 2");
 
-    { // With no changes, the handler should not be called at all
+    {
+        // With no changes, the handler should not be called at all
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
             void parse_complete()
@@ -8931,7 +8938,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     sched_yield();
     for (int i = 0; i < read_thread_count; ++i) {
         threads[write_thread_count + i].
-            start([&] { multiple_trackers_reader_thread(test_context, path); });
+        start([&] { multiple_trackers_reader_thread(test_context, path); });
     }
 
     // Wait for all writer threads to complete
@@ -8972,10 +8979,12 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 // fork should not be used on android or ios.
 
 /*
-
 This unit test has been disabled as it occasionally gets itself into a hang
 (which has plauged the testing process for a long time). It is unknown to me
 (Kristian) whether this is due to a bug in Core or a bug in this test.
+*/
+
+#if 0
 
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
@@ -9000,7 +9009,8 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
             wt.commit();
         }
         exit(0);
-    } else {
+    }
+    else {
         int status;
         waitpid(pid, &status, 0);
     }
@@ -9061,8 +9071,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
 }
 
-*/
-
+#endif // 0
 #endif // !REALM_ANDROID && !REALM_IOS
 #endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
@@ -9417,7 +9426,7 @@ TEST(LangBindHelper_HandoverQuery)
     SharedGroup::VersionID vid;
     {
         // Typed interface
-        std::unique_ptr<SharedGroup::Handover<TestTableInts::Query> > handover;
+        std::unique_ptr<SharedGroup::Handover<TestTableInts::Query>> handover;
         {
             LangBindHelper::promote_to_write(sg_w);
             TestTableInts::Ref table = group_w.add_table<TestTableInts>("table");
@@ -9445,7 +9454,7 @@ TEST(LangBindHelper_HandoverQuery)
     }
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<Query> > handover;
+        std::unique_ptr<SharedGroup::Handover<Query>> handover;
         {
             sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
             sg_w.begin_read();
@@ -9493,8 +9502,8 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
     SharedGroup::VersionID vid;
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
-        std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover1;
+        std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
         {
             TableView tv1;
             LangBindHelper::promote_to_write(sg_w);
@@ -9544,7 +9553,7 @@ TEST(LangBindHelper_HandoverPartialQuery)
     SharedGroup::VersionID vid;
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<Query> > handover;
+        std::unique_ptr<SharedGroup::Handover<Query>> handover;
         {
             LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
@@ -9591,7 +9600,7 @@ TEST(LangBindHelper_HandoverWithPinning)
         SharedGroup::VersionID token;
 
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<Query> > handover;
+        std::unique_ptr<SharedGroup::Handover<Query>> handover;
         {
             LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
@@ -9653,7 +9662,7 @@ TEST(LangBindHelper_HandoverNestedTableViews)
     SharedGroup::VersionID vid;
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         {
             LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
@@ -9698,7 +9707,7 @@ TEST(LangBindHelper_HandoverAccessors)
     SharedGroup::VersionID vid;
     {
         // Typed interface
-        std::unique_ptr<SharedGroup::Handover<TestTableInts::View> > handover;
+        std::unique_ptr<SharedGroup::Handover<TestTableInts::View>> handover;
         {
             TestTableInts::View tv;
             LangBindHelper::promote_to_write(sg_w);
@@ -9733,13 +9742,13 @@ TEST(LangBindHelper_HandoverAccessors)
 
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover2;
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover3;
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover4;
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover5;
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover6;
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover7;
-        std::unique_ptr<SharedGroup::Handover<Row> > handover_row;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover2;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover3;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover4;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover5;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover6;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover7;
+        std::unique_ptr<SharedGroup::Handover<Row>> handover_row;
         {
             TableView tv;
             Row row;
@@ -9873,7 +9882,7 @@ struct HandoverControl {
         m_version = v;
         m_changed.notify_all();
     }
-    void get(std::unique_ptr<T>& h, SharedGroup::VersionID &v)
+    void get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
     {
         LockGuard lg(m_lock);
         //std::cout << "get " << std::endl;
@@ -9917,8 +9926,7 @@ void handover_writer(std::string path)
     Group& g = const_cast<Group&>(sg.begin_read());
     TheTable::Ref table = g.get_table<TheTable>("table");
     Random random(random_int<unsigned long>());
-    for (int i = 1; i < 5000; ++i)
-    {
+    for (int i = 1; i < 5000; ++i) {
         LangBindHelper::promote_to_write(sg);
         // table holds random numbers >= 1, until the writing process
         // finishes, after which table[0] is set to 0 to signal termination
@@ -10087,8 +10095,8 @@ TEST(LangBindHelper_HandoverDependentViews)
     SharedGroup::VersionID vid;
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover2;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover1;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover2;
         {
             TableView tv1;
             TableView tv2;
@@ -10136,8 +10144,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
 {
     // First iteration hands-over a normal valid attached LinkView. Second
     // iteration hands-over a detached LinkView.
-    for (int detached = 0; detached < 2; detached++)
-    {
+    for (int detached = 0; detached < 2; detached++) {
         SHARED_GROUP_TEST_PATH(path);
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
         SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
@@ -10146,7 +10153,7 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
         std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID vid;
 
         {
@@ -10236,7 +10243,7 @@ TEST(LangBindHelper_HandoverTableRef)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    std::unique_ptr<SharedGroup::Handover<Table> > handover;
+    std::unique_ptr<SharedGroup::Handover<Table>> handover;
     SharedGroup::VersionID vid;
     {
         LangBindHelper::promote_to_write(sg_w);
@@ -10265,8 +10272,8 @@ TEST(LangBindHelper_HandoverLinkView)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    std::unique_ptr<SharedGroup::Handover<LinkView> > handover;
-    std::unique_ptr<SharedGroup::Handover<LinkView> > handover2;
+    std::unique_ptr<SharedGroup::Handover<LinkView>> handover;
+    std::unique_ptr<SharedGroup::Handover<LinkView>> handover2;
     SharedGroup::VersionID vid;
     {
 
@@ -10371,8 +10378,8 @@ TEST(LangBindHelper_HandoverDistinctView)
     SharedGroup::VersionID vid;
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover2;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover1;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover2;
         {
             TableView tv1;
             TableView tv2;
@@ -10435,8 +10442,8 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
     SharedGroup::VersionID vid;
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover2;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover1;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover2;
         TableView tv1;
         TableView tv2;
         {
@@ -10479,7 +10486,7 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     SharedGroup::VersionID vid;
     {
         // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover1;
         {
             LangBindHelper::promote_to_write(sg_w);
 
@@ -10642,9 +10649,9 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 
     size_t match;
 
-    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery;
-    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery2;
-    std::unique_ptr<SharedGroup::Handover<Query> > handoverQuery_int;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery2;
+    std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery_int;
 
 
     {
@@ -10879,9 +10886,9 @@ TEST(LangBindHelper_VersionControl)
         // first create 'num_version' versions
         sg.begin_read();
         {
-                WriteTransaction wt(sg_w);
-                MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
-                wt.commit();
+            WriteTransaction wt(sg_w);
+            MyTable::Ref t = wt.get_or_add_table<MyTable>("test");
+            wt.commit();
         }
         for (int i = 0; i < num_versions; ++i) {
             {
@@ -11022,8 +11029,7 @@ TEST(LangBindHelper_LinkListCrash)
         WriteTransaction wt(sg);
         wt.commit();
     }
-    for (int i = 0; i < 1; ++i)
-    {
+    for (int i = 0; i < 1; ++i) {
         WriteTransaction wt(sg);
         wt.get_table("Point")->add_empty_row();
         wt.commit();
@@ -11269,7 +11275,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     size_t numberOfDogsPerOwner = 20;
 
     std::vector<SharedGroup::VersionID> vids;
-    std::vector < std::unique_ptr<SharedGroup::Handover<Query> > > qs;
+    std::vector <std::unique_ptr<SharedGroup::Handover<Query>>> qs;
     std::mutex vector_mutex;
 
     std::atomic<bool> end_signal(false);
@@ -11329,7 +11335,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
 
                 SharedGroup::VersionID v = std::move(vids[0]);
                 vids.erase(vids.begin());
-                std::unique_ptr<SharedGroup::Handover<Query> > qptr = move(qs[0]);
+                std::unique_ptr<SharedGroup::Handover<Query>> qptr = move(qs[0]);
                 qs.erase(qs.begin());
                 vector_mutex.unlock();
 
@@ -11458,7 +11464,7 @@ TEST(LangBindHelper_TableViewClear)
         TableRef history = group_w.get_table("history");
         TableRef line = group_w.get_table("line");
 
-    //    number_of_line = 2;
+        //    number_of_line = 2;
         for (size_t i = 1; i <= number_of_line; ++i) {
             TableView tv = (line->column<Int>(1) == int64_t(i)).find_all();
             tv.clear(RemoveMode::unordered);
@@ -11740,7 +11746,7 @@ TEST(LangBindHelper_InRealmHistory_RollbackAndContinueAsRead)
     SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
-       {
+        {
             LangBindHelper::promote_to_write(sg);
             TableRef origin = group->get_or_add_table("origin");
             origin->add_column(type_Int, "");

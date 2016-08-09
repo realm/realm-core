@@ -89,8 +89,7 @@ struct TypeCount {
 };
 /// Base case for empty type list.
 template<>
-struct TypeCount<void>
-{
+struct TypeCount<void> {
     static const int value = 0;
 };
 
@@ -157,8 +156,8 @@ struct ForEachType {
     }
 };
 /// Base case for empty type list.
-template<template<class T, int i>
-class Op, int i> struct ForEachType<void, Op, i> {
+template<template<class T, int i> class Op, int i>
+struct ForEachType<void, Op, i> {
     static void exec() {}
     template<class A>
     static void exec(const A&) {}
@@ -183,7 +182,7 @@ struct HasType {
     static bool exec()
     {
         return Pred<typename List::head, i>::exec() ||
-            HasType<typename List::tail, Pred, i+1>::exec();
+               HasType<typename List::tail, Pred, i+1>::exec();
     }
     /// Execute the `Op<T,i>::exec(a)` for each type `T` at index `i`
     /// in `List`.
@@ -191,7 +190,7 @@ struct HasType {
     static bool exec(const A& a)
     {
         return Pred<typename List::head, i>::exec(a) ||
-            HasType<typename List::tail, Pred, i+1>::exec(a);
+               HasType<typename List::tail, Pred, i+1>::exec(a);
     }
     /// Execute the `Op<T,i>::exec(a,b)` for each type `T` at index
     /// `i` in `List`.
@@ -199,7 +198,7 @@ struct HasType {
     static bool exec(const A& a, const B& b)
     {
         return Pred<typename List::head, i>::exec(a,b) ||
-            HasType<typename List::tail, Pred, i+1>::exec(a,b);
+               HasType<typename List::tail, Pred, i+1>::exec(a,b);
     }
     /// Execute the `Op<T,i>::exec(a,b,c)` for each type `T` at index
     /// `i` in `List`.
@@ -207,7 +206,7 @@ struct HasType {
     static bool exec(const A& a, const B& b, const C& c)
     {
         return Pred<typename List::head, i>::exec(a,b,c) ||
-            HasType<typename List::tail, Pred, i+1>::exec(a,b,c);
+               HasType<typename List::tail, Pred, i+1>::exec(a,b,c);
     }
 };
 /// Base case for empty type list.

@@ -21,13 +21,13 @@
 #include <realm/util/thread.hpp>
 
 #if !defined _WIN32
-#  include <unistd.h>
+    #include <unistd.h>
 #endif
 
 // "Process shared mutexes" are not officially supported on Android,
 // but they appear to work anyway.
 #if (defined(_POSIX_THREAD_PROCESS_SHARED) && _POSIX_THREAD_PROCESS_SHARED > 0) || REALM_ANDROID
-#  define REALM_HAVE_PTHREAD_PROCESS_SHARED
+    #define REALM_HAVE_PTHREAD_PROCESS_SHARED
 #endif
 
 // Unfortunately Older Ubuntu releases such as 10.04 reports support
@@ -38,17 +38,17 @@
 // Support was added to glibc 2.12, so we disable for earlier versions
 // of glibs
 #ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
-#  if !defined _WIN32 // 'robust' not supported by our windows pthreads port
-#    if _POSIX_THREADS >= 200809L
-#      ifdef __GNU_LIBRARY__
-#        if __GLIBC__ >= 2  && __GLIBC_MINOR__ >= 12
-#          define REALM_HAVE_ROBUST_PTHREAD_MUTEX
-#        endif
-#      else
-#        define REALM_HAVE_ROBUST_PTHREAD_MUTEX
-#      endif
-#    endif
-#  endif
+    #if !defined _WIN32 // 'robust' not supported by our windows pthreads port
+        #if _POSIX_THREADS >= 200809L
+            #ifdef __GNU_LIBRARY__
+                #if __GLIBC__ >= 2  && __GLIBC_MINOR__ >= 12
+                    #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
+                #endif
+            #else
+                #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
+            #endif
+        #endif
+    #endif
 #endif
 
 
@@ -66,8 +66,7 @@ namespace {
 #if defined _WIN32 && defined REALM_DEBUG
 void free_threadpool();
 
-class Initialization
-{
+class Initialization {
 public:
     ~Initialization()
     {

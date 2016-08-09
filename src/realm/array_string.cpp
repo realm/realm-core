@@ -21,9 +21,9 @@
 #include <cstring>
 
 #ifdef REALM_DEBUG
-#  include <cstdio>
-#  include <iostream>
-#  include <iomanip>
+    #include <cstdio>
+    #include <iostream>
+    #include <iomanip>
 #endif
 
 #include <realm/utilities.hpp>
@@ -286,7 +286,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
 }
 
 void ArrayString::find_all(IntegerColumn& result, StringData value, size_t add_offset,
-    size_t begin, size_t end)
+                           size_t begin, size_t end)
 {
     size_t begin_2 = begin;
     for (;;) {

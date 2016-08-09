@@ -166,7 +166,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     using ColTypeTraits = ColumnTypeTraits<typename ColType::value_type>;
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
     REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count
-              || function == act_Average);
+                 || function == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
     if ((m_row_indexes.size() - m_num_detached_refs) == 0) {
@@ -256,7 +256,7 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
     }
 
     if (function == act_Average)
-            return res / (m_row_indexes.size() == 0 ? 1 : m_row_indexes.size());
+        return res / (m_row_indexes.size() == 0 ? 1 : m_row_indexes.size());
     else
         return res;
 }
@@ -445,8 +445,8 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     // Set limit=-1 to print all rows, otherwise only print to limit
     const size_t row_count = num_attached_rows();
     const size_t out_count = (limit == size_t(-1))
-        ? row_count
-        : (row_count < limit) ? row_count : limit;
+                             ? row_count
+                             : (row_count < limit) ? row_count : limit;
 
     // Print rows
     size_t i = 0;

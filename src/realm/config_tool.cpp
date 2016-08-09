@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
         }
 
         if (empty || error || help) {
-	    const char* prog = argv[0];
+            const char* prog = argv[0];
             std::string msg =
                 "Synopsis: "+std::string(prog)+"\n\n"
                 "Options:\n"

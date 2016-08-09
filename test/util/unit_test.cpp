@@ -105,13 +105,13 @@ public:
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
         m_out <<
-            "<?xml version=\"1.0\"?>\n"
-            "<unittest-results "
-            "tests=\"" << results_summary.num_executed_tests << "\" "
-            "failedtests=\"" << results_summary.num_failed_tests << "\" "
-            "checks=\"" << results_summary.num_executed_checks << "\" "
-            "failures=\"" << results_summary.num_failed_checks << "\" "
-            "time=\"" << results_summary.elapsed_seconds << "\">\n";
+              "<?xml version=\"1.0\"?>\n"
+              "<unittest-results "
+              "tests=\"" << results_summary.num_executed_tests << "\" "
+              "failedtests=\"" << results_summary.num_failed_tests << "\" "
+              "checks=\"" << results_summary.num_executed_checks << "\" "
+              "failures=\"" << results_summary.num_failed_checks << "\" "
+              "time=\"" << results_summary.elapsed_seconds << "\">\n";
         std::ostringstream out;
         out.imbue(std::locale::classic());
         for (const auto& p: m_tests) {
@@ -126,9 +126,9 @@ public:
                 out << '#' << (recurrence_index+1);
             std::string test_name = out.str();
             m_out <<
-                "  <test suite=\""<< xml_escape(details.suite_name) <<"\" "
-                "name=\"" << xml_escape(test_name) << "\" "
-                "time=\"" << t.elapsed_seconds << "\"";
+                  "  <test suite=\""<< xml_escape(details.suite_name) <<"\" "
+                  "name=\"" << xml_escape(test_name) << "\" "
+                  "time=\"" << t.elapsed_seconds << "\"";
             if (t.failures.empty()) {
                 m_out << "/>\n";
                 continue;
@@ -139,12 +139,12 @@ public:
             for (fail_iter i_2 = t.failures.begin(); i_2 != fails_end; ++i_2) {
                 std::string msg = xml_escape(i_2->message);
                 m_out << "    <failure message=\"" << i_2->file_name << ""
-                    "(" << i_2->line_number << ") : " << msg << "\"/>\n";
+                      "(" << i_2->line_number << ") : " << msg << "\"/>\n";
             }
             m_out << "  </test>\n";
         }
         m_out <<
-            "</unittest-results>\n";
+              "</unittest-results>\n";
     }
 
 protected:
@@ -615,8 +615,8 @@ REALM_NORETURN void TestContext::abort()
 {
     const SharedContext& context = thread_context.shared_context;
     const char* format = context.num_threads == 1 ?
-        "Aborting due to failure" :
-        "Aborting due to failure in test thread %1";
+                         "Aborting due to failure" :
+                         "Aborting due to failure in test thread %1";
     context.report_logger.info(format, m_thread_context.thread_index+1);
     ::abort();
 }
@@ -826,8 +826,8 @@ void SimpleReporter::begin(const TestContext& context)
     const TestDetails& details = context.test_details;
     util::Logger& logger = context.thread_context.report_logger;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ?
-        "%1:%2: Begin %3" :
-        "%1:%2: Begin %3#%4";
+                  "%1:%2: Begin %3" :
+                  "%1:%2: Begin %3#%4";
     logger.info(format, details.file_name, details.line_number, details.test_name,
                 context.recurrence_index+1);
 }
@@ -838,8 +838,8 @@ void SimpleReporter::fail(const TestContext& context, const char* file_name, lon
     const TestDetails& details = context.test_details;
     util::Logger& logger = context.thread_context.report_logger;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ?
-        "%1:%2: ERROR in %3: %5" :
-        "%1:%2: ERROR in %3#%4: %5";
+                  "%1:%2: ERROR in %3: %5" :
+                  "%1:%2: ERROR in %3#%4: %5";
     logger.info(format, file_name, line_number, details.test_name, context.recurrence_index+1,
                 message);
 }
@@ -870,8 +870,8 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
     logger.info("Test time: %1", Timer::format(results_summary.elapsed_seconds));
     if (results_summary.num_excluded_tests >= 1) {
         auto format = results_summary.num_excluded_tests == 1 ?
-            "Note: One test was excluded!" :
-            "Note: %1 tests were excluded!";
+                      "Note: One test was excluded!" :
+                      "Note: %1 tests were excluded!";
         logger.info(format, results_summary.num_excluded_tests);
     }
 }

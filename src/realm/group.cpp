@@ -22,8 +22,8 @@
 #include <fstream>
 
 #ifdef REALM_DEBUG
-#  include <iostream>
-#  include <iomanip>
+    #include <iostream>
+    #include <iomanip>
 #endif
 
 #include <realm/util/file_mapper.hpp>

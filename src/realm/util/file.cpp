@@ -28,16 +28,16 @@
 #include <stdlib.h>
 
 #ifdef _WIN32
-#  define NOMINMAX
-#  include <windows.h>
-#  include <io.h>
-#  include <direct.h>
+    #define NOMINMAX
+    #include <windows.h>
+    #include <io.h>
+    #include <direct.h>
 #else
-#  include <unistd.h>
-#  include <fcntl.h>
-#  include <sys/stat.h>
-#  include <sys/mman.h>
-#  include <sys/file.h> // BSD / Linux flock()
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <sys/stat.h>
+    #include <sys/mman.h>
+    #include <sys/file.h> // BSD / Linux flock()
 #endif
 
 #include <realm/util/errno.hpp>
@@ -438,7 +438,7 @@ void File::write(const char* data, size_t size)
     }
     return;
 
-  error:
+error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("WriteFile() failed: ", err);
     throw std::runtime_error(msg);
@@ -450,7 +450,7 @@ void File::write(const char* data, size_t size)
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
         Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        // FIXME: Expect this to fail due to assert asking for a read first! This FIXME seems to be made by Finn who does not remember it. 
+        // FIXME: Expect this to fail due to assert asking for a read first! This FIXME seems to be made by Finn who does not remember it.
         realm::util::encryption_read_barrier(write_map, pos, size);
         memcpy(write_map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(write_map, pos, size);
@@ -471,7 +471,7 @@ void File::write(const char* data, size_t size)
     }
     return;
 
-  error:
+error:
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("write(): failed: ", err);
     throw std::runtime_error(msg);
@@ -752,7 +752,8 @@ bool File::lock(bool exclusive, bool non_blocking)
     do {
         if (flock(m_fd, operation) == 0)
             return true;
-    } while (errno == EINTR);
+    }
+    while (errno == EINTR);
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
         return false;
@@ -782,7 +783,8 @@ void File::unlock() noexcept
     int r;
     do {
         r = flock(m_fd, LOCK_UN);
-    } while (r != 0 && errno == EINTR);
+    }
+    while (r != 0 && errno == EINTR);
     REALM_ASSERT_RELEASE(r == 0);
 
 #endif
@@ -1042,13 +1044,14 @@ bool File::is_same_file(const File& f) const
         DWORD file_ndx_low   = file_info.nFileIndexLow;
         if (GetFileInformationByHandle(f.m_handle, &file_info)) {
             return vol_serial_num == file_info.dwVolumeSerialNumber &&
-                file_ndx_high == file_info.nFileIndexHigh &&
-                file_ndx_low  == file_info.nFileIndexLow;
+                   file_ndx_high == file_info.nFileIndexHigh &&
+                   file_ndx_low  == file_info.nFileIndexLow;
         }
     }
 
-/* FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
-   solution correctly handles file identification on ReFS.
+    /*
+    FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
+    solution correctly handles file identification on ReFS.
 
     FILE_ID_INFO file_id_info;
     if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
@@ -1060,7 +1063,7 @@ bool File::is_same_file(const File& f) const
                 file_id == file_id_info.FileId;
         }
     }
-*/
+    */
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
@@ -1082,7 +1085,8 @@ bool File::is_same_file(const File& f) const
 #endif
 }
 
-File::UniqueID File::get_unique_id() const {
+File::UniqueID File::get_unique_id() const
+{
     REALM_ASSERT_RELEASE(is_attached());
 #ifdef _WIN32 // Windows version
     throw std::runtime_error("Not yet supported");
@@ -1097,7 +1101,8 @@ File::UniqueID File::get_unique_id() const {
 #endif
 }
 
-bool File::get_unique_id(const std::string& path, File::UniqueID& uid) {
+bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
+{
 #ifdef _WIN32 // Windows version
     throw std::runtime_error("Not yet supported");
 #else // POSIX version
@@ -1148,7 +1153,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
         path_2 = ".";
     if (!base_dir_2.empty() && base_dir_2.back() != dir_sep)
         base_dir_2.push_back(dir_sep);
-/*
+    /*
     // Abbreviate
     for (;;) {
         if (base_dir_2.empty()) {
@@ -1170,7 +1175,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
             break;
         if (path_2.size())
     }
-*/
+    */
     return base_dir_2 + path_2;
 #else
     static_cast<void>(path);
@@ -1184,7 +1189,7 @@ void File::set_encryption_key(const char* key)
 {
 #if REALM_ENABLE_ENCRYPTION
     if (key) {
-        char *buffer = new char[64];
+        char* buffer = new char[64];
         memcpy(buffer, key, 64);
         m_encryption_key.reset(buffer);
     }

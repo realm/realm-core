@@ -52,7 +52,8 @@ struct TestTable {
 class match_second {
 public:
     match_second(const std::string& target) : m_target(target) {}
-    bool operator()(const TestTable& v) const {
+    bool operator()(const TestTable& v) const
+    {
         return v.second == m_target;
     }
 private:

@@ -22,16 +22,17 @@
 using namespace realm;
 
 REALM_TABLE_2(Phones,
-                desc, String,
-                number, String)
+              desc, String,
+              number, String)
 
 REALM_TABLE_4(People,
-                name, String,
-                age,  Int,
-                hired, Bool,
-                phones, Subtable<Phones>)
+              name, String,
+              age,  Int,
+              hired, Bool,
+              phones, Subtable<Phones>)
 
-int main(int, char*[]) {
+int main(int, char*[])
+{
 
     People t;
 

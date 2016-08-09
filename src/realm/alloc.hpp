@@ -56,7 +56,7 @@ private:
     char* m_addr;
     ref_type m_ref;
 #if REALM_ENABLE_MEMDEBUG
-    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call 
+    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call
     // get_ref()/get_addr and that it e.g. has not been free'ed
     const Allocator* m_alloc = nullptr;
 #endif
@@ -79,7 +79,7 @@ private:
 /// \sa SlabAlloc
 class Allocator {
 public:
-	static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
+    static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.

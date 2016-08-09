@@ -40,7 +40,7 @@ public:
 
     /// Use submit_single() when you know there is only going to be a single datapoint.
     void submit_single(const char* ident, const char* lead_text, double seconds,
-                ChangeType = change_Percent);
+                       ChangeType = change_Percent);
 
     /// Use submit() when there are multiple data points, and call finish() when you are done.
     void submit(const char* ident, double seconds);

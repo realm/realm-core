@@ -118,7 +118,7 @@ double BenchmarkResults::Result::avg() const
 }
 
 void BenchmarkResults::submit_single(const char* ident, const char* lead_text,
-    double seconds, ChangeType change_type)
+                                     double seconds, ChangeType change_type)
 {
     submit(ident, seconds);
     finish(ident, lead_text, change_type);
@@ -332,11 +332,11 @@ void BenchmarkResults::save_results()
     // Format: YYYYMMDD_hhmmss;
     name_out.fill('0');
     name_out << (1900 + local.tm_year) << ""
-        "" << std::setw(2) << (1 + local.tm_mon) << ""
-        "" << std::setw(2) << local.tm_mday << "_"
-        "" << std::setw(2) << local.tm_hour << ""
-        "" << std::setw(2) << local.tm_min << ""
-        "" << std::setw(2) << local.tm_sec;
+             << std::setw(2) << (1 + local.tm_mon) << ""
+             << std::setw(2) << local.tm_mday << "_"
+             << std::setw(2) << local.tm_hour << ""
+             << std::setw(2) << local.tm_min << ""
+             << std::setw(2) << local.tm_sec;
     std::string name = name_out.str();
     std::string csv_name = name + ".csv";
     {

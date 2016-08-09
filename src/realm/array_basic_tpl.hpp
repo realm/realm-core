@@ -192,7 +192,7 @@ void BasicArray<T>::insert(size_t ndx, T value)
     T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
 
-     ++m_size;
+    ++m_size;
 }
 
 template<class T>

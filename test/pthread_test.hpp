@@ -31,10 +31,10 @@ Use by #including this file in the file(s) that call pthreads functions. If you 
 #define REALM_PTHREAD_TEST_HPP
 
 #ifdef _WIN32
-#define NOMINMAX
-#include <Windows.h>
+    #define NOMINMAX
+    #include <Windows.h>
 #else
-#include <unistd.h>
+    #include <unistd.h>
 #endif
 
 inline unsigned int ptf_fastrand()
@@ -74,9 +74,9 @@ inline void ptf_randsleep(void)
     else if (r < 999) {
         // Wake up in time slice according to normal OS scheduling
 #ifdef _WIN32
-    Sleep(0);
+        Sleep(0);
 #else
-    usleep(0);
+        usleep(0);
 #endif
     }
     else {

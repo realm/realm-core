@@ -151,7 +151,7 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin,
 }
 
 void ArrayStringLong::find_all(IntegerColumn& result, StringData value, size_t add_offset,
-                              size_t begin, size_t end) const
+                               size_t begin, size_t end) const
 {
     size_t begin_2 = begin;
     for (;;) {
@@ -257,8 +257,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         top.add(v); // Throws
         dg_2.release();
     }
-    if (nullable)
-    {
+    if (nullable) {
         bool context_flag = false;
         int64_t value = 0; // initialize all rows to realm::null()
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws

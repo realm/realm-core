@@ -58,11 +58,11 @@ public:
     StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
     void destroy_search_index() noexcept override;
     void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-            bool allow_duplicate_values) final;
+                              bool allow_duplicate_values) final;
     void populate_search_index();
     StringIndex* create_search_index() override;
     bool supports_search_index() const noexcept final { return true; }
-    
+
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept override;
     ref_type write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream&) const override;
     void update_from_parent(size_t old_baseline) noexcept override;
@@ -74,7 +74,7 @@ public:
     void do_dump_node_structure(std::ostream&, int level) const override;
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
 #endif
-    void add(const Timestamp& ts = Timestamp{});
+    void add(const Timestamp& ts = Timestamp {});
     Timestamp get(size_t row_ndx) const noexcept;
     void set(size_t row_ndx, const Timestamp& ts);
     bool compare(const TimestampColumn& c) const noexcept;

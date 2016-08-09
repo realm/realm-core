@@ -33,17 +33,17 @@ namespace {
 void show_help(const std::string& program_name)
 {
     std::cerr <<
-        "Usage: " << program_name << " [options] FILE\n"
-        "\n"
-        "Arguments:\n"
-        "\n"
-        "  FILE    The Realm file that should have its schema dumped.\n"
-        "\n"
-        "Options:\n"
-        "\n"
-        "  -k,--key     Encryption key to decrypt the Realm\n"
-        "  -u,--upgrade Perform file format upgrade if required\n"
-        "  -h,--help    Print this message\n";
+              "Usage: " << program_name << " [options] FILE\n"
+              "\n"
+              "Arguments:\n"
+              "\n"
+              "  FILE    The Realm file that should have its schema dumped.\n"
+              "\n"
+              "Options:\n"
+              "\n"
+              "  -k,--key     Encryption key to decrypt the Realm\n"
+              "  -u,--upgrade Perform file format upgrade if required\n"
+              "  -h,--help    Print this message\n";
 }
 
 namespace Logging {
@@ -224,7 +224,7 @@ void SchemaDumper::list_columns(std::ostream& stream, const ConstTableRef& table
         std::string column_type_name = LangBindHelper::get_data_type_name(column_type);
 
         stream << "    " << column_type_name << " " << column_name
-            << " (type id: " << column_type << ")";
+               << " (type id: " << column_type << ")";
 
         if (idx + 1 < column_count) {
             stream << ',';

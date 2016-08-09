@@ -120,9 +120,9 @@ public:
     //@}
 
     size_t get_backlink_count(const Table& src_table,
-                                   size_t src_col_ndx) const noexcept;
+                              size_t src_col_ndx) const noexcept;
     size_t get_backlink(const Table& src_table, size_t src_col_ndx,
-                             size_t backlink_ndx) const noexcept;
+                        size_t backlink_ndx) const noexcept;
 
     size_t get_column_count() const noexcept;
     DataType get_column_type(size_t col_ndx) const noexcept;
@@ -184,7 +184,7 @@ private:
 /// \sa BasicRow
 template<class T>
 class BasicRowExpr:
-        public RowFuncs<T, BasicRowExpr<T>> {
+    public RowFuncs<T, BasicRowExpr<T>> {
 public:
     BasicRowExpr() noexcept;
 
@@ -279,8 +279,8 @@ private:
 /// \sa RowFuncs
 template<class T>
 class BasicRow:
-        private RowBase,
-        public RowFuncs<T, BasicRow<T>> {
+    private RowBase,
+    public RowFuncs<T, BasicRow<T>> {
 public:
     BasicRow() noexcept;
 

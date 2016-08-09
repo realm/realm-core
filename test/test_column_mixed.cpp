@@ -110,7 +110,8 @@ TEST(MixedColumn_Float)
     float f = float(v);
     float fval1[] = { 0.0f, 100.123f, -111.222f, f };
     float fval2[] = { -0.0f, -100.123f, std::numeric_limits<float>::max(),
-                      std::numeric_limits<float>::min() };
+                      std::numeric_limits<float>::min()
+                    };
 
     // Test insert
     for (size_t i=0; i<4; ++i)
@@ -437,20 +438,23 @@ TEST(MixedColumn_SubtableSize)
     // No table instantiated yet (zero ref)
     CHECK_EQUAL( 0, c.get_subtable_size(0));
 
-    {    // Empty table (no columns)
+    {
+        // Empty table (no columns)
         TableRef t1 = c.get_subtable_ptr(1)->get_table_ref();
         CHECK(t1->is_empty());
         CHECK_EQUAL( 0, c.get_subtable_size(1));
     }
 
-    {   // Empty table (1 column, no rows)
+    {
+        // Empty table (1 column, no rows)
         TableRef t2 = c.get_subtable_ptr(2)->get_table_ref();
         CHECK(t2->is_empty());
         t2->add_column(type_Int, "col1");
         CHECK_EQUAL( 0, c.get_subtable_size(2));
     }
 
-    {   // Table with rows
+    {
+        // Table with rows
         TableRef t3 = c.get_subtable_ptr(3)->get_table_ref();
         CHECK(t3->is_empty());
         t3->add_column(type_Int, "col1");
@@ -458,7 +462,8 @@ TEST(MixedColumn_SubtableSize)
         CHECK_EQUAL(10, c.get_subtable_size(3));
     }
 
-    {   // Table with mixed column first
+    {
+        // Table with mixed column first
         TableRef t4 = c.get_subtable_ptr(4)->get_table_ref();
         CHECK(t4->is_empty());
         t4->add_column(type_Mixed, "col1");

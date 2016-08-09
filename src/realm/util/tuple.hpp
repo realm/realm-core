@@ -68,29 +68,29 @@ tuple(const A& a, const B& b, const C& c)
 }
 
 template<class A, class B, class C, class D>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, void>>>>>
-tuple(const A& a, const B& b, const C& c, const D& d)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, void>>>>> tuple(
+            const A& a, const B& b, const C& c, const D& d)
 {
     return cons(a, tuple(b,c,d));
 }
 
 template<class A, class B, class C, class D, class E>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, void>>>>>>
-tuple(const A& a, const B& b, const C& c, const D& d, const E& e)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, void>>>>>> tuple(
+    const A& a, const B& b, const C& c, const D& d, const E& e)
 {
     return cons(a, tuple(b,c,d,e));
 }
 
 template<class A, class B, class C, class D, class E, class F>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>>
-tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>> tuple(
+    const A& a, const B& b, const C& c, const D& d, const E& e, const F& f)
 {
     return cons(a, tuple(b,c,d,e,f));
 }
 
 template<class A, class B, class C, class D, class E, class F, class G>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>>
-tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f, const G& g)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>> tuple(
+            const A& a, const B& b, const C& c, const D& d, const E& e, const F& f, const G& g)
 {
     return cons(a, tuple(b,c,d,e,f,g));
 }
@@ -115,32 +115,32 @@ inline Tuple<typename TypeAppend<L,V>::type> operator,(const Tuple<L>& t, const 
 } // namespace util
 
 namespace _impl {
-    template<class L, int i>
-    struct TupleAt {
-        static typename util::TypeAt<L,i>::type exec(const util::Tuple<L>& t)
-        {
-            return TupleAt<typename L::tail, i-1>::exec(t.m_tail);
-        }
-    };
-    template<class L>
-    struct TupleAt<L,0> {
-        static typename L::head exec(const util::Tuple<L>& t) { return t.m_head; }
-    };
+template<class L, int i>
+struct TupleAt {
+    static typename util::TypeAt<L,i>::type exec(const util::Tuple<L>& t)
+    {
+        return TupleAt<typename L::tail, i-1>::exec(t.m_tail);
+    }
+};
+template<class L>
+struct TupleAt<L,0> {
+    static typename L::head exec(const util::Tuple<L>& t) { return t.m_head; }
+};
 
-    template<class Ch, class Tr, class T>
-    inline void write(std::basic_ostream<Ch, Tr>& out,
-                      const util::Tuple<util::TypeCons<T, void>>& t)
-    {
-        out << t.m_head;
-    }
-    template<class Ch, class Tr>
-    inline void write(std::basic_ostream<Ch, Tr>&, const util::Tuple<void>&) {}
-    template<class Ch, class Tr, class L>
-    inline void write(std::basic_ostream<Ch, Tr>& out, const util::Tuple<L>& t)
-    {
-        out << t.m_head << ',';
-        write(out, t.m_tail);
-    }
+template<class Ch, class Tr, class T>
+inline void write(std::basic_ostream<Ch, Tr>& out,
+                  const util::Tuple<util::TypeCons<T, void>>& t)
+{
+    out << t.m_head;
+}
+template<class Ch, class Tr>
+inline void write(std::basic_ostream<Ch, Tr>&, const util::Tuple<void>&) {}
+template<class Ch, class Tr, class L>
+inline void write(std::basic_ostream<Ch, Tr>& out, const util::Tuple<L>& t)
+{
+    out << t.m_head << ',';
+    write(out, t.m_tail);
+}
 }
 
 namespace util {

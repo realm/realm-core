@@ -176,7 +176,7 @@ inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColum
         root.init_from_ref(ref);
 }
 
-inline std::shared_ptr<LinkView> 
+inline std::shared_ptr<LinkView>
 LinkView::create(Table* origin_table, LinkListColumn& column, size_t row_ndx)
 {
     return std::make_shared<LinkView>(ctor_cookie(), origin_table, column, row_ndx);
@@ -233,10 +233,10 @@ inline bool LinkView::operator==(const LinkView& link_list) const noexcept
         return false;
     if (!m_row_indexes.is_attached() || m_row_indexes.is_empty()) {
         return !link_list.m_row_indexes.is_attached() ||
-            link_list.m_row_indexes.is_empty();
+               link_list.m_row_indexes.is_empty();
     }
     return link_list.m_row_indexes.is_attached() &&
-        m_row_indexes.compare(link_list.m_row_indexes);
+           m_row_indexes.compare(link_list.m_row_indexes);
 }
 
 inline bool LinkView::operator!=(const LinkView& link_list) const noexcept

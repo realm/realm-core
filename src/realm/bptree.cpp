@@ -158,9 +158,9 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
                                             bool leaf_or_compact, ref_type* is_last)
 {
     bool force_general_form = !leaf_or_compact ||
-        (elems_in_child != m_max_elems_per_child &&
-         m_main.size() != 1 + REALM_MAX_BPNODE_SIZE - 1 &&
-         !is_last);
+                              (elems_in_child != m_max_elems_per_child &&
+                               m_main.size() != 1 + REALM_MAX_BPNODE_SIZE - 1 &&
+                               !is_last);
 
     // Add the incoming child to this inner node
     if (m_elems_in_parent > 0) { // This node contains children already
@@ -183,7 +183,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         }
         m_elems_in_parent += elems_in_child;
         if (!is_last && m_main.size() < 1 + REALM_MAX_BPNODE_SIZE)
-          return;
+            return;
     }
     else { // First child in this node
         m_main.add(0); // Placeholder for `elems_per_child` or `offsets_ref`
@@ -228,7 +228,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             Allocator& alloc = m_main.get_alloc();
             size_t next_level_elems_per_child = m_max_elems_per_child;
             if (util::int_multiply_with_overflow_detect(next_level_elems_per_child,
-                                                  REALM_MAX_BPNODE_SIZE))
+                                                        REALM_MAX_BPNODE_SIZE))
                 throw std::runtime_error("Overflow in number of elements per child");
             m_prev_parent_level.reset(new ParentLevel(alloc, m_out,
                                                       next_level_elems_per_child)); // Throws

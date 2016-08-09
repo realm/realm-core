@@ -59,9 +59,9 @@ public:
     void erase(size_t ndx);
 
     size_t count(StringData value, size_t begin = 0,
-                      size_t end = npos) const noexcept;
+                 size_t end = npos) const noexcept;
     size_t find_first(StringData value, size_t begin = 0,
-                           size_t end = npos) const noexcept;
+                      size_t end = npos) const noexcept;
     void find_all(IntegerColumn& result, StringData value, size_t add_offset = 0,
                   size_t begin = 0, size_t end = npos);
 
@@ -101,7 +101,7 @@ public:
 private:
     size_t calc_byte_len(size_t num_items, size_t width) const override;
     size_t calc_item_count(size_t bytes,
-                              size_t width) const noexcept override;
+                           size_t width) const noexcept override;
 
     bool m_nullable;
 };
@@ -112,7 +112,7 @@ private:
 
 // Creates new array (but invalid, call init_from_ref() to init)
 inline ArrayString::ArrayString(Allocator& allocator, bool nullable) noexcept:
-Array(allocator), m_nullable(nullable)
+    Array(allocator), m_nullable(nullable)
 {
 }
 

@@ -63,7 +63,7 @@ struct SpecBase {
     public:
         typedef T table_type;
         Subtable(T* t): m_table(t) {}
-        operator T*() const { return m_table; }
+        operator T* () const { return m_table; }
     private:
         T* m_table;
     };
@@ -1120,8 +1120,7 @@ public:
 
 /// Column accessor specialization for enumerations.
 template<class Taboid, int col_idx, class E>
-class ColumnAccessor<Taboid, col_idx, SpecBase::Enum<E>>:
-    public ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> {
+class ColumnAccessor<Taboid, col_idx, SpecBase::Enum<E>>: public ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
 
@@ -1235,12 +1234,12 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
 
-    size_t find_first(const BinaryData &value) const
+    size_t find_first(const BinaryData& value) const
     {
         return Base::m_table->get_impl()->find_first_binary(col_idx, value.data(), value.size());
     }
 
-    BasicTableView<typename Base::RealTable> find_all(const BinaryData &value) const
+    BasicTableView<typename Base::RealTable> find_all(const BinaryData& value) const
     {
         return Base::m_table->get_impl()->find_all_binary(col_idx, value.data(), value.size());
     }
@@ -1250,7 +1249,7 @@ public:
 /// Column accessor specialization for subtables.
 template<class Taboid, int col_idx, class Subtab>
 class ColumnAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>>:
-    public ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> {
+            public ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> Base;
 
@@ -1426,15 +1425,15 @@ public:
     }
 
     float maximum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = nullptr) const
+                  size_t end = size_t(-1), size_t limit=size_t(-1),
+                  size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     float minimum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = nullptr) const
+                  size_t end = size_t(-1), size_t limit=size_t(-1),
+                  size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
@@ -1497,15 +1496,15 @@ public:
     }
 
     double maximum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = nullptr) const
+                   size_t end = size_t(-1), size_t limit=size_t(-1),
+                   size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     double minimum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit=size_t(-1),
-                    size_t* return_ndx = nullptr) const
+                   size_t end = size_t(-1), size_t limit=size_t(-1),
+                   size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
@@ -1535,8 +1534,7 @@ public:
 
 /// QueryColumn specialization for enumerations.
 template<class Taboid, int col_idx, class E>
-class QueryColumn<Taboid, col_idx, SpecBase::Enum<E>>:
-    public QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> {
+class QueryColumn<Taboid, col_idx, SpecBase::Enum<E>>: public QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
     typedef typename Taboid::Query Query;
@@ -1601,15 +1599,15 @@ public:
     }
 
     OldDateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
-                 size_t end = size_t(-1), size_t limit=size_t(-1),
-                 size_t* return_ndx = nullptr) const
+                        size_t end = size_t(-1), size_t limit=size_t(-1),
+                        size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_olddatetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     OldDateTime minimum(size_t* resultcount = nullptr, size_t start = 0,
-                 size_t end = size_t(-1), size_t limit=size_t(-1),
-                 size_t* return_ndx = nullptr) const
+                        size_t end = size_t(-1), size_t limit=size_t(-1),
+                        size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_olddatetime(col_idx, resultcount, start, end, limit, return_ndx);
     }

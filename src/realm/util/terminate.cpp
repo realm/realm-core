@@ -23,14 +23,14 @@
 #include <realm/util/features.h>
 
 #if REALM_PLATFORM_APPLE
-#  include <asl.h>
-#  include <dlfcn.h>
-#  include <execinfo.h>
-#  include <CoreFoundation/CoreFoundation.h>
+    #include <asl.h>
+    #include <dlfcn.h>
+    #include <execinfo.h>
+    #include <CoreFoundation/CoreFoundation.h>
 #endif
 
 #ifdef __ANDROID__
-#  include <android/log.h>
+    #include <android/log.h>
 #endif
 
 
@@ -42,7 +42,8 @@ void please_report_this_error_to_help_at_realm_dot_io();
 
 // LCOV_EXCL_START
 extern "C" REALM_NORETURN REALM_NOINLINE
-void please_report_this_error_to_help_at_realm_dot_io() {
+void please_report_this_error_to_help_at_realm_dot_io()
+{
     std::abort();
 }
 // LCOV_EXCL_STOP

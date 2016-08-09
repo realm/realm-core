@@ -151,16 +151,16 @@ int64_t Importer::parse_integer(const char* col, bool* success)
         return 0;
     }
 
-    if (*col == '-'){
+    if (*col == '-') {
         ++col;
         x = 0;
         while (*col != '\0') {
-            if (can_fail && ('0' > *col || *col > '9')){
+            if (can_fail && ('0' > *col || *col > '9')) {
                 *success = false;
                 return 0;
             }
             int64_t y = *col - '0';
-            if (can_fail && x < (std::numeric_limits<int64_t>::min()+y)/10){
+            if (can_fail && x < (std::numeric_limits<int64_t>::min()+y)/10) {
                 *success = false;
                 return 0;
             }
@@ -175,8 +175,8 @@ int64_t Importer::parse_integer(const char* col, bool* success)
     else if (*col == '+')
         ++col;
 
-    while (*col != '\0'){
-        if(can_fail && ('0' > *col || *col > '9')){
+    while (*col != '\0') {
+        if(can_fail && ('0' > *col || *col > '9')) {
             *success = false;
             return 0;
         }
@@ -219,10 +219,8 @@ bool Importer::parse_bool(const char*col, bool* success)
             return false;
         }
 
-        for(size_t t = 0; t < sizeof(a) / sizeof(a[0]); t++)
-        {
-            if(strcmp(col, a[t]) == 0)
-            {
+        for(size_t t = 0; t < sizeof(a) / sizeof(a[0]); t++) {
+            if(strcmp(col, a[t]) == 0) {
                 *success = true;
                 return !((t & 0x1) == 0);
             }
@@ -291,7 +289,7 @@ double Importer::parse_double(const char* col, bool* success, size_t* significan
         ++col;
 
     x = 0;
-    while('0' <= *col && *col <= '9'){
+    while('0' <= *col && *col <= '9') {
         int y = *col - '0';
         x *= 10;
         x += y;
@@ -299,10 +297,10 @@ double Importer::parse_double(const char* col, bool* success, size_t* significan
         ++*significants;
     }
 
-    if(*col == '.'|| *col == Separator){
+    if(*col == '.'|| *col == Separator) {
         ++col;
         double pos = 1;
-        while ('0' <= *col && *col <= '9'){
+        while ('0' <= *col && *col <= '9') {
             pos /= 10;
             int y = *col - '0';
             ++col;
@@ -311,7 +309,7 @@ double Importer::parse_double(const char* col, bool* success, size_t* significan
         }
     }
 
-    if(*col == 'e' || *col == 'E'){
+    if(*col == 'e' || *col == 'E') {
         if(can_fail && col == orig_col) {
             *success = false;
             return 0;
@@ -692,20 +690,20 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *imp
                     if(type_detection_rows > 0) {
                         if(scheme[col] != type_String && is_null(payload[row][col].c_str()) && Empty_as_string)
                             sstm << "Column " << col << " was auto detected to be of type " << DataTypeToText(scheme[col])
-                            << " using the first " << type_detection_rows << " rows of CSV file, but in row " <<
-                            imported_rows << " of cvs file the field contained the NULL value '" <<
-                            payload[row][col].c_str() << "'. Please increase the 'type_detection_rows' argument or set "
-                            "Empty_as_string = false/void the -e flag to convert such fields to 0, 0.0 or false";
+                                 << " using the first " << type_detection_rows << " rows of CSV file, but in row "
+                                 << imported_rows << " of cvs file the field contained the NULL value '"
+                                 << payload[row][col].c_str() << "'. Please increase the 'type_detection_rows' argument or set "
+                                 << "Empty_as_string = false/void the -e flag to convert such fields to 0, 0.0 or false";
                         else
                             sstm << "Column " << col << " was auto detected to be of type " << DataTypeToText(scheme[col])
-                            << " using the first " << type_detection_rows << " rows of CSV file, but in row " <<
-                            imported_rows << " of cvs file the field contained '" << payload[row][col].c_str() <<
-                            "' which is of another type. Please increase the 'type_detection_rows' argument";
+                                 << " using the first " << type_detection_rows << " rows of CSV file, but in row "
+                                 << imported_rows << " of cvs file the field contained '" << payload[row][col].c_str()
+                                 << "' which is of another type. Please increase the 'type_detection_rows' argument";
                     }
                     else
-                        sstm << "Column " << col << " was specified to be of type " << DataTypeToText(scheme[col]) <<
-                        ", but in row " << imported_rows << " of cvs file," << "the field contained '" <<
-                        payload[row][col].c_str() << "' which is of another type";
+                        sstm << "Column " << col << " was specified to be of type " << DataTypeToText(scheme[col])
+                             << ", but in row " << imported_rows << " of cvs file," << "the field contained '"
+                             << payload[row][col].c_str() << "' which is of another type";
 
                     throw std::runtime_error(sstm.str());
                 }

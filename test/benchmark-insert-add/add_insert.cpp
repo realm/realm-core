@@ -37,11 +37,11 @@ enum Mode {
 };
 
 REALM_TABLE_5(TestTable,
-                x,  Int,
-                s1, String,
-                b,  Bool,
-                s2, String,
-                s3, String)
+              x,  Int,
+              s1, String,
+              b,  Bool,
+              s2, String,
+              s3, String)
 
 
 void usage()

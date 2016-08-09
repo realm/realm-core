@@ -20,7 +20,7 @@
 #include <iomanip>
 
 #ifdef REALM_DEBUG
-#  include <iostream>
+    #include <iostream>
 #endif
 
 #include <realm/exceptions.hpp>
@@ -49,7 +49,7 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
 {
     if (dt.is_null())
         return null{};
-    
+
     int64_t s = dt.get_seconds();
     int32_t ns = dt.get_nanoseconds();
     constexpr size_t index_size = sizeof(s) + sizeof(ns);

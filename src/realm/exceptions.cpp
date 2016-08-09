@@ -70,18 +70,18 @@ const char* LogicError::what() const noexcept
             return "Attempted to insert null into non-nullable column";
         case wrong_group_state:
             return "Wrong state or group accessor (already attached, "
-                "or managed by a SharedGroup object)";
+                   "or managed by a SharedGroup object)";
         case wrong_transact_state:
             return "Wrong transactional state (no active transaction, wrong type of transaction, "
-                "or transaction already in progress)";
+                   "or transaction already in progress)";
         case no_history:
             return "Continuous transaction through SharedGroup object without history information";
         case mixed_durability:
             return "Durability setting (as passed to the SharedGroup constructor) was "
-                "not consistent across the session";
+                   "not consistent across the session";
         case mixed_history_type:
             return "History type (as specified by the Replication implementation passed to "
-                "the SharedGroup constructor) was not consistent across the session";
+                   "the SharedGroup constructor) was not consistent across the session";
         case table_has_no_columns:
             return "Table has no columns";
     }

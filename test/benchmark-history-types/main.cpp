@@ -179,7 +179,7 @@ int main()
 
     Timer timer(Timer::type_UserTime);
     {
-/*
+        /*
         for (int i = 0; i != 1; ++i) {
             PeakFileSizeTask task;
             timer.reset();
@@ -187,7 +187,7 @@ int main()
             results.submit("dummy", timer);
         }
         results.finish("dummy", "Dummy");
-*/
+        */
         // No readers (no grow)
         for (int i = 0; i != 25; ++i) {
             Task task(0, false);

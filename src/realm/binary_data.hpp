@@ -197,7 +197,7 @@ inline bool BinaryData::contains(BinaryData d) const noexcept
         return false;
 
     return d.m_size == 0 ||
-        std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+           std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 template<class C, class T>

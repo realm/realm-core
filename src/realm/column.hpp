@@ -69,7 +69,7 @@ struct ImplicitNull<double> {
 
 template<class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, size_t start, size_t end,
-                size_t limit, size_t* return_ndx);
+            size_t limit, size_t* return_ndx);
 
 /// Base class for all column types.
 class ColumnBase {
@@ -377,7 +377,7 @@ public:
     const StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
     void destroy_search_index() noexcept override;
     void set_search_index_ref(ref_type ref, ArrayParent* parent,
-            size_t ndx_in_parent, bool allow_duplicate_valaues) final;
+                              size_t ndx_in_parent, bool allow_duplicate_valaues) final;
     StringIndex* create_search_index() override = 0;
 protected:
     ColumnBaseWithIndex() {}
@@ -444,7 +444,7 @@ public:
     /// be accessed through the returned const-qualified reference,
     /// and never directly through the specfied fallback accessor.
     void get_leaf(size_t ndx, size_t& ndx_in_leaf,
-        LeafInfo& inout_leaf) const noexcept;
+                  LeafInfo& inout_leaf) const noexcept;
 
     // Getting and setting values
     T get(size_t ndx) const noexcept;
@@ -489,7 +489,7 @@ public:
     minimum(size_t start = 0, size_t end = npos, size_t limit = npos, size_t* return_ndx = nullptr) const;
 
     double average(size_t start = 0, size_t end = npos, size_t limit = npos,
-                    size_t* return_ndx = nullptr) const;
+                   size_t* return_ndx = nullptr) const;
 
     size_t find_first(T value, size_t begin = 0, size_t end = npos) const;
     void find_all(Column<int64_t>& out_indices, T value,
@@ -497,12 +497,12 @@ public:
 
     void populate_search_index();
     StringIndex* create_search_index() override;
-    inline bool supports_search_index() const noexcept override 
-    { 
+    inline bool supports_search_index() const noexcept override
+    {
         if (realm::is_any<T, float, double>::value)
             return false;
         else
-            return true; 
+            return true;
     }
 
 
@@ -825,7 +825,7 @@ Column<T>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) c
 
 template<class T>
 void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
-                             typename BpTree<T>::LeafInfo& inout_leaf_info) const noexcept
+                         typename BpTree<T>::LeafInfo& inout_leaf_info) const noexcept
 {
     m_tree.get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
 }
@@ -1399,7 +1399,7 @@ ref_type Column<T>::create(Allocator& alloc, Array::Type leaf_type, size_t size,
 
 template<class T>
 ref_type Column<T>::write(size_t slice_offset, size_t slice_size,
-                       size_t table_size, _impl::OutputStream& out) const
+                          size_t table_size, _impl::OutputStream& out) const
 {
     return m_tree.write(slice_offset, slice_size, table_size, out);
 }
@@ -1456,7 +1456,7 @@ void Column<T>::tree_to_dot(std::ostream& out) const
 
 template<class T>
 void Column<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                         std::ostream& out) const
+                            std::ostream& out) const
 {
     BpTree<T>::leaf_to_dot(leaf_mem, parent, ndx_in_parent, out, get_alloc());
 }
@@ -1470,7 +1470,7 @@ MemStats Column<T>::stats() const
 }
 
 namespace _impl {
-    void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level);
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level);
 }
 
 template<class T>

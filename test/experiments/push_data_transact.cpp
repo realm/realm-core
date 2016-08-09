@@ -30,8 +30,8 @@ using namespace realm;
 namespace {
 
 REALM_TABLE_2(MyTable,
-                number, Int,
-                text, String)
+              number, Int,
+              text, String)
 
 } // anonymous namespace
 
@@ -58,12 +58,12 @@ int main(int argc, const char* const argv[])
     }
 
     if (positional_args.size() < 2) {
-    bad_command_line:
+bad_command_line:
         std::cerr <<
-            "ERROR: Bad command line.\n\n"
-            "Synopsis: "<<argv[0]<<"  NUM-REPS  TEXT...\n\n"
-            "Options:\n"
-            "  --database-file STRING   (default: \""<<database_file<<"\")\n";
+                  "ERROR: Bad command line.\n\n"
+                  "Synopsis: "<<argv[0]<<"  NUM-REPS  TEXT...\n\n"
+                  "Options:\n"
+                  "  --database-file STRING   (default: \""<<database_file<<"\")\n";
         return 1;
     }
 

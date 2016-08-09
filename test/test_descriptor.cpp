@@ -704,8 +704,7 @@ TEST(Descriptor_TwoStringColumnTypesEquality)
     t2.add_empty_row(10);
     t3.add_empty_row(10);
 
-    for (int i = 0; i < 10; ++i)
-    {
+    for (int i = 0; i < 10; ++i) {
         t1.set_string(0, i, StringData("a", 1));
         t2.set_string(0, i, StringData("a", 1));
         t3.set_string(0, i, StringData("a", 1));

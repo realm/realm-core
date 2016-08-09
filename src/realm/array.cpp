@@ -22,13 +22,13 @@
 #include <limits>
 
 #ifdef REALM_DEBUG
-#  include <iostream>
-#  include <sstream>
+    #include <iostream>
+    #include <sstream>
 #endif
 
 #ifdef _MSC_VER
-#  include <intrin.h>
-#  pragma warning (disable : 4127) // Condition is constant warning
+    #include <intrin.h>
+    #pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
 #include <realm/util/tuple.hpp>
@@ -511,7 +511,7 @@ void Array::move_rotate(size_t from, size_t to, size_t num_elems)
             move(from + num_elems, to + num_elems, from);
         }
         else { // from > to
-               // Shift up.
+            // Shift up.
             move_backward(to, from, from + num_elems);
         }
 
@@ -829,8 +829,7 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
 
     size_t ret;
 
-    if (start >= m_size || target > ubound_for_width(w))
-    {
+    if (start >= m_size || target > ubound_for_width(w)) {
         ret = not_found;
         goto exit;
     }
@@ -856,14 +855,13 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
     size_t test_ndx;
     test_ndx = 1;
 
-    for (size_t offset = start + test_ndx ;; offset = start + test_ndx)
-    {
+    for (size_t offset = start + test_ndx ;; offset = start + test_ndx) {
         if (offset < m_size && get<w>(indirection ? to_size_t(indirection->get(offset)) : offset) < target)
             start += test_ndx;
         else
             break;
 
-       test_ndx *= 2;
+        test_ndx *= 2;
     }
 
     size_t high;
@@ -911,14 +909,13 @@ size_t Array::first_set_bit(unsigned int v) const
     return __builtin_clz(v);
 #else
     int r;
-    static const int MultiplyDeBruijnBitPosition[32] =
-    {
+    static const int MultiplyDeBruijnBitPosition[32] = {
         0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
         31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
 
     r = MultiplyDeBruijnBitPosition[(uint32_t((v & -int(v)) * 0x077CB531U)) >> 27];
-return r;
+    return r;
 #endif
 }
 
@@ -973,7 +970,8 @@ inline int64_t lower_bits()
 
 // Return true if 'value' has an element (of bit-width 'width') which is 0
 template<size_t width>
-inline bool has_zero_element(uint64_t value) {
+inline bool has_zero_element(uint64_t value)
+{
     uint64_t hasZeroByte;
     uint64_t lower = lower_bits<width>();
     uint64_t upper = lower_bits<width>() * 1ULL << (width == 0 ? 0 : (width - 1ULL));
@@ -1593,8 +1591,8 @@ void Array::copy_on_write()
     // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
     // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the m_no_relocation
     // member)
-    if (!m_no_relocation) { 
-#else        
+    if (!m_no_relocation) {
+#else
     if (m_alloc.is_read_only(m_ref)) {
 #endif
         // Calculate size in bytes (plus a bit of matchcount room for expansion)
@@ -1683,22 +1681,22 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) noexcept
     }
     else if (width == 8) {
         REALM_ASSERT_DEBUG(std::numeric_limits<int8_t>::min() <= value &&
-                             value <= std::numeric_limits<int8_t>::max());
+                           value <= std::numeric_limits<int8_t>::max());
         *(reinterpret_cast<int8_t*>(data) + ndx) = int8_t(value);
     }
     else if (width == 16) {
         REALM_ASSERT_DEBUG(std::numeric_limits<int16_t>::min() <= value &&
-                             value <= std::numeric_limits<int16_t>::max());
+                           value <= std::numeric_limits<int16_t>::max());
         *(reinterpret_cast<int16_t*>(data) + ndx) = int16_t(value);
     }
     else if (width == 32) {
         REALM_ASSERT_DEBUG(std::numeric_limits<int32_t>::min() <= value &&
-                             value <= std::numeric_limits<int32_t>::max());
+                           value <= std::numeric_limits<int32_t>::max());
         *(reinterpret_cast<int32_t*>(data) + ndx) = int32_t(value);
     }
     else if (width == 64) {
         REALM_ASSERT_DEBUG(std::numeric_limits<int64_t>::min() <= value &&
-                             value <= std::numeric_limits<int64_t>::max());
+                           value <= std::numeric_limits<int64_t>::max());
         *(reinterpret_cast<int64_t*>(data) + ndx) = int64_t(value);
     }
     else {
@@ -1799,7 +1797,7 @@ void Array::alloc(size_t init_size, size_t width)
             char* header = get_header_from_data(m_data);
             MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes,
                                               capacity_bytes); // Throws
-            
+
             header = mem_ref.get_addr();
             set_header_width(int(width), header);
             set_header_size(init_size, header);
@@ -1902,7 +1900,8 @@ int_fast64_t Array::ubound_for_width() noexcept
 template<size_t width>
 struct Array::VTableForWidth {
     struct PopulatedVTable : Array::VTable {
-        PopulatedVTable() {
+        PopulatedVTable()
+        {
             getter = &Array::get<width>;
             setter = &Array::set<width>;
             chunk_getter = &Array::get_chunk<width>;
@@ -2018,7 +2017,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         adjust(size()-1, +2); // Throws
         if (offsets.is_attached()) {
             size_t elem_ndx_offset = orig_child_ndx > 0 ?
-                to_size_t(offsets.get(orig_child_ndx-1)) : 0;
+                                     to_size_t(offsets.get(orig_child_ndx-1)) : 0;
             offsets.insert(orig_child_ndx, elem_ndx_offset + state.m_split_offset); // Throws
             offsets.adjust(orig_child_ndx+1, offsets.size(), +1); // Throws
         }
@@ -2154,7 +2153,7 @@ void Array::verify() const
     REALM_ASSERT(is_attached());
 
     REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
-                   m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
+                 m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64);
 
     if (!m_parent)
         return;
@@ -2172,7 +2171,7 @@ std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats
     out_2.precision(1);
     double used_percent = 100.0 * stats.used / stats.allocated;
     out_2 << "allocated = "<<stats.allocated<<", used = "<<stats.used<<" ("<<used_percent<<"%), "
-        "array_count = "<<stats.array_count;
+          "array_count = "<<stats.array_count;
     out << out_2.str();
     return out;
 }
@@ -2563,7 +2562,7 @@ template<int width>
 inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
 {
     return std::make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
-                     to_size_t(get_direct<width>(data, ndx + 1)));
+                          to_size_t(get_direct<width>(data, ndx + 1)));
 }
 
 inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_t ndx) noexcept
@@ -2974,7 +2973,8 @@ void Array::index_string_find_all(IntegerColumn& result, StringData value, Colum
 
 FindRes Array::index_string_find_all_no_copy(StringData value, ref_type& res_ref, ColumnBase* column) const
 {
-    IntegerColumn dummy; return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
+    IntegerColumn dummy;
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
 }
 
 
@@ -3002,7 +3002,7 @@ find_child_from_offsets(const char* offsets_header, size_t elem_ndx) noexcept
     size_t offsets_size = Array::get_size_from_header(offsets_header);
     size_t child_ndx = upper_bound<width>(offsets_data, offsets_size, elem_ndx);
     size_t elem_ndx_offset = child_ndx == 0 ? 0 :
-        to_size_t(get_direct<width>(offsets_data, child_ndx-1));
+                             to_size_t(get_direct<width>(offsets_data, child_ndx-1));
     size_t ndx_in_child = elem_ndx - elem_ndx_offset;
     return std::make_pair(child_ndx, ndx_in_child);
 }
@@ -3010,7 +3010,7 @@ find_child_from_offsets(const char* offsets_header, size_t elem_ndx) noexcept
 
 // Returns (child_ndx, ndx_in_child)
 inline std::pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t ndx,
-                                              const Allocator& alloc) noexcept
+                                                   const Allocator& alloc) noexcept
 {
     size_t child_ndx;
     size_t ndx_in_child;
@@ -3048,7 +3048,7 @@ inline std::pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) noex
 // Returns (child_ref, ndx_in_child)
 template<int width>
 inline std::pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
-                                                const Allocator& alloc) noexcept
+                                                     const Allocator& alloc) noexcept
 {
     int_fast64_t first_value = get_direct<width>(data, 0);
     std::pair<size_t, size_t> p = find_bptree_child(first_value, ndx, alloc);
