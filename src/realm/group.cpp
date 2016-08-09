@@ -1387,57 +1387,47 @@ public:
         return true;
     }
 
-    bool set_int(size_t, size_t, int_fast64_t) noexcept
+    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) noexcept
+    bool set_bool(size_t, size_t, bool, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_bool(size_t, size_t, bool) noexcept
+    bool set_float(size_t, size_t, float, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_float(size_t, size_t, float) noexcept
+    bool set_double(size_t, size_t, double, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_double(size_t, size_t, double) noexcept
+    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string(size_t, size_t, StringData) noexcept
+    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string_unique(size_t, size_t, size_t, StringData) noexcept
+    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_binary(size_t, size_t, BinaryData) noexcept
+    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_olddatetime(size_t, size_t, OldDateTime) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_timestamp(size_t, size_t, Timestamp) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_table(size_t col_ndx, size_t row_ndx) noexcept
+    bool set_table(size_t col_ndx, size_t row_ndx, _impl::Instruction) noexcept
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
@@ -1449,7 +1439,7 @@ public:
         return true;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) noexcept
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&, _impl::Instruction) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table)
@@ -1457,12 +1447,12 @@ public:
         return true;
     }
 
-    bool set_null(size_t, size_t) noexcept
+    bool set_null(size_t, size_t, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_link(size_t col_ndx, size_t, size_t, size_t) noexcept
+    bool set_link(size_t col_ndx, size_t, size_t, size_t, _impl::Instruction) noexcept
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it

@@ -2858,7 +2858,7 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_int_unique(this, col_ndx, ndx, value); // Throws
+        repl->set_int(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
 }
 
 void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
@@ -3070,7 +3070,7 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_string_unique(this, col_ndx, ndx, value); // Throws
+        repl->set_string(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
 }
 
 void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)

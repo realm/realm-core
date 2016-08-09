@@ -7575,20 +7575,18 @@ public:
     bool link_list_clear(size_t) { return false; }
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
-    bool set_int(size_t, size_t, int_fast64_t) { return false; }
-    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return false; }
-    bool set_bool(size_t, size_t, bool) { return false; }
-    bool set_float(size_t, size_t, float) { return false; }
-    bool set_double(size_t, size_t, double) { return false; }
-    bool set_string(size_t, size_t, StringData) { return false; }
-    bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
-    bool set_binary(size_t, size_t, BinaryData) { return false; }
-    bool set_olddatetime(size_t, size_t, OldDateTime) { return false; }
-    bool set_timestamp(size_t, size_t, Timestamp) { return false; }
-    bool set_table(size_t, size_t) { return false; }
-    bool set_mixed(size_t, size_t, const Mixed&) { return false; }
-    bool set_link(size_t, size_t, size_t, size_t) { return false; }
-    bool set_null(size_t, size_t) { return false; }
+    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) { return false; }
+    bool set_bool(size_t, size_t, bool, _impl::Instruction) { return false; }
+    bool set_float(size_t, size_t, float, _impl::Instruction) { return false; }
+    bool set_double(size_t, size_t, double, _impl::Instruction) { return false; }
+    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t) { return false; }
+    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction) { return false; }
+    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction) { return false; }
+    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction) { return false; }
+    bool set_table(size_t, size_t, _impl::Instruction) { return false; }
+    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction) { return false; }
+    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction) { return false; }
+    bool set_null(size_t, size_t, _impl::Instruction) { return false; }
     bool nullify_link(size_t, size_t, size_t) { return false; }
     bool insert_substring(size_t, size_t, size_t, StringData) { return false; }
     bool erase_substring(size_t, size_t, size_t, size_t) { return false; }
@@ -7811,7 +7809,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool set_int(size_t, size_t, int_fast64_t) const
+            bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) const
             {
                 throw ObserverError();
             }
@@ -8714,7 +8712,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t)
+            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t,
+                          _impl::Instruction)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);
