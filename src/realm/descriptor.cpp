@@ -40,7 +40,7 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
     SubspecRef subspec_ref = m_spec->get_subtable_spec(column_ndx);
     auto subspec = std::make_unique<Spec>(subspec_ref);
     auto subdesc = std::make_shared<Descriptor>(
-            ConcretDescriptor{m_root_table.get(), this, subspec.get()});
+            ConcreteDescriptor{m_root_table.get(), this, subspec.get()});
     m_subdesc_map.push_back(subdesc_entry(column_ndx, subdesc));
     subspec.release();
 
