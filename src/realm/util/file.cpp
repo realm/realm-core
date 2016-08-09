@@ -89,6 +89,9 @@ size_t get_page_size()
     return static_cast<size_t>(size);
 }
 
+// This variable exists such that page_size() can return the page size without having to make any system calls.
+// It could also have been a static local variable, but Valgrind/Helgrind gives a false error on that.
+size_t cached_page_size = get_page_size();
 
 } // anonymous namespace
 
@@ -191,7 +194,6 @@ std::string make_temp_dir()
 
 size_t page_size()
 {
-    static size_t cached_page_size = get_page_size(); // thread safe in C++11
     return cached_page_size;
 }
 
