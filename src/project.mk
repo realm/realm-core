@@ -10,7 +10,7 @@ endif
 
 CFLAGS_DEBUG += -fno-elide-constructors
 CFLAGS_PTHREADS += -pthread
-CFLAGS_GENERAL += -Wextra -pedantic -Wundef -Wshadow
+CFLAGS_GENERAL += -Wextra -pedantic -Wundef -Wshadow -fsigned-char
 CFLAGS_CXX = -std=c++14
 
 # Avoid a warning from Clang when linking on OS X. By default,
@@ -78,7 +78,7 @@ endif
 
 ifneq ($(REALM_ANDROID),)
   PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden
-  CFLAGS_OPTIM = -Os -flto -ffunction-sections -fdata-sections -DNDEBUG
+  CFLAGS_OPTIM = -Os -flto -ffunction-sections -fdata-sections -DNDEBUG -fsigned-char
   ifeq ($(ENABLE_ENCRYPTION),yes)
     PROJECT_CFLAGS += -I../../openssl/include
   endif
