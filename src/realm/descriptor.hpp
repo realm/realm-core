@@ -62,24 +62,8 @@ namespace _impl { class DescriptorFriend; }
 /// Note, however, that this equivalence holds only as long as no
 /// shared subtable descriptors are involved.
 ///
-/// Root descriptor is created by table which also keeps a shared ref
-/// on it. Sub descriptor is created by root descriptor which also keeps
-/// a shared ref on it. This means for most cases, the descriptors live
-/// as long as the root table. Don't hold a shared ref on it to avoid
-/// circular refs.
-///
 /// \sa Table::get_descriptor()
 class Descriptor {
-    // So the constructor can only be called privately but still works with
-    // make_shared().
-    struct ConcreteDescriptor {
-        Table* const m_table;
-        Descriptor* const m_parent;
-        Spec* const m_spec;
-        explicit ConcreteDescriptor(Table* table, Descriptor* parent, Spec* spec)
-            :m_table(table), m_parent(parent), m_spec(spec) {}
-    };
-
 public:
     /// Get the number of columns in the associated tables.
     size_t get_column_count() const noexcept;
@@ -330,13 +314,10 @@ public:
     /// If this descriptor is the *root descriptor*, then this
     /// function returns null. Otherwise it returns the accessor of
     /// the parent descriptor.
-    /// The raw pointer of the parent descriptor lives as long as this descriptor
-    /// and it is not owned by this descriptor. So don't try to free the returned
-    /// pointer and there is no need to free it.
     ///
     /// \sa is_root()
-    Descriptor* get_parent() noexcept;
-    const Descriptor* get_parent() const noexcept;
+    DescriptorRef get_parent() noexcept;
+    ConstDescriptorRef get_parent() const noexcept;
     //@}
 
     //@{
@@ -427,43 +408,15 @@ public:
     /// debugging purposes.
     size_t get_num_unique_values(size_t column_ndx) const;
 
-    // Use DescriptorFriend::create() instead for creating new instances outside.
-    //
-    // When it is called by the root table to create the root descriptors,
-    // con_desc.m_parent needs to be null. The specified spec must be the spec
-    // of the specified table.
-    // The created descriptor doesn't own the specified spec which means it won't
-    // free it.
-    //
-    // When it called by the descriptor that becomes its parent to create a
-    // sub descriptor, con_desc.m_parent needs to be non-null value which points
-    // to the parent descriptor. The specified spec must be the spec of
-    // one of its direct or indirect subtable columns.
-    // The created descriptor owns the specified spec which means it will free it.
-    //
-    // This also puts this descriptor accessor into the attached state. This
-    // attaches it to the underlying structure of array nodes. When
-    // this function returns, is_attached() will return true.
-    //
-    // Not idempotent.
-    //
-    // The specified table is not allowed to be a subtable with a
-    // shareable spec. That is, Table::has_shared_spec() must return
-    // false.
-    //
-    // The specified spec here is not owned by the created descriptor,
-    // which means it won't be freed here.
-    Descriptor(const ConcreteDescriptor& con_desc) noexcept;
     ~Descriptor() noexcept;
 
-protected:
-    Descriptor(const Descriptor &) = delete;
-    const Descriptor &operator =(const Descriptor&) = delete;
 
 private:
-    TableRef m_root_table; // Table associated with root descriptor. Detached if null.
-    Descriptor* const m_parent; // Null if detached or root descriptor. Not owned by this.
-    Spec* m_spec; // Valid if attached. Owned if valid and `m_parent`.
+    TableRef m_root_table; // Table associated with root descriptor. Detached iff null.
+    DescriptorRef m_parent; // Null iff detached or root descriptor.
+    Spec* m_spec; // Valid if attached. Owned iff valid and `m_parent`.
+
+    mutable unsigned long m_ref_count;
 
     // Whenever a subtable descriptor accessor is created, it is
     // stored in this map. This ensures that when get_subdescriptor()
@@ -475,17 +428,44 @@ private:
     // objects.
     struct subdesc_entry {
         size_t m_column_ndx;
-        DescriptorRef m_subdesc;
-        subdesc_entry(size_t column_ndx, DescriptorRef& desc_ref) noexcept;
+        Descriptor* m_subdesc;
+        subdesc_entry(size_t column_ndx, Descriptor*);
     };
     typedef std::vector<subdesc_entry> subdesc_map;
-    // No lock is needed for this map to guarantee the destructor's thread safety.
-    // If it is a root descriptor, the map will be cleared and there won't be
-    // concurrent operations on the map anymore.
-    // If it is a sub descriptor, no operation on its parent's map.
     mutable subdesc_map m_subdesc_map;
 
-    // Detach accessor from underlying descriptor.
+    Descriptor() noexcept;
+
+    void bind_ptr() const noexcept;
+    void unbind_ptr() const noexcept;
+
+    // Called by the root table if this becomes the root
+    // descriptor. Otherwise it is called by the descriptor that
+    // becomes its parent.
+    //
+    // Puts this descriptor accessor into the attached state. This
+    // attaches it to the underlying structure of array nodes. It does
+    // not establish the parents reference to this descriptor, that is
+    // the job of the parent. When this function returns,
+    // is_attached() will return true.
+    //
+    // Not idempotent.
+    //
+    // The specified table is not allowed to be a subtable with a
+    // shareable spec. That is, Table::has_shared_spec() must return
+    // false.
+    //
+    // The specified spec must be the spec of the specified table or
+    // of one of its direct or indirect subtable columns.
+    //
+    // When the specified spec is the spec of the root table, the
+    // parent must be specified as null. When the specified spec is
+    // not the root spec, a proper parent must be specified.
+    void attach(Table*, Descriptor* parent, Spec*) noexcept;
+
+    // Detach accessor from underlying descriptor. Caller must ensure
+    // that a reference count exists upon return, for example by
+    // obtaining an extra reference count before the call.
     //
     // This function is called either by the root table if this is the
     // root descriptor, or by the parent descriptor, if it is not.
@@ -495,20 +475,17 @@ private:
     // also calls detach_subdesc_accessors(). When this function
     // returns, is_attached() will return false.
     //
-    // This won't remove its entry from subdesc_map if it is called
-    // on a sub descriptor. Thus this is not supposed to be called
-    // outside to detach a sub descriptor.
-    //
-    // root_desc is for checking purpose. If this descriptor is not root
-    // descriptor, then this function is not supposed to be called outside.
-    //
     // Not idempotent.
-    void detach(bool root_desc) noexcept;
+    void detach() noexcept;
 
     // Recursively detach all subtable descriptor accessors that
     // exist, that is, all subtable descriptor accessors that have
     // this descriptor as ancestor.
     void detach_subdesc_accessors() noexcept;
+
+    // Remove the entry from m_subdesc_map that refers to the
+    // specified subtable descriptor. It must be there.
+    void remove_subdesc_entry(Descriptor* subdesc) const noexcept;
 
     // Record the path in terms of subtable column indexes from the
     // root descriptor to this descriptor. If this descriptor is a
@@ -518,12 +495,19 @@ private:
     // `begin_2` is the returned pointer.
     size_t* record_subdesc_path(size_t* begin, size_t* end) const noexcept;
 
+    // Returns a pointer to the accessor of the specified
+    // subdescriptor if that accessor exists, otherwise this function
+    // return null.
+    Descriptor* get_subdesc_accessor(size_t column_ndx) noexcept;
+
     void move_column(size_t from_ndx, size_t to_ndx);
 
     void adj_insert_column(size_t col_ndx) noexcept;
     void adj_erase_column(size_t col_ndx) noexcept;
     void adj_move_column(size_t col_ndx_1, size_t col_ndx_2) noexcept;
 
+    friend class util::bind_ptr<Descriptor>;
+    friend class util::bind_ptr<const Descriptor>;
     friend class _impl::DescriptorFriend;
 };
 
@@ -683,14 +667,14 @@ inline ConstDescriptorRef Descriptor::get_subdescriptor(size_t column_ndx) const
     return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
 }
 
-inline Descriptor* Descriptor::get_parent() noexcept
+inline DescriptorRef Descriptor::get_parent() noexcept
 {
     return m_parent;
 }
 
-inline const Descriptor* Descriptor::get_parent() const noexcept
+inline ConstDescriptorRef Descriptor::get_parent() const noexcept
 {
-    return m_parent;
+    return const_cast<Descriptor*>(this)->get_parent();
 }
 
 inline TableRef Descriptor::get_root_table() noexcept
@@ -722,23 +706,38 @@ inline bool Descriptor::is_root() const noexcept
     return !m_parent;
 }
 
-inline Descriptor::Descriptor(const ConcreteDescriptor& con_desc) noexcept
-:m_parent(con_desc.m_parent), m_spec(con_desc.m_spec)
+inline Descriptor::Descriptor() noexcept: m_ref_count(0)
 {
-    REALM_ASSERT(con_desc.m_spec);
-    REALM_ASSERT(!con_desc.m_table->has_shared_type());
-    m_root_table.reset(con_desc.m_table);
 }
 
+inline void Descriptor::bind_ptr() const noexcept
+{
+    ++m_ref_count;
+}
+
+inline void Descriptor::unbind_ptr() const noexcept
+{
+    if (--m_ref_count == 0)
+        delete this;
+}
+
+inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) noexcept
+{
+    REALM_ASSERT(!is_attached());
+    REALM_ASSERT(!table->has_shared_type());
+    m_root_table.reset(table);
+    m_parent.reset(parent);
+    m_spec = spec;
+}
 
 inline bool Descriptor::is_attached() const noexcept
 {
     return bool(m_root_table);
 }
 
-inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef& desc_ref) noexcept:
+inline Descriptor::subdesc_entry::subdesc_entry(size_t n, Descriptor* d):
     m_column_ndx(n),
-    m_subdesc(desc_ref)
+    m_subdesc(d)
 {
 }
 
@@ -758,15 +757,21 @@ inline bool Descriptor::operator!=(const Descriptor& d) const noexcept
 // not all of the non-public parts of the Descriptor class.
 class _impl::DescriptorFriend {
 public:
-    static Descriptor* create(Table* table, Spec* spec) noexcept
+    static Descriptor* create()
     {
-        return new Descriptor(Descriptor::ConcreteDescriptor{table, nullptr, spec});
+        return new Descriptor; // Throws
+    }
+
+    static void attach(Descriptor& desc, Table* table, Descriptor* parent, Spec* spec) noexcept
+    {
+        desc.attach(table, parent, spec);
     }
 
     static void detach(Descriptor& desc) noexcept
     {
-        desc.detach(true);
+        desc.detach();
     }
+
     static Table& get_root_table(Descriptor& desc) noexcept
     {
         return *desc.m_root_table;
@@ -791,6 +796,11 @@ public:
                                             size_t* end) noexcept
     {
         return desc.record_subdesc_path(begin, end);
+    }
+
+    static Descriptor* get_subdesc_accessor(Descriptor& desc, size_t column_ndx) noexcept
+    {
+        return desc.get_subdesc_accessor(column_ndx);
     }
 
     static void move_column(Descriptor& desc, size_t from_ndx, size_t to_ndx)
