@@ -82,8 +82,8 @@ DWORD calculate_ws_private(DWORD process_id)
                 if (i == dPages) break; //if last page
 
                 dCurrentPageAddress = dWorkingSetPages[i] & 0xFFFFF000;
-                dNextPageAddress = dWorkingSetPages[i+1] & 0xFFFFF000;
-                dNextPageFlags = dWorkingSetPages[i+1] & 0x00000FFF;
+                dNextPageAddress = dWorkingSetPages[i + 1] & 0xFFFFF000;
+                dNextPageFlags = dWorkingSetPages[i + 1] & 0x00000FFF;
 
                 //decide whether iterate further or exit
                 //(this is non-contiguous page or have different flags)

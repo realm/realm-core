@@ -513,7 +513,7 @@ public:
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
-    void set_subtable(size_t column_ndx,size_t row_ndx, const Table* table);
+    void set_subtable(size_t column_ndx, size_t row_ndx, const Table* table);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
 
     // Subtables
@@ -1262,7 +1262,7 @@ inline ConstTableView::~ConstTableView() noexcept
 inline void TableView::remove_last(RemoveMode underlying_mode)
 {
     if (!is_empty())
-        remove(size()-1, underlying_mode);
+        remove(size() - 1, underlying_mode);
 }
 
 inline Table& TableView::get_parent() noexcept

@@ -30,7 +30,7 @@ int main(int, char* [])
     size_t name_ndx = t.get_column_index("name");
 
     t.add_empty_row();
-    t.set_string(name_ndx, 0,"Joe");
+    t.set_string(name_ndx, 0, "Joe");
 
     t.add_empty_row();
     t.set_string(name_ndx, 1, "Joe");

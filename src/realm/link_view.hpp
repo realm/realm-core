@@ -97,7 +97,7 @@ public:
     /// by its index in the target table). If found, the index of the link to
     /// that row within this list is returned, otherwise `realm::not_found` is
     /// returned.
-    size_t find(size_t target_row_ndx, size_t start=0) const noexcept;
+    size_t find(size_t target_row_ndx, size_t start = 0) const noexcept;
 
     const ColumnBase& get_column_base(size_t index) const override; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
     const Table& get_origin_table() const noexcept;

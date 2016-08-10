@@ -215,8 +215,8 @@ int main()
 #else
     std::cout << "Running Release Build\n";
 #endif
-    std::cout << "  Row count: "<<row_count<<"\n";
-    std::cout << "  Rounds:    "<<rounds<<"\n";
+    std::cout << "  Row count: " << row_count << "\n";
+    std::cout << "  Rounds:    " << rounds << "\n";
     std::cout << "\n";
 
 
@@ -272,7 +272,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "Realm: Column "<<i<<": Sparse:  "<<timer<<"\n";
+                std::cout << "Realm: Column " << i << ": Sparse:  " << timer << "\n";
 
                 // Search with column intrinsic functions
                 timer.reset();
@@ -293,7 +293,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "Realm: Column "<<i<<": Sparse2: "<<timer<<"\n";
+                std::cout << "Realm: Column " << i << ": Sparse2: " << timer << "\n";
             }
 
             // Do a search over entire column (all matches)
@@ -321,7 +321,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "Realm: Column "<<i<<": Many:    "<<timer<<"\n";
+                std::cout << "Realm: Column " << i << ": Many:    " << timer << "\n";
 
                 // Search with column intrinsic functions
                 timer.reset();
@@ -342,7 +342,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "Realm: Column "<<i<<": Many2:   "<<timer<<"\n";
+                std::cout << "Realm: Column " << i << ": Many2:   " << timer << "\n";
             }
 
             // Do a sum over entire column (all matches)
@@ -376,7 +376,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "Realm: Column "<<i<<": Sum:     "<<timer<<"\n";
+                std::cout << "Realm: Column " << i << ": Sum:     " << timer << "\n";
             }
 
             // Do a sum over entire column (all matches)
@@ -409,7 +409,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "Realm: Column "<<i<<": Sum2:    "<<timer<<"\n";
+                std::cout << "Realm: Column " << i << ": Sum2:    " << timer << "\n";
             }
         }
 
@@ -433,7 +433,7 @@ int main()
                             }
                         }
                     }
-                    std::cout << "Realm: "<<run<<"Column c "<<i<<": Sparse: "<<timer<<"\n";
+                    std::cout << "Realm: " << run << "Column c " << i << ": Sparse: " << timer << "\n";
                 }
 
                 // Query: Do a search over entire column (sparse, only last value matches)
@@ -454,7 +454,7 @@ int main()
                             }
                         }
                     }
-                    std::cout << "Realm: "<<run<<"Column q "<<i<<": Sparse: "<<timer<<"\n";
+                    std::cout << "Realm: " << run << "Column q " << i << ": Sparse: " << timer << "\n";
                 }
 
                 // Do a search over entire column (many matches)
@@ -472,9 +472,9 @@ int main()
                         for (size_t n = 0; n < rounds; ++n) {
                             size_t res;
                             if (i == 0)
-                                res = len -table.column().short_str.count("bottom");
+                                res = len - table.column().short_str.count("bottom");
                             else if (i == 1)
-                                res = len -table.column().long_str.count("long bottom");
+                                res = len - table.column().long_str.count("long bottom");
                             else if (i == 2)
                                 res = table.column().enum_str.count("monday");
                             if (res != expected) {
@@ -482,7 +482,7 @@ int main()
                             }
                         }
                     }
-                    std::cout << "Realm: "<<run<<"Column c "<<i<<": Many:   "<<timer<<"\n";
+                    std::cout << "Realm: " << run << "Column c " << i << ": Many:   " << timer << "\n";
                 }
 
                 // Query: Do a search over entire column (many matches)
@@ -503,7 +503,7 @@ int main()
                             }
                         }
                     }
-                    std::cout << "Realm: "<<run<<"Column q "<<i<<": Many:   "<<timer<<"\n";
+                    std::cout << "Realm: " << run << "Column q " << i << ": Many:   " << timer << "\n";
                 }
             }
 
@@ -567,7 +567,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "STL: Column "<<i<<": Sparse: "<<timer<<"\n";
+                std::cout << "STL: Column " << i << ": Sparse: " << timer << "\n";
             }
 
             // Do a search over entire column (all matches)
@@ -593,7 +593,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "STL: Column "<<i<<": Many:   "<<timer<<"\n";
+                std::cout << "STL: Column " << i << ": Many:   " << timer << "\n";
             }
 
             // Do a sum over entire column (all matches)
@@ -657,7 +657,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "STL: Column "<<i<<": Sum:    "<<timer<<"\n";
+                std::cout << "STL: Column " << i << ": Sum:    " << timer << "\n";
             }
         }
 
@@ -679,7 +679,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "STL: StringColumn "<<i<<": Sparse: "<<timer<<"\n";
+                std::cout << "STL: StringColumn " << i << ": Sparse: " << timer << "\n";
             }
 
             // Do a search over entire column (all but last value matches)
@@ -699,7 +699,7 @@ int main()
                         }
                     }
                 }
-                std::cout << "STL: StringColumn "<<i<<": Many: "<<timer<<"\n";
+                std::cout << "STL: StringColumn " << i << ": Many: " << timer << "\n";
             }
         }
 
@@ -754,7 +754,7 @@ int main()
                     }
                 }
             }
-            std::cout << "Realm: c2: "<<timer<<"\n";
+            std::cout << "Realm: c2: " << timer << "\n";
         }
 
         // Search over three columns
@@ -771,7 +771,7 @@ int main()
                     }
                 }
             }
-            std::cout << "Realm: c3: "<<timer<<"\n";
+            std::cout << "Realm: c3: " << timer << "\n";
         }
 
         // Search over four columns
@@ -791,7 +791,7 @@ int main()
                     }
                 }
             }
-            std::cout << "Realm: c4: "<<timer<<"\n";
+            std::cout << "Realm: c4: " << timer << "\n";
         }
 
         // Search over five columns
@@ -808,11 +808,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
                     if (res != expected) {
-                        std::cout << "error "<<expected<<" "<<res<<"\n";
+                        std::cout << "error " << expected << " " << res << "\n";
                     }
                 }
             }
-            std::cout << "Realm: c5: "<<timer<<"\n";
+            std::cout << "Realm: c5: " << timer << "\n";
         }
 
         // Search over six columns
@@ -834,7 +834,7 @@ int main()
                     }
                 }
             }
-            std::cout << "Realm: c6: "<<timer<<"\n";
+            std::cout << "Realm: c6: " << timer << "\n";
         }
 
         // Search over six columns
@@ -857,7 +857,7 @@ int main()
                     }
                 }
             }
-            std::cout << "Realm: c7: "<<timer<<"\n";
+            std::cout << "Realm: c7: " << timer << "\n";
         }
     }
 
@@ -909,7 +909,7 @@ int main()
                     }
                 }
             }
-            std::cout << "STL: c2: "<<timer<<"\n";
+            std::cout << "STL: c2: " << timer << "\n";
         }
 
         // Search over three columns
@@ -925,7 +925,7 @@ int main()
                     }
                 }
             }
-            std::cout << "STL: c3: "<<timer<<"\n";
+            std::cout << "STL: c3: " << timer << "\n";
         }
 
         // Search over four columns
@@ -941,7 +941,7 @@ int main()
                     }
                 }
             }
-            std::cout << "STL: c4: "<<timer<<"\n";
+            std::cout << "STL: c4: " << timer << "\n";
         }
 
         // Search over five columns
@@ -957,7 +957,7 @@ int main()
                     }
                 }
             }
-            std::cout << "STL: c5: "<<timer<<"\n";
+            std::cout << "STL: c5: " << timer << "\n";
         }
 
         // Search over six columns
@@ -973,7 +973,7 @@ int main()
                     }
                 }
             }
-            std::cout << "STL: c6: "<<timer<<"\n";
+            std::cout << "STL: c6: " << timer << "\n";
         }
 
         // Search over seven columns
@@ -989,7 +989,7 @@ int main()
                     }
                 }
             }
-            std::cout << "STL: c7: "<<timer<<"\n";
+            std::cout << "STL: c7: " << timer << "\n";
         }
     }
 

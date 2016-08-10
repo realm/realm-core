@@ -67,7 +67,7 @@ int main()
     }
     table.add(0, "abcde", 100, Wed);
 
-    std::cout << "Memory usage: "<<test_util::get_mem_usage()<<" bytes\n";
+    std::cout << "Memory usage: " << test_util::get_mem_usage() << " bytes\n";
 
     test_util::Timer timer;
 
@@ -83,7 +83,7 @@ int main()
             }
         }
 
-        std::cout << "Search (small integer): "<<timer<<"\n";
+        std::cout << "Search (small integer): " << timer << "\n";
     }
 
     // Search byte-size integer column
@@ -98,7 +98,7 @@ int main()
             }
         }
 
-        std::cout << "Search (byte-size integer): "<<timer<<"\n";
+        std::cout << "Search (byte-size integer): " << timer << "\n";
     }
 
     // Search string column
@@ -113,7 +113,7 @@ int main()
             }
         }
 
-        std::cout << "Search (string): "<<timer<<"\n";
+        std::cout << "Search (string): " << timer << "\n";
     }
 
     // Add index
@@ -122,10 +122,10 @@ int main()
 
         table.column().first.add_search_index();
 
-        std::cout << "Add index: "<<timer<<"\n";
+        std::cout << "Add index: " << timer << "\n";
     }
 
-    std::cout << "Memory usage2: "<<test_util::get_mem_usage()<<" bytes\n";
+    std::cout << "Memory usage2: " << test_util::get_mem_usage() << " bytes\n";
 
     // Search with index
     {
@@ -139,7 +139,7 @@ int main()
             }
         }
 
-        std::cout << "Search index: "<<timer<<"\n";
+        std::cout << "Search index: " << timer << "\n";
     }
 
 #ifdef _MSC_VER

@@ -114,7 +114,7 @@ TEST(MixedColumn_Float)
                     };
 
     // Test insert
-    for (size_t i=0; i<4; ++i)
+    for (size_t i = 0; i < 4; ++i)
         c.insert_float(i, fval1[i]);
     CHECK_EQUAL(4, c.size());
 
@@ -124,7 +124,7 @@ TEST(MixedColumn_Float)
     }
 
     // Set to new values - ensure sign is changed
-    for (size_t i=0; i<4; ++i)
+    for (size_t i = 0; i < 4; ++i)
         c.set_float(i, fval2[i]);
 
     for (size_t i = 0; i < c.size(); ++i) {
@@ -148,7 +148,7 @@ TEST(MixedColumn_Double)
     double fval2[] = {-1.0, -100.123, std::numeric_limits<double>::max(), std::numeric_limits<double>::min()};
 
     // Test insert
-    for (size_t i=0; i<4; ++i)
+    for (size_t i = 0; i < 4; ++i)
         c.insert_double(i, fval1[i]);
     CHECK_EQUAL(4, c.size());
 
@@ -159,7 +159,7 @@ TEST(MixedColumn_Double)
     }
 
     // Set to new values - ensure sign is changed
-    for (size_t i=0; i<4; ++i)
+    for (size_t i = 0; i < 4; ++i)
         c.set_double(i, fval2[i]);
 
     CHECK_EQUAL(4, c.size());

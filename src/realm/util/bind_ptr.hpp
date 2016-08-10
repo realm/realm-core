@@ -150,7 +150,7 @@ private:
 
 
 template<class C, class T, class U>
-inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const bind_ptr<U>& p)
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const bind_ptr<U>& p)
 {
     out << static_cast<const void*>(p.get());
     return out;

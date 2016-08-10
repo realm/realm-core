@@ -227,7 +227,7 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
         double avg = r.avg();
         double baseline_avg = br.avg();
 
-        if ((r.min - br.min) > r.stddev*2) {
+        if ((r.min - br.min) > r.stddev * 2) {
             out << "* ";
         }
         else {
@@ -237,7 +237,7 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
 
         out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " " << pad_right(format_change(br.max, r.max, change_type), 15) << "   ";
 
-        if ((r.median - br.median) > r.stddev*2) {
+        if ((r.median - br.median) > r.stddev * 2) {
             out << "* ";
         }
         else {
@@ -246,7 +246,7 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
 
         out << "med " << std::setw(time_width) << format_elapsed_time(r.median)   << " " << pad_right(format_change(br.median, r.median, change_type), 15) << "   ";
 
-        if ((avg - baseline_avg) > r.stddev*2) {
+        if ((avg - baseline_avg) > r.stddev * 2) {
             out << "* ";
         }
         else {
@@ -312,7 +312,7 @@ void BenchmarkResults::try_load_baseline_results()
             ++lineno;
         }
         if (error) {
-            std::cerr << "WARNING: Failed to parse '"<<baseline_file<<"'\n";
+            std::cerr << "WARNING: Failed to parse '" << baseline_file << "'\n";
         }
         else {
             m_baseline_results = baseline_results;

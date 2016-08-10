@@ -826,7 +826,7 @@ TEST(Upgrade_DatabaseWithCallback)
     SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
     const char* encryption_key = nullptr;
     bool allow_file_format_upgrade = true;
-    std::function<void(int,int)> upgrade_callback;
+    std::function<void(int, int)> upgrade_callback;
 
     bool did_upgrade = false;
     int old_version, new_version;
@@ -867,7 +867,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
     const char* encryption_key = nullptr;
     bool allow_file_format_upgrade = true;
-    std::function<void(int,int)> upgrade_callback;
+    std::function<void(int, int)> upgrade_callback;
 
     bool did_upgrade = false;
     int old_version, new_version;

@@ -535,7 +535,7 @@ inline SubtableColumnBase::~SubtableColumnBase() noexcept
 
 inline bool SubtableColumnBase::compare_subtable_rows(const Table& a, const Table& b)
 {
-    return _impl::TableFriend::compare_rows(a,b);
+    return _impl::TableFriend::compare_rows(a, b);
 }
 
 inline ref_type SubtableColumnBase::clone_table_columns(const Table* t)

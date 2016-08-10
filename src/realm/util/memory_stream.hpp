@@ -191,7 +191,7 @@ inline void MemoryOutputStream::set_buffer(char* begin, char* end) noexcept
 template<size_t N>
 inline void MemoryOutputStream::set_buffer(char (&buffer)[N]) noexcept
 {
-    set_buffer(buffer, buffer+N);
+    set_buffer(buffer, buffer + N);
 }
 
 inline size_t MemoryOutputStream::size() const noexcept

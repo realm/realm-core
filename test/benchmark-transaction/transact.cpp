@@ -136,7 +136,7 @@ void copy_db(const char* src, const char* dst)
 
 double delta_time(struct timespec ts_1, struct timespec ts_2)
 {
-    return (double)ts_2.tv_sec+1e-9*(double)ts_2.tv_nsec - ((double)ts_1.tv_sec+1e-9*(double)ts_1.tv_nsec);
+    return (double)ts_2.tv_sec + 1e-9 * (double)ts_2.tv_nsec - ((double)ts_1.tv_sec + 1e-9 * (double)ts_1.tv_nsec);
 }
 
 void update_reader(struct timespec ts_1, struct timespec ts_2)
@@ -420,7 +420,7 @@ static void* realm_writer(void* arg)
             long randx = random() % 1000;
             long randy = random() % 1000;
             TestTable::View tv = t->where().y.equal(randy).find_all();
-            for (size_t j=0; j<tv.size(); ++j) {
+            for (size_t j = 0; j < tv.size(); ++j) {
                 tv[j].x = randx;
             }
             wt.commit();
@@ -456,7 +456,7 @@ void sqlite_create(const char* f, long n, bool wal)
         sqlite3_exec(db, "CREATE TABLE test (x INT, y INT)", NULL, NULL, &errmsg);
     }
     sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &errmsg);
-    for (i=0; i<n; ++i) {
+    for (i = 0; i < n; ++i) {
         randx = random() % 1000;
         randy = random() % 1000;
         sprintf(sql, "INSERT INTO test VALUES (%ld, %ld)", randx, randy);
@@ -483,7 +483,7 @@ void mysql_create(const char* f, long n)
     if (mysql_query(db, "START TRANSACTION;")) {
         std::cout << "MySQL error: " << mysql_errno(db) << std::endl;
     }
-    for (i=0; i<n; ++i) {
+    for (i = 0; i < n; ++i) {
         randx = random() % 1000;
         randy = random() % 1000;
         sprintf(sql, "INSERT INTO %s VALUES (%ld, %ld)", f, randx, randy);
@@ -498,14 +498,14 @@ void mysql_create(const char* f, long n)
 void realm_create(const char* f, long n)
 {
     util::File::try_remove(f);
-    util::File::try_remove(std::string(f)+".lock");
+    util::File::try_remove(std::string(f) + ".lock");
     SharedGroup sg(f);
     {
         WriteTransaction wt(sg);
         BasicTableRef<TestTable> t = wt.get_or_add_table<TestTable>("test");
 
         srandom(1);
-        for (int i=0; i<n; ++i) {
+        for (int i = 0; i < n; ++i) {
             long randx = random() % 1000;
             long randy = random() % 1000;
             t->add(randx, randy);
@@ -531,34 +531,34 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
     if (!single) {
         if (verbose) std::cout << "Copying file" << std::endl;
         if (database == DB_MYSQL) {
-            copy_db(datfile, ("tmp"+std::string(datfile)).c_str());
+            copy_db(datfile, ("tmp" + std::string(datfile)).c_str());
         }
         else {
-            copy(datfile, ("tmp"+std::string(datfile)).c_str());
+            copy(datfile, ("tmp" + std::string(datfile)).c_str());
         }
     }
     if (database != DB_MYSQL) {
-        unlink(("tmp"+std::string(datfile)).c_str());
-        unlink(("tmp"+std::string(datfile)+".lock").c_str());
+        unlink(("tmp" + std::string(datfile)).c_str());
+        unlink(("tmp" + std::string(datfile) + ".lock").c_str());
     }
 
     assert(pthread_attr_init(&attr) == 0);
-    assert((tinfo = (struct thread_info*)calloc(sizeof(struct thread_info), n_readers+n_writers)) != NULL);
+    assert((tinfo = (struct thread_info*)calloc(sizeof(struct thread_info), n_readers + n_writers)) != NULL);
 
-    for (int i=0; i<(n_readers+n_writers); ++i) {
-        tinfo[i].thread_num = i+1;
+    for (int i = 0; i < (n_readers + n_writers); ++i) {
+        tinfo[i].thread_num = i + 1;
         if (single) {
             tinfo[i].datfile = strdup(datfile);
         }
         else {
-            tinfo[i].datfile = strdup(("tmp"+std::string(datfile)).c_str());
+            tinfo[i].datfile = strdup(("tmp" + std::string(datfile)).c_str());
         }
     }
 
     if (verbose) std::cout << "Starting threads" << std::endl;
     struct timespec ts_1;
     clock_gettime(CLOCK_REALTIME, &ts_1);
-    for (int i=0; i<n_readers; ++i) {
+    for (int i = 0; i < n_readers; ++i) {
         switch (database) {
             case DB_REALM:
                 pthread_create(&tinfo[i].thread_id, &attr, &realm_reader, &tinfo[i]);
@@ -573,8 +573,8 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
                 break;
         }
     }
-    for (int i=0; i<n_writers; ++i) {
-        int j = i+n_readers;
+    for (int i = 0; i < n_writers; ++i) {
+        int j = i + n_readers;
         switch (database) {
             case DB_REALM:
                 pthread_create(&tinfo[j].thread_id, &attr, &realm_writer, &tinfo[j]);
@@ -599,12 +599,12 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
 
     if (verbose)
         std::cout << "Waiting for threads" << std::endl;
-    for (int i=0; i<n_readers; ++i) {
+    for (int i = 0; i < n_readers; ++i) {
         pthread_join(tinfo[i].thread_id, &res);
     }
 
-    for (int i=0; i<n_writers; ++i) {
-        int j = i+n_readers;
+    for (int i = 0; i < n_writers; ++i) {
+        int j = i + n_readers;
         pthread_join(tinfo[j].thread_id, &res);
     }
     struct timespec ts_2;
@@ -612,8 +612,8 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
     wall_time = delta_time(ts_1, ts_2);
 
     if (database == DB_REALM || database == DB_SQLITE) {
-        unlink(("tmp"+std::string(datfile)).c_str());
-        unlink(("tmp"+std::string(datfile)+".lock").c_str());
+        unlink(("tmp" + std::string(datfile)).c_str());
+        unlink(("tmp" + std::string(datfile) + ".lock").c_str());
     }
     free((void*)tinfo);
 }
@@ -723,8 +723,8 @@ int main(int argc, char* argv[])
         std::cout << "# 5. read time"                << std::endl;
         std::cout << "# 6. writer transactions"      << std::endl;
         std::cout << "# 7. writer time"              << std::endl;
-        for (int i=0; i<=n_readers; ++i) {
-            for (int j=0; j<=n_writers; ++j) {
+        for (int i = 0; i <= n_readers; ++i) {
+            for (int j = 0; j <= n_writers; ++j) {
                 benchmark(false, database, "test_db", i, j, duration);
                 std::cout << i << " " << j << " ";
                 std::cout << wall_time << " " << iteration_readers

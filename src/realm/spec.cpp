@@ -427,7 +427,7 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col
     size_t tagged_ndx = (origin_col_ndx << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
-    m_subspecs.set(subspec_ndx+1, tagged_ndx); // Throws
+    m_subspecs.set(subspec_ndx + 1, tagged_ndx); // Throws
 }
 
 
@@ -438,7 +438,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
 
     // Origin column is stored as second tagged int in the subspecs array
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
-    int64_t tagged_value = m_subspecs.get(subspec_ndx+1);
+    int64_t tagged_value = m_subspecs.get(subspec_ndx + 1);
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     size_t origin_col_ndx = size_t(uint64_t(tagged_value) >> 1);
@@ -456,8 +456,7 @@ size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx
     int64_t tagged_column_ndx = (origin_col_ndx << 1) + 1;
 
     for (size_t i = backlinks_start; i < count; i += 2) {
-        if (m_subspecs.get(i)   == tagged_table_ndx &&
-                m_subspecs.get(i+1) == tagged_column_ndx) {
+        if (m_subspecs.get(i) == tagged_table_ndx && m_subspecs.get(i + 1) == tagged_column_ndx) {
             size_t pos = (i - backlinks_start) / 2;
             return backlinks_column_start + pos;
         }

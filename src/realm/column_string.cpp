@@ -577,7 +577,7 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // Copying string data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-    std::copy(value.data(), value.data()+value.size(), buffer.get());
+    std::copy(value.data(), value.data() + value.size(), buffer.get());
     StringData copy_of_value(value.is_null() ? nullptr : buffer.get(), value.size());
 
     if (m_search_index) {
@@ -1022,7 +1022,7 @@ bool StringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool
             continue;
 
         // Don't bother auto enumerating if there are too few duplicates
-        if (!enforce && n/2 < keys.size()) {
+        if (!enforce && n / 2 < keys.size()) {
             keys.destroy(); // cleanup
             return false;
         }
@@ -1662,7 +1662,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         }
     }
     int indent = level * 2;
-    out << std::setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
+    out << std::setw(indent) << "" << leaf_type << " (size: " << leaf_size << ")\n";
 }
 
 } // anonymous namespace
@@ -1672,7 +1672,7 @@ void StringColumn::do_dump_node_structure(std::ostream& out, int level) const
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
     int indent = level * 2;
     out << std::setw(indent) << "" << "Search index\n";
-    m_search_index->do_dump_node_structure(out, level+1);
+    m_search_index->do_dump_node_structure(out, level + 1);
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

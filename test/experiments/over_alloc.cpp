@@ -46,11 +46,11 @@ int main()
         SharedGroup db("over_alloc_1.realm");
         if (!db.is_valid()) throw runtime_error("Failed to open database 1");
 
-        for (int i=0; i<n_outer; ++i) {
+        for (int i = 0; i < n_outer; ++i) {
             {
                 Group& group = db.begin_write();
                 MyTable::Ref table = group.get_table<MyTable>("my_table");
-                for (int j=0; j<n_inner; ++j) {
+                for (int j = 0; j < n_inner; ++j) {
                     table->add("x");
                 }
             }
@@ -68,8 +68,8 @@ int main()
         {
             Group& group = db.begin_write();
             MyTable::Ref table = group.get_table<MyTable>("my_table");
-            for (int i=0; i<n_outer; ++i) {
-                for (int j=0; j<n_inner; ++j) {
+            for (int i = 0; i < n_outer; ++i) {
+                for (int j = 0; j < n_inner; ++j) {
                     table->add("x");
                 }
             }

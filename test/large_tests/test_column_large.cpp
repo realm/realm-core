@@ -143,8 +143,8 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     }
 
                     // FIND
-                    a.set(match, v[w]-1);
-                    size_t f = a.find_first(v[w]-1, from, to);
+                    a.set(match, v[w] - 1);
+                    size_t f = a.find_first(v[w] - 1, from, to);
                     a.set(match, v[w]);
                     if (match >= from && match < to) {
                         CHECK(match == f);
@@ -156,12 +156,12 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     if (v[w] != LL_MIN) {
                         // MIN
                         int64_t val = 0;
-                        a.set(match, v[w]-1);
+                        a.set(match, v[w] - 1);
                         bool b = a.minimum(val, from, to);
                         a.set(match, v[w]);
                         CHECK_EQUAL(true, b);
                         if (match >= from && match < to)
-                            CHECK(val == v[w]-1);
+                            CHECK(val == v[w] - 1);
                         else
                             CHECK(val == v[w]);
                     }
@@ -169,19 +169,19 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     // MAX
                     if (v[w] != LL_MAX) {
                         int64_t val = 0;
-                        a.set(match, v[w]+1);
+                        a.set(match, v[w] + 1);
                         bool b = a.maximum(val, from, to);
                         a.set(match, v[w]);
                         CHECK_EQUAL(true, b);
                         if (match >= from && match < to)
-                            CHECK(val == v[w]+1);
+                            CHECK(val == v[w] + 1);
                         else
                             CHECK(val == v[w]);
                     }
 
                     // SUM
                     int64_t val = 0;
-                    a.set(match, v[w]+1);
+                    a.set(match, v[w] + 1);
                     val = a.sum(from, to);
                     a.set(match, v[w]);
                     int64_t intended;

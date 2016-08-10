@@ -175,45 +175,45 @@ struct Deref {
 struct Mul {
     static const char* sym() { return "*"; }
     template<class A, class B>
-    struct Result { typedef typename ArithBinOpType<A,B>::type type; };
-    template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a * b; }
+    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    template <class A, class B>
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a * b; }
 };
 
 /// Encoding of division.
 struct Div {
     static const char* sym() { return "/"; }
     template<class A, class B>
-    struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a / b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a / b; }
 };
 
 /// Encoding of modulus operation (remainder of integer division).
 struct Mod {
     static const char* sym() { return "%"; }
     template<class A, class B>
-    struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a % b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a % b; }
 };
 
 /// Encoding of addition.
 struct Add {
     static const char* sym() { return "+"; }
     template<class A, class B>
-    struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a + b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a + b; }
 };
 
 /// Encoding of subtraction.
 struct Sub {
     static const char* sym() { return "-"; }
     template<class A, class B>
-    struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a - b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a - b; }
 };
 
 /// Encoding of 'shift left' operation.
@@ -222,7 +222,7 @@ struct Shl {
     template<class A, class>
     struct Result { typedef typename Promote<A>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a << b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a << b; }
 };
 
 /// Encoding of 'shift right' operation.
@@ -231,7 +231,7 @@ struct Shr {
     template<class A, class>
     struct Result { typedef typename Promote<A>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a >> b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a >> b; }
 };
 
 /// Encoding of equality comparison operation.
@@ -292,27 +292,27 @@ struct Ge {
 struct And {
     static const char* sym() { return "&"; }
     template<class A, class B>
-    struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a & b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a & b; }
 };
 
 /// Encoding of bitwise 'exclusiv or' operation.
 struct Xor {
     static const char* sym() { return "^"; }
     template<class A, class B>
-    struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a ^ b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a ^ b; }
 };
 
 /// Encoding of bitwise 'or' operation.
 struct Or {
     static const char* sym() { return "|"; }
     template<class A, class B>
-    struct Result { typedef typename ArithBinOpType<A,B>::type type; };
+    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
     template<class A, class B>
-    static typename Result<A,B>::type eval(const A& a, const B& b) { return a | b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b) { return a | b; }
 };
 
 /// Encoding of logical conjunction.
@@ -365,7 +365,7 @@ inline UnOp<Op, Q> unop(const Q& q)
 template<class Op, class A, class B>
 inline BinOp<Op, A, B> binop(const A& a, const B& b)
 {
-    return BinOp<Op, A, B>(a,b);
+    return BinOp<Op, A, B>(a, b);
 }
 
 template<class Op, class Col, class Query>
@@ -373,7 +373,7 @@ inline Subquery<Op, Col, Query> subquery(const Col& c, const Query& q)
 {
     static_assert(IsSubtable<typename Col::column_type>::value,
                   "A subtable column is required at this point");
-    return Subquery<Op, Col, Query>(c,q);
+    return Subquery<Op, Col, Query>(c, q);
 }
 
 
@@ -1185,7 +1185,7 @@ private:
             const int col_idx = query::GetCol<T>::col_idx;
             query::ColEval<BasicTable, col_idx, Type> eval(t->m_cols[col_idx], t);
             for (size_t i = begin; i != end; ++i)
-                if (eval(q,i)) return i;
+                if (eval(q, i)) return i;
             return end;
         }
     };
@@ -1212,7 +1212,7 @@ private:
         {
             const size_t i = t->_find(a, begin, end);
             const size_t j = t->_find(b, begin, i);
-            return std::min(i,j);
+            return std::min(i, j);
         }
     };
     template<class A, class B>

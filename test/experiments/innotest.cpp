@@ -35,7 +35,7 @@ int main(int argc, char* argv [])
     spawns = atoi(argv[2]);
     const int reads_per_write = atoi(argv[3]);
     int pid = 0;
-    for (int i=0; i < spawns - 1; i++) {
+    for (int i = 0; i < spawns - 1; i++) {
         pid = fork();
         if (pid == 0) {
             spawns = 0;
@@ -45,7 +45,7 @@ int main(int argc, char* argv [])
     srand(time(NULL));
     if (spawns) {
         char name[100];
-        sprintf(name,"%s_%s_%s.prof", argv[1], argv[2], argv[3]);
+        sprintf(name, "%s_%s_%s.prof", argv[1], argv[2], argv[3]);
         if (strcmp("0", argv[1]))
             ProfilerStart(name);
     }

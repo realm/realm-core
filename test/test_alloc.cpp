@@ -231,8 +231,8 @@ TEST(Alloc_BadBuffer)
 
     // Produce an invalid buffer
     char buffer[32];
-    for (size_t i=0; i<sizeof buffer; ++i)
-        buffer[i] = char((i+192)%128);
+    for (size_t i = 0; i < sizeof buffer; ++i)
+        buffer[i] = char((i + 192) % 128);
 
     {
         SlabAlloc alloc;

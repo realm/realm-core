@@ -693,7 +693,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         leaf_type = "Big blobs leaf";
     }
     int indent = level * 2;
-    out << std::setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
+    out << std::setw(indent) << "" << leaf_type << " (size: " << leaf_size << ")\n";
 }
 
 } // anonymous namespace

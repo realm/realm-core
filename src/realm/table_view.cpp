@@ -576,7 +576,7 @@ void TableViewBase::adj_row_acc_erase_row(size_t row_ndx) noexcept
         ++m_num_detached_refs;
         m_row_indexes.set(it, -1);
     }
-    m_row_indexes.adjust_ge(int_fast64_t(row_ndx)+1, -1);
+    m_row_indexes.adjust_ge(int_fast64_t(row_ndx) + 1, -1);
 }
 
 

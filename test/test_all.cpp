@@ -260,10 +260,10 @@ void display_build_config()
 
     std::cout <<
               "\n"
-              "Realm version: "<<Version::get_version()<<" with Debug "<<with_debug<<"\n"
-              "Encryption: "<<encryption<<"\n"
+              "Realm version: " << Version::get_version() << " with Debug " << with_debug << "\n"
+              "Encryption: " << encryption << "\n"
               "\n"
-              "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
+              "REALM_MAX_BPNODE_SIZE = " << REALM_MAX_BPNODE_SIZE << "\n"
               "REALM_MEMDEBUG = " << memdebug << "\n"
               "\n"
               // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
@@ -321,7 +321,7 @@ public:
             out.imbue(std::locale::classic());
             out << details.test_name;
             if (context.num_recurrences > 1)
-                out << '#' << (r.recurrence_index+1);
+                out << '#' << (r.recurrence_index + 1);
             std::string name = out.str();
             std::string time = Timer::format(r.elapsed_seconds);
             rows.emplace_back(name, time);
@@ -336,7 +336,7 @@ public:
         std::cout.fill('-');
         std::cout << "\nTop " << n << " time usage:\n" << std::setw(int(full_width)) << "" << "\n";
         std::cout.fill(' ');
-        for (const auto& row: rows) {
+        for (const auto& row : rows) {
             std::cout <<
                       std::left  << std::setw(int(name_col_width)) << std::get<0>(row) <<
                       std::right << std::setw(int(time_col_width)) << std::get<1>(row) << "\n";
@@ -388,7 +388,7 @@ bool run_tests(util::Logger* logger)
             if (bad)
                 throw std::runtime_error("Bad number of threads");
             if (config.num_threads > 1)
-                std::cout << "Number of test threads: "<<config.num_threads<<"\n\n";
+                std::cout << "Number of test threads: "<< config.num_threads << "\n\n";
         }
     }
 
@@ -540,7 +540,7 @@ int test_all(int argc, char* argv[], util::Logger* logger)
         REALM_ASSERT(num_open_files_2 >= 0);
         if (num_open_files_2 > num_open_files) {
             long n = num_open_files_2 - num_open_files;
-            std::cerr << "ERROR: "<<n<<" file descriptors were leaked\n";
+            std::cerr << "ERROR: " << n << " file descriptors were leaked\n";
             success = false;
         }
     }

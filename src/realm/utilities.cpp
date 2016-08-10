@@ -88,9 +88,9 @@ void cpuid_init()
     __asm ( "mov %1, %%eax; "            // a into eax
             "cpuid;"
             "mov %%ecx, %0;"             // ecx into b
-            :"=r"(cret)                     // output
-            :"r"(a)                      // input
-            :"%eax","%ebx","%ecx","%edx" // clobbered register
+            : "=r"(cret)                    // output
+            : "r"(a)                     // input
+            : "%eax", "%ebx", "%ecx", "%edx" // clobbered register
           );
 #  endif
 
@@ -228,7 +228,7 @@ namespace realm {
 // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
 int fast_popcount32(int32_t x)
 {
-    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x >> 8] + a_popcount_bits[255 & x >> 16] + a_popcount_bits[255 & x >> 24];
 }
 int fast_popcount64(int64_t x)
 {

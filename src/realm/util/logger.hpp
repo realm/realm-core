@@ -92,10 +92,10 @@ private:
 };
 
 template<class C, class T>
-std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, Logger::Level);
+std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, Logger::Level);
 
 template<class C, class T>
-std::basic_istream<C,T>& operator>>(std::basic_istream<C,T>&, Logger::Level&);
+std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
 
 class Logger::LevelThreshold {
 public:
@@ -315,7 +315,7 @@ inline void Logger::log_impl(State& state, const Param& param, Params... params)
 }
 
 template<class C, class T>
-std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, Logger::Level level)
+std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Logger::Level level)
 {
     switch (level) {
         case Logger::Level::all:
@@ -351,9 +351,9 @@ std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, Logger::Level 
 }
 
 template<class C, class T>
-std::basic_istream<C,T>& operator>>(std::basic_istream<C,T>& in, Logger::Level& level)
+std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>& in, Logger::Level& level)
 {
-    std::basic_string<C,T> str;
+    std::basic_string<C, T> str;
     auto check = [&](const char* name) {
         size_t n = strlen(name);
         if (n != str.size())

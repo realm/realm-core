@@ -370,7 +370,7 @@ template<class T>
 T BpTree<T>::back() const noexcept
 {
     // FIXME: slow
-    return get(size()-1);
+    return get(size() - 1);
 }
 
 namespace _impl {
@@ -611,7 +611,7 @@ template<class T>
 void BpTree<T>::erase(size_t ndx, bool is_last)
 {
     REALM_ASSERT_DEBUG_EX(ndx < size(), ndx, size());
-    REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
+    REALM_ASSERT_DEBUG(is_last == (ndx == size() - 1));
     if (root_is_leaf()) {
         root_as_leaf().erase(ndx);
     }

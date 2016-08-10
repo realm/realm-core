@@ -63,10 +63,10 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
     DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
     DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
     DWORD size =
-        FormatMessageA(flags, 0, err, language_id, buffer.data()+offset,
+        FormatMessageA(flags, 0, err, language_id, buffer.data() + offset,
                        static_cast<DWORD>(max_msg_size), 0);
     if (0 < size)
-        return std::string(buffer.data(), offset+size);
+        return std::string(buffer.data(), offset + size);
     buffer.resize(offset);
     buffer.append_c_str("Unknown error");
     return buffer.str();
@@ -103,7 +103,7 @@ bool try_make_dir(const std::string& path)
     if (_mkdir(path.c_str()) == 0)
         return true;
 #else // POSIX
-    if (::mkdir(path.c_str(), S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) == 0)
+    if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
@@ -161,8 +161,8 @@ std::string make_temp_dir()
 #ifdef _WIN32 // Windows version
 
     StringBuffer buffer1;
-    buffer1.resize(MAX_PATH+1);
-    if (GetTempPathA(MAX_PATH+1, buffer1.data()) == 0)
+    buffer1.resize(MAX_PATH + 1);
+    if (GetTempPathA(MAX_PATH + 1, buffer1.data()) == 0)
         throw std::runtime_error("CreateDirectory() failed");
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
@@ -294,7 +294,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         flags2 |= O_TRUNC;
     if (flags & flag_Append)
         flags2 |= O_APPEND;
-    int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    int fd = ::open(path.c_str(), flags2, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
         if (success)
@@ -809,7 +809,7 @@ void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
             break;
     }
     LARGE_INTEGER large_int;
-    if (int_cast_with_overflow_detect(offset+size, large_int.QuadPart))
+    if (int_cast_with_overflow_detect(offset + size, large_int.QuadPart))
         throw std::runtime_error("Map size is too large");
     HANDLE map_handle =
         CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);

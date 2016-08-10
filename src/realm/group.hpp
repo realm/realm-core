@@ -383,7 +383,7 @@ public:
     ///
     /// \param pad If true, the file is padded to ensure the footer is aligned
     /// to the end of a page
-    void write(std::ostream&, bool pad=false) const;
+    void write(std::ostream&, bool pad = false) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
@@ -400,7 +400,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const char* encryption_key=0) const;
+    void write(const std::string& file, const char* encryption_key = 0) const;
 
     /// Write this database to a memory buffer.
     ///

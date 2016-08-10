@@ -69,7 +69,7 @@ struct TypeAppend<void, T> {
 /// \tparam i The index of the list element to get.
 template<class List, int i>
 struct TypeAt {
-    typedef typename TypeAt<typename List::tail, i-1>::type type;
+    typedef typename TypeAt<typename List::tail, i - 1>::type type;
 };
 /// Base case for empty type list.
 template<class List>
@@ -121,14 +121,14 @@ struct FindType<void, Pred> {
 ///
 /// \tparam List The list of types, constructed using TypeCons<>. Note
 /// that 'void' is interpreted as a zero-length list.
-template<class List, template<class T, int i> class Op, int i=0>
+template<class List, template<class T, int i> class Op, int i = 0>
 struct ForEachType {
     /// Execute the `Op<T,i>::exec()` for each type `T` at index `i`
     /// in `List`.
     static void exec()
     {
         Op<typename List::head, i>::exec();
-        ForEachType<typename List::tail, Op, i+1>::exec();
+        ForEachType<typename List::tail, Op, i + 1>::exec();
     }
     /// Execute the `Op<T,i>::exec(a)` for each type `T` at index `i`
     /// in `List`.
@@ -136,23 +136,23 @@ struct ForEachType {
     static void exec(const A& a)
     {
         Op<typename List::head, i>::exec(a);
-        ForEachType<typename List::tail, Op, i+1>::exec(a);
+        ForEachType<typename List::tail, Op, i + 1>::exec(a);
     }
     /// Execute the `Op<T,i>::exec(a,b)` for each type `T` at index
     /// `i` in `List`.
     template<class A, class B>
     static void exec(const A& a, const B& b)
     {
-        Op<typename List::head, i>::exec(a,b);
-        ForEachType<typename List::tail, Op, i+1>::exec(a,b);
+        Op<typename List::head, i>::exec(a, b);
+        ForEachType<typename List::tail, Op, i + 1>::exec(a, b);
     }
     /// Execute the `Op<T,i>::exec(a,b,c)` for each type `T` at index
     /// `i` in `List`.
     template<class A, class B, class C>
     static void exec(const A& a, const B& b, const C& c)
     {
-        Op<typename List::head, i>::exec(a,b,c);
-        ForEachType<typename List::tail, Op, i+1>::exec(a,b,c);
+        Op<typename List::head, i>::exec(a, b, c);
+        ForEachType<typename List::tail, Op, i + 1>::exec(a, b, c);
     }
 };
 /// Base case for empty type list.
@@ -175,38 +175,35 @@ struct ForEachType<void, Op, i> {
 ///
 /// \tparam List The list of types, constructed using TypeCons<>. Note
 /// that 'void' is interpreted as a zero-length list.
-template<class List, template<class T, int i> class Pred, int i=0>
+template<class List, template<class T, int i> class Pred, int i = 0>
 struct HasType {
     /// Execute the `Op<T,i>::exec()` for each type `T` at index `i`
     /// in `List`.
     static bool exec()
     {
-        return Pred<typename List::head, i>::exec() ||
-               HasType<typename List::tail, Pred, i+1>::exec();
+        return Pred<typename List::head, i>::exec() || HasType<typename List::tail, Pred, i + 1>::exec();
     }
     /// Execute the `Op<T,i>::exec(a)` for each type `T` at index `i`
     /// in `List`.
     template<class A>
     static bool exec(const A& a)
     {
-        return Pred<typename List::head, i>::exec(a) ||
-               HasType<typename List::tail, Pred, i+1>::exec(a);
+        return Pred<typename List::head, i>::exec(a) || HasType<typename List::tail, Pred, i + 1>::exec(a);
     }
     /// Execute the `Op<T,i>::exec(a,b)` for each type `T` at index
     /// `i` in `List`.
     template<class A, class B>
     static bool exec(const A& a, const B& b)
     {
-        return Pred<typename List::head, i>::exec(a,b) ||
-               HasType<typename List::tail, Pred, i+1>::exec(a,b);
+        return Pred<typename List::head, i>::exec(a, b) || HasType<typename List::tail, Pred, i + 1>::exec(a, b);
     }
     /// Execute the `Op<T,i>::exec(a,b,c)` for each type `T` at index
     /// `i` in `List`.
     template<class A, class B, class C>
     static bool exec(const A& a, const B& b, const C& c)
     {
-        return Pred<typename List::head, i>::exec(a,b,c) ||
-               HasType<typename List::tail, Pred, i+1>::exec(a,b,c);
+        return Pred<typename List::head, i>::exec(a, b, c) ||
+               HasType<typename List::tail, Pred, i + 1>::exec(a, b, c);
     }
 };
 /// Base case for empty type list.

@@ -396,9 +396,9 @@ TEST(Descriptor_Subtables)
     // Add some subtables
     table->add_empty_row(3);
     TableRef subtab_1, subtab_2, subtab_3;
-    subtab_1 = table->get_subtable(0,0);
-    subtab_2 = table->get_subtable(0,1);
-    subtab_3 = table->get_subtable(0,2);
+    subtab_1 = table->get_subtable(0, 0);
+    subtab_2 = table->get_subtable(0, 1);
+    subtab_3 = table->get_subtable(0, 2);
 
     // Add second level subtables
     subtab_1->add_empty_row(1);
@@ -411,9 +411,9 @@ TEST(Descriptor_Subtables)
     CHECK_EQUAL(subdesc, subtab_3->get_descriptor());
 
     // Check that all second level subtables have same descriptor
-    CHECK_EQUAL(subsubdesc, subtab_1->get_subtable(0,0)->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_2->get_subtable(0,0)->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_3->get_subtable(0,0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_1->get_subtable(0, 0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_2->get_subtable(0, 0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_3->get_subtable(0, 0)->get_descriptor());
 
     // Clear and reobtain fixed refs
     desc.reset();
@@ -427,17 +427,17 @@ TEST(Descriptor_Subtables)
     desc.reset();
     desc = subdesc->get_parent();
     table = desc->get_root_table();
-    subtab_1 = table->get_subtable(0,0);
-    subtab_2 = table->get_subtable(0,1);
-    subtab_3 = table->get_subtable(0,2);
+    subtab_1 = table->get_subtable(0, 0);
+    subtab_2 = table->get_subtable(0, 1);
+    subtab_3 = table->get_subtable(0, 2);
 
     // Recheck
     CHECK_EQUAL(subdesc, subtab_1->get_descriptor());
     CHECK_EQUAL(subdesc, subtab_2->get_descriptor());
     CHECK_EQUAL(subdesc, subtab_3->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_1->get_subtable(0,0)->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_2->get_subtable(0,0)->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_3->get_subtable(0,0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_1->get_subtable(0, 0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_2->get_subtable(0, 0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_3->get_subtable(0, 0)->get_descriptor());
 }
 
 
@@ -446,7 +446,7 @@ TEST(Descriptor_Subtables2)
     TableRef table = Table::create();
     table->add_column(type_Table, "");
     table->add_empty_row(1);
-    TableRef subtab = table->get_subtable(0,0);
+    TableRef subtab = table->get_subtable(0, 0);
     DescriptorRef subdesc = subtab->get_descriptor();
     table->remove_column(0);
     CHECK(!subtab->is_attached());
@@ -625,7 +625,7 @@ TEST(Descriptor_IllegalOps)
         desc->add_column(type_Table, "subtable", &subdesc);
         subdesc->add_column(type_Int, "int");
         table->add_empty_row();
-        TableRef subtable = table->get_subtable(0,0);
+        TableRef subtable = table->get_subtable(0, 0);
         CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", *subtable),
                           LogicError::wrong_kind_of_table);
     }

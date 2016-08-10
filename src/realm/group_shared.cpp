@@ -228,7 +228,7 @@ public:
         }
         old_pos = 0;
         data[ 0 ].count.store( 0, std::memory_order_relaxed );
-        data[ init_readers_size-1 ].next = 0 ;
+        data[init_readers_size - 1].next = 0;
         put_pos.store( 0, std::memory_order_release );
     }
 
@@ -538,7 +538,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
     shared_controlmutex() // Throws
 {
     durability = dura; // durability level is fixed from creation
-    REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(hist_type+0));
+    REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(hist_type + 0));
     history_type = hist_type;
 #ifndef _WIN32
     InterprocessCondVar::init_shared_part(new_commit_available); // Throws
@@ -626,10 +626,10 @@ void spawn_daemon(const std::string& file)
         int i;
         for (i = m - 1; i >= 0; --i)
             close(i);
-        i = ::open("/dev/null",O_RDWR);
+        i = ::open("/dev/null", O_RDWR);
 #ifdef REALM_ENABLE_LOGFILE
         // FIXME: Do we want to always open the log file? Should it be configurable?
-        i = ::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        i = ::open((file + ".log").c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = dup(i);
 #endif
@@ -890,11 +890,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // with EOWNERDEAD, because that would mark the mutex as consistent
         // again and prevent us from being notified below.
 
-        m_writemutex.set_shared_part(info->shared_writemutex,m_lockfile_prefix,"write");
+        m_writemutex.set_shared_part(info->shared_writemutex, m_lockfile_prefix, "write");
 #ifdef REALM_ASYNC_DAEMON
-        m_balancemutex.set_shared_part(info->shared_balancemutex,m_lockfile_prefix,"balance");
+        m_balancemutex.set_shared_part(info->shared_balancemutex, m_lockfile_prefix, "balance");
 #endif
-        m_controlmutex.set_shared_part(info->shared_controlmutex,m_lockfile_prefix,"control");
+        m_controlmutex.set_shared_part(info->shared_controlmutex, m_lockfile_prefix, "control");
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
@@ -1056,11 +1056,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             }
 
 #ifndef _WIN32
-            m_new_commit_available.set_shared_part(info->new_commit_available,m_lockfile_prefix,"new_commit");
+            m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit");
 #ifdef REALM_ASYNC_DAEMON
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_lockfile_prefix,"daemon_ready");
-            m_work_to_do.set_shared_part(info->work_to_do,m_lockfile_prefix,"work_ready");
-            m_room_to_write.set_shared_part(info->room_to_write,m_lockfile_prefix,"allow_write");
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready");
+            m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready");
+            m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write");
             // In async mode, we need to make sure the daemon is running and ready:
             if (durability == durability_Async && !is_backend) {
                 while (info->daemon_ready == 0) {

@@ -95,7 +95,7 @@ public:
     bool contains(BinaryData) const noexcept;
 
     template<class C, class T>
-    friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
+    friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const BinaryData&);
 
     explicit operator bool() const noexcept;
 
@@ -201,9 +201,9 @@ inline bool BinaryData::contains(BinaryData d) const noexcept
 }
 
 template<class C, class T>
-inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BinaryData& d)
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const BinaryData& d)
 {
-    out << "BinaryData("<<static_cast<const void*>(d.m_data)<<", "<<d.m_size<<")";
+    out << "BinaryData(" << static_cast<const void*>(d.m_data) << ", " << d.m_size << ")";
     return out;
 }
 

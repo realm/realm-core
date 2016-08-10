@@ -1109,7 +1109,7 @@ protected:
 template<>
 class StringNode<Equal>: public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column): StringNodeBase(v,column)
+    StringNode(StringData v, size_t column): StringNodeBase(v, column)
     {
     }
     ~StringNode() noexcept override

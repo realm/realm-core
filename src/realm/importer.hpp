@@ -72,7 +72,7 @@ import_csv(csv file handle, realm table)
 // will make the operating system read 32 K from disk and return it, and then read-ahead 32-64 K more after fread()
 // has returned. This read-ahead behaviour does NOT occur if we request megabyte-sized chunks (observed on Windows 7 /
 // Ubuntu)
-static const size_t chunk_size = 32*1024;
+static const size_t chunk_size = 32 * 1024;
 
 // Number of rows to csv-parse + insert into realm in each iteration.
 static const size_t record_chunks = 100;
@@ -114,7 +114,7 @@ private:
     std::vector<DataType> detect_scheme (std::vector<std::vector<std::string>> payload, size_t begin, size_t end);
     std::vector<DataType> lowest_common (std::vector<DataType> types1, std::vector<DataType> types2);
 
-    char src[2*chunk_size];    // .csv input buffer
+    char src[2 * chunk_size];  // .csv input buffer
     size_t m_top;              // points at top of buffer
     size_t m_curpos;           // points at next byte to parse
     FILE* m_file;              // handle to .csv file

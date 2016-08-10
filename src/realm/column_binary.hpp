@@ -230,7 +230,7 @@ inline StringData BinaryColumn::get_string(size_t ndx) const noexcept
 {
     BinaryData bin = get(ndx);
     REALM_ASSERT_3(0, <, bin.size());
-    return StringData(bin.data(), bin.size()-1);
+    return StringData(bin.data(), bin.size() - 1);
 }
 
 inline void BinaryColumn::set_string(size_t ndx, StringData value)

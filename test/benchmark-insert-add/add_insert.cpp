@@ -194,22 +194,22 @@ int main(int argc, char* argv[])
     }
 
     test_util::Timer timer(test_util::Timer::type_RealTime);
-    for (size_t i=0; i<N/rows_per_commit; ++i) {
+    for (size_t i = 0; i < N / rows_per_commit; ++i) {
         switch (m) {
             case mode_UseShared: {
                 WriteTransaction wt(sg);
                 BasicTableRef<TestTable> t1 = wt.get_table<TestTable>("test");
                 {
-                    for (size_t j=0; j<rows_per_commit; ++j) {
+                    for (size_t j = 0; j < rows_per_commit; ++j) {
                         if (do_insert) {
                             size_t k = 0;
                             if (random_insert && t1->size() > 0) {
                                 k = size_t(random() % t1->size());
                             }
-                            t1->insert(k, N, "Hello", i%2, "World", "Smurf");
+                            t1->insert(k, N, "Hello", i % 2, "World", "Smurf");
                         }
                         else {
-                            t1->add(N, "Hello", i%2, "World", "Smurf");
+                            t1->add(N, "Hello", i % 2, "World", "Smurf");
                         }
                     }
                 }
@@ -218,16 +218,16 @@ int main(int argc, char* argv[])
             }
             case mode_UseGroup: {
                 BasicTableRef<TestTable> t1 = g.get_table<TestTable>("test");
-                for (size_t j=0; j<rows_per_commit; ++j) {
+                for (size_t j = 0; j < rows_per_commit; ++j) {
                     if (do_insert) {
                         size_t k = 0;
                         if (random_insert && t1->size() > 0) {
                             k = size_t(random() % t1->size());
                         }
-                        t1->insert(k, N, "Hello", i%2, "World", "Smurf");
+                        t1->insert(k, N, "Hello", i % 2, "World", "Smurf");
                     }
                     else {
-                        t1->add(N, "Hello", i%2, "World", "Smurf");
+                        t1->add(N, "Hello", i % 2, "World", "Smurf");
                     }
                 }
                 try {
@@ -244,24 +244,25 @@ int main(int argc, char* argv[])
                 break;
             }
             case mode_UseTable:
-                for (size_t j=0; j<rows_per_commit; ++j) {
+                for (size_t j = 0; j < rows_per_commit; ++j) {
                     if (do_insert) {
                         size_t k = 0;
                         if (random_insert && t.size() > 0) {
                             k = size_t(random() % t.size());
                         }
-                        t.insert(k, N, "Hello", i%2, "World", "Smurf");
+                        t.insert(k, N, "Hello", i % 2, "World", "Smurf");
                     }
                     else {
-                        t.add(N, "Hello", i%2, "World", "Smurf");
+                        t.add(N, "Hello", i % 2, "World", "Smurf");
                     }
                 }
                 break;
         }
 
-        if (((i*rows_per_commit) % n) == 0 && i > 0) {
+        if (((i * rows_per_commit) % n) == 0 && i > 0) {
             double dt = timer.get_elapsed_time();
-            std::cout << i*rows_per_commit << ";" << dt << ";" << double(i*rows_per_commit)/dt << ";" << dt/double(i*rows_per_commit) << std::endl;
+            std::cout << i * rows_per_commit << ";" << dt << ";" << double(i * rows_per_commit) / dt << ";"
+                      << dt / double(i * rows_per_commit) << std::endl;
         }
     }
     return 0;

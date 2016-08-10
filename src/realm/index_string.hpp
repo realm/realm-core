@@ -177,7 +177,7 @@ private:
         size_t ref1;
         size_t ref2;
         enum ChangeType { none, insert_before, insert_after, split } type;
-        NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
+        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0) : ref1(r1), ref2(r2), type(t) {}
         NodeChange() : ref1(0), ref2(0), type(none) {}
     };
 
@@ -185,7 +185,7 @@ private:
     void TreeInsert(size_t row_ndx, key_type, size_t offset, StringData value);
     NodeChange do_insert(size_t ndx, key_type, size_t offset, StringData value);
     /// Returns true if there is room or it can join existing entries
-    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
+    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
     void do_delete(size_t ndx, StringData, size_t offset);
@@ -347,7 +347,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 
     // for very short strings
     size_t tail = str.size() - offset;
-    if (tail <= sizeof(key_type)-1) {
+    if (tail <= sizeof(key_type) - 1) {
         char buf[sizeof(key_type)];
         memset(buf, 0, sizeof(key_type));
         buf[tail] = 'X';

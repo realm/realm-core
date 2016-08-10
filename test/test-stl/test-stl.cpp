@@ -86,7 +86,7 @@ int main()
 
     std::vector<TestTable> table;
 
-    std::cout << "Create random content with "<<ROWS<<" rows.\n\n";
+    std::cout << "Create random content with " << ROWS << " rows.\n\n";
     for (size_t i = 0; i < ROWS; ++i) {
         // create random string
         const int n = rand() % 1000;// * 10 + rand();
@@ -100,7 +100,7 @@ int main()
     TestTable t = {0, "abcde", 100, Wed};
     table.push_back(t);
 
-    std::cout << "Memory usage:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
+    std::cout << "Memory usage:\t\t" << test_util::get_mem_usage() << " bytes\n";
 
     test_util::Timer timer;
 
@@ -116,7 +116,7 @@ int main()
             }
         }
 
-        std::cout << "Search (small integer):\t"<<timer<<"\n";
+        std::cout << "Search (small integer):\t" << timer << "\n";
     }
 
     // Search byte-sized integer column
@@ -131,7 +131,7 @@ int main()
             }
         }
 
-        std::cout << "Search (byte-sized int)\t"<<timer<<"\n";
+        std::cout << "Search (byte-sized int)\t" << timer << "\n";
     }
 
     // Search string column
@@ -147,7 +147,7 @@ int main()
             }
         }
 
-        std::cout << "Search (string):\t"<<timer<<"\n";
+        std::cout << "Search (string):\t" << timer << "\n";
     }
 
     // Add index
@@ -157,22 +157,22 @@ int main()
 
         // Copy data to map
         for (std::vector<TestTable>::const_iterator p = table.begin(); p != table.end(); ++p) {
-            mapTable.insert(std::pair<int,TestTable>(p->first,*p));
+            mapTable.insert(std::pair<int, TestTable>(p->first, *p));
         }
 
         // free memory used by table
         std::vector<TestTable>().swap(table);
 
-        std::cout << "\nAdd index:\t\t"<<timer<<"\n";
+        std::cout << "\nAdd index:\t\t" << timer << "\n";
 
-        std::cout << "Memory usage2:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
+        std::cout << "Memory usage2:\t\t" << test_util::get_mem_usage() << " bytes\n";
     }
 
     // Search with index
     {
         timer.reset();
 
-        for (size_t i = 0; i < TESTS*10; ++i) {
+        for (size_t i = 0; i < TESTS * 10; ++i) {
             const size_t n = rand() % 1000;
             std::multimap<int, TestTable>::const_iterator p = mapTable.find(n);
             if (p->second.fourth == Fri) { // to avoid above find being optimized away
@@ -180,7 +180,7 @@ int main()
             }
         }
 
-        std::cout << "Search index:\t\t"<<timer<<"\n";
+        std::cout << "Search index:\t\t" << timer << "\n";
     }
     std::cout << "\nDone.\n";
 

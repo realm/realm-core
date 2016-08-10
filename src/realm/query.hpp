@@ -183,17 +183,17 @@ public:
     Query& between_olddatetime(size_t column_ndx, OldDateTime from, OldDateTime to) { return between(column_ndx, int64_t(from.get_olddatetime()), int64_t(to.get_olddatetime())); }
 
     // Conditions: strings
-    Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& equal(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& contains(size_t column_ndx, StringData value, bool case_sensitive = true);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
     // implicit conversion of char* to bool.
-    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
+    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive = true);
+    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive = true);
 
     // Conditions: binary data
     Query& equal(size_t column_ndx, BinaryData value);
@@ -220,12 +220,12 @@ public:
 
 
     // Searching
-    size_t         find(size_t begin_at_table_row=size_t(0));
-    TableView      find_all(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
-    ConstTableView find_all(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    size_t         find(size_t begin_at_table_row = size_t(0));
+    TableView      find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
+    ConstTableView find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
     // Aggregates
-    size_t count(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    size_t count(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
     int64_t sum_int(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
                     size_t limit = size_t(-1)) const;
@@ -276,12 +276,12 @@ public:
                                 size_t limit = size_t(-1));
 
     // Deletion
-    size_t  remove(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
+    size_t  remove(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
 
 #if REALM_MULTITHREAD_QUERY
     // Multi-threading
-    TableView      find_all_multi(size_t start = 0, size_t end=size_t(-1));
-    ConstTableView find_all_multi(size_t start = 0, size_t end=size_t(-1)) const;
+    TableView      find_all_multi(size_t start = 0, size_t end = size_t(-1));
+    ConstTableView find_all_multi(size_t start = 0, size_t end = size_t(-1)) const;
     int            set_threads(unsigned int threadcount);
 #endif
 
@@ -303,7 +303,7 @@ protected:
 
     void   init(const Table& table) const;
     bool   is_initialized() const;
-    size_t find_internal(size_t start = 0, size_t end=size_t(-1)) const;
+    size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
     size_t peek_tableview(size_t tv_index) const;
     void handle_pending_not();
     void set_table(TableRef tr);
@@ -366,7 +366,7 @@ private:
 
     template<typename T, bool Nullable>
     double average(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+                   size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
     template<Action action, typename T, typename R, class ColClass>
     R aggregate(R (ColClass::*method)(size_t, size_t, size_t, size_t*) const,
@@ -377,7 +377,7 @@ private:
                             ParentNode* pn, QueryStateBase* st,
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 
-    void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    void find_all(TableViewBase& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
 
     bool has_conditions() const { return m_groups.size() > 0 && m_groups[0].m_root_node; }

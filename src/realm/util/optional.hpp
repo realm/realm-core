@@ -53,7 +53,7 @@ struct BadOptionalAccess : std::logic_error {
 
 namespace _impl {
 
-template<class T, bool=std::is_trivially_destructible<T>::value>
+template<class T, bool = std::is_trivially_destructible<T>::value>
 struct OptionalStorage;
 
 template<class T, class U>
@@ -91,7 +91,7 @@ public:
     Optional<T>& operator=(const Optional<T>& other);
 
     template<class U, class = typename std::enable_if<_impl::TypeIsAssignableToOptional<T, U>::value>::type>
-    Optional<T>& operator=(U&& value);
+    Optional<T>& operator=(U && value);
 
     explicit constexpr operator bool() const;
     constexpr const T& value() const; // Throws

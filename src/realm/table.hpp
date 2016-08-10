@@ -1475,7 +1475,7 @@ inline void Table::move_last_over(size_t row_ndx)
 inline void Table::remove_last()
 {
     if (!is_empty())
-        remove(size()-1);
+        remove(size() - 1);
 }
 
 // A good place to start if you want to understand the memory ordering
@@ -1804,12 +1804,12 @@ inline Table::ConstRowExpr Table::front() const noexcept
 
 inline Table::RowExpr Table::back() noexcept
 {
-    return get(m_size-1);
+    return get(m_size - 1);
 }
 
 inline Table::ConstRowExpr Table::back() const noexcept
 {
-    return get(m_size-1);
+    return get(m_size - 1);
 }
 
 inline Table::RowExpr Table::operator[](size_t row_ndx) noexcept

@@ -128,7 +128,7 @@ void writer(std::string path, int id)
         bool done = false;
         SharedGroup sg(path, true, SharedGroup::durability_Full, crypt_key());
         // std::cerr << "Opened sg " << std::endl;
-        for (int i=0; !done; ++i) {
+        for (int i = 0; !done; ++i) {
             // std::cerr << "       - " << getpid() << std::endl;
             WriteTransaction wt(sg);
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
@@ -233,7 +233,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
         _Exit(0);
     }
     else {
-        for (int k=1; k < num_processes; ++k) {
+        for (int k = 1; k < num_processes; ++k) {
             int pid2 = pid;
             pid = fork();
             if (pid == pid_t(-1))
@@ -244,11 +244,11 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
             }
             else {
                 // std::cerr << "New process " << pid << " killing old " << pid2 << std::endl;
-                killer(test_context, pid2, path, k-1);
+                killer(test_context, pid2, path, k - 1);
             }
         }
         // std::cerr << "Killing last one: " << pid << std::endl;
-        killer(test_context, pid, path, num_processes-1);
+        killer(test_context, pid, path, num_processes - 1);
     }
     // We need to wait cleaning up til the killed processes have exited.
     sleep(1);
@@ -611,14 +611,14 @@ TEST(Shared_1)
     {
         // Create a new shared db
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
-        Timestamp first_timestamp_value{1,1};
+        Timestamp first_timestamp_value{1, 1};
 
         // Create first table in group
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
             TestTableSharedTimestamp::Ref t1 = wt.add_table<TestTableSharedTimestamp>("test");
-            t1->add(1, 2, false, "test", Timestamp{1,1});
+            t1->add(1, 2, false, "test", Timestamp{1, 1});
             wt.commit();
         }
 
@@ -642,7 +642,7 @@ TEST(Shared_1)
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
                 TestTableSharedTimestamp::Ref t1 = wt.get_table<TestTableSharedTimestamp>("test");
-                t1->add(2, 3, true, "more test", Timestamp{2,2});
+                t1->add(2, 3, true, "more test", Timestamp{2, 2});
                 wt.commit();
             }
 
@@ -660,7 +660,7 @@ TEST(Shared_1)
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
                 TestTableSharedTimestamp::Ref t1 = wt.get_table<TestTableSharedTimestamp>("test");
-                t1->add(0, 1, false, "even more test", Timestamp{3,3});
+                t1->add(0, 1, false, "even more test", Timestamp{3, 3});
                 wt.commit();
             }
 
@@ -690,13 +690,13 @@ TEST(Shared_1)
             CHECK_EQUAL(3, t3[1].second);
             CHECK_EQUAL(true, t3[1].third);
             CHECK_EQUAL("more test", t3[1].fourth);
-            Timestamp second_timestamp_value{2,2};
+            Timestamp second_timestamp_value{2, 2};
             CHECK_EQUAL(second_timestamp_value, t3[1].fifth);
             CHECK_EQUAL(0, t3[2].first);
             CHECK_EQUAL(1, t3[2].second);
             CHECK_EQUAL(false, t3[2].third);
             CHECK_EQUAL("even more test", t3[2].fourth);
-            Timestamp third_timestamp_value{3,3};
+            Timestamp third_timestamp_value{3, 3};
             CHECK_EQUAL(third_timestamp_value, t3[2].fifth);
         }
     }
@@ -836,7 +836,7 @@ TEST(Shared_AddColumnToSubspec)
         table->add_column(type_Table, "subtable", &sub_1);
         sub_1->add_column(type_Int,   "int");
         table->add_empty_row();
-        TableRef subtable = table->get_subtable(0,0);
+        TableRef subtable = table->get_subtable(0, 0);
         subtable->add_empty_row();
         subtable->set_int(0, 0, 789);
         wt.commit();
@@ -850,16 +850,16 @@ TEST(Shared_AddColumnToSubspec)
         TableRef table = wt.get_table("table");
         DescriptorRef subdesc = table->get_subdescriptor(0);
         subdesc->add_column(type_Int, "int_2");
-        TableRef subtable = table->get_subtable(0,0);
+        TableRef subtable = table->get_subtable(0, 0);
         CHECK_EQUAL(2, subtable->get_column_count());
         CHECK_EQUAL(type_Int, subtable->get_column_type(0));
         CHECK_EQUAL(type_Int, subtable->get_column_type(1));
         CHECK_EQUAL(1, subtable->size());
-        CHECK_EQUAL(789, subtable->get_int(0,0));
+        CHECK_EQUAL(789, subtable->get_int(0, 0));
         subtable->add_empty_row();
         CHECK_EQUAL(2, subtable->size());
         subtable->set_int(1, 1, 654);
-        CHECK_EQUAL(654, subtable->get_int(1,1));
+        CHECK_EQUAL(654, subtable->get_int(1, 1));
         wt.commit();
     }
 
@@ -867,15 +867,15 @@ TEST(Shared_AddColumnToSubspec)
     {
         ReadTransaction rt(sg);
         ConstTableRef table = rt.get_table("table");
-        ConstTableRef subtable = table->get_subtable(0,0);
+        ConstTableRef subtable = table->get_subtable(0, 0);
         CHECK_EQUAL(2, subtable->get_column_count());
         CHECK_EQUAL(type_Int, subtable->get_column_type(0));
         CHECK_EQUAL(type_Int, subtable->get_column_type(1));
         CHECK_EQUAL(2, subtable->size());
-        CHECK_EQUAL(789, subtable->get_int(0,0));
-        CHECK_EQUAL(0,   subtable->get_int(0,1));
-        CHECK_EQUAL(0,   subtable->get_int(1,0));
-        CHECK_EQUAL(654, subtable->get_int(1,1));
+        CHECK_EQUAL(789, subtable->get_int(0, 0));
+        CHECK_EQUAL(0,   subtable->get_int(0, 1));
+        CHECK_EQUAL(0,   subtable->get_int(1, 0));
+        CHECK_EQUAL(654, subtable->get_int(1, 1));
     }
 }
 
@@ -895,7 +895,7 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
         table->add_column(type_Table, "subtable", &sub_1);
         sub_1->add_column(type_Int,   "int");
         table->add_empty_row();
-        TableRef subtable = table->get_subtable(1,0);
+        TableRef subtable = table->get_subtable(1, 0);
         subtable->add_empty_row();
         subtable->set_int(0, 0, 789);
         wt.commit();
@@ -906,15 +906,15 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         table->remove_column(0);
-        TableRef subtable = table->get_subtable(0,0);
+        TableRef subtable = table->get_subtable(0, 0);
         CHECK_EQUAL(1, subtable->get_column_count());
         CHECK_EQUAL(type_Int, subtable->get_column_type(0));
         CHECK_EQUAL(1, subtable->size());
-        CHECK_EQUAL(789, subtable->get_int(0,0));
+        CHECK_EQUAL(789, subtable->get_int(0, 0));
         subtable->add_empty_row();
         CHECK_EQUAL(2, subtable->size());
         subtable->set_int(0, 1, 654);
-        CHECK_EQUAL(654, subtable->get_int(0,1));
+        CHECK_EQUAL(654, subtable->get_int(0, 1));
         wt.commit();
     }
 
@@ -922,12 +922,12 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
     {
         ReadTransaction rt(sg);
         ConstTableRef table = rt.get_table("table");
-        ConstTableRef subtable = table->get_subtable(0,0);
+        ConstTableRef subtable = table->get_subtable(0, 0);
         CHECK_EQUAL(1, subtable->get_column_count());
         CHECK_EQUAL(type_Int, subtable->get_column_type(0));
         CHECK_EQUAL(2, subtable->size());
-        CHECK_EQUAL(789, subtable->get_int(0,0));
-        CHECK_EQUAL(654, subtable->get_int(0,1));
+        CHECK_EQUAL(789, subtable->get_int(0, 0));
+        CHECK_EQUAL(654, subtable->get_int(0, 1));
     }
 }
 
@@ -964,10 +964,10 @@ TEST(Shared_ManyReaders)
 #else
     int rounds[] = { 3, 5, 11, 15, 17, 23, 27, 31, 47, 59 };
 #endif
-    const int num_rounds = sizeof rounds / sizeof *rounds;
+    const int num_rounds = sizeof rounds / sizeof * rounds;
 
     const int max_N = 64;
-    CHECK(max_N >= rounds[num_rounds-1]);
+    CHECK(max_N >= rounds[num_rounds - 1]);
     std::unique_ptr<SharedGroup> shared_groups[8 * max_N];
     std::unique_ptr<ReadTransaction> read_transactions[8 * max_N];
 
@@ -986,7 +986,7 @@ TEST(Shared_ManyReaders)
             TableRef test_1 = wt.get_or_add_table("test_1");
             test_1->add_column(type_Int, "i");
             test_1->insert_empty_row(0);
-            test_1->set_int(0,0,0);
+            test_1->set_int(0, 0, 0);
             TableRef test_2 = wt.get_or_add_table("test_2");
             test_2->add_column(type_Binary, "b");
             wt.commit();
@@ -994,25 +994,25 @@ TEST(Shared_ManyReaders)
 
 
         // Create 8*N shared group accessors
-        for (int i = 0; i < 8*N; ++i)
+        for (int i = 0; i < 8 * N; ++i)
             shared_groups[i].reset(new SharedGroup(path, no_create, SharedGroup::durability_MemOnly));
 
         // Initiate 2*N read transactions with progressive changes
-        for (int i = 0; i < 2*N; ++i) {
+        for (int i = 0; i < 2 * N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
             read_transactions[i]->get_group().verify();
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
-                CHECK_EQUAL(i, test_1->get_int(0,0));
+                CHECK_EQUAL(i, test_1->get_int(0, 0));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i *  1;
                 int n_2 = i * 18;
-                CHECK_EQUAL(n_1+n_2, test_2->size());
+                CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
-                for (int j = n_1; j < n_1+n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
+                for (int j = n_1; j < n_1 + n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
             }
             {
                 WriteTransaction wt(root_sg);
@@ -1037,23 +1037,23 @@ TEST(Shared_ManyReaders)
         }
 
         // Check isolation between read transactions
-        for (int i = 0; i < 2*N; ++i) {
+        for (int i = 0; i < 2 * N; ++i) {
             ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
-            CHECK_EQUAL(i, test_1->get_int(0,0));
+            CHECK_EQUAL(i, test_1->get_int(0, 0));
             ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
             int n_1 = i *  1;
             int n_2 = i * 18;
-            CHECK_EQUAL(n_1+n_2, test_2->size());
+            CHECK_EQUAL(n_1 + n_2, test_2->size());
             for (int j = 0; j < n_1; ++j)
-                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
-            for (int j = n_1; j < n_1+n_2; ++j)
-                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
+            for (int j = n_1; j < n_1 + n_2; ++j)
+                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
         }
 
         // End the first half of the read transactions during further
         // changes
-        for (int i = N-1; i >= 0; --i) {
+        for (int i = N - 1; i >= 0; --i) {
             {
                 WriteTransaction wt(root_sg);
 #if !defined(_WIN32) || TEST_DURATION > 0  // These .verify() calls are horribly slow on Windows
@@ -1066,21 +1066,21 @@ TEST(Shared_ManyReaders)
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
-                CHECK_EQUAL(i, test_1->get_int(0,0));
+                CHECK_EQUAL(i, test_1->get_int(0, 0));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i *  1;
                 int n_2 = i * 18;
-                CHECK_EQUAL(n_1+n_2, test_2->size());
+                CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
-                for (int j = n_1; j < n_1+n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
+                for (int j = n_1; j < n_1 + n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
             }
             read_transactions[i].reset();
         }
 
         // Initiate 6*N extra read transactionss with further progressive changes
-        for (int i = 2*N; i < 8*N; ++i) {
+        for (int i = 2 * N; i < 8 * N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
 #if !defined(_WIN32) || TEST_DURATION > 0
             read_transactions[i]->get_group().verify();
@@ -1088,16 +1088,16 @@ TEST(Shared_ManyReaders)
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
-                int i_2 = 2*N + i;
-                CHECK_EQUAL(i_2, test_1->get_int(0,0));
+                int i_2 = 2 * N + i;
+                CHECK_EQUAL(i_2, test_1->get_int(0, 0));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i *  1;
                 int n_2 = i * 18;
-                CHECK_EQUAL(n_1+n_2, test_2->size());
+                CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
-                for (int j = n_1; j < n_1+n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
+                for (int j = n_1; j < n_1 + n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
             }
             {
                 WriteTransaction wt(root_sg);
@@ -1126,7 +1126,7 @@ TEST(Shared_ManyReaders)
         }
 
         // End all remaining read transactions during further changes
-        for (int i = 1*N; i < 8*N; ++i) {
+        for (int i = 1 * N; i < 8 * N; ++i) {
             {
                 WriteTransaction wt(root_sg);
 #if !defined(_WIN32) || TEST_DURATION > 0
@@ -1139,22 +1139,22 @@ TEST(Shared_ManyReaders)
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
-                int i_2 = i<2*N ? i : 2*N + i;
-                CHECK_EQUAL(i_2, test_1->get_int(0,0));
+                int i_2 = i < 2 * N ? i : 2 * N + i;
+                CHECK_EQUAL(i_2, test_1->get_int(0, 0));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
                 int n_1 = i *  1;
                 int n_2 = i * 18;
-                CHECK_EQUAL(n_1+n_2, test_2->size());
+                CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
-                for (int j = n_1; j < n_1+n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
+                for (int j = n_1; j < n_1 + n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
             }
             read_transactions[i].reset();
         }
 
         // Check final state via each shared group, then destroy it
-        for (int i=0; i<8*N; ++i) {
+        for (int i = 0; i < 8 * N; ++i) {
             {
                 ReadTransaction rt(*shared_groups[i]);
 #if !defined(_WIN32) || TEST_DURATION > 0
@@ -1162,15 +1162,15 @@ TEST(Shared_ManyReaders)
 #endif
                 ConstTableRef test_1 = rt.get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
-                CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
+                CHECK_EQUAL(3 * 8 * N, test_1->get_int(0, 0));
                 ConstTableRef test_2 = rt.get_table("test_2");
-                int n_1 = 8*N *  1;
-                int n_2 = 8*N * 18;
-                CHECK_EQUAL(n_1+n_2, test_2->size());
+                int n_1 = 8 * N *  1;
+                int n_2 = 8 * N * 18;
+                CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
-                for (int j = n_1; j < n_1+n_2; ++j)
-                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
+                for (int j = n_1; j < n_1 + n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
             }
             shared_groups[i].reset();
         }
@@ -1184,15 +1184,15 @@ TEST(Shared_ManyReaders)
 #endif
             ConstTableRef test_1 = rt.get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
-            CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
+            CHECK_EQUAL(3 * 8 * N, test_1->get_int(0, 0));
             ConstTableRef test_2 = rt.get_table("test_2");
-            int n_1 = 8*N *  1;
-            int n_2 = 8*N * 18;
-            CHECK_EQUAL(n_1+n_2, test_2->size());
+            int n_1 = 8 * N *  1;
+            int n_2 = 8 * N * 18;
+            CHECK_EQUAL(n_1 + n_2, test_2->size());
             for (int j = 0; j < n_1; ++j)
-                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
-            for (int j = n_1; j < n_1+n_2; ++j)
-                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0, j));
+            for (int j = n_1; j < n_1 + n_2; ++j)
+                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0, j));
         }
     }
 }
@@ -1258,14 +1258,14 @@ TEST(Shared_WritesSpecialOrder)
         WriteTransaction wt(sg);
         wt.get_group().verify();
         MyTable_SpecialOrder::Ref table = wt.add_table<MyTable_SpecialOrder>("test");
-        for (int i=0; i<num_rows; ++i) {
+        for (int i = 0; i < num_rows; ++i) {
             table->add(0);
         }
         wt.commit();
     }
 
-    for (int i=0; i<num_rows; ++i) {
-        for (int j=0; j<num_reps; ++j) {
+    for (int i = 0; i < num_rows; ++i) {
+        for (int j = 0; j < num_reps; ++j) {
             {
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
@@ -1281,7 +1281,7 @@ TEST(Shared_WritesSpecialOrder)
         ReadTransaction rt(sg);
         rt.get_group().verify();
         MyTable_SpecialOrder::ConstRef table = rt.get_table<MyTable_SpecialOrder>("test");
-        for (int i=0; i<num_rows; ++i) {
+        for (int i = 0; i < num_rows; ++i) {
             CHECK_EQUAL(num_reps, table[i].first);
         }
     }
@@ -1318,7 +1318,7 @@ void writer_threads_thread(TestContext& test_context, std::string path, size_t r
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             int64_t v = t[row_ndx].first;
-            int64_t expected = i+1;
+            int64_t expected = i + 1;
             CHECK_EQUAL(expected, v);
         }
     }
@@ -1427,7 +1427,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             if (table->is_empty()) {
                 table->add_column(type_Int, "i");
                 table->insert_empty_row(0);
-                table->set_int(0,0,0);
+                table->set_int(0, 0, 0);
             }
             add_int(*table, 0, 1);
             wt.commit();
@@ -1441,7 +1441,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         CHECK(!rt.has_table("alpha"));
         CHECK(rt.has_table("beta"));
         ConstTableRef table = rt.get_table("beta");
-        CHECK_EQUAL(process_count, table->get_int(0,0));
+        CHECK_EQUAL(process_count, table->get_int(0, 0));
     }
 }
 
@@ -1604,7 +1604,7 @@ REALM_TABLE_1(FormerErrorCase2_Table,
 TEST(Shared_FormerErrorCase2)
 {
     SHARED_GROUP_TEST_PATH(path);
-    for (int i=0; i<10; ++i) {
+    for (int i = 0; i < 10; ++i) {
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg);
         wt.get_group().verify();
@@ -1875,7 +1875,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         ReadTransaction rt(sg);
         ConstTableRef test = rt.get_table("Test");
-        CHECK_EQUAL(727.2, test->get_double(0,0));
+        CHECK_EQUAL(727.2, test->get_double(0, 0));
     }
 }
 
@@ -1952,7 +1952,7 @@ void multiprocess_thread(TestContext& test_context, std::string path, size_t row
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             int64_t v = t[row_ndx].first;
-            int64_t expected = i+1;
+            int64_t expected = i + 1;
             CHECK_EQUAL(expected, v);
         }
     }
@@ -2037,7 +2037,7 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
 
     // Start threads
     for (size_t i = 0; i != num_threads; ++i) {
-        threads[i].start([&test_context, &path, base, i] { multiprocess_thread(test_context, path, base+i); });
+        threads[i].start([&test_context, &path, base, i] { multiprocess_thread(test_context, path, base + i); });
     }
 
     // Wait for threads to finish
@@ -2045,7 +2045,7 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
         bool thread_has_thrown = false;
         std::string except_msg;
         if (threads[i].join(except_msg)) {
-            std::cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+            std::cerr << "Exception thrown in thread " << i << ": " << except_msg << "\n";
             thread_has_thrown = true;
         }
         CHECK(!thread_has_thrown);
@@ -2060,7 +2060,7 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
         TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
         for (size_t i = 0; i != num_threads; ++i) {
-            int64_t v = t[i+base].first;
+            int64_t v = t[i + base].first;
             CHECK_EQUAL(multiprocess_increments, v);
         }
     }
@@ -2095,7 +2095,7 @@ void multiprocess(TestContext& test_context, std::string path, int num_procs, si
     int* pids = new int[num_procs];
     for (int i = 0; i != num_procs; ++i) {
         if (0 == (pids[i] = fork())) {
-            multiprocess_threaded(test_context, path, num_threads, i*num_threads);
+            multiprocess_threaded(test_context, path, num_threads, i * num_threads);
             _exit(0);
         }
     }
@@ -2201,16 +2201,16 @@ TEST(Shared_WaitForChange)
     };
 
     SHARED_GROUP_TEST_PATH(path);
-    for (int j=0; j < num_threads; j++)
+    for (int j = 0; j < num_threads; j++)
         shared_state[j] = 0;
     SharedGroup sg(path, false, SharedGroup::durability_Full);
     Thread threads[num_threads];
-    for (int j=0; j < num_threads; j++)
+    for (int j = 0; j < num_threads; j++)
         threads[j].start([waiter, &path, j] { waiter(path, j); });
     bool try_again = true;
     while (try_again) {
         try_again = false;
-        for (int j=0; j < num_threads; j++) {
+        for (int j = 0; j < num_threads; j++) {
             LockGuard l(mutex);
             if (shared_state[j] < 1) try_again = true;
             CHECK(shared_state[j] < 2);
@@ -2226,7 +2226,7 @@ TEST(Shared_WaitForChange)
     try_again = true;
     while (try_again) {
         try_again = false;
-        for (int j=0; j < num_threads; j++) {
+        for (int j = 0; j < num_threads; j++) {
             LockGuard l(mutex);
             if (3 != shared_state[j]) try_again = true;
             CHECK(shared_state[j] < 4);
@@ -2238,7 +2238,7 @@ TEST(Shared_WaitForChange)
     try_again = true;
     while (try_again) {
         try_again = false;
-        for (int j=0; j < num_threads; j++) {
+        for (int j = 0; j < num_threads; j++) {
             LockGuard l(mutex);
             if (4 != shared_state[j]) try_again = true;
         }
@@ -2248,7 +2248,7 @@ TEST(Shared_WaitForChange)
     try_again = true;
     while (try_again) {
         try_again = false;
-        for (int j=0; j < num_threads; j++) {
+        for (int j = 0; j < num_threads; j++) {
             LockGuard l(mutex);
             if (5 != shared_state[j]) try_again = true;
         }
@@ -2256,7 +2256,7 @@ TEST(Shared_WaitForChange)
     try_again = true;
     while (try_again) {
         try_again = false;
-        for (int j=0; j < num_threads; j++) {
+        for (int j = 0; j < num_threads; j++) {
             LockGuard l(mutex);
             if (sgs[j]) {
                 sgs[j]->wait_for_change_release();
@@ -2266,9 +2266,9 @@ TEST(Shared_WaitForChange)
             }
         }
     }
-    for (int j=0; j < num_threads; j++)
+    for (int j = 0; j < num_threads; j++)
         threads[j].join();
-    for (int j=0; j < num_threads; j++) {
+    for (int j = 0; j < num_threads; j++) {
         delete sgs[j];
         sgs[j] = 0;
     }
@@ -2520,7 +2520,7 @@ TEST(Shared_ReserveDiskSpace)
         if (crypt_key()) {
             // For encrypted files, reserve() may actually grow the file
             // with a page sized header.
-            CHECK(orig_file_size <= new_file_size_2 && (orig_file_size+page_size()) >= new_file_size_2 );
+            CHECK(orig_file_size <= new_file_size_2 && (orig_file_size + page_size()) >= new_file_size_2 );
         }
         else {
             CHECK_EQUAL(orig_file_size, new_file_size_2);
@@ -2601,7 +2601,7 @@ TEST(Shared_MovingEnumStringColumn)
         CHECK_EQUAL(1, table->get_descriptor()->get_num_unique_values(0));
         table->insert_column(0, type_String, "");
         for (int i = 0; i < 64; ++i)
-            table->set_string(0, i, i%2 == 0 ? "a" : "b");
+            table->set_string(0, i, i % 2 == 0 ? "a" : "b");
         table->optimize();
         wt.get_group().verify();
         CHECK_EQUAL(2, table->get_descriptor()->get_num_unique_values(0));
@@ -2621,7 +2621,7 @@ TEST(Shared_MovingEnumStringColumn)
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
         for (int i = 0; i < 64; ++i) {
             std::string value = table->get_string(0, i);
-            if (i%2 == 0) {
+            if (i % 2 == 0) {
                 CHECK_EQUAL("a", value);
             }
             else {
@@ -2876,7 +2876,7 @@ TEST_IF(Shared_ArrayEraseBug, TEST_DURATION >= 1)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
-        size_t row_ndx = max_node_size_squared - max_node_size - max_node_size/2;
+        size_t row_ndx = max_node_size_squared - max_node_size - max_node_size / 2;
         table->insert_empty_row(row_ndx);
         wt.commit();
     }

@@ -37,16 +37,16 @@ std::string number_name(size_t n)
 
     std::string txt;
     if (n >= 1000) {
-        txt = number_name(n/1000) + " thousand ";
+        txt = number_name(n / 1000) + " thousand ";
         n %= 1000;
     }
     if (n >= 100) {
-        txt += ones[n/100];
+        txt += ones[n / 100];
         txt += " hundred ";
         n %= 100;
     }
     if (n >= 20) {
-        txt += tens[n/10];
+        txt += tens[n / 10];
         n %= 10;
     }
     else {

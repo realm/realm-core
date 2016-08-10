@@ -607,22 +607,20 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     // this value could have been increased to 15 (one less than the
     // number of value bits in 'unsigned').
     const int bits_per_byte = 7;
-    const int max_bytes = (num_bits + (bits_per_byte-1)) / bits_per_byte;
+    const int max_bytes = (num_bits + (bits_per_byte - 1)) / bits_per_byte;
     static_assert(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
     // An explicit constant maximum number of iterations is specified
     // in the hope that it will help the optimizer (to do loop
     // unrolling, for example).
     typedef unsigned char uchar;
-    for (int i=0; i<max_bytes; ++i) {
-        if (value >> (bits_per_byte-1) == 0)
+    for (int i = 0; i < max_bytes; ++i) {
+        if (value >> (bits_per_byte - 1) == 0)
             break;
-        *reinterpret_cast<uchar*>(ptr) =
-            uchar((1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1)));
+        *reinterpret_cast<uchar*>(ptr) = uchar((1U << bits_per_byte) | unsigned(value & ((1U << bits_per_byte) - 1)));
         ++ptr;
         value >>= bits_per_byte;
     }
-    *reinterpret_cast<uchar*>(ptr) =
-        uchar(negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value);
+    *reinterpret_cast<uchar*>(ptr) = uchar(negative ? (1U << (bits_per_byte - 1)) | unsigned(value) : value);
     return ++ptr;
 }
 
@@ -741,7 +739,7 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
             return;
         }
         case type_Timestamp: {
-            Timestamp ts= value.get_timestamp();
+            Timestamp ts = value.get_timestamp();
             int64_t seconds = ts.get_seconds();
             int32_t nano_seconds = ts.get_nanoseconds();
             auto numbers_3 = append(numbers_2, seconds);
@@ -1737,14 +1735,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             int levels = read_int<int>(); // Throws
             if (levels < 0 || levels > m_max_levels)
                 parser_error();
-            m_path.reserve(0, 2*levels); // Throws
+            m_path.reserve(0, 2 * levels); // Throws
             size_t* path = m_path.data();
             size_t group_level_ndx = read_int<size_t>(); // Throws
             for (int i = 0; i != levels; ++i) {
                 size_t col_ndx = read_int<size_t>(); // Throws
                 size_t row_ndx = read_int<size_t>(); // Throws
-                path[2*i + 0] = col_ndx;
-                path[2*i + 1] = row_ndx;
+                path[2 * i + 0] = col_ndx;
+                path[2 * i + 1] = row_ndx;
             }
             if (!handler.select_table(group_level_ndx, levels, path)) // Throws
                 parser_error();
@@ -1961,7 +1959,7 @@ T TransactLogParser::read_int()
 {
     T value = 0;
     int part = 0;
-    const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
+    const int max_bytes = (std::numeric_limits<T>::digits + 1 + 6) / 7;
     for (int i = 0; i != max_bytes; ++i) {
         char c;
         if (!read_char(c))
@@ -1971,14 +1969,14 @@ T TransactLogParser::read_int()
             goto bad_transact_log; // Only the first 8 bits may be used in each byte
         if ((part & 0x80) == 0) {
             T p = part & 0x3F;
-            if (util::int_shift_left_with_overflow_detect(p, i*7))
+            if (util::int_shift_left_with_overflow_detect(p, i * 7))
                 goto bad_transact_log;
             value |= p;
             break;
         }
-        if (i == max_bytes-1)
+        if (i == max_bytes - 1)
             goto bad_transact_log; // Too many bytes
-        value |= T(part & 0x7F) << (i*7);
+        value |= T(part & 0x7F) << (i * 7);
     }
     if (part & 0x40) {
         // The real value is negative. Because 'value' is positive at
@@ -2621,7 +2619,7 @@ public:
             m_current--;
             begin = m_buffer + m_instr_order[m_current].begin;
             end   = m_buffer + m_instr_order[m_current].end;
-            return end-begin;
+            return end - begin;
         }
         return 0;
     }

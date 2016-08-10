@@ -62,7 +62,7 @@ TEST_TYPES(TimestampColumn_Basic, std::true_type, std::false_type)
     constexpr bool nullable_toggle = TEST_TYPE::value;
     ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
     TimestampColumn c(Allocator::get_default(), ref);
-    c.add(Timestamp(123,123));
+    c.add(Timestamp(123, 123));
     Timestamp ts = c.get(0);
     CHECK(ts == Timestamp(123, 123));
     c.destroy();
@@ -366,7 +366,7 @@ TEST_TYPES(TimestampColumn_DeleteAfterSetWithIndex, std::true_type, std::false_t
     CHECK(index);
 
     c.add(Timestamp{1, 1});
-    c.set(0,Timestamp{2, 2});
+    c.set(0, Timestamp{2, 2});
     c.erase_rows(0, 1, 1, false);
     CHECK_EQUAL(c.size(), 0);
 

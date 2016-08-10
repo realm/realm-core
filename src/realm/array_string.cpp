@@ -96,11 +96,11 @@ void ArrayString::set(size_t ndx, StringData value)
         alloc(m_size, new_width); // Throws
 
         char* base = m_data;
-        char* new_end = base + m_size*new_width;
+        char* new_end = base + m_size * new_width;
 
         // Expand the old values in reverse order
         if (0 < m_width) {
-            const char* old_end = base + m_size*m_width;
+            const char* old_end = base + m_size * m_width;
             while (new_end != base) {
                 *--new_end = char(*--old_end + (new_width - m_width));
                 {
@@ -188,9 +188,9 @@ void ArrayString::erase(size_t ndx)
 
     // move data backwards after deletion
     if (ndx < m_size - 1) {
-        char* new_begin = m_data + ndx*m_width;
+        char* new_begin = m_data + ndx * m_width;
         char* old_begin = new_begin + m_width;
-        char* old_end = m_data + m_size*m_width;
+        char* old_end = m_data + m_size * m_width;
         std::copy(old_begin, old_end, new_begin);
     }
 

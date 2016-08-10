@@ -148,7 +148,7 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
     m_groups.reserve(source.m_groups.size());
-    for (const auto& cur_group: source.m_groups) {
+    for (const auto& cur_group : source.m_groups) {
         m_groups.emplace_back(cur_group, patch.m_node_data);
     }
 }
@@ -168,7 +168,7 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
     m_groups.reserve(source.m_groups.size());
-    for (const auto& cur_group: source.m_groups) {
+    for (const auto& cur_group : source.m_groups) {
         m_groups.emplace_back(cur_group, patch.m_node_data);
     }
 }
@@ -269,9 +269,10 @@ struct MakeConditionNode {
         return std::unique_ptr<ParentNode> {new Node(null{}, col_ndx)};
     }
 
-    template<class T = typename Node::TConditionValue>
-    static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value, std::unique_ptr<ParentNode>>::type
-            make(size_t col_ndx, typename util::RemoveOptional<T>::type value)
+    template <class T = typename Node::TConditionValue>
+    static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value,
+                                   std::unique_ptr<ParentNode>>::type
+    make(size_t col_ndx, typename util::RemoveOptional<T>::type value)
     {
         return std::unique_ptr<ParentNode> {new Node(std::move(value), col_ndx)};
     }

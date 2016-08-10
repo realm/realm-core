@@ -443,7 +443,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << std::setw(indent) << "" << "Subtable leaf (size: "<<leaf.size()<<")\n";
+    out << std::setw(indent) << "" << "Subtable leaf (size: " << leaf.size() << ")\n";
 }
 
 } // anonymous namespace

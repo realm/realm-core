@@ -130,7 +130,7 @@ static int jsmn_parse_string(jsmn_parser* parser, const char* js,
                 parser->pos = start;
                 return JSMN_ERROR_NOMEM;
             }
-            jsmn_fill_token(token, JSMN_STRING, start+1, parser->pos);
+            jsmn_fill_token(token, JSMN_STRING, start + 1, parser->pos);
 #ifdef JSMN_PARENT_LINKS
             token->parent = parser->toksuper;
 #endif

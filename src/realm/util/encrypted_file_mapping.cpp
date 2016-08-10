@@ -184,7 +184,7 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
 
     // Constant-time memcmp to avoid timing attacks
     uint8_t result = 0;
-    for (size_t i = 0; i < 224/8; ++i)
+    for (size_t i = 0; i < 224 / 8; ++i)
         result |= buffer[i] ^ hmac[i];
     return result == 0;
 }
@@ -326,10 +326,10 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
                                            File::AccessMode access)
     : m_file(file)
     , m_page_shift(log2(realm::util::page_size()))
-    , m_blocks_per_page((1<<m_page_shift) / block_size)
+    , m_blocks_per_page((1 << m_page_shift) / block_size)
     , m_access(access)
 #ifdef REALM_DEBUG
-    , m_validate_buffer(new char[1<<m_page_shift])
+    , m_validate_buffer(new char[1 << m_page_shift])
 #endif
 {
     REALM_ASSERT(m_blocks_per_page * block_size == (1ULL << m_page_shift));
@@ -483,7 +483,7 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
     REALM_ASSERT(m_access == File::access_ReadWrite);
 
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) >> m_page_shift;
-    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) >> m_page_shift;
+    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr) + size - 1) >> m_page_shift;
 
     size_t first_idx = first_accessed_page - m_first_page;
     size_t last_idx = last_accessed_page - m_first_page;

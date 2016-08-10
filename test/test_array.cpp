@@ -498,8 +498,8 @@ TEST(Array_UpperLowerBound)
 
     // we use 4 as constant in order to make border case sequences of
     // v, v, v and v, v+1, v+2, etc, probable
-    for (int i=0; i< (1000 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION *
-                              TEST_DURATION * TEST_DURATION)) ; i++) {
+    for (int i = 0; i < (1000 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION *
+                                 TEST_DURATION * TEST_DURATION)) ; i++) {
         int elements = random.draw_int_mod(64);
         int val = random.draw_int_mod(4); // random start value
 
@@ -1006,13 +1006,13 @@ TEST(Array_Greater)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add(1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-            size_t t = a.find_first<Greater>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL + 1ULL);
+            size_t t = a.find_first<Greater>(1000ULL * 1000ULL * 1000ULL * 1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
 
     }
@@ -1130,13 +1130,13 @@ TEST(Array_Less)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add(1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL - 1ULL);
-            size_t t = a.find_first<Less>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL - 1ULL);
+            size_t t = a.find_first<Less>(1000ULL * 1000ULL * 1000ULL * 1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
 
     }
@@ -1266,13 +1266,13 @@ TEST(Array_NotEqual)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add(1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-            size_t t = a.find_first<NotEqual>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL + 1ULL);
+            size_t t = a.find_first<NotEqual>(1000ULL * 1000ULL * 1000ULL * 1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
 
     }

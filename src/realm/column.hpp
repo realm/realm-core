@@ -1257,7 +1257,8 @@ template<class T> struct NullOrDefaultValue<util::Optional<T>, void> {
         }
     }
 };
-template<class T> struct NullOrDefaultValue<T, typename std::enable_if<!ImplicitNull<T>::value>::type> {
+template <class T>
+struct NullOrDefaultValue<T, typename std::enable_if<!ImplicitNull<T>::value>::type> {
     static T null_or_default_value(bool is_null)
     {
         REALM_ASSERT(!is_null);
@@ -1354,7 +1355,7 @@ bool Column<T>::compare(const Column<T>& c) const noexcept
     size_t n = size();
     if (c.size() != n)
         return false;
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         bool left_is_null = is_null(i);
         bool right_is_null = c.is_null(i);
         if (left_is_null != right_is_null) {

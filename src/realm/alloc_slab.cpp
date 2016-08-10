@@ -476,7 +476,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
     // Copy existing segment
     char* new_addr = new_mem.get_addr();
-    std::copy(addr, addr+old_size, new_addr);
+    std::copy(addr, addr + old_size, new_addr);
 
     // Add old segment to freelist
     do_free(ref, addr);
@@ -502,8 +502,8 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     // we shift by 16 two times. On 32-bitters it's undefined to shift by
     // 32. Shifting twice x16 however, is defined and gives zero. On 64-bitters
     // the compiler should reduce it to a single 32 bit shift.
-    cache_index = cache_index ^(cache_index >> 16);
-    cache_index = (cache_index ^(cache_index >> 8)) & 0xFF;
+    cache_index = cache_index ^ (cache_index >> 16);
+    cache_index = (cache_index ^ (cache_index >> 8)) & 0xFF;
     if (cache[cache_index].ref == ref && cache[cache_index].version == version)
         return cache[cache_index].addr;
 
@@ -545,7 +545,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
         iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
         REALM_ASSERT_DEBUG(i != m_slabs.end());
 
-        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
+        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i - 1)->ref_end;
         addr = i->addr + (ref - slab_ref);
     }
     cache[cache_index].addr = addr;
@@ -645,7 +645,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             m_baseline = get_section_base(section_index);
             m_num_local_mappings = m_file_mappings->m_num_global_mappings;
             m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
-            for (size_t k=0; k<m_num_local_mappings; ++k) {
+            for (size_t k = 0; k < m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
         }
@@ -742,8 +742,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // session initialization, even if it means writing the database during open.
     if (cfg.session_initiator && m_file_on_streaming_form) {
         const Header& header = *reinterpret_cast<Header*>(m_data);
-        const StreamingFooter& footer =
-            *(reinterpret_cast<StreamingFooter*>(m_data+size) - 1);
+        const StreamingFooter& footer = *(reinterpret_cast<StreamingFooter*>(m_data + size) - 1);
         // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
         static_cast<void>(header);
@@ -905,7 +904,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
     if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof (Header) + sizeof (StreamingFooter)))
             throw InvalidDatabase("Realm file in streaming form has bad size", path);
-        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data+size) - 1);
+        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data + size) - 1);
         top_ref = footer.m_top_ref;
         if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie))
             throw InvalidDatabase("Bad Realm file header (#1)", path);
@@ -1037,7 +1036,7 @@ void SlabAlloc::remap(size_t file_size)
         if (num_additional_mappings > m_num_local_mappings) {
             m_num_local_mappings = num_additional_mappings;
             m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
-            for (size_t k=0; k<m_num_local_mappings; ++k) {
+            for (size_t k = 0; k < m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
         }
@@ -1081,7 +1080,7 @@ size_t SlabAlloc::get_section_index(size_t pos) const noexcept
 {
     // size_t section_base_number = pos/m_initial_section_size;
     size_t section_base_number = pos >> m_section_shifts;
-    size_t section_group_number = section_base_number/16;
+    size_t section_group_number = section_base_number / 16;
     size_t index;
     if (section_group_number == 0) {
         // first 16 entries aligns 1:1
@@ -1090,7 +1089,7 @@ size_t SlabAlloc::get_section_index(size_t pos) const noexcept
     else {
         // remaning entries are exponential
         size_t log_index = log2(section_group_number);
-        size_t section_index_in_group = (section_base_number >> (1+log_index)) & 0x7;
+        size_t section_index_in_group = (section_base_number >> (1 + log_index)) & 0x7;
         index = (16 + (log_index * 8)) + section_index_in_group;
     }
     return index;
@@ -1105,8 +1104,8 @@ size_t SlabAlloc::compute_section_base(size_t index) const noexcept
     }
     else {
         size_t section_index_in_group = index & 7;
-        size_t log_index = (index - section_index_in_group)/8 - 2;
-        size_t section_base_number = (8 + section_index_in_group)<<(1+log_index);
+        size_t log_index = (index - section_index_in_group) / 8 - 2;
+        size_t section_base_number = (8 + section_index_in_group) << (1 + log_index);
         // base = m_initial_section_size * section_base_number;
         base = section_base_number << m_section_shifts;
     }

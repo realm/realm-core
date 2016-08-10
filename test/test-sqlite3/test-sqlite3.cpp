@@ -37,7 +37,7 @@ int main()
     sqlite3* db = NULL;
     int rc = sqlite3_open(":memory:", &db);
     if ( rc ) {
-        std::cerr << "Can't open database: "<<sqlite3_errmsg(db)<<"\n";
+        std::cerr << "Can't open database: " << sqlite3_errmsg(db) << "\n";
         sqlite3_close(db);
         exit(1);
     }
@@ -46,7 +46,7 @@ int main()
     char* zErrMsg = NULL;
     rc = sqlite3_exec(db, "create table t1 (first INTEGER, second VARCHAR(100), third INTEGER, fourth INTEGER);", NULL, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
-        std::cerr << "SQL error: "<<zErrMsg<<"\n";
+        std::cerr << "SQL error: " << zErrMsg << "\n";
         sqlite3_free(zErrMsg);
     }
 
@@ -54,10 +54,10 @@ int main()
     sqlite3_stmt* ppStmt = NULL;
     rc = sqlite3_prepare(db, "INSERT INTO t1 VALUES(?1, ?2, ?3, ?4);", -1, &ppStmt, NULL);
     if (rc != SQLITE_OK) {
-        std::cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
+        std::cerr << "SQL error: " << sqlite3_errmsg(db) << "\n";
     }
 
-    std::cout << "Create random content with "<<ROWS<<" rows.\n\n";
+    std::cout << "Create random content with " << ROWS << " rows.\n\n";
 
     // Fill with data
     for (size_t i = 0; i < ROWS; ++i) {
@@ -73,12 +73,12 @@ int main()
 
         rc = sqlite3_step(ppStmt);
         if (rc != SQLITE_DONE) {
-            std::cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
+            std::cerr << "SQL error: " << sqlite3_errmsg(db) << "\n";
         }
     }
     sqlite3_finalize(ppStmt); // Cleanup
 
-    std::cout << "Memory usage:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
+    std::cout << "Memory usage:\t\t" << test_util::get_mem_usage() << " bytes\n";
 
     test_util::Timer timer;
 
@@ -87,7 +87,7 @@ int main()
         // Prepare select statement
         rc = sqlite3_prepare(db, "SELECT * FROM t1 WHERE fourth=1;", -1, &ppStmt, NULL);
         if (rc != SQLITE_OK) {
-            std::cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
+            std::cerr << "SQL error: " << sqlite3_errmsg(db) << "\n";
         }
 
         timer.reset();
@@ -97,12 +97,12 @@ int main()
             sqlite3_reset(ppStmt);
             rc = sqlite3_step(ppStmt);
             if (rc != SQLITE_DONE) {
-                std::cerr << "SQL error: "<<zErrMsg<<"\n";
+                std::cerr << "SQL error: " << zErrMsg << "\n";
                 sqlite3_free(zErrMsg);
             }
         }
 
-        std::cout << "Search (small integer):\t"<<timer<<"\n";
+        std::cout << "Search (small integer):\t" << timer << "\n";
 
         sqlite3_finalize(ppStmt); // Cleanup
     }
@@ -112,7 +112,7 @@ int main()
         // Prepare select statement
         rc = sqlite3_prepare(db, "SELECT * FROM t1 WHERE second='abcde';", -1, &ppStmt, NULL);
         if (rc != SQLITE_OK) {
-            std::cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
+            std::cerr << "SQL error: " << sqlite3_errmsg(db) << "\n";
         }
 
         timer.reset();
@@ -121,12 +121,12 @@ int main()
         for (size_t i = 0; i < TESTS; ++i) {
             rc = sqlite3_step(ppStmt);
             if (rc != SQLITE_DONE) {
-                std::cerr << "SQL error: "<<zErrMsg<<"\n";
+                std::cerr << "SQL error: " << zErrMsg << "\n";
                 sqlite3_free(zErrMsg);
             }
         }
 
-        std::cout << "Search (string):\t"<<timer<<"\n";
+        std::cout << "Search (string):\t" << timer << "\n";
 
         sqlite3_finalize(ppStmt); // Cleanup
     }
@@ -136,7 +136,7 @@ int main()
         // Prepare select statement
         rc = sqlite3_prepare(db, "CREATE INDEX i1a ON t1(first);", -1, &ppStmt, NULL);
         if (rc != SQLITE_OK) {
-            std::cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
+            std::cerr << "SQL error: " << sqlite3_errmsg(db) << "\n";
         }
 
         timer.reset();
@@ -144,41 +144,41 @@ int main()
         // Do a search over entire column (value not found)
         rc = sqlite3_step(ppStmt);
         if (rc != SQLITE_DONE) {
-            std::cerr << "SQL error: "<<zErrMsg<<"\n";
+            std::cerr << "SQL error: " << zErrMsg << "\n";
             sqlite3_free(zErrMsg);
         }
 
-        std::cout << "\nAdd index:\t\t"<<timer<<"\n";
+        std::cout << "\nAdd index:\t\t" << timer << "\n";
 
         sqlite3_finalize(ppStmt); // Cleanup
     }
 
-    std::cout << "Memory usage2:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
+    std::cout << "Memory usage2:\t\t" << test_util::get_mem_usage() << " bytes\n";
 
     // Search with index
     {
         // Prepare select statement
         rc = sqlite3_prepare(db, "SELECT * FROM t1 WHERE first=?1;", -1, &ppStmt, NULL);
         if (rc != SQLITE_OK) {
-            std::cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
+            std::cerr << "SQL error: " << sqlite3_errmsg(db) << "\n";
         }
 
         timer.reset();
 
         // Do a search over entire column
-        for (size_t i = 0; i < TESTS*10; ++i) {
+        for (size_t i = 0; i < TESTS * 10; ++i) {
             const size_t n = rand() % 1000;
 
             sqlite3_reset(ppStmt);
             sqlite3_bind_int(ppStmt, 1, n);
             rc = sqlite3_step(ppStmt);
             if (rc == SQLITE_ERROR) {
-                std::cerr << "SQL error: "<<zErrMsg<<"\n";
+                std::cerr << "SQL error: " << zErrMsg << "\n";
                 sqlite3_free(zErrMsg);
             }
         }
 
-        std::cout << "Search index:\t\t"<<timer<<"\n";
+        std::cout << "Search index:\t\t" << timer << "\n";
 
         sqlite3_finalize(ppStmt); // Cleanup
     }

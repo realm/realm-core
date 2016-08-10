@@ -229,7 +229,7 @@ template<class T>
 inline void AppendBuffer<T>::append(const T* append_data, size_t append_data_size)
 {
     m_buffer.reserve_extra(m_size, append_data_size); // Throws
-    std::copy(append_data, append_data+append_data_size, m_buffer.data()+m_size);
+    std::copy(append_data, append_data + append_data_size, m_buffer.data() + m_size);
     m_size += append_data_size;
 }
 

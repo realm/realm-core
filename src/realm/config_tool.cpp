@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
         if (empty || error || help) {
             const char* prog = argv[0];
             std::string msg =
-                "Synopsis: "+std::string(prog)+"\n\n"
+                "Synopsis: " + std::string(prog) + "\n\n"
                 "Options:\n"
                 "  --version     Show the version of Realm that this command was installed\n"
                 "                as part of\n"

@@ -176,12 +176,12 @@ public:
     ///
     RowAccessor back(int rel_idx = -1) noexcept
     {
-        return RowAccessor(std::make_pair(this, size()+rel_idx));
+        return RowAccessor(std::make_pair(this, size() + rel_idx));
     }
 
     ConstRowAccessor back(int rel_idx = -1) const noexcept
     {
-        return ConstRowAccessor(std::make_pair(this, size()+rel_idx));
+        return ConstRowAccessor(std::make_pair(this, size() + rel_idx));
     }
 
     RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
@@ -369,7 +369,7 @@ private:
 template<class Spec>
 class BasicTable<Spec>::Query: public BASIC_TABLE_PARENT {
 public:
-    Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
+    Query(const Query& q) : Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     virtual ~Query() noexcept {}
 
     Query& group() { m_impl.group(); return *this; }
@@ -418,19 +418,19 @@ public:
     std::string validate() { return m_impl.validate(); }
 
 protected:
-    Query(const BasicTable<Spec>& table, TableViewBase* tv):
-        Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
-
-    using HandoverPatch = QueryHandoverPatch;
-    Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode) :
-        Spec::template ColNames<QueryCol, Query*>(this),
-        m_impl(source.m_impl, patch, mode)
+    Query(const BasicTable<Spec>& table, TableViewBase* tv)
+        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv)
     {
     }
 
-    Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode) :
-        Spec::template ColNames<QueryCol, Query*>(this),
-        m_impl(source.m_impl, patch, mode)
+    using HandoverPatch = QueryHandoverPatch;
+    Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
+        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(source.m_impl, patch, mode)
+    {
+    }
+
+    Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
+        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(source.m_impl, patch, mode)
     {
     }
 

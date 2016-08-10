@@ -117,7 +117,7 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
     Allocator& alloc = m_array->get_alloc();
     Array values(alloc);
     get_child(*m_array, 0, values);
-    REALM_ASSERT(m_array->size() == values.size()+1);
+    REALM_ASSERT(m_array->size() == values.size() + 1);
 
     size_t ins_pos = values.lower_bound_int(key);
     if (ins_pos == values.size()) {
@@ -136,7 +136,7 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
 
     // If key is not present we add it at the correct location
     values.insert(ins_pos, key);
-    m_array->insert(ins_pos+1, ref);
+    m_array->insert(ins_pos + 1, ref);
 }
 
 
@@ -182,17 +182,17 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         // Get subnode table
         Array offsets(alloc);
         get_child(*m_array, 0, offsets);
-        REALM_ASSERT(m_array->size() == offsets.size()+1);
+        REALM_ASSERT(m_array->size() == offsets.size() + 1);
 
         // Find the subnode containing the item
         size_t node_ndx = offsets.lower_bound_int(key);
         if (node_ndx == offsets.size()) {
             // node can never be empty, so try to fit in last item
-            node_ndx = offsets.size()-1;
+            node_ndx = offsets.size() - 1;
         }
 
         // Get sublist
-        size_t refs_ndx = node_ndx+1; // first entry in refs points to offsets
+        size_t refs_ndx = node_ndx + 1; // first entry in refs points to offsets
         ref_type ref = m_array->get_as_ref(refs_ndx);
         StringIndex target(ref, m_array.get(), refs_ndx, m_target_column,
                            m_deny_duplicate_values, alloc);
@@ -291,13 +291,13 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         // Move items after split to new list
         for (size_t i = ndx; i < old_offsets_size; ++i) {
             int64_t v2 = old_offsets.get(i);
-            int64_t v3 = m_array->get(i+1);
+            int64_t v3 = m_array->get(i + 1);
 
             new_offsets.add(v2);
             new_list.m_array->add(v3);
         }
         old_offsets.truncate(ndx);
-        m_array->truncate(ndx+1);
+        m_array->truncate(ndx + 1);
 
         return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
     }
@@ -313,12 +313,12 @@ void StringIndex::node_insert_split(size_t ndx, size_t new_ref)
     Array offsets(alloc);
     get_child(*m_array, 0, offsets);
 
-    REALM_ASSERT(m_array->size() == offsets.size()+1);
+    REALM_ASSERT(m_array->size() == offsets.size() + 1);
     REALM_ASSERT(ndx < offsets.size());
     REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE);
 
     // Get sublists
-    size_t refs_ndx = ndx+1; // first entry in refs points to offsets
+    size_t refs_ndx = ndx + 1; // first entry in refs points to offsets
     ref_type orig_ref = m_array->get_as_ref(refs_ndx);
     StringIndex orig_col(orig_ref, m_array.get(), refs_ndx, m_target_column,
                          m_deny_duplicate_values, alloc);
@@ -331,8 +331,8 @@ void StringIndex::node_insert_split(size_t ndx, size_t new_ref)
 
     // Insert new ref
     key_type new_key = new_col.get_last_key();
-    offsets.insert(ndx+1, new_key);
-    m_array->insert(ndx+2, new_ref);
+    offsets.insert(ndx + 1, new_key);
+    m_array->insert(ndx + 2, new_ref);
 }
 
 
@@ -344,7 +344,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
     Allocator& alloc = m_array->get_alloc();
     Array offsets(alloc);
     get_child(*m_array, 0, offsets);
-    REALM_ASSERT(m_array->size() == offsets.size()+1);
+    REALM_ASSERT(m_array->size() == offsets.size() + 1);
 
     REALM_ASSERT(ndx <= offsets.size());
     REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE);
@@ -354,7 +354,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
     key_type last_key = col.get_last_key();
 
     offsets.insert(ndx, last_key);
-    m_array->insert(ndx+1, ref);
+    m_array->insert(ndx + 1, ref);
 }
 
 
@@ -366,7 +366,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     Allocator& alloc = m_array->get_alloc();
     Array values(alloc);
     get_child(*m_array, 0, values);
-    REALM_ASSERT(m_array->size() == values.size()+1);
+    REALM_ASSERT(m_array->size() == values.size() + 1);
 
     size_t ins_pos = values.lower_bound_int(key);
     if (ins_pos == values.size()) {
@@ -396,7 +396,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
 
     // This leaf already has a slot for for the key
 
-    int_fast64_t slot_value = m_array->get(ins_pos+1);
+    int_fast64_t slot_value = m_array->get(ins_pos + 1);
     size_t suboffset = offset + s_index_key_length;
 
     // Single match (lowest bit set indicates literal row_ndx)
@@ -548,7 +548,7 @@ void StringIndex::adjust_row_indexes(size_t min_row_ndx, int diff)
             if (ref & 1) {
                 size_t r = size_t(uint64_t(ref) >> 1);
                 if (r >= min_row_ndx) {
-                    size_t adjusted_ref = ((r + diff) << 1)+1;
+                    size_t adjusted_ref = ((r + diff) << 1) + 1;
                     m_array->set(i, adjusted_ref);
                 }
             }
@@ -575,7 +575,7 @@ void StringIndex::clear()
 {
     Array values(m_array->get_alloc());
     get_child(*m_array, 0, values);
-    REALM_ASSERT(m_array->size() == values.size()+1);
+    REALM_ASSERT(m_array->size() == values.size() + 1);
 
     values.clear();
     values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
@@ -592,7 +592,7 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
     Allocator& alloc = m_array->get_alloc();
     Array values(alloc);
     get_child(*m_array, 0, values);
-    REALM_ASSERT(m_array->size() == values.size()+1);
+    REALM_ASSERT(m_array->size() == values.size() + 1);
 
     // Create 4 byte index key
     key_type key = create_key(value, offset);
@@ -665,7 +665,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     Allocator& alloc = m_array->get_alloc();
     Array values(alloc);
     get_child(*m_array, 0, values);
-    REALM_ASSERT(m_array->size() == values.size()+1);
+    REALM_ASSERT(m_array->size() == values.size() + 1);
 
     // Create 4 byte index key
     key_type key = create_key(value, offset);
@@ -798,8 +798,8 @@ void StringIndex::node_add_key(ref_type ref)
     Allocator& alloc = m_array->get_alloc();
     Array offsets(alloc);
     get_child(*m_array, 0, offsets);
-    REALM_ASSERT(m_array->size() == offsets.size()+1);
-    REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE+1);
+    REALM_ASSERT(m_array->size() == offsets.size() + 1);
+    REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE + 1);
 
     Array new_top(alloc);
     Array new_offsets(alloc);
@@ -854,15 +854,15 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
 
     bool node_is_leaf = !node.is_inner_bptree_node();
     if (node_is_leaf) {
-        out << std::setw(indent) << "" << "Leaf (B+ tree) (ref: "<<node.get_ref()<<")\n";
+        out << std::setw(indent) << "" << "Leaf (B+ tree) (ref: " << node.get_ref() << ")\n";
     }
     else {
-        out << std::setw(indent) << "" << "Inner node (B+ tree) (ref: "<<node.get_ref()<<")\n";
+        out << std::setw(indent) << "" << "Inner node (B+ tree) (ref: " << node.get_ref() << ")\n";
     }
 
     subnode.init_from_ref(to_ref(node.front()));
     out << std::setw(indent) << "" << "  Keys (keys_ref: "
-        ""<<subnode.get_ref()<<", ";
+        "" << subnode.get_ref() << ", ";
     if (subnode.is_empty()) {
         out << "no keys";
     }
@@ -881,18 +881,18 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
             int_fast64_t value = node.get(i);
             bool is_single_row_index = (value & 1) != 0;
             if (is_single_row_index) {
-                out << std::setw(indent) << "" << "  Single row index (value: "<<(value/2)<<")\n";
+                out << std::setw(indent) << "" << "  Single row index (value: " << (value / 2) << ")\n";
                 continue;
             }
             subnode.init_from_ref(to_ref(value));
             bool is_subindex = subnode.get_context_flag();
             if (is_subindex) {
                 out << std::setw(indent) << "" << "  Subindex\n";
-                dump_node_structure(subnode, out, level+2);
+                dump_node_structure(subnode, out, level + 2);
                 continue;
             }
             out << std::setw(indent) << "" << "  List of row indexes\n";
-            IntegerColumn::dump_node_structure(subnode, out, level+2);
+            IntegerColumn::dump_node_structure(subnode, out, level + 2);
         }
         return;
     }
@@ -903,7 +903,7 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
     size_t child_ref_end = 1 + num_children;
     for (size_t i = child_ref_begin; i != child_ref_end; ++i) {
         subnode.init_from_ref(node.get_as_ref(i));
-        dump_node_structure(subnode, out, level+1);
+        dump_node_structure(subnode, out, level + 1);
     }
 }
 
@@ -958,7 +958,7 @@ void StringIndex::array_to_dot(std::ostream& out, const Array& array)
     Allocator& alloc = array.get_alloc();
     Array offsets(alloc);
     get_child(const_cast<Array&>(array), 0, offsets);
-    REALM_ASSERT(array.size() == offsets.size()+1);
+    REALM_ASSERT(array.size() == offsets.size() + 1);
     ref_type ref  = array.get_ref();
 
     if (array.is_inner_bptree_node()) {

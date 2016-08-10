@@ -3521,7 +3521,7 @@ TEST(Query_SubtableBug)
     sub->add_column(type_Bool, "sub 2");
     CHECK_EQUAL(2, table->get_column_count());
 
-    for (int i = 0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
         table->insert_empty_row(i);
         table->set_int(0, i, 100);
     }

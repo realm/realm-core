@@ -42,8 +42,8 @@ inline unsigned int ptf_fastrand()
     // Must be fast because important edge case is 0 delay. Not thread safe, but that just adds randomnes.
     static unsigned int u = 1;
     static unsigned int v = 1;
-    v = 36969*(v & 65535) + (v >> 16);
-    u = 18000*(u & 65535) + (u >> 16);
+    v = 36969 * (v & 65535) + (v >> 16);
+    u = 18000 * (u & 65535) + (u >> 16);
     return (v << 16) + u;
 }
 

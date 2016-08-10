@@ -230,7 +230,7 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
     if (compact_form) {
         // FIXME: Dangerous cast here (unsigned -> signed)
         int_fast64_t v = state.m_split_offset; // elems_per_child
-        new_root->add(1 + 2*v); // Throws
+        new_root->add(1 + 2 * v); // Throws
     }
     else {
         Array new_offsets(alloc);
@@ -246,7 +246,7 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
     new_root->add(new_sibling_ref); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = state.m_split_size; // total_elems_in_tree
-    new_root->add(1 + 2*v); // Throws
+    new_root->add(1 + 2 * v); // Throws
     replace_root_array(std::move(new_root));
 }
 
@@ -271,7 +271,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
             new_inner_node.create(Array::type_InnerBptreeNode); // Throws
             try {
                 int_fast64_t v = elems_per_child;
-                new_inner_node.add(1 + 2*v); // Throws
+                new_inner_node.add(1 + 2 * v); // Throws
                 v = node; // FIXME: Dangerous cast here (unsigned -> signed)
                 new_inner_node.add(v); // Throws
                 node = 0;
@@ -289,7 +289,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                     ++num_children;
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
-                new_inner_node.add(1 + 2*v); // Throws
+                new_inner_node.add(1 + 2 * v); // Throws
             }
             catch (...) {
                 new_inner_node.destroy_deep();
@@ -394,8 +394,8 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << std::setw(indent) << "" << "Integer leaf (ref: "<<leaf.get_ref()<<", "
-        "size: "<<leaf.size()<<")\n";
+    out << std::setw(indent) << "" << "Integer leaf (ref: " << leaf.get_ref() << ", "
+        "size: " << leaf.size() << ")\n";
     std::ostringstream out_2;
     for (size_t i = 0; i != leaf.size(); ++i) {
         if (i != 0) {
@@ -407,7 +407,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         }
         out_2 << leaf.get(i);
     }
-    out << std::setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
+    out << std::setw(indent) << "" << "  Elems: " << out_2.str() << "\n";
 }
 
 } // namespace _impl

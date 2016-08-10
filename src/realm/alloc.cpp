@@ -69,7 +69,7 @@ public:
             throw std::bad_alloc();
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
-        std::fill(addr, addr+size, 0);
+        std::fill(addr, addr + size, 0);
 #endif
         return MemRef(addr, reinterpret_cast<size_t>(addr), *this);
     }
@@ -83,7 +83,7 @@ public:
             throw std::bad_alloc();
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
-        std::fill(new_addr+old_size, new_addr+new_size, 0);
+        std::fill(new_addr + old_size, new_addr + new_size, 0);
 #else
         static_cast<void>(old_size);
 #endif

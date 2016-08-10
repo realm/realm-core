@@ -846,7 +846,7 @@ public:
     void add_search_index() const { m_table->get_impl()->add_search_index(col_idx); }
     void remove_search_index() const { m_table->get_impl()->remove_search_index(col_idx); }
 
-    BasicTableView<RealTable> get_sorted_view(bool ascending=true) const
+    BasicTableView<RealTable> get_sorted_view(bool ascending = true) const
     {
         return m_table->get_impl()->get_sorted_view(col_idx, ascending);
     }
@@ -1348,27 +1348,27 @@ public:
     }
 
     int64_t sum(size_t* resultcount = nullptr, size_t start = 0,
-                size_t end = size_t(-1), size_t limit=size_t(-1)) const
+                size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_int(col_idx, resultcount, start, end, limit);
     }
 
     int64_t maximum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit=size_t(-1),
+                    size_t end = size_t(-1), size_t limit = size_t(-1),
                     size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     int64_t minimum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit=size_t(-1),
+                    size_t end = size_t(-1), size_t limit = size_t(-1),
                     size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     double average(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end=size_t(-1), size_t limit=size_t(-1)) const
+                   size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.average_int(col_idx, resultcount, start, end, limit);
     }
@@ -1419,27 +1419,27 @@ public:
     }
 
     double sum(size_t* resultcount = nullptr, size_t start = 0,
-               size_t end = size_t(-1), size_t limit=size_t(-1)) const
+               size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_float(col_idx, resultcount, start, end, limit);
     }
 
     float maximum(size_t* resultcount = nullptr, size_t start = 0,
-                  size_t end = size_t(-1), size_t limit=size_t(-1),
+                  size_t end = size_t(-1), size_t limit = size_t(-1),
                   size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     float minimum(size_t* resultcount = nullptr, size_t start = 0,
-                  size_t end = size_t(-1), size_t limit=size_t(-1),
+                  size_t end = size_t(-1), size_t limit = size_t(-1),
                   size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     double average(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end=size_t(-1), size_t limit=size_t(-1)) const
+                   size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.average_float(col_idx, resultcount, start, end, limit);
     }
@@ -1490,27 +1490,27 @@ public:
     }
 
     double sum(size_t* resultcount = nullptr, size_t start = 0,
-               size_t end = size_t(-1), size_t limit=size_t(-1)) const
+               size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_double(col_idx, resultcount, start, end, limit);
     }
 
     double maximum(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end = size_t(-1), size_t limit=size_t(-1),
+                   size_t end = size_t(-1), size_t limit = size_t(-1),
                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     double minimum(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end = size_t(-1), size_t limit=size_t(-1),
+                   size_t end = size_t(-1), size_t limit = size_t(-1),
                    size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     double average(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end=size_t(-1), size_t limit=size_t(-1)) const
+                   size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.average_double(col_idx, resultcount, start, end, limit);
     }
@@ -1599,14 +1599,14 @@ public:
     }
 
     OldDateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
-                        size_t end = size_t(-1), size_t limit=size_t(-1),
+                        size_t end = size_t(-1), size_t limit = size_t(-1),
                         size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_olddatetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
     OldDateTime minimum(size_t* resultcount = nullptr, size_t start = 0,
-                        size_t end = size_t(-1), size_t limit=size_t(-1),
+                        size_t end = size_t(-1), size_t limit = size_t(-1),
                         size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_olddatetime(col_idx, resultcount, start, end, limit, return_ndx);
@@ -1625,31 +1625,31 @@ private:
 public:
     explicit QueryColumn(Query* q) noexcept: Base(q) {}
 
-    Query& equal(StringData value, bool case_sensitive=true) const
+    Query& equal(StringData value, bool case_sensitive = true) const
     {
         Base::m_query->m_impl.equal(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& not_equal(StringData value, bool case_sensitive=true) const
+    Query& not_equal(StringData value, bool case_sensitive = true) const
     {
         Base::m_query->m_impl.not_equal(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& begins_with(StringData value, bool case_sensitive=true) const
+    Query& begins_with(StringData value, bool case_sensitive = true) const
     {
         Base::m_query->m_impl.begins_with(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& ends_with(StringData value, bool case_sensitive=true) const
+    Query& ends_with(StringData value, bool case_sensitive = true) const
     {
         Base::m_query->m_impl.ends_with(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& contains(StringData value, bool case_sensitive=true) const
+    Query& contains(StringData value, bool case_sensitive = true) const
     {
         Base::m_query->m_impl.contains(col_idx, value, case_sensitive);
         return *Base::m_query;

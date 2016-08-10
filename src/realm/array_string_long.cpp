@@ -56,7 +56,7 @@ void ArrayStringLong::set(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     size_t end   = to_size_t(m_offsets.get(ndx));
     bool add_zero_term = true;
     m_blob.replace(begin, end, value.data(), value.size(), add_zero_term);
@@ -72,12 +72,12 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <=, m_offsets.size());
 
-    size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     bool add_zero_term = true;
 
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
     m_offsets.insert(ndx, pos + value.size() + 1);
-    m_offsets.adjust(ndx+1, m_offsets.size(), value.size() + 1);
+    m_offsets.adjust(ndx + 1, m_offsets.size(), value.size() + 1);
     if (m_nullable)
         m_nulls.insert(ndx, !value.is_null());
 }
@@ -86,7 +86,7 @@ void ArrayStringLong::erase(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     size_t end   = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(begin, end);

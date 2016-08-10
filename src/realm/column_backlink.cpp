@@ -267,7 +267,7 @@ void BacklinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     // Nullify forward links to the removed target rows
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
         auto handler = [=](size_t origin_row_ndx) {
-            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx+i); // Throws
+            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx + i); // Throws
         };
         bool do_destroy = true;
         for_each_link(row_ndx, do_destroy, handler); // Throws
@@ -452,7 +452,7 @@ void BacklinkColumn::get_backlinks(std::vector<VerifyPair>& pairs)
         pair.target_row_ndx = i;
         size_t m = get_backlink_count(i);
         for (size_t j = 0; j < m; ++j) {
-            pair.origin_row_ndx = get_backlink(i,j);
+            pair.origin_row_ndx = get_backlink(i, j);
             pairs.push_back(pair);
         }
     }

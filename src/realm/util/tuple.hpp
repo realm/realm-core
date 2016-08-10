@@ -40,9 +40,9 @@ struct Tuple<void> {};
 
 
 template<class H, class T>
-inline Tuple<TypeCons<H,T>> cons(const H& h, const Tuple<T>& t)
+inline Tuple<TypeCons<H, T>> cons(const H& h, const Tuple<T>& t)
 {
-    return Tuple<TypeCons<H,T>>(h,t);
+    return Tuple<TypeCons<H, T>>(h, t);
 }
 
 
@@ -64,40 +64,40 @@ template<class A, class B, class C>
 inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, void>>>>
 tuple(const A& a, const B& b, const C& c)
 {
-    return cons(a, tuple(b,c));
+    return cons(a, tuple(b, c));
 }
 
 template<class A, class B, class C, class D>
 inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, void>>>>> tuple(
             const A& a, const B& b, const C& c, const D& d)
 {
-    return cons(a, tuple(b,c,d));
+    return cons(a, tuple(b, c, d));
 }
 
 template<class A, class B, class C, class D, class E>
 inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, void>>>>>> tuple(
     const A& a, const B& b, const C& c, const D& d, const E& e)
 {
-    return cons(a, tuple(b,c,d,e));
+    return cons(a, tuple(b, c, d, e));
 }
 
 template<class A, class B, class C, class D, class E, class F>
 inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>> tuple(
     const A& a, const B& b, const C& c, const D& d, const E& e, const F& f)
 {
-    return cons(a, tuple(b,c,d,e,f));
+    return cons(a, tuple(b, c, d, e, f));
 }
 
 template<class A, class B, class C, class D, class E, class F, class G>
 inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>> tuple(
             const A& a, const B& b, const C& c, const D& d, const E& e, const F& f, const G& g)
 {
-    return cons(a, tuple(b,c,d,e,f,g));
+    return cons(a, tuple(b, c, d, e, f, g));
 }
 
 
 template<class L, class V>
-inline Tuple<typename TypeAppend<L,V>::type> append(const Tuple<L>& t, const V& v)
+inline Tuple<typename TypeAppend<L, V>::type> append(const Tuple<L>& t, const V& v)
 {
     return cons(t.m_head, append(t.m_tail, v));
 }
@@ -107,9 +107,9 @@ inline Tuple<TypeCons<V, void>> append(const Tuple<void>&, const V& v)
     return tuple(v);
 }
 template<class L, class V>
-inline Tuple<typename TypeAppend<L,V>::type> operator,(const Tuple<L>& t, const V& v)
+inline Tuple<typename TypeAppend<L, V>::type> operator, (const Tuple<L>& t, const V& v)
 {
-    return append(t,v);
+    return append(t, v);
 }
 
 } // namespace util
@@ -117,13 +117,13 @@ inline Tuple<typename TypeAppend<L,V>::type> operator,(const Tuple<L>& t, const 
 namespace _impl {
 template<class L, int i>
 struct TupleAt {
-    static typename util::TypeAt<L,i>::type exec(const util::Tuple<L>& t)
+    static typename util::TypeAt<L, i>::type exec(const util::Tuple<L>& t)
     {
-        return TupleAt<typename L::tail, i-1>::exec(t.m_tail);
+        return TupleAt<typename L::tail, i - 1>::exec(t.m_tail);
     }
 };
 template<class L>
-struct TupleAt<L,0> {
+struct TupleAt<L, 0> {
     static typename L::head exec(const util::Tuple<L>& t) { return t.m_head; }
 };
 
@@ -146,9 +146,9 @@ inline void write(std::basic_ostream<Ch, Tr>& out, const util::Tuple<L>& t)
 namespace util {
 
 template<int i, class L>
-inline typename TypeAt<L,i>::type at(const Tuple<L>& tuple)
+inline typename TypeAt<L, i>::type at(const Tuple<L>& tuple)
 {
-    return _impl::TupleAt<L,i>::exec(tuple);
+    return _impl::TupleAt<L, i>::exec(tuple);
 }
 
 template<template<class T> class Op, class L>

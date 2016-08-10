@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
     BasicTableRef<IndexTable> t = g->add_table<IndexTable>("test");
     srandom(1);
     printf("Adding rows\n");
-    for (size_t i=0; i<10000000; ++i) {
+    for (size_t i = 0; i < 10000000; ++i) {
         long n1 = random() % 1000;
         long n2 = random() % 1000;
         long n3 = random() % 1000;

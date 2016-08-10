@@ -1413,7 +1413,7 @@ TEST(ColumnString_NonLeafRoot)
         ref_type ref = StringColumn::create(Allocator::get_default());
         StringColumn c(Allocator::get_default(), ref);
 
-        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(s);
         }
@@ -1421,8 +1421,8 @@ TEST(ColumnString_NonLeafRoot)
         CHECK_EQUAL(c.count("3"), 1);
         CHECK_EQUAL(c.find_first("3"), 3);
         CHECK_EQUAL(c.find_first("5000"), not_found);
-        auto mid_point = util::to_string(REALM_MAX_BPNODE_SIZE/2);
-        CHECK_EQUAL(c.upper_bound_string(mid_point), REALM_MAX_BPNODE_SIZE/2 + 1);
+        auto mid_point = util::to_string(REALM_MAX_BPNODE_SIZE / 2);
+        CHECK_EQUAL(c.upper_bound_string(mid_point), REALM_MAX_BPNODE_SIZE / 2 + 1);
 
         ref_type col_ref = IntegerColumn::create(Allocator::get_default());
         IntegerColumn col(Allocator::get_default(), col_ref);
@@ -1432,9 +1432,9 @@ TEST(ColumnString_NonLeafRoot)
         col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
         CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
 
@@ -1446,7 +1446,7 @@ TEST(ColumnString_NonLeafRoot)
         StringColumn c(Allocator::get_default(), ref);
 
         c.add("This is a medium long string");
-        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(s);
         }
@@ -1462,9 +1462,9 @@ TEST(ColumnString_NonLeafRoot)
         col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
         CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
 
@@ -1476,7 +1476,7 @@ TEST(ColumnString_NonLeafRoot)
         StringColumn c(Allocator::get_default(), ref);
 
         c.add("This is a rather long string, that should not be very much shorter");
-        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(s);
         }
@@ -1492,9 +1492,9 @@ TEST(ColumnString_NonLeafRoot)
         col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
         CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
 
@@ -1505,7 +1505,7 @@ TEST(ColumnString_NonLeafRoot)
         ref_type ref = StringColumn::create(Allocator::get_default());
         StringColumn c(Allocator::get_default(), ref);
 
-        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(s);
         }

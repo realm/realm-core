@@ -159,7 +159,7 @@ inline StringData ArrayStringLong::get(size_t ndx) const noexcept
         // FIXME: Consider how much of a performance problem it is,
         // that we have to issue two separate calls to read two
         // consecutive values from an array.
-        begin = to_size_t(m_offsets.get(ndx-1));
+        begin = to_size_t(m_offsets.get(ndx - 1));
         end   = to_size_t(m_offsets.get(ndx));
     }
     else {
@@ -168,14 +168,14 @@ inline StringData ArrayStringLong::get(size_t ndx) const noexcept
     }
     --end; // Discount the terminating zero
 
-    return StringData(m_blob.get(begin), end-begin);
+    return StringData(m_blob.get(begin), end - begin);
 }
 
 inline void ArrayStringLong::truncate(size_t new_size)
 {
     REALM_ASSERT_3(new_size, <, m_offsets.size());
 
-    size_t blob_size = new_size ? to_size_t(m_offsets.get(new_size-1)) : 0;
+    size_t blob_size = new_size ? to_size_t(m_offsets.get(new_size - 1)) : 0;
 
     m_offsets.truncate(new_size);
     m_blob.truncate(blob_size);

@@ -47,7 +47,7 @@ public:
     }
 
     void to_json(std::ostream& out) const { m_impl.to_json(out); }
-    void to_string(std::ostream& out, size_t limit=500) const
+    void to_string(std::ostream& out, size_t limit = 500) const
     {
         m_impl.to_string(out, limit);
     }

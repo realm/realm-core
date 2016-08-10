@@ -426,7 +426,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     typedef std::char_traits<char> traits;
     if (upper) {
         size_t n = source.size();
-        for (size_t i = 0; i<n; ++i) {
+        for (size_t i = 0; i < n; ++i) {
             char c = source[i];
             if (traits::lt(0x60, c) &&
                     traits::lt(c, 0x7B)) c = traits::to_char_type(traits::to_int_type(c) - 0x20);
@@ -435,7 +435,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     }
     else { // lower
         size_t n = source.size();
-        for (size_t i = 0; i<n; ++i) {
+        for (size_t i = 0; i < n; ++i) {
             char c = source[i];
             if (traits::lt(0x40, c) &&
                     traits::lt(c, 0x5B)) c = traits::to_char_type(traits::to_int_type(c) + 0x20);

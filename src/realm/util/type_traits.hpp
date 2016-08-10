@@ -97,7 +97,7 @@ struct Promote {
 
 template<class A, class B>
 struct ArithBinOpType {
-    typedef decltype(A()+B()) type;
+    typedef decltype(A() + B()) type;
 };
 
 

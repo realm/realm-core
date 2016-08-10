@@ -503,7 +503,7 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
 
 void MixedColumn::verify() const
 {
-    do_verify(0,0);
+    do_verify(0, 0);
 }
 
 void MixedColumn::verify(const Table& table, size_t col_ndx) const

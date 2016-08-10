@@ -236,10 +236,10 @@ template<class T>struct Pow {
 };
 
 // Finds a common type for T1 and T2 according to C++ conversion/promotion in arithmetic (float + int => float, etc)
-template<class T1, class T2,
-         bool T1_is_int = std::numeric_limits<T1>::is_integer || std::is_same<T1, null>::value,
-         bool T2_is_int = std::numeric_limits<T2>::is_integer || std::is_same<T2, null>::value,
-         bool T1_is_widest = (sizeof(T1) > sizeof(T2)   ||     std::is_same<T2, null>::value    ) > struct Common;
+template <class T1, class T2, bool T1_is_int = std::numeric_limits<T1>::is_integer || std::is_same<T1, null>::value,
+          bool T2_is_int = std::numeric_limits<T2>::is_integer || std::is_same<T2, null>::value,
+          bool T1_is_widest = (sizeof(T1) > sizeof(T2) || std::is_same<T2, null>::value)>
+struct Common;
 template<class T1, class T2, bool b>
 struct Common<T1, T2, b, b, true> {
     typedef T1 type;
@@ -649,7 +649,7 @@ public:
 
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
 #define RLM_U(o) RLM_U2(int, o) RLM_U2(float, o) RLM_U2(double, o) RLM_U2(int64_t, o) RLM_U2(StringData, o) RLM_U2(bool, o) RLM_U2(OldDateTime, o) RLM_U2(Timestamp, o) RLM_U2(null, o)
-    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/ ) RLM_U(> ) RLM_U(< ) RLM_U(== ) RLM_U(!= ) RLM_U(>= ) RLM_U(<= )
+    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
 // Subexpr2<Link> only provides equality comparisons. Their implementations can be found later in this file.
@@ -690,8 +690,9 @@ time optimizations for these cases.
 template<class T, size_t prealloc = 8>
 struct NullableVector {
     using Underlying = typename util::RemoveOptional<T>::type;
-    using t_storage  = typename std::conditional<std::is_same<Underlying, bool>::value
-                       || std::is_same<Underlying, int>::value, int64_t, Underlying>::type;
+    using t_storage =
+        typename std::conditional<std::is_same<Underlying, bool>::value || std::is_same<Underlying, int>::value,
+                                  int64_t, Underlying>::type;
 
     NullableVector() {}
 
@@ -1071,9 +1072,8 @@ public:
         }
     }
 
-    template<class D>
-    typename std::enable_if<!std::is_convertible<T, D>::value>::type
-    REALM_FORCEINLINE export2(ValueBase&) const
+    template <class D>
+    typename std::enable_if<!std::is_convertible<T, D>::value>::type REALM_FORCEINLINE export2(ValueBase&) const
     {
         // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never
         // performed at runtime but would result in a compiler error if we did not provide this implementation.
@@ -2120,7 +2120,7 @@ public:
     }
 
 private:
-    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links= {}) :
+    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {}) :
         m_link_map(table, links)
     {
         static_cast<void>(column_ndx);
@@ -2187,7 +2187,7 @@ class Columns : public Subexpr2<T> {
 public:
     using ColType = typename ColumnTypeTraits<T>::column_type;
 
-    Columns(size_t column, const Table* table, const std::vector<size_t>& links= {}):
+    Columns(size_t column, const Table* table, const std::vector<size_t>& links = {}):
         m_link_map(table, links), m_column(column), m_nullable(m_link_map.target_table()->is_nullable(m_column))
     {
     }
@@ -2555,7 +2555,7 @@ private:
 };
 
 namespace aggregate_operations {
-template<typename T, typename Derived, typename R=T>
+template<typename T, typename Derived, typename R = T>
 class BaseAggregateOperation {
     static_assert(std::is_same<T, Int>::value || std::is_same<T, Float>::value || std::is_same<T, Double>::value,
                   "Numeric aggregates can only be used with subcolumns of numeric types");

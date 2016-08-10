@@ -72,7 +72,7 @@ struct RandomPrimeMode: PrimeMode {
     int n;
     RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed):
         random(seed),
-        dist(0, m-1),
+        dist(0, m - 1),
         n(trigger_threshold)
     {
         REALM_ASSERT(n >= 0 && m > 0);

@@ -80,17 +80,17 @@ To cast_to_unsigned(From) noexcept;
 /// except that it complies with at least C++03.
 
 template<class A, class B>
-inline bool int_equal_to(A,B) noexcept;
+inline bool int_equal_to(A, B) noexcept;
 template<class A, class B>
-inline bool int_not_equal_to(A,B) noexcept;
+inline bool int_not_equal_to(A, B) noexcept;
 template<class A, class B>
-inline bool int_less_than(A,B) noexcept;
+inline bool int_less_than(A, B) noexcept;
 template<class A, class B>
-inline bool int_less_than_or_equal(A,B) noexcept;
+inline bool int_less_than_or_equal(A, B) noexcept;
 template<class A, class B>
-inline bool int_greater_than(A,B) noexcept;
+inline bool int_greater_than(A, B) noexcept;
 template<class A, class B>
-inline bool int_greater_than_or_equal(A,B) noexcept;
+inline bool int_greater_than_or_equal(A, B) noexcept;
 
 //@}
 
@@ -501,49 +501,49 @@ inline To cast_to_unsigned(From value) noexcept
 template<class A, class B>
 inline bool int_equal_to(A a, B b) noexcept
 {
-    return _impl::SafeIntBinops<A,B>::equal(a,b);
+    return _impl::SafeIntBinops<A, B>::equal(a, b);
 }
 
 template<class A, class B>
 inline bool int_not_equal_to(A a, B b) noexcept
 {
-    return !_impl::SafeIntBinops<A,B>::equal(a,b);
+    return !_impl::SafeIntBinops<A, B>::equal(a, b);
 }
 
 template<class A, class B>
 inline bool int_less_than(A a, B b) noexcept
 {
-    return _impl::SafeIntBinops<A,B>::less(a,b);
+    return _impl::SafeIntBinops<A, B>::less(a, b);
 }
 
 template<class A, class B>
 inline bool int_less_than_or_equal(A a, B b) noexcept
 {
-    return !_impl::SafeIntBinops<B,A>::less(b,a); // Not greater than
+    return !_impl::SafeIntBinops<B, A>::less(b, a); // Not greater than
 }
 
 template<class A, class B>
 inline bool int_greater_than(A a, B b) noexcept
 {
-    return _impl::SafeIntBinops<B,A>::less(b,a);
+    return _impl::SafeIntBinops<B, A>::less(b, a);
 }
 
 template<class A, class B>
 inline bool int_greater_than_or_equal(A a, B b) noexcept
 {
-    return !_impl::SafeIntBinops<A,B>::less(a,b); // Not less than
+    return !_impl::SafeIntBinops<A, B>::less(a, b); // Not less than
 }
 
 template<class L, class R>
 inline bool int_add_with_overflow_detect(L& lval, R rval) noexcept
 {
-    return _impl::SafeIntBinops<L,R>::add(lval, rval);
+    return _impl::SafeIntBinops<L, R>::add(lval, rval);
 }
 
 template<class L, class R>
 inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept
 {
-    return _impl::SafeIntBinops<L,R>::sub(lval, rval);
+    return _impl::SafeIntBinops<L, R>::sub(lval, rval);
 }
 
 template<class L, class R>

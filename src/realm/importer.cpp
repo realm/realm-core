@@ -160,12 +160,12 @@ int64_t Importer::parse_integer(const char* col, bool* success)
                 return 0;
             }
             int64_t y = *col - '0';
-            if (can_fail && x < (std::numeric_limits<int64_t>::min()+y)/10) {
+            if (can_fail && x < (std::numeric_limits<int64_t>::min() + y) / 10) {
                 *success = false;
                 return 0;
             }
 
-            x = 10*x-y;
+            x = 10 * x - y;
             ++col;
         }
         if (can_fail)
@@ -181,7 +181,7 @@ int64_t Importer::parse_integer(const char* col, bool* success)
             return 0;
         }
         int64_t y = *col - '0';
-        x = 10*x+y;
+        x = 10 * x + y;
         ++col;
     }
 
@@ -297,14 +297,14 @@ double Importer::parse_double(const char* col, bool* success, size_t* significan
         ++*significants;
     }
 
-    if (*col == '.'|| *col == Separator) {
+    if (*col == '.' || *col == Separator) {
         ++col;
         double pos = 1;
         while ('0' <= *col && *col <= '9') {
             pos /= 10;
             int y = *col - '0';
             ++col;
-            x += y*pos;
+            x += y * pos;
             ++*significants;
         }
     }
@@ -331,7 +331,7 @@ double Importer::parse_double(const char* col, bool* success, size_t* significan
 
             while (e != 1) {
                 if ((e & 1) == 0) {
-                    base = base*base;
+                    base = base * base;
                     e >>= 1;
                 }
                 else {
@@ -523,7 +523,7 @@ payload:
             m_curpos++;
 
         if (payload.size() >= 2) {
-            if (payload[payload.size() - 2].size() != payload[payload.size()- 1].size()) {
+            if (payload[payload.size() - 2].size() != payload[payload.size() - 1].size()) {
                 // We don't use n-versions of printf because windows needs some macro tweaking for it
                 char buf[500];
                 std::string s = payload[payload.size() - 1][0];

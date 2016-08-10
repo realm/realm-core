@@ -153,7 +153,7 @@ inline StringData ArrayBigBlobs::get_string(size_t ndx) const noexcept
     if (bin.is_null())
         return realm::null();
     else
-        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
 }
 
 inline void ArrayBigBlobs::set_string(size_t ndx, StringData value)
@@ -189,7 +189,7 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
     if (bin.is_null())
         return realm::null();
     else
-        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
 }
 
 inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(size_t ndx, StringData value,

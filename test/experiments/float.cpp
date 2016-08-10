@@ -43,7 +43,7 @@ void exploreFloat()
     Float_t num(1.0f);
     num.i -= 1;
     printf("Float value, representation, sign, exponent, mantissa\n");
-    for (int i=0; i<100; i++) {
+    for (int i = 0; i < 100; i++) {
         // Breakpoint here.
         printf("%1.8e, 0x%08X, %d, %d, 0x%06X\n",
                num.f, num.i,

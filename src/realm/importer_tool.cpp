@@ -154,7 +154,7 @@ int main(int argc, char* argv[])
             }
         }
         else if (strncmp(argv[a], "-l", 2) == 0) {
-            abort2(a >= argc-4 , "Too few arguments");
+            abort2(a >= argc - 4, "Too few arguments");
             tablename = argv[++a];
         }
         else {

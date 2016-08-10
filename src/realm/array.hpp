@@ -163,7 +163,7 @@ struct MemStats {
     size_t array_count = 0;
 };
 template<class C, class T>
-std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats);
+std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats stats);
 #endif
 
 
@@ -1731,7 +1731,7 @@ inline void Array::erase(size_t ndx)
 {
     // This can throw, but only if array is currently in read-only
     // memory.
-    move(ndx+1, size(), ndx);
+    move(ndx + 1, size(), ndx);
 
     // Update size (also in header)
     --m_size;
@@ -2213,7 +2213,7 @@ inline size_t Array::get_bptree_size_from_header(const char* root_header) noexce
 {
     REALM_ASSERT_DEBUG(get_is_inner_bptree_node_from_header(root_header));
     size_t root_size = get_size_from_header(root_header);
-    int_fast64_t v = get(root_header, root_size-1);
+    int_fast64_t v = get(root_header, root_size - 1);
     return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
@@ -2283,7 +2283,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
 
     if (REALM_LIKELY(!new_sibling_ref)) {
         // +2 because stored value is 1 + 2*total_elems_in_subtree
-        adjust(size()-1, +2); // Throws
+        adjust(size() - 1, +2); // Throws
         return 0; // Child was not split, so parent was not split either
     }
 
@@ -2325,7 +2325,7 @@ ref_type Array::bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state)
         // when searching through the offsets array.
         child_ndx = offsets.lower_bound_int(elem_ndx);
         REALM_ASSERT_3(child_ndx, <, size() - 2);
-        size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
+        size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx - 1));
         elem_ndx_in_child = elem_ndx - elem_ndx_offset;
     }
 
@@ -2349,7 +2349,7 @@ ref_type Array::bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state)
 
     if (REALM_LIKELY(!new_sibling_ref)) {
         // +2 because stored value is 1 + 2*total_elems_in_subtree
-        adjust(size()-1, +2); // Throws
+        adjust(size() - 1, +2); // Throws
         offsets.adjust(child_ndx, offsets.size(), +1);
         return 0; // Child was not split, so parent was not split either
     }
@@ -2464,7 +2464,7 @@ uint64_t Array::cascade(uint64_t a) const
     }
     else if (width == 2) {
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0x3 * 0x1;
+        const uint64_t c1 = ~0ULL / 0x3 * 0x1;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a &= m1;     // isolate single bit in each segment
@@ -2474,11 +2474,11 @@ uint64_t Array::cascade(uint64_t a) const
         return a;
     }
     else if (width == 4) {
-        const uint64_t m  = ~0ULL/0xF * 0x1;
+        const uint64_t m  = ~0ULL / 0xF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xF * 0x7;
-        const uint64_t c2 = ~0ULL/0xF * 0x3;
+        const uint64_t c1 = ~0ULL / 0xF * 0x7;
+        const uint64_t c2 = ~0ULL / 0xF * 0x3;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
@@ -2489,12 +2489,12 @@ uint64_t Array::cascade(uint64_t a) const
         return a;
     }
     else if (width == 8) {
-        const uint64_t m  = ~0ULL/0xFF * 0x1;
+        const uint64_t m  = ~0ULL / 0xFF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xFF * 0x7F;
-        const uint64_t c2 = ~0ULL/0xFF * 0x3F;
-        const uint64_t c3 = ~0ULL/0xFF * 0x0F;
+        const uint64_t c1 = ~0ULL / 0xFF * 0x7F;
+        const uint64_t c2 = ~0ULL / 0xFF * 0x3F;
+        const uint64_t c3 = ~0ULL / 0xFF * 0x0F;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
@@ -2506,13 +2506,13 @@ uint64_t Array::cascade(uint64_t a) const
         return a;
     }
     else if (width == 16) {
-        const uint64_t m  = ~0ULL/0xFFFF * 0x1;
+        const uint64_t m  = ~0ULL / 0xFFFF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xFFFF * 0x7FFF;
-        const uint64_t c2 = ~0ULL/0xFFFF * 0x3FFF;
-        const uint64_t c3 = ~0ULL/0xFFFF * 0x0FFF;
-        const uint64_t c4 = ~0ULL/0xFFFF * 0x00FF;
+        const uint64_t c1 = ~0ULL / 0xFFFF * 0x7FFF;
+        const uint64_t c2 = ~0ULL / 0xFFFF * 0x3FFF;
+        const uint64_t c3 = ~0ULL / 0xFFFF * 0x0FFF;
+        const uint64_t c4 = ~0ULL / 0xFFFF * 0x00FF;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
@@ -2526,14 +2526,14 @@ uint64_t Array::cascade(uint64_t a) const
     }
 
     else if (width == 32) {
-        const uint64_t m  = ~0ULL/0xFFFFFFFF * 0x1;
+        const uint64_t m  = ~0ULL / 0xFFFFFFFF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xFFFFFFFF * 0x7FFFFFFF;
-        const uint64_t c2 = ~0ULL/0xFFFFFFFF * 0x3FFFFFFF;
-        const uint64_t c3 = ~0ULL/0xFFFFFFFF * 0x0FFFFFFF;
-        const uint64_t c4 = ~0ULL/0xFFFFFFFF * 0x00FFFFFF;
-        const uint64_t c5 = ~0ULL/0xFFFFFFFF * 0x0000FFFF;
+        const uint64_t c1 = ~0ULL / 0xFFFFFFFF * 0x7FFFFFFF;
+        const uint64_t c2 = ~0ULL / 0xFFFFFFFF * 0x3FFFFFFF;
+        const uint64_t c3 = ~0ULL / 0xFFFFFFFF * 0x0FFFFFFF;
+        const uint64_t c4 = ~0ULL / 0xFFFFFFFF * 0x00FFFFFF;
+        const uint64_t c5 = ~0ULL / 0xFFFFFFFF * 0x0000FFFF;
 
         a |= (a >> 1) & c1; // cascade ones in non-zeroed segments
         a |= (a >> 2) & c2;
@@ -2816,7 +2816,7 @@ bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* 
 
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
-    uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / no0(mask1) * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/no0(mask1)*(mask2+1));
+    uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / no0(mask1) * (mask2 + 1)) : ((chunk - magic) & ~chunk & ~0ULL / no0(mask1) * (mask2 + 1));
     size_t p = 0;
     while (m) {
         if (find_action_pattern<action, Callback>(baseindex, m >> (no0(width) - 1), state, callback))
@@ -2981,10 +2981,10 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
     }
     else if (width == 16) {
 
-        if (gt ? static_cast<short int>(chunk >> 0*16) > v : static_cast<short int>(chunk >> 0*16) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<short int>(chunk >> 0*16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 1*16) > v : static_cast<short int>(chunk >> 1*16) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<short int>(chunk >> 1*16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 2*16) > v : static_cast<short int>(chunk >> 2*16) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<short int>(chunk >> 2*16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 3*16) > v : static_cast<short int>(chunk >> 3*16) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<short int>(chunk >> 3*16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 0 * 16) > v : static_cast<short int>(chunk >> 0 * 16) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<short int>(chunk >> 0 * 16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 1 * 16) > v : static_cast<short int>(chunk >> 1 * 16) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<short int>(chunk >> 1 * 16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 2 * 16) > v : static_cast<short int>(chunk >> 2 * 16) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<short int>(chunk >> 2 * 16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 3 * 16) > v : static_cast<short int>(chunk >> 3 * 16) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<short int>(chunk >> 3 * 16), state, callback)) return false;};
 
         /*
         // Faster but disabled due to bug in VC2010 compiler (fixed in 2012 toolchain) where last 'if' is errorneously optimized away

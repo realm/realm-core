@@ -743,7 +743,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
 
     FindRes res = ndx.find_all(null{}, results);
     CHECK_EQUAL(FindRes_single, res);
-    CHECK_EQUAL(results, col.size()-1);
+    CHECK_EQUAL(results, col.size() - 1);
 
     // Clean up
     col.destroy();

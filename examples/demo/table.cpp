@@ -79,9 +79,9 @@ int main(int, char* [])
     t[4].phones[1].number = "555-4321-999";
 
     // Iterating
-    for (size_t i=0; i<t.size(); ++i) {
+    for (size_t i = 0; i < t.size(); ++i) {
         std::cout << t[i].name << " has " << t[i].phones->size() << " phones" << std::endl;
-        for (size_t j=0; j<t[i].phones->size(); ++j) {
+        for (size_t j = 0; j < t[i].phones->size(); ++j) {
             std::cout << " " << t[i].phones[j].desc << ": " << t[i].phones[j].number << std::endl;
         }
     }

@@ -3,7 +3,7 @@
 --style=stroustrup
 --break-closing-brackets
 --indent-switches
-#--pad-oper
+--pad-oper
 --pad-header
 --align-pointer=type
 --align-reference=type

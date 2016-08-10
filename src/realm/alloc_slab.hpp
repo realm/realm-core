@@ -545,7 +545,7 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
 
 inline size_t SlabAlloc::get_upper_section_boundary(size_t start_pos) const noexcept
 {
-    return get_section_base(1+get_section_index(start_pos));
+    return get_section_base(1 + get_section_index(start_pos));
 }
 
 inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noexcept

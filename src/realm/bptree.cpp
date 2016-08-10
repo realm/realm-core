@@ -56,7 +56,7 @@ void BpTreeBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     if (compact_form) {
         // FIXME: Dangerous cast here (unsigned -> signed)
         int_fast64_t v = state.m_split_offset; // elems_per_child
-        new_root->add(1 + 2*v); // Throws
+        new_root->add(1 + 2 * v); // Throws
     }
     else {
         Array new_offsets(alloc);
@@ -72,7 +72,7 @@ void BpTreeBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     new_root->add(new_sibling_ref); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = state.m_split_size; // total_elems_in_tree
-    new_root->add(1 + 2*v); // Throws
+    new_root->add(1 + 2 * v); // Throws
     replace_root(std::move(new_root));
 }
 
@@ -202,7 +202,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     // Write this inner node to the output stream
     if (!m_is_on_general_form) {
         int_fast64_t v(m_max_elems_per_child); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.set(0, 1 + 2*v); // Throws
+        m_main.set(0, 1 + 2 * v); // Throws
     }
     else {
         bool deep = true; // Deep
@@ -213,7 +213,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     }
     {
         int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
-        m_main.add(1 + 2*v); // Throws
+        m_main.add(1 + 2 * v); // Throws
     }
     bool deep = false; // Shallow
     bool only_if_modified = false; // Always

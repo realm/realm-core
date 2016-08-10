@@ -106,7 +106,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
 
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_int(0, i, int64_t(i*sign));
+        table.set_int(0, i, int64_t(i * sign));
     }
     for (size_t i = 0; i < rows; ++i)
         table.set_bool(1, i, (i % 2 ? true : false));
@@ -114,11 +114,11 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         table.set_olddatetime(2, i, 12345);
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_float(3, i, 123.456f*sign);
+        table.set_float(3, i, 123.456f * sign);
     }
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_double(4, i, 9876.54321*sign);
+        table.set_double(4, i, 9876.54321 * sign);
     }
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -169,7 +169,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
             n += i;
         for (size_t j = 0; j != n; ++j) {
             TableRef subtable = table.get_subtable(10, i);
-            int64_t val = -123 + i*j * 1234 * sign;
+            int64_t val = -123 + i * j * 1234 * sign;
             subtable->insert_empty_row(j);
             subtable->set_int(0, j, val);
             subtable->set_string(1, j, "sub");
@@ -182,7 +182,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
                 table.set_mixed(11, i, false);
                 break;
             case 1:
-                table.set_mixed(11, i, int64_t(i*i*sign));
+                table.set_mixed(11, i, int64_t(i * i * sign));
                 break;
             case 2:
                 table.set_mixed(11, i, "string");
@@ -203,16 +203,16 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
                 subtable->add_column(type_String, "second");
                 for (size_t j = 0; j != 2; ++j) {
                     subtable->insert_empty_row(j);
-                    subtable->set_int(0, j, i*i*j*sign);
+                    subtable->set_int(0, j, i * i * j * sign);
                     subtable->set_string(1, j, "mixed sub");
                 }
                 break;
             }
             case 6:
-                table.set_mixed(11, i, float(123.1*i*sign));
+                table.set_mixed(11, i, float(123.1 * i * sign));
                 break;
             case 7:
-                table.set_mixed(11, i, double(987.65*i*sign));
+                table.set_mixed(11, i, double(987.65 * i * sign));
                 break;
         }
     }

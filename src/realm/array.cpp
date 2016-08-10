@@ -457,7 +457,7 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     if (bits_per_elem < 8) {
         // FIXME: Should be optimized
         for (size_t i = end; i != begin; --i) {
-            int_fast64_t v = (this->*m_getter)(i-1);
+            int_fast64_t v = (this->*m_getter)(i - 1);
             (this->*(m_vtable->setter))(--dest_end, v);
         }
         return;
@@ -596,11 +596,11 @@ void Array::insert(size_t ndx, int_fast64_t value)
     if (do_expand) {
         size_t width = bit_width(value);
         REALM_ASSERT_DEBUG(width > m_width);
-        alloc(m_size+1, width); // Throws
+        alloc(m_size + 1, width); // Throws
         set_width(width);
     }
     else {
-        alloc(m_size+1, m_width); // Throws
+        alloc(m_size + 1, m_width); // Throws
     }
 
     // Move values below insertion (may expand)
@@ -609,15 +609,15 @@ void Array::insert(size_t ndx, int_fast64_t value)
         while (i > ndx) {
             --i;
             int64_t v = (this->*old_getter)(i);
-            (this->*(m_vtable->setter))(i+1, v);
+            (this->*(m_vtable->setter))(i + 1, v);
         }
     }
     else if (ndx != m_size) {
         // when byte sized and no expansion, use memmove
 // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
-        char* src_begin = m_data + ndx*w;
-        char* src_end   = m_data + m_size*w;
+        char* src_begin = m_data + ndx * w;
+        char* src_end   = m_data + m_size * w;
         char* dst_end   = src_end + w;
         std::copy_backward(src_begin, src_end, dst_end);
     }
@@ -1274,7 +1274,7 @@ int64_t Array::sum(size_t start, size_t end) const
 
             // Sum elements of sum
             for (size_t t = 0; t < sizeof (__m128i) * 8 / ((w == 8 || w == 16) ? 32 : 64); ++t) {
-                int64_t v = get_universal<(w == 8 || w == 16) ? 32 : 64>(reinterpret_cast<char*>(&sum3), t);
+                int64_t v = get_universal < (w == 8 || w == 16) ? 32 : 64 > (reinterpret_cast<char*>(&sum3), t);
                 s += v;
             }
         }
@@ -1331,10 +1331,10 @@ size_t Array::count(int64_t value) const noexcept
         if (uint64_t(value) > 3)
             return 0;
 
-        const uint64_t v = ~0ULL/0x3 * value;
+        const uint64_t v = ~0ULL / 0x3 * value;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0x3 * 0x1;
+        const uint64_t c1 = ~0ULL / 0x3 * 0x1;
 
         const size_t chunkvals = 32;
         for (; i + chunkvals <= end; i += chunkvals) {
@@ -1357,12 +1357,12 @@ size_t Array::count(int64_t value) const noexcept
         if (uint64_t(value) > 15)
             return 0;
 
-        const uint64_t v  = ~0ULL/0xF * value;
-        const uint64_t m  = ~0ULL/0xF * 0x1;
+        const uint64_t v  = ~0ULL / 0xF * value;
+        const uint64_t m  = ~0ULL / 0xF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xF * 0x7;
-        const uint64_t c2 = ~0ULL/0xF * 0x3;
+        const uint64_t c1 = ~0ULL / 0xF * 0x7;
+        const uint64_t c2 = ~0ULL / 0xF * 0x3;
 
         const size_t chunkvals = 16;
         for (; i + chunkvals <= end; i += chunkvals) {
@@ -1384,13 +1384,13 @@ size_t Array::count(int64_t value) const noexcept
         if (value > 0x7FLL || value < -0x80LL)
             return 0; // by casting?
 
-        const uint64_t v  = ~0ULL/0xFF * value;
-        const uint64_t m  = ~0ULL/0xFF * 0x1;
+        const uint64_t v  = ~0ULL / 0xFF * value;
+        const uint64_t m  = ~0ULL / 0xFF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xFF * 0x7F;
-        const uint64_t c2 = ~0ULL/0xFF * 0x3F;
-        const uint64_t c3 = ~0ULL/0xFF * 0x0F;
+        const uint64_t c1 = ~0ULL / 0xFF * 0x7F;
+        const uint64_t c2 = ~0ULL / 0xFF * 0x3F;
+        const uint64_t c3 = ~0ULL / 0xFF * 0x0F;
 
         const size_t chunkvals = 8;
         for (; i + chunkvals <= end; i += chunkvals) {
@@ -1412,14 +1412,14 @@ size_t Array::count(int64_t value) const noexcept
         if (value > 0x7FFFLL || value < -0x8000LL)
             return 0; // by casting?
 
-        const uint64_t v  = ~0ULL/0xFFFF * value;
-        const uint64_t m  = ~0ULL/0xFFFF * 0x1;
+        const uint64_t v  = ~0ULL / 0xFFFF * value;
+        const uint64_t m  = ~0ULL / 0xFFFF * 0x1;
 
         // Masks to avoid spillover between segments in cascades
-        const uint64_t c1 = ~0ULL/0xFFFF * 0x7FFF;
-        const uint64_t c2 = ~0ULL/0xFFFF * 0x3FFF;
-        const uint64_t c3 = ~0ULL/0xFFFF * 0x0FFF;
-        const uint64_t c4 = ~0ULL/0xFFFF * 0x00FF;
+        const uint64_t c1 = ~0ULL / 0xFFFF * 0x7FFF;
+        const uint64_t c2 = ~0ULL / 0xFFFF * 0x3FFF;
+        const uint64_t c3 = ~0ULL / 0xFFFF * 0x0FFF;
+        const uint64_t c4 = ~0ULL / 0xFFFF * 0x00FF;
 
         const size_t chunkvals = 4;
         for (; i + chunkvals <= end; i += chunkvals) {
@@ -1487,7 +1487,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
     if (overflow)
         throw std::runtime_error("Byte size overflow");
     REALM_ASSERT_3(byte_size, >, 0);
-    size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
+    size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
 }
 
@@ -1504,7 +1504,7 @@ size_t Array::calc_byte_len(size_t num_items, size_t width) const
 
     // FIXME: This arithemtic could overflow. Consider using <realm/util/safe_int_ops.hpp>
     size_t bits = num_items * width;
-    size_t bytes = (bits+7) / 8; // round up
+    size_t bytes = (bits + 7) / 8; // round up
     return bytes + header_size; // add room for 8 byte header
 }
 
@@ -1738,7 +1738,7 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     }
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
-    size_t byte_size = std::max(byte_size_0, initial_capacity+0);
+    size_t byte_size = std::max(byte_size_0, initial_capacity + 0);
     MemRef mem = alloc.alloc(byte_size); // Throws
     char* header = mem.get_addr();
 
@@ -2012,12 +2012,12 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         // does not have to be split.
         insert(insert_ndx, new_sibling_ref); // Throws
         // +2 because stored value is 1 + 2*total_elems_in_subtree
-        adjust(size()-1, +2); // Throws
+        adjust(size() - 1, +2); // Throws
         if (offsets.is_attached()) {
             size_t elem_ndx_offset = orig_child_ndx > 0 ?
-                                     to_size_t(offsets.get(orig_child_ndx-1)) : 0;
+                                     to_size_t(offsets.get(orig_child_ndx - 1)) : 0;
             offsets.insert(orig_child_ndx, elem_ndx_offset + state.m_split_offset); // Throws
-            offsets.adjust(orig_child_ndx+1, offsets.size(), +1); // Throws
+            offsets.adjust(orig_child_ndx + 1, offsets.size(), +1); // Throws
         }
         return 0; // Parent node was not split
     }
@@ -2030,7 +2030,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
     size_t elem_ndx_offset = 0;
     if (orig_child_ndx > 0) {
         if (offsets.is_attached()) {
-            elem_ndx_offset = size_t(offsets.get(orig_child_ndx-1));
+            elem_ndx_offset = size_t(offsets.get(orig_child_ndx - 1));
         }
         else {
             int_fast64_t elems_per_child = get(0) / 2;
@@ -2068,7 +2068,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         // the general form.
         REALM_ASSERT(new_offsets.is_attached());
         new_split_offset = elem_ndx_offset + state.m_split_size;
-        new_split_size = to_size_t(back()/2) + 1;
+        new_split_size = to_size_t(back() / 2) + 1;
         REALM_ASSERT_3(size(), >=, 2);
         size_t num_children = size() - 2;
         REALM_ASSERT_3(num_children, >=, 1); // invar:bptree-nonempty-inner
@@ -2078,25 +2078,25 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
             new_sibling.add(get(i)); // Throws
         // Move some offsets over
         size_t offsets_end = num_children - 1;
-        for (size_t i = orig_child_ndx+1; i != offsets_end; ++i) {
+        for (size_t i = orig_child_ndx + 1; i != offsets_end; ++i) {
             size_t offset = to_size_t(offsets.get(i));
             // FIXME: Dangerous cast here (unsigned -> signed)
-            new_offsets.add(offset - (new_split_offset-1)); // Throws
+            new_offsets.add(offset - (new_split_offset - 1)); // Throws
         }
         // Update original parent
-        erase(insert_ndx+1, child_refs_end);
+        erase(insert_ndx + 1, child_refs_end);
         // FIXME: Dangerous cast here (unsigned -> signed)
         set(insert_ndx, new_sibling_ref); // Throws
-        offsets.erase(orig_child_ndx+1, offsets_end);
+        offsets.erase(orig_child_ndx + 1, offsets_end);
         // FIXME: Dangerous cast here (unsigned -> signed)
         offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset); // Throws
     }
     // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = new_split_offset; // total_elems_in_subtree
-    set(size() - 1, 1 + 2*v); // Throws
+    set(size() - 1, 1 + 2 * v); // Throws
     // FIXME: Dangerous cast here (unsigned -> signed)
     v = new_split_size - new_split_offset; // total_elems_in_subtree
-    new_sibling.add(1 + 2*v); // Throws
+    new_sibling.add(1 + 2 * v); // Throws
     state.m_split_offset = new_split_offset;
     state.m_split_size   = new_split_size;
     return new_sibling.get_ref();
@@ -2162,14 +2162,14 @@ void Array::verify() const
 }
 
 template<class C, class T>
-std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, MemStats stats)
+std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats stats)
 {
     std::ostringstream out_2;
     out_2.setf(std::ios::fixed);
     out_2.precision(1);
     double used_percent = 100.0 * stats.used / stats.allocated;
-    out_2 << "allocated = "<<stats.allocated<<", used = "<<stats.used<<" ("<<used_percent<<"%), "
-          "array_count = "<<stats.array_count;
+    out_2 << "allocated = " << stats.allocated << ", used = " << stats.used << " (" << used_percent << "%), "
+          "array_count = " << stats.array_count;
     out << out_2.str();
     return out;
 }
@@ -2206,7 +2206,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
             REALM_ASSERT_3(offsets.size(), ==, num_children - 1);
         }
         else {
-            REALM_ASSERT(!int_cast_with_overflow_detect(first_value/2, elems_per_child));
+            REALM_ASSERT(!int_cast_with_overflow_detect(first_value / 2, elems_per_child));
         }
     }
 
@@ -2258,7 +2258,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         int_fast64_t last_value = node.back();
         REALM_ASSERT_3(last_value % 2, !=, 0);
         size_t total_elems = 0;
-        REALM_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
+        REALM_ASSERT(!int_cast_with_overflow_detect(last_value / 2, total_elems));
         REALM_ASSERT_3(num_elems, ==, total_elems);
     }
     return realm::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
@@ -2281,23 +2281,23 @@ void Array::dump_bptree_structure(std::ostream& out, int level, LeafDumper leaf_
     }
 
     int indent = level * 2;
-    out << std::setw(indent) << "" << "Inner node (B+ tree) (ref: "<<get_ref()<<")\n";
+    out << std::setw(indent) << "" << "Inner node (B+ tree) (ref: " << get_ref() << ")\n";
 
     size_t num_elems_in_subtree = size_t(back() / 2);
     out << std::setw(indent) << "" << "  Number of elements in subtree: "
-        ""<<num_elems_in_subtree<<"\n";
+        "" << num_elems_in_subtree << "\n";
 
     bool compact_form = front() % 2 != 0;
     if (compact_form) {
         size_t elems_per_child = size_t(front() / 2);
         out << std::setw(indent) << "" << "  Compact form (elements per child: "
-            ""<<elems_per_child<<")\n";
+            "" << elems_per_child << ")\n";
     }
     else { // General form
         Array offsets(m_alloc);
         offsets.init_from_ref(to_ref(front()));
         out << std::setw(indent) << "" << "  General form (offsets_ref: "
-            ""<<offsets.get_ref()<<", ";
+            "" << offsets.get_ref() << ", ";
         if (offsets.is_empty()) {
             out << "no offsets";
         }
@@ -2318,7 +2318,7 @@ void Array::dump_bptree_structure(std::ostream& out, int level, LeafDumper leaf_
     for (size_t i = child_ref_begin; i != child_ref_end; ++i) {
         Array child(m_alloc);
         child.init_from_ref(get_as_ref(i));
-        child.dump_bptree_structure(out, level+1, leaf_dumper);
+        child.dump_bptree_structure(out, level + 1, leaf_dumper);
     }
 }
 
@@ -3000,7 +3000,7 @@ find_child_from_offsets(const char* offsets_header, size_t elem_ndx) noexcept
     size_t offsets_size = Array::get_size_from_header(offsets_header);
     size_t child_ndx = upper_bound<width>(offsets_data, offsets_size, elem_ndx);
     size_t elem_ndx_offset = child_ndx == 0 ? 0 :
-                             to_size_t(get_direct<width>(offsets_data, child_ndx-1));
+                             to_size_t(get_direct<width>(offsets_data, child_ndx - 1));
     size_t ndx_in_child = elem_ndx - elem_ndx_offset;
     return std::make_pair(child_ndx, ndx_in_child);
 }
@@ -3014,7 +3014,7 @@ inline std::pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, siz
     size_t ndx_in_child;
     if (first_value % 2 != 0) {
         // Case 1/2: No offsets array (compact form)
-        size_t elems_per_child = to_size_t(first_value/2);
+        size_t elems_per_child = to_size_t(first_value / 2);
         child_ndx    = ndx / elems_per_child;
         ndx_in_child = ndx % elems_per_child;
         // FIXME: It may be worth considering not to store the total
@@ -3104,7 +3104,7 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size, Hand
         bool is_compact = first_value % 2 != 0;
         if (is_compact) {
             // Compact form
-            elems_per_child = to_size_t(first_value/2);
+            elems_per_child = to_size_t(first_value / 2);
             if (start_offset > node_offset) {
                 size_t local_start_offset = start_offset - node_offset;
                 child_ndx = local_start_offset / elems_per_child;
@@ -3119,7 +3119,7 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size, Hand
                 size_t local_start_offset = start_offset - node_offset;
                 child_ndx = offsets.upper_bound_int(local_start_offset);
                 if (child_ndx > 0)
-                    child_offset += to_size_t(offsets.get(child_ndx-1));
+                    child_offset += to_size_t(offsets.get(child_ndx - 1));
             }
         }
     }
@@ -3139,7 +3139,7 @@ bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size, Hand
         if (!is_last_child) {
             bool is_compact = elems_per_child != 0;
             if (!is_compact) {
-                size_t next_child_offset = node_offset + to_size_t(offsets.get(child_ndx-1 + 1));
+                size_t next_child_offset = node_offset + to_size_t(offsets.get(child_ndx - 1 + 1));
                 child_info.m_size = next_child_offset - child_info.m_offset;
             }
         }
@@ -3426,7 +3426,7 @@ void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handle
 {
     REALM_ASSERT(root->is_inner_bptree_node());
     REALM_ASSERT_3(root->size(), >=, 1 + 1 + 1); // invar:bptree-nonempty-inner
-    REALM_ASSERT_DEBUG(elem_ndx == npos || elem_ndx+1 != root->get_bptree_size());
+    REALM_ASSERT_DEBUG(elem_ndx == npos || elem_ndx + 1 != root->get_bptree_size());
 
     // Note that this function is implemented in a way that makes it
     // fully exception safe. Please be sure to keep it that way.
@@ -3565,7 +3565,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
         // fact that we never increase or insert values.
         size_t offsets_adjust_begin = child_ndx;
         if (destroy_child) {
-            if (offsets_adjust_begin == num_children-1)
+            if (offsets_adjust_begin == num_children - 1)
                 --offsets_adjust_begin;
             offsets.erase(offsets_adjust_begin);
         }
@@ -3576,7 +3576,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
     // decrease the value, and because the subtree rooted at this node
     // has been modified, so this array cannot be in read-only memory
     // any longer.
-    adjust(size()-1, -2); // -2 because stored value is 1 + 2*total_elems_in_subtree
+    adjust(size() - 1, -2); // -2 because stored value is 1 + 2*total_elems_in_subtree
 
     return false; // Element erased and offsets adjusted
 }
@@ -3585,10 +3585,10 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
 void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
 {
     offsets.create(type_Normal); // Throws
-    int_fast64_t elems_per_child = first_value/2;
+    int_fast64_t elems_per_child = first_value / 2;
     int_fast64_t accum_num_elems = 0;
     size_t num_children = size() - 2;
-    for (size_t i = 0; i != num_children-1; ++i) {
+    for (size_t i = 0; i != num_children - 1; ++i) {
         accum_num_elems += elems_per_child;
         offsets.add(accum_num_elems); // Throws
     }

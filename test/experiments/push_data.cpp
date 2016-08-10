@@ -41,15 +41,15 @@ int main(int argc, const char* const argv[])
     string database_file  = "/tmp/push_data.realm";
 
     deque<string> positional_args;
-    for (int i=1; i<argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg.size() < 2 || arg.substr(0,2) != "--") {
+        if (arg.size() < 2 || arg.substr(0, 2) != "--") {
             positional_args.push_back(arg);
             continue;
         }
 
         if (arg == "--database-file") {
-            if (i+1 < argc) {
+            if (i + 1 < argc) {
                 database_file = argv[++i];
                 continue;
             }
@@ -61,9 +61,9 @@ int main(int argc, const char* const argv[])
 bad_command_line:
         std::cerr <<
                   "ERROR: Bad command line.\n\n"
-                  "Synopsis: "<<argv[0]<<"  NUM-REPS  TEXT...\n\n"
+                  "Synopsis: " << argv[0] << "  NUM-REPS  TEXT...\n\n"
                   "Options:\n"
-                  "  --database-file STRING   (default: \""<<database_file<<"\")\n";
+                  "  --database-file STRING   (default: \"" << database_file << "\")\n";
         return 1;
     }
 
@@ -84,8 +84,8 @@ bad_command_line:
         MyTable::Ref table = group.get_table<MyTable>("my_table");
 
         int counter = 0;
-        for (int i=0; i<num_reps; ++i) {
-            for (size_t j=0; j<positional_args.size(); ++j) {
+        for (int i = 0; i < num_reps; ++i) {
+            for (size_t j = 0; j < positional_args.size(); ++j) {
                 table->add(++counter, positional_args[j].c_str());
             }
         }

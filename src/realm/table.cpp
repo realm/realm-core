@@ -1144,7 +1144,7 @@ void Table::discard_row_accessors() noexcept
 void Table::update_subtables(Descriptor& desc, SubtableUpdater* updater)
 {
     size_t stat_buf[8];
-    size_t size = sizeof stat_buf / sizeof *stat_buf;
+    size_t size = sizeof stat_buf / sizeof * stat_buf;
     size_t* begin = stat_buf;
     size_t* end = begin + size;
     std::unique_ptr<size_t[]> dyn_buf;
@@ -1225,7 +1225,7 @@ void Table::update_subtables(const size_t* col_path_begin, const size_t* col_pat
                     continue;
                 subtable.reset(subtables.get_subtable_ptr(row_ndx)); // Throws
             }
-            subtable->update_subtables(col_path_begin+1, col_path_end, updater); // Throws
+            subtable->update_subtables(col_path_begin + 1, col_path_end, updater); // Throws
         }
     }
 }
@@ -1258,7 +1258,7 @@ void Table::update_accessors(const size_t* col_path_begin, const size_t* col_pat
     if (ColumnBase* col = m_cols[col_ndx]) {
         REALM_ASSERT(dynamic_cast<SubtableColumn*>(col));
         SubtableColumn* col_2 = static_cast<SubtableColumn*>(col);
-        col_2->update_table_accessors(col_path_begin+1, col_path_end, updater); // Throws
+        col_2->update_table_accessors(col_path_begin + 1, col_path_end, updater); // Throws
     }
 }
 
@@ -1307,7 +1307,7 @@ void Table::detach() noexcept
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_attached() to return false.
-    m_columns.set_parent(0,0);
+    m_columns.set_parent(0, 0);
 
     discard_child_accessors();
     destroy_column_accessors();
@@ -1699,7 +1699,7 @@ void Table::add_search_index(size_t col_ndx)
 
     // Update column accessors for all columns after the one we just added an
     // index for, as their position in `m_columns` has changed
-    refresh_column_accessors(col_ndx+1); // Throws
+    refresh_column_accessors(col_ndx + 1); // Throws
 
     if (Replication* repl = get_repl())
         repl->add_search_index(this, col_ndx); // Throws
@@ -4018,7 +4018,7 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
     if (ndx == 0) {
         ndx = result.add_empty_row();
         result.set_string(0, ndx, state.enums->get(i));
-        state.keys[to_size_t(key)] = ndx+1;
+        state.keys[to_size_t(key)] = ndx + 1;
         state.added_row = true;
     }
     else
@@ -4406,7 +4406,7 @@ void Table::optimize(bool enforce)
             // Upgrading the column may have moved the
             // refs to keylists in other columns so we
             // have to update their parent info
-            for (size_t c = i+1; c < m_cols.size(); ++c) {
+            for (size_t c = i + 1; c < m_cols.size(); ++c) {
                 ColumnType type_c = get_real_column_type(c);
                 if (type_c == col_type_StringEnum) {
                     StringEnumColumn& column_c = get_column_string_enum(c);
@@ -4835,7 +4835,7 @@ size_t chars_in_int(int64_t v)
     size_t count = 0;
     while (v /= 10)
         ++count;
-    return count+1;
+    return count + 1;
 }
 
 } // anonymous namespace
@@ -4913,7 +4913,7 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
             case type_Table:
                 for (size_t row = 0; row < row_count; ++row) {
                     size_t len = chars_in_int(get_subtable_size(col, row));
-                    width = std::max(width, len+2);
+                    width = std::max(width, len + 2);
                 }
                 width += 2; // space for "[]"
                 break;
@@ -5035,7 +5035,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
 
     for (size_t col = 0; col < column_count; ++col) {
         out << "  "; // spacing
-        out.width(widths[col+1]);
+        out.width(widths[col + 1]);
 
         if (is_nullable(col) && is_null(col, row_ndx)) {
             out << "(null)";
@@ -5069,7 +5069,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                 out_table(out, get_subtable_size(col, row_ndx));
                 break;
             case type_Binary:
-                out.width(widths[col+1]-6); // adjust for " bytes" text
+                out.width(widths[col + 1] - 6); // adjust for " bytes" text
                 out << get_binary(col, row_ndx).size() << " bytes";
                 break;
             case type_Mixed: {
@@ -5102,7 +5102,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                             out_timestamp(out, m.get_timestamp());
                             break;
                         case type_Binary:
-                            out.width(widths[col+1]-6); // adjust for " bytes" text
+                            out.width(widths[col + 1] - 6); // adjust for " bytes" text
                             out << m.get_binary().size() << " bytes";
                             break;
                         case type_Table:
@@ -5714,8 +5714,8 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
                 col->set_search_index_allow_duplicate_values(allow_duplicate_values);
             }
             else {
-                ref_type ref = m_columns.get_as_ref(ndx_in_parent+1);
-                col->set_search_index_ref(ref, &m_columns, ndx_in_parent+1,
+                ref_type ref = m_columns.get_as_ref(ndx_in_parent + 1);
+                col->set_search_index_ref(ref, &m_columns, ndx_in_parent + 1,
                                           allow_duplicate_values); // Throws
             }
         }
@@ -6070,12 +6070,12 @@ void Table::dump_node_structure() const
 void Table::dump_node_structure(std::ostream& out, int level) const
 {
     int indent = level * 2;
-    out << std::setw(indent) << "" << "Table (top_ref: "<<m_top.get_ref()<<")\n";
+    out << std::setw(indent) << "" << "Table (top_ref: " << m_top.get_ref() << ")\n";
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
-        out << std::setw(indent) << "" << "  Column "<<(i+1)<<"\n";
+        out << std::setw(indent) << "" << "  Column " << (i + 1) << "\n";
         const ColumnBase& col = get_column_base(i);
-        col.do_dump_node_structure(out, level+2);
+        col.do_dump_node_structure(out, level + 2);
     }
 }
 

@@ -149,7 +149,7 @@ TEST(bounds)
         }
         int64_t limit = val + rand() % 5;
         int index_table[1000];
-        for (int i=0; i<1000; i++)
+        for (int i = 0; i < 1000; i++)
             index_table[i] = rand() % limit;
 
         best = 9999; //std::numeric_limits<double>::max();
@@ -224,7 +224,7 @@ TEST(bounds)
         }
         int64_t limit = val + rand() % 5;
         int index_table[1000];
-        for (int i=0; i<1000; i++)
+        for (int i = 0; i < 1000; i++)
             index_table[i] = rand() % limit;
 
         best = 9999; //std::numeric_limits<double>::max();
