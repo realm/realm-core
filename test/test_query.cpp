@@ -3686,6 +3686,352 @@ TEST(Query_SortBools)
     CHECK(tv.get_bool(0, 2) == true);
 }
 
+TEST(Query_SortLinks)
+{
+    const size_t num_rows = 10;
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_string");
+    size_t t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_to_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_str_col = t2->add_column(type_String, "t2_string");
+    size_t t2_link_t1_col = t2->add_column_link(type_Link, "t2_link_to_t1", *t1);
+
+    t1->add_empty_row(num_rows);
+    t2->add_empty_row(num_rows);
+    std::vector<std::string> ordered_strings;
+
+    for (size_t i = 0; i < num_rows; ++i) {
+        ordered_strings.push_back(std::string("a string") + util::to_string(i));
+        t1->set_int(t1_int_col, i, i);
+        t1->set_string(t1_str_col, i, ordered_strings[i]);
+        t1->set_link(t1_link_t2_col, i, num_rows - i - 1);
+
+        t2->set_int(t2_int_col, i, i);
+        t2->set_string(t2_str_col, i, ordered_strings[i]);
+        t2->set_link(t2_link_t1_col, i, i);
+    }
+
+    TableView tv = t1->where().find_all();
+
+    // Check natural order
+    CHECK_EQUAL(tv.size(), num_rows);
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), i);
+        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[i]);
+    }
+
+    // Check sorted order by ints
+    tv.sort(t1_int_col);
+    CHECK_EQUAL(tv.size(), num_rows);
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), i);
+        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[i]);
+    }
+
+    // Check that you can sort on a regular link column
+    tv.sort(t1_link_t2_col);
+    CHECK_EQUAL(tv.size(), num_rows);
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), num_rows - i - 1);
+        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[num_rows - i - 1]);
+    }
+}
+
+
+TEST(Query_SortLinkChains)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+
+    t1->add_empty_row(7);
+    t2->add_empty_row(6);
+    t3->add_empty_row(4);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t2->size(); i++) {
+        t1->set_int(t1_int_col, i + 1, i);
+        t2->set_int(t2_int_col, i, t1->size() - i);
+    }
+
+    t1->set_link(t1_link_col, 0, 1);
+    t1->set_link(t1_link_col, 1, 0);
+    t1->set_link(t1_link_col, 2, 2);
+    t1->set_link(t1_link_col, 3, 3);
+    t1->set_link(t1_link_col, 4, 5);
+    t1->set_link(t1_link_col, 5, 4);
+    t1->set_link(t1_link_col, 6, 1);
+
+    t2->set_link(t2_link_col, 0, 3);
+    t2->set_link(t2_link_col, 1, 2);
+    t2->set_link(t2_link_col, 2, 0);
+    t2->set_link(t2_link_col, 3, 1);
+    t2->nullify_link(t2_link_col, 4);
+    t2->nullify_link(t2_link_col, 5);
+
+    t3->set_null(t3_int_col, 0);
+    t3->set_int(t3_int_col, 1, 4);
+    t3->set_int(t3_int_col, 2, 7);
+    t3->set_int(t3_int_col, 3, 3);
+    t3->set_string(t3_str_col, 0, "b");
+    t3->set_string(t3_str_col, 1, "a");
+    t3->set_string(t3_str_col, 2, "c");
+    t3->set_string(t3_str_col, 3, "k");
+
+    //  T1                       T2                     T3
+    //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
+    //  ==============================================================
+    //  99       1           |   5       3          |   null    "b"
+    //  0        0           |   4       2          |   4       "a"
+    //  1        2           |   3       0          |   7       "c"
+    //  2        3           |   2       1          |   3       "k"
+    //  3        5           |   1       null       |
+    //  4        4           |   0       null       |
+    //  5        1           |                      |
+
+    TableView tv = t1->where().less(t1_int_col, 6).find_all();
+
+    // Test original funcionality through chain class
+    std::vector<size_t> results1 = { 0, 1, 2, 3, 4, 5 };
+    tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
+    CHECK_EQUAL(tv.size(), results1.size());
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+    }
+    tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]);
+    }
+
+    // Test basic one link chain
+    std::vector<size_t> results2 = { 3, 4, 2, 1, 5, 0 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
+    CHECK_EQUAL(tv.size(), results2.size());
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+    }
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[results2.size() - 1 - i]);
+    }
+
+    // Test link chain through two links with nulls
+    std::vector<size_t> results3 = { 1, 0, 2, 5 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {true}));
+    // No guarantees about nullified links except they are at the end.
+    CHECK(tv.size() >= results3.size());
+    for (size_t i = 0; i < results3.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+    }
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
+    // No guarantees about nullified links except they are at the beginning.
+    size_t num_nulls = tv.size() - results3.size();
+    for (size_t i = num_nulls; i < results3.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results2.size() - 1 - i]);
+    }
+
+    // Test link chain with nulls and a single local column
+    std::vector<size_t> results4 = { 1, 0, 2, 5, 3, 4 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}));
+    CHECK_EQUAL(tv.size(), results4.size());
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4[i]);
+    }
+    std::vector<size_t> results4_rev = { 1, 0, 2, 5, 4, 3 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, false}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev[i]);
+    }
+    std::vector<size_t> results4_rev2 = { 3, 4, 5, 2, 0, 1 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, true}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev2[i]);
+    }
+    std::vector<size_t> results4_rev3 = { 4, 3, 5, 2, 0, 1 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, false}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev3[i]);
+    }
+}
+
+
+TEST(Query_LinkChainSortErrors)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_linklist_col = t1->add_column_link(type_LinkList, "t1_linklist", *t2);
+    size_t t2_string_col = t2->add_column(type_String, "t2_string");
+    t2->add_column_link(type_Link, "t2_link_t1", *t1); // add a backlink to t1
+
+    // Disallow backlinks, linklists, other non-link column types.
+    size_t backlink_ndx = 2;
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_linklist_col, t2_string_col}}), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{backlink_ndx, t2_string_col}}), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_int_col, t2_string_col}}), LogicError::type_mismatch);
+}
+
+
+TEST(Query_DistinctThroughLinks)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+
+    t1->add_empty_row(7);
+    t2->add_empty_row(6);
+    t3->add_empty_row(4);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t2->size(); i++) {
+        t1->set_int(t1_int_col, i + 1, i);
+        t2->set_int(t2_int_col, i, t2->size() - i - 1);
+    }
+    t2->set_int(t2_int_col, 0, 0);
+    t2->set_int(t2_int_col, 1, 0);
+
+    t1->set_link(t1_link_col, 0, 1);
+    t1->set_link(t1_link_col, 1, 0);
+    t1->set_link(t1_link_col, 2, 2);
+    t1->set_link(t1_link_col, 3, 3);
+    t1->set_link(t1_link_col, 4, 5);
+    t1->set_link(t1_link_col, 5, 4);
+    t1->set_link(t1_link_col, 6, 1);
+
+    t2->set_link(t2_link_col, 0, 3);
+    t2->set_link(t2_link_col, 1, 2);
+    t2->set_link(t2_link_col, 2, 0);
+    t2->set_link(t2_link_col, 3, 1);
+    t2->nullify_link(t2_link_col, 4);
+    t2->nullify_link(t2_link_col, 5);
+
+    t3->set_null(t3_int_col, 0);
+    t3->set_int(t3_int_col, 1, 4);
+    t3->set_int(t3_int_col, 2, 7);
+    t3->set_int(t3_int_col, 3, 3);
+    t3->set_string(t3_str_col, 0, "b");
+    t3->set_string(t3_str_col, 1, "a");
+    t3->set_string(t3_str_col, 2, "c");
+    t3->set_string(t3_str_col, 3, "k");
+
+    //  T1                       T2                     T3
+    //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
+    //  ==============================================================
+    //  99       1           |   0       3          |   null    "b"
+    //  0        0           |   0       2          |   4       "a"
+    //  1        2           |   3       0          |   7       "c"
+    //  2        3           |   2       1          |   3       "k"
+    //  3        5           |   1       null       |
+    //  4        4           |   0       null       |
+    //  5        1           |                      |
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+
+        // Test original funcionality through chain class
+        std::vector<size_t> results1 = { 0, 1, 2, 3, 4, 5 };
+        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}, {true} ));
+        CHECK_EQUAL(tv.size(), results1.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+        }
+        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
+        }
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
+        }
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
+        }
+    }
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all(); // fresh unsorted view
+
+        // Test basic one link chain
+        std::vector<size_t> results2 = { 0, 1, 2, 4 };
+        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        CHECK_EQUAL(tv.size(), results2.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+        }
+        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results2.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            // no difference even though false on distinct was specified
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+        }
+
+        std::vector<size_t> results2_sorted_link = { 0, 4, 2, 1 };
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
+        CHECK_EQUAL(tv.size(), results2_sorted_link.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[i]);
+        }
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[results2_sorted_link.size() - 1 - i]);
+        }
+    }
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all(); // fresh unsorted view
+
+        // Test link chain through two links with nulls
+        std::vector<size_t> results3 = { 0, 1, 2, 5 };
+        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
+        // Nullified links are excluded from distinct.
+        CHECK_EQUAL(tv.size(), results3.size());
+        for (size_t i = 0; i < results3.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+        }
+        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results3.size());
+        for (size_t i = 0; i < results3.size(); ++i) {
+            // same order as before
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+        }
+
+        results3 = { 1, 0, 2, 5 }; // sorted order on t3_col_int { null, 3, 4, 7 }
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
+        CHECK_EQUAL(tv.size(), results3.size());
+        for (size_t i = 0; i < results3.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+        }
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results3.size());
+        for (size_t i = 0; i < results3.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results3.size() - 1 - i]);
+        }
+    }
+}
+
 
 TEST(Query_Sort_And_Requery_Typed1)
 {
