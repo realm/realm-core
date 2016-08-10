@@ -36,7 +36,7 @@ class ObjectSchema;
 class Query;
 class Realm;
 class Results;
-struct SortOrder;
+class SortDescriptor;
 
 class List {
 public:
@@ -73,7 +73,7 @@ public:
 
     void delete_all();
 
-    Results sort(SortOrder order);
+    Results sort(SortDescriptor order);
     Results filter(Query q);
 
     // Return a Results representing a snapshot of this List.

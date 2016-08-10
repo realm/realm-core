@@ -65,16 +65,18 @@ private:
 
         struct {
             QueryHandover query_handover;
-            SortOrder sort_order;
+            SortDescriptor::HandoverPatch sort_order;
         } m_results;
     };
 
-    AnyHandover(RowHandover row_handover, std::string object_schema_name) : m_type(AnyThreadConfined::Type::Object),
-        m_object({std::move(row_handover), std::move(object_schema_name)}) {}
-    AnyHandover(LinkViewHandover link_view) : m_type(AnyThreadConfined::Type::List),
-        m_list({std::move(link_view)}) {}
-    AnyHandover(QueryHandover query_handover, SortOrder sort_order) : m_type(AnyThreadConfined::Type::Results),
-        m_results({std::move(query_handover), sort_order}) {}
+    AnyHandover(RowHandover row_handover, std::string object_schema_name)
+    : m_type(AnyThreadConfined::Type::Object), m_object({std::move(row_handover), std::move(object_schema_name)}) {}
+
+    AnyHandover(LinkViewHandover link_view)
+    : m_type(AnyThreadConfined::Type::List), m_list({std::move(link_view)}) {}
+
+    AnyHandover(QueryHandover query_handover, SortDescriptor::HandoverPatch sort_order)
+    : m_type(AnyThreadConfined::Type::Results), m_results({std::move(query_handover), std::move(sort_order)}) {}
 };
 }
 }

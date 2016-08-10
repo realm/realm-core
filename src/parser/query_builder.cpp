@@ -113,7 +113,7 @@ struct PropertyExpression
         }
 
         table_getter = [&] {
-            TableRef& tbl = query.get_table();
+            auto& tbl = query.get_table();
             for (size_t col : indexes) {
                 tbl->link(col); // mutates m_link_chain on table
             }
@@ -217,19 +217,19 @@ void add_binary_constraint_to_query(Query &query,
                                     std::string &&value) {
     switch (op) {
         case Predicate::Operator::BeginsWith:
-            query.begins_with(column.m_column, BinaryData(value));
+            query.begins_with(column.column_ndx(), BinaryData(value));
             break;
         case Predicate::Operator::EndsWith:
-            query.ends_with(column.m_column, BinaryData(value));
+            query.ends_with(column.column_ndx(), BinaryData(value));
             break;
         case Predicate::Operator::Contains:
-            query.contains(column.m_column, BinaryData(value));
+            query.contains(column.column_ndx(), BinaryData(value));
             break;
         case Predicate::Operator::Equal:
-            query.equal(column.m_column, BinaryData(value));
+            query.equal(column.column_ndx(), BinaryData(value));
             break;
         case Predicate::Operator::NotEqual:
-            query.not_equal(column.m_column, BinaryData(value));
+            query.not_equal(column.column_ndx(), BinaryData(value));
             break;
         default:
             throw std::logic_error("Unsupported operator for binary queries.");
@@ -242,10 +242,10 @@ void add_binary_constraint_to_query(realm::Query &query,
                                     Columns<Binary> &&column) {
     switch (op) {
         case Predicate::Operator::Equal:
-            query.equal(column.m_column, BinaryData(value));
+            query.equal(column.column_ndx(), BinaryData(value));
             break;
         case Predicate::Operator::NotEqual:
-            query.not_equal(column.m_column, BinaryData(value));
+            query.not_equal(column.column_ndx(), BinaryData(value));
             break;
         default:
             throw std::logic_error("Substring comparison not supported for keypath substrings.");

@@ -35,7 +35,7 @@ AnyHandover::AnyHandover(AnyHandover&& handover)
 
         case AnyThreadConfined::Type::Results:
             new (&m_results.query_handover) QueryHandover(std::move(handover.m_results.query_handover));
-            new (&m_results.sort_order) SortOrder(std::move(handover.m_results.sort_order));
+            new (&m_results.sort_order) SortDescriptor::HandoverPatch(std::move(handover.m_results.sort_order));
             break;
     }
     new (&m_type) AnyThreadConfined::Type(handover.m_type);
@@ -61,7 +61,7 @@ AnyHandover::~AnyHandover()
 
         case AnyThreadConfined::Type::Results:
             m_results.query_handover.~unique_ptr();
-            m_results.sort_order.~SortOrder();
+            m_results.sort_order.~unique_ptr();
             break;
     }
 }
@@ -82,7 +82,9 @@ AnyThreadConfined AnyHandover::import_from_handover(SharedRealm realm) &&
         }
         case AnyThreadConfined::Type::Results: {
             auto query = shared_group.import_from_handover(std::move(m_results.query_handover));
-            return AnyThreadConfined(Results(std::move(realm), std::move(*query), m_results.sort_order));
+            auto& table = *query->get_table();
+            return AnyThreadConfined(Results(std::move(realm), std::move(*query),
+                                             SortDescriptor::create_from_and_consume_patch(m_results.sort_order, table)));
         }
     }
 }

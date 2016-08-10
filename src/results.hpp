@@ -36,13 +36,6 @@ namespace _impl {
     class ResultsNotifier;
 }
 
-struct SortOrder {
-    std::vector<size_t> column_indices;
-    std::vector<bool> ascending;
-
-    explicit operator bool() const { return !column_indices.empty(); }
-};
-
 class Results {
 public:
     // Results can be either be backed by nothing, a thin wrapper around a table,
@@ -50,9 +43,9 @@ public:
     // the tableview as needed
     Results();
     Results(SharedRealm r, Table& table);
-    Results(SharedRealm r, Query q, SortOrder s = {});
-    Results(SharedRealm r, TableView tv, SortOrder s = {});
-    Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q = {}, SortOrder s = {});
+    Results(SharedRealm r, Query q, SortDescriptor s = {});
+    Results(SharedRealm r, TableView tv, SortDescriptor s = {});
+    Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q = {}, SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable
@@ -72,7 +65,7 @@ public:
     Query get_query() const;
 
     // Get the currently applied sort order for this Results
-    SortOrder const& get_sort() const noexcept { return m_sort; }
+    SortDescriptor const& get_sort() const noexcept { return m_sort; }
 
     // Get a tableview containing the same rows as this Results
     TableView get_tableview();
@@ -109,7 +102,7 @@ public:
 
     // Create a new Results by further filtering or sorting this Results
     Results filter(Query&& q) const;
-    Results sort(SortOrder&& sort) const;
+    Results sort(SortDescriptor&& sort) const;
 
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
     Results snapshot() const &;
@@ -204,7 +197,7 @@ private:
     TableView m_table_view;
     LinkViewRef m_link_view;
     Table* m_table = nullptr;
-    SortOrder m_sort;
+    SortDescriptor m_sort;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 
