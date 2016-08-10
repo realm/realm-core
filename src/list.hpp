@@ -31,6 +31,7 @@
 namespace realm {
 using RowExpr = BasicRowExpr<Table>;
 
+class AnyThreadConfined;
 class ObjectSchema;
 class Query;
 class Realm;
@@ -107,6 +108,8 @@ public:
     };
 
 private:
+    friend AnyThreadConfined;
+
     std::shared_ptr<Realm> m_realm;
     mutable const ObjectSchema* m_object_schema = nullptr;
     LinkViewRef m_link_view;
