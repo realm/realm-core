@@ -450,7 +450,9 @@ bool Realm::compact()
 
 void Realm::write_copy(StringData path, BinaryData key)
 {
-    REALM_ASSERT(!key.data() || key.size() == 64);
+    if (key.data() && key.size() != 64) {
+        throw InvalidEncryptionKeyException();
+    }
     verify_thread();
     try {
         read_group().write(path, key.data());
