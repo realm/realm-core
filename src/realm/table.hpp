@@ -450,6 +450,13 @@ public:
     /// Users intending to implement primary keys must therefore manually check
     /// for duplicates if they want to raise an error instead.
     ///
+    /// NOTE:  It is an error to call either function after adding elements to a
+    /// linklist in the object. In general, calling set_int_unique() or
+    /// set_string_unique() should be the first thing that happens after
+    /// creating a row. These limitations are imposed by limitations in the
+    /// Realm Object Server and may be relaxed in the future. A violation of
+    /// these rules results in a LogicError being thrown.
+    ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
     /// or equal to the size of the currently stored string.
@@ -814,6 +821,8 @@ protected:
     bool compare_rows(const Table&) const;
 
     void set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const;
+
+    void check_lists_are_empty(size_t row_ndx) const;
 
 private:
     class SliceWriter;
