@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 1.5.0 Release notes
 
 ### Bugfixes
 
@@ -11,7 +11,8 @@
 
 ### Breaking changes
 
-* Added support for sorting and distincting table views through a chain of links. (#1030)
+* Added support for sorting and distincting table views through a chain of
+  links. (#1030)
 
 ### Enhancements
 
