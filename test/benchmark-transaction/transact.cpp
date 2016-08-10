@@ -55,7 +55,7 @@ REALM_TABLE_2(TestTable,
 struct thread_info {
     pthread_t thread_id;
     int       thread_num;
-    char     *datfile;
+    char*     datfile;
 };
 
 
@@ -74,7 +74,7 @@ static pthread_mutex_t mtx_writers = PTHREAD_MUTEX_INITIALIZER;
 
 double wall_time;
 
-void usage(const char *msg)
+void usage(const char* msg)
 {
     if (strlen(msg) > 0)
         std::cout << "Error: " << msg << std::endl << std::endl;
@@ -93,7 +93,7 @@ void usage(const char *msg)
 
 
 // minimal version: no error checks!
-void copy(const char *src, const char *dst)
+void copy(const char* src, const char* dst)
 {
     int fd_to, fd_from;
     char buf[4096];
@@ -102,7 +102,7 @@ void copy(const char *src, const char *dst)
     fd_from = open(src, O_RDONLY);
     fd_to = open(dst, O_WRONLY | O_CREAT | O_EXCL, 0666);
     while ((nread = read(fd_from, buf, sizeof(buf))) > 0) {
-        char *out_ptr = buf;
+        char* out_ptr = buf;
         ssize_t nwritten;
         do {
             nwritten = write(fd_to, out_ptr, nread);
@@ -118,9 +118,9 @@ void copy(const char *src, const char *dst)
 }
 
 // copy table in mysql
-void copy_db(const char *src, const char *dst)
+void copy_db(const char* src, const char* dst)
 {
-    MYSQL    *db;
+    MYSQL*    db;
     char sql[128];
 
     db = mysql_init(NULL);
@@ -160,29 +160,29 @@ void update_writer(struct timespec ts_1, struct timespec ts_2)
 
 
 // keep retrying
-int db_retry(void *data, int i)
+int db_retry(void* data, int i)
 {
     return 1;
 }
 
-static void *sqlite_reader(void *arg)
+static void* sqlite_reader(void* arg)
 {
     struct timespec ts_1, ts_2;
-    sqlite3 *db;
+    sqlite3* db;
     long int randy;
-    char *errmsg;
+    char* errmsg;
     char sql[128];
-    sqlite3_stmt *s;
-    char *tail;
+    sqlite3_stmt* s;
+    char* tail;
     long int c = 0;
 
-    struct thread_info *tinfo = (struct thread_info *)arg;
+    struct thread_info* tinfo = (struct thread_info*)arg;
     srandom(tinfo->thread_num);
     sqlite3_open(tinfo->datfile, &db);
     sqlite3_busy_handler(db, &db_retry, NULL);
 
     sprintf(sql, "SELECT COUNT(*) FROM test WHERE y = @Y");
-    sqlite3_prepare_v2(db, sql, 128, &s, (const char **)&tail);
+    sqlite3_prepare_v2(db, sql, 128, &s, (const char**)&tail);
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -216,15 +216,15 @@ static void *sqlite_reader(void *arg)
     return NULL;
 }
 
-static void *mysql_reader(void *arg)
+static void* mysql_reader(void* arg)
 {
     struct timespec ts_1, ts_2;
     long int randy;
     char sql[128];
-    MYSQL *db;
+    MYSQL* db;
     long int c = 0;
 
-    struct thread_info *tinfo = (struct thread_info *)arg;
+    struct thread_info* tinfo = (struct thread_info*)arg;
     srandom(tinfo->thread_num);
 
     // open mysql
@@ -252,7 +252,7 @@ static void *mysql_reader(void *arg)
         if (mysql_query(db, sql)) {
             std::cout << "MySQL error in " << sql << ": " << mysql_errno(db) << std::endl;
         }
-        MYSQL_RES *res = mysql_use_result(db);
+        MYSQL_RES* res = mysql_use_result(db);
         MYSQL_ROW row = mysql_fetch_row(res);
         c += atoi(row[0]);
         mysql_free_result(res);
@@ -270,10 +270,10 @@ static void *mysql_reader(void *arg)
     mysql_close(db);
 }
 
-static void *realm_reader(void *arg)
+static void* realm_reader(void* arg)
 {
     struct timespec ts_1, ts_2;
-    struct thread_info *tinfo = (struct thread_info *)arg;
+    struct thread_info* tinfo = (struct thread_info*)arg;
     size_t c = 0;
     srandom(tinfo->thread_num);
     clock_gettime(CLOCK_REALTIME, &ts_1);
@@ -305,23 +305,23 @@ static void *realm_reader(void *arg)
     return NULL;
 }
 
-static void *sqlite_writer(void *arg)
+static void* sqlite_writer(void* arg)
 {
-    sqlite3 *db;
+    sqlite3* db;
     long int randx, randy;
-    char *errmsg;
+    char* errmsg;
     char sql[128];
     struct timespec ts_1, ts_2;
-    sqlite3_stmt *s;
-    char *tail;
+    sqlite3_stmt* s;
+    char* tail;
 
-    struct thread_info *tinfo = (struct thread_info *) arg;
+    struct thread_info* tinfo = (struct thread_info*) arg;
     srandom(tinfo->thread_num);
 
     sqlite3_open(tinfo->datfile, &db);
     sqlite3_busy_handler(db, &db_retry, NULL);
     sprintf(sql, "UPDATE test SET x=@X WHERE y = @Y");
-    sqlite3_prepare_v2(db, sql, 128, &s, (const char **)&tail);
+    sqlite3_prepare_v2(db, sql, 128, &s, (const char**)&tail);
     while (true) {
         pthread_mutex_lock(&mtx_runnable);
         bool local_runnable = runnable;
@@ -353,14 +353,14 @@ static void *sqlite_writer(void *arg)
     return NULL;
 }
 
-static void *mysql_writer(void *arg)
+static void* mysql_writer(void* arg)
 {
     struct timespec ts_1, ts_2;
     long int randx, randy;
     char sql[128];
-    MYSQL *db;
+    MYSQL* db;
 
-    struct thread_info *tinfo = (struct thread_info *)arg;
+    struct thread_info* tinfo = (struct thread_info*)arg;
     srandom(tinfo->thread_num);
 
     // open mysql
@@ -398,10 +398,10 @@ static void *mysql_writer(void *arg)
     return NULL;
 }
 
-static void *realm_writer(void *arg)
+static void* realm_writer(void* arg)
 {
     struct timespec ts_1, ts_2;
-    struct thread_info *tinfo = (struct thread_info *)arg;
+    struct thread_info* tinfo = (struct thread_info*)arg;
     srandom(tinfo->thread_num);
     SharedGroup sg(tinfo->datfile);
     while (true) {
@@ -433,13 +433,13 @@ static void *realm_writer(void *arg)
     return NULL;
 }
 
-void sqlite_create(const char *f, long n, bool wal)
+void sqlite_create(const char* f, long n, bool wal)
 {
     int      i;
     long     randx, randy;
     char     sql[128];
-    sqlite3 *db;
-    char    *errmsg;
+    sqlite3* db;
+    char*    errmsg;
 
     util::File::try_remove(f);
     srandom(1);
@@ -466,12 +466,12 @@ void sqlite_create(const char *f, long n, bool wal)
     sqlite3_close(db);
 }
 
-void mysql_create(const char *f, long n)
+void mysql_create(const char* f, long n)
 {
     int      i;
     long     randx, randy;
     char     sql[128];
-    MYSQL    *db;
+    MYSQL*    db;
 
     db = mysql_init(NULL);
     mysql_real_connect(db, DB_HOST, DB_USER, DB_PASS, DB_NAME, 0, NULL, 0);
@@ -495,7 +495,7 @@ void mysql_create(const char *f, long n)
     mysql_close(db);
 }
 
-void realm_create(const char *f, long n)
+void realm_create(const char* f, long n)
 {
     util::File::try_remove(f);
     util::File::try_remove(std::string(f)+".lock");
@@ -515,11 +515,11 @@ void realm_create(const char *f, long n)
 }
 
 
-void benchmark(bool single, int database, const char *datfile, long n_readers, long n_writers, unsigned int duration)
+void benchmark(bool single, int database, const char* datfile, long n_readers, long n_writers, unsigned int duration)
 {
     pthread_attr_t attr;
-    struct thread_info *tinfo;
-    void *res;
+    struct thread_info* tinfo;
+    void* res;
 
     wall_time         = 0.0;
     dt_readers        = 0.0;
@@ -543,7 +543,7 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
     }
 
     assert(pthread_attr_init(&attr) == 0);
-    assert((tinfo = (struct thread_info *)calloc(sizeof(struct thread_info), n_readers+n_writers)) != NULL);
+    assert((tinfo = (struct thread_info*)calloc(sizeof(struct thread_info), n_readers+n_writers)) != NULL);
 
     for(int i=0; i<(n_readers+n_writers); ++i) {
         tinfo[i].thread_num = i+1;
@@ -615,18 +615,18 @@ void benchmark(bool single, int database, const char *datfile, long n_readers, l
         unlink(("tmp"+std::string(datfile)).c_str());
         unlink(("tmp"+std::string(datfile)+".lock").c_str());
     }
-    free((void *)tinfo);
+    free((void*)tinfo);
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int c;
     long n_readers = -1, n_writers = -1, n_records = -1;
     unsigned int duration = 0;
     int database = -1;
     bool single  = true;
-    extern char *optarg;
-    char *datfile = NULL;
+    extern char* optarg;
+    char* datfile = NULL;
 
     verbose = false;
     while ((c = getopt(argc, argv, "hr:w:f:n:t:d:vs")) != EOF) {

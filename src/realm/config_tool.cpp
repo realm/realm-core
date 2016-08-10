@@ -48,7 +48,7 @@ void clear_emit_flags()
 
 bool dirty = false;
 
-void emit_flags(const char*str)
+void emit_flags(const char* str)
 {
     if (dirty)
         std::cout << ' ';

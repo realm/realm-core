@@ -68,7 +68,7 @@ public:
                  size_t end = npos) const noexcept;
     size_t find_first(StringData value, size_t begin = 0,
                       size_t end = npos) const noexcept;
-    void find_all(IntegerColumn &result, StringData value, size_t add_offset = 0,
+    void find_all(IntegerColumn& result, StringData value, size_t add_offset = 0,
                   size_t begin = 0, size_t end = npos) const;
 
     /// Get the specified element without the cost of constructing an

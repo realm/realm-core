@@ -22,7 +22,7 @@
 
 using namespace realm;
 
-int main(int, char*[])
+int main(int, char* [])
 {
     Table t;
 

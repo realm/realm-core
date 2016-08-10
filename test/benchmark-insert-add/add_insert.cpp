@@ -60,7 +60,7 @@ void usage()
 } // anonymous namespace
 
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     size_t N = 100000000;
     size_t n = 50000;
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     TestTable t;
 
     int c;
-    extern char *optarg;
+    extern char* optarg;
 
     bool use_shared    = false;
     SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_Full;

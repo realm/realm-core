@@ -33,9 +33,9 @@ REALM_TABLE_7(IndexTable,
 
 
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    Group *g = new Group();
+    Group* g = new Group();
 
     BasicTableRef<IndexTable> t = g->add_table<IndexTable>("test");
     srandom(1);

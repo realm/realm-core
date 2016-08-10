@@ -522,7 +522,7 @@ void Array::move_rotate(size_t from, size_t to, size_t num_elems)
     }
     else {
         size_t bytes_per_elem = bits_per_elem / 8;
-        char *first, *new_first, *last;
+        char* first, *new_first, *last;
         if (from < to) {
             first     = m_data + (from * bytes_per_elem);
             new_first = m_data + ((from + num_elems) * bytes_per_elem);
@@ -1060,7 +1060,7 @@ bool Array::minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx
         }
 
         if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof (__m128i) * 8 / no0(w)) {
-            __m128i *data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
+            __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
             __m128i state = data[0];
             char state2[sizeof (state)];
 
@@ -1151,7 +1151,7 @@ int64_t Array::sum(size_t start, size_t end) const
         const uint64_t m4  = 0x0f0f0f0f0f0f0f0fULL;
         const uint64_t h01 = 0x0101010101010101ULL;
 
-        int64_t *data = reinterpret_cast<int64_t*>(m_data + start * w / 8);
+        int64_t* data = reinterpret_cast<int64_t*>(m_data + start * w / 8);
         size_t chunks = (end - start) * w / 8 / sizeof (int64_t);
 
         for (size_t t = 0; t < chunks; t++) {
@@ -2767,7 +2767,7 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
 }
 
 
-bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state, bool nullable_array, bool find_null) const
+bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, bool nullable_array, bool find_null) const
 {
     if (cond == cond_Equal) {
         return find<Equal>(action, value, start, end, baseindex, state, nullable_array, find_null);

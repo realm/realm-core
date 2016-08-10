@@ -89,7 +89,7 @@ inline void ptf_randsleep(void)
     }
 }
 
-inline int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_trylock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_trylock(mutex);
@@ -97,7 +97,7 @@ inline int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
     return i;
 }
 
-inline int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
+inline int ptf_pthread_barrier_wait(pthread_barrier_t* barrier)
 {
     ptf_randsleep();
     int i = pthread_barrier_wait(barrier);
@@ -105,7 +105,7 @@ inline int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
     return i;
 }
 
-inline int ptf_pthread_mutex_lock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_lock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_lock(mutex);
@@ -113,7 +113,7 @@ inline int ptf_pthread_mutex_lock(pthread_mutex_t * mutex)
     return i;
 }
 
-inline int ptf_pthread_mutex_unlock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_unlock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_unlock(mutex);

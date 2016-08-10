@@ -194,7 +194,7 @@ int64_t Importer::parse_integer(const char* col, bool* success)
 // Convert string to bool. Set can_fail = true if you also want to verify if your string was of that type. In this
 // case, provide the optional 'success' argument. If the string is null (as defined by is_null()) it will return false
 template<bool can_fail>
-bool Importer::parse_bool(const char*col, bool* success)
+bool Importer::parse_bool(const char* col, bool* success)
 {
     // Must be tuples of {true value, false value}
     static const char* a[] = {"True", "False", "true", "false", "TRUE", "FALSE", "1", "0", "Yes", "No", "yes", "no", "YES", "NO"};
@@ -243,7 +243,7 @@ bool Importer::parse_bool(const char*col, bool* success)
 // If the string contains more than 6 significant digits (5.259862, -9.1869e11), it will return *success = false
 // because a 32-bit float cannot represent so many significants. In that case, use double instead
 template<bool can_fail>
-float Importer::parse_float(const char*col, bool* success)
+float Importer::parse_float(const char* col, bool* success)
 {
     bool s;
     size_t significants = 0;
@@ -430,7 +430,7 @@ std::vector<DataType> Importer::detect_scheme(std::vector<std::vector<std::strin
     return res;
 }
 
-size_t Importer::tokenize(std::vector<std::vector<std::string>> & payload, size_t records)
+size_t Importer::tokenize(std::vector<std::vector<std::string>>& payload, size_t records)
 {
     size_t original_size = payload.size();
 
@@ -544,7 +544,7 @@ end:
     return payload.size() - original_size;
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType> *import_scheme, std::vector<std::string> *column_names,
+size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* import_scheme, std::vector<std::string>* column_names,
                             size_t type_detection_rows, size_t skip_first_rows,
                             size_t import_rows)
 {

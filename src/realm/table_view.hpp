@@ -380,7 +380,7 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row);
+    TableViewBase(Table* parent, Table* linked_table, size_t column, BasicRowExpr<const Table> row);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -624,7 +624,7 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(Table *parent, Table *linked_table, size_t column, ConstRowExpr row);
+    TableView(Table* parent, Table* linked_table, size_t column, ConstRowExpr row);
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
@@ -833,7 +833,7 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
-inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row):
+inline TableViewBase::TableViewBase(Table* parent, Table* linked_table, size_t column, BasicRowExpr<const Table> row):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
     m_linked_table(linked_table->get_table_ref()), // Throws
@@ -1290,7 +1290,7 @@ inline TableView::TableView(Table& parent, Query& query, size_t start, size_t en
 {
 }
 
-inline TableView::TableView(Table *parent, Table *linked_table, size_t column, ConstRowExpr row):
+inline TableView::TableView(Table* parent, Table* linked_table, size_t column, ConstRowExpr row):
     TableViewBase(parent, linked_table, column, row)
 {
 }

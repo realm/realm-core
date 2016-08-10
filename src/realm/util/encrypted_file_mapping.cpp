@@ -111,13 +111,13 @@ off_t iv_table_pos(off_t pos)
     return metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size;
 }
 
-void check_write(int fd, off_t pos, const void *data, size_t len)
+void check_write(int fd, off_t pos, const void* data, size_t len)
 {
     ssize_t ret = pwrite(fd, data, len, pos);
     REALM_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
 }
 
-size_t check_read(int fd, off_t pos, void *dst, size_t len)
+size_t check_read(int fd, off_t pos, void* dst, size_t len)
 {
     ssize_t ret = pread(fd, dst, len, pos);
     REALM_ASSERT(ret >= 0);
@@ -177,7 +177,7 @@ iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
     return m_iv_buffer[idx];
 }
 
-bool AESCryptor::check_hmac(const void *src, size_t len, const uint8_t *hmac) const
+bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) const
 {
     uint8_t buffer[224 / 8];
     calc_hmac(src, len, buffer, m_hmacKey);

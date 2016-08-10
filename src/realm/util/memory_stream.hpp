@@ -34,7 +34,7 @@ public:
     MemoryInputStreambuf();
     ~MemoryInputStreambuf() noexcept;
 
-    void set_buffer(const char *begin, const char *end) noexcept;
+    void set_buffer(const char* begin, const char* end) noexcept;
 
 private:
     int_type underflow() override;
@@ -71,11 +71,11 @@ public:
     MemoryInputStream();
     ~MemoryInputStream() noexcept;
 
-    void set_buffer(const char *begin, const char *end) noexcept;
+    void set_buffer(const char* begin, const char* end) noexcept;
 
     void set_string(const std::string&);
 
-    void set_c_string(const char *c_str) noexcept;
+    void set_c_string(const char* c_str) noexcept;
 
 private:
     MemoryInputStreambuf m_streambuf;
@@ -87,7 +87,7 @@ public:
     MemoryOutputStream();
     ~MemoryOutputStream() noexcept;
 
-    void set_buffer(char *begin, char *end) noexcept;
+    void set_buffer(char* begin, char* end) noexcept;
 
     template<size_t N>
     void set_buffer(char (&buffer)[N]) noexcept;
@@ -116,7 +116,7 @@ inline MemoryInputStreambuf::~MemoryInputStreambuf() noexcept
 {
 }
 
-inline void MemoryInputStreambuf::set_buffer(const char *begin, const char *end) noexcept
+inline void MemoryInputStreambuf::set_buffer(const char* begin, const char* end) noexcept
 {
     m_begin = begin;
     m_end   = end;
@@ -152,7 +152,7 @@ inline MemoryInputStream::~MemoryInputStream() noexcept
 {
 }
 
-inline void MemoryInputStream::set_buffer(const char *begin, const char *end) noexcept
+inline void MemoryInputStream::set_buffer(const char* begin, const char* end) noexcept
 {
     m_streambuf.set_buffer(begin, end);
     clear();
@@ -165,7 +165,7 @@ inline void MemoryInputStream::set_string(const std::string& str)
     set_buffer(begin, end);
 }
 
-inline void MemoryInputStream::set_c_string(const char *c_str) noexcept
+inline void MemoryInputStream::set_c_string(const char* c_str) noexcept
 {
     const char* begin = c_str;
     const char* end   = begin + traits_type::length(c_str);
@@ -182,7 +182,7 @@ inline MemoryOutputStream::~MemoryOutputStream() noexcept
 {
 }
 
-inline void MemoryOutputStream::set_buffer(char *begin, char *end) noexcept
+inline void MemoryOutputStream::set_buffer(char* begin, char* end) noexcept
 {
     m_streambuf.set_buffer(begin, end);
     clear();

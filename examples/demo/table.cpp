@@ -31,7 +31,7 @@ REALM_TABLE_4(People,
               hired, Bool,
               phones, Subtable<Phones>)
 
-int main(int, char*[])
+int main(int, char* [])
 {
 
     People t;

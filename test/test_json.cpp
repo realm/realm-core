@@ -227,7 +227,7 @@ bool json_test(std::string json, std::string expected_file, bool generate)
     file_name += expected_file + ".json";
 
     jsmn_parser p;
-    jsmntok_t *t = new jsmntok_t[10000];
+    jsmntok_t* t = new jsmntok_t[10000];
     jsmn_init(&p);
     int r = jsmn_parse(&p, json.c_str(), strlen(json.c_str()), t, 10000);
     delete[] t;

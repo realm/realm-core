@@ -1078,7 +1078,7 @@ public:
     BasicTable(): m_size(0)
     {
         m_size = 256;
-        m_cols = new void*[TypeCount<typename Spec::Columns>::value];
+        m_cols = new void* [TypeCount<typename Spec::Columns>::value];
         ForEachType<typename Spec::Columns, MakeCol>::exec(this);
     }
 

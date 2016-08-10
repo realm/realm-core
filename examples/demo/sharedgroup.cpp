@@ -89,7 +89,7 @@ int main()
 {
     pthread_attr_t attr;
     struct thread_info tinfo[2];
-    void *res;
+    void* res;
 
     pthread_attr_init(&attr);
     tinfo[0].thread_num = 1;

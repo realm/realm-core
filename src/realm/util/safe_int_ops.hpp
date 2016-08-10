@@ -476,9 +476,9 @@ struct SafeIntBinops: SafeIntBinopsImpl<L, R, std::numeric_limits<L>::is_signed,
     std::numeric_limits<R>::is_signed> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
-    static_assert(lim_l::is_specialized && lim_r::is_specialized,
+    static_assert(lim_l::is_specialized&& lim_r::is_specialized,
                   "std::numeric_limits<> must be specialized for both types");
-    static_assert(lim_l::is_integer && lim_r::is_integer,
+    static_assert(lim_l::is_integer&& lim_r::is_integer,
                   "Both types must be integers");
 };
 

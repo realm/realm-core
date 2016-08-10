@@ -34,7 +34,7 @@ int main()
     const size_t TESTS = 100;
 
     // Open sqlite in-memory db
-    sqlite3 *db = NULL;
+    sqlite3* db = NULL;
     int rc = sqlite3_open(":memory:", &db);
     if( rc ) {
         std::cerr << "Can't open database: "<<sqlite3_errmsg(db)<<"\n";
@@ -43,7 +43,7 @@ int main()
     }
 
     // Create table
-    char *zErrMsg = NULL;
+    char* zErrMsg = NULL;
     rc = sqlite3_exec(db, "create table t1 (first INTEGER, second VARCHAR(100), third INTEGER, fourth INTEGER);", NULL, NULL, &zErrMsg);
     if (rc != SQLITE_OK) {
         std::cerr << "SQL error: "<<zErrMsg<<"\n";
@@ -51,7 +51,7 @@ int main()
     }
 
     // Prepare insert statement
-    sqlite3_stmt *ppStmt = NULL;
+    sqlite3_stmt* ppStmt = NULL;
     rc = sqlite3_prepare(db, "INSERT INTO t1 VALUES(?1, ?2, ?3, ?4);", -1, &ppStmt, NULL);
     if (rc != SQLITE_OK) {
         std::cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";

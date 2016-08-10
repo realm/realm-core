@@ -1878,12 +1878,12 @@ BinaryColumn& Table::get_column_binary(size_t ndx)
     return get_column<BinaryColumn, col_type_Binary>(ndx);
 }
 
-const SubtableColumn &Table::get_column_table(size_t ndx) const noexcept
+const SubtableColumn& Table::get_column_table(size_t ndx) const noexcept
 {
     return get_column<SubtableColumn, col_type_Table>(ndx);
 }
 
-SubtableColumn &Table::get_column_table(size_t ndx)
+SubtableColumn& Table::get_column_table(size_t ndx)
 {
     return get_column<SubtableColumn, col_type_Table>(ndx);
 }
@@ -4287,7 +4287,7 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
     return const_cast<Table*>(this)->get_range_view(begin, end);
 }
 
-TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_col_ndx)
+TableView Table::get_backlink_view(size_t row_ndx, Table* src_table, size_t src_col_ndx)
 {
     TableView tv(src_table, this, src_col_ndx, get(row_ndx));
     tv.do_sync();

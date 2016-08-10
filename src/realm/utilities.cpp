@@ -140,7 +140,7 @@ void* round_up(void* p, size_t align)
     // be stored in size_t. Use uintptr_t instead. The problem with
     // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
-    return static_cast<char *>(p) + r;
+    return static_cast<char*>(p) + r;
 }
 
 void* round_down(void* p, size_t align)
@@ -149,7 +149,7 @@ void* round_down(void* p, size_t align)
     // be stored in size_t. Use uintptr_t instead. The problem with
     // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p);
-    return reinterpret_cast<void *>(r & ~(align - 1));
+    return reinterpret_cast<void*>(r & ~(align - 1));
 }
 
 size_t round_up(size_t p, size_t align)

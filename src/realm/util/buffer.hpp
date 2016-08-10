@@ -74,7 +74,7 @@ public:
 
     T* release() noexcept;
 
-    friend void swap(Buffer&a, Buffer&b) noexcept
+    friend void swap(Buffer& a, Buffer& b) noexcept
     {
         using std::swap;
         swap(a.m_data, b.m_data);

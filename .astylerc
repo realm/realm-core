@@ -5,8 +5,8 @@
 --indent-switches
 #--pad-oper
 #--pad-header
-#--align-pointer=type
-#--align-reference=type
+--align-pointer=type
+--align-reference=type
 #--add-brackets
 --close-templates
 #--max-code-length=118

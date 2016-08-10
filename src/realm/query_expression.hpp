@@ -1503,7 +1503,7 @@ struct MakeLinkVector : public LinkMapFunction {
         m_links.push_back(row_index);
         return true; // continue evaluation
     }
-    std::vector<size_t> &m_links;
+    std::vector<size_t>& m_links;
 };
 
 struct CountLinks : public LinkMapFunction {

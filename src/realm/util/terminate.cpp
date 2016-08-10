@@ -51,7 +51,7 @@ void please_report_this_error_to_help_at_realm_dot_io()
 namespace {
 
 #if REALM_PLATFORM_APPLE
-void nslog(const char *message) noexcept
+void nslog(const char* message) noexcept
 {
     // Standard error goes nowhere for applications managed by launchd, so log to ASL as well.
     fputs(message, stderr);

@@ -25,7 +25,7 @@
 namespace realm {
 namespace util {
 
-void Printable::print(std::ostream &out, bool quote) const
+void Printable::print(std::ostream& out, bool quote) const
 {
     switch (m_type) {
         case Printable::Type::Bool:
