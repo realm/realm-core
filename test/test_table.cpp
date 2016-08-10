@@ -122,7 +122,7 @@ TEST(Table_ManyColumnsCrash2)
             REALM_ASSERT(subtable2->is_attached());
 
 #endif
-            if((counter % 1000) == 0) {
+            if ((counter % 1000) == 0) {
                 //     std::cerr << counter << "\n";
             }
         }

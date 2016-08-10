@@ -267,7 +267,7 @@ TEST(Group_OpenUnencryptedFileWithKey)
 #ifndef _WIN32
 TEST(Group_Permissions)
 {
-    if(getuid() == 0) {
+    if (getuid() == 0) {
         std::cout << "Group_Permissions test skipped because you are running it as root\n\n";
         return;
     }
@@ -278,7 +278,7 @@ TEST(Group_Permissions)
         TableRef t1 = group1.add_table("table1");
         t1->add_column(type_String, "s");
         t1->add_column(type_Int,    "i");
-        for(size_t i=0; i<4; ++i) {
+        for (size_t i=0; i<4; ++i) {
             t1->insert_empty_row(i);
             t1->set_string(0, i, "a");
             t1->set_int(1, i, 3);

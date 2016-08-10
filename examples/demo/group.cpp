@@ -56,7 +56,7 @@ int main()
     Group g2("test.realm");
     Books::Ref t3 = g2.get_table<Books>("books");
     std::cout << "Table Books" << std::endl;
-    for(size_t i=0; i<t3->size(); ++i) {
+    for (size_t i=0; i<t3->size(); ++i) {
         std::cout << "'" << t3[i].title << "' by " << t3[i].author << std::endl;
     }
 }

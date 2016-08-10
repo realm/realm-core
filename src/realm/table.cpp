@@ -3953,7 +3953,7 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
         else {
             // Only last column in link chain is allowed to be non-link
             if (t + 1 != link_chain.size())
-                throw(LogicError::type_mismatch);
+                throw (LogicError::type_mismatch);
         }
     }
     return table;

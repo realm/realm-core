@@ -891,7 +891,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
                         allow_file_format_upgrade,
                         upgrade_callback);
     }
-    catch(...) {
+    catch (...) {
         exception_thrown = true;
     }
     CHECK(exception_thrown);

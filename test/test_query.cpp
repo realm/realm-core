@@ -7921,14 +7921,14 @@ TEST(Query_DeepLink)
     size_t col_bool = table->add_column(type_Bool, "bool");
     size_t col_linklist = table->add_column_link(type_LinkList, "list", *table);
 
-    for(size_t j = 0; j < N; ++j) {
+    for (size_t j = 0; j < N; ++j) {
         table->add_empty_row();
         table->set_int(col_int, j, j);
         table->set_bool(col_bool, j, (j % 2) == 0);
 
         LinkViewRef links = table->get_linklist(col_linklist, j);
         TableView view = table->where().find_all();
-        for(size_t i = 0; i < view.size(); ++i) {
+        for (size_t i = 0; i < view.size(); ++i) {
             links->add(i);
         }
     }

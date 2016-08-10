@@ -272,7 +272,7 @@ TEST(Alloc_Fuzzy)
             // write some data to the allcoated area so that we can verify it later
             memset(r.get_addr() + 3, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 3);
         }
-        else if(refs.size() > 0) {
+        else if (refs.size() > 0) {
             // free random entry
             size_t entry = rand() % refs.size();
             alloc.free_(refs[entry].get_ref(), refs[entry].get_addr());
@@ -281,7 +281,7 @@ TEST(Alloc_Fuzzy)
 
         if (iter + 1 == iterations || refs.size() > 10) {
             // free everything when we have 10 allocations, or when we exit, to not leak
-            while(refs.size() > 0) {
+            while (refs.size() > 0) {
                 MemRef r = refs[0];
                 size_t siz = get_capacity(r.get_addr());
 

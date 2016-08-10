@@ -1245,7 +1245,7 @@ void SharedGroup::close() noexcept
                 try {
                     util::File::remove(m_db_path.c_str());
                 }
-                catch(...) {} // ignored on purpose.
+                catch (...) {} // ignored on purpose.
             }
             if (Replication* repl = gf::get_replication(m_group))
                 repl->terminate_session();
@@ -1323,7 +1323,7 @@ void SharedGroup::do_async_commits()
     using gf = _impl::GroupFriend;
     gf::detach(m_group);
 
-    while(true) {
+    while (true) {
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
             shutdown = true;
@@ -1459,7 +1459,7 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
                 try {
                     m_upgrade_callback(current_file_format_version_2, target_file_format_version); // Throws
                 }
-                catch(...) {
+                catch (...) {
                     rollback();
                     throw;
                 }

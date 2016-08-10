@@ -4,7 +4,7 @@
 --break-closing-brackets
 --indent-switches
 #--pad-oper
-#--pad-header
+--pad-header
 --align-pointer=type
 --align-reference=type
 #--add-brackets

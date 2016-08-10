@@ -420,7 +420,7 @@ static void* realm_writer(void* arg)
             long randx = random() % 1000;
             long randy = random() % 1000;
             TestTable::View tv = t->where().y.equal(randy).find_all();
-            for(size_t j=0; j<tv.size(); ++j) {
+            for (size_t j=0; j<tv.size(); ++j) {
                 tv[j].x = randx;
             }
             wt.commit();
@@ -456,7 +456,7 @@ void sqlite_create(const char* f, long n, bool wal)
         sqlite3_exec(db, "CREATE TABLE test (x INT, y INT)", NULL, NULL, &errmsg);
     }
     sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &errmsg);
-    for(i=0; i<n; ++i) {
+    for (i=0; i<n; ++i) {
         randx = random() % 1000;
         randy = random() % 1000;
         sprintf(sql, "INSERT INTO test VALUES (%ld, %ld)", randx, randy);
@@ -483,7 +483,7 @@ void mysql_create(const char* f, long n)
     if (mysql_query(db, "START TRANSACTION;")) {
         std::cout << "MySQL error: " << mysql_errno(db) << std::endl;
     }
-    for(i=0; i<n; ++i) {
+    for (i=0; i<n; ++i) {
         randx = random() % 1000;
         randy = random() % 1000;
         sprintf(sql, "INSERT INTO %s VALUES (%ld, %ld)", f, randx, randy);
@@ -505,7 +505,7 @@ void realm_create(const char* f, long n)
         BasicTableRef<TestTable> t = wt.get_or_add_table<TestTable>("test");
 
         srandom(1);
-        for(int i=0; i<n; ++i) {
+        for (int i=0; i<n; ++i) {
             long randx = random() % 1000;
             long randy = random() % 1000;
             t->add(randx, randy);
@@ -545,7 +545,7 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
     assert(pthread_attr_init(&attr) == 0);
     assert((tinfo = (struct thread_info*)calloc(sizeof(struct thread_info), n_readers+n_writers)) != NULL);
 
-    for(int i=0; i<(n_readers+n_writers); ++i) {
+    for (int i=0; i<(n_readers+n_writers); ++i) {
         tinfo[i].thread_num = i+1;
         if (single) {
             tinfo[i].datfile = strdup(datfile);
@@ -558,7 +558,7 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
     if (verbose) std::cout << "Starting threads" << std::endl;
     struct timespec ts_1;
     clock_gettime(CLOCK_REALTIME, &ts_1);
-    for(int i=0; i<n_readers; ++i) {
+    for (int i=0; i<n_readers; ++i) {
         switch (database) {
             case DB_REALM:
                 pthread_create(&tinfo[i].thread_id, &attr, &realm_reader, &tinfo[i]);
@@ -573,7 +573,7 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
                 break;
         }
     }
-    for(int i=0; i<n_writers; ++i) {
+    for (int i=0; i<n_writers; ++i) {
         int j = i+n_readers;
         switch (database) {
             case DB_REALM:
@@ -599,11 +599,11 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
 
     if (verbose)
         std::cout << "Waiting for threads" << std::endl;
-    for(int i=0; i<n_readers; ++i) {
+    for (int i=0; i<n_readers; ++i) {
         pthread_join(tinfo[i].thread_id, &res);
     }
 
-    for(int i=0; i<n_writers; ++i) {
+    for (int i=0; i<n_writers; ++i) {
         int j = i+n_readers;
         pthread_join(tinfo[j].thread_id, &res);
     }
@@ -723,8 +723,8 @@ int main(int argc, char* argv[])
         std::cout << "# 5. read time"                << std::endl;
         std::cout << "# 6. writer transactions"      << std::endl;
         std::cout << "# 7. writer time"              << std::endl;
-        for(int i=0; i<=n_readers; ++i) {
-            for(int j=0; j<=n_writers; ++j) {
+        for (int i=0; i<=n_readers; ++i) {
+            for (int j=0; j<=n_writers; ++j) {
                 benchmark(false, database, "test_db", i, j, duration);
                 std::cout << i << " " << j << " ";
                 std::cout << wall_time << " " << iteration_readers

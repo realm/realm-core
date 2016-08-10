@@ -44,7 +44,7 @@ int main(int, char* [])
 
     // Retire seniors
     People::View v2 = t.where().age.greater(65).find_all();
-    for(size_t i=0; i<v2.size(); ++i) {
+    for (size_t i=0; i<v2.size(); ++i) {
         v2[i].hired = false;
     }
 

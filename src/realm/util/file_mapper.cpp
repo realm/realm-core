@@ -289,7 +289,7 @@ void munmap(void* addr, size_t size) noexcept
 #if REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
-    if(::munmap(addr, size) != 0) {
+    if (::munmap(addr, size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
     }

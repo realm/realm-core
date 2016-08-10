@@ -777,7 +777,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                    size_t* return_ndx) const
 {
-    if(limit == 0 || m_table->is_degenerate()) {
+    if (limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
         return static_cast<R>(0);
@@ -989,7 +989,7 @@ Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t
 template<typename T, bool Nullable>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if(limit == 0 || m_table->is_degenerate()) {
+    if (limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
         return 0.;
@@ -1207,7 +1207,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
-    if(limit == 0 || m_table->is_degenerate())
+    if (limit == 0 || m_table->is_degenerate())
         return 0;
 
     if (end == size_t(-1))
@@ -1242,7 +1242,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(size_t start, size_t end, size_t limit)
 {
-    if(limit == 0 || m_table->is_degenerate())
+    if (limit == 0 || m_table->is_degenerate())
         return 0;
 
     if (end == not_found)

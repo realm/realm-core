@@ -250,7 +250,7 @@ bool json_test(std::string json, std::string expected_file, bool generate)
         std::ifstream test_file(file_name.c_str(), std::ios::in | std::ios::binary);
 
         // fixme, find a way to use CHECK from a function
-        if(!test_file.good())
+        if (!test_file.good())
             return false;
         if (test_file.fail())
             return false;

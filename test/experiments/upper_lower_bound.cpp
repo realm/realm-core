@@ -143,7 +143,7 @@ TEST(bounds)
         int64_t val = 0;
         volatile size_t tt = 40;
 
-        for(int i = 0; i < tt; i++) {
+        for (int i = 0; i < tt; i++) {
             val += rand() % 5;
             a.add(val);
         }
@@ -153,56 +153,56 @@ TEST(bounds)
             index_table[i] = rand() % limit;
 
         best = 9999; //std::numeric_limits<double>::max();
-        for(int iter = 0; iter < 10; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 100000; j++) {
-                for(int i = 0; i < 1000; i++) {
+            for (int j = 0; j < 100000; j++) {
+                for (int i = 0; i < 1000; i++) {
                     volatile size_t t = a.upper_bound_int(index_table[i]); // average
                 }
             }
-            if(t < best)
+            if (t < best)
                 best = t;
         }
         std::cerr << "byte array, random indexing:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
-        for(int iter = 0; iter < 10; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 1000000; j++) {
-                for(int i = 0; i < val; i += val / 30) {
+            for (int j = 0; j < 1000000; j++) {
+                for (int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(i); // average
                 }
             }
-            if(t < best)
+            if (t < best)
                 best = t;
         }
         std::cerr << "byte array, average direction:  \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
-        for(int iter = 0; iter < 10; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 1000000; j++) {
-                for(int i = 0; i < val; i += val / 30) {
+            for (int j = 0; j < 1000000; j++) {
+                for (int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(0); // always go left
                 }
             }
-            if(t < best)
+            if (t < best)
                 best = t;
         }
         std::cerr << "byte array, always go left:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
-        for(int iter = 0; iter < 10; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 1000000; j++) {
-                for(int i = 0; i < val; i += val / 30) {
+            for (int j = 0; j < 1000000; j++) {
+                for (int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(val); // always go right
                 }
             }
-            if(t < best)
+            if (t < best)
                 best = t;
         }
         std::cerr << "byte array, always go right:    \t" << best << "\n";
@@ -218,7 +218,7 @@ TEST(bounds)
         realm::Array a;
         int64_t val = 0;
 
-        for(int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 1000; i++) {
             val += rand() % 1000;
             a.add(val);
         }
@@ -228,55 +228,55 @@ TEST(bounds)
             index_table[i] = rand() % limit;
 
         best = 9999; //std::numeric_limits<double>::max();
-        for(int iter = 0; iter < 10; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 100000; j++) {
-                for(int i = 0; i < 1000; i++) {
+            for (int j = 0; j < 100000; j++) {
+                for (int i = 0; i < 1000; i++) {
                     volatile size_t t = a.upper_bound_int(index_table[i]); // average
                 }
             }
-            if(t < best)
+            if (t < best)
                 best = t;
         }
         std::cerr << "32-bit array, random indexing:     \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
-        for(int iter = 0; iter < 10; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 30000; j++) {
-                for(int i = 0; i < val; i += val / 1000) {
+            for (int j = 0; j < 30000; j++) {
+                for (int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(i); // average direction
                 }
             }
-            if(t < best)
+            if (t < best)
                 best = t;
         }
         std::cerr << "32-bit array, average direction:\t" << best << "\n";
 
         best = 9999; //std::numeric_limits<double>::max();
-        for(int iter = 0; iter < 10; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 30000; j++) {
-                for(int i = 0; i < val; i += val / 1000) {
+            for (int j = 0; j < 30000; j++) {
+                for (int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(0); // always go left
                 }
             }
-            if(t < best)
+            if (t < best)
                 best = t;
         }
         std::cerr << "32-bit array, always go left:   \t" << best << "\n";
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();
-        for(int iter = 0; iter < 10; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 30000; j++) {
-                for(int i = 0; i < val; i += val / 1000) {
+            for (int j = 0; j < 30000; j++) {
+                for (int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(val);  // always go right
                 }
             }
-            if(t < best)
+            if (t < best)
                 best = t;
         }
         std::cerr << "32-bit array, always go right:  \t" << best << "\n";

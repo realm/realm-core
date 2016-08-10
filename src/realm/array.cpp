@@ -1972,15 +1972,15 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
     }
     else {
         size_t i = 0;
-        for(; i + ndx < m_size && i < 8; i++)
+        for (; i + ndx < m_size && i < 8; i++)
             res[i] = get<w>(ndx + i);
 
-        for(; i < 8; i++)
+        for (; i < 8; i++)
             res[i] = 0;
     }
 
 #ifdef REALM_DEBUG
-    for(int j = 0; j + ndx < m_size && j < 8; j++) {
+    for (int j = 0; j + ndx < m_size && j < 8; j++) {
         int64_t expected = get<w>(ndx + j);
         if (res[j] != expected)
             REALM_ASSERT(false);

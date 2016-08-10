@@ -317,7 +317,7 @@ inline void Logger::log_impl(State& state, const Param& param, Params... params)
 template<class C, class T>
 std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, Logger::Level level)
 {
-    switch(level) {
+    switch (level) {
         case Logger::Level::all:
             out << "all";
             return out;

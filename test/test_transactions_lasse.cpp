@@ -335,7 +335,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
         SharedGroup sg(path);
         while (!terminate) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
             ReadTransaction rt(sg);
-            if(rt.get_table("table")->size() > 0) {
+            if (rt.get_table("table")->size() > 0) {
                 int64_t r1 = rt.get_table("table")->get_int(0,0);
                 rand_sleep(random);
                 int64_t r2 = rt.get_table("table")->get_int(0,0);

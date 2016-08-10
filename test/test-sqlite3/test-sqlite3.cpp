@@ -36,7 +36,7 @@ int main()
     // Open sqlite in-memory db
     sqlite3* db = NULL;
     int rc = sqlite3_open(":memory:", &db);
-    if( rc ) {
+    if ( rc ) {
         std::cerr << "Can't open database: "<<sqlite3_errmsg(db)<<"\n";
         sqlite3_close(db);
         exit(1);

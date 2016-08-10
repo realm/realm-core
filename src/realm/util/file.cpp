@@ -653,7 +653,7 @@ File::SizeType File::get_file_position()
 #ifdef _WIN32 // Windows version
     LARGE_INTEGER liOfs = { 0 };
     LARGE_INTEGER liNew = { 0 };
-    if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
+    if (!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
         throw std::runtime_error("SetFilePointerEx() failed");
     return liNew.QuadPart;
 #else
