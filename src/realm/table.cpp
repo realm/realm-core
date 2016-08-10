@@ -318,7 +318,7 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
     link_col.set_target_table(target_table);
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
-    backlink_col.set_origin_column(link_col, link_col_ndx);
+    backlink_col.set_origin_column(link_col);
 }
 
 
@@ -1407,30 +1407,30 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
         case col_type_Bool:
         case col_type_OldDateTime:
             if (nullable) {
-                col = new IntNullColumn(alloc, ref); // Throws
+                col = new IntNullColumn(alloc, ref, col_ndx); // Throws
             }
             else {
-                col = new IntegerColumn(alloc, ref); // Throws
+                col = new IntegerColumn(alloc, ref, col_ndx); // Throws
             }
             break;
         case col_type_Float:
-            col = new FloatColumn(alloc, ref); // Throws
+            col = new FloatColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_Double:
-            col = new DoubleColumn(alloc, ref); // Throws
+            col = new DoubleColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_String:
-            col = new StringColumn(alloc, ref, nullable); // Throws
+            col = new StringColumn(alloc, ref, nullable, col_ndx); // Throws
             break;
         case col_type_Binary:
-            col = new BinaryColumn(alloc, ref, nullable); // Throws
+            col = new BinaryColumn(alloc, ref, nullable, col_ndx); // Throws
             break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
             size_t keys_ndx_in_parent;
             ref_type keys_ref =
                 m_spec.get_enumkeys_ref(col_ndx, &keys_parent, &keys_ndx_in_parent);
-            StringEnumColumn* col_2 = new StringEnumColumn(alloc, ref, keys_ref, nullable); // Throws
+            StringEnumColumn* col_2 = new StringEnumColumn(alloc, ref, keys_ref, nullable, col_ndx); // Throws
             col_2->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             col = col_2;
             break;
@@ -1451,11 +1451,11 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             break;
         case col_type_BackLink:
             // Origin table will be set by group after entire table has been created
-            col = new BacklinkColumn(alloc, ref); // Throws
+            col = new BacklinkColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_Timestamp:
             // Origin table will be set by group after entire table has been created
-            col = new TimestampColumn(alloc, ref); // Throws
+            col = new TimestampColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
@@ -3909,16 +3909,16 @@ ConstTableView Table::get_sorted_view(size_t col_ndx, bool ascending) const
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }
 
-TableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending)
+TableView Table::get_sorted_view(SortDescriptor order)
 {
     TableView tv = where().find_all();
-    tv.sort(col_ndx, ascending);
+    tv.sort(std::move(order));
     return tv;
 }
 
-ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending) const
+ConstTableView Table::get_sorted_view(SortDescriptor order) const
 {
-    return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
+    return const_cast<Table*>(this)->get_sorted_view(std::move(order));
 }
 
 const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain) const
@@ -4409,7 +4409,7 @@ void Table::optimize(bool enforce)
             size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
 
             // Replace column
-            StringEnumColumn* e = new StringEnumColumn(alloc, ref, keys_ref, is_nullable(i)); // Throws
+            StringEnumColumn* e = new StringEnumColumn(alloc, ref, keys_ref, is_nullable(i), i); // Throws
             e->set_parent(&m_columns, ndx_in_parent);
             e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;

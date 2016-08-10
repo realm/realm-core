@@ -2756,6 +2756,7 @@
 					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
+				WARNING_CFLAGS = "-Wreorder";
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Debug;
@@ -2805,6 +2806,7 @@
 					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
+				WARNING_CFLAGS = "-Wreorder";
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Release;

@@ -18,17 +18,6 @@
 
 #include <realm/query_engine.hpp>
 
-namespace realm {
-namespace _impl {
-
-const double CostHeuristic<IntegerColumn>::dD = 100.0;
-const double CostHeuristic<IntegerColumn>::dT = 1.0 / 4.0;
-const double CostHeuristic<IntNullColumn>::dD = 100.0;
-const double CostHeuristic<IntNullColumn>::dT = 1.0 / 4.0;
-
-}
-}
-
 using namespace realm;
 
 size_t ParentNode::find_first(size_t start, size_t end)

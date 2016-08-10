@@ -20,11 +20,11 @@
 
 #include <realm/table_view.hpp>
 #include <realm/column.hpp>
-#include <realm/query_conditions.hpp>
-#include <realm/util/utf8.hpp>
-#include <realm/index_string.hpp>
 #include <realm/column_tpl.hpp>
 #include <realm/impl/sequential_getter.hpp>
+#include <realm/index_string.hpp>
+#include <realm/query_conditions.hpp>
+#include <realm/util/utf8.hpp>
 
 using namespace realm;
 
@@ -42,16 +42,14 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
     Table::generate_patch(src.m_linked_table, patch.linked_table);
     Row::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
-    m_table = TableRef();
+    SortDescriptor::generate_patch(src.m_sorting_predicate, patch.sort_patch);
+    SortDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+
     src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
-    m_distinct_column_source = src.m_distinct_column_source;
-    m_sorting_predicate = src.m_sorting_predicate;
-    m_auto_sort = src.m_auto_sort;
     m_start = src.m_start;
     m_end = src.m_end;
     m_limit = src.m_limit;
-    m_num_detached_refs = 0;
 }
 
 TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
@@ -68,15 +66,13 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
     Table::generate_patch(src.m_linked_table, patch.linked_table);
     ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
-    m_table = TableRef();
+    SortDescriptor::generate_patch(src.m_sorting_predicate, patch.sort_patch);
+    SortDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+
     m_last_seen_version = 0;
-    m_distinct_column_source = src.m_distinct_column_source;
-    m_sorting_predicate = src.m_sorting_predicate;
-    m_auto_sort = src.m_auto_sort;
     m_start = src.m_start;
     m_end = src.m_end;
     m_limit = src.m_limit;
-    m_num_detached_refs = 0;
 }
 
 void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
@@ -85,11 +81,14 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
     m_table->register_view(this);
     m_query.apply_patch(patch.query_patch, group);
     m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
+    m_sorting_predicate = SortDescriptor::create_from_and_consume_patch(patch.sort_patch, *m_table);
+    m_distinct_predicate = SortDescriptor::create_from_and_consume_patch(patch.distinct_patch, *m_table);
 
     if (patch.linked_table) {
         m_linked_table = Table::create_from_and_consume_patch(patch.linked_table, group);
         m_linked_row.apply_and_consume_patch(patch.linked_row, group);
     }
+
 
     if (patch.was_in_sync)
         m_last_seen_version = outside_version();
@@ -681,101 +680,30 @@ void TableViewBase::sync_distinct_view(size_t column)
 
 void TableViewBase::distinct(size_t column)
 {
-    distinct(std::vector<size_t> { column });
+    distinct(SortDescriptor(*m_table, {{column}}));
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
-void TableViewBase::distinct(std::vector<size_t> columns)
+void TableViewBase::distinct(SortDescriptor columns)
 {
-    m_distinct_columns.clear();
-    const_cast<TableViewBase*>(this)->do_sync();
-    m_distinct_columns = columns;
-
-    if (m_distinct_columns.size() == 0)
-        return;
-
-    // Step 1: First copy original TableView into a vector
-    std::vector<size_t> original;
-    original.resize(size());
-    std::vector<bool> ascending;
-    for (size_t r = 0; r < size(); r++) {
-        int64_t row_index_r = m_row_indexes.get(r);
-        REALM_ASSERT(!util::int_cast_has_overflow<size_t>(row_index_r));
-        original[r] = size_t(row_index_r);
-        ascending.push_back(true);
-    }
-
-    // Step 2: Now sort ascending using the same column set that was passed to distinct()
-    Sorter s(columns, ascending);
-    sort(s);
-
-    // Step 3: Create column accessors for all columns in the column set.
-    std::vector<const ColumnBase*> m_columns;
-    m_columns.resize(columns.size());
-    for (size_t i = 0; i < columns.size(); i++) {
-        m_columns[i] = &m_table->get_column_base(m_distinct_columns[i]);
-    }
-
-    // Step 4: Build a list of all duplicated rows that need to be removed
-    std::unordered_set<size_t> remove;
-    for (size_t r = 1; r < size(); r++) {
-        bool identical = true;
-        for (size_t c = 0; c < m_distinct_columns.size(); c++) {
-
-            int64_t r1_64 = m_row_indexes.get(r);
-            int64_t r2_64 = m_row_indexes.get(r - 1);
-            REALM_ASSERT(!util::int_cast_has_overflow<size_t>(r1_64) && !util::int_cast_has_overflow<size_t>(r2_64));
-            size_t r1 = size_t(r1_64);
-            size_t r2 = size_t(r2_64);
-            int cmp = m_columns[c]->compare_values(r1, r2);
-
-            if (cmp != 0) {
-                identical = false;
-                break;
-            }
-        }
-        if (identical) {
-            int64_t row_index = m_row_indexes.get(r);
-            REALM_ASSERT(!util::int_cast_has_overflow<size_t>(row_index));
-            remove.insert(size_t(row_index));
-        }
-    }
-
-    // Step 5: Add all elements from the original TableView, but skip those in the duplicate-list
-    m_row_indexes.clear();
-    for (size_t i = 0; i < original.size(); i++) {
-        if (remove.find(original[i]) == remove.end()) {
-            m_row_indexes.add(original[i]);
-        }
-    }
+    m_distinct_predicate = std::move(columns);
+    do_sync();
 }
 
 
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)
 {
-    std::vector<size_t> c;
-    std::vector<bool> a;
-    c.push_back(column);
-    a.push_back(ascending);
-    sort(c, a);
+    sort(SortDescriptor(*m_table, {{column}}, {ascending}));
 }
 
 // Sort according to multiple columns, user specified order on each column
-void TableViewBase::sort(std::vector<size_t> columns, std::vector<bool> ascending)
+void TableViewBase::sort(SortDescriptor order)
 {
-    REALM_ASSERT(columns.size() == ascending.size());
-    m_auto_sort = true;
-    m_sorting_predicate = Sorter(columns, ascending);
-    sort(m_sorting_predicate);
+    m_sorting_predicate = std::move(order);
+    do_sort(m_sorting_predicate, m_distinct_predicate);
 }
-
-void TableViewBase::re_sort()
-{
-    sort(m_sorting_predicate);
-}
-
 
 void TableViewBase::do_sync()
 {
@@ -827,11 +755,7 @@ void TableViewBase::do_sync()
     }
     m_num_detached_refs = 0;
 
-    if (m_auto_sort)
-        re_sort();
-
-    if (m_distinct_columns.size() > 0)
-        distinct(m_distinct_columns);
+    do_sort(m_sorting_predicate, m_distinct_predicate);
 
     m_last_seen_version = outside_version();
 }

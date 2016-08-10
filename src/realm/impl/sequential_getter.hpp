@@ -98,7 +98,7 @@ public:
 
     size_t m_leaf_start;
     size_t m_leaf_end;
-    const ColType* m_column;
+    const ColType* m_column = nullptr;
 
     const ArrayType* m_leaf_ptr = nullptr;
 private:
