@@ -129,7 +129,7 @@ bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx,
 void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
 {
     select_table(list.m_origin_table.get());
-    size_t col_ndx = list.m_origin_column.m_column_ndx;
+    size_t col_ndx = list.m_origin_column.get_column_index();
     size_t row_ndx = list.get_origin_row_index();
 
     size_t* link_target_path_begin;

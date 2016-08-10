@@ -59,6 +59,11 @@ void ColumnBase::move_assign(ColumnBase&) noexcept
     destroy();
 }
 
+void ColumnBase::refresh_accessor_tree(size_t new_col_ndx, const realm::Spec&)
+{
+    m_column_ndx = new_col_ndx;
+}
+
 void ColumnBaseWithIndex::move_assign(ColumnBaseWithIndex& col) noexcept
 {
     ColumnBase::move_assign(col);
@@ -86,6 +91,7 @@ void ColumnBaseWithIndex::update_from_parent(size_t old_baseline) noexcept
 
 void ColumnBaseWithIndex::refresh_accessor_tree(size_t new_col_ndx, const realm::Spec& spec)
 {
+    ColumnBase::refresh_accessor_tree(new_col_ndx, spec);
     if (m_search_index) {
         m_search_index->refresh_accessor_tree(new_col_ndx, spec);
     }
@@ -113,9 +119,10 @@ void ColumnBaseWithIndex::destroy() noexcept
 
 #ifdef REALM_DEBUG
 
-void ColumnBase::verify(const Table&, size_t) const
+void ColumnBase::verify(const Table&, size_t column_ndx) const
 {
     verify();
+    REALM_ASSERT_EX(column_ndx == m_column_ndx, column_ndx, m_column_ndx);
 }
 
 #endif // REALM_DEBUG
