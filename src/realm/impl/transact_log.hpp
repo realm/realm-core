@@ -43,51 +43,41 @@ enum Instruction {
     instr_InsertGroupLevelTable =  1,
     instr_EraseGroupLevelTable  =  2, // Remove columnless table from group
     instr_RenameGroupLevelTable =  3,
-    instr_MoveGroupLevelTable   = 45,
-    instr_SelectTable           =  4,
-    instr_SetInt                =  5,
-    instr_SetIntUnique          = 31,
-    instr_SetBool               =  6,
-    instr_SetFloat              =  7,
-    instr_SetDouble             =  8,
-    instr_SetString             =  9,
-    instr_SetStringUnique       = 32,
-    instr_SetBinary             = 10,
-    instr_SetOldDateTime        = 11,
-    instr_SetTimestamp          = 48,
-    instr_SetTable              = 12,
-    instr_SetMixed              = 13,
-    instr_SetLink               = 14,
-    instr_NullifyLink           = 15, // Set link to null due to target being erased
-    instr_SetNull               = 16,
-    instr_InsertSubstring       = 43,                                                      // FIXME: Reenumerate
-    instr_EraseFromString       = 44,                                                      // FIXME: Reenumerate
-    instr_InsertEmptyRows       = 17,
-    instr_EraseRows             = 18, // Remove (multiple) rows
-    instr_SwapRows              = 19,
-    instr_ChangeLinkTargets     = 47, // Replace links pointing to row A with links to row B
-    instr_ClearTable            = 20, // Remove all rows in selected table
-    instr_OptimizeTable         = 21,
-    instr_SelectDescriptor      = 22, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 23, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 24, // do, but for a link-type column
-    instr_InsertNullableColumn  = 25, // Insert nullable column
-    instr_EraseColumn           = 26, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 27, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 28, // Rename column in selected descriptor
-    instr_MoveColumn            = 46, // Move column in selected descriptor                // FIXME: Reenumerate
-    instr_AddSearchIndex        = 29, // Add a search index to a column
-    instr_RemoveSearchIndex     = 30, // Remove a search index from a column
-    instr_SetLinkType           = 33, // Strong/weak
-    instr_SelectLinkList        = 34,
-    instr_LinkListSet           = 35, // Assign to link list entry
-    instr_LinkListInsert        = 36, // Insert entry into link list
-    instr_LinkListMove          = 37, // Move an entry within a link list
-    instr_LinkListSwap          = 38, // Swap two entries within a link list
-    instr_LinkListErase         = 39, // Remove an entry from a link list
-    instr_LinkListNullify       = 40, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear         = 41, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 42, // Assign to link list entry
+    instr_MoveGroupLevelTable   =  4,
+    instr_SelectTable           =  5,
+    instr_Set                   =  6,
+    instr_SetUnique             =  7,
+    //instr_SetDefault          =  8, // FIXME: Implement
+    instr_SetNull               =  9,
+    instr_NullifyLink           = 10, // Set link to null due to target being erased
+    instr_InsertSubstring       = 11,
+    instr_EraseFromString       = 12,
+    instr_InsertEmptyRows       = 13,
+    instr_EraseRows             = 14, // Remove (multiple) rows
+    instr_SwapRows              = 15,
+    instr_ChangeLinkTargets     = 16, // Replace links pointing to row A with links to row B
+    instr_ClearTable            = 17, // Remove all rows in selected table
+    instr_OptimizeTable         = 18,
+    instr_SelectDescriptor      = 19, // Select descriptor from currently selected root table
+    instr_InsertColumn          = 20, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn      = 21, // do, but for a link-type column
+    instr_InsertNullableColumn  = 22, // Insert nullable column
+    instr_EraseColumn           = 23, // Remove column from selected descriptor
+    instr_EraseLinkColumn       = 24, // Remove link-type column from selected descriptor
+    instr_RenameColumn          = 25, // Rename column in selected descriptor
+    instr_MoveColumn            = 26, // Move column in selected descriptor
+    instr_AddSearchIndex        = 27, // Add a search index to a column
+    instr_RemoveSearchIndex     = 28, // Remove a search index from a column
+    instr_SetLinkType           = 29, // Strong/weak
+    instr_SelectLinkList        = 30,
+    instr_LinkListSet           = 31, // Assign to link list entry
+    instr_LinkListInsert        = 32, // Insert entry into link list
+    instr_LinkListMove          = 33, // Move an entry within a link list
+    instr_LinkListSwap          = 34, // Swap two entries within a link list
+    instr_LinkListErase         = 35, // Remove an entry from a link list
+    instr_LinkListNullify       = 36, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear         = 37, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 38, // Assign to link list entry
 };
 
 
@@ -681,6 +671,16 @@ struct TransactLogEncoder::EncodeNumber<double> {
         *ptr = encode_double(*ptr, value);
     }
 };
+template<>
+struct TransactLogEncoder::EncodeNumber<DataType> {
+    void operator()(DataType type, char** ptr)
+    {
+        // Check that the type fits in a char
+        REALM_ASSERT(static_cast<std::underlying_type_t<DataType>>(type) <= std::numeric_limits<char>::max());
+        **ptr = static_cast<char>(type);
+        ++(*ptr);
+    }
+};
 
 template<class L>
 void TransactLogEncoder::append_simple_instr(Instruction instr, const util::Tuple<L>& numbers)
@@ -997,7 +997,7 @@ inline void TransactLogConvenientEncoder::move_column(const Descriptor& desc, si
 
 inline bool TransactLogEncoder::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
-    append_simple_instr(instr_SetInt, util::tuple(col_ndx, ndx, value)); // Throws
+    append_simple_instr(instr_Set, util::tuple(type_Int, col_ndx, ndx, value)); // Throws
     return true;
 }
 
@@ -1010,7 +1010,7 @@ inline void TransactLogConvenientEncoder::set_int(const Table* t, size_t col_ndx
 
 inline bool TransactLogEncoder::set_int_unique(size_t col_ndx, size_t ndx, size_t prior_num_rows, int_fast64_t value)
 {
-    append_simple_instr(instr_SetIntUnique, util::tuple(col_ndx, ndx, prior_num_rows, value));
+    append_simple_instr(instr_SetUnique, util::tuple(type_Int, col_ndx, ndx, prior_num_rows, value));
     return true;
 }
 
@@ -1023,7 +1023,7 @@ inline void TransactLogConvenientEncoder::set_int_unique(const Table* t, size_t 
 
 inline bool TransactLogEncoder::set_bool(size_t col_ndx, size_t ndx, bool value)
 {
-    append_simple_instr(instr_SetBool, util::tuple(col_ndx, ndx, value)); // Throws
+    append_simple_instr(instr_Set, util::tuple(type_Bool, col_ndx, ndx, value)); // Throws
     return true;
 }
 
@@ -1036,7 +1036,7 @@ inline void TransactLogConvenientEncoder::set_bool(const Table* t, size_t col_nd
 
 inline bool TransactLogEncoder::set_float(size_t col_ndx, size_t ndx, float value)
 {
-    append_simple_instr(instr_SetFloat, util::tuple(col_ndx, ndx, value)); // Throws
+    append_simple_instr(instr_Set, util::tuple(type_Float, col_ndx, ndx, value)); // Throws
     return true;
 }
 
@@ -1049,7 +1049,7 @@ inline void TransactLogConvenientEncoder::set_float(const Table* t, size_t col_n
 
 inline bool TransactLogEncoder::set_double(size_t col_ndx, size_t ndx, double value)
 {
-    append_simple_instr(instr_SetDouble, util::tuple(col_ndx, ndx, value)); // Throws
+    append_simple_instr(instr_Set, util::tuple(type_Double, col_ndx, ndx, value)); // Throws
     return true;
 }
 
@@ -1066,7 +1066,7 @@ inline bool TransactLogEncoder::set_string(size_t col_ndx, size_t ndx, StringDat
         set_null(col_ndx, ndx); // Throws
     }
     else {
-        append_string_instr(instr_SetString, util::tuple(col_ndx, ndx), value); // Throws
+        append_string_instr(instr_Set, util::tuple(type_String, col_ndx, ndx), value); // Throws
     }
     return true;
 }
@@ -1085,7 +1085,7 @@ inline bool TransactLogEncoder::set_string_unique(size_t col_ndx, size_t ndx, si
         set_null(col_ndx, ndx); // Throws
     }
     else {
-        append_string_instr(instr_SetStringUnique, util::tuple(col_ndx, ndx, prior_num_rows), value); // Throws
+        append_string_instr(instr_SetUnique, util::tuple(type_String, col_ndx, ndx, prior_num_rows), value); // Throws
     }
     return true;
 }
@@ -1104,7 +1104,7 @@ inline bool TransactLogEncoder::set_binary(size_t col_ndx, size_t row_ndx, Binar
     }
     else {
         StringData value_2(value.data(), value.size());
-        append_string_instr(instr_SetBinary, util::tuple(col_ndx, row_ndx), value_2); // Throws
+        append_string_instr(instr_Set, util::tuple(type_Binary, col_ndx, row_ndx), value_2); // Throws
     }
     return true;
 }
@@ -1118,8 +1118,8 @@ inline void TransactLogConvenientEncoder::set_binary(const Table* t, size_t col_
 
 inline bool TransactLogEncoder::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value)
 {
-    append_simple_instr(instr_SetOldDateTime, util::tuple(col_ndx, ndx,
-                                                          value.get_olddatetime())); // Throws
+    append_simple_instr(instr_Set, util::tuple(type_OldDateTime, col_ndx, ndx,
+                                               value.get_olddatetime())); // Throws
     return true;
 }
 
@@ -1132,8 +1132,8 @@ inline void TransactLogConvenientEncoder::set_olddatetime(const Table* t, size_t
 
 inline bool TransactLogEncoder::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
 {
-    append_simple_instr(instr_SetTimestamp, util::tuple(col_ndx, ndx,
-                                                        value.get_seconds(), value.get_nanoseconds())); // Throws
+    append_simple_instr(instr_Set, util::tuple(type_Timestamp, col_ndx, ndx,
+                                               value.get_seconds(), value.get_nanoseconds())); // Throws
     return true;
 }
 
@@ -1145,7 +1145,7 @@ inline void TransactLogConvenientEncoder::set_timestamp(const Table* t, size_t c
 
 inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx)
 {
-    append_simple_instr(instr_SetTable, util::tuple(col_ndx, ndx)); // Throws
+    append_simple_instr(instr_Set, util::tuple(type_Table, col_ndx, ndx)); // Throws
     return true;
 }
 
@@ -1158,7 +1158,7 @@ inline void TransactLogConvenientEncoder::set_table(const Table* t, size_t col_n
 
 inline bool TransactLogEncoder::set_mixed(size_t col_ndx, size_t ndx, const Mixed& value)
 {
-    append_mixed_instr(instr_SetMixed, util::tuple(col_ndx, ndx), value); // Throws
+    append_mixed_instr(instr_Set, util::tuple(type_Mixed, col_ndx, ndx), value); // Throws
     return true;
 }
 
@@ -1175,8 +1175,8 @@ inline bool TransactLogEncoder::set_link(size_t col_ndx, size_t ndx,
     // Map `realm::npos` to zero, and `n` to `n+1`, where `n` is a target row
     // index.
     size_t value_2 = size_t(1) + value;
-    append_simple_instr(instr_SetLink, util::tuple(col_ndx, ndx, value_2,
-                                                   target_group_level_ndx)); // Throws
+    append_simple_instr(instr_Set, util::tuple(type_Link, col_ndx, ndx, value_2,
+                                               target_group_level_ndx)); // Throws
     return true;
 }
 
@@ -1546,125 +1546,151 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
 {
     char instr;
     if (!read_char(instr))
-        parser_error();
+        parser_error(); // Throws
 //    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << std::dec << "\n";
     switch (Instruction(instr)) {
-        case instr_SetInt: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            // FIXME: Don't depend on the existence of int64_t,
-            // but don't allow values to use more than 64 bits
-            // either.
-            int_fast64_t value = read_int<int64_t>(); // Throws
-            if (!handler.set_int(col_ndx, row_ndx, value)) // Throws
-                parser_error();
+        case instr_Set: {
+            char type;
+            if (!read_char(type))
+                parser_error(); // Throws
+            switch (DataType(type)) {
+                case type_Int: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    // FIXME: Don't depend on the existence of int64_t,
+                    // but don't allow values to use more than 64 bits
+                    // either.
+                    int_fast64_t value = read_int<int64_t>(); // Throws
+                    if (!handler.set_int(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Bool: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    bool value = read_bool(); // Throws
+                    if (!handler.set_bool(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Float: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    float value = read_float(); // Throws
+                    if (!handler.set_float(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Double: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    double value = read_double(); // Throws
+                    if (!handler.set_double(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_String: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    StringData value = read_string(m_string_buffer); // Throws
+                    if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Binary: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    BinaryData value = read_binary(m_string_buffer); // Throws
+                    if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_OldDateTime: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    int_fast64_t value = read_int<int_fast64_t>(); // Throws
+                    if (!handler.set_olddatetime(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Timestamp: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    int64_t seconds = read_int<int64_t>(); // Throws
+                    int32_t nanoseconds = read_int<int32_t>(); // Throws
+                    Timestamp value = Timestamp(seconds, nanoseconds);
+                    if (!handler.set_timestamp(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Table: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    if (!handler.set_table(col_ndx, row_ndx)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Mixed: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    Mixed value;
+                    read_mixed(&value); // Throws
+                    if (!handler.set_mixed(col_ndx, row_ndx, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_Link: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    size_t value = read_int<size_t>(); // Throws
+                    // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
+                    size_t target_row_ndx = size_t(value - 1);
+                    size_t target_group_level_ndx = read_int<size_t>(); // Throws
+                    if (!handler.set_link(col_ndx, row_ndx, target_row_ndx, target_group_level_ndx)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_LinkList: {
+                    // Unsupported column type for Set.
+                    parser_error();
+                    return;
+                }
+            }
+            parser_error();
             return;
         }
-        case instr_SetIntUnique: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            size_t prior_num_rows = read_int<size_t>(); // Throws
-            // FIXME: Don't depend on the existence of int64_t,
-            // but don't allow values to use more than 64 bits
-            // either.
-            int_fast64_t value = read_int<int64_t>(); // Throws
-            if (!handler.set_int_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetBool: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            bool value = read_bool(); // Throws
-            if (!handler.set_bool(col_ndx, row_ndx, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetFloat: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            float value = read_float(); // Throws
-            if (!handler.set_float(col_ndx, row_ndx, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetDouble: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            double value = read_double(); // Throws
-            if (!handler.set_double(col_ndx, row_ndx, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetString: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            StringData value = read_string(m_string_buffer); // Throws
-            if (!handler.set_string(col_ndx, row_ndx, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetStringUnique: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            size_t prior_num_rows = read_int<size_t>(); // Throws
-            StringData value = read_string(m_string_buffer); // Throws
-            if (!handler.set_string_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetBinary: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            BinaryData value = read_binary(m_string_buffer); // Throws
-            if (!handler.set_binary(col_ndx, row_ndx, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetOldDateTime: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            int_fast64_t value = read_int<int_fast64_t>(); // Throws
-            if (!handler.set_olddatetime(col_ndx, row_ndx, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetTimestamp: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            int64_t seconds = read_int<int64_t>(); // Throws
-            int32_t nanoseconds = read_int<int32_t>(); // Throws
-            Timestamp value = Timestamp(seconds, nanoseconds);
-            if (!handler.set_timestamp(col_ndx, row_ndx, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetTable: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            if (!handler.set_table(col_ndx, row_ndx)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetMixed: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            Mixed value;
-            read_mixed(&value); // Throws
-            if (!handler.set_mixed(col_ndx, row_ndx, value)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetLink: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            size_t value = read_int<size_t>(); // Throws
-            // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
-            size_t target_row_ndx = size_t(value - 1);
-            size_t target_group_level_ndx = read_int<size_t>(); // Throws
-            if (!handler.set_link(col_ndx, row_ndx, target_row_ndx, target_group_level_ndx)) // Throws
-                parser_error();
-            return;
+        case instr_SetUnique: {
+            char type;
+            if (!read_char(type))
+                parser_error(); // Throws
+            switch (DataType(type)) {
+                case type_Int: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    size_t prior_num_rows = read_int<size_t>(); // Throws
+                    // FIXME: Don't depend on the existence of int64_t,
+                    // but don't allow values to use more than 64 bits
+                    // either.
+                    int_fast64_t value = read_int<int64_t>(); // Throws
+                    if (!handler.set_int_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                case type_String: {
+                    size_t col_ndx = read_int<size_t>(); // Throws
+                    size_t row_ndx = read_int<size_t>(); // Throws
+                    size_t prior_num_rows = read_int<size_t>(); // Throws
+                    StringData value = read_string(m_string_buffer); // Throws
+                    if (!handler.set_string_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
+                        parser_error();
+                    return;
+                }
+                default: {
+                    // Unsupported column type for SetUnique
+                    parser_error();
+                    return;
+                }
+            }
         }
         case instr_SetNull: {
             size_t col_ndx = read_int<size_t>(); // Throws
