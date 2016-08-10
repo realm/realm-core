@@ -19,13 +19,14 @@
 #ifndef REALM_DESCRIPTOR_FWD_HPP
 #define REALM_DESCRIPTOR_FWD_HPP
 
-#include <memory>
+#include <realm/util/bind_ptr.hpp>
+
 
 namespace realm {
 
 class Descriptor;
-using DescriptorRef = std::shared_ptr<Descriptor>;
-using ConstDescriptorRef = std::shared_ptr<const Descriptor>;
+typedef util::bind_ptr<Descriptor> DescriptorRef;
+typedef util::bind_ptr<const Descriptor> ConstDescriptorRef;
 
 } // namespace realm
 
