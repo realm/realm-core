@@ -461,8 +461,9 @@ def environment() {
 def readGitTag() {
   sh "git describe --exact-match --tags HEAD | tail -n 1 > tag.txt 2>&1 || true"
   def tag = readFile('tag.txt').trim()
-  return tag
-}
+  return "v2.0.0-rc0"
+/*  return tag
+*/}
 
 def readGitSha() {
   sh "git rev-parse HEAD | cut -b1-8 > sha.txt"
