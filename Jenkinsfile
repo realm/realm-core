@@ -9,7 +9,7 @@ def getSourceArchive() {
 def readGitTag() {
   sh "git describe --exact-match --tags HEAD | tail -n 1 > tag.txt 2>&1 || true"
   def tag = readFile('tag.txt').trim()
-  return "v1.5.0"
+  return "v2.0.0-rc0"
 /*  return tag
 */}
 

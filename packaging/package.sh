@@ -12,7 +12,7 @@ default="generic centos-6 centos-7"
 distros=${@:-$default}
 
 #git_tag=$(git describe --exact-match --tags HEAD 2>/dev/null || true)
-git_tag="v1.5.0"
+git_tag="v2.0.0-rc0"
 
 . ${src_path}/dependencies.list
 
