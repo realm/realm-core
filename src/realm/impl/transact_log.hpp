@@ -255,6 +255,11 @@ private:
     static const int max_enc_bytes_per_num = max_enc_bytes_per_int <
         max_enc_bytes_per_double ? max_enc_bytes_per_double : max_enc_bytes_per_int;
 
+    // This value is used in Set* instructions in place of the 'type' field in
+    // the stream to indicate that the value of the Set* instruction is NULL,
+    // which doesn't have a type.
+    static constexpr int set_null_sentinel() { return -1; }
+
     TransactLogStream& m_stream;
 
     // These two delimit a contiguous region of free space in a
@@ -287,6 +292,7 @@ private:
     static char* encode_double(char*, double value);
     template<class>
     struct EncodeNumber;
+    friend class TransactLogParser;
 };
 
 class TransactLogConvenientEncoder {
@@ -677,10 +683,8 @@ template<>
 struct TransactLogEncoder::EncodeNumber<DataType> {
     void operator()(DataType type, char** ptr)
     {
-        // Check that the type fits in a char
-        REALM_ASSERT(static_cast<std::underlying_type_t<DataType>>(type) <= std::numeric_limits<char>::max());
-        **ptr = static_cast<char>(type);
-        ++(*ptr);
+        auto value_2 = type + 0; // Perform integral promotion
+        *ptr = encode_int(*ptr, value_2);
     }
 };
 
@@ -827,7 +831,7 @@ inline void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
     // here. We assume that the list given to on_link_list_destroyed() can
     // *never* be the same as the list argument given here. We resolve the
     // race by a) always updating m_selected_link_list in do_select_link_list()
-    // and b) only atomically and conditionally updating it in 
+    // and b) only atomically and conditionally updating it in
     // on_link_list_destroyed().
     if (&list != m_selected_link_list) {
         do_select_link_list(list); // Throws
@@ -1203,7 +1207,7 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_nd
 inline bool TransactLogEncoder::set_null(size_t col_ndx, size_t ndx, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
-    append_simple_instr(variant, util::tuple(char(-1), col_ndx, ndx)); // Throws
+    append_simple_instr(variant, util::tuple(set_null_sentinel(), col_ndx, ndx)); // Throws
     return true;
 }
 
@@ -1566,16 +1570,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetDefault:
         case instr_SetUnique:
         case instr_Set: {
-            char type;
-            if (!read_char(type))
-                parser_error(); // Throws
+            int type = read_int<int>(); // Throws
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
             size_t prior_num_rows = 0;
             if (REALM_UNLIKELY(instr == instr_SetUnique))
                 prior_num_rows = read_int<size_t>(); // Throws
 
-            if (type == -1) {
+            if (type == TransactLogEncoder::set_null_sentinel()) {
                 // Special case for set_null
                 if (!handler.set_null(col_ndx, row_ndx, instr)) // Throws
                     parser_error();
