@@ -501,6 +501,7 @@ public:
     ConstTableRef get_link_target(size_t column_ndx) const noexcept;
     void nullify_link(size_t column_ndx, size_t row_ndx);
 
+    /// \defgroup table_view_removes
     //@{
     /// \brief Remove the specified row (or rows) from the underlying table.
     ///

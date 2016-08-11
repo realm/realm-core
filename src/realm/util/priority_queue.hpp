@@ -50,7 +50,7 @@ public:
     using const_reverse_iterator = typename Container::const_reverse_iterator;
     using const_iterator         = typename Container::const_iterator;
 
-    //{@
+    //@{
     /// Construct a PriorityQueue, optionally providing a comparator object.
     PriorityQueue(const Compare& comparator, const Container& cont);
 
@@ -73,7 +73,7 @@ public:
     bool empty() const;
     size_type size() const;
 
-    //{@
+    //@{
     /// Push an element to the priority queue.
     ///
     /// If insertion to the underlying `Container` invalidates

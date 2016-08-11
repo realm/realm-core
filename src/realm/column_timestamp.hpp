@@ -61,7 +61,7 @@ public:
     void populate_search_index();
     StringIndex* create_search_index() override;
     bool supports_search_index() const noexcept final { return true; }
-    
+
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept override;
     ref_type write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream&) const override;
     void update_from_parent(size_t old_baseline) noexcept override;

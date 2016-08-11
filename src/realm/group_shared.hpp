@@ -174,10 +174,6 @@ public:
 
     /// Attach this SharedGroup instance to the specified database file.
     ///
-    /// If the database file does not already exist, it will be created (unless
-    /// \a no_create is set to true.) When multiple threads are involved, it is
-    /// safe to let the first thread, that gets to it, create the file.
-    ///
     /// While at least one instance of SharedGroup exists for a specific
     /// database file, a "lock" file will be present too. The lock file will be
     /// placed in the same directory as the database file, and its name will be
@@ -187,12 +183,26 @@ public:
     /// specify the same durability level, otherwise an exception will be
     /// thrown.
     ///
-    /// If \a allow_file_format_upgrade is set to `true`, this function will
-    /// automatically upgrade the file format used in the specified Realm file
-    /// if necessary (and if it is possible). In order to prevent this, set \a
-    /// allow_upgrade to `false`.
+    /// \param file Filesystem path to a Realm database file.
     ///
-    /// If \a allow_upgrade is set to `false`, only two outcomes are possible:
+    /// \param no_create If the database file does not already exist, it will be
+    /// created (unless this is set to true.) When multiple threads are involved,
+    /// it is safe to let the first thread, that gets to it, create the file.
+    ///
+    /// \param durability See DurabilityLevel.
+    ///
+    /// \param encryption_key The key to encrypt the Realm, or `nullptr` (default)
+    /// if the file is not encrypted.
+    ///
+    /// \param allow_file_format_upgrade
+    /// \parblock
+    ///
+    /// If this is set to `true`, this function
+    /// will automatically upgrade the file format used in the specified Realm
+    /// file if necessary (and if it is possible). In order to prevent this, set
+    /// \a allow_file_format_upgrade to `false`.
+    ///
+    /// If this is set to `false`, only two outcomes are possible:
     ///
     /// - the specified Realm file is already using the latest file format, and
     ///   can be used, or
@@ -200,10 +210,10 @@ public:
     /// - the specified Realm file uses a deprecated file format, resulting a
     ///   the throwing of FileFormatUpgradeRequired.
     ///
+    /// \endparblock
+    ///
     /// Calling open() on a SharedGroup instance that is already in the attached
     /// state has undefined behavior.
-    ///
-    /// \param file Filesystem path to a Realm database file.
     ///
     /// \throw util::File::AccessError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are derived from
@@ -213,7 +223,7 @@ public:
     /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
     ///        and an upgrade is required.
     void open(const std::string& file, bool no_create = false,
-              DurabilityLevel = durability_Full,
+              DurabilityLevel durability = durability_Full,
               const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication instance
@@ -286,7 +296,7 @@ public:
     /// bound (or tethered) snapshot.
     struct BadVersion;
 
-
+    /// \defgroup group_shared_transactions
     //@{
 
     /// begin_read() initiates a new read transaction. A read transaction is
