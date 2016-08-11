@@ -94,7 +94,7 @@ def pushPackages(packages, fileType, distroName, distroVersion) {
 node {
   setBuildName("${RPM_VERSION}")
   
-  def packages = ['realm-core', 'realm-core-devel']
+  def packages = ['realm', 'realm-devel', 'realm-node', 'realm-node-devel', 'realm-utils']
   dir("packages") {
     pullPackages(packages, 'rpm', 'el', 6)
     pullPackages(packages, 'rpm', 'el', 7)
