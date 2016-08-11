@@ -9,8 +9,9 @@ def getSourceArchive() {
 def readGitTag() {
   sh "git describe --exact-match --tags HEAD | tail -n 1 > tag.txt 2>&1 || true"
   def tag = readFile('tag.txt').trim()
-  return tag
-}
+  return "v1.5.0"
+/*  return tag
+*/}
 
 def readGitSha() {
   sh "git rev-parse HEAD | cut -b1-8 > sha.txt"
@@ -136,7 +137,7 @@ parallel(
   centos6: doBuildPackage('centos-6', 'rpm')
 )
 
-if (['master'].contains(env.BRANCH_NAME)) {
+if (['ajl/jenkinsfile'].contains(env.BRANCH_NAME)) {
   stage 'publish-packages'
   parallel(
     generic: doPublishGeneric(),
