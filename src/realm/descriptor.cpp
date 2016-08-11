@@ -29,7 +29,8 @@ using namespace realm::util;
 DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 {
     // Reuse the the descriptor accessor if it is already in the map
-    if (DescriptorRef d = get_subdesc_accessor(column_ndx)) {
+    DescriptorRef d = get_subdesc_accessor(column_ndx);
+    if (bool(d)) {
         return d;
     }
 
@@ -65,7 +66,6 @@ Descriptor::~Descriptor() noexcept
         return;
     if (m_parent) {
         delete m_spec;
-        m_parent->remove_subdesc_entry(shared_from_this());
         m_parent.reset();
     }
     else {
@@ -101,20 +101,6 @@ void Descriptor::detach_subdesc_accessors() noexcept
 }
 
 
-void Descriptor::remove_subdesc_entry(DescriptorRef subdesc) const noexcept
-{
-    typedef subdesc_map::iterator iter;
-    iter end = m_subdesc_map.end();
-    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_subdesc.lock() == subdesc) {
-            m_subdesc_map.erase(i);
-            return;
-        }
-    }
-    REALM_ASSERT(false);
-}
-
-
 size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const noexcept
 {
     size_t* begin_2 = end;
@@ -145,11 +131,23 @@ DescriptorRef Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
 
-    for (const auto& subdesc : m_subdesc_map) {
-        if (subdesc.m_column_ndx == column_ndx)
-            return subdesc.m_subdesc.lock();
+    int i = 0;
+    int limit = m_subdesc_map.size();
+    while (i < limit) {
+        subdesc_entry& sub = m_subdesc_map[i];
+        auto res = sub.m_subdesc.lock();
+        if (sub.m_column_ndx == column_ndx) {
+            return res;
+        }
+        if (!bool(res)) { // move last over
+            sub = m_subdesc_map.back();
+            m_subdesc_map.pop_back();
+            --limit;
+        }
+        else {
+            ++i;
+        }
     }
-
     return 0;
 }
 
@@ -176,8 +174,9 @@ void Descriptor::adj_erase_column(size_t col_ndx) noexcept
     for (iter i = m_subdesc_map.begin(); i != end; ++i) {
         if (i->m_column_ndx == col_ndx) {
             // Must hold a reliable reference count while detaching
-            DescriptorRef desc(i->m_subdesc);
-            desc->detach();
+            DescriptorRef desc(i->m_subdesc.lock());
+            if (desc)
+                desc->detach();
             erase = i;
         }
         else if (i->m_column_ndx > col_ndx) {

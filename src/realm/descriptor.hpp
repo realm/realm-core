@@ -435,9 +435,6 @@ private:
 
     Descriptor() noexcept;
 
-    void bind_ptr() const noexcept;
-    void unbind_ptr() const noexcept;
-
     // Called by the root table if this becomes the root
     // descriptor. Otherwise it is called by the descriptor that
     // becomes its parent.
@@ -481,10 +478,6 @@ private:
     // exist, that is, all subtable descriptor accessors that have
     // this descriptor as ancestor.
     void detach_subdesc_accessors() noexcept;
-
-    // Remove the entry from m_subdesc_map that refers to the
-    // specified subtable descriptor. It must be there.
-    void remove_subdesc_entry(DescriptorRef subdesc) const noexcept;
 
     // Record the path in terms of subtable column indexes from the
     // root descriptor to this descriptor. If this descriptor is a
