@@ -39,6 +39,7 @@ namespace realm {
 namespace _impl {
 
 /// Transaction log instruction encoding
+/// NOTE: Any change to this enum is a file-format breaking change.
 enum Instruction {
     instr_InsertGroupLevelTable =  1,
     instr_EraseGroupLevelTable  =  2, // Remove columnless table from group
