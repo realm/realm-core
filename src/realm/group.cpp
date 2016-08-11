@@ -1510,11 +1510,11 @@ public:
         if (m_table) {
             REALM_ASSERT(!m_table->has_shared_type());
             typedef _impl::TableFriend tf;
-            Descriptor* desc = tf::get_root_table_desc_accessor(*m_table);
+            DescriptorRef desc = tf::get_root_table_desc_accessor(*m_table);
             int i = 0;
             while (desc) {
                 if (i >= levels) {
-                    m_desc.reset(desc);
+                    m_desc = desc;
                     break;
                 }
                 typedef _impl::DescriptorFriend df;

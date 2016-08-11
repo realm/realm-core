@@ -28,26 +28,22 @@ using namespace realm::util;
 
 DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 {
-    DescriptorRef subdesc;
-
     // Reuse the the descriptor accessor if it is already in the map
-    if (Descriptor* d = get_subdesc_accessor(column_ndx)) {
-        subdesc.reset(d);
-        goto out;
+    if (DescriptorRef d = get_subdesc_accessor(column_ndx)) {
+        return d;
     }
 
     // Create a new descriptor accessor
     {
+        DescriptorRef subdesc;
         SubspecRef subspec_ref = m_spec->get_subtable_spec(column_ndx);
         std::unique_ptr<Spec> subspec(new Spec(subspec_ref)); // Throws
-        subdesc.reset(new Descriptor); // Throws
-        m_subdesc_map.push_back(subdesc_entry(column_ndx, subdesc.get())); // Throws
-        subdesc->attach(m_root_table.get(), this, subspec.get());
+        subdesc = std::make_shared<Descriptor>(Descriptor::PrivateTag()); // Throws
+        m_subdesc_map.push_back(subdesc_entry(column_ndx, subdesc)); // Throws
+        subdesc->attach(m_root_table.get(), shared_from_this(), subspec.get());
         subspec.release();
+        return subdesc;
     }
-
-  out:
-    return subdesc;
 }
 
 
@@ -69,7 +65,7 @@ Descriptor::~Descriptor() noexcept
         return;
     if (m_parent) {
         delete m_spec;
-        m_parent->remove_subdesc_entry(this);
+        m_parent->remove_subdesc_entry(shared_from_this());
         m_parent.reset();
     }
     else {
@@ -97,19 +93,20 @@ void Descriptor::detach_subdesc_accessors() noexcept
         for (const auto& subdesc : m_subdesc_map) {
             // Must hold a reliable reference count while detaching
             DescriptorRef desc(subdesc.m_subdesc);
-            desc->detach();
+            if (desc)
+                desc->detach();
         }
         m_subdesc_map.clear();
     }
 }
 
 
-void Descriptor::remove_subdesc_entry(Descriptor* subdesc) const noexcept
+void Descriptor::remove_subdesc_entry(DescriptorRef subdesc) const noexcept
 {
     typedef subdesc_map::iterator iter;
     iter end = m_subdesc_map.end();
     for (iter i = m_subdesc_map.begin(); i != end; ++i) {
-        if (i->m_subdesc == subdesc) {
+        if (i->m_subdesc.lock() == subdesc) {
             m_subdesc_map.erase(i);
             return;
         }
@@ -121,17 +118,17 @@ void Descriptor::remove_subdesc_entry(Descriptor* subdesc) const noexcept
 size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const noexcept
 {
     size_t* begin_2 = end;
-    const Descriptor* desc = this;
+    ConstDescriptorRef desc = shared_from_this();
     for (;;) {
         if (desc->is_root())
             return begin_2;
         if (REALM_UNLIKELY(begin_2 == begin))
             return 0; // Not enough space in path buffer
-        const Descriptor* parent = desc->m_parent.get();
+        ConstDescriptorRef parent = desc->m_parent;
         size_t column_ndx = not_found;
 
         for (const auto& subdesc : parent->m_subdesc_map) {
-            if (subdesc.m_subdesc == desc) {
+            if (subdesc.m_subdesc.lock() == desc) {
                 column_ndx = subdesc.m_column_ndx;
                 break;
             }
@@ -144,13 +141,13 @@ size_t* Descriptor::record_subdesc_path(size_t* begin, size_t* end) const noexce
 }
 
 
-Descriptor* Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
+DescriptorRef Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
 
     for (const auto& subdesc : m_subdesc_map) {
         if (subdesc.m_column_ndx == column_ndx)
-            return subdesc.m_subdesc;
+            return subdesc.m_subdesc.lock();
     }
 
     return 0;
