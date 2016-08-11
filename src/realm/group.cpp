@@ -1447,7 +1447,7 @@ public:
         return true;
     }
 
-    bool set_null(size_t, size_t, _impl::Instruction) noexcept
+    bool set_null(size_t, size_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }

@@ -7586,7 +7586,7 @@ public:
     bool set_table(size_t, size_t, _impl::Instruction) { return false; }
     bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction) { return false; }
     bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction) { return false; }
-    bool set_null(size_t, size_t, _impl::Instruction) { return false; }
+    bool set_null(size_t, size_t, _impl::Instruction, size_t) { return false; }
     bool nullify_link(size_t, size_t, size_t) { return false; }
     bool insert_substring(size_t, size_t, size_t, StringData) { return false; }
     bool erase_substring(size_t, size_t, size_t, size_t) { return false; }

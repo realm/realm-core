@@ -178,10 +178,11 @@ public:
         return false;
     }
 
-    bool set_null(size_t col_ndx, size_t row_ndx, _impl::Instruction)
+    bool set_null(size_t col_ndx, size_t row_ndx, _impl::Instruction, size_t)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_null(%1, %2);", col_ndx, row_ndx); // Throws
+            // FIXME: Support "set_null_unique"
             m_table->set_null(col_ndx, row_ndx); // Throws
             return true;
         }

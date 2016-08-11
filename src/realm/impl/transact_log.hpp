@@ -147,7 +147,7 @@ public:
     bool set_table(size_t, size_t, Instruction) { return true; }
     bool set_mixed(size_t, size_t, const Mixed&, Instruction) { return true; }
     bool set_link(size_t, size_t, size_t, size_t, Instruction) { return true; }
-    bool set_null(size_t, size_t, Instruction) { return true; }
+    bool set_null(size_t, size_t, Instruction, size_t) { return true; }
     bool nullify_link(size_t, size_t, size_t) { return true; }
     bool insert_substring(size_t, size_t, size_t, StringData) { return true; }
     bool erase_substring(size_t, size_t, size_t, size_t) { return true; }
@@ -214,7 +214,7 @@ public:
     bool set_table(size_t col_ndx, size_t row_ndx, Instruction = instr_Set);
     bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&, Instruction = instr_Set);
     bool set_link(size_t col_ndx, size_t row_ndx, size_t, size_t target_group_level_ndx, Instruction = instr_Set);
-    bool set_null(size_t col_ndx, size_t row_ndx, Instruction = instr_Set);
+    bool set_null(size_t col_ndx, size_t row_ndx, Instruction = instr_Set, size_t = 0);
     bool nullify_link(size_t col_ndx, size_t row_ndx, size_t target_group_level_ndx);
     bool insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
     bool erase_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t size);
@@ -1074,7 +1074,7 @@ inline bool TransactLogEncoder::set_string(size_t col_ndx, size_t ndx, StringDat
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault || variant == instr_SetUnique, variant);
     if (value.is_null()) {
-        set_null(col_ndx, ndx, variant); // Throws
+        set_null(col_ndx, ndx, variant, prior_num_rows); // Throws
     }
     else {
         if (REALM_UNLIKELY(variant == instr_SetUnique))
@@ -1205,10 +1205,16 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_nd
     m_encoder.set_link(col_ndx, ndx, value, target_group_level_ndx, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_null(size_t col_ndx, size_t ndx, Instruction variant)
+inline bool TransactLogEncoder::set_null(size_t col_ndx, size_t ndx, Instruction variant,
+                                         size_t prior_num_rows)
 {
-    REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
-    append_simple_instr(variant, util::tuple(set_null_sentinel(), col_ndx, ndx)); // Throws
+    REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault || variant == instr_SetUnique, variant);
+    if (REALM_UNLIKELY(variant == instr_SetUnique)) {
+        append_simple_instr(variant, util::tuple(set_null_sentinel(), col_ndx, ndx, prior_num_rows)); // Throws
+    }
+    else {
+        append_simple_instr(variant, util::tuple(set_null_sentinel(), col_ndx, ndx)); // Throws
+    }
     return true;
 }
 
@@ -1580,7 +1586,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
 
             if (type == TransactLogEncoder::set_null_sentinel()) {
                 // Special case for set_null
-                if (!handler.set_null(col_ndx, row_ndx, instr)) // Throws
+                if (!handler.set_null(col_ndx, row_ndx, instr, prior_num_rows)) // Throws
                     parser_error();
                 return;
             }
@@ -2360,9 +2366,9 @@ public:
         return true;
     }
 
-    bool set_null(size_t col_ndx, size_t row_ndx, Instruction variant)
+    bool set_null(size_t col_ndx, size_t row_ndx, Instruction variant, size_t prior_num_rows)
     {
-        m_encoder.set_null(col_ndx, row_ndx, variant);
+        m_encoder.set_null(col_ndx, row_ndx, variant, prior_num_rows);
         append_instruction();
         return true;
     }
