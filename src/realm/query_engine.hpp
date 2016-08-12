@@ -498,7 +498,7 @@ public:
         size_t start_in_leaf = s - this->m_leaf_start;
         cont = this->m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>
                 (m_value, start_in_leaf, end_in_leaf, this->m_leaf_start, nullptr,
-                 std::bind1st(std::mem_fun(&ThisType::template match_callback<TAction, AggregateColumnType>), this));
+                 std::bind(std::mem_fn(&ThisType::template match_callback<TAction, AggregateColumnType>), this, std::placeholders::_1));
         return cont;
     }
 
