@@ -60,9 +60,10 @@ struct CollectionChangeSet {
     IndexSet deletions;
     IndexSet insertions;
     IndexSet modifications;
+    IndexSet modifications_new;
     std::vector<Move> moves;
 
-    bool empty() const { return deletions.empty() && insertions.empty() && modifications.empty() && moves.empty(); }
+    bool empty() const { return deletions.empty() && insertions.empty() && modifications.empty() && modifications_new.empty() && moves.empty(); }
 };
 
 // A type-erasing wrapper for the callback for collection notifications. Can be

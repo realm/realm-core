@@ -206,6 +206,7 @@ TEST_CASE("results: notifications") {
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE_INDICES(change.modifications_new, 0);
         }
 
         SECTION("modifying a matching row to no longer match marks that row as deleted") {
@@ -223,6 +224,7 @@ TEST_CASE("results: notifications") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 4);
             REQUIRE(change.modifications.empty());
+            REQUIRE(change.modifications_new.empty());
         }
 
         SECTION("deleting a matching row marks that row as deleted") {
@@ -276,6 +278,7 @@ TEST_CASE("results: notifications") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 4);
             REQUIRE(change.modifications.empty());
+            REQUIRE(change.modifications_new.empty());
         }
 
         SECTION("modification indices are pre-insert/delete") {
@@ -288,6 +291,7 @@ TEST_CASE("results: notifications") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 1);
             REQUIRE_INDICES(change.modifications, 2);
+            REQUIRE_INDICES(change.modifications_new, 1);
         }
 
         SECTION("notifications are not delivered when collapsing transactions results in no net change") {
@@ -439,6 +443,7 @@ TEST_CASE("results: notifications") {
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.modifications, 3);
+            REQUIRE_INDICES(change.modifications_new, 3);
         }
 
         SECTION("modifying a matching row to no longer match marks that row as deleted") {

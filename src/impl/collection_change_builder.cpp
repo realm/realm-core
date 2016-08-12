@@ -30,7 +30,7 @@ CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions,
                                                  IndexSet insertions,
                                                  IndexSet modifications,
                                                  std::vector<Move> moves)
-: CollectionChangeSet({std::move(deletions), std::move(insertions), std::move(modifications), std::move(moves)})
+: CollectionChangeSet({std::move(deletions), std::move(insertions), std::move(modifications), {}, std::move(moves)})
 {
     for (auto&& move : this->moves) {
         this->deletions.add(move.from);
@@ -663,7 +663,9 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> c
 
 CollectionChangeSet CollectionChangeBuilder::finalize() &&
 {
-    modifications.erase_at(insertions);
-    modifications.shift_for_insert_at(deletions);
-    return {std::move(deletions), std::move(insertions), std::move(modifications), std::move(moves)};
+    auto mod2 = modifications;
+    mod2.erase_at(insertions);
+    mod2.shift_for_insert_at(deletions);
+    modifications.remove(insertions);
+    return {std::move(deletions), std::move(insertions), std::move(mod2), std::move(modifications), std::move(moves)};
 }
