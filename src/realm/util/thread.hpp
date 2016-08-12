@@ -44,8 +44,8 @@ namespace util {
 
 /// A separate thread of execution.
 ///
-/// This class is a C++03 compatible reproduction of a subset of
-/// std::thread from C++11 (when discounting Thread::start()).
+/// This class is a C++03 compatible reproduction of a subset of std::thread
+/// from C++11 (when discounting Thread::start() and Thread::set_name()).
 class Thread {
 public:
     Thread();
@@ -66,6 +66,12 @@ public:
     bool joinable() noexcept;
 
     void join();
+
+    // If supported by the platform, set the name of the calling thread (mainly
+    // for debugging purposes). The name will be silently clamped to whatever
+    // limit the platform places on these names. Linux places a limit of 15
+    // characters for these names.
+    static void set_name(const std::string&);
 
 private:
     pthread_t m_id;

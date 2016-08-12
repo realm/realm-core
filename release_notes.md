@@ -16,7 +16,9 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Support for setting thread names (`util::Thread::set_name()`) when the
+  platform supports it. This is now used by the test harness as a help while
+  debugging.
 
 ----------------------------------------------
 

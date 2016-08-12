@@ -97,6 +97,27 @@ void Thread::join()
     m_joinable = false;
 }
 
+
+void Thread::set_name(const std::string& name)
+{
+#if defined _GNU_SOURCE && !REALM_ANDROID && !REALM_PLATFORM_APPLE
+    const size_t max = 16;
+    size_t n = name.size();
+    if (n > max-1)
+        n = max-1;
+    char name_2[max];
+    std::copy(name.data(), name.data()+n, name_2);
+    name_2[n] = '\n';
+    pthread_t id = pthread_self();
+    int r = pthread_setname_np(id, name_2);
+    if (REALM_UNLIKELY(r != 0))
+        throw std::runtime_error("pthread_setname_np() failed.");
+#else
+    static_cast<void>(name);
+#endif
+}
+
+
 REALM_NORETURN void Thread::create_failed(int)
 {
     throw std::runtime_error("pthread_create() failed");
