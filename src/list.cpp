@@ -183,7 +183,7 @@ void List::delete_all()
     m_link_view->remove_all_target_rows();
 }
 
-Results List::sort(SortOrder order)
+Results List::sort(SortDescriptor order)
 {
     verify_attached();
     return Results(m_realm, m_link_view, util::none, std::move(order));

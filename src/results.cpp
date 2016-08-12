@@ -33,14 +33,13 @@ using namespace realm;
 Results::Results() = default;
 Results::~Results() = default;
 
-Results::Results(SharedRealm r, Query q, SortOrder s)
+Results::Results(SharedRealm r, Query q, SortDescriptor s)
 : m_realm(std::move(r))
 , m_query(std::move(q))
 , m_table(m_query.get_table().get())
 , m_sort(std::move(s))
 , m_mode(Mode::Query)
 {
-    REALM_ASSERT(m_sort.column_indices.size() == m_sort.ascending.size());
 }
 
 Results::Results(SharedRealm r, Table& table)
@@ -50,28 +49,26 @@ Results::Results(SharedRealm r, Table& table)
 {
 }
 
-Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortOrder s)
+Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
 , m_link_view(lv)
 , m_table(&lv->get_target_table())
 , m_sort(std::move(s))
 , m_mode(Mode::LinkView)
 {
-    REALM_ASSERT(m_sort.column_indices.size() == m_sort.ascending.size());
     if (q) {
         m_query = std::move(*q);
         m_mode = Mode::Query;
     }
 }
 
-Results::Results(SharedRealm r, TableView tv, SortOrder s)
+Results::Results(SharedRealm r, TableView tv, SortDescriptor s)
 : m_realm(std::move(r))
 , m_table_view(std::move(tv))
 , m_table(&m_table_view.get_parent())
 , m_sort(std::move(s))
 , m_mode(Mode::TableView)
 {
-    REALM_ASSERT(m_sort.column_indices.size() == m_sort.ascending.size());
 }
 
 Results::Results(const Results&) = default;
@@ -267,7 +264,7 @@ void Results::update_tableview(bool wants_notifications)
             m_query.sync_view_if_needed();
             m_table_view = m_query.find_all();
             if (m_sort) {
-                m_table_view.sort(m_sort.column_indices, m_sort.ascending);
+                m_table_view.sort(m_sort);
             }
             m_mode = Mode::TableView;
             break;
@@ -484,9 +481,8 @@ TableView Results::get_tableview()
     REALM_UNREACHABLE();
 }
 
-Results Results::sort(realm::SortOrder&& sort) const
+Results Results::sort(realm::SortDescriptor&& sort) const
 {
-    REALM_ASSERT(sort.column_indices.size() == sort.ascending.size());
     return Results(m_realm, get_query(), std::move(sort));
 }
 

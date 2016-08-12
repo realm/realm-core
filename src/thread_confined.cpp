@@ -115,8 +115,11 @@ _impl::AnyHandover AnyThreadConfined::export_for_handover() const
         case AnyThreadConfined::Type::List:
             return _impl::AnyHandover(shared_group.export_linkview_for_handover(m_list.m_link_view));
 
-        case AnyThreadConfined::Type::Results:
+        case AnyThreadConfined::Type::Results: {
+            SortDescriptor::HandoverPatch sort_order;
+            SortDescriptor::generate_patch(m_results.get_sort(), sort_order);
             return _impl::AnyHandover(shared_group.export_for_handover(m_results.get_query(), ConstSourcePayload::Copy),
-                                      m_results.get_sort());
+                                      std::move(sort_order));
+        }
     }
 }

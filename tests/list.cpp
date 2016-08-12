@@ -318,7 +318,7 @@ TEST_CASE("list") {
 
     SECTION("sorted add_notification_block()") {
         List lst(r, lv);
-        Results results = lst.sort({{0}, {false}});
+        Results results = lst.sort({*target, {{0}}, {false}});
 
         int notification_calls = 0;
         CollectionChangeSet change;
@@ -440,7 +440,7 @@ TEST_CASE("list") {
     SECTION("sort()") {
         auto objectschema = &*r->schema().find("target");
         List list(r, lv);
-        auto results = list.sort({{0}, {false}});
+        auto results = list.sort({*target, {{0}}, {false}});
 
         REQUIRE(&results.get_object_schema() == objectschema);
         REQUIRE(results.get_mode() == Results::Mode::LinkView);
