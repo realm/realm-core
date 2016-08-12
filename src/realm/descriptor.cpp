@@ -92,7 +92,7 @@ void Descriptor::detach_subdesc_accessors() noexcept
     if (!m_subdesc_map.empty()) {
         for (const auto& subdesc : m_subdesc_map) {
             // Must hold a reliable reference count while detaching
-            DescriptorRef desc(subdesc.m_subdesc);
+            DescriptorRef desc = subdesc.m_subdesc.lock();
             if (desc)
                 desc->detach();
         }

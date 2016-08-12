@@ -656,7 +656,7 @@ inline void Descriptor::set_link_type(size_t col_ndx, LinkType link_type)
 
 inline ConstDescriptorRef Descriptor::get_subdescriptor(size_t column_ndx) const
 {
-    return const_cast<const Descriptor*>(this)->get_subdescriptor(column_ndx);
+    return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
 }
 
 inline DescriptorRef Descriptor::get_parent() noexcept
@@ -666,7 +666,7 @@ inline DescriptorRef Descriptor::get_parent() noexcept
 
 inline ConstDescriptorRef Descriptor::get_parent() const noexcept
 {
-    return const_cast<const Descriptor*>(this)->get_parent();
+    return const_cast<Descriptor*>(this)->get_parent();
 }
 
 inline TableRef Descriptor::get_root_table() noexcept
