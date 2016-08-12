@@ -462,7 +462,6 @@ public:
     using TableViewBase::TableViewBase;
 
     TableView() = default;
-    ~TableView() noexcept = default;
 
     // Rows
     typedef BasicRowExpr<Table> RowExpr;
