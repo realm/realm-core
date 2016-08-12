@@ -112,6 +112,10 @@ void Thread::set_name(const std::string& name)
     int r = pthread_setname_np(id, name_2);
     if (REALM_UNLIKELY(r != 0))
         throw std::runtime_error("pthread_setname_np() failed.");
+#elif REALM_PLATFORM_APPLE
+    int r = pthread_setname_np(name.data());
+    if (REALM_UNLIKELY(r != 0))
+        throw std::runtime_error("pthread_setname_np() failed.");
 #else
     static_cast<void>(name);
 #endif
