@@ -131,8 +131,8 @@ DescriptorRef Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
 {
     REALM_ASSERT(is_attached());
 
-    int i = 0;
-    int limit = m_subdesc_map.size();
+    size_t i = 0;
+    size_t limit = m_subdesc_map.size();
     while (i < limit) {
         subdesc_entry& sub = m_subdesc_map[i];
         auto res = sub.m_subdesc.lock();
