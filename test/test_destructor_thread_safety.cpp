@@ -33,24 +33,32 @@ using unit_test::TestContext;
 ONLY(ThreadSafety_TableView) {
     std::vector<std::shared_ptr<TableView>> ptrs;
     Mutex mutex;
+    Mutex destruct_mutex;
     test_util::ThreadWrapper thread;
 
-    thread.start([&mutex, &ptrs] {
+    thread.start([&mutex, &destruct_mutex, &ptrs] {
             while (true) {
                 LockGuard lock(mutex);
+                LockGuard lock1(destruct_mutex);
                 ptrs.clear();
             }
         });
 
     while (true) {
-        Group group;
+        auto group = std::make_shared<Group>();
 
-        TableRef table = group.add_table("table");
+        TableRef table = group->add_table("table");
         table->add_column(type_Int, "int");
-        auto table_view = std::make_shared<TableView>(table->where().find_all());
+        for (int i = 0; i < 10000; i++) {
+            auto table_view = std::make_shared<TableView>(table->where().find_all());
+            {
+                LockGuard lock(mutex);
+                ptrs.push_back(table_view);
+            }
+        }
         {
-            LockGuard lock(mutex);
-            ptrs.push_back(table_view);
+            LockGuard lock(destruct_mutex);
+            group.reset();
         }
     }
 }
