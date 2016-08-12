@@ -3,6 +3,10 @@
 require 'tmpdir'
 require 'fileutils'
 
+task :default do
+  system("rake -sT")  # s for silent
+end
+
 REALM_PROJECT_ROOT    = File.absolute_path(File.dirname(__FILE__))
 REALM_BUILD_DIR_APPLE = "build.apple"
 REALM_BUILD_DIR_STEM  = "build.make"
