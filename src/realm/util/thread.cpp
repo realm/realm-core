@@ -107,7 +107,7 @@ void Thread::set_name(const std::string& name)
         n = max-1;
     char name_2[max];
     std::copy(name.data(), name.data()+n, name_2);
-    name_2[n] = '\n';
+    name_2[n] = '\0';
     pthread_t id = pthread_self();
     int r = pthread_setname_np(id, name_2);
     if (REALM_UNLIKELY(r != 0))
