@@ -411,7 +411,7 @@ public:
     ~Descriptor() noexcept;
 
     struct PrivateTag {};
-    Descriptor(const PrivateTag&) : Descriptor() {};
+    Descriptor(const PrivateTag&) : Descriptor() {}
 private:
     TableRef m_root_table; // Table associated with root descriptor. Detached iff null.
     DescriptorRef m_parent; // Null iff detached or root descriptor.
