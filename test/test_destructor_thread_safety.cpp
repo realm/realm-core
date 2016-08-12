@@ -30,21 +30,80 @@ using namespace realm::util;
 using namespace realm::test_util;
 using unit_test::TestContext;
 
-ONLY(ThreadSafety_TableView) {
-    std::vector<std::shared_ptr<TableView>> ptrs;
+// Tests thread safety of accessor chain manipulations related to LinkViews
+TEST(ThreadSafety_LinkViewDestruction) {
+    std::vector<LinkViewRef> ptrs;
     Mutex mutex;
     Mutex destruct_mutex;
     test_util::ThreadWrapper thread;
+    bool done = false;
 
-    thread.start([&mutex, &destruct_mutex, &ptrs] {
+    thread.start([&mutex, &destruct_mutex, &ptrs, &done] {
             while (true) {
                 LockGuard lock(mutex);
                 LockGuard lock1(destruct_mutex);
                 ptrs.clear();
+                if (done)
+                    break;
             }
         });
 
-    while (true) {
+    for (int k=0; k<50; ++k) {
+        auto group = std::make_shared<Group>();
+
+        TableRef table = group->add_table("table");
+        table->add_column(type_Int, "int");
+        size_t col_link = table->add_column_link(type_LinkList, "links", *table);
+        table->add_empty_row();
+        table->add_empty_row();
+        table->add_empty_row();
+        {
+            LinkViewRef links = table->get_linklist(col_link, 0);
+            links->add(2);
+            links->add(1);
+            links->add(0);
+        }
+        table->add_empty_row();
+        for (int i = 0; i < 10000; i++) {
+            LinkViewRef links = table->get_linklist(col_link, 0);
+            {
+                LockGuard lock(mutex);
+                ptrs.push_back(links);
+            }
+        }
+        {
+            LockGuard lock(destruct_mutex);
+            group.reset();
+        }
+    }
+    {
+        LockGuard lock(destruct_mutex);
+        done = true;
+    }
+    thread.join();
+}
+
+// Tests thread safety of accessor chain manipulations related to TableViews
+// (implies queries and descriptors). This test revealed a bug in the management
+// of Descriptors.
+TEST(ThreadSafety_TableViewDestruction) {
+    std::vector<std::shared_ptr<TableView>> ptrs;
+    Mutex mutex;
+    Mutex destruct_mutex;
+    test_util::ThreadWrapper thread;
+    bool done = false;
+
+    thread.start([&mutex, &destruct_mutex, &ptrs, &done] {
+            while (true) {
+                LockGuard lock(mutex);
+                LockGuard lock1(destruct_mutex);
+                ptrs.clear();
+                if (done)
+                    break;
+            }
+        });
+
+    for (int k=0; k<20; ++k) {
         auto group = std::make_shared<Group>();
 
         TableRef table = group->add_table("table");
@@ -61,7 +120,56 @@ ONLY(ThreadSafety_TableView) {
             group.reset();
         }
     }
+    {
+        LockGuard lock(destruct_mutex);
+        done = true;
+    }
+    thread.join();
 }
+
+// Tests thread safety of accessor chain manipulations related to Rows
+TEST(ThreadSafety_RowDestruction) {
+    std::vector<Row> ptrs;
+    Mutex mutex;
+    Mutex destruct_mutex;
+    test_util::ThreadWrapper thread;
+    bool done = false;
+
+    thread.start([&mutex, &destruct_mutex, &ptrs, &done] {
+            while (true) {
+                LockGuard lock(mutex);
+                LockGuard lock1(destruct_mutex);
+                ptrs.clear();
+                if (done)
+                    break;
+            }
+        });
+
+    for (int k=0; k<100; ++k) {
+        auto group = std::make_shared<Group>();
+
+        TableRef table = group->add_table("table");
+        table->add_column(type_Int, "int");
+        table->add_empty_row();
+        for (int i = 0; i < 10000; i++) {
+            Row r = table->get(0);
+            {
+                LockGuard lock(mutex);
+                ptrs.push_back(r);
+            }
+        }
+        {
+            LockGuard lock(destruct_mutex);
+            group.reset();
+        }
+    }
+    {
+        LockGuard lock(destruct_mutex);
+        done = true;
+    }
+    thread.join();
+}
+
 
 #endif
 
