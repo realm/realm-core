@@ -54,7 +54,6 @@ public:
     void adj_acc_clear_root_table() noexcept override;
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
-    void refresh_accessor_tree(size_t, const Spec&) override;
     bool supports_search_index() const noexcept override { return false; }
     StringIndex* create_search_index() override { return nullptr; }
 
@@ -67,10 +66,6 @@ protected:
     /// A pointer to the table that this column is part of. For a free-standing
     /// column, this pointer is null.
     Table* const m_table;
-
-    /// The index of this column within m_table.m_cols. For a free-standing
-    /// column, this index is zero.
-    size_t m_column_ndx;
 
     struct SubtableMap {
         ~SubtableMap() noexcept {}
@@ -312,12 +307,6 @@ inline void SubtableColumnBase::mark(int type) noexcept
         m_subtable_map.recursive_mark();
 }
 
-inline void SubtableColumnBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
-{
-    IntegerColumn::refresh_accessor_tree(col_ndx, spec); // Throws
-    m_column_ndx = col_ndx;
-}
-
 inline void SubtableColumnBase::adj_acc_insert_rows(size_t row_ndx,
                                                     size_t num_rows) noexcept
 {
@@ -505,9 +494,8 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
 
 inline SubtableColumnBase::SubtableColumnBase(Allocator& alloc, ref_type ref,
                                               Table* table, size_t column_ndx):
-    IntegerColumn(alloc, ref), // Throws
-    m_table(table),
-    m_column_ndx(column_ndx)
+    IntegerColumn(alloc, ref, column_ndx), // Throws
+    m_table(table)
 {
 }
 
@@ -552,7 +540,7 @@ inline size_t* SubtableColumnBase::record_subtable_path(size_t* begin, size_t* e
 {
     if (end == begin)
         return 0; // Error, not enough space in buffer
-    *begin++ = m_column_ndx;
+    *begin++ = get_column_index();
     if (end == begin)
         return 0; // Error, not enough space in buffer
     return _impl::TableFriend::record_subtable_path(*m_table, begin, end);
@@ -604,7 +592,7 @@ inline size_t SubtableColumn::get_subspec_ndx() const noexcept
     if (REALM_UNLIKELY(m_subspec_ndx == realm::npos)) {
         typedef _impl::TableFriend tf;
         const Spec& spec = tf::get_spec(*m_table);
-        m_subspec_ndx = spec.get_subspec_ndx(m_column_ndx);
+        m_subspec_ndx = spec.get_subspec_ndx(get_column_index());
     }
     return m_subspec_ndx;
 }

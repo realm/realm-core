@@ -2,8 +2,7 @@
 
 ### Bugfixes
 
-* Fix a race condition that could result in a crash if a `LinkView` was
-  destroyed while another thread was adjusting accessors on a `LinkListColumn`.
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -11,7 +10,36 @@
 
 ### Enhancements
 
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 1.5.0 Release notes
+
+### Bugfixes
+
+* Fix a race condition that could result in a crash if a `LinkView` was
+  destroyed while another thread was adjusting accessors on a `LinkListColumn`.
+* Fix crashes and general brokenness when constructing a Query, inserting a
+  column into the queried table, and then running the query.
+* Fix crashes and general brokenness when syncing a sorted or distincted
+  TableView after inserting new columns into the source Table.
+
+### Breaking changes
+
+* Added support for sorting and distincting table views through a chain of
+  links. (#1030)
+
+### Enhancements
+
 * Improve performance of sorting on non-nullable columns.
+* Improve overall sort performance.
 
 -----------
 

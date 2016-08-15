@@ -20,30 +20,67 @@
 #define REALM_VIEWS_HPP
 
 #include <realm/column.hpp>
-#include <realm/column_string_enum.hpp>
 #include <realm/handover_defs.hpp>
-#include <realm/index_string.hpp>
 
 namespace realm {
 
 const int64_t detached_ref = -1;
 
+class RowIndexes;
+
+// SortDescriptor encapsulates a reference to a set of columns (possibly over links), which is
+// used to indicate the criteria columns for sort and distinct. Although the input is column
+// indices, it does not rely on those indices remaining stable as long as the columns continue to exist.
+class SortDescriptor {
+public:
+    SortDescriptor() = default;
+    SortDescriptor(SortDescriptor const&) = default;
+    SortDescriptor(SortDescriptor&&) = default;
+    SortDescriptor& operator=(SortDescriptor const&) = default;
+    SortDescriptor& operator=(SortDescriptor&&) = default;
+
+    // Create a sort descriptor for the given columns on the given table.
+    // Each vector in `column_indices` represents a chain of columns, where
+    // all but the last are Link columns (n.b.: LinkList and Backlink are not
+    // supported), and the final is any column type that can be sorted on.
+    // `column_indices` must be non-empty, and each vector within it must also
+    // be non-empty. `ascending` must either be empty or have one entry for each
+    // column index chain.
+    SortDescriptor(Table const& table,
+                   std::vector<std::vector<size_t>> column_indices,
+                   std::vector<bool> ascending={});
+
+    // returns whether this descriptor is valid and can be used to sort
+    explicit operator bool() const noexcept { return !m_columns.empty(); }
+
+    // handover support
+    using HandoverPatch = std::unique_ptr<SortDescriptorHandoverPatch>;
+    static void generate_patch(SortDescriptor const&, HandoverPatch&);
+    static SortDescriptor create_from_and_consume_patch(HandoverPatch&, Table const&);
+
+    class Sorter;
+    Sorter sorter(IntegerColumn const& row_indexes) const;
+private:
+    std::vector<std::vector<const ColumnBase*>> m_columns;
+    std::vector<bool> m_ascending;
+};
+
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
-// supports sorting.
+// supports sorting and distinct.
 class RowIndexes {
 public:
     RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc) :
-#ifdef REALM_COOKIE_CHECK
-        cookie(cookie_expected),
-#endif
         m_row_indexes(urt, alloc)
+#ifdef REALM_COOKIE_CHECK
+        , cookie(cookie_expected)
+#endif
     {}
 
     RowIndexes(IntegerColumn&& col) :
-#ifdef REALM_COOKIE_CHECK
-        cookie(cookie_expected),
-#endif
         m_row_indexes(std::move(col))
+#ifdef REALM_COOKIE_CHECK
+        , cookie(cookie_expected)
+#endif
     {}
 
     RowIndexes(const RowIndexes& source, ConstSourcePayload mode);
@@ -73,47 +110,15 @@ public:
 #endif
     }
 
-    // Predicate for std::sort
-    struct Sorter {
-        Sorter() {}
-        Sorter(const std::vector<size_t>& columns, const std::vector<bool>& ascending)
-            : m_column_indexes(columns), m_ascending(ascending) {}
-        bool operator()(size_t i, size_t j) const
-        {
-            for (size_t t = 0; t < m_columns.size(); t++) {
-                int c = m_columns[t]->compare_values(i, j);
+    IntegerColumn m_row_indexes;
 
-                if (c != 0)
-                    return m_ascending[t] ? c > 0 : c < 0;
-            }
-            return false; // row i == row j
-        }
-
-        void init(RowIndexes* row_indexes)
-        {
-            m_columns.clear();
-            m_columns.resize(m_column_indexes.size(), 0);
-
-            for (size_t i = 0; i < m_column_indexes.size(); i++) {
-                m_columns[i] = &row_indexes->get_column_base(m_column_indexes[i]);
-            }
-        }
-
-        explicit operator bool() const { return !m_column_indexes.empty(); }
-
-        std::vector<size_t> m_column_indexes;
-        std::vector<bool> m_ascending;
-        std::vector<const ColumnBase*> m_columns;
-    };
-
-    void sort(Sorter& sorting_predicate);
+protected:
+    void do_sort(const SortDescriptor& sorting_predicate, const SortDescriptor& distinct_columns);
 
 #ifdef REALM_COOKIE_CHECK
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
     uint64_t cookie;
 #endif
-
-    IntegerColumn m_row_indexes;
 };
 
 } // namespace realm

@@ -20,6 +20,7 @@ namespace realm {
 
 inline MixedColumn::MixedColumn(Allocator& alloc, ref_type ref,
                                 Table* table, size_t column_ndx)
+: ColumnBaseSimple(column_ndx)
 {
     create(alloc, ref, table, column_ndx);
 }
@@ -467,6 +468,8 @@ inline void MixedColumn::mark(int type) noexcept
 
 inline void MixedColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
+    ColumnBaseSimple::refresh_accessor_tree(col_ndx, spec);
+
     get_root_array()->init_from_parent();
     m_types->refresh_accessor_tree(col_ndx, spec); // Throws
     m_data->refresh_accessor_tree(col_ndx, spec); // Throws

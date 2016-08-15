@@ -42,7 +42,8 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable):
+BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable, size_t column_ndx):
+    ColumnBaseSimple(column_ndx),
     m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
@@ -522,8 +523,9 @@ ref_type BinaryColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
-void BinaryColumn::refresh_accessor_tree(size_t, const Spec&)
+void BinaryColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
 {
+    ColumnBaseSimple::refresh_accessor_tree(new_col_ndx, spec);
     ref_type ref = m_array->get_ref_from_parent();
     update_from_ref(ref); // Throws
 }

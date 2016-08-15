@@ -534,6 +534,9 @@
 		C0552C571B45CEA8007FF3AA /* simulated_failure.hpp in Headers */ = {isa = PBXBuildFile; fileRef = C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */; };
 		C08FE2B81B45BD750037AFCE /* simulated_failure.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C08FE2B61B45BD750037AFCE /* simulated_failure.cpp */; };
 		C08FE2B91B45BD750037AFCE /* simulated_failure.hpp in Headers */ = {isa = PBXBuildFile; fileRef = C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */; };
+		D4AC5C2D1D5BACD600E3D29D /* version_id.hpp in Headers */ = {isa = PBXBuildFile; fileRef = D4AC5C2B1D5BACD600E3D29D /* version_id.hpp */; };
+		D4AC5C2E1D5BAFD600E3D29D /* version_id.hpp in Headers */ = {isa = PBXBuildFile; fileRef = D4AC5C2B1D5BACD600E3D29D /* version_id.hpp */; };
+		D4AC5C2F1D5BAFD700E3D29D /* version_id.hpp in Headers */ = {isa = PBXBuildFile; fileRef = D4AC5C2B1D5BACD600E3D29D /* version_id.hpp */; };
 		F43098B21B021C04000A2333 /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F43098B01B021C04000A2333 /* bptree.cpp */; };
 		F43098B31B021C04000A2333 /* bptree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F43098B01B021C04000A2333 /* bptree.cpp */; };
 		F43098B41B021C04000A2333 /* bptree.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F43098B11B021C04000A2333 /* bptree.hpp */; };
@@ -1033,6 +1036,7 @@
 		C008FF991B67F02F0042669E /* liblibrealm watchos.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibrealm watchos.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C08FE2B61B45BD750037AFCE /* simulated_failure.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simulated_failure.cpp; sourceTree = "<group>"; };
 		C08FE2B71B45BD750037AFCE /* simulated_failure.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = simulated_failure.hpp; sourceTree = "<group>"; };
+		D4AC5C2B1D5BACD600E3D29D /* version_id.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = version_id.hpp; path = realm/version_id.hpp; sourceTree = "<group>"; };
 		F43098B01B021C04000A2333 /* bptree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bptree.cpp; path = realm/bptree.cpp; sourceTree = "<group>"; };
 		F43098B11B021C04000A2333 /* bptree.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = bptree.hpp; path = realm/bptree.hpp; sourceTree = "<group>"; };
 		F44D4CE51B381D27009ADAB9 /* input_stream.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = input_stream.hpp; sourceTree = "<group>"; };
@@ -1307,6 +1311,7 @@
 				365CCE33157CC37D00172BF8 /* utilities.hpp */,
 				80ADCCE718A23DD00049D472 /* version.cpp */,
 				80ADCCE818A23DD00049D472 /* version.hpp */,
+				D4AC5C2B1D5BACD600E3D29D /* version_id.hpp */,
 				42F862D119BDE3460053C134 /* views.cpp */,
 				42F862D219BDE3460053C134 /* views.hpp */,
 			);
@@ -1746,6 +1751,7 @@
 				52D7C4911852A01700633748 /* utf8.hpp in Headers */,
 				365CCE76157CC37D00172BF8 /* utilities.hpp in Headers */,
 				80ADCCEB18A23DD00049D472 /* version.hpp in Headers */,
+				D4AC5C2D1D5BACD600E3D29D /* version_id.hpp in Headers */,
 				42F862D419BDE3460053C134 /* views.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1781,6 +1787,7 @@
 				4142C9701623478700B3B902 /* group_writer.hpp in Headers */,
 				4142C9881623478700B3B902 /* index_string.hpp in Headers */,
 				F44D4CE91B381D27009ADAB9 /* input_stream.hpp in Headers */,
+				D4AC5C2E1D5BAFD600E3D29D /* version_id.hpp in Headers */,
 				4142C9731623478700B3B902 /* lang_bind_helper.hpp in Headers */,
 				4142C9751623478700B3B902 /* mixed.hpp in Headers */,
 				4142C96F1623478700B3B902 /* olddatetime.hpp in Headers */,
@@ -1855,6 +1862,7 @@
 				5DC597341B854CBA0020D712 /* column_type_traits.hpp in Headers */,
 				48A048331C7F7A55000FFD12 /* continuous_transactions_history.hpp in Headers */,
 				C008FF7C1B67F02F0042669E /* data_type.hpp in Headers */,
+				D4AC5C2F1D5BAFD700E3D29D /* version_id.hpp in Headers */,
 				C008FF7E1B67F02F0042669E /* group.hpp in Headers */,
 				C008FF7F1B67F02F0042669E /* group_shared.hpp in Headers */,
 				C008FF801B67F02F0042669E /* group_writer.hpp in Headers */,
@@ -2756,6 +2764,7 @@
 					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
+				WARNING_CFLAGS = "-Wreorder";
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Debug;
@@ -2805,6 +2814,7 @@
 					"-Wconditional-uninitialized",
 				);
 				SDKROOT = macosx;
+				WARNING_CFLAGS = "-Wreorder";
 				WATCHOS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Release;

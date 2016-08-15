@@ -20,14 +20,15 @@
 #ifdef TEST_QUERY
 
 #include <cstdlib> // itoa()
+#include <initializer_list>
 #include <limits>
 #include <vector>
 
 #include <realm.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
+#include <realm/history.hpp>
 #include <realm/query_engine.hpp>
-#include <initializer_list>
 
 #include "test.hpp"
 
@@ -3541,20 +3542,6 @@ TEST(Query_SubtableBug)
     CHECK_EQUAL(1, t1.size());
 }
 
-/*
-// Disabled because assert has now been added to disallow adding rows when no columns exist
-TEST(Query_SubtableViewSizeBug)
-{
-Table table;
-table.add_column(type_Table, "subtab");
-table.add_empty_row(1);
-TableRef subtab = table.get_subtable(0,0);
-subtab->add_empty_row(1);
-TableView subview = subtab->where().find_all();
-CHECK_EQUAL(1, subview.size());
-}
-*/
-
 TEST(Query_Sort1)
 {
     TupleTableType ttt;
@@ -3696,6 +3683,352 @@ TEST(Query_SortBools)
     CHECK(tv.get_bool(0, 0) == false);
     CHECK(tv.get_bool(0, 1) == true);
     CHECK(tv.get_bool(0, 2) == true);
+}
+
+TEST(Query_SortLinks)
+{
+    const size_t num_rows = 10;
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_string");
+    size_t t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_to_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_str_col = t2->add_column(type_String, "t2_string");
+    size_t t2_link_t1_col = t2->add_column_link(type_Link, "t2_link_to_t1", *t1);
+
+    t1->add_empty_row(num_rows);
+    t2->add_empty_row(num_rows);
+    std::vector<std::string> ordered_strings;
+
+    for (size_t i = 0; i < num_rows; ++i) {
+        ordered_strings.push_back(std::string("a string") + util::to_string(i));
+        t1->set_int(t1_int_col, i, i);
+        t1->set_string(t1_str_col, i, ordered_strings[i]);
+        t1->set_link(t1_link_t2_col, i, num_rows - i - 1);
+
+        t2->set_int(t2_int_col, i, i);
+        t2->set_string(t2_str_col, i, ordered_strings[i]);
+        t2->set_link(t2_link_t1_col, i, i);
+    }
+
+    TableView tv = t1->where().find_all();
+
+    // Check natural order
+    CHECK_EQUAL(tv.size(), num_rows);
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), i);
+        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[i]);
+    }
+
+    // Check sorted order by ints
+    tv.sort(t1_int_col);
+    CHECK_EQUAL(tv.size(), num_rows);
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), i);
+        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[i]);
+    }
+
+    // Check that you can sort on a regular link column
+    tv.sort(t1_link_t2_col);
+    CHECK_EQUAL(tv.size(), num_rows);
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), num_rows - i - 1);
+        CHECK_EQUAL(tv.get_string(t1_str_col, i), ordered_strings[num_rows - i - 1]);
+    }
+}
+
+
+TEST(Query_SortLinkChains)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+
+    t1->add_empty_row(7);
+    t2->add_empty_row(6);
+    t3->add_empty_row(4);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t2->size(); i++) {
+        t1->set_int(t1_int_col, i + 1, i);
+        t2->set_int(t2_int_col, i, t1->size() - i);
+    }
+
+    t1->set_link(t1_link_col, 0, 1);
+    t1->set_link(t1_link_col, 1, 0);
+    t1->set_link(t1_link_col, 2, 2);
+    t1->set_link(t1_link_col, 3, 3);
+    t1->set_link(t1_link_col, 4, 5);
+    t1->set_link(t1_link_col, 5, 4);
+    t1->set_link(t1_link_col, 6, 1);
+
+    t2->set_link(t2_link_col, 0, 3);
+    t2->set_link(t2_link_col, 1, 2);
+    t2->set_link(t2_link_col, 2, 0);
+    t2->set_link(t2_link_col, 3, 1);
+    t2->nullify_link(t2_link_col, 4);
+    t2->nullify_link(t2_link_col, 5);
+
+    t3->set_null(t3_int_col, 0);
+    t3->set_int(t3_int_col, 1, 4);
+    t3->set_int(t3_int_col, 2, 7);
+    t3->set_int(t3_int_col, 3, 3);
+    t3->set_string(t3_str_col, 0, "b");
+    t3->set_string(t3_str_col, 1, "a");
+    t3->set_string(t3_str_col, 2, "c");
+    t3->set_string(t3_str_col, 3, "k");
+
+    //  T1                       T2                     T3
+    //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
+    //  ==============================================================
+    //  99       1           |   5       3          |   null    "b"
+    //  0        0           |   4       2          |   4       "a"
+    //  1        2           |   3       0          |   7       "c"
+    //  2        3           |   2       1          |   3       "k"
+    //  3        5           |   1       null       |
+    //  4        4           |   0       null       |
+    //  5        1           |                      |
+
+    TableView tv = t1->where().less(t1_int_col, 6).find_all();
+
+    // Test original funcionality through chain class
+    std::vector<size_t> results1 = { 0, 1, 2, 3, 4, 5 };
+    tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
+    CHECK_EQUAL(tv.size(), results1.size());
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+    }
+    tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]);
+    }
+
+    // Test basic one link chain
+    std::vector<size_t> results2 = { 3, 4, 2, 1, 5, 0 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
+    CHECK_EQUAL(tv.size(), results2.size());
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+    }
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[results2.size() - 1 - i]);
+    }
+
+    // Test link chain through two links with nulls
+    std::vector<size_t> results3 = { 1, 0, 2, 5 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {true}));
+    // No guarantees about nullified links except they are at the end.
+    CHECK(tv.size() >= results3.size());
+    for (size_t i = 0; i < results3.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+    }
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
+    // No guarantees about nullified links except they are at the beginning.
+    size_t num_nulls = tv.size() - results3.size();
+    for (size_t i = num_nulls; i < results3.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results2.size() - 1 - i]);
+    }
+
+    // Test link chain with nulls and a single local column
+    std::vector<size_t> results4 = { 1, 0, 2, 5, 3, 4 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}));
+    CHECK_EQUAL(tv.size(), results4.size());
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4[i]);
+    }
+    std::vector<size_t> results4_rev = { 1, 0, 2, 5, 4, 3 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, false}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev[i]);
+    }
+    std::vector<size_t> results4_rev2 = { 3, 4, 5, 2, 0, 1 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, true}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev2[i]);
+    }
+    std::vector<size_t> results4_rev3 = { 4, 3, 5, 2, 0, 1 };
+    tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, false}));
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev3[i]);
+    }
+}
+
+
+TEST(Query_LinkChainSortErrors)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_linklist_col = t1->add_column_link(type_LinkList, "t1_linklist", *t2);
+    size_t t2_string_col = t2->add_column(type_String, "t2_string");
+    t2->add_column_link(type_Link, "t2_link_t1", *t1); // add a backlink to t1
+
+    // Disallow backlinks, linklists, other non-link column types.
+    size_t backlink_ndx = 2;
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_linklist_col, t2_string_col}}), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{backlink_ndx, t2_string_col}}), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_int_col, t2_string_col}}), LogicError::type_mismatch);
+}
+
+
+TEST(Query_DistinctThroughLinks)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    TableRef t3 = g.add_table("t3");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    size_t t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    size_t t3_int_col = t3->add_column(type_Int, "t3_int", true);
+    size_t t3_str_col = t3->add_column(type_String, "t3_str");
+
+    t1->add_empty_row(7);
+    t2->add_empty_row(6);
+    t3->add_empty_row(4);
+
+    t1->set_int(t1_int_col, 0, 99);
+    for (size_t i = 0; i < t2->size(); i++) {
+        t1->set_int(t1_int_col, i + 1, i);
+        t2->set_int(t2_int_col, i, t2->size() - i - 1);
+    }
+    t2->set_int(t2_int_col, 0, 0);
+    t2->set_int(t2_int_col, 1, 0);
+
+    t1->set_link(t1_link_col, 0, 1);
+    t1->set_link(t1_link_col, 1, 0);
+    t1->set_link(t1_link_col, 2, 2);
+    t1->set_link(t1_link_col, 3, 3);
+    t1->set_link(t1_link_col, 4, 5);
+    t1->set_link(t1_link_col, 5, 4);
+    t1->set_link(t1_link_col, 6, 1);
+
+    t2->set_link(t2_link_col, 0, 3);
+    t2->set_link(t2_link_col, 1, 2);
+    t2->set_link(t2_link_col, 2, 0);
+    t2->set_link(t2_link_col, 3, 1);
+    t2->nullify_link(t2_link_col, 4);
+    t2->nullify_link(t2_link_col, 5);
+
+    t3->set_null(t3_int_col, 0);
+    t3->set_int(t3_int_col, 1, 4);
+    t3->set_int(t3_int_col, 2, 7);
+    t3->set_int(t3_int_col, 3, 3);
+    t3->set_string(t3_str_col, 0, "b");
+    t3->set_string(t3_str_col, 1, "a");
+    t3->set_string(t3_str_col, 2, "c");
+    t3->set_string(t3_str_col, 3, "k");
+
+    //  T1                       T2                     T3
+    //  t1_int   t1_link_t2  |   t2_int  t2_link_t3 |   t3_int  t3_str
+    //  ==============================================================
+    //  99       1           |   0       3          |   null    "b"
+    //  0        0           |   0       2          |   4       "a"
+    //  1        2           |   3       0          |   7       "c"
+    //  2        3           |   2       1          |   3       "k"
+    //  3        5           |   1       null       |
+    //  4        4           |   0       null       |
+    //  5        1           |                      |
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
+
+        // Test original funcionality through chain class
+        std::vector<size_t> results1 = { 0, 1, 2, 3, 4, 5 };
+        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}, {true} ));
+        CHECK_EQUAL(tv.size(), results1.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
+        }
+        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
+        }
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
+        }
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
+        }
+    }
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all(); // fresh unsorted view
+
+        // Test basic one link chain
+        std::vector<size_t> results2 = { 0, 1, 2, 4 };
+        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        CHECK_EQUAL(tv.size(), results2.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+        }
+        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results2.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            // no difference even though false on distinct was specified
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
+        }
+
+        std::vector<size_t> results2_sorted_link = { 0, 4, 2, 1 };
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
+        CHECK_EQUAL(tv.size(), results2_sorted_link.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[i]);
+        }
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[results2_sorted_link.size() - 1 - i]);
+        }
+    }
+
+    {
+        TableView tv = t1->where().less(t1_int_col, 6).find_all(); // fresh unsorted view
+
+        // Test link chain through two links with nulls
+        std::vector<size_t> results3 = { 0, 1, 2, 5 };
+        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
+        // Nullified links are excluded from distinct.
+        CHECK_EQUAL(tv.size(), results3.size());
+        for (size_t i = 0; i < results3.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+        }
+        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results3.size());
+        for (size_t i = 0; i < results3.size(); ++i) {
+            // same order as before
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+        }
+
+        results3 = { 1, 0, 2, 5 }; // sorted order on t3_col_int { null, 3, 4, 7 }
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
+        CHECK_EQUAL(tv.size(), results3.size());
+        for (size_t i = 0; i < results3.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
+        }
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results3.size());
+        for (size_t i = 0; i < results3.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[results3.size() - 1 - i]);
+        }
+    }
 }
 
 
@@ -8949,6 +9282,434 @@ TEST(Query_CombineWithEmptyQueryDoesntCrash)
         Query q3 = table.where() || q1;
         CHECK_EQUAL(1, q3.count());
     }
+}
+
+namespace {
+struct QueryInitHelper;
+
+// Test a whole bunch of various permutations of operations on every query node
+// type. This is done in a somewhat ridiculous CPS style to ensure complete
+// control over when the Query instances are copied.
+struct PreRun {
+    template<typename Next>
+    auto operator()(Query& q, Next&& next) { q.count(); return next(q); }
+};
+struct CopyQuery {
+    template<typename Next>
+    auto operator()(Query& q, Next&& next) {  Query copy(q); return next(copy); }
+};
+struct AndQuery {
+    template<typename Next>
+    auto operator()(Query& q, Next&& next) {
+        return next(q.get_table()->where().and_query(q));
+    }
+};
+struct HandoverQuery {
+    template<typename Next>
+    auto operator()(Query& q, Next&& next)
+    {
+        auto main_table = next.state.table;
+
+        // Hand over the query to the secondary SG and continue processing on that
+        std::swap(next.state.sg, next.state.sg2);
+        auto& group = next.state.sg->begin_read(next.state.sg2->get_version_of_current_transaction());
+        auto copy = next.state.sg->import_from_handover(next.state.sg2->export_for_handover(q, ConstSourcePayload::Copy));
+        next.state.table = const_cast<Table*>(group.get_table(0).get());
+
+        auto ret = next(*copy);
+
+        // Restore the old state
+        next.state.sg->end_read();
+        next.state.table = main_table;
+        std::swap(next.state.sg, next.state.sg2);
+        return ret;
+    }
+};
+struct InsertColumn {
+    template<typename Next>
+    auto operator()(Query& q, Next&& next)
+    {
+        LangBindHelper::advance_read(*next.state.sg);
+        return next(q);
+    }
+};
+struct GetCount {
+    auto operator()(Query& q) {  return q.count(); }
+};
+
+template<typename Func, typename... Rest>
+struct Compose {
+    QueryInitHelper& state;
+    auto operator()(Query& q) { return Func()(q, Compose<Rest...>{state}); }
+};
+
+template<typename Func>
+struct Compose<Func> {
+    QueryInitHelper& state;
+    auto operator()(Query& q) { return Func()(q); }
+};
+
+struct QueryInitHelper {
+    test_util::unit_test::TestContext& test_context;
+    SharedGroup* sg;
+    SharedGroup* sg2;
+    SharedGroup::VersionID initial_version, extra_col_version;
+    Table* table;
+
+    template<typename Func>
+    REALM_NOINLINE void operator()(Func&& fn);
+
+    template<typename Func, typename... Mutations>
+    REALM_NOINLINE size_t run(Func& fn);
+};
+
+template<typename Func>
+void QueryInitHelper::operator()(Func&& fn)
+{
+    // get baseline result with no copies
+    size_t count = run(fn);
+    CHECK_EQUAL(count, (run<Func, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn>(fn)));
+
+    // copy the query, then run
+    CHECK_EQUAL(count, (run<Func, CopyQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, AndQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, HandoverQuery>(fn)));
+
+    // run, copy the query, rerun
+    CHECK_EQUAL(count, (run<Func, PreRun, CopyQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, AndQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, HandoverQuery>(fn)));
+
+    // copy the query, insert column, then run
+    CHECK_EQUAL(count, (run<Func, CopyQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<Func, AndQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<Func, HandoverQuery, InsertColumn>(fn)));
+
+    // run, copy the query, insert column, rerun
+    CHECK_EQUAL(count, (run<Func, PreRun, CopyQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, AndQuery, InsertColumn>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, HandoverQuery, InsertColumn>(fn)));
+
+    // insert column, copy the query, then run
+    CHECK_EQUAL(count, (run<Func, InsertColumn, CopyQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, InsertColumn, AndQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, InsertColumn, HandoverQuery>(fn)));
+
+    // run, insert column, copy the query, rerun
+    CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn, CopyQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn, AndQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn, HandoverQuery>(fn)));
+}
+
+template<typename Func, typename... Mutations>
+size_t QueryInitHelper::run(Func& fn)
+{
+    auto& group = sg->begin_read(initial_version);
+    table = const_cast<Table*>(group.get_table(0).get());
+    size_t count;
+    Query query = table->where();
+    fn(query, [&](auto&& q2) {
+        count = Compose<Mutations..., GetCount>{*this}(q2);
+    });
+    sg->end_read();
+    return count;
+}
+} // anonymous namespace
+
+// Test that queries properly bind to their tables and columns by constructing
+// a query, maybe copying it in one of several ways, inserting a column at the
+// beginning of the table, and then rerunning the query
+TEST(Query_TableInitialization)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    auto repl = make_in_realm_history(path);
+    auto repl2 = make_in_realm_history(path);
+    SharedGroup sg(*repl, SharedGroup::durability_MemOnly);
+    SharedGroup sg2(*repl2, SharedGroup::durability_MemOnly);
+    Group& g = const_cast<Group&>(sg.begin_read());
+    LangBindHelper::promote_to_write(sg);
+
+    SharedGroup::VersionID initial_version, extra_col_version;
+
+    Table& table = *g.add_table("table");
+    // The columns are ordered to avoid having types which are backed by the
+    // same implementation column type next to each other so that being
+    // off-by-one doesn't work by coincidence
+    size_t col_int = table.add_column(type_Int, "int");
+    size_t col_float = table.add_column(type_Float, "float");
+    size_t col_bool = table.add_column(type_Bool, "bool");
+    size_t col_link = table.add_column_link(type_Link, "link", table);
+    size_t col_string_enum = table.add_column(type_String, "string enum");
+    table.optimize();
+    size_t col_double = table.add_column(type_Double, "double");
+    size_t col_string = table.add_column(type_String, "string");
+    size_t col_list = table.add_column_link(type_LinkList, "list", table);
+    size_t col_binary = table.add_column(type_Binary, "binary");
+    size_t col_timestamp = table.add_column(type_Timestamp, "timestamp");
+    size_t col_string_indexed = table.add_column(type_String, "indexed string");
+
+    size_t col_int_null = table.add_column(type_Int, "int", true);
+    size_t col_float_null = table.add_column(type_Float, "float", true);
+    size_t col_bool_null = table.add_column(type_Bool, "bool", true);
+    size_t col_double_null = table.add_column(type_Double, "double", true);
+    size_t col_string_null = table.add_column(type_String, "string", true);
+    size_t col_binary_null = table.add_column(type_Binary, "binary", true);
+    size_t col_timestamp_null = table.add_column(type_Timestamp, "timestamp", true);
+
+    DescriptorRef subdesc;
+    size_t col_table = table.add_column(type_Table, "table", &subdesc);
+    subdesc->add_column(type_Int, "col");
+
+    table.add_empty_row(20);
+    for (size_t i = 0; i < 10; ++i) {
+        table.set_link(col_link, i, i);
+        table.get_linklist(col_list, i)->add(i);
+        table.get_subtable(col_table, i)->add_empty_row();
+    }
+    LangBindHelper::commit_and_continue_as_read(sg);
+
+    // Save this version so we can go back to it before every test
+    initial_version = sg.get_version_of_current_transaction();
+    sg.pin_version();
+
+    // Create a second version which has an extra column at the beginning
+    // of the table, so that anything which relies on stable column numbers
+    // will use the wrong column after advancing
+    LangBindHelper::promote_to_write(sg);
+    table.insert_column(0, type_Double, "new col");
+    LangBindHelper::commit_and_continue_as_read(sg);
+    sg.pin_version();
+    extra_col_version = sg.get_version_of_current_transaction();
+    sg.end_read();
+
+    QueryInitHelper helper{test_context, &sg, &sg2, initial_version, extra_col_version, nullptr};
+
+    // links_to
+    helper([&](Query& q, auto&& test) { test(q.links_to(col_link, (*q.get_table())[0])); });
+    helper([&](Query& q, auto&& test) { test(q.links_to(col_list, (*q.get_table())[0])); });
+    helper([&](Query& q, auto&& test) { test(q.Not().links_to(col_link, (*q.get_table())[0])); });
+    helper([&](Query& q, auto&& test) { test(q.links_to(col_link, (*q.get_table())[0]).Or().links_to(col_link, (*q.get_table())[1])); });
+
+    // subtable
+    helper([&](Query& q, auto&& test) { test(q.subtable(col_table).equal(0, 0).end_subtable()); });
+
+    // compare to null
+    helper([&](Query& q, auto&& test) { test(q.equal(col_int_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.equal(col_float_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.equal(col_bool_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.equal(col_double_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.equal(col_string_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.equal(col_binary_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.equal(col_timestamp_null, null{})); });
+
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_int_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_float_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_bool_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_double_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_binary_null, null{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_timestamp_null, null{})); });
+
+    // Conditions: int64_t
+    helper([&](Query& q, auto&& test) { test(q.equal(col_int, int64_t{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_int, int64_t{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater(col_int, int64_t{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_int, int64_t{})); });
+    helper([&](Query& q, auto&& test) { test(q.less(col_int, int64_t{})); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal(col_int, int64_t{})); });
+    helper([&](Query& q, auto&& test) { test(q.between(col_int, int64_t{}, {})); });
+
+    // Conditions: int
+    helper([&](Query& q, auto&& test) { test(q.equal(col_int, int{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_int, int{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater(col_int, int{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_int, int{})); });
+    helper([&](Query& q, auto&& test) { test(q.less(col_int, int{})); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal(col_int, int{})); });
+    helper([&](Query& q, auto&& test) { test(q.between(col_int, int{}, {})); });
+
+    // Conditions: 2 int columns
+    helper([&](Query& q, auto&& test) { test(q.equal_int(col_int, col_int)); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal_int(col_int, col_int)); });
+    helper([&](Query& q, auto&& test) { test(q.greater_int(col_int, col_int)); });
+    helper([&](Query& q, auto&& test) { test(q.less_int(col_int, col_int)); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal_int(col_int, col_int)); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal_int(col_int, col_int)); });
+
+    // Conditions: float
+    helper([&](Query& q, auto&& test) { test(q.equal(col_float, float{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_float, float{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater(col_float, float{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_float, float{})); });
+    helper([&](Query& q, auto&& test) { test(q.less(col_float, float{})); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal(col_float, float{})); });
+    helper([&](Query& q, auto&& test) { test(q.between(col_float, float{}, {})); });
+
+    // Conditions: 2 float columns
+    helper([&](Query& q, auto&& test) { test(q.equal_float(col_float, col_float)); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal_float(col_float, col_float)); });
+    helper([&](Query& q, auto&& test) { test(q.greater_float(col_float, col_float)); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal_float(col_float, col_float)); });
+    helper([&](Query& q, auto&& test) { test(q.less_float(col_float, col_float)); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal_float(col_float, col_float)); });
+
+    // Conditions: double
+    helper([&](Query& q, auto&& test) { test(q.equal(col_double, double{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_double, double{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater(col_double, double{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_double, double{})); });
+    helper([&](Query& q, auto&& test) { test(q.less(col_double, double{})); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal(col_double, double{})); });
+    helper([&](Query& q, auto&& test) { test(q.between(col_double, double{}, {})); });
+
+    // Conditions: 2 double columns
+    helper([&](Query& q, auto&& test) { test(q.equal_double(col_double, col_double)); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal_double(col_double, col_double)); });
+    helper([&](Query& q, auto&& test) { test(q.greater_double(col_double, col_double)); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal_double(col_double, col_double)); });
+    helper([&](Query& q, auto&& test) { test(q.less_double(col_double, col_double)); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal_double(col_double, col_double)); });
+
+    // Conditions: timestamp
+    helper([&](Query& q, auto&& test) { test(q.equal(col_timestamp, Timestamp{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_timestamp, Timestamp{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater(col_timestamp, Timestamp{})); });
+    helper([&](Query& q, auto&& test) { test(q.greater_equal(col_timestamp, Timestamp{})); });
+    helper([&](Query& q, auto&& test) { test(q.less_equal(col_timestamp, Timestamp{})); });
+    helper([&](Query& q, auto&& test) { test(q.less(col_timestamp, Timestamp{})); });
+
+    // Conditions: bool
+    helper([&](Query& q, auto&& test) { test(q.equal(col_bool, bool{})); });
+
+    // Conditions: strings
+    helper([&](Query& q, auto&& test) { test(q.equal(col_string, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{})); });
+
+    helper([&](Query& q, auto&& test) { test(q.equal(col_string, StringData{}, false)); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string, StringData{}, false)); });
+    helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{}, false)); });
+    helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{}, false)); });
+    helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{}, false)); });
+
+    helper([&](Query& q, auto&& test) { test(q.equal(col_string_enum, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_enum, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_enum, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_enum, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.contains(col_string_enum, StringData{})); });
+
+    helper([&](Query& q, auto&& test) { test(q.equal(col_string_indexed, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_indexed, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_indexed, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_indexed, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.contains(col_string_indexed, StringData{})); });
+
+    // Conditions: binary data
+    helper([&](Query& q, auto&& test) { test(q.equal(col_binary, BinaryData{})); });
+    helper([&](Query& q, auto&& test) { test(q.not_equal(col_binary, BinaryData{})); });
+    helper([&](Query& q, auto&& test) { test(q.begins_with(col_binary, BinaryData{})); });
+    helper([&](Query& q, auto&& test) { test(q.ends_with(col_binary, BinaryData{})); });
+    helper([&](Query& q, auto&& test) { test(q.contains(col_binary, BinaryData{})); });
+
+    enum class Mode { Direct, Link, LinkList };
+
+    // note: using std::function<> rather than auto&& here for the sake of compilation speed
+    auto test_query_expression = [&](std::function<Table&()> get_table, Mode mode) {
+        auto test_operator = [&](auto&& op, auto&& column, auto&& v) {
+            if (mode != Mode::LinkList)
+                helper([&](Query&, auto&& test) { test(op(column(), column())); });
+            helper([&](Query&, auto&& test) { test(op(column(), v)); });
+        };
+        auto test_numeric = [&](auto value, size_t col, size_t null_col) {
+            using Type = decltype(value);
+            auto get_column = [&] { return get_table().template column<Type>(col); };
+            test_operator(std::equal_to<>(), get_column, value);
+            test_operator(std::not_equal_to<>(), get_column, value);
+            test_operator(std::greater<>(), get_column, value);
+            test_operator(std::less<>(), get_column, value);
+            test_operator(std::greater_equal<>(), get_column, value);
+            test_operator(std::less_equal<>(), get_column, value);
+
+            auto get_null_column = [&] { return get_table().template column<Type>(null_col); };
+            test_operator(std::equal_to<>(), get_null_column, null{});
+            test_operator(std::not_equal_to<>(), get_null_column, null{});
+        };
+
+        test_numeric(Int(), col_int, col_int_null);
+        test_numeric(Float(), col_float, col_float_null);
+        test_numeric(Bool(), col_bool, col_bool_null);
+        test_numeric(Double(), col_double, col_double_null);
+        test_numeric(Timestamp(), col_timestamp, col_timestamp_null);
+
+        auto string_col = [&] { return get_table().template column<String>(col_string); };
+        test_operator(std::equal_to<>(), string_col, StringData());
+        test_operator(std::not_equal_to<>(), string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.begins_with(b); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.ends_with(b); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.contains(b); }, string_col, StringData());
+
+        test_operator([](auto&& a, auto&& b) { return a.equal(b, false); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.not_equal(b, false); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.begins_with(b, false); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.ends_with(b, false); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.contains(b, false); }, string_col, StringData());
+
+        auto null_string_col = [&] { return get_table().template column<String>(col_string_null); };
+        test_operator(std::equal_to<>(), null_string_col, null());
+        test_operator(std::not_equal_to<>(), null_string_col, null());
+
+        auto binary_col = [&] { return get_table().template column<Binary>(col_binary); };
+        helper([&](Query&, auto&& test) { test(binary_col() == BinaryData()); });
+        helper([&](Query&, auto&& test) { test(binary_col() != BinaryData()); });
+
+        auto link_col = [&] { return get_table().template column<Link>(col_link); };
+        auto list_col = [&] { return get_table().template column<Link>(col_list); };
+
+        if (mode == Mode::Direct) { // link equality over links isn't implemented
+            helper([&](Query&, auto&& test) { test(link_col().is_null()); });
+            helper([&](Query&, auto&& test) { test(link_col().is_not_null()); });
+            helper([&](Query&, auto&& test) { test(link_col() == (*helper.table)[0]); });
+            helper([&](Query&, auto&& test) { test(link_col() != (*helper.table)[0]); });
+
+            helper([&](Query&, auto&& test) { test(list_col() == (*helper.table)[0]); });
+            helper([&](Query&, auto&& test) { test(list_col() != (*helper.table)[0]); });
+        }
+
+        helper([&](Query&, auto&& test) { test(list_col().count() == 1); });
+        helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).max() > 0); });
+        helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).min() > 0); });
+        helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).sum() > 0); });
+        helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).average() > 0); });
+    };
+
+    // Test all of the query expressions directly, over a link, over a backlink
+    // over a linklist, and over two links
+    test_query_expression([&]() -> Table& { return *helper.table; }, Mode::Direct);
+    test_query_expression([&]() -> Table& {
+        helper.table->link(col_link);
+        return *helper.table;
+    }, Mode::Link);
+    test_query_expression([&]() -> Table& {
+        helper.table->backlink(*helper.table, col_link);
+        return *helper.table;
+    }, Mode::LinkList);
+    test_query_expression([&]() -> Table& {
+        helper.table->link(col_list);
+        return *helper.table;
+    }, Mode::LinkList);
+    test_query_expression([&]() -> Table& {
+        helper.table->link(col_link);
+        helper.table->link(col_list);
+        return *helper.table;
+    }, Mode::LinkList);
+
+    helper([&](Query& q, auto&& test) {
+        test(helper.table->column<LinkList>(col_list, q.equal_int(col_int, 0)).count() > 0);
+    });
 }
 
 #endif // TEST_QUERY

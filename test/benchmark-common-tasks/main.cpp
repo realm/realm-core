@@ -249,6 +249,56 @@ struct BenchmarkSortInt : BenchmarkWithInts {
     }
 };
 
+struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
+    const char* name() const { return "DistinctIntNoDupes"; }
+
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithIntsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_empty_row(BASE_SIZE * 4);
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+            t->set_int(0, i, r.draw_int(0, BASE_SIZE * 2));
+        }
+        tr.commit();
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("IntOnly");
+        ConstTableView view = table->where().find_all();
+        view.distinct(0);
+    }
+};
+
+struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
+    const char* name() const { return "DistinctIntManyDupes"; }
+
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithIntsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("IntOnly");
+        t->add_empty_row(BASE_SIZE * 4);
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+            t->set_int(0, i, r.draw_int(0, 10));
+        }
+        tr.commit();
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("IntOnly");
+        ConstTableView view = table->where().find_all();
+        view.distinct(0);
+    }
+};
+
 struct BenchmarkInsert : BenchmarkWithStringsTable {
     const char* name() const { return "Insert"; }
 
@@ -551,6 +601,8 @@ TEST(benchmark_common_tasks_main)
     BENCH(BenchmarkSize);
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
+    BENCH(BenchmarkDistinctIntFewDupes);
+    BENCH(BenchmarkDistinctIntManyDupes);
     BENCH(BenchmarkInsert);
     BENCH(BenchmarkGetString);
     BENCH(BenchmarkSetString);

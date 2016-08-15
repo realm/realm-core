@@ -105,12 +105,16 @@ public:
 #endif
 };
 
+// This variable is declared such that get_default() can return it. It could be a static local variable, but
+// Valgrind/Helgrind gives a false error report because it doesn't recognize gcc's static variable initialization
+// mutex
+DefaultAllocator default_alloc;
+
 } // anonymous namespace
 
 
 
 Allocator& Allocator::get_default() noexcept
 {
-    static DefaultAllocator default_alloc;
     return default_alloc;
 }

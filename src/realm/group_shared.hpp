@@ -35,6 +35,7 @@
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/replication.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
@@ -279,25 +280,7 @@ public:
     // Transactions:
 
     using version_type = _impl::History::version_type;
-
-    struct VersionID {
-        version_type version = std::numeric_limits<version_type>::max();
-        uint_fast32_t index   = 0;
-
-        VersionID() {}
-        VersionID(version_type initial_version, uint_fast32_t initial_index)
-        {
-            version = initial_version;
-            index = initial_index;
-        }
-
-        bool operator==(const VersionID& other) { return version == other.version; }
-        bool operator!=(const VersionID& other) { return version != other.version; }
-        bool operator<(const VersionID& other) { return version < other.version; }
-        bool operator<=(const VersionID& other) { return version <= other.version; }
-        bool operator>(const VersionID& other) { return version > other.version; }
-        bool operator>=(const VersionID& other) { return version >= other.version; }
-    };
+    using VersionID = realm::VersionID;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.

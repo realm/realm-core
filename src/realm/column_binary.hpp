@@ -34,7 +34,7 @@ class BinaryColumn: public ColumnBaseSimple {
 public:
     typedef BinaryData value_type;
 
-    BinaryColumn(Allocator&, ref_type, bool nullable = false);
+    BinaryColumn(Allocator&, ref_type, bool nullable = false, size_t column_ndx = npos);
 
     size_t size() const noexcept final;
     bool is_empty() const noexcept { return size() == 0; }

@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <cstddef>
+#include <atomic>
 
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
@@ -246,7 +247,12 @@ protected:
     // place for now, because every table has a pointer leading here. It would
     // be more obvious to place it in Group, but that would add a runtime overhead,
     // and access is time critical.
-    uint_fast64_t m_table_versioning_counter;
+    //
+    // This means that multiple threads that allocate Realm objects through the
+    // default allocator will share this variable, which is a logical design flaw
+    // that can make sync_if_needed() re-run queries even though it is not required.
+    // It must be atomic because it's shared.
+    std::atomic<uint_fast64_t> m_table_versioning_counter;
 
     /// Bump the global version counter. This method should be called when
     /// version bumping is initiated. Then following calls to should_propagate_version()
