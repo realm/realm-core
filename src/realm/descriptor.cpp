@@ -136,15 +136,17 @@ DescriptorRef Descriptor::get_subdesc_accessor(size_t column_ndx) noexcept
     while (i < limit) {
         subdesc_entry& sub = m_subdesc_map[i];
         auto res = sub.m_subdesc.lock();
-        if (sub.m_column_ndx == column_ndx) {
-            return res;
-        }
-        if (!bool(res)) { // move last over
-            sub = m_subdesc_map.back();
+        if (!bool(res)) {
+            // expired weak_ptr, so move last over:
+            m_subdesc_map[i] = m_subdesc_map.back();
             m_subdesc_map.pop_back();
             --limit;
         }
         else {
+            // valid shared_ptr, so use it if applicable:
+            if (sub.m_column_ndx == column_ndx) {
+                return res;
+            }
             ++i;
         }
     }

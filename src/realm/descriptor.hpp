@@ -410,7 +410,9 @@ public:
 
     ~Descriptor() noexcept;
 
-    struct PrivateTag {};
+private:
+    struct PrivateTag {}; // for initialization through make_shared
+public:
     Descriptor(const PrivateTag&) : Descriptor() {}
 private:
     TableRef m_root_table; // Table associated with root descriptor. Detached iff null.
