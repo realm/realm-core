@@ -89,7 +89,7 @@ public:
     size_t find(Timestamp value, size_t begin, size_t end) const noexcept
     {
         // FIXME: Here we can do all sorts of clever optimizations. Use bithack-search on seconds, then for each match check
-        // nanoseconds, etc, etc, etc. Lots of possibilities. Below code is naive and slow but works.
+        // nanoseconds, etc. Lots of possibilities. Below code is naive and slow but works.
 
         Condition cond;
         for (size_t t = begin; t < end; t++) {

@@ -209,12 +209,7 @@ void Group::open(BinaryData buffer, bool take_ownership)
     if (is_attached() || m_is_shared)
         throw LogicError(LogicError::wrong_group_state);
 
-    // FIXME: Why do we have to pass a const-unqualified data pointer
-    // to SlabAlloc::attach_buffer()? It seems unnecessary given that
-    // the data is going to become the immutable part of its managed
-    // memory.
-    char* data = const_cast<char*>(buffer.data());
-    ref_type top_ref = m_alloc.attach_buffer(data, buffer.size()); // Throws
+    ref_type top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size()); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
 
     // Select file format if it is still undecided.
@@ -299,7 +294,6 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
         size_t top_size = m_top.size();
         static_cast<void>(top_size);
 
-        // FIXME: Use a future REALM_ASSERT_EX
         if (top_size < 8) {
             REALM_ASSERT_11(top_size, ==, 3, ||, top_size, ==, 5, ||, top_size, ==, 7);
         }
@@ -862,8 +856,8 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
         top.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg_top(&top);
         // FIXME: We really need an alternative to Array::truncate() that is able to expand.
-        int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
-        int_fast64_t value_2 = int_fast64_t(tables_ref); // FIXME: Problematic unsigned -> signed conversion
+        int_fast64_t value_1 = from_ref(names_ref);
+        int_fast64_t value_2 = from_ref(tables_ref);
         top.add(value_1); // Throws
         top.add(value_2); // Throws
         top.add(0); // Throws

@@ -228,24 +228,18 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
     // root is still on the compact form.
     REALM_ASSERT(!compact_form || is_append);
     if (compact_form) {
-        // FIXME: Dangerous cast here (unsigned -> signed)
-        int_fast64_t v = state.m_split_offset; // elems_per_child
+        int_fast64_t v = to_int64(state.m_split_offset); // elems_per_child
         new_root->add(1 + 2*v); // Throws
     }
     else {
         Array new_offsets(alloc);
         new_offsets.create(Array::type_Normal); // Throws
-        // FIXME: Dangerous cast here (unsigned -> signed)
-        new_offsets.add(state.m_split_offset); // Throws
-        // FIXME: Dangerous cast here (unsigned -> signed)
-        new_root->add(new_offsets.get_ref()); // Throws
+        new_offsets.add(to_int64(state.m_split_offset)); // Throws
+        new_root->add(from_ref(new_offsets.get_ref())); // Throws
     }
-    // FIXME: Dangerous cast here (unsigned -> signed)
-    new_root->add(orig_root->get_ref()); // Throws
-    // FIXME: Dangerous cast here (unsigned -> signed)
-    new_root->add(new_sibling_ref); // Throws
-    // FIXME: Dangerous cast here (unsigned -> signed)
-    int_fast64_t v = state.m_split_size; // total_elems_in_tree
+    new_root->add(from_ref(orig_root->get_ref())); // Throws
+    new_root->add(from_ref(new_sibling_ref)); // Throws
+    int_fast64_t v = to_int64(state.m_split_size); // total_elems_in_tree
     new_root->add(1 + 2*v); // Throws
     replace_root_array(std::move(new_root));
 }
@@ -272,14 +266,14 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
             try {
                 int_fast64_t v = elems_per_child;
                 new_inner_node.add(1 + 2*v); // Throws
-                v = node; // FIXME: Dangerous cast here (unsigned -> signed)
+                v = from_ref(node);
                 new_inner_node.add(v); // Throws
                 node = 0;
                 size_t num_children = 1;
                 while (rest_size > 0 && num_children != REALM_MAX_BPNODE_SIZE) {
                     ref_type child = build(&rest_size, height, alloc, handler); // Throws
                     try {
-                        int_fast64_t w = child; // FIXME: Dangerous cast here (unsigned -> signed)
+                        int_fast64_t w = from_ref(child);
                         new_inner_node.add(w); // Throws
                     }
                     catch (...) {

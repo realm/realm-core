@@ -653,7 +653,7 @@ void BinaryColumn::to_dot(std::ostream& out, StringData title) const
 void BinaryColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
                                std::ostream& out) const
 {
-    bool is_strings = false; // FIXME: Not necessarily the case
+    bool is_strings = false; // FIXME: Not necessarily the case, but leaf_to_dot() is just a debug method
     bool is_big = Array::get_context_flag_from_header(leaf_mem.get_addr());
     if (!is_big) {
         // Small blobs

@@ -155,7 +155,7 @@ void LinkListColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     // once per target row. Otherwise, a linklist containing two
     // references to the same row would be swapped back, cancelling
     // out the effect of swap.
-    // FIXME: This is ridiculously, unnecessarily slow, because it heap-allocates.
+    // FIXME: This is unnecessarily slow because it heap-allocates.
     std::set<size_t> update_target_backlinks;
 
     ref_type ref_1 = get_as_ref(row_ndx_1);
@@ -198,7 +198,7 @@ void LinkListColumn::clear(size_t, bool broken_reciprocal_backlinks)
 
     // Do the actual deletion
     clear_without_updating_index(); // Throws
-    // FIXME: This one is needed because
+    //  FIXME: This one is needed because
     // IntegerColumn::clear_without_updating_index() forgets about the leaf
     // type. A better solution should probably be sought after.
     get_root_array()->set_type(Array::type_HasRefs); // Throws

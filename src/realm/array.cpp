@@ -331,7 +331,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t slice_size, Allocat
         Allocator& allocator = get_alloc();
         MemRef new_mem = clone(MemRef(ref, allocator), allocator, target_alloc); // Throws
         dg_2.reset(new_mem.get_ref());
-        value = new_mem.get_ref(); 
+        value = from_ref(new_mem.get_ref());
         new_slice.add(value); // Throws
         dg_2.release();
     }
@@ -407,7 +407,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         if (is_ref) {
             ref_type subref = to_ref(value);
             ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
-            value = int_fast64_t(new_subref); 
+            value = from_ref(new_subref); 
         }
         new_array.add(value); // Throws
     }
@@ -1589,7 +1589,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         ref_type ref = to_ref(value);
         MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.get_ref());
-        value = new_mem.get_ref(); 
+        value = from_ref(new_mem.get_ref()); 
         new_array.add(value); // Throws
         dg_2.release();
     }
@@ -2050,7 +2050,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
     if (offsets.is_attached()) {
         new_offsets.set_parent(&new_sibling, 0);
         new_offsets.create(type_Normal); // Throws
-        new_sibling.add(new_offsets.get_ref()); // Throws
+        new_sibling.add(from_ref(new_offsets.get_ref())); // Throws
     }
     else {
         int_fast64_t v = get(0); // v = 1 + 2 * elems_per_child
@@ -2089,7 +2089,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         }
         // Update original parent
         erase(insert_ndx+1, child_refs_end);
-        set(insert_ndx, new_sibling_ref); // Throws
+        set(insert_ndx, from_ref(new_sibling_ref)); // Throws
         offsets.erase(orig_child_ndx+1, offsets_end);
         offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset); // Throws
     }
@@ -2755,9 +2755,6 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
 
     if (end == npos)
         end = m_size;
-
-    if (begin == end)
-        return; // FIXME: Why do we have to check and early-out here?
 
     QueryState<int64_t> state;
     state.init(act_FindAll, result, static_cast<size_t>(-1));

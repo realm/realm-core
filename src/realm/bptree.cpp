@@ -61,7 +61,7 @@ void BpTreeBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
         Array new_offsets(alloc);
         new_offsets.create(Array::type_Normal); // Throws
         new_offsets.add(state.m_split_offset); // Throws
-        new_root->add(new_offsets.get_ref()); // Throws
+        new_root->add(from_ref(new_offsets.get_ref())); // Throws
     }
     new_root->add(orig_root->get_ref()); // Throws
     new_root->add(new_sibling_ref); // Throws
@@ -168,7 +168,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
             m_is_on_general_form = true;
         }
         {
-            int_fast64_t v(child_ref); 
+            int_fast64_t v(from_ref(child_ref)); 
             m_main.add(v); // Throws
         }
         if (m_is_on_general_form) {
@@ -181,7 +181,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     }
     else { // First child in this node
         m_main.add(0); // Placeholder for `elems_per_child` or `offsets_ref`
-        int_fast64_t v(child_ref); 
+        int_fast64_t v(from_ref(child_ref)); 
         m_main.add(v); // Throws
         m_elems_in_parent = elems_in_child;
         m_is_on_general_form = force_general_form; // `invar:bptree-node-form`
@@ -202,7 +202,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         bool deep = true; // Deep
         bool only_if_modified = false; // Always
         ref_type ref = m_offsets.write(m_out, deep, only_if_modified); // Throws
-        int_fast64_t v(ref); 
+        int_fast64_t v(from_ref(ref)); 
         m_main.set(0, v); // Throws
     }
     {

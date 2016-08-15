@@ -37,6 +37,7 @@ using ref_type = size_t;
 
 int_fast64_t from_ref(ref_type) noexcept;
 ref_type to_ref(int_fast64_t) noexcept;
+int64_t to_int64(size_t value) noexcept;
 
 class MemRef {
 public:
@@ -176,7 +177,7 @@ public:
     ///
     ///   1 Initial file format version
     ///
-    ///   2 FIXME: Does anybody remember what happened here?
+    ///   2 Various changes.
     ///
     ///   3 Supporting null on string columns broke the file format in following
     ///     way: Index appends an 'X' character to all strings except the null
@@ -298,6 +299,13 @@ inline ref_type to_ref(int_fast64_t v) noexcept
     REALM_ASSERT_DEBUG(v % 8 == 0);
     return ref_type(v);
 }
+
+inline int64_t to_int64(size_t value) noexcept
+{
+    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
+    return static_cast<int64_t>(value);
+}
+
 
 inline MemRef::MemRef() noexcept:
     m_addr(nullptr),

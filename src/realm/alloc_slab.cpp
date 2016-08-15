@@ -174,7 +174,7 @@ void SlabAlloc::detach() noexcept
         case attach_UsersBuffer:
             break;
         case attach_OwnedBuffer:
-            ::free(m_data);
+            ::free(const_cast<char*>(m_data));
             break;
         case attach_SharedFile:
         case attach_UnsharedFile:
@@ -496,7 +496,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
 
-    char* addr = nullptr;
+    const char* addr = nullptr;
 
     size_t cache_index = ref ^ ((ref >> 16) >> 16);
     // we shift by 16 two times. On 32-bitters it's undefined to shift by
@@ -505,7 +505,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     cache_index = cache_index ^(cache_index >> 16);
     cache_index = (cache_index ^(cache_index >> 8)) & 0xFF;
     if (cache[cache_index].ref == ref && cache[cache_index].version == version)
-        return cache[cache_index].addr;
+        return const_cast<char*>(cache[cache_index].addr);
 
     if (ref < m_baseline) {
 
@@ -552,13 +552,13 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     cache[cache_index].ref = ref;
     cache[cache_index].version = version;
     REALM_ASSERT_DEBUG(addr != nullptr);
-    return addr;
+    return const_cast<char*>(addr);
 }
 
 
 int SlabAlloc::get_committed_file_format_version() const noexcept
 {
-    Header& header = *reinterpret_cast<Header*>(m_data);
+    const Header& header = *reinterpret_cast<const Header*>(m_data);
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
     int file_format_version = int(header.m_file_format[slot_selector]);
     return file_format_version;
@@ -741,9 +741,9 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // anybody concurrently joining the session, so it seems easier to do it at
     // session initialization, even if it means writing the database during open.
     if (cfg.session_initiator && m_file_on_streaming_form) {
-        const Header& header = *reinterpret_cast<Header*>(m_data);
+        const Header& header = *reinterpret_cast<const Header*>(m_data);
         const StreamingFooter& footer =
-            *(reinterpret_cast<StreamingFooter*>(m_data+size) - 1);
+            *(reinterpret_cast<const StreamingFooter*>(m_data+size) - 1);
         // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
         static_cast<void>(header);
@@ -836,7 +836,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     return top_ref;
 }
 
-ref_type SlabAlloc::attach_buffer(char* data, size_t size)
+ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
