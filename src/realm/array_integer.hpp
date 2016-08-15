@@ -464,7 +464,7 @@ size_t ArrayIntNull::upper_bound(int64_t value) const noexcept
 inline
 int64_t ArrayIntNull::sum(size_t start, size_t end) const
 {
-    // FIXME: Optimize!
+    // FIXME: Optimize
     int64_t sum_of_range = 0;
     if (end == npos)
         end = size();
@@ -487,7 +487,7 @@ size_t ArrayIntNull::count(int64_t value) const noexcept
     return count_of_value;
 }
 
-// FIXME: Optimize!
+// FIXME: Optimize
 template<bool find_max>
 inline
 bool ArrayIntNull::minmax_helper(int64_t& result, size_t start, size_t end, size_t* return_ndx) const

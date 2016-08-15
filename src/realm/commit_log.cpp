@@ -75,9 +75,6 @@ namespace _impl {
 // buffers. The pointers may end up going to both mappings/files.
 //
 // Access to the commit-logs metadata is protected by an inter-process mutex.
-//
-// FIXME: we should not use size_t for memory mapped members, but one where the
-// size is guaranteed
 
 class WriteLogCollector:
         public Replication,

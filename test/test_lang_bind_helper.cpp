@@ -8910,7 +8910,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
-    const int read_thread_count = 3; // must be less than 42 for correct operation (really?)
+    const int read_thread_count = 3; // must be less than 42 for correct operation
 
     SHARED_GROUP_TEST_PATH(path);
 

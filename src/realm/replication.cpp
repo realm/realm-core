@@ -718,7 +718,7 @@ private:
             case type_Binary:
                 return "type_Binary";
             case type_OldDateTime:
-                return "type_DataTime"; // FIXME? Can we fix this spelling mistake?
+                return "type_DateTime";
             case type_Timestamp:
                 return "type_Timestamp";
             case type_Table:
