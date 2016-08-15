@@ -284,8 +284,6 @@ TEST_CASE("Transaction log parsing: schema change validation") {
 
         SECTION("moving tables is allowed") {
             WriteTransaction wt(sg);
-            // FIXME: Workaround for https://github.com/realm/realm-core/pull/1939
-            wt.get_table(0);
             wt.get_group().move_table(2, 0);
             wt.commit();
             REQUIRE_NOTHROW(r->refresh());
