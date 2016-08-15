@@ -182,8 +182,8 @@
 //
 // LIMITATION: The code below makes the assumption that a reference into
 // a realm file will never grow in size above what can be represented in 
-// a positive size_t, which is 2^31-1 on a 32-bit platform, and 2^63-1 on
-// a 64 bit platform.
+// a size_t, which is 2^31-1 on a 32-bit platform, and 2^63-1 on a 64 bit
+// platform.
 
 using namespace realm;
 using namespace realm::util;
