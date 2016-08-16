@@ -61,6 +61,7 @@ def doBuildInDocker(String command) {
     sh 'git clean -ffdx -e .????????'
 
     def buildEnv = docker.build 'realm-core:snapshot'
+    def environment = environment()
     withEnv(environment) {
       buildEnv.inside {
         sh 'sh build.sh config'
