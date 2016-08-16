@@ -33,11 +33,9 @@ ifeq ($(COMPILER_IS),clang)
   CFLAGS_GENERAL += -Wextra-semi
 endif
 
-# CoreFoundation is required for Apple specific logging. CoreFoundation and
-# CFNetwork are required for Apple specific event loop
-# (realm/util/event_loop_apple.cpp).
+# CoreFoundation is required for logging
 ifeq ($(OS),Darwin)
-  PROJECT_LDFLAGS += -framework CoreFoundation -framework CFNetwork
+  PROJECT_LDFLAGS += -framework CoreFoundation
 endif
 
 # Android logging
