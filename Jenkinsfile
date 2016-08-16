@@ -64,7 +64,9 @@ def doBuildInDocker(String command) {
     buildEnv.inside {
       sh 'sh build.sh config'
       try {
-        sh "sh build.sh ${command}"
+        withEnv(environment) {
+          sh "sh build.sh ${command}"
+        }
       } finally {
         collectCompilerWarnings('gcc')
         recordTests(command)
@@ -131,6 +133,16 @@ def collectCompilerWarnings(compiler) {
         messagesPattern: '',
         unHealthy: ''
     ])
+}
+
+def environment() {
+    return [
+    "REALM_MAX_BPNODE_SIZE_DEBUG=4",
+    "UNITTEST_SHUFFLE=1",
+    "UNITTEST_RANDOM_SEED=random",
+    "UNITTEST_THREADS=1",
+    "UNITTEST_XML=1"
+    ]
 }
 
 def getSourceArchive() {
