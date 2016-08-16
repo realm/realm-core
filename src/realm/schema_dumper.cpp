@@ -30,6 +30,19 @@ using realm::util::Optional;
 
 namespace {
 
+#ifdef _WIN32
+int setenv(const char *name, const char *value, int overwrite)
+{
+    int errcode = 0;
+    if (!overwrite) {
+        size_t envsize = 0;
+        errcode = getenv_s(&envsize, NULL, 0, name);
+        if (errcode || envsize) return errcode;
+    }
+    return _putenv_s(name, value);
+}
+#endif
+
 void show_help(const std::string& program_name)
 {
     std::cerr <<
