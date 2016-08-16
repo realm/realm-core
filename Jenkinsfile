@@ -56,20 +56,22 @@ if (['ajl/jenkinsfile'].contains(env.BRANCH_NAME)) {
 }
 
 def doBuildInDocker(String command) {
-  node('docker') {
-    checkout scm
-    sh 'git clean -ffdx -e .????????'
+  return {
+    node('docker') {
+      checkout scm
+      sh 'git clean -ffdx -e .????????'
 
-    def buildEnv = docker.build 'realm-core:snapshot'
-    def environment = environment()
-    withEnv(environment) {
-      buildEnv.inside {
-        sh 'sh build.sh config'
-        try {
-            sh "sh build.sh ${command}"
-        } finally {
-          collectCompilerWarnings('gcc')
-          recordTests(command)
+      def buildEnv = docker.build 'realm-core:snapshot'
+      def environment = environment()
+      withEnv(environment) {
+        buildEnv.inside {
+          sh 'sh build.sh config'
+          try {
+              sh "sh build.sh ${command}"
+          } finally {
+            collectCompilerWarnings('gcc')
+            recordTests(command)
+          }
         }
       }
     }
