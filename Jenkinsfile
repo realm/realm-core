@@ -61,15 +61,15 @@ def doBuildInDocker(String command) {
     sh 'git clean -ffdx -e .????????'
 
     def buildEnv = docker.build 'realm-core:snapshot'
-    buildEnv.inside {
-      sh 'sh build.sh config'
-      try {
-        withEnv(environment) {
-          sh "sh build.sh ${command}"
+    withEnv(environment) {
+      buildEnv.inside {
+        sh 'sh build.sh config'
+        try {
+            sh "sh build.sh ${command}"
+        } finally {
+          collectCompilerWarnings('gcc')
+          recordTests(command)
         }
-      } finally {
-        collectCompilerWarnings('gcc')
-        recordTests(command)
       }
     }
   }
