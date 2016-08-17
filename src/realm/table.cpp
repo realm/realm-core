@@ -1990,7 +1990,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
     {
         MemRef mem = Spec::create_empty_spec(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
         dg_2.release();
     }
@@ -1998,7 +1998,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
         dg_2.release();
     }
@@ -2079,14 +2079,14 @@ ref_type Table::clone(Allocator& alloc) const
     {
         MemRef mem = m_spec.m_top.clone_deep(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         new_top.add(v); // Throws
         dg_2.release();
     }
     {
         MemRef mem = m_columns.clone_deep(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         new_top.add(v); // Throws
         dg_2.release();
     }
@@ -4494,7 +4494,7 @@ public:
             size_t table_size = m_table.size();
             for (auto& column : m_table.m_cols) {
                 ref_type ref = column->write(m_offset, m_size, table_size, out); // Throws
-                int_fast64_t ref_2(ref); // FIXME: Dangerous cast (unsigned -> signed)
+                int_fast64_t ref_2(from_ref(ref));
                 column_refs.add(ref_2); // Throws
             }
             bool deep = false; // Shallow
@@ -4508,9 +4508,9 @@ public:
             Array table_top(alloc);
             table_top.create(Array::type_HasRefs); // Throws
             _impl::ShallowArrayDestroyGuard dg(&table_top);
-            int_fast64_t spec_ref_2(spec_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t spec_ref_2(from_ref(spec_ref));
             table_top.add(spec_ref_2); // Throws
-            int_fast64_t columns_ref_2(columns_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t columns_ref_2(from_ref(columns_ref));
             table_top.add(columns_ref_2); // Throws
             bool deep = false; // Shallow
             bool only_if_modified = false; // Always
@@ -4521,7 +4521,7 @@ public:
         Array tables(alloc);
         tables.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg(&tables);
-        int_fast64_t table_top_ref_2(table_top_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t table_top_ref_2(from_ref(table_top_ref));
         tables.add(table_top_ref_2); // Throws
         bool deep = false; // Shallow
         bool only_if_modified = false; // Always

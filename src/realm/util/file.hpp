@@ -422,7 +422,7 @@ public:
     /// not, this function has undefined behavior.
     bool is_same_file(const File&) const;
 
-    // FIXME: Can we get rid of this one please!!!
+    // FIXME: Get rid of this method
     bool is_removed() const;
 
     /// Resolve the specified path against the specified base directory.

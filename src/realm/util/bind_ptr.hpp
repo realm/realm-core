@@ -221,11 +221,13 @@ public:
 
 protected:
     // FIXME: Operators ++ and -- as used below use
-    // std::memory_order_seq_cst. I'm not sure whether this is the
-    // choice that leads to maximum efficiency, but at least it is
-    // safe.
+    // std::memory_order_seq_cst. This can be optimized.
     void bind_ptr() const noexcept { ++m_ref_count; }
-    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
+    void unbind_ptr() const noexcept { 
+        if (--m_ref_count == 0) {
+            delete this;
+        }
+    }
 
 private:
     mutable std::atomic<unsigned long> m_ref_count;

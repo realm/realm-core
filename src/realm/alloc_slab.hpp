@@ -158,7 +158,7 @@ public:
     /// \sa own_buffer()
     ///
     /// \throw InvalidDatabase
-    ref_type attach_buffer(char* data, size_t size);
+    ref_type attach_buffer(const char* data, size_t size);
 
     /// Reads file format from file header. Must be called from within a write
     /// transaction.
@@ -378,7 +378,7 @@ private:
     std::unique_ptr<std::shared_ptr<const util::File::Map<char>>[]> m_local_mappings;
     size_t m_num_local_mappings = 0;
 
-    char* m_data = nullptr;
+    const char* m_data = nullptr;
     size_t m_initial_chunk_size = 0;
     size_t m_initial_section_size = 0;
     int m_section_shifts = 0;
@@ -413,7 +413,7 @@ private:
 #endif
     struct hash_entry {
         ref_type ref = 0;
-        char* addr = nullptr;
+        const char* addr = nullptr;
         size_t version = 0;
     };
     mutable hash_entry cache[256];
