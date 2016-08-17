@@ -65,6 +65,8 @@ TEST(MixedColumn_Int)
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
+    CHECK(!c.is_nullable());
+
     int64_t max_val = std::numeric_limits<int64_t>::max();
     int64_t min_val = std::numeric_limits<int64_t>::min();
     int64_t all_bit = 0xFFFFFFFFFFFFFFFFULL; // FIXME: Undefined cast from unsigned to signed
@@ -74,6 +76,8 @@ TEST(MixedColumn_Int)
     c.insert_int(2, max_val);
     c.insert_int(3, all_bit);
     CHECK_EQUAL(4, c.size());
+    CHECK(!c.is_null(0));
+    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
 
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Int, c.get_type(i));

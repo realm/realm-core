@@ -418,6 +418,7 @@ inline size_t BasicArray<T>::calc_aligned_byte_size(size_t size)
 
 #ifdef REALM_DEBUG
 
+// LCOV_EXCL_START
 template<class T>
 void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
 {
@@ -448,6 +449,7 @@ void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
 
     to_dot_parent_edge(out);
 }
+// LCOV_EXCL_STOP
 
 #endif // REALM_DEBUG
 

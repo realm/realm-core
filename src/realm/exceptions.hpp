@@ -206,6 +206,8 @@ private:
 
 // Implementation:
 
+// LCOV_EXCL_START (Wording of what() strings are not to be tested)
+
 inline const char* NoSuchTable::what() const noexcept
 {
     return "No such table exists";
@@ -230,6 +232,8 @@ inline const char* FileFormatUpgradeRequired::what() const noexcept
 {
     return "Database upgrade required but prohibited";
 }
+
+// LCOV_EXCL_STOP
 
 inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg):
     std::runtime_error(msg)
