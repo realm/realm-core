@@ -283,30 +283,36 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                         int_fast64_t w = from_ref(child);
                         new_inner_node.add(w); // Throws
                     }
+                    // LCOV_EXCL_START
                     catch (...) {
                         Array::destroy_deep(child, alloc);
                         throw;
                     }
+                    // LCOV_EXCL_END
                     ++num_children;
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
                 new_inner_node.add(1 + 2*v); // Throws
             }
+            // LCOV_EXCL_START
             catch (...) {
                 new_inner_node.destroy_deep();
                 throw;
             }
+            // LCOV_EXCL_END
             node = new_inner_node.get_ref();
             ++height;
             // Overflow is impossible here is all nodes will have elems_per_child <= orig_rest_size
             elems_per_child *= REALM_MAX_BPNODE_SIZE;
         }
     }
+    // LCOV_EXCL_START
     catch (...) {
         if (node != 0)
             Array::destroy_deep(node, alloc);
         throw;
     }
+    // LCOV_EXCL_END
 }
 
 
