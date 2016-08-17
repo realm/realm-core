@@ -29,7 +29,7 @@ node {
 stage 'check'
 parallel (
   checkLinuxRelease: doBuildInDocker('check'),
-  checkLinuxDebug: doBuildInDocker('check-debug')
+  checkLinuxDebug: doBuildInDocker('check-debug'),
   buildCocoa: doBuildCocoa()
 )
 
