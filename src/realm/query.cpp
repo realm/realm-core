@@ -195,7 +195,7 @@ void Query::set_table(TableRef tr)
             root->set_table(*m_table);
     }
     else {
-        m_current_descriptor.reset(nullptr);
+        m_current_descriptor.reset();
     }
 }
 

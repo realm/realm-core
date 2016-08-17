@@ -174,6 +174,7 @@
 		3F838D1C1D35A1ED004625B7 /* test_column_timestamp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65033A7C1C7DD5180019E9F2 /* test_column_timestamp.cpp */; };
 		3F838D1D1D35A1ED004625B7 /* test_descriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52678851189AB590009CDE7D /* test_descriptor.cpp */; };
 		3F838D1E1D35A1ED004625B7 /* test_destroy_guard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52807FB418E73A1900A22716 /* test_destroy_guard.cpp */; };
+		4B07BA971D64860100A6D7E0 /* test_destructor_thread_safety.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */; };
 		3F838D1F1D35A1ED004625B7 /* test_encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */; };
 		3F838D201D35A1ED004625B7 /* test_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B3D17D4E84700DD22CC /* test_file.cpp */; };
 		3F838D211D35A1ED004625B7 /* test_file_locks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52807FB618E73A4700A22716 /* test_file_locks.cpp */; };
@@ -878,6 +879,7 @@
 		48A048341C7F7A6B000FFD12 /* continuous_transactions_history.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = continuous_transactions_history.cpp; sourceTree = "<group>"; };
 		48B1D2371C749D750066A961 /* crypt_key.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = crypt_key.hpp; sourceTree = "<group>"; };
 		48B1D2391C749D850066A961 /* crypt_key.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = crypt_key.cpp; sourceTree = "<group>"; };
+		4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_destructor_thread_safety.cpp; sourceTree = "<group>"; };
 		4B3B03B51D1817D400E86FA2 /* test_impl_simulated_failure.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_impl_simulated_failure.cpp; sourceTree = "<group>"; };
 		4B3B03C11D182BC400E86FA2 /* importer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = importer.cpp; path = realm/importer.cpp; sourceTree = "<group>"; };
 		4B3B03C21D182BC400E86FA2 /* importer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = importer.hpp; path = realm/importer.hpp; sourceTree = "<group>"; };
@@ -1357,6 +1359,7 @@
 				65033A7C1C7DD5180019E9F2 /* test_column_timestamp.cpp */,
 				52678851189AB590009CDE7D /* test_descriptor.cpp */,
 				52807FB418E73A1900A22716 /* test_destroy_guard.cpp */,
+				4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */,
 				3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */,
 				52A32B3D17D4E84700DD22CC /* test_file.cpp */,
 				52807FB618E73A4700A22716 /* test_file_locks.cpp */,
@@ -2334,6 +2337,7 @@
 				3F838D1C1D35A1ED004625B7 /* test_column_timestamp.cpp in Sources */,
 				3F838D1D1D35A1ED004625B7 /* test_descriptor.cpp in Sources */,
 				3F838D1E1D35A1ED004625B7 /* test_destroy_guard.cpp in Sources */,
+				4B07BA971D64860100A6D7E0 /* test_destructor_thread_safety.cpp in Sources */,
 				3F838D1F1D35A1ED004625B7 /* test_encrypted_file_mapping.cpp in Sources */,
 				3F838D201D35A1ED004625B7 /* test_file.cpp in Sources */,
 				3F838D211D35A1ED004625B7 /* test_file_locks.cpp in Sources */,

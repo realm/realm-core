@@ -874,7 +874,7 @@ private:
     // point in time. Subdescriptors are kept unique by means of a
     // registry in the parent descriptor. Table::m_descriptor is
     // always null for tables with shared descriptor.
-    mutable Descriptor* m_descriptor;
+    mutable std::weak_ptr<Descriptor> m_descriptor;
 
     // Table view instances
     // Access needs to be protected by m_accessor_mutex
@@ -1638,7 +1638,6 @@ inline Table::Table(Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
-    m_descriptor = nullptr;
 
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = nullptr;
@@ -1652,7 +1651,6 @@ inline Table::Table(const Table& t, Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
-    m_descriptor = nullptr;
 
     ref_type ref = t.clone(alloc); // Throws
     Parent* parent = nullptr;
@@ -1666,7 +1664,6 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 0; // Lifetime managed by reference counting
-    m_descriptor = nullptr;
 }
 
 inline Allocator& Table::get_alloc() const
@@ -2215,12 +2212,6 @@ public:
         table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
     }
 
-    static void clear_root_table_desc(const Table& root_table) noexcept
-    {
-        REALM_ASSERT(!root_table.has_shared_type());
-        root_table.m_descriptor = nullptr;
-    }
-
     static Table* get_subtable_accessor(Table& table, size_t col_ndx,
                                         size_t row_ndx) noexcept
     {
@@ -2321,9 +2312,9 @@ public:
         table.mark_opposite_link_tables();
     }
 
-    static Descriptor* get_root_table_desc_accessor(Table& root_table) noexcept
+    static DescriptorRef get_root_table_desc_accessor(Table& root_table) noexcept
     {
-        return root_table.m_descriptor;
+        return root_table.m_descriptor.lock();
     }
 
     typedef Table::AccessorUpdater AccessorUpdater;

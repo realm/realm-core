@@ -424,16 +424,13 @@ DescriptorRef Table::get_descriptor()
         return parent->get_descriptor()->get_subdescriptor(col_ndx); // Throws
     }
 
-    DescriptorRef desc;
-    if (!m_descriptor) {
+    DescriptorRef desc = m_descriptor.lock();
+    if (!desc) {
         typedef _impl::DescriptorFriend df;
-        desc.reset(df::create()); // Throws
-        Descriptor* parent = nullptr;
+        desc = df::create(); // Throws
+        DescriptorRef parent = nullptr;
         df::attach(*desc, this, parent, &m_spec);
-        m_descriptor = desc.get();
-    }
-    else {
-        desc.reset(m_descriptor);
+        m_descriptor = desc;
     }
     return desc;
 }
@@ -1374,12 +1371,12 @@ void Table::discard_child_accessors() noexcept
 
 void Table::discard_desc_accessor() noexcept
 {
-    if (m_descriptor) {
-        // Must hold a reliable reference count while detaching
-        DescriptorRef desc(m_descriptor);
+    // Must hold a reliable reference count while detaching
+    DescriptorRef desc = m_descriptor.lock();
+    if (desc) {
         typedef _impl::DescriptorFriend df;
         df::detach(*desc);
-        m_descriptor = nullptr;
+        m_descriptor.reset();
     }
 }
 
