@@ -30,7 +30,8 @@ stage 'check'
 parallel (
   checkLinuxRelease: doBuildInDocker('check'),
   checkLinuxDebug: doBuildInDocker('check-debug'),
-  buildCocoa: doBuildCocoa()
+  buildCocoa: doBuildCocoa(),
+  buildNodeLinux: doBuildNodeInDocker()
 )
 
 stage 'build-packages'
@@ -125,6 +126,33 @@ def doBuildInDocker(String command) {
           } finally {
             collectCompilerWarnings('gcc')
             recordTests(command)
+          }
+        }
+      }
+    }
+  }
+}
+
+def doBuildNodeInDocker() {
+  return {
+    node('docker') {
+      checkout scm
+      sh 'git clean -ffdx -e .????????'
+
+      def buildEnv = docker.build 'realm-core:snapshot'
+      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
+      withEnv(environment) {
+        buildEnv.inside {
+          sh 'sh build.sh config'
+          try {
+              sh 'sh build.sh build-node-package'
+              sh 'cp realm-core-node-*.tar.gz realm-core-node-linux-latest.tar.gz'
+              archive '*realm-core-node-linux-*.*.*.tar.gz'
+              withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+                sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core'
+              }
+          } finally {
+            collectCompilerWarnings('gcc')
           }
         }
       }
