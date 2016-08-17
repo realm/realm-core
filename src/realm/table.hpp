@@ -2212,12 +2212,6 @@ public:
         table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
     }
 
-    static void clear_root_table_desc(const Table& root_table) noexcept
-    {
-        REALM_ASSERT(!root_table.has_shared_type());
-        root_table.m_descriptor.reset();
-    }
-
     static Table* get_subtable_accessor(Table& table, size_t col_ndx,
                                         size_t row_ndx) noexcept
     {

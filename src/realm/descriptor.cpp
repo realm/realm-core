@@ -68,9 +68,6 @@ Descriptor::~Descriptor() noexcept
         delete m_spec;
         m_parent.reset();
     }
-    else {
-        _impl::TableFriend::clear_root_table_desc(*m_root_table);
-    }
     m_root_table.reset();
 }
 
