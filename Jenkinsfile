@@ -56,7 +56,7 @@ if (['ajl/jenkinsfile'].contains(env.BRANCH_NAME)) {
   }
 }
 
-def buildCocoa() {
+def doBuildCocoa() {
   return {
     node('osx') {
       checkout scm
