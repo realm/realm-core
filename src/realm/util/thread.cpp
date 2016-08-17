@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include <string.h>
 #include <stdexcept>
 
 #include <realm/util/thread.hpp>
@@ -118,6 +119,24 @@ void Thread::set_name(const std::string& name)
         throw std::runtime_error("pthread_setname_np() failed.");
 #else
     static_cast<void>(name);
+#endif
+}
+
+
+bool Thread::get_name(std::string& name)
+{
+#if (defined _GNU_SOURCE && !REALM_ANDROID) || REALM_PLATFORM_APPLE
+    const size_t max = 64;
+    char name_2[max];
+    pthread_t id = pthread_self();
+    int r = pthread_getname_np(id, name_2, max);
+    if (REALM_UNLIKELY(r != 0))
+        throw std::runtime_error("pthread_getname_np() failed.");
+    name.assign(name_2, strlen(name_2)); // Throws
+    return true;
+#else
+    static_cast<void>(name);
+    return false;
 #endif
 }
 
