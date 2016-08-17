@@ -259,9 +259,9 @@ public:
     {
     }
 
-    void do_log(std::string message) override final
+    void do_log(Logger::Level level, std::string message) override final
     {
-        Logger::do_log(m_base_logger, message); // Throws
+        Logger::do_log(m_base_logger, level, message); // Throws
     }
 
 private:
