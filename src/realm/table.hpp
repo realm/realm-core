@@ -793,7 +793,7 @@ public:
 
     class Parent;
     using HandoverPatch = TableHandoverPatch;
-    static void generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch);
+    static void generate_patch(const Table* ref, std::unique_ptr<HandoverPatch>& patch);
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
 protected:

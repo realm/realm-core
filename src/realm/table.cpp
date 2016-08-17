@@ -4289,7 +4289,8 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 
 TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_col_ndx)
 {
-    TableView tv(src_table, this, src_col_ndx, get(row_ndx));
+    REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
+    TableView tv(src_table, src_col_ndx, get(row_ndx));
     tv.do_sync();
     return tv;
 }
@@ -5773,11 +5774,11 @@ bool Table::is_cross_table_link_target() const noexcept
 }
 
 
-void Table::generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch)
+void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& patch)
 {
-    if (ref.get()) {
+    if (table) {
         patch.reset(new Table::HandoverPatch);
-        patch->m_table_num = ref.get()->get_index_in_group();
+        patch->m_table_num = table->get_index_in_group();
         // must be group level table!
         if (patch->m_table_num == npos) {
             throw std::runtime_error("Table handover failed: not a group level table");

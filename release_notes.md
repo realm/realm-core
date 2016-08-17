@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed incorrect results when updating a backlink TableView after inserting
+  new columns into the source table.
 
 ### Breaking changes
 
