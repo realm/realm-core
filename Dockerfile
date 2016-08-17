@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     ruby \
     ruby-dev \
+    s3cmd \
     && rm -rf /var/lib/apt/lists/*
 
 VOLUME /source

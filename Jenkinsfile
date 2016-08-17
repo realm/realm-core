@@ -30,6 +30,7 @@ stage 'check'
 parallel (
   checkLinuxRelease: doBuildInDocker('check'),
   checkLinuxDebug: doBuildInDocker('check-debug')
+  buildCocoa: doBuildCocoa()
 )
 
 stage 'build-packages'
@@ -52,6 +53,59 @@ if (['ajl/jenkinsfile'].contains(env.BRANCH_NAME)) {
     build job: 'sync_release/realm-core-rpm-release',
       wait: false,
       parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
+  }
+}
+
+def buildCocoa() {
+  return {
+    node('osx') {
+      checkout scm
+      sh 'git clean -ffdx -e .????????'
+      try {
+        withEnv([
+          'PATH=$PATH:/usr/local/bin',
+          'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer',
+          'REALM_ENABLE_ENCRYPTION=yes',
+          'REALM_ENABLE_ASSERTIONS=yes',
+          'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
+          'UNITTEST_SHUFFLE=1',
+          'UNITTEST_REANDOM_SEED=random',
+          'UNITTEST_XML=1',
+          'UNITTEST_THREADS=1'
+        ]) {
+            sh '''
+              dir=$(pwd)
+              sh build.sh config $dir/install
+              sh build.sh build-cocoa
+              sh build.sh check-debug
+
+              # Repack the release with just what we need so that it's not a 1 GB download
+              version=$(sh build.sh get-version)
+              tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
+              (
+                  cd $tmpdir || exit 1
+                  unzip -qq "$dir/core-$version.zip" || exit 1
+
+                  # We only need an armv7s slice for CocoaPods, and the podspec never uses
+                  # the debug build of core, so remove that slice
+                  lipo -remove armv7s core/librealm-ios-dbg.a -o core/librealm-ios-dbg.a
+
+                  tar cf "$dir/core-$version.tar.xz" --xz core || exit 1
+              )
+              rm -rf "$tmpdir" || exit 1
+
+              cp core-*.tar.xz realm-core-latest.tar.xz
+            '''
+            archive '*core-*.*.*.tar.xz'
+        }
+      } finally {
+        collectCompilerWarnings('clang')
+        recordTests('check-debug-cocoa')
+        withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+          sh "s3cfg -c ${ENV.s3cfg_config_file} put realm-core-latest.tar.xz s3://static.realm.io/downloads/core"
+        }
+      }
+    }
   }
 }
 
@@ -157,9 +211,8 @@ def getSourceArchive() {
 def readGitTag() {
   sh "git describe --exact-match --tags HEAD | tail -n 1 > tag.txt 2>&1 || true"
   def tag = readFile('tag.txt').trim()
-  return "v1.5.0"
-/*  return tag
-*/}
+  return tag
+}
 
 def readGitSha() {
   sh "git rev-parse HEAD | cut -b1-8 > sha.txt"
