@@ -78,9 +78,9 @@ public:
 protected:
     Logger(const LevelThreshold&) noexcept;
 
-    static void do_log(Logger&, std::string message);
+    static void do_log(Logger&, Level, std::string message);
 
-    virtual void do_log(std::string message) = 0;
+    virtual void do_log(Level, std::string message) = 0;
 
 private:
     struct State;
@@ -126,7 +126,7 @@ private:
 /// threshold.
 class StderrLogger: public RootLogger {
 protected:
-    void do_log(std::string) override final;
+    void do_log(Level, std::string) override final;
 };
 
 
@@ -140,7 +140,7 @@ public:
     explicit StreamLogger(std::ostream&) noexcept;
 
 protected:
-    void do_log(std::string) override final;
+    void do_log(Level, std::string) override final;
 
 private:
     std::ostream& m_out;
@@ -173,7 +173,7 @@ public:
     explicit ThreadSafeLogger(Logger& base_logger, Level = Level::info);
 
 protected:
-    void do_log(std::string) override final;
+    void do_log(Level, std::string) override final;
 
 private:
     const Level m_level_threshold; // Immutable for thread safety
@@ -192,7 +192,7 @@ public:
     PrefixLogger(std::string prefix, Logger& base_logger) noexcept;
 
 protected:
-    void do_log(std::string) override final;
+    void do_log(Level, std::string) override final;
 
 private:
     const std::string m_prefix;
@@ -205,12 +205,14 @@ private:
 // Implementation
 
 struct Logger::State {
+    Logger::Level m_level;
     std::string m_message;
     std::string m_search;
     int m_param_num = 1;
     std::ostringstream m_formatter;
     std::locale m_locale = std::locale::classic();
-    State(const char* s):
+    State(Logger::Level level, const char* s):
+        m_level(level),
         m_message(s),
         m_search(m_message)
     {
@@ -292,20 +294,20 @@ inline Logger::Logger(const LevelThreshold& lt) noexcept:
 {
 }
 
-inline void Logger::do_log(Logger& logger, std::string message)
+inline void Logger::do_log(Logger& logger, Level level, std::string message)
 {
-    logger.do_log(std::move(message));
+    logger.do_log(level, std::move(message));
 }
 
-template<class... Params> void Logger::do_log(Level, const char* message, Params... params)
+template<class... Params> void Logger::do_log(Level level, const char* message, Params... params)
 {
-    State state(message);
+    State state(level, message);
     log_impl(state, params...);
 }
 
 inline void Logger::log_impl(State& state)
 {
-    do_log(std::move(state.m_message));
+    do_log(state.m_level, std::move(state.m_message));
 }
 
 template<class Param, class... Params>
@@ -416,7 +418,7 @@ inline Logger::Level RootLogger::get() const noexcept
     return m_level_threshold;
 }
 
-inline void StderrLogger::do_log(std::string message)
+inline void StderrLogger::do_log(Level, std::string message)
 {
     std::cerr << message << '\n'; // Throws
     std::cerr.flush(); // Throws
@@ -427,7 +429,7 @@ inline StreamLogger::StreamLogger(std::ostream& out) noexcept:
 {
 }
 
-inline void StreamLogger::do_log(std::string message)
+inline void StreamLogger::do_log(Level, std::string message)
 {
     m_out << message << '\n'; // Throws
     m_out.flush(); // Throws
@@ -457,10 +459,10 @@ inline ThreadSafeLogger::ThreadSafeLogger(Logger& base_logger, Level threshold):
 {
 }
 
-inline void ThreadSafeLogger::do_log(std::string message)
+inline void ThreadSafeLogger::do_log(Level level, std::string message)
 {
     LockGuard l(m_mutex);
-    Logger::do_log(m_base_logger, message); // Throws
+    Logger::do_log(m_base_logger, level, message); // Throws
 }
 
 inline Logger::Level ThreadSafeLogger::get() const noexcept
@@ -475,9 +477,9 @@ inline PrefixLogger::PrefixLogger(std::string prefix, Logger& base_logger) noexc
 {
 }
 
-inline void PrefixLogger::do_log(std::string message)
+inline void PrefixLogger::do_log(Level level, std::string message)
 {
-    Logger::do_log(m_base_logger, m_prefix + message); // Throws
+    Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
 }
 
 } // namespace util
