@@ -1552,9 +1552,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetInt: {
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
-            // FIXME: Don't depend on the existence of int64_t,
-            // but don't allow values to use more than 64 bits
-            // either.
             int_fast64_t value = read_int<int64_t>(); // Throws
             if (!handler.set_int(col_ndx, row_ndx, value)) // Throws
                 parser_error();
@@ -1564,9 +1561,6 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
             size_t prior_num_rows = read_int<size_t>(); // Throws
-            // FIXME: Don't depend on the existence of int64_t,
-            // but don't allow values to use more than 64 bits
-            // either.
             int_fast64_t value = read_int<int64_t>(); // Throws
             if (!handler.set_int_unique(col_ndx, row_ndx, prior_num_rows, value)) // Throws
                 parser_error();
@@ -2094,9 +2088,6 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
     DataType type = DataType(read_int<int>()); // Throws
     switch (type) {
         case type_Int: {
-            // FIXME: Don't depend on the existence of
-            // int64_t, but don't allow values to use more
-            // than 64 bits either.
             int_fast64_t value = read_int<int64_t>(); // Throws
             mixed->set_int(value);
             return;
@@ -2402,7 +2393,8 @@ public:
 
     bool clear_table()
     {
-        m_encoder.insert_empty_rows(0, 0, 0, true); // FIXME: Explain what is going on here (Finn).
+        // FIXME: Add a comment on why we call insert_empty_rows() inside clear_table()
+        m_encoder.insert_empty_rows(0, 0, 0, true);
         append_instruction();
         return true;
     }
