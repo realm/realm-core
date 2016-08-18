@@ -9,20 +9,6 @@
 * Fixed incorrect results when updating a backlink TableView after inserting
   new columns into the source table.
 
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
-
 ----------------------------------------------
 
 # 1.5.0 Release notes
