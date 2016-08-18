@@ -30,10 +30,11 @@ public:
     ~ArrayBlob() noexcept override {}
 
     const char* get(size_t index) const noexcept;
+    size_t read(size_t pos, char* buffer, size_t max_size) const noexcept;
     bool is_null(size_t index) const noexcept;
-    void add(const char* data, size_t data_size, bool add_zero_term = false);
+    ref_type add(const char* data, size_t data_size, bool add_zero_term = false);
     void insert(size_t pos, const char* data, size_t data_size, bool add_zero_term = false);
-    void replace(size_t begin, size_t end, const char* data, size_t data_size,
+    ref_type replace(size_t begin, size_t end, const char* data, size_t data_size,
                  bool add_zero_term = false);
     void erase(size_t begin, size_t end);
 
@@ -57,6 +58,7 @@ public:
     static MemRef create_array(size_t init_size, Allocator&);
 
 #ifdef REALM_DEBUG
+    size_t blob_size() const noexcept;
     void verify() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
@@ -88,9 +90,9 @@ inline const char* ArrayBlob::get(size_t index) const noexcept
     return m_data + index;
 }
 
-inline void ArrayBlob::add(const char* data, size_t data_size, bool add_zero_term)
+inline ref_type ArrayBlob::add(const char* data, size_t data_size, bool add_zero_term)
 {
-    replace(m_size, m_size, data, data_size, add_zero_term);
+    return replace(m_size, m_size, data, data_size, add_zero_term);
 }
 
 inline void ArrayBlob::insert(size_t pos, const char* data, size_t data_size,
