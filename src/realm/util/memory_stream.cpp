@@ -21,6 +21,8 @@
 
 using namespace realm;
 using namespace realm::util;
+using pos_type = realm::util::MemoryInputStreambuf::pos_type;
+using off_type = realm::util::MemoryInputStreambuf::off_type;
 
 MemoryInputStreambuf::int_type MemoryInputStreambuf::underflow()
 {
@@ -48,14 +50,11 @@ std::streamsize MemoryInputStreambuf::showmanyc()
     return m_end - m_curr;
 }
 
-MemoryInputStreambuf::pos_type 
-MemoryInputStreambuf::seekoff(MemoryInputStreambuf::off_type off, 
+pos_type MemoryInputStreambuf::seekoff(off_type off,
                               std::ios_base::seekdir dir, 
                               std::ios_base::openmode which)
 {
 	REALM_ASSERT(which == std::ios_base::in);
-
-	pos_type pos;
 
 	switch (dir) {
 		case std::ios_base::beg:
@@ -76,11 +75,9 @@ MemoryInputStreambuf::seekoff(MemoryInputStreambuf::off_type off,
 
 	return m_curr - m_begin;
 }
-	 
-MemoryInputStreambuf::pos_type 
-MemoryInputStreambuf::seekpos(MemoryInputStreambuf::pos_type pos, 
-                              std::ios_base::openmode which)
-{   
+
+pos_type MemoryInputStreambuf::seekpos(pos_type pos, std::ios_base::openmode which)
+{
 	REALM_ASSERT(which == std::ios_base::in);
 
 	m_curr = m_begin + pos;
