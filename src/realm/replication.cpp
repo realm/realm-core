@@ -768,15 +768,15 @@ public:
 
     ~InputStreamImpl() noexcept {}
 
-    size_t next_block(const char*& begin, const char*& end) override
+    bool next_block(const char*& begin, const char*& end) override
     {
         if (m_begin != 0) {
             begin = m_begin;
             end = m_end;
             m_begin = nullptr;
-            return end - begin;
+            return (end > begin);
         }
-        return 0;
+        return false;
     }
     const char* m_begin;
     const char* const m_end;

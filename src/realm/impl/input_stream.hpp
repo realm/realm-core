@@ -23,6 +23,7 @@
 
 #include <realm/binary_data.hpp>
 #include <realm/impl/continuous_transactions_history.hpp>
+#include <realm/util/buffer.hpp>
 
 
 namespace realm {
@@ -72,12 +73,12 @@ private:
 
 class NoCopyInputStream {
 public:
-    /// \return the number of accessible bytes.
-    /// A value of zero indicates end-of-input.
-    /// For non-zero return value, \a begin and \a end are
+    /// \return if any bytes was read.
+    /// A value of false indicates end-of-input.
+    /// If return value is true, \a begin and \a end are
     /// updated to reflect the start and limit of a
     /// contiguous memory chunk.
-    virtual size_t next_block(const char*& begin, const char*& end) = 0;
+    virtual bool next_block(const char*& begin, const char*& end) = 0;
 
     virtual ~NoCopyInputStream() noexcept {}
 };
@@ -91,7 +92,7 @@ public:
         m_buffer_size(buffer_size)
     {
     }
-    size_t next_block(const char*& begin, const char*& end) override
+    bool next_block(const char*& begin, const char*& end) override
     {
         size_t n = m_in.read(m_buffer, m_buffer_size);
         begin = m_buffer;
@@ -113,7 +114,7 @@ public:
     {
     }
 
-    size_t next_block(const char*& begin, const char*& end) override
+    bool next_block(const char*& begin, const char*& end) override
     {
         if (m_size == 0)
             return 0;
@@ -163,7 +164,7 @@ public:
         }
     }
 
-    size_t next_block(const char*& begin, const char*& end) override
+    bool next_block(const char*& begin, const char*& end) override
     {
         while (m_logs_begin < m_logs_end) {
             size_t result = m_logs_begin->size();
@@ -188,51 +189,59 @@ private:
 class ChangesetInputStream: public NoCopyInputStream {
 public:
     using version_type = History::version_type;
-    ChangesetInputStream(History&, version_type begin_version, version_type end_version);
-    size_t next_block(const char*& begin, const char*& end) override;
+    static constexpr unsigned BUFFER_SIZE = 1024;
+    static constexpr unsigned NB_BUFFERS = 8;
+
+    ChangesetInputStream(History& hist, version_type begin_version, version_type end_version)
+        : m_history(hist), m_begin_version(begin_version), m_end_version(end_version), m_buffer(new char[BUFFER_SIZE])
+    {
+        get_changeset();
+    }
+
+    bool next_block(const char*& begin, const char*& end) override
+    {
+        while (m_valid) {
+            size_t actual = m_changesets_begin->read(m_buffer.get(), BUFFER_SIZE);
+
+            if (actual > 0) {
+                begin = m_buffer.get();
+                end = m_buffer.get() + actual;
+                return true;
+            }
+
+            m_changesets_begin++;
+
+            if (REALM_UNLIKELY(m_changesets_begin == m_changesets_end)) {
+                get_changeset();
+            }
+        }
+        return false;  // End of input
+    }
+
 private:
     History& m_history;
     version_type m_begin_version, m_end_version;
-    BinaryData m_changesets[8]; // Buffer
-    BinaryData* m_changesets_begin = 0;
-    BinaryData* m_changesets_end = 0;
-};
+    BinaryIterator m_changesets[NB_BUFFERS]; // Buffer
+    BinaryIterator* m_changesets_begin = nullptr;
+    BinaryIterator* m_changesets_end = nullptr;
+    bool m_valid;
+    std::unique_ptr<char[]> m_buffer;
 
-
-inline ChangesetInputStream::ChangesetInputStream(History& hist, version_type begin_version,
-                                                  version_type end_version):
-    m_history(hist),
-    m_begin_version(begin_version),
-    m_end_version(end_version)
-{
-}
-
-inline size_t ChangesetInputStream::next_block(const char*& begin, const char*& end)
-{
-    for (;;) {
-        if (REALM_UNLIKELY(m_changesets_begin == m_changesets_end)) {
-            if (m_begin_version == m_end_version)
-                return 0; // End of input
-            version_type n = sizeof m_changesets / sizeof m_changesets[0];
-            version_type avail = m_end_version - m_begin_version;
-            if (n > avail)
-                n = avail;
-            version_type end_version = m_begin_version + n;
+    void get_changeset()
+    {
+        auto versions_to_get = m_end_version - m_begin_version;
+        m_valid = versions_to_get > 0;
+        if (m_valid) {
+            if (versions_to_get > NB_BUFFERS)
+                versions_to_get = NB_BUFFERS;
+            version_type end_version = m_begin_version + versions_to_get;
             m_history.get_changesets(m_begin_version, end_version, m_changesets);
             m_begin_version = end_version;
             m_changesets_begin = m_changesets;
-            m_changesets_end = m_changesets_begin + n;
-        }
-
-        BinaryData changeset = *m_changesets_begin++;
-        if (changeset.size() > 0) {
-            begin = changeset.data();
-            end   = changeset.data() + changeset.size();
-            return changeset.size();
+            m_changesets_end = m_changesets_begin + versions_to_get;
         }
     }
-}
-
+};
 
 } // namespace _impl
 } // namespace realm
