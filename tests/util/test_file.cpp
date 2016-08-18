@@ -22,8 +22,8 @@
 #include "util/format.hpp"
 
 #if REALM_ENABLE_SYNC
-#include "sync_config.hpp"
-#include "sync_manager.hpp"
+#include "sync/sync_config.hpp"
+#include "sync/sync_manager.hpp"
 #endif
 
 #include <realm/disable_sync_to_disk.hpp>

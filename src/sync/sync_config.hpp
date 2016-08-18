@@ -21,8 +21,12 @@
 
 #include <functional>
 #include <string>
+#include <memory>
 
 namespace realm {
+
+class SyncUser;
+class SyncSession;
 
 enum class SyncSessionStopPolicy;
 
@@ -34,25 +38,30 @@ enum class SyncSessionError {
 };
 
 struct SyncConfig;
-using SyncLogInHandler = void(const std::string&, const SyncConfig&);
+using SyncBindSessionHandler = void(const std::string&,                       // path on disk of the Realm file.
+                                    const SyncConfig&,                        // the sync configuration object.
+                                    std::shared_ptr<SyncSession>              // the session which should be bound.
+                                    );
 
 using SyncSessionErrorHandler = void(int error_code, std::string message, SyncSessionError);
 
 struct SyncConfig {
-    SyncConfig(std::string user_tag, std::string realm_url, SyncSessionStopPolicy stop_policy,
-               std::function<SyncLogInHandler> log_in_handler,
+    SyncConfig(std::shared_ptr<SyncUser> user,
+               std::string realm_url,
+               SyncSessionStopPolicy stop_policy,
+               std::function<SyncBindSessionHandler> bind_session_handler,
                std::function<SyncSessionErrorHandler> error_handler={})
-    : user_tag(std::move(user_tag))
+    : user(std::move(user))
     , realm_url(std::move(realm_url))
-    , log_in_handler(std::move(log_in_handler))
+    , bind_session_handler(std::move(bind_session_handler))
     , error_handler(std::move(error_handler))
     , stop_policy(stop_policy)
     {
     }
 
-    std::string user_tag;
+    std::shared_ptr<SyncUser> user;
     std::string realm_url;
-    std::function<SyncLogInHandler> log_in_handler;
+    std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
     SyncSessionStopPolicy stop_policy;
 };

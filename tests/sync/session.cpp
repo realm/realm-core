@@ -21,9 +21,9 @@
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 
-#include "sync_config.hpp"
-#include "sync_manager.hpp"
-#include "sync_session.hpp"
+#include "sync/sync_config.hpp"
+#include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -37,14 +37,15 @@ using namespace realm::util;
 static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
 
 template <typename FetchAccessToken, typename ErrorHandler>
-std::shared_ptr<SyncSession> sync_session(SyncServer& server, const std::string& user, const std::string& path,
+std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
                                           FetchAccessToken&& fetch_access_token, ErrorHandler&& error_handler)
 {
     std::string url = server.base_url() + path;
     SyncTestFile config(SyncConfig(user, url, SyncSessionStopPolicy::AfterChangesUploaded,
-                                   [&](const std::string& path, const SyncConfig& config) {
-        EventLoop::main().perform([&] {
-            auto session = SyncManager::shared().get_existing_active_session(path);
+                                   [&](const std::string& path,
+                                       const SyncConfig& config,
+                                       std::shared_ptr<SyncSession> session) {
+        EventLoop::main().perform([&, session=std::move(session)] {
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);
         });
@@ -60,10 +61,12 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, const std::string&
 
 TEST_CASE("sync: log-in", "[sync]") {
     SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system("/tmp/", SyncManager::MetadataMode::NoMetadata);
 
     SECTION("Can log in") {
         std::atomic<int> error_count(0);
-        auto session = sync_session(server, "user", "/test",
+        auto session = sync_session(server, SyncManager::shared().get_user("user", "not_a_real_token"), "/test",
                                     [&](auto...) { return s_test_token; },
                                     [&](auto...) { ++error_count; });
 
@@ -83,7 +86,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     SECTION("Session is invalid after invalid token") {
         std::atomic<int> error_count(0);
-        auto session = sync_session(server, "user", "/test",
+        auto session = sync_session(server, SyncManager::shared().get_user("user", "not_a_real_token"), "/test",
                                     [&](auto...) { return "this is not a valid access token"; },
                                     [&](auto...) { ++error_count; });
 
@@ -97,7 +100,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     SECTION("Session is invalid after invalid token while waiting on download to complete") {
         std::atomic<int> error_count(0);
-        auto session = sync_session(server, "user", "/test",
+        auto session = sync_session(server, nullptr, "/test",
                                     [&](auto...) { return "this is not a valid access token"; },
                                     [&](auto...) { ++error_count; });
 
@@ -111,4 +114,11 @@ TEST_CASE("sync: log-in", "[sync]") {
         CHECK(!session->is_valid());
     }
 #endif
+
+    // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
+
+    // Cleanup
+    SyncManager::shared().reset_for_testing();
 }
+
+// TODO: tests investigating the interaction of SyncUser and SyncSession

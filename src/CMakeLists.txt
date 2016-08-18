@@ -80,11 +80,15 @@ if(REALM_ENABLE_SYNC)
         sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_session.hpp
+        sync/sync_user.hpp
         sync/impl/sync_client.hpp
+        sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp)
     list(APPEND SOURCES
         sync/sync_manager.cpp
         sync/sync_session.cpp
+        sync/sync_user.cpp
+        sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp)
     find_package(ZLIB REQUIRED)
     list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})

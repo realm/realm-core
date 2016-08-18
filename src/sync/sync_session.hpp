@@ -29,6 +29,7 @@
 namespace realm {
 
 class SyncManager;
+class SyncUser;
 
 namespace _impl {
 class RealmCoordinator;
@@ -49,8 +50,10 @@ class Session;
 
 using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
 
-struct SyncSession : public std::enable_shared_from_this<SyncSession> {
+class SyncSession : public std::enable_shared_from_this<SyncSession> {
+public:
     bool is_valid() const;
+    bool is_inactive() const;
 
     std::string const& path() const { return m_realm_path; }
 
@@ -59,9 +62,10 @@ struct SyncSession : public std::enable_shared_from_this<SyncSession> {
 
     // If the sync session is currently `Dying`, ask it to stay alive instead.
     // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
-    void revive_if_needed();
+    static void revive_if_needed(std::shared_ptr<SyncSession> session);
 
     void refresh_access_token(std::string access_token, util::Optional<std::string> server_url);
+    void bind_with_admin_token(std::string admin_token, std::string server_url);
 
     // Inform the sync session that it should close.
     void close();
@@ -71,6 +75,21 @@ struct SyncSession : public std::enable_shared_from_this<SyncSession> {
 
     // Inform the sync session that it should log out.
     void log_out();
+
+    std::shared_ptr<SyncUser> user() const
+    {
+        return m_config.user;
+    }
+
+    const SyncConfig& config() const
+    {
+        return m_config;
+    }
+
+    util::Optional<std::string> full_realm_url() const
+    {
+        return m_server_url;
+    }
 
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
@@ -105,9 +124,6 @@ private:
     friend class realm::SyncManager;
     // Called by SyncManager {
     SyncSession(std::shared_ptr<_impl::SyncClient>, std::string realm_path, SyncConfig);
-
-    // Check if this sync session is actually inactive
-    bool is_inactive() const;
     // }
 
     bool can_wait_for_network_completion() const;

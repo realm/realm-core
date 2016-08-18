@@ -28,7 +28,7 @@ class Replication;
 class Schema;
 class SharedGroup;
 class StringData;
-struct SyncSession;
+class SyncSession;
 
 namespace _impl {
 class CollectionNotifier;

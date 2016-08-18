@@ -27,9 +27,9 @@
 #include "schema.hpp"
 
 #if REALM_ENABLE_SYNC
-#include "sync_config.hpp"
-#include "sync_manager.hpp"
-#include "sync_session.hpp"
+#include "sync/sync_config.hpp"
+#include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
 #endif
 
 #include <realm/group_shared.hpp>
@@ -125,8 +125,8 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         }
 
         if (config.sync_config) {
-            if (m_config.sync_config->user_tag != config.sync_config->user_tag) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with different sync user identifier.", config.path);
+            if (m_config.sync_config->user != config.sync_config->user) {
+                throw MismatchedConfigException("Realm at path '%1' already opened with different sync user.", config.path);
             }
             if (m_config.sync_config->realm_url != config.sync_config->realm_url) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync server URL.", config.path);
@@ -137,9 +137,11 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         // Realm::update_schema() handles complaining about schema mismatches
     }
 
+#if REALM_ENABLE_SYNC
     if (config.sync_config) {
         create_sync_session();
     }
+#endif
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)

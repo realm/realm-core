@@ -329,6 +329,8 @@ public:
     enum class Kind {
         /** Thrown for any I/O related exception scenarios when a realm is opened. */
         AccessError,
+        /** Thrown if the history type of the on-disk Realm is unexpected or incompatible. */
+        BadHistoryError,
         /** Thrown if the user does not have permission to open or create
          the specified file in the specified access mode when the realm is opened. */
         PermissionDenied,
