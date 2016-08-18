@@ -25,6 +25,7 @@ namespace realm {
 // Note: Value assignments must be kept in sync with <realm/c/data_type.h>
 // Note: Value assignments must be kept in sync with <realm/objc/type.h>
 // Note: Value assignments must be kept in sync with "com/realm/ColumnType.java"
+// Note: Any change to this enum is a file-format breaking change.
 enum DataType {
     type_Int         =  0,
     type_Bool        =  1,

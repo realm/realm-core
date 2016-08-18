@@ -2849,10 +2849,10 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_int_unique(this, col_ndx, ndx, value); // Throws
+        repl->set_int(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
 }
 
-void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
+void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2868,7 +2868,8 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_int(this, col_ndx, ndx, value); // Throws
+        repl->set_int(this, col_ndx, ndx, value,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept
@@ -2877,7 +2878,7 @@ Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
+void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), == , col_type_Timestamp);
@@ -2892,9 +2893,11 @@ void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value)
 
     if (Replication* repl = get_repl()) {
         if (value.is_null())
-            repl->set_null(this, col_ndx, ndx); // Throws
+            repl->set_null(this, col_ndx, ndx,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
         else
-            repl->set_timestamp(this, col_ndx, ndx, value); // Throws
+            repl->set_timestamp(this, col_ndx, ndx, value,
+                                is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 }
 
@@ -2905,7 +2908,7 @@ bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
+void Table::set_bool(size_t col_ndx, size_t ndx, bool value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
@@ -2922,7 +2925,8 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_bool(this, col_ndx, ndx, value); // Throws
+        repl->set_bool(this, col_ndx, ndx, value,
+                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -2932,7 +2936,7 @@ OldDateTime Table::get_olddatetime(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value)
+void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_OldDateTime);
@@ -2949,7 +2953,8 @@ void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_olddatetime(this, col_ndx, ndx, value); // Throws
+        repl->set_olddatetime(this, col_ndx, ndx, value,
+                              is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -2959,7 +2964,7 @@ float Table::get_float(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_float(size_t col_ndx, size_t ndx, float value)
+void Table::set_float(size_t col_ndx, size_t ndx, float value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2969,7 +2974,8 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value)
     col.set(ndx, value);
 
     if (Replication* repl = get_repl())
-        repl->set_float(this, col_ndx, ndx, value); // Throws
+        repl->set_float(this, col_ndx, ndx, value,
+                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -2979,7 +2985,7 @@ double Table::get_double(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_double(size_t col_ndx, size_t ndx, double value)
+void Table::set_double(size_t col_ndx, size_t ndx, double value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2989,7 +2995,8 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value)
     col.set(ndx, value);
 
     if (Replication* repl = get_repl())
-        repl->set_double(this, col_ndx, ndx, value); // Throws
+        repl->set_double(this, col_ndx, ndx, value,
+                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -2999,7 +3006,7 @@ StringData Table::get_string(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
+void Table::set_string(size_t col_ndx, size_t ndx, StringData value, bool is_default)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -3021,7 +3028,8 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value)
     col.set_string(ndx, value); // Throws
 
     if (Replication* repl = get_repl())
-        repl->set_string(this, col_ndx, ndx, value); // Throws
+        repl->set_string(this, col_ndx, ndx, value,
+                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -3061,7 +3069,7 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_string_unique(this, col_ndx, ndx, value); // Throws
+        repl->set_string(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
 }
 
 void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)
@@ -3134,7 +3142,7 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
+void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -3158,7 +3166,8 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value)
     col.set(ndx, value);
 
     if (Replication* repl = get_repl())
-        repl->set_binary(this, col_ndx, ndx, value); // Throws
+        repl->set_binary(this, col_ndx, ndx, value,
+                         is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -3209,7 +3218,7 @@ DataType Table::get_mixed_type(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
+void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -3258,7 +3267,8 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_mixed(this, col_ndx, ndx, value); // Throws
+        repl->set_mixed(this, col_ndx, ndx, value,
+                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -3277,7 +3287,7 @@ TableRef Table::get_link_target(size_t col_ndx) noexcept
 }
 
 
-void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
+void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -3301,7 +3311,8 @@ void Table::set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx)
     // type. Idea: Introduce `DataType ColumnBase::m_type`.
 
     if (Replication* repl = get_repl())
-        repl->set_link(this, col_ndx, row_ndx, target_row_ndx); // Throws
+        repl->set_link(this, col_ndx, row_ndx, target_row_ndx,
+                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     size_t old_target_row_ndx = do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
     if (old_target_row_ndx == realm::npos)
@@ -3386,7 +3397,7 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
 }
 
 
-void Table::set_null(size_t col_ndx, size_t row_ndx)
+void Table::set_null(size_t col_ndx, size_t row_ndx, bool is_default)
 {
     if (!is_nullable(col_ndx)) {
         throw LogicError{LogicError::column_not_nullable};
@@ -3398,7 +3409,8 @@ void Table::set_null(size_t col_ndx, size_t row_ndx)
     col.set_null(row_ndx);
 
     if (Replication* repl = get_repl())
-        repl->set_null(this, col_ndx, row_ndx); // Throws
+        repl->set_null(this, col_ndx, row_ndx,
+                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
