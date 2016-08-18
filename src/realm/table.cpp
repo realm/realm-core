@@ -424,16 +424,13 @@ DescriptorRef Table::get_descriptor()
         return parent->get_descriptor()->get_subdescriptor(col_ndx); // Throws
     }
 
-    DescriptorRef desc;
-    if (!m_descriptor) {
+    DescriptorRef desc = m_descriptor.lock();
+    if (!desc) {
         typedef _impl::DescriptorFriend df;
-        desc.reset(df::create()); // Throws
-        Descriptor* parent = nullptr;
+        desc = df::create(); // Throws
+        DescriptorRef parent = nullptr;
         df::attach(*desc, this, parent, &m_spec);
-        m_descriptor = desc.get();
-    }
-    else {
-        desc.reset(m_descriptor);
+        m_descriptor = desc;
     }
     return desc;
 }
@@ -1374,12 +1371,12 @@ void Table::discard_child_accessors() noexcept
 
 void Table::discard_desc_accessor() noexcept
 {
-    if (m_descriptor) {
-        // Must hold a reliable reference count while detaching
-        DescriptorRef desc(m_descriptor);
+    // Must hold a reliable reference count while detaching
+    DescriptorRef desc = m_descriptor.lock();
+    if (desc) {
         typedef _impl::DescriptorFriend df;
         df::detach(*desc);
-        m_descriptor = nullptr;
+        m_descriptor.reset();
     }
 }
 
@@ -4289,7 +4286,8 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 
 TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_col_ndx)
 {
-    TableView tv(src_table, this, src_col_ndx, get(row_ndx));
+    REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
+    TableView tv(src_table, src_col_ndx, get(row_ndx));
     tv.do_sync();
     return tv;
 }
@@ -5773,11 +5771,11 @@ bool Table::is_cross_table_link_target() const noexcept
 }
 
 
-void Table::generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch)
+void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& patch)
 {
-    if (ref.get()) {
+    if (table) {
         patch.reset(new Table::HandoverPatch);
-        patch->m_table_num = ref.get()->get_index_in_group();
+        patch->m_table_num = table->get_index_in_group();
         // must be group level table!
         if (patch->m_table_num == npos) {
             throw std::runtime_error("Table handover failed: not a group level table");

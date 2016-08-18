@@ -24,6 +24,19 @@
 
 ----------------------------------------------
 
+# 1.5.1 Release notes
+
+### Bugfixes
+
+* Fixed java bug #3144 / Core #2014. Management of Descriptor class was
+  not thread safe with respect to destruction/creation/management of
+  accessor tree. Bug could be triggered by destruction of TableView on
+  one thread, while new TableViews where created on a different thread.
+* Fixed incorrect results when updating a backlink TableView after inserting
+  new columns into the source table.
+
+----------------------------------------------
+
 # 1.5.0 Release notes
 
 ### Bugfixes

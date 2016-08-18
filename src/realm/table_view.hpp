@@ -331,11 +331,8 @@ protected:
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
-    // Contains a reference to the table that is the target of the link.
-    // Null unless this TableView was created using Table::get_backlink_view.
-    mutable TableRef m_linked_table;
-    // The index of the link column that this view contain backlinks for.
-    size_t m_linked_column;
+    // The link column that this view contain backlinks for.
+    const BacklinkColumn* m_linked_column = nullptr;
     // The target row that rows in this view link to.
     ConstRow m_linked_row;
 
@@ -370,7 +367,7 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row);
+    TableViewBase(Table *parent, size_t column, BasicRowExpr<const Table> row);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -755,11 +752,10 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
-inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row):
+inline TableViewBase::TableViewBase(Table *parent, size_t column, BasicRowExpr<const Table> row):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
-    m_linked_table(linked_table->get_table_ref()), // Throws
-    m_linked_column(column),
+    m_linked_column(&parent->get_column_link_base(column).get_backlink_column()),
     m_linked_row(row),
     m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
@@ -776,7 +772,6 @@ inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t c
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
-    m_linked_table(tv.m_linked_table),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(tv.m_linkview_source),
@@ -805,7 +800,6 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     RowIndexes(std::move(tv.m_row_indexes)),
     m_table(std::move(tv.m_table)),
-    m_linked_table(std::move(tv.m_linked_table)),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(std::move(tv.m_linkview_source)),
@@ -849,7 +843,6 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_table = std::move(tv.m_linked_table);
     m_linked_column = tv.m_linked_column;
     m_linked_row = tv.m_linked_row;
     m_linkview_source = std::move(tv.m_linkview_source);
@@ -886,7 +879,6 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_table = tv.m_linked_table;
     m_linked_column = tv.m_linked_column;
     m_linked_row = tv.m_linked_row;
     m_linkview_source = tv.m_linkview_source;

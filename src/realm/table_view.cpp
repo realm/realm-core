@@ -38,12 +38,14 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
     // as exporting m_query will bring src out of sync.
     m_query = Query(src.m_query, patch.query_patch, mode);
 
-    Table::generate_patch(src.m_table, patch.m_table);
-    Table::generate_patch(src.m_linked_table, patch.linked_table);
-    Row::generate_patch(src.m_linked_row, patch.linked_row);
+    Table::generate_patch(src.m_table.get(), patch.m_table);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     SortDescriptor::generate_patch(src.m_sorting_predicate, patch.sort_patch);
     SortDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+    if (src.m_linked_column) {
+        ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
+        patch.linked_col = src.m_linked_column->get_origin_column_index();
+    }
 
     src.m_last_seen_version = util::none; // bring source out-of-sync, now that it has lost its data
     m_last_seen_version = 0;
@@ -62,9 +64,11 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
         patch.was_in_sync = false;
     else
         patch.was_in_sync = src.is_in_sync();
-    Table::generate_patch(src.m_table, patch.m_table);
-    Table::generate_patch(src.m_linked_table, patch.linked_table);
-    ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
+    Table::generate_patch(src.m_table.get(), patch.m_table);
+    if (src.m_linked_column) {
+        ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
+        patch.linked_col = src.m_linked_column->get_origin_column_index();
+    }
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     SortDescriptor::generate_patch(src.m_sorting_predicate, patch.sort_patch);
     SortDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
@@ -84,11 +88,10 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
     m_sorting_predicate = SortDescriptor::create_from_and_consume_patch(patch.sort_patch, *m_table);
     m_distinct_predicate = SortDescriptor::create_from_and_consume_patch(patch.distinct_patch, *m_table);
 
-    if (patch.linked_table) {
-        m_linked_table = Table::create_from_and_consume_patch(patch.linked_table, group);
+    if (patch.linked_row) {
+        m_linked_column = &m_table->get_column_link_base(patch.linked_col).get_backlink_column();
         m_linked_row.apply_and_consume_patch(patch.linked_row, group);
     }
-
 
     if (patch.was_in_sync)
         m_last_seen_version = outside_version();
@@ -528,8 +531,8 @@ uint64_t TableViewBase::outside_version() const
         }
     }
 
-    if (m_linked_table && !m_linked_row) {
-        // m_linked_table is set when created by Table::get_backlink_view.
+    if (m_linked_column && !m_linked_row) {
+        // m_linked_column is set when created by Table::get_backlink_view.
         return max;
     }
 
@@ -718,13 +721,13 @@ void TableViewBase::do_sync()
     else if (m_table && m_distinct_column_source != npos) {
         sync_distinct_view(m_distinct_column_source);
     }
-    else if (m_table && m_linked_table) {
+    else if (m_table && m_linked_column) {
         m_row_indexes.clear();
         if (m_linked_row.is_attached()) {
             size_t linked_row_ndx = m_linked_row.get_index();
-            size_t backlink_count = m_linked_table->get_backlink_count(linked_row_ndx, *m_table, m_linked_column);
+            size_t backlink_count = m_linked_column->get_backlink_count(linked_row_ndx);
             for (size_t i = 0; i < backlink_count; i++)
-                m_row_indexes.add(m_linked_table->get_backlink(linked_row_ndx, *m_table, m_linked_column, i));
+                m_row_indexes.add(m_linked_column->get_backlink(linked_row_ndx, i));
         }
     }
     // precondition: m_table is attached
@@ -768,7 +771,7 @@ bool TableViewBase::is_in_table_order() const
     else if (m_linkview_source) {
         return false;
     }
-    else if (m_table && m_linked_table) {
+    else if (m_table && m_linked_column) {
         return false;
     }
     else if (!m_query.m_table) {
