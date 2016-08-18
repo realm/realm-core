@@ -26,7 +26,7 @@
 #include <ostream>
 
 #include <realm.hpp>
-#include <realm/commit_log.hpp>
+#include <realm/history.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
@@ -6852,7 +6852,7 @@ TEST(Table_DetachedAccessor)
 TEST(Table_StaleLinkIndexOnTableRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
     SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 

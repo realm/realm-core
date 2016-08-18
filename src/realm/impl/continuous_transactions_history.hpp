@@ -161,7 +161,7 @@ public:
 class InRealmHistory: public History {
 public:
     void initialize(Group&);
-
+    
     /// Must never be called more than once per transaction. Returns the version
     /// produced by the added changeset.
     version_type add_changeset(BinaryData);

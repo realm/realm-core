@@ -29,8 +29,11 @@ namespace _impl {
 
 void InRealmHistory::initialize(Group& group)
 {
-    REALM_ASSERT(!m_group);
+    //REALM_ASSERT(!m_group);
     m_group = &group;
+    m_base_version = 0;
+    m_size = 0;
+    m_changesets = nullptr;
 }
 
 

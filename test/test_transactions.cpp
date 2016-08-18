@@ -26,7 +26,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/commit_log.hpp>
+#include <realm/history.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/file.hpp>
 #include <realm/group_shared.hpp>
@@ -566,7 +566,7 @@ TEST(Transactions_General)
 TEST(Transactions_RollbackMoveTableColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
@@ -597,7 +597,7 @@ TEST(Transactions_RollbackMoveTableColumns)
 TEST(Transactions_RollbackMoveTableReferences)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
@@ -625,8 +625,8 @@ TEST(Transactions_RollbackMoveTableReferences)
 TEST(LangBindHelper_RollbackStringEnumInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, 0));
-    std::unique_ptr<Replication> hist_2(make_client_history(path, 0));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_2(make_in_realm_history(path));
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
     SharedGroup sg_2(*hist_2, SharedGroup::durability_Full, 0);
     Group& g = const_cast<Group&>(sg_w.begin_read());
@@ -674,7 +674,7 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
 TEST(LangBindHelper_RollbackLinkInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, 0));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
     Group& g = const_cast<Group&>(sg_w.begin_read());
