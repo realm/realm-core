@@ -593,11 +593,13 @@ public:
         return true;
     }
 
-    bool link_list_set(size_t link_ndx, size_t value)
+    bool link_list_set(size_t link_ndx, size_t value, size_t prior_size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx >= m_link_list->size())))
+            return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
             return false;
         log("link_list->set(%1, %2);", link_ndx, value); // Throws
         typedef _impl::LinkListFriend llf;

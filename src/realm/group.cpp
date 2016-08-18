@@ -1680,7 +1680,7 @@ public:
         return true; // No-op
     }
 
-    bool link_list_set(size_t, size_t) noexcept
+    bool link_list_set(size_t, size_t, size_t) noexcept
     {
         return true; // No-op
     }

@@ -7576,7 +7576,7 @@ public:
     bool swap_rows(size_t, size_t) { return false; }
     bool change_link_targets(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
-    bool link_list_set(size_t, size_t) { return false; }
+    bool link_list_set(size_t, size_t, size_t) { return false; }
     bool link_list_insert(size_t, size_t, size_t) { return false; }
     bool link_list_erase(size_t, size_t) { return false; }
     bool link_list_nullify(size_t, size_t) { return false; }

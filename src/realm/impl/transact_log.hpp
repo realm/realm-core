@@ -166,7 +166,7 @@ public:
     bool set_link_type(size_t, LinkType) { return true; }
 
     // Must have linklist selected:
-    bool link_list_set(size_t, size_t) { return true; }
+    bool link_list_set(size_t, size_t, size_t) { return true; }
     bool link_list_insert(size_t, size_t, size_t) { return true; }
     bool link_list_move(size_t, size_t) { return true; }
     bool link_list_swap(size_t, size_t) { return true; }
@@ -233,7 +233,7 @@ public:
     bool set_link_type(size_t col_ndx, LinkType);
 
     // Must have linklist selected:
-    bool link_list_set(size_t link_ndx, size_t value);
+    bool link_list_set(size_t link_ndx, size_t value, size_t prior_size);
     bool link_list_set_all(const IntegerColumn& values);
     bool link_list_insert(size_t link_ndx, size_t value, size_t prior_size);
     bool link_list_move(size_t from_link_ndx, size_t to_link_ndx);
@@ -1401,9 +1401,9 @@ inline void TransactLogConvenientEncoder::optimize_table(const Table* t)
     m_encoder.optimize_table(); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_set(size_t link_ndx, size_t value)
+inline bool TransactLogEncoder::link_list_set(size_t link_ndx, size_t value, size_t prior_size)
 {
-    append_simple_instr(instr_LinkListSet, util::tuple(link_ndx, value)); // Throws
+    append_simple_instr(instr_LinkListSet, util::tuple(link_ndx, value, prior_size)); // Throws
     return true;
 }
 
@@ -1411,7 +1411,7 @@ inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, si
                                        size_t value)
 {
     select_link_list(list); // Throws
-    m_encoder.link_list_set(link_ndx, value); // Throws
+    m_encoder.link_list_set(link_ndx, value, list.size()); // Throws
 }
 
 inline bool TransactLogEncoder::link_list_nullify(size_t link_ndx, size_t prior_size)
@@ -1765,7 +1765,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_LinkListSet: {
             size_t link_ndx = read_int<size_t>(); // Throws
             size_t value = read_int<size_t>(); // Throws
-            if (!handler.link_list_set(link_ndx, value)) // Throws
+            size_t prior_size = read_int<size_t>(); // Throws
+            if (!handler.link_list_set(link_ndx, value, prior_size)) // Throws
                 parser_error();
             return;
         }
@@ -1774,7 +1775,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             size_t size = read_int<size_t>(); // Throws
             for (size_t i = 0; i < size; i++) {
                 size_t link = read_int<size_t>(); // Throws
-                if (!handler.link_list_set(i, link)) // Throws
+                if (!handler.link_list_set(i, link, size)) // Throws
                     parser_error();
             }
             return;
@@ -2473,9 +2474,9 @@ public:
         return true;
     }
 
-    bool link_list_set(size_t row, size_t value)
+    bool link_list_set(size_t row, size_t value, size_t prior_size)
     {
-        m_encoder.link_list_set(row, value);
+        m_encoder.link_list_set(row, value, prior_size);
         append_instruction();
         return true;
     }
