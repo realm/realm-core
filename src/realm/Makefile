@@ -79,6 +79,7 @@ lang_bind_helper.hpp \
 realm_nmmintrin.h \
 importer.hpp \
 version.hpp \
+version_id.hpp \
 unicode.hpp \
 history.hpp \
 commit_log.hpp \

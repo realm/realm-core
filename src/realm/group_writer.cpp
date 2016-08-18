@@ -296,8 +296,8 @@ ref_type GroupWriter::write_group()
     ref_type names_ref  = m_group.m_table_names.write(*this, deep, only_if_modified); // Throws
     ref_type tables_ref = m_group.m_tables.write(*this, deep, only_if_modified); // Throws
 
-    int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
-    int_fast64_t value_2 = int_fast64_t(tables_ref); // FIXME: Problematic unsigned -> signed conversion
+    int_fast64_t value_1 = from_ref(names_ref);
+    int_fast64_t value_2 = from_ref(tables_ref);
     top.set(0, value_1); // Throws
     top.set(1, value_2); // Throws
 
@@ -305,9 +305,8 @@ ref_type GroupWriter::write_group()
         REALM_ASSERT(top.size() >= 9);
         if (ref_type history_ref = top.get_as_ref(8)) {
             Allocator& alloc = top.get_alloc();
-            ref_type new_history_ref =
-                Array::write(history_ref, alloc, *this, only_if_modified); // Throws
-            int_fast64_t value_3 = int_fast64_t(new_history_ref); // FIXME: Problematic unsigned -> signed conversion
+            ref_type new_history_ref = Array::write(history_ref, alloc, *this, only_if_modified); // Throws
+            int_fast64_t value_3 = from_ref(new_history_ref);
             top.set(8, value_3); // Throws
         }
     }
@@ -394,7 +393,7 @@ ref_type GroupWriter::write_group()
     // change the byte-size of those arrays.
     size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
-    int_fast64_t value_4 = int_fast64_t(reserve_pos + max_free_space_needed); // FIXME: Problematic unsigned -> signed conversion
+    int_fast64_t value_4 = to_int64(reserve_pos + max_free_space_needed);
 
 #if REALM_ENABLE_MEMDEBUG
     m_free_positions.m_no_relocation = true;
@@ -420,12 +419,12 @@ ref_type GroupWriter::write_group()
     ref_type top_ref            = free_versions_ref  + free_versions_size;
 
     // Update top to point to the calculated positions
-    int_fast64_t value_5 = int_fast64_t(free_positions_ref); // FIXME: Problematic unsigned -> signed conversion
-    int_fast64_t value_6 = int_fast64_t(free_sizes_ref); // FIXME: Problematic unsigned -> signed conversion
+    int_fast64_t value_5 = from_ref(free_positions_ref);
+    int_fast64_t value_6 = from_ref(free_sizes_ref);
     top.set(3, value_5); // Throws
     top.set(4, value_6); // Throws
     if (is_shared) {
-        int_fast64_t value_7 = int_fast64_t(free_versions_ref); // FIXME: Problematic unsigned -> signed conversion
+        int_fast64_t value_7 = from_ref(free_versions_ref);
         int_fast64_t value_8 = 1 + 2 * int_fast64_t(m_current_version); // FIXME: Problematic unsigned -> signed conversion
         top.set(5, value_7); // Throws
         top.set(6, value_8); // Throws
@@ -444,8 +443,8 @@ ref_type GroupWriter::write_group()
     size_t rest = reserve_pos + reserve_size - size_t(end_ref);
     size_t used = size_t(end_ref) - reserve_pos;
     REALM_ASSERT_3(rest, >, 0);
-    int_fast64_t value_8 = int_fast64_t(end_ref); // FIXME: Problematic unsigned -> signed conversion
-    int_fast64_t value_9 = int_fast64_t(rest); // FIXME: Problematic unsigned -> signed conversion
+    int_fast64_t value_8 = from_ref(end_ref);
+    int_fast64_t value_9 = to_int64(rest);
 
     // value_9 is guaranteed to be smaller than the existing entry in the array and hence will not cause bit expansion
     REALM_ASSERT_3(value_8, <= , Array::ubound_for_width(m_free_positions.get_width()));
@@ -540,8 +539,8 @@ size_t GroupWriter::get_free_space(size_t size)
         // of the chunk. The call to reserve_free_space may split chunks
         // in order to make sure that it returns a chunk from which allocation
         // can be done from the beginning
-        m_free_positions.set(chunk_ndx, chunk_pos + size); // FIXME: Undefined conversion to signed
-        m_free_lengths.set(chunk_ndx, rest); // FIXME: Undefined conversion to signed
+        m_free_positions.set(chunk_ndx, to_int64(chunk_pos + size));
+        m_free_lengths.set(chunk_ndx, to_int64(rest));
     }
     else {
         // Allocating entire chunk

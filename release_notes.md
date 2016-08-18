@@ -2,10 +2,7 @@
 
 ### Bugfixes
 
-* Use shared_ptr for Descriptor to ensure the thread safety of destructors.
-* Fix a misusing of get_subdesc_accessor in group.
-* Fix a race condition that could result in a crash if a `LinkView` was
-  destroyed while another thread was adjusting accessors on a `LinkListColumn`.
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -13,7 +10,49 @@
 
 ### Enhancements
 
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 1.5.1 Release notes
+
+### Bugfixes
+
+* Fixed java bug #3144 / Core #2014. Management of Descriptor class was
+  not thread safe with respect to destruction/creation/management of
+  accessor tree. Bug could be triggered by destruction of TableView on
+  one thread, while new TableViews where created on a different thread.
+* Fixed incorrect results when updating a backlink TableView after inserting
+  new columns into the source table.
+
+----------------------------------------------
+
+# 1.5.0 Release notes
+
+### Bugfixes
+
+* Fix a race condition that could result in a crash if a `LinkView` was
+  destroyed while another thread was adjusting accessors on a `LinkListColumn`.
+* Fix crashes and general brokenness when constructing a Query, inserting a
+  column into the queried table, and then running the query.
+* Fix crashes and general brokenness when syncing a sorted or distincted
+  TableView after inserting new columns into the source Table.
+
+### Breaking changes
+
+* Added support for sorting and distincting table views through a chain of
+  links. (#1030)
+
+### Enhancements
+
 * Improve performance of sorting on non-nullable columns.
+* Improve overall sort performance.
 
 -----------
 

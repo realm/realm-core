@@ -42,7 +42,8 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable):
+BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable, size_t column_ndx):
+    ColumnBaseSimple(column_ndx),
     m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
@@ -522,8 +523,9 @@ ref_type BinaryColumn::write(size_t slice_offset, size_t slice_size,
 }
 
 
-void BinaryColumn::refresh_accessor_tree(size_t, const Spec&)
+void BinaryColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec)
 {
+    ColumnBaseSimple::refresh_accessor_tree(new_col_ndx, spec);
     ref_type ref = m_array->get_ref_from_parent();
     update_from_ref(ref); // Throws
 }
@@ -653,7 +655,7 @@ void BinaryColumn::to_dot(std::ostream& out, StringData title) const
 void BinaryColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
                                std::ostream& out) const
 {
-    bool is_strings = false; // FIXME: Not necessarily the case
+    bool is_strings = false; // FIXME: Not necessarily the case, but leaf_to_dot() is just a debug method
     bool is_big = Array::get_context_flag_from_header(leaf_mem.get_addr());
     if (!is_big) {
         // Small blobs
