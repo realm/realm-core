@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 1.5.1 Release notes
 
 ### Bugfixes
 
@@ -8,20 +8,6 @@
   one thread, while new TableViews where created on a different thread.
 * Fixed incorrect results when updating a backlink TableView after inserting
   new columns into the source table.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
