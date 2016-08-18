@@ -76,9 +76,6 @@ public:
     // Clears all caches on existing coordinators
     static void clear_all_caches();
 
-    // FIXME: this should be moved out of the coordinator once we separate sync from the object store
-    static void set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger* logger);
-
     // Explicit constructor/destructor needed for the unique_ptrs to forward-declared types
     RealmCoordinator();
     ~RealmCoordinator();
@@ -131,7 +128,6 @@ private:
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
 
-    std::shared_ptr<SyncClient> m_sync_client;
     std::unique_ptr<sync::Session> m_sync_session;
     bool m_sync_awaits_user_token = true;
     util::Optional<int_fast64_t> m_sync_deferred_commit_notification;

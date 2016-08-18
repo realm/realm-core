@@ -526,11 +526,6 @@ bool Realm::refresh()
     return true;
 }
 
-void Realm::set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger)
-{
-    RealmCoordinator::set_up_sync_client(std::move(errorHandler), logger);
-}
-
 bool Realm::can_deliver_notifications() const noexcept
 {
     if (m_config.read_only()) {

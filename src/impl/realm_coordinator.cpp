@@ -26,6 +26,8 @@
 #include "object_store.hpp"
 #include "schema.hpp"
 
+#include "sync_manager.hpp"
+
 #include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
@@ -38,56 +40,6 @@
 
 using namespace realm;
 using namespace realm::_impl;
-
-namespace realm {
-namespace _impl {
-
-struct SyncClient {
-    sync::Client client;
-    std::function<sync::Client::ErrorHandler> handler;
-
-    SyncClient(sync::Client client, std::function<sync::Client::ErrorHandler> handler)
-    : client(std::move(client))
-    , handler(std::move(handler))
-    , m_thread([this]{
-        this->client.set_error_handler(this->handler);
-        this->client.run();
-    })
-    {
-    }
-
-    ~SyncClient()
-    {
-        client.stop();
-        m_thread.join();
-    }
-
-private:
-    std::thread m_thread;
-};
-
-}
-}
-
-static std::mutex g_sync_client_mutex;
-static std::shared_ptr<SyncClient> g_sync_client;
-
-static std::shared_ptr<SyncClient> get_sync_client()
-{
-    std::lock_guard<std::mutex> lock(g_sync_client_mutex);
-    REALM_ASSERT(g_sync_client);
-    return g_sync_client;
-}
-
-static void create_sync_client(std::function<sync::Client::ErrorHandler> handler,
-                                                      realm::util::Logger* logger)
-{
-    std::lock_guard<std::mutex> lock(g_sync_client_mutex);
-    REALM_ASSERT(!g_sync_client);   // Object store should never call this more than once.
-    sync::Client::Config client_config;
-    client_config.logger = logger;
-    g_sync_client = std::make_shared<SyncClient>(sync::Client(client_config), std::move(handler));
-}
 
 static std::mutex s_coordinator_mutex;
 static std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>> s_coordinators_per_path;
@@ -154,9 +106,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     }
 
     if (config.sync_login_function && !m_sync_session) {
-        m_sync_client = get_sync_client();
-
-        m_sync_session = std::make_unique<sync::Session>(m_sync_client->client, config.path);
+        m_sync_session = std::make_unique<sync::Session>(SyncManager::shared().get_sync_client(), config.path);
         m_sync_session->set_sync_transact_callback([this] (sync::Session::version_type) {
             if (m_notifier)
                 m_notifier->notify_others();
@@ -205,11 +155,6 @@ void RealmCoordinator::update_schema(Schema const& schema, uint64_t schema_versi
     m_schema_version = schema_version;
 
     // FIXME: notify realms of the schema change
-}
-
-void RealmCoordinator::set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler,
-                                         realm::util::Logger* logger) {
-    create_sync_client(errorHandler, logger);
 }
 
 RealmCoordinator::RealmCoordinator() = default;
