@@ -7577,9 +7577,9 @@ public:
     bool change_link_targets(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
     bool link_list_set(size_t, size_t) { return false; }
-    bool link_list_insert(size_t, size_t) { return false; }
-    bool link_list_erase(size_t) { return false; }
-    bool link_list_nullify(size_t) { return false; }
+    bool link_list_insert(size_t, size_t, size_t) { return false; }
+    bool link_list_erase(size_t, size_t) { return false; }
+    bool link_list_nullify(size_t, size_t) { return false; }
     bool link_list_clear(size_t) { return false; }
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
@@ -7728,7 +7728,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
 
-            bool link_list_nullify(size_t ndx)
+            bool link_list_nullify(size_t ndx, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -8707,7 +8707,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool link_list_insert(size_t ndx, size_t value)
+            bool link_list_insert(size_t ndx, size_t value, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -8760,7 +8760,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
             size_t list_ndx = 0;
 
-            bool link_list_insert(size_t ndx, size_t)
+            bool link_list_insert(size_t ndx, size_t, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);

@@ -1685,7 +1685,7 @@ public:
         return true; // No-op
     }
 
-    bool link_list_insert(size_t, size_t) noexcept
+    bool link_list_insert(size_t, size_t, size_t) noexcept
     {
         return true; // No-op
     }
@@ -1700,7 +1700,7 @@ public:
         return true; // No-op
     }
 
-    bool link_list_erase(size_t) noexcept
+    bool link_list_erase(size_t, size_t) noexcept
     {
         return true; // No-op
     }
@@ -1715,7 +1715,7 @@ public:
         return true; // No-op
     }
 
-    bool link_list_nullify(size_t)
+    bool link_list_nullify(size_t, size_t)
     {
         return true; // No-op
     }
