@@ -18,6 +18,8 @@
 
 #include "sync_manager.hpp"
 
+#include "sync_session.hpp"
+
 #include <thread>
 
 using namespace realm;
@@ -83,6 +85,12 @@ void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> ha
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_error_handler = std::move(handler);
+}
+
+std::unique_ptr<SyncSession> SyncManager::create_session(std::string realm_path) const
+{
+    auto& client = get_sync_client(); // Throws
+    return std::make_unique<SyncSession>(sync::Session(client, std::move(realm_path))); // Throws
 }
 
 sync::Client& SyncManager::get_sync_client() const

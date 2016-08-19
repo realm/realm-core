@@ -691,4 +691,3 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }
-

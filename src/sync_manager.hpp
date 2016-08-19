@@ -29,6 +29,7 @@ namespace realm {
 
 namespace _impl {
 struct SyncClient;
+struct SyncSession;
 }
 
 class SyncLoggerFactory {
@@ -44,13 +45,14 @@ public:
     void set_logger_factory(SyncLoggerFactory&) noexcept;
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
 
-    sync::Client& get_sync_client() const;
+    std::unique_ptr<_impl::SyncSession> create_session(std::string realm_path) const;
 
 private:
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
+    sync::Client& get_sync_client() const;
     std::unique_ptr<_impl::SyncClient> create_sync_client() const;
 
     mutable std::mutex m_mutex;
