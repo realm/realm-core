@@ -2363,6 +2363,31 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
         }
     }
 
+    // Copy linklist contents from row_ndx to new_row_ndx. row_ndx and
+    // new_row_ndx represent the loser and winner of a PK merge conflict, and
+    // the winner should end up with all the links. If the rule that list
+    // modifications may not be carried out before setting the primary key is
+    // followed, only the winner or the loser will have any list elements at the
+    // time of applying this instruction, but never both. This makes it safe for
+    // the merge algorithm to redirect linklist instructions, because it can
+    // make do with simply redirecting `SetLinkList` instructions, without
+    // having to resynthesize the whole instruction sequence on both sides.
+    for (size_t col_ndx = 0; col_ndx < backlink_col_start; ++col_ndx) {
+        if (m_spec.get_column_type(col_ndx) == col_type_LinkList) {
+            auto& col = get_column_link_list(col_ndx);
+            LinkViewRef from = col.get(row_ndx);
+            LinkViewRef to = col.get(new_row_ndx);
+            REALM_ASSERT_EX(to->size() == 0 || from->size() == 0, to->size(), from->size());
+            if (from->size() != 0) {
+                using llf = _impl::LinkListFriend;
+                for (size_t i = 0; i < from->size(); ++i) {
+                    llf::do_insert(*to, i, from->get(i).get_index());
+                }
+                llf::do_clear(*from);
+            }
+        }
+    }
+
     bump_version();
 }
 
