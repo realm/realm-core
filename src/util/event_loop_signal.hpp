@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2015 Realm Inc.
+// Copyright 2016 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -10,27 +10,25 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or utilied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/weak_realm_notifier_base.hpp"
+#ifndef REALM_EVENT_LOOP_SIGNAL_HPP
+#define REALM_EVENT_LOOP_SIGNAL_HPP
 
-namespace realm {
-class Realm;
+#include <realm/util/features.h>
 
-namespace _impl {
+#if REALM_PLATFORM_NODE
+#include "util/node/event_loop_signal.hpp"
+#elif REALM_PLATFORM_APPLE
+#include "util/apple/event_loop_signal.hpp"
+#elif REALM_ANDROID
+#include "util/android/event_loop_signal.hpp"
+#else
+#include "util/generic/event_loop_signal.hpp"
+#endif
 
-class WeakRealmNotifier : public WeakRealmNotifierBase {
-public:
-    using WeakRealmNotifierBase::WeakRealmNotifierBase;
-
-    // Do nothing, as this can't be implemented portably
-    void notify() { }
-};
-
-} // namespace _impl
-} // namespace realm
-
+#endif // REALM_EVENT_LOOP_SIGNAL_HPP

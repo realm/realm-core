@@ -16,32 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/weak_realm_notifier_base.hpp"
-
-typedef struct uv_async_s uv_async_t;
-
 namespace realm {
-class Realm;
+namespace util {
 
-namespace _impl {
-
-class WeakRealmNotifier : public WeakRealmNotifierBase {
+template<typename Callback>
+class EventLoopSignal {
 public:
-    WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool cache);
-    ~WeakRealmNotifier();
-
-    WeakRealmNotifier(WeakRealmNotifier&&);
-    WeakRealmNotifier& operator=(WeakRealmNotifier&&);
-
-    WeakRealmNotifier(const WeakRealmNotifier&) = delete;
-    WeakRealmNotifier& operator=(const WeakRealmNotifier&) = delete;
-
-    // Asynchronously call notify() on the Realm on the main thread.
-    void notify();
-
-private:
-    uv_async_t* m_handle;
+    EventLoopSignal(Callback&&) { }
+    // Do nothing, as this can't be implemented portably
+    void notify() { }
 };
 
-} // namespace _impl
+} // namespace util
 } // namespace realm
+
