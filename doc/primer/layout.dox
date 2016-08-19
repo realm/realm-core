@@ -6,7 +6,7 @@
 ///
 /// Topics that will be covered include (but not limited to):
 ///
-/// - \subpage primer_intro "Introduction"
-/// - \subpage primer_architecture "Global Architecture"
+/// - \ref primer_intro "Introduction"
+/// - \ref primer_architecture "Global Architecture"
 /// - API Entrypoints (how to use the API),
 /// - Development methodology.

@@ -23,12 +23,12 @@ notes along the way, add non-obvious stuff to documentation, all the better.
 You're free to do anything you want; whichever method gets you online and
 contributing quickest is valid.
 
-If you get stuck, or don't understand something, you can ask a question on
-`#core`. If nobody answers within a few minutes, ask someone in the office if
-they can help you out. People will tell you if they're busy and don't want to
-lose their train of thought. If you're not in the office, pester people with
-instant messages and whatnot. They have the knowledge, and they should've
-documented it or made sure you had access to the documentation.
+If you get stuck, or don't understand something, you can ask a question in
+the core slack channel. If nobody answers within a few minutes, ask someone in
+the office if they can help you out. People will tell you if they're busy and
+don't want to lose their train of thought. If you're not in the office, pester
+people with instant messages and whatnot. They have the knowledge, and they
+should've documented it or made sure you had access to the documentation.
 
 ## Getting the code ##
 
@@ -89,9 +89,9 @@ capable of tackling; just go ahead and assign the issue to yourself and get
 going!
 
 If you have trouble understanding what the issues are about, ask the person who
-created it, or maybe just give a shout in `#core` to see if anyone is familiar
-with it. If you get interesting information, add it to the issue, so that the
-information isn't lost.
+created it, or maybe just give a shout in the core slack channel to see if anyone
+is familiar with it. If you get interesting information, add it to the issue, so
+that the information isn't lost.
 
 You can keep track of what other team members are working on by monitoring
 active pull requests and reviewing the code they are submitting. This is a
