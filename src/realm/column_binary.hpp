@@ -133,7 +133,38 @@ private:
     friend class ColumnBase;
 };
 
+class BinaryIterator {
+public:
+    BinaryIterator() {}
+    // TODO: When WriteLogCollector is removed, there is no need for this
+    BinaryIterator(BinaryData binary) : m_binary(binary) {}
 
+    BinaryIterator(BinaryColumn* col, size_t ndx) : m_binary_col(col), m_ndx(ndx) {}
+
+    size_t read(char* buffer, size_t max_size) noexcept
+    {
+        size_t actual = 0;
+        if (m_binary_col) {
+            actual = m_binary_col->read(m_ndx, m_pos, buffer, max_size);
+        }
+        else if (!m_binary.is_null()) {
+            if (m_pos < m_binary.size()) {
+                size_t bytes_left = m_binary.size() - m_pos;
+                actual = std::min(max_size, bytes_left);
+                const char* begin = m_binary.data() + m_pos;
+                std::copy(begin, begin + actual, buffer);
+            }
+        }
+        m_pos += actual;
+        return actual;
+    }
+
+private:
+    BinaryColumn* m_binary_col = nullptr;
+    size_t m_ndx = 0;
+    size_t m_pos = 0;
+    BinaryData m_binary;
+};
 
 
 // Implementation

@@ -575,6 +575,26 @@ TEST(BinaryColumn_Read)
     CHECK_EQUAL(read, 10);
     CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 10));
 
+    BinaryIterator it0;
+    read = it0.read(buffer, 5);
+    CHECK_EQUAL(read, 0);
+
+    BinaryIterator it1(&c, 1);
+    read = it1.read(buffer, 5);
+    CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 5));
+    read = it1.read(buffer, 100);
+    CHECK_EQUAL(std::string(buffer, read), hello.substr(5));
+    read = it0.read(buffer, 5);
+    CHECK_EQUAL(read, 0);
+
+    BinaryIterator it2(c.get(1));
+    read = it2.read(buffer, 5);
+    CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 5));
+    read = it2.read(buffer, 100);
+    CHECK_EQUAL(std::string(buffer, read), hello.substr(5));
+    read = it0.read(buffer, 5);
+    CHECK_EQUAL(read, 0);
+
     c.add(BinaryData(very_lazy_fox));
 
     read = c.read(2, 0, buffer, 10);
