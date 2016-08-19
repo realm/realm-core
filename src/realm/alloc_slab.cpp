@@ -320,7 +320,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         size_t copy_on_write = curr_ref_end - m_baseline;
 
         // Allocate 20% of that (for the first few number of slabs the math below will just result in 1 page each)
-        size_t min_size = 0.2 * copy_on_write;
+        size_t min_size = static_cast<size_t>(0.2 * copy_on_write);
 
         if (new_size < min_size)
             new_size = min_size;
