@@ -33,11 +33,9 @@ ifeq ($(COMPILER_IS),clang)
   CFLAGS_GENERAL += -Wextra-semi
 endif
 
-# CoreFoundation is required for Apple specific logging. CoreFoundation and
-# CFNetwork are required for Apple specific event loop
-# (realm/util/event_loop_apple.cpp).
+# CoreFoundation is required for logging
 ifeq ($(OS),Darwin)
-  PROJECT_LDFLAGS += -framework CoreFoundation -framework CFNetwork
+  PROJECT_LDFLAGS += -framework CoreFoundation
 endif
 
 # Android logging
@@ -77,8 +75,10 @@ ifneq ($(REALM_HAVE_CONFIG),)
 endif
 
 ifneq ($(REALM_ANDROID),)
-  PROJECT_CFLAGS += -fPIC -DPIC -fvisibility=hidden
-  CFLAGS_OPTIM = -Os -flto -ffunction-sections -fdata-sections -DNDEBUG
+  PROJECT_CFLAGS += -fPIC -DPIC
+  # android.toolchain.cmake has `-fsigned-char` by default, we have to use the same
+  # to avoid lto linking problems.
+  CFLAGS_OPTIM = -Os -flto -ffunction-sections -fdata-sections -DNDEBUG -fsigned-char -fvisibility=hidden
   ifeq ($(ENABLE_ENCRYPTION),yes)
     PROJECT_CFLAGS += -I../../openssl/include
   endif

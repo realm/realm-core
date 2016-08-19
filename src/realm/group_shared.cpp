@@ -807,12 +807,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
         // initializer, and fails the initialization. In either case, the retry
         // loop will eventually terminate.
 
-        // FIXME: This scheme fails to guarantee reinitialization after
-        // system-level crash. If the system crashes (e.g. due to abrupt power
-        // off), the lock file is generally left in an abitrary, and likely
-        // inconsistent state, but it will still appear properly initialized to
-        // a subsequent session initiator.
-
         // An empty file is (and was) never a successfully initialized file.
         size_t info_size = sizeof (SharedInfo);
         {
@@ -1972,7 +1966,7 @@ std::unique_ptr<SharedGroup::Handover<Table>> SharedGroup::export_table_for_hand
         throw LogicError(LogicError::wrong_transact_state);
     }
     std::unique_ptr<Handover<Table>> result(new Handover<Table>());
-    Table::generate_patch(accessor, result->patch);
+    Table::generate_patch(accessor.get(), result->patch);
     result->clone = 0;
     result->version = get_version_of_current_transaction();
     return result;

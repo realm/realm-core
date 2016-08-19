@@ -480,7 +480,7 @@ namespace realm {
     size_t search_case_fold(StringData haystack, const char* needle_upper, const char* needle_lower,
         size_t needle_size)
     {
-        // FIXME: This solution is terribly inefficient. Consider deploying the Boyer-Moore algorithm.
+        // FIXME: This solution is very inefficient. Consider deploying the Boyer-Moore algorithm.
         size_t i = 0;
         while (needle_size <= haystack.size() - i) {
             if (equal_case_fold(haystack.substr(i, needle_size), needle_upper, needle_lower)) {
