@@ -601,6 +601,7 @@ public:
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
             return false;
+        static_cast<void>(prior_size);
         log("link_list->set(%1, %2);", link_ndx, value); // Throws
         typedef _impl::LinkListFriend llf;
         llf::do_set(*m_link_list, link_ndx, value); // Throws
@@ -615,6 +616,7 @@ public:
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
             return false;
+        static_cast<void>(prior_size);
         log("link_list->insert(%1, %2);", link_ndx, value); // Throws
         m_link_list->insert(link_ndx, value); // Throws
         return true;
@@ -660,6 +662,7 @@ public:
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
             return false;
+        static_cast<void>(prior_size);
         log("link_list->remove(%1);", link_ndx); // Throws
         typedef _impl::LinkListFriend llf;
         llf::do_remove(*m_link_list, link_ndx); // Throws
