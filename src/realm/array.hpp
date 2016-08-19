@@ -505,7 +505,7 @@ public:
 
     //@{
     /// These are similar in spirit to std::move() and std::move_backward from
-    /// <algorithm>. \a dest_begin must not be in the range [`begin`,`end`), and
+    /// `<algorithm>`. \a dest_begin must not be in the range [`begin`,`end`), and
     /// \a dest_end must not be in the range (`begin`,`end`].
     ///
     /// These functions are guaranteed to not throw if
@@ -654,9 +654,14 @@ public:
     /// The number of bytes that will be written by a non-recursive invocation
     /// of this function is exactly the number returned by get_byte_size().
     ///
+    /// \param out The destination stream (writer).
+    ///
     /// \param deep If true, recursively write out subarrays, but still subject
     /// to \a only_if_modified.
-    ref_type write(_impl::ArrayWriterBase&, bool deep, bool only_if_modified) const;
+    ///
+    /// \param only_if_modified Set to `false` to always write, or to `true` to
+    /// only write the array if it has been modified.
+    ref_type write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const;
 
     /// Same as non-static write() with `deep` set to true. This is for the
     /// cases where you do not already have an array accessor available.
@@ -872,12 +877,16 @@ public:
     /// invar:bptree-nonempty-leaf, an inner B+-tree node can never be
     /// empty.
     ///
-    /// \param elems_in_tree The total number of element in the tree.
+    /// \param elem_ndx_offset The start position (must be valid).
+    ///
+    /// \param elems_in_tree The total number of elements in the tree.
+    ///
+    /// \param handler The callback which will get called for each leaf.
     ///
     /// \return True if, and only if the handler has returned true for
     /// all visited leafs.
     bool visit_bptree_leaves(size_t elem_ndx_offset, size_t elems_in_tree,
-                             VisitHandler&);
+                             VisitHandler& handler);
 
 
     class UpdateHandler;

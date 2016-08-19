@@ -569,6 +569,8 @@ public:
     void clear(size_t, bool) override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
+    /// \param value The value to store at the specified row.
+    /// \param num_rows The number of rows to insert.
     void insert_without_updating_index(size_t row_ndx, T value, size_t num_rows);
 
 #ifdef REALM_DEBUG
@@ -851,7 +853,7 @@ Column<T>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) c
 
 template<class T>
 void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
-                             typename BpTree<T>::LeafInfo& inout_leaf_info) const noexcept
+                             LeafInfo& inout_leaf_info) const noexcept
 {
     m_tree.get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
 }

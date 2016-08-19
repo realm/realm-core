@@ -103,8 +103,8 @@ public:
     /// range, are undefined.
     bool is_nullable(size_t column_ndx) const noexcept;
 
-    //@{
-
+    /// \defgroup descriptor_column_accessors Accessing Columns Through A Descriptor
+    ///
     /// add_column() and add_column_link() are a shorthands for calling
     /// insert_column() and insert_column_link(), respectively, with a column
     /// index equal to the original number of columns. The returned value is
@@ -155,6 +155,7 @@ public:
     /// \sa Table::add_column_link()
     /// \sa Table::insert_column_link()
     /// \sa is_root()
+    //@{
 
     static const size_t max_column_name_length = 63;
 
@@ -209,6 +210,8 @@ public:
     /// \param col_ndx The index of the column to be renamed. It is an error to
     /// specify an index that is greater than, or equal to the number of
     /// columns.
+    ///
+    /// \param new_name The new name of the column.
     ///
     /// \sa is_root()
     /// \sa Table::rename_column()
@@ -286,7 +289,9 @@ public:
     /// `type_LinkList`) to be modified. It is an error to specify an index that
     /// is greater than, or equal to the number of columns, or to specify the
     /// index of a non-link column.
-    void set_link_type(size_t col_ndx, LinkType);
+    ///
+    /// \param link_type The type of links the column should store.
+    void set_link_type(size_t col_ndx, LinkType link_type);
 
     //@{
     /// Get the descriptor for the specified subtable column.
