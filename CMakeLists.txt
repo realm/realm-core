@@ -67,6 +67,14 @@ if(APPLE)
         set(CMAKE_XCODE_ATTRIBUTE_WATCHOS_DEPLOYMENT_TARGET "2.0")
         set(CMAKE_XCODE_ATTRIBUTE_TVOS_DEPLOYMENT_TARGET "9.0")
 
+        # Architectures. Everything but iOS uses the default architectures.
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphoneos*] "\$(ARCHS_iphoneos_\$(CONFIGURATION))")
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_Debug "\$(ARCHS)")
+        # iOS release configurations need to build for armv7s for sake of CocoaPods.
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_Release "armv7 armv7s arm64")
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_RelWithDebInfo "armv7 armv7s arm64")
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_MinSizeRel "armv7 armv7s arm64")
+
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Os") # FIXME: CMake does not recognize -Oz
     endif()
 endif(APPLE)

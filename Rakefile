@@ -254,20 +254,11 @@ def build_apple(sdk, configuration, enable_bitcode, configuration_build_dir)
         bitcode_mode   = configuration == 'Debug' ? 'marker' : 'bitcode'
         bitcode_option = "ENABLE_BITCODE=#{enable_bitcode ? "YES BITCODE_GENERATION_MODE=#{bitcode_mode}" : 'NO'}"
         configuration_temp_dir  = configuration_build_dir
-        archs = case sdk
-        when 'macosx', 'iphonesimulator' then "i386 x86_64"
-        when 'appletvsimulator' then 'x86_64'
-        when 'watchsimulator'   then 'i386'
-        when 'iphoneos'  then 'armv7 armv7s arm64'
-        when 'appletvos' then 'arm64'
-        when 'watchos'   then 'armv7k'
-        end
         sh <<-EOS.gsub(/\s+/, ' ')
             xcodebuild
             -sdk #{sdk}
             -target realm-static
             -configuration #{configuration}
-            ARCHS=\"#{archs}\"
             ONLY_ACTIVE_ARCH=NO
             CONFIGURATION_BUILD_DIR=#{configuration_build_dir}
             CONFIGURATION_TEMP_DIR=#{configuration_temp_dir}
