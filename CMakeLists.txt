@@ -23,7 +23,6 @@ project(
 # Include general CMake modules
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
-include(FindOpenSSL)
 include(GetGitRevisionDescription)
 
 # Get accurate git-describe version
@@ -46,7 +45,6 @@ endif()
 
 # Platform-specific build configuration
 if(APPLE)
-    set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
     find_library(Foundation Foundation)
 
     # Enable Apple-specific platforms on Xcode
@@ -65,9 +63,11 @@ if(APPLE)
 endif(APPLE)
 
 # Find dependencies
-# Note: OpenSSL was already found through the `FindOpenSSL` CMake module
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+if(NOT APPLE)
+    include(FindOpenSSL)
+endif()
 
 # Options (passed to CMake)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode.")

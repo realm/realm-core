@@ -203,9 +203,9 @@ target_link_libraries(
     Threads::Threads
 )
 
-if(REALM_ENABLE_ENCRYPTION)
+if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
     target_link_libraries(realm ${OPENSSL_LIBRARIES})
-endif(REALM_ENABLE_ENCRYPTION)
+endif()
 
 if(APPLE)
     target_link_libraries(realm ${Foundation})
