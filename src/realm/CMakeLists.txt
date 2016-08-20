@@ -222,7 +222,7 @@ set_target_properties(
 target_link_libraries(
     realm
     ${REALM_EXTRA_LIBS}
-    Threads::Threads
+    ${CMAKE_THREAD_LIBS_INIT}
 )
 
 if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)

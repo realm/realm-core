@@ -29,9 +29,14 @@ include(GetGitRevisionDescription)
 git_describe(REALM_VERSION)
 
 # Project-wide build flags
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED on)
-set(CMAKE_CXX_EXTENSIONS off)
+if(CMAKE_VERSION VERSION_LESS "3.1")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+else()
+    set(CMAKE_CXX_STANDARD 14)
+    set(CMAKE_CXX_STANDARD_REQUIRED on)
+    set(CMAKE_CXX_EXTENSIONS off)
+endif()
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic $ENV{EXTRA_CFLAGS}")
 set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
