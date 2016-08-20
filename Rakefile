@@ -249,10 +249,10 @@ task :xcode_project => [:build_dir_apple, :check_xcpretty] do
     end
 end
 
-def build_apple(sdk, configuration, enable_bitcode, configuration_build_dir)
+def build_apple(sdk, configuration, configuration_build_dir, bitcode: nil)
     Dir.chdir(@build_dir) do
-        bitcode_mode   = configuration == 'Debug' ? 'marker' : 'bitcode'
-        bitcode_option = "ENABLE_BITCODE=#{enable_bitcode ? "YES BITCODE_GENERATION_MODE=#{bitcode_mode}" : 'NO'}"
+        bitcode_option = bitcode.nil? ? "" : "ENABLE_BITCODE=#{bitcode ? "YES" : "NO"}"
+
         configuration_temp_dir  = configuration_build_dir
         sh <<-EOS.gsub(/\s+/, ' ')
             xcodebuild
@@ -269,8 +269,8 @@ def build_apple(sdk, configuration, enable_bitcode, configuration_build_dir)
 end
 
 simulator_pairs = {
-    'ios-bitcode' => ['iphoneos-bitcode', 'iphonesimulator-bitcode'],
-    'ios-no-bitcode' => ['iphoneos', 'iphonesimulator'],
+    'ios' => ['iphoneos', 'iphonesimulator'],
+    'ios-no-bitcode' => ['iphoneos-no-bitcode', 'iphonesimulator-no-bitcode'],
     'tvos' => ['appletvos', 'appletvsimulator'],
     'watchos' => ['watchos', 'watchsimulator']
 }
@@ -279,20 +279,20 @@ simulator_pairs = {
     target_suffix = configuration == 'Debug' ? '-dbg' : ''
 
     task "build-macosx#{target_suffix}" => :xcode_project do
-        build_apple('macosx', configuration, false, "#{@build_dir}/build/#{configuration}-macosx")
+        build_apple('macosx', configuration, "#{@build_dir}/build/#{configuration}-macosx")
     end
 
     ['watchos', 'appletvos', 'watchsimulator', 'appletvsimulator'].each do |sdk|
         task "build-#{sdk}#{target_suffix}" => :xcode_project do
-            build_apple(sdk, configuration, true, "#{@build_dir}/build/#{configuration}-#{sdk}")
+            build_apple(sdk, configuration, "#{@build_dir}/build/#{configuration}-#{sdk}")
         end
     end
 
     [true, false].each do |enable_bitcode|
-        bitcode_suffix = enable_bitcode ? '-bitcode' : ''
+        bitcode_suffix = enable_bitcode ? '' : '-no-bitcode'
         ['iphoneos', 'iphonesimulator'].each do |sdk|
             task "build-#{sdk}#{bitcode_suffix}#{target_suffix}" => :xcode_project do
-                build_apple(sdk, configuration, enable_bitcode, "#{@build_dir}/build/#{configuration}-#{sdk}#{bitcode_suffix}")
+                build_apple(sdk, configuration, "#{@build_dir}/build/#{configuration}-#{sdk}#{bitcode_suffix}", bitcode: enable_bitcode)
             end
         end
     end
@@ -315,7 +315,7 @@ end
 task 'build-iphone' => 'build-iphoneos'
 
 apple_static_library_targets = (['-dbg', ''].map do |dbg|
-    REALM_COCOA_PLATFORMS.map {|p| p == 'iphone' ? ['ios-bitcode', 'ios-no-bitcode'] : p}.
+    REALM_COCOA_PLATFORMS.map {|p| p == 'iphone' ? ['ios', 'ios-no-bitcode'] : p}.
         flatten.map {|c| "#{c}#{dbg}" }
 end.flatten.map {|c| "librealm-#{c}.a" })
 
