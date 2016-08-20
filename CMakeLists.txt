@@ -59,7 +59,14 @@ if(APPLE)
         )
         set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO") # Overridden by Rakefile
         set(CMAKE_OSX_SYSROOT $(PLATFORM_NAME))
+        set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+
+        # Deployment targets
+        set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "10.8")
         set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "7.0")
+        set(CMAKE_XCODE_ATTRIBUTE_WATCHOS_DEPLOYMENT_TARGET "2.0")
+        set(CMAKE_XCODE_ATTRIBUTE_TVOS_DEPLOYMENT_TARGET "9.0")
+
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Os") # FIXME: CMake does not recognize -Oz
     endif()
 endif(APPLE)
