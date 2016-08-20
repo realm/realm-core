@@ -220,17 +220,25 @@ end
 ### Apple-specific tasks
 
 REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx iphone watchos tvos)
-if ENV['REALM_COCOA_PLATFORMS']
-    REALM_COCOA_PLATFORMS = ENV['REALM_COCOA_PLATFORMS'].gsub('ios', 'iphone').gsub(/\bosx\b/, 'macosx').split
-    REALM_COCOA_PLATFORMS.each do|p|
-        unless REALM_COCOA_SUPPORTED_PLATFORMS.include?(p)
-            $stderr.puts("Supported platforms are: #{REALM_COCOA_SUPPORTED_PLATFORMS.join(' ')}")
-            exit 1
-        end
+REALM_DOTNET_COCOA_SUPPORTED_PLATFORMS = %w(iphone-no-bitcode)
+
+def platforms supported, requested
+    return supported unless requested
+
+    requested = requested.gsub('ios', 'iphone').gsub(/\bosx\b/, 'macosx').split
+    if (requested - supported).size > 0
+        $stderr.puts("Supported platforms are: #{supported.join(' ')}")
+        exit 1
     end
-else
-    REALM_COCOA_PLATFORMS = REALM_COCOA_SUPPORTED_PLATFORMS
+    requested
 end
+
+APPLE_BINDINGS = {
+    'cocoa' => { :name => "Cocoa", :path => '../realm-cocoa/core',
+                 :platforms => platforms(REALM_COCOA_SUPPORTED_PLATFORMS, ENV['REALM_COCOA_PLATFORMS']) },
+    'dotnet-cocoa' => { :name => ".NET", :path => '../realm-dotnet/wrappers',
+                        :platforms => platforms(REALM_DOTNET_COCOA_SUPPORTED_PLATFORMS, ENV['REALM_DOTNET_COCOA_PLATFORMS']) },
+}
 
 apple_build_dir = ENV['build_dir'] || REALM_BUILD_DIR_APPLE
 
@@ -246,6 +254,8 @@ task :check_xcpretty do
 end
 
 desc 'Generate Xcode project (default dir: \'build.apple\')'
+task 'xcode-project' => :xcode_project
+
 task :xcode_project => [:build_dir_apple, :check_xcpretty] do
     Dir.chdir(@build_dir) do
         sh "cmake -GXcode -DREALM_ENABLE_ENCRYPTION=1 -DREALM_ENABLE_ASSERTIONS=1 #{REALM_PROJECT_ROOT}"
@@ -330,12 +340,6 @@ end
 task 'build-iphone' => ['build-iphoneos', 'build-iphonesimulator']
 task 'build-ios' => 'build-iphone'
 
-apple_static_library_targets = REALM_COCOA_PLATFORMS.product(['-dbg', '']).map do |platform, suffix|
-    "librealm-#{platform}#{suffix}.a"
-end
-
-task :apple_static_libraries => apple_static_library_targets
-
 task :tmpdir_core => :tmpdir do
     FileUtils.mkdir_p("#{@tmpdir}/core")
 end
@@ -378,17 +382,24 @@ task :apple_release_notes => [:tmpdir_core, :check_pandoc] do
     sh "#{@pandoc} -f markdown -t plain -o \"#{@tmpdir}/core/release_notes.txt\" #{REALM_PROJECT_ROOT}/release_notes.md"
 end
 
-task :apple_zip => [:guess_version_string, :apple_static_libraries, :apple_copy_headers, :apple_copy_license, :apple_release_notes] do
-    zip_name = "core-#{@version_string}.zip"
-    puts "Creating #{zip_name}..."
-    Dir.chdir(@tmpdir) do
-        sh "zip -r -q --symlinks \"#{zip_name}\" \"core\""
+APPLE_BINDINGS.map do |name, info|
+    static_library_targetes = info[:platforms].product(['-dbg', '']).map do |platform, suffix|
+        "librealm-#{platform}#{suffix}.a"
+    end.to_a
+
+    task "#{name}_static_libraries" => static_library_targetes
+
+    task "#{name}_zip" => [:guess_version_string, "#{name}_static_libraries", :apple_copy_headers, :apple_copy_license, :apple_release_notes] do
+        zip_name = "core-#{@version_string}.zip"
+        puts "Creating #{zip_name}..."
+        Dir.chdir(@tmpdir) do
+            sh "zip -r -q --symlinks \"#{zip_name}\" \"core\""
+        end
+        FileUtils.mv "#{@tmpdir}/#{zip_name}", "#{zip_name}"
     end
-    FileUtils.mv "#{@tmpdir}/#{zip_name}", "#{zip_name}"
-end
 
-desc 'Build zipped Core library suitable for Cocoa binding'
-task 'build-cocoa' => :apple_zip do
-    puts "TODO: Unzip in ../realm-cocoa"
+    desc "Build zipped Core library suitable for #{info[:name]} binding"
+    task "build-#{name}" => "#{name}_zip" do
+        puts "TODO: Unzip in #{info[:path]}"
+    end
 end
-
