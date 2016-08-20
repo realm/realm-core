@@ -198,6 +198,9 @@ end
 
 task :tmpdir do
     @tmpdir = Dir.mktmpdir("realm-build")
+    at_exit do
+        FileUtils.remove_entry_secure @tmpdir
+    end
     puts "Using temporary directory: #{@tmpdir}"
 end
 
@@ -249,20 +252,19 @@ task :xcode_project => [:build_dir_apple, :check_xcpretty] do
     end
 end
 
-def build_apple(sdk, configuration, configuration_build_dir, bitcode: nil)
+def build_apple(sdk, configuration, bitcode: nil, install_to: nil)
     Dir.chdir(@build_dir) do
         bitcode_option = bitcode.nil? ? "" : "ENABLE_BITCODE=#{bitcode ? "YES" : "NO"}"
+        install_action = install_to.nil? ? "" : "DSTROOT=#{install_to} install"
 
-        configuration_temp_dir  = configuration_build_dir
         sh <<-EOS.gsub(/\s+/, ' ')
             xcodebuild
             -sdk #{sdk}
             -target realm-static
             -configuration #{configuration}
             ONLY_ACTIVE_ARCH=NO
-            CONFIGURATION_BUILD_DIR=#{configuration_build_dir}
-            CONFIGURATION_TEMP_DIR=#{configuration_temp_dir}
             #{bitcode_option}
+            #{install_action}
             #{@xcpretty_suffix}
         EOS
     end
@@ -279,12 +281,20 @@ simulator_pairs = {
     target_suffix = configuration == 'Debug' ? '-dbg' : ''
 
     task "build-macosx#{target_suffix}" => :xcode_project do
-        build_apple('macosx', configuration, "#{@build_dir}/build/#{configuration}-macosx")
+        build_apple('macosx', configuration)
+    end
+
+    task "build-macosx#{target_suffix}-for-packaging" => :xcode_project do
+        build_apple('macosx', configuration, install_to: "#{@tmpdir}/#{configuration}")
     end
 
     ['watchos', 'appletvos', 'watchsimulator', 'appletvsimulator'].each do |sdk|
         task "build-#{sdk}#{target_suffix}" => :xcode_project do
-            build_apple(sdk, configuration, "#{@build_dir}/build/#{configuration}-#{sdk}")
+            build_apple(sdk, configuration)
+        end
+
+        task "build-#{sdk}#{target_suffix}-for-packaging" => :xcode_project do
+            build_apple(sdk, configuration, install_to: "#{@tmpdir}/#{configuration}-#{sdk}")
         end
     end
 
@@ -292,21 +302,25 @@ simulator_pairs = {
         bitcode_suffix = enable_bitcode ? '' : '-no-bitcode'
         ['iphoneos', 'iphonesimulator'].each do |sdk|
             task "build-#{sdk}#{bitcode_suffix}#{target_suffix}" => :xcode_project do
-                build_apple(sdk, configuration, "#{@build_dir}/build/#{configuration}-#{sdk}#{bitcode_suffix}", bitcode: enable_bitcode)
+                build_apple(sdk, configuration, bitcode: enable_bitcode)
+            end
+
+            task "build-#{sdk}#{bitcode_suffix}#{target_suffix}-for-packaging" => :xcode_project do
+                build_apple(sdk, configuration, bitcode: enable_bitcode, install_to: "#{@tmpdir}/#{configuration}-#{sdk}#{bitcode_suffix}")
             end
         end
     end
 
     simulator_pairs.each do |target, pair|
-        task "librealm-#{target}#{target_suffix}.a" => [:tmpdir_core, pair.map{|p| "build-#{p}#{target_suffix}"}].flatten do
-            inputs = pair.map{|p| "#{@build_dir}/build/#{configuration}-#{p}/librealm.a"}
+        task "librealm-#{target}#{target_suffix}.a" => [:tmpdir_core, pair.map{|p| "build-#{p}#{target_suffix}-for-packaging"}].flatten do
+            inputs = pair.map{|p| "#{@tmpdir}/#{configuration}-#{p}/librealm.a"}
             output = "#{@tmpdir}/core/librealm-#{target}#{target_suffix}.a"
             sh "lipo -create -output #{output} #{inputs.join(' ')}"
         end
     end
 
-    task "librealm-macosx#{target_suffix}.a" => [:tmpdir_core, "build-macosx#{target_suffix}"] do
-        FileUtils.cp("#{@build_dir}/build/#{configuration}-macosx/librealm.a", "#{@tmpdir}/core/librealm-macosx#{target_suffix}.a")
+    task "librealm-macosx#{target_suffix}.a" => [:tmpdir_core, "build-macosx#{target_suffix}-for-packaging"] do
+        FileUtils.mv("#{@tmpdir}/#{configuration}/librealm.a", "#{@tmpdir}/core/librealm-macosx#{target_suffix}.a")
         FileUtils.ln_s("librealm-macosx#{target_suffix}.a", "#{@tmpdir}/core/librealm#{target_suffix}.a")
     end
 end
@@ -364,10 +378,12 @@ task :apple_release_notes => [:tmpdir_core, :check_pandoc] do
 end
 
 task :apple_zip => [:guess_version_string, :apple_static_libraries, :apple_copy_headers, :apple_copy_license, :apple_release_notes] do
-    puts "Creating core-#{@version_string}.zip..."
+    zip_name = "core-#{@version_string}.zip"
+    puts "Creating #{zip_name}..."
     Dir.chdir(@tmpdir) do
-        sh "zip -r -q --symlinks \"#{REALM_PROJECT_ROOT}/core-#{@version_string}.zip\" \"core\""
+        sh "zip -r -q --symlinks \"#{zip_name}\" \"core\""
     end
+    FileUtils.mv "#{@tmpdir}/#{zip_name}", "#{zip_name}"
 end
 
 desc 'Build zipped Core library suitable for Cocoa binding'

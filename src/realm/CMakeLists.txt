@@ -205,6 +205,9 @@ set_target_properties(
     # The static library may get included in a dynamic library
     # (the bindings), so build as position independent code.
     POSITION_INDEPENDENT_CODE true
+
+    XCODE_ATTRIBUTE_INSTALL_PATH "/"
+    XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
 )
 
 target_link_libraries(
