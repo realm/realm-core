@@ -221,7 +221,7 @@ end
 
 REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx iphone watchos tvos)
 if ENV['REALM_COCOA_PLATFORMS']
-    REALM_COCOA_PLATFORMS = ENV['REALM_COCOA_PLATFORMS'].split
+    REALM_COCOA_PLATFORMS = ENV['REALM_COCOA_PLATFORMS'].gsub('ios', 'iphone').gsub(/\bosx\b/, 'macosx').split
     REALM_COCOA_PLATFORMS.each do|p|
         unless REALM_COCOA_SUPPORTED_PLATFORMS.include?(p)
             $stderr.puts("Supported platforms are: #{REALM_COCOA_SUPPORTED_PLATFORMS.join(' ')}")
@@ -271,8 +271,8 @@ def build_apple(sdk, configuration, bitcode: nil, install_to: nil)
 end
 
 simulator_pairs = {
-    'ios' => ['iphoneos', 'iphonesimulator'],
-    'ios-no-bitcode' => ['iphoneos-no-bitcode', 'iphonesimulator-no-bitcode'],
+    'iphone' => ['iphoneos', 'iphonesimulator'],
+    'iphone-no-bitcode' => ['iphoneos-no-bitcode', 'iphonesimulator-no-bitcode'],
     'tvos' => ['appletvos', 'appletvsimulator'],
     'watchos' => ['watchos', 'watchsimulator']
 }
@@ -330,10 +330,9 @@ end
 # alias to make CI happy. Ideally we should agree on a single name for iOS and use it everywhere.
 task 'build-iphone' => 'build-iphoneos'
 
-apple_static_library_targets = (['-dbg', ''].map do |dbg|
-    REALM_COCOA_PLATFORMS.map {|p| p == 'iphone' ? ['ios', 'ios-no-bitcode'] : p}.
-        flatten.map {|c| "#{c}#{dbg}" }
-end.flatten.map {|c| "librealm-#{c}.a" })
+apple_static_library_targets = REALM_COCOA_PLATFORMS.product(['-dbg', '']).map do |platform, suffix|
+    "librealm-#{platform}#{suffix}.a"
+end
 
 task :apple_static_libraries => apple_static_library_targets
 
