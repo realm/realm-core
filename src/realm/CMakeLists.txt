@@ -179,8 +179,18 @@ set(REALM_OTHER_UTIL_HEADERS
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
 
-add_library(realm SHARED ${REALM_SOURCES})
-add_library(realm-static STATIC ${REALM_SOURCES})
+# An object library to group together the compilation of the source files.
+add_library(realm-objects OBJECT
+    ${REALM_SOURCES} ${REALM_INSTALL_GENERAL_HEADERS}
+    ${REALM_INSTALL_UTIL_HEADERS} ${REALM_OTHER_UTIL_HEADERS}
+)
+
+set_target_properties(realm-objects PROPERTIES
+    POSITION_INDEPENDENT_CODE true
+)
+
+add_library(realm SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
+add_library(realm-static STATIC $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
 set_target_properties(
     realm PROPERTIES
