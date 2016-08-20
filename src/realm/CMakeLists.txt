@@ -187,6 +187,15 @@ add_library(realm-objects OBJECT
 
 set_target_properties(realm-objects PROPERTIES
     POSITION_INDEPENDENT_CODE true
+
+    # Configure the optimization level explicitly because CMake doesn't recognize -Oz
+    # in CMAKE_CXX_CFLAGS.
+    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "\$(GCC_OPTIMIZATION_LEVEL_\$(CONFIGURATION))"
+    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Debug "0"
+    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_MinSizeDebug "z"
+    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Release "3"
+    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelWithDebInfo "3"
+    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelMinSize "3"
 )
 
 add_library(realm SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)

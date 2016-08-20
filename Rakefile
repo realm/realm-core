@@ -278,6 +278,7 @@ simulator_pairs = {
 }
 
 ['Debug', 'Release'].each do |configuration|
+    packaging_configuration = {'Debug' => 'MinSizeDebug', 'Release' => 'Release'}[configuration]
     target_suffix = configuration == 'Debug' ? '-dbg' : ''
 
     task "build-macosx#{target_suffix}" => :xcode_project do
@@ -285,7 +286,7 @@ simulator_pairs = {
     end
 
     task "build-macosx#{target_suffix}-for-packaging" => :xcode_project do
-        build_apple('macosx', configuration, install_to: "#{@tmpdir}/#{configuration}")
+        build_apple('macosx', packaging_configuration, install_to: "#{@tmpdir}/#{configuration}")
     end
 
     ['watchos', 'appletvos', 'watchsimulator', 'appletvsimulator'].each do |sdk|
@@ -294,7 +295,7 @@ simulator_pairs = {
         end
 
         task "build-#{sdk}#{target_suffix}-for-packaging" => :xcode_project do
-            build_apple(sdk, configuration, install_to: "#{@tmpdir}/#{configuration}-#{sdk}")
+            build_apple(sdk, packaging_configuration, install_to: "#{@tmpdir}/#{configuration}-#{sdk}")
         end
     end
 
@@ -306,7 +307,8 @@ simulator_pairs = {
             end
 
             task "build-#{sdk}#{bitcode_suffix}#{target_suffix}-for-packaging" => :xcode_project do
-                build_apple(sdk, configuration, bitcode: enable_bitcode, install_to: "#{@tmpdir}/#{configuration}-#{sdk}#{bitcode_suffix}")
+                build_apple(sdk, packaging_configuration, bitcode: enable_bitcode,
+                    install_to: "#{@tmpdir}/#{configuration}-#{sdk}#{bitcode_suffix}")
             end
         end
     end

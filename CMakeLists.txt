@@ -35,9 +35,17 @@ set(CMAKE_CXX_EXTENSIONS off)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic $ENV{EXTRA_CFLAGS}")
 set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
-# Add REALM_DEBUG=1 to compile definitions for Debug targets
+if(CMAKE_CONFIGURATION_TYPES)
+    # Add the MinSizeDebug configuration, used for packaging releases for Cocoa.
+    list(APPEND CMAKE_CONFIGURATION_TYPES MinSizeDebug)
+    list(REMOVE_DUPLICATES CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES}" CACHE STRING "Add MinSizeDebug configuration" FORCE)
+endif()
+
+# Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
     $<$<CONFIG:Debug>:REALM_DEBUG=1>
+    $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 
 # Coverage-specific build flags
@@ -69,6 +77,7 @@ if(APPLE)
         # Architectures. Everything but iOS uses the default architectures.
         set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphoneos*] "\$(ARCHS_iphoneos_\$(CONFIGURATION))")
         set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_Debug "\$(ARCHS)")
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_MinSizeDebug "\$(ARCHS)")
         # iOS release configurations need to build for armv7s for sake of CocoaPods.
         set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_Release "armv7 armv7s arm64")
         set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_RelWithDebInfo "armv7 armv7s arm64")
@@ -80,11 +89,10 @@ if(APPLE)
         set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=appletv*] "YES")
         set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE "\$(BITCODE_GENERATION_MODE_\$(CONFIGURATION))")
         set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_Debug "marker")
+        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_MinSizeDebug "marker")
         set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_Release "bitcode")
         set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_RelWithDebInfo "bitcode")
         set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_MinSizeRel "bitcode")
-
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Os") # FIXME: CMake does not recognize -Oz
     endif()
 endif(APPLE)
 
