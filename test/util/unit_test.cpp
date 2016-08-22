@@ -479,7 +479,7 @@ bool TestList::run(Config config)
                 {
                     std::ostringstream out;
                     out.imbue(std::locale::classic());
-                    out << "test-thread-"<<(i+1);
+                    out << "test-thread-" << (i + 1);
                     Thread::set_name(out.str());
                 }
                 thread_contexts[i]->run();

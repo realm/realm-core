@@ -493,7 +493,7 @@ private:
     void* m_handle;
     bool m_have_lock; // Only valid when m_handle is not null
 
-    SizeType get_file_position();  // POSIX version not needed because it's only used by Windows version of resize().
+    SizeType get_file_position(); // POSIX version not needed because it's only used by Windows version of resize().
 #else
     int m_fd;
 #endif

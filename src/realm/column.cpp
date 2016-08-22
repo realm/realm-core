@@ -242,10 +242,10 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
         Array new_offsets(alloc);
         new_offsets.create(Array::type_Normal); // Throws
         new_offsets.add(to_int64(state.m_split_offset)); // Throws
-        new_root->add(from_ref(new_offsets.get_ref())); // Throws
+        new_root->add(from_ref(new_offsets.get_ref()));  // Throws
     }
     new_root->add(from_ref(orig_root->get_ref())); // Throws
-    new_root->add(from_ref(new_sibling_ref)); // Throws
+    new_root->add(from_ref(new_sibling_ref));      // Throws
     int_fast64_t v = to_int64(state.m_split_size); // total_elems_in_tree
     new_root->add(1 + 2 * v); // Throws
     replace_root_array(std::move(new_root));

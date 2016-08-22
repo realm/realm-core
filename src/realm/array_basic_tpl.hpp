@@ -143,7 +143,7 @@ inline T BasicArray<T>::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
     // This casting assumes that T can be aliged on an 8-bype
-    // boundary (since data is aligned on an 8-byte boundary.) 
+    // boundary (since data is aligned on an 8-byte boundary.)
     return *(reinterpret_cast<const T*>(data) + ndx);
 }
 
@@ -256,7 +256,7 @@ size_t BasicArray<T>::calc_byte_len(size_t for_size, size_t) const
     // is done by returning the aligned version, and most callers of
     // calc_byte_len() will actually benefit if calc_byte_len() was
     // changed to always return the aligned byte size.
-    return header_size + for_size * sizeof (T); 
+    return header_size + for_size * sizeof(T);
 }
 
 template<class T>

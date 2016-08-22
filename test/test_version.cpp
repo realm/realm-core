@@ -70,6 +70,6 @@ TEST(Version_General)
     CHECK_EQUAL(true, Version::is_at_least(0, 1, 9));
     CHECK_EQUAL(true, Version::is_at_least(1, 0, 0));
     CHECK_EQUAL(false, Version::is_at_least(2, 0, 0));
-    CHECK_EQUAL(false, Version::is_at_least(REALM_VER_MAJOR,99,0));
-    CHECK_EQUAL(false, Version::is_at_least(REALM_VER_MAJOR,REALM_VER_MINOR,99));
+    CHECK_EQUAL(false, Version::is_at_least(REALM_VER_MAJOR, 99, 0));
+    CHECK_EQUAL(false, Version::is_at_least(REALM_VER_MAJOR, REALM_VER_MINOR, 99));
 }

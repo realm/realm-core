@@ -155,7 +155,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             }
             else {
                 // FIXME: But this will lead to unbounded in-file leaking in
-                // for(;;) { insert_binary(i, ...); erase(i); }  
+                // for(;;) { insert_binary(i, ...); erase(i); }
                 // (not important because Mixed is not officially supported)
                 m_timestamp_data->set(data_row_ndx, Timestamp(null{}));
             }

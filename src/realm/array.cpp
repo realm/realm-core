@@ -181,7 +181,7 @@
 // known target platforms.
 //
 // LIMITATION: The code below makes the assumption that a reference into
-// a realm file will never grow in size above what can be represented in 
+// a realm file will never grow in size above what can be represented in
 // a size_t, which is 2^31-1 on a 32-bit platform, and 2^63-1 on a 64 bit
 // platform.
 
@@ -407,7 +407,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         if (is_ref) {
             ref_type subref = to_ref(value);
             ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
-            value = from_ref(new_subref); 
+            value = from_ref(new_subref);
         }
         new_array.add(value); // Throws
     }
@@ -1585,7 +1585,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         ref_type ref = to_ref(value);
         MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.get_ref());
-        value = from_ref(new_mem.get_ref()); 
+        value = from_ref(new_mem.get_ref());
         new_array.add(value); // Throws
         dg_2.release();
     }
@@ -2529,7 +2529,7 @@ int64_t get_direct(const char* data, size_t ndx) noexcept
         return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
     }
     if (w == 8) {
-        return *reinterpret_cast<const signed char*>(data + ndx); 
+        return *reinterpret_cast<const signed char*>(data + ndx);
     }
     if (w == 16) {
         size_t offset = ndx * 2;

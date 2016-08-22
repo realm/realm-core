@@ -713,7 +713,7 @@ TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
 
     // Append a value
     e.add("lastval");
-    auto last_val = e.get(e.size()-1);
+    auto last_val = e.get(e.size() - 1);
     CHECK_EQUAL("lastval", last_val);
 
     // Delete values
