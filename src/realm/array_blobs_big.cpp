@@ -48,7 +48,7 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
         ArrayBlob new_blob(m_alloc);
         new_blob.create(); // Throws
         ref_type ref = new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-        Array::add(static_cast<int64_t>(ref)); // Throws
+        Array::add(from_ref(ref)); // Throws
     }
 }
 

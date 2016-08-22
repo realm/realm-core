@@ -292,17 +292,21 @@ TEST(ArrayBigBlobs_Read)
 
     c.add(BinaryData(lazy_fox));
     char buffer[1000];
+    // Read only part of the data
     size_t read = c.read(0, 0, buffer, 10);
     CHECK_EQUAL(read, 10);
     CHECK_EQUAL(std::string(buffer, read), lazy_fox.substr(0, 10));
 
+    // Read from an offset
     read = c.read(0, 4, buffer, 100);
     CHECK_EQUAL(read, 40);
     CHECK_EQUAL(std::string(buffer, read), lazy_fox.substr(4));
 
+    // Read from an offset larger than size of data
     read = c.read(0, 50, buffer, 100);
     CHECK_EQUAL(read, 0);
 
+    // Construct a huge blob
     std::vector<char> big_blob(0x2000000);
     for (unsigned i = 0; i < big_blob.size(); i++) {
         big_blob[i] = char(i & 0xFF);
@@ -312,14 +316,18 @@ TEST(ArrayBigBlobs_Read)
 #ifdef REALM_DEBUG
     c.verify();
 #endif
-    BinaryData binary = c.get(1);
-    CHECK(binary.is_null());
-
+    BinaryData binary;
     char* header = c.get_mem().get_addr();
+
+    // Using the normal get results in a NULL object
+    binary= c.get(1);
+    CHECK(binary.is_null());
     binary = ArrayBigBlobs::get(header, 1, Allocator::get_default());
     CHECK(binary.is_null());
 
+    // Reset data
     big_blob.assign(big_blob.size(), '\0');
+    // Read data back
     read = c.read(1, 0, big_blob.data(), big_blob.size());
     CHECK_EQUAL(read, 0x2000000);
     ok = true;
@@ -330,6 +338,7 @@ TEST(ArrayBigBlobs_Read)
     }
     CHECK(ok);
 
+    // Read from an offset
     read = c.read(1, 0x1800000, buffer, 0x200);
     CHECK_EQUAL(read, 0x200);
     ok = true;
@@ -340,6 +349,7 @@ TEST(ArrayBigBlobs_Read)
     }
     CHECK(ok);
 
+    // Request more data than available
     read = c.read(1, 0x1FFFF00, buffer, 0x200);
     CHECK_EQUAL(read, 0x100);
     ok = true;
@@ -350,6 +360,7 @@ TEST(ArrayBigBlobs_Read)
     }
     CHECK(ok);
 
+    // Read outside data
     read = c.read(1, 0x2000000, buffer, 0x200);
     CHECK_EQUAL(read, 0);
 

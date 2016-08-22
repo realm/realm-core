@@ -22,7 +22,13 @@
 
 using namespace realm;
 
-constexpr size_t MAX_BLOB_NODE_SIZE = (max_array_payload - Array::header_size) & 0xFFFFFFF0;
+namespace {
+// If size of BinaryData is below 'max_blob_node_size', the data is stored directly
+// in a single ArrayBlob. If more space is needed, the root blob will just contain
+// references to child blobs holding the actual data. Context flag will indicate
+// if blob is split.
+constexpr size_t max_blob_node_size = (max_array_payload - Array::header_size) & 0xFFFFFFF0;
+}
 
 size_t ArrayBlob::read(size_t pos, char* buffer, size_t max_size) const noexcept
 {
@@ -43,9 +49,10 @@ size_t ArrayBlob::read(size_t pos, char* buffer, size_t max_size) const noexcept
 
         while (max_size) {
             ArrayBlob blob(m_alloc);
-            blob.init_from_ref(get_as_ref(ndx));
+            blob.init_from_ref(Array::get_as_ref(ndx));
 
             size_t actual = blob.read(pos, buffer, max_size);
+            // Read from start of blob the next time around
             pos = 0;
             size_copied += actual;
             max_size -= actual;
@@ -61,6 +68,7 @@ size_t ArrayBlob::read(size_t pos, char* buffer, size_t max_size) const noexcept
         return size_copied;
     }
     else {
+        // All data is in this array
         size_t size_to_copy = (pos > m_size) ? 0 : std::min(max_size, m_size - pos);
         std::copy(m_data + pos, m_data + pos + size_to_copy, buffer);
         return size_to_copy;
@@ -73,23 +81,33 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
     REALM_ASSERT_3(end, <=, m_size);
     REALM_ASSERT(data_size == 0 || data);
 
+    // The context flag indicates if the array contains references to blobs
+    // holding the actual data.
     if (get_context_flag()) {
+        REALM_ASSERT(begin == 0 && end == 0);   // For the time being, only support append
+
+        // We might have room for more data in the last node
         ArrayBlob lastNode(m_alloc);
         lastNode.init_from_ref(get_as_ref(size() - 1));
         lastNode.set_parent(this, size() - 1);
 
-        size_t space_left = MAX_BLOB_NODE_SIZE - lastNode.size();
+        size_t space_left = max_blob_node_size - lastNode.size();
         size_t size_to_copy = std::min(space_left, data_size);
         lastNode.add(data, size_to_copy);
         data_size -= space_left;
         data += space_left;
 
         while (data_size) {
-            size_to_copy = std::min(MAX_BLOB_NODE_SIZE, data_size);
+            // Create new nodes as required
+            size_to_copy = std::min(max_blob_node_size, data_size);
             ArrayBlob new_blob(m_alloc);
             new_blob.create(); // Throws
 
-            Array::add(new_blob.add(data, size_to_copy));
+            // Copy data
+            ref_type ref = new_blob.add(data, size_to_copy);
+            // Add new node in hosting node
+            Array::add(ref);
+
             data_size -= size_to_copy;
             data += size_to_copy;
         }
@@ -99,11 +117,12 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
         size_t add_size = add_zero_term ? data_size + 1 : data_size;
         size_t new_size = m_size - remove_size + add_size;
 
-        if (new_size > MAX_BLOB_NODE_SIZE) {
-            REALM_ASSERT(begin == 0 && end == 0);   // For the time being, only support append
-
+        if (new_size > max_blob_node_size) {
             Array new_root(m_alloc);
+            // Create new array with context flag set
             new_root.create(type_HasRefs, true); // Throws
+
+            // Add current node to the new root
             new_root.add(get_ref());
             return reinterpret_cast<ArrayBlob*>(&new_root)->replace(begin, end, data, data_size, add_zero_term);
         }
