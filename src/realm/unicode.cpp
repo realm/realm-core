@@ -20,10 +20,10 @@
 #include <vector>
 
 #ifdef _WIN32
-    #define NOMINMAX
-    #include <windows.h>
+#define NOMINMAX
+#include <windows.h>
 #else
-    #include <ctype.h>
+#include <ctype.h>
 #endif
 
 #include <realm/util/safe_int_ops.hpp>
@@ -32,9 +32,9 @@
 #include <clocale>
 
 #ifdef _MSC_VER
-    #include <codecvt>
+#include <codecvt>
 #else
-    #include <locale>
+#include <locale>
 #endif
 
 

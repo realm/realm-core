@@ -28,7 +28,7 @@
 
 // Enable this only on platforms where it might be needed
 #if REALM_PLATFORM_APPLE || REALM_ANDROID
-    #define REALM_ROBUST_MUTEX_EMULATION
+#define REALM_ROBUST_MUTEX_EMULATION
 #endif
 
 namespace realm {

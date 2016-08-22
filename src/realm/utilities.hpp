@@ -27,7 +27,7 @@
 #include <functional>
 
 #ifdef _MSC_VER
-    #include <intrin.h>
+#include <intrin.h>
 #endif
 
 #include <realm/util/features.h>
@@ -35,26 +35,30 @@
 #include <realm/util/safe_int_ops.hpp>
 
 // GCC defines __i386__ and __x86_64__
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-    #define REALM_X86_OR_X64
-    #define REALM_X86_OR_X64_TRUE true
+#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || \
+     defined(__x86_64__) || defined(_M_X64))
+#define REALM_X86_OR_X64
+#define REALM_X86_OR_X64_TRUE true
 #else
-    #define REALM_X86_OR_X64_TRUE false
+#define REALM_X86_OR_X64_TRUE false
 #endif
 
 // GCC defines __arm__
 #ifdef __arm__
-    #define REALM_ARCH_ARM
+#define REALM_ARCH_ARM
 #endif
 
-#if defined _LP64 || defined __LP64__ || defined __64BIT__ || defined _ADDR64 || defined _WIN64 || defined __arch64__ || (defined(__WORDSIZE) && __WORDSIZE == 64) || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-    #define REALM_PTR_64
+#if defined _LP64 || defined __LP64__ || defined __64BIT__ || defined _ADDR64 || defined _WIN64 ||               \
+    defined __arch64__ || (defined(__WORDSIZE) && __WORDSIZE == 64) || (defined __sparc && defined __sparcv9) || \
+    defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 ||            \
+    defined __ia64 || defined __IA64__
+#define REALM_PTR_64
 #endif
 
 
 #if defined(REALM_PTR_64) && defined(REALM_X86_OR_X64)
-    #define REALM_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
-    #define REALM_COMPILER_AVX
+#define REALM_COMPILER_SSE // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+#define REALM_COMPILER_AVX
 #endif
 
 namespace realm {
@@ -111,7 +115,7 @@ size_t round_down(size_t p, size_t align);
 void millisleep(size_t milliseconds);
 
 #ifdef REALM_SLAB_ALLOC_TUNE
-    void process_mem_usage(double& vm_usage, double& resident_set);
+void process_mem_usage(double& vm_usage, double& resident_set);
 #endif
 // popcount
 int fast_popcount32(int32_t x);
@@ -124,18 +128,18 @@ inline int log2(size_t x)
     if (x == 0)
         return -1;
 #if defined(__GNUC__)
-#   ifdef REALM_PTR_64
+#ifdef REALM_PTR_64
     return 63 - __builtin_clzll(x); // returns int
-#   else
+#else
     return 31 - __builtin_clz(x); // returns int
-#   endif
+#endif
 #elif defined(_WIN32)
     unsigned long index = 0;
-#   ifdef REALM_PTR_64
+#ifdef REALM_PTR_64
     unsigned char c = _BitScanReverse64(&index, x); // outputs unsigned long
-#   else
+#else
     unsigned char c = _BitScanReverse(&index, x); // outputs unsigned long
-#   endif
+#endif
     return static_cast<int>(index);
 #else // not __GNUC__ and not _WIN32
     int r = 0;

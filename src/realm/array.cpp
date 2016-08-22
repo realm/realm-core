@@ -22,13 +22,13 @@
 #include <limits>
 
 #ifdef REALM_DEBUG
-    #include <iostream>
-    #include <sstream>
+#include <iostream>
+#include <sstream>
 #endif
 
 #ifdef _MSC_VER
-    #include <intrin.h>
-    #pragma warning (disable : 4127) // Condition is constant warning
+#include <intrin.h>
+#pragma warning(disable : 4127) // Condition is constant warning
 #endif
 
 #include <realm/util/tuple.hpp>

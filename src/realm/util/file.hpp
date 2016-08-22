@@ -27,7 +27,7 @@
 #include <streambuf>
 
 #ifndef _WIN32
-    #include <dirent.h> // POSIX.1-2001
+#include <dirent.h> // POSIX.1-2001
 #endif
 
 #include <realm/util/features.h>

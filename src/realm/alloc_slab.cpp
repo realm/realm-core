@@ -24,11 +24,11 @@
 #include <map>
 
 #ifdef REALM_DEBUG
-    #include <iostream>
+#include <iostream>
 #endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
-    #include <cstdlib>
+#include <cstdlib>
 #endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
@@ -210,12 +210,12 @@ SlabAlloc::~SlabAlloc() noexcept
             if (m_free_space_state != free_space_Invalid) {
                 if (REALM_COVER_NEVER(!is_all_free())) {
                     print();
-#  ifndef REALM_SLAB_ALLOC_DEBUG
+#ifndef REALM_SLAB_ALLOC_DEBUG
                     std::cerr << "To get the stack-traces of the corresponding allocations,"
                               "first compile with REALM_SLAB_ALLOC_DEBUG defined,"
                               "then run under Valgrind with --leak-check=full\n";
                     REALM_TERMINATE("SlabAlloc detected a leak");
-#  endif
+#endif
                 }
             }
         }

@@ -66,8 +66,8 @@ Searching: The main finding function is:
     SSE4.2: nmmintrin.h
 */
 #ifdef REALM_COMPILER_SSE
-    #include <emmintrin.h> // SSE2
-    #include <realm/realm_nmmintrin.h> // SSE42
+#include <emmintrin.h>             // SSE2
+#include <realm/realm_nmmintrin.h> // SSE42
 #endif
 
 namespace realm {

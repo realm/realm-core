@@ -23,12 +23,12 @@
 #include <iostream>
 
 #ifdef _WIN32
-    #define NOMINMAX
-    #include <windows.h> // Sleep(), sched_yield()
-    #include <pthread.h> // pthread_win32_process_attach_np()
+#define NOMINMAX
+#include <windows.h> // Sleep(), sched_yield()
+#include <pthread.h> // pthread_win32_process_attach_np()
 #else
-    #include <sched.h>  // sched_yield()
-    #include <unistd.h> // usleep()
+#include <sched.h>  // sched_yield()
+#include <unistd.h> // usleep()
 #endif
 
 #include <realm.hpp>

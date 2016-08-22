@@ -26,14 +26,14 @@
 #include <mutex>
 
 #ifndef _WIN32
-    #include <unistd.h>
+#include <unistd.h>
 #endif
 
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-    #include <realm/util/interprocess_condvar.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 

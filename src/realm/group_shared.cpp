@@ -38,12 +38,12 @@
 #include <realm/disable_sync_to_disk.hpp>
 
 #ifndef _WIN32
-    #include <sys/wait.h>
-    #include <sys/time.h>
-    #include <unistd.h>
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <unistd.h>
 #else
-    #define NOMINMAX
-    #include <windows.h>
+#define NOMINMAX
+#include <windows.h>
 #endif
 
 //#define REALM_ENABLE_LOGFILE
@@ -57,8 +57,8 @@ namespace {
 
 // Constants controlling the amount of uncommited writes in flight:
 #ifdef REALM_ASYNC_DAEMON
-    const uint16_t max_write_slots = 100;
-    const uint16_t relaxed_sync_threshold = 50;
+const uint16_t max_write_slots = 100;
+const uint16_t relaxed_sync_threshold = 50;
 #endif
 
 // value   change

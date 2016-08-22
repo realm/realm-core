@@ -28,16 +28,16 @@
 #include <stdlib.h>
 
 #ifdef _WIN32
-    #define NOMINMAX
-    #include <windows.h>
-    #include <io.h>
-    #include <direct.h>
+#define NOMINMAX
+#include <windows.h>
+#include <io.h>
+#include <direct.h>
 #else
-    #include <unistd.h>
-    #include <fcntl.h>
-    #include <sys/stat.h>
-    #include <sys/mman.h>
-    #include <sys/file.h> // BSD / Linux flock()
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/file.h> // BSD / Linux flock()
 #endif
 
 #include <realm/util/errno.hpp>

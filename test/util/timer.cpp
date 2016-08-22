@@ -24,14 +24,14 @@
 #include <realm/util/features.h>
 
 #if defined _WIN32
-    #define NOMINMAX
-    #include <windows.h>
+#define NOMINMAX
+#include <windows.h>
 #elif REALM_PLATFORM_APPLE
-    #include <sys/resource.h>
-    #include <mach/mach_time.h>
-    #include <sys/time.h>
+#include <sys/resource.h>
+#include <mach/mach_time.h>
+#include <sys/time.h>
 #else
-    #include <time.h>
+#include <time.h>
 #endif
 
 #include "timer.hpp"

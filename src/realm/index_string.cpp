@@ -20,7 +20,7 @@
 #include <iomanip>
 
 #ifdef REALM_DEBUG
-    #include <iostream>
+#include <iostream>
 #endif
 
 #include <realm/exceptions.hpp>

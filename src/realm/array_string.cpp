@@ -21,9 +21,9 @@
 #include <cstring>
 
 #ifdef REALM_DEBUG
-    #include <cstdio>
-    #include <iostream>
-    #include <iomanip>
+#include <cstdio>
+#include <iostream>
+#include <iomanip>
 #endif
 
 #include <realm/utilities.hpp>

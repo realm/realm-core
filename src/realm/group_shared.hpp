@@ -20,7 +20,7 @@
 #define REALM_GROUP_SHARED_HPP
 
 #ifdef REALM_DEBUG
-    #include <time.h> // usleep()
+#include <time.h> // usleep()
 #endif
 
 #include <functional>
@@ -28,7 +28,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-    #include <realm/util/interprocess_condvar.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>

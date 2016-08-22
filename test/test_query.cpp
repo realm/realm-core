@@ -5363,10 +5363,10 @@ TEST(Query_SyntaxCheck)
     // when is becomes available.
     /*
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
-    #ifdef REALM_DEBUG
+#ifdef REALM_DEBUG
     s = q7.verify();
     CHECK(s != "");
-    #endif
+#endif
     */
 }
 

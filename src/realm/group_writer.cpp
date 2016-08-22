@@ -19,7 +19,7 @@
 #include <algorithm>
 
 #ifdef REALM_DEBUG
-    #include <iostream>
+#include <iostream>
 #endif
 
 #include <realm/util/miscellaneous.hpp>

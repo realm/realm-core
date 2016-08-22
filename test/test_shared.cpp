@@ -25,16 +25,16 @@
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
-    #include <unistd.h>
-    #include <sys/mman.h>
-    #include <sys/types.h>
-    #include <sys/wait.h>
-    #include <signal.h>
-    #include <sched.h>
-    #define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <sched.h>
+#define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
-    #define NOMINMAX
-    #include <windows.h>
+#define NOMINMAX
+#include <windows.h>
 #endif
 
 #include <realm.hpp>
@@ -100,11 +100,11 @@ namespace {
 // async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
 // Also: async requires interprocess communication, which does not work with our current encryption support.
 #if !defined(_WIN32) && !REALM_PLATFORM_APPLE
-    #if REALM_ANDROID || defined DISABLE_ASYNC || REALM_ENABLE_ENCRYPTION
-        bool allow_async = false;
-    #else
-        bool allow_async = true;
-    #endif
+#if REALM_ANDROID || defined DISABLE_ASYNC || REALM_ENABLE_ENCRYPTION
+bool allow_async = false;
+#else
+bool allow_async = true;
+#endif
 #endif
 
 
@@ -1825,7 +1825,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
     // Create first table in group
 #if 1
     static_cast<void>(alone_path);
-#  if 0
+#if 0
     {
         SharedGroup sgr(path);
         SharedGroup sgw(path);
@@ -1850,8 +1850,8 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
         }
         wt2.commit();
     }
-#  else
-#    if 0
+#else
+#if 0
     {
         SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
         WriteTransaction wt(sg);
@@ -1861,7 +1861,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
         }
         wt.commit();
     }
-#    else
+#else
     {
         bool no_create = false;
         SharedGroup sg(path, no_create, SharedGroup::durability_Async);
@@ -1872,8 +1872,8 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
         }
         wt.commit();
     }
-#    endif
-#  endif
+#endif
+#endif
     // Wait for async_commit process to shutdown
     // FIXME: No good way of doing this
     sleep(1);

@@ -18,7 +18,7 @@
 
 // #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
-    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
+#include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
 #include <time.h>
@@ -52,12 +52,12 @@
 // like an unknown number of file descriptors can be left behind, presumably due
 // the way asynchronous DNS lookup is implemented.
 #if !defined _WIN32 && !REALM_PLATFORM_APPLE
-    #define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+#define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
 #endif
 
 #ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
-    #include <unistd.h>
-    #include <fcntl.h>
+#include <unistd.h>
+#include <fcntl.h>
 #endif
 
 using namespace realm;
@@ -171,22 +171,22 @@ void fix_async_daemon_path()
     // look for the daemon there
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
-#  ifdef REALM_DEBUG
+#ifdef REALM_DEBUG
         async_daemon = "realmd-dbg-noinst";
-#  else
+#else
         async_daemon = "realmd-noinst";
-#  endif
+#endif
     }
     else {
-#  ifdef REALM_COVER
+#ifdef REALM_COVER
         async_daemon = "../src/realm/realmd-cov-noinst";
-#  else
-#    ifdef REALM_DEBUG
+#else
+#ifdef REALM_DEBUG
         async_daemon = "../src/realm/realmd-dbg-noinst";
-#    else
+#else
         async_daemon = "../src/realm/realmd-noinst";
-#    endif
-#  endif
+#endif
+#endif
     }
     setenv("REALM_ASYNC_DAEMON", async_daemon, 0);
 #endif // _WIN32

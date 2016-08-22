@@ -3145,15 +3145,15 @@ TEST(Table_HighLevelSubtables)
       Idea for compile time failure tests:
 
         const MyTable2 t;
-    #if    TEST_INDEX == 0
+#if    TEST_INDEX == 0
         t[0].val = 7;
-    #elsif TEST_INDEX == 1
+#elsif TEST_INDEX == 1
         t.column().val[0] = 7;
-    #elsif TEST_INDEX == 2
+#elsif TEST_INDEX == 2
         t[0].subtab[0].val = 7;
-    #elsif TEST_INDEX == 3
+#elsif TEST_INDEX == 3
         t[0].subtab->column().val[0] = 7;
-    #endif
+#endif
     */
 }
 
@@ -3409,9 +3409,9 @@ REALM_TABLE_3(TableAgg,
 } // anonymous namespace
 
 #if TEST_DURATION > 0
-    #define TBL_SIZE REALM_MAX_BPNODE_SIZE*10
+#define TBL_SIZE REALM_MAX_BPNODE_SIZE * 10
 #else
-    #define TBL_SIZE 10
+#define TBL_SIZE 10
 #endif
 
 TEST(Table_Aggregates)

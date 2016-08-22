@@ -22,9 +22,9 @@
 #include <climits>
 
 #ifdef REALM_DEBUG
-    #include <iostream>
-    #include <iomanip>
-    #include <sstream>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
 #endif
 
 #include <realm/column.hpp>

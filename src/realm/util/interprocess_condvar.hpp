@@ -31,7 +31,7 @@
 
 // Condvar Emulation is required if RobustMutex emulation is enabled
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    #define REALM_CONDVAR_EMULATION
+#define REALM_CONDVAR_EMULATION
 #endif
 
 namespace realm {

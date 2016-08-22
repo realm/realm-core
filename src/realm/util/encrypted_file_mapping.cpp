@@ -25,8 +25,8 @@
 #include <algorithm>
 
 #ifdef REALM_DEBUG
-    #include <cstdio>
-    #include <iostream>
+#include <cstdio>
+#include <iostream>
 #endif
 
 #include <cstring>

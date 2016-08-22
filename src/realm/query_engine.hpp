@@ -115,7 +115,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <map>
 
 #if defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219
-    #include <immintrin.h>
+#include <immintrin.h>
 #endif
 
 namespace realm {

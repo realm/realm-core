@@ -23,8 +23,8 @@
 #include <sstream>
 
 #ifdef REALM_CONDVAR_EMULATION
-    #include <unistd.h>
-    #include <poll.h>
+#include <unistd.h>
+#include <poll.h>
 #endif
 
 using namespace realm;

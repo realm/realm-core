@@ -25,12 +25,12 @@
 #if REALM_ENABLE_ENCRYPTION
 
 #if REALM_PLATFORM_APPLE
-    #include <CommonCrypto/CommonCrypto.h>
+#include <CommonCrypto/CommonCrypto.h>
 #elif !defined(_WIN32)
-    #include <openssl/aes.h>
-    #include <openssl/sha.h>
+#include <openssl/aes.h>
+#include <openssl/sha.h>
 #else
-    #  error Encryption is not yet implemented for this platform.
+#error Encryption is not yet implemented for this platform.
 #endif
 
 namespace realm {

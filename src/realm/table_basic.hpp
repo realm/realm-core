@@ -359,8 +359,8 @@ private:
 
 
 #ifdef _MSC_VER
-    #pragma warning(push)
-    #pragma warning(disable: 4355)
+#pragma warning(push)
+#pragma warning(disable : 4355)
 #endif
 
 // Code formatting is tricked by this
@@ -475,7 +475,7 @@ private:
 };
 
 #ifdef _MSC_VER
-    #pragma warning(pop)
+#pragma warning(pop)
 #endif
 
 

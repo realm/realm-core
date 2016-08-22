@@ -21,13 +21,13 @@
 #include <realm/util/features.h>
 
 #if defined _WIN32
-    #include <windows.h>
-    #include <psapi.h>
+#include <windows.h>
+#include <psapi.h>
 #elif REALM_PLATFORM_APPLE
-    #include <mach/mach.h>
+#include <mach/mach.h>
 #elif defined REALM_HAVE_LIBPROCPS
     // Requires libprocps (formerly known as libproc)
-    #include <proc/readproc.h>
+#include <proc/readproc.h>
 #endif
 
 #include "mem.hpp"

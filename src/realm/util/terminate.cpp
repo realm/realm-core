@@ -24,14 +24,14 @@
 #include <realm/util/thread.hpp>
 
 #if REALM_PLATFORM_APPLE
-    #include <asl.h>
-    #include <dlfcn.h>
-    #include <execinfo.h>
-    #include <CoreFoundation/CoreFoundation.h>
+#include <asl.h>
+#include <dlfcn.h>
+#include <execinfo.h>
+#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 #ifdef __ANDROID__
-    #include <android/log.h>
+#include <android/log.h>
 #endif
 
 

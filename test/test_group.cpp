@@ -24,17 +24,17 @@
 
 #include <sys/stat.h>
 #ifndef _WIN32
-    #include <unistd.h>
-    #include <sys/types.h>
+#include <unistd.h>
+#include <sys/types.h>
 #endif
 
 // File permissions for Windows
 // http://stackoverflow.com/questions/592448/c-how-to-set-file-permissions-cross-platform
 #ifdef _WIN32
-    #include <io.h>
-    typedef int mode_t2;
-    static const mode_t2 S_IWUSR = mode_t2(_S_IWRITE);
-    static const mode_t2 MS_MODE_MASK = 0x0000ffff;
+#include <io.h>
+typedef int mode_t2;
+static const mode_t2 S_IWUSR = mode_t2(_S_IWRITE);
+static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #endif
 
 #include <realm.hpp>

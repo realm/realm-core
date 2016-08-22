@@ -29,9 +29,9 @@
 #define REALM_MULTITHREAD_QUERY 0
 
 #if REALM_MULTITHREAD_QUERY
-    // FIXME: Use our C++ thread abstraction API since it provides a much
-    // higher level of encapsulation and safety.
-    #include <pthread.h>
+// FIXME: Use our C++ thread abstraction API since it provides a much
+// higher level of encapsulation and safety.
+#include <pthread.h>
 #endif
 
 #include <realm/views.hpp>
