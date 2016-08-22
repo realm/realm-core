@@ -37,7 +37,7 @@ struct SyncSession {
     void refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url);
 
 private:
-    sync::Session m_session;;
+    sync::Session m_session;
     bool m_awaits_user_token = true;
     util::Optional<int_fast64_t> m_deferred_commit_notification;
 
