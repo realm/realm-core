@@ -26,7 +26,7 @@ public:
     virtual ~SequentialGetterBase() noexcept {}
 };
 
-template<class ColType>
+template <class ColType>
 class SequentialGetter : public SequentialGetterBase {
 public:
     using T = typename ColType::value_type;

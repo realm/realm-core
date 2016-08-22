@@ -48,7 +48,7 @@ struct SpecBase {
     typedef realm::BinaryData Binary;
     typedef realm::Mixed      Mixed;
 
-    template<class E>
+    template <class E>
     class Enum {
     public:
         typedef E enum_type;
@@ -58,7 +58,7 @@ struct SpecBase {
         E m_value;
     };
 
-    template<class T>
+    template <class T>
     class Subtable {
     public:
         typedef T table_type;
@@ -77,7 +77,7 @@ struct SpecBase {
     ///     typedef TypeAppend<void, int>::type Columns1;
     ///     typedef TypeAppend<Columns1, bool>::type Columns;
     ///
-    ///     template<template<int> class Col, class Init>
+    ///     template <template <int> class Col, class Init>
     ///     struct ColNames {
     ///       typename Col<0>::type foo;
     ///       typename Col<1>::type bar;
@@ -91,7 +91,7 @@ struct SpecBase {
     /// particular column index. You may specify the column names in
     /// any order. Multiple names may refer to the same column, and
     /// you do not have to specify a name for every column.
-    template<template<int> class Col, class Init>
+    template <template <int> class Col, class Init>
     struct ColNames {
         ColNames(Init) noexcept {}
     };
@@ -137,9 +137,9 @@ struct SpecBase {
 };
 
 
-template<class>
+template <class>
 class BasicTable;
-template<class>
+template <class>
 class BasicTableView;
 
 
@@ -150,11 +150,11 @@ namespace _impl {
 ///
 /// If T matches 'BasicTableView<T2>' or 'const BasicTableView<T2>',
 /// then return T2, else simply return T.
-template<class Tab>
+template <class Tab>
 struct GetTableFromView { typedef Tab type; };
-template<class Tab>
+template <class Tab>
 struct GetTableFromView<BasicTableView<Tab>> { typedef Tab type; };
-template<class Tab>
+template <class Tab>
 struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
 
 
@@ -165,11 +165,11 @@ struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
 /// Note that for Taboid = 'BasicTableView<const Tab>', a column
 /// accessor is still allowed to reorder the rows of the view, as long
 /// as it does not modify the contents of the table.
-template<class Taboid>
+template <class Taboid>
 struct TableIsConst { static const bool value = false; };
-template<class Taboid>
+template <class Taboid>
 struct TableIsConst<const Taboid> { static const bool value = true; };
-template<class Tab>
+template <class Tab>
 struct TableIsConst<BasicTableView<const Tab>> {
     static const bool value = true;
 };
@@ -190,12 +190,12 @@ struct TableIsConst<BasicTableView<const Tab>> {
 /// \tparam const_tab Indicates whether the accessor has const-only
 /// access to the field, that is, if, and only if Taboid matches
 /// 'const T' or 'BasicTableView<const T>' for any T.
-template<class Taboid, int col_idx, class Type, bool const_tab>
+template <class Taboid, int col_idx, class Type, bool const_tab>
 class FieldAccessor;
 
 
 /// Commmon base class for all field accessor specializations.
-template<class Taboid>
+template <class Taboid>
 class FieldAccessorBase {
 protected:
     typedef std::pair<Taboid*, size_t> Init;
@@ -206,7 +206,7 @@ protected:
 
 
 /// Field accessor specialization for integers.
-template<class Taboid, int col_idx, bool const_tab>
+template <class Taboid, int col_idx, bool const_tab>
 class FieldAccessor<Taboid, col_idx, int64_t, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -267,7 +267,7 @@ public:
 
 
 /// Field accessor specialization for floats.
-template<class Taboid, int col_idx, bool const_tab>
+template <class Taboid, int col_idx, bool const_tab>
 class FieldAccessor<Taboid, col_idx, float, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -308,7 +308,7 @@ public:
 
 
 /// Field accessor specialization for doubles.
-template<class Taboid, int col_idx, bool const_tab>
+template <class Taboid, int col_idx, bool const_tab>
 class FieldAccessor<Taboid, col_idx, double, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -349,7 +349,7 @@ public:
 
 
 /// Field accessor specialization for booleans.
-template<class Taboid, int col_idx, bool const_tab>
+template <class Taboid, int col_idx, bool const_tab>
 class FieldAccessor<Taboid, col_idx, bool, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -374,7 +374,7 @@ public:
 
 
 /// Field accessor specialization for enumerations.
-template<class Taboid, int col_idx, class E, bool const_tab>
+template <class Taboid, int col_idx, class E, bool const_tab>
 class FieldAccessor<Taboid, col_idx, SpecBase::Enum<E>, const_tab>:
     public FieldAccessorBase<Taboid> {
 private:
@@ -400,7 +400,7 @@ public:
 
 
 /// Field accessor specialization for dates.
-template<class Taboid, int col_idx, bool const_tab>
+template <class Taboid, int col_idx, bool const_tab>
 class FieldAccessor<Taboid, col_idx, OldDateTime, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -424,7 +424,7 @@ public:
 };
 
 /// Field accessor specialization for timestamps.
-template<class Taboid, int col_idx, bool const_tab>
+template <class Taboid, int col_idx, bool const_tab>
 class FieldAccessor<Taboid, col_idx, Timestamp, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -448,7 +448,7 @@ public:
 };
 
 /// Field accessor specialization for strings.
-template<class Taboid, int col_idx, bool const_tab>
+template <class Taboid, int col_idx, bool const_tab>
 class FieldAccessor<Taboid, col_idx, StringData, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -478,7 +478,7 @@ public:
 
 
 /// Field accessor specialization for binary data.
-template<class Taboid, int col_idx, bool const_tab>
+template <class Taboid, int col_idx, bool const_tab>
 class FieldAccessor<Taboid, col_idx, BinaryData, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -506,7 +506,7 @@ public:
 
 
 /// Field accessor specialization for subtables of non-const parent.
-template<class Taboid, int col_idx, class Subtab>
+template <class Taboid, int col_idx, class Subtab>
 class FieldAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>, false>:
     public FieldAccessorBase<Taboid> {
 private:
@@ -559,7 +559,7 @@ public:
 
 
 /// Field accessor specialization for subtables of const parent.
-template<class Taboid, int col_idx, class Subtab>
+template <class Taboid, int col_idx, class Subtab>
 class FieldAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>, true>:
     public FieldAccessorBase<Taboid> {
 private:
@@ -602,7 +602,7 @@ public:
 
 
 /// Base for field accessor specializations for mixed type.
-template<class Taboid, int col_idx, class FieldAccessor>
+template <class Taboid, int col_idx, class FieldAccessor>
 class MixedFieldAccessorBase: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
@@ -653,7 +653,7 @@ public:
     /// redundant, and it is inefficient if you want to also get a
     /// reference to the table, or if you want to check for multiple
     /// table types.
-    template<class T>
+    template <class T>
     bool is_subtable() const
     {
         // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
@@ -667,25 +667,25 @@ public:
         return Base::m_table->get_impl()->get_subtable_size(col_idx, Base::m_row_idx);
     }
 
-    template<class T>
+    template <class T>
     friend bool operator==(const FieldAccessor& a, const T& b) noexcept
     {
         return a.get() == b;
     }
 
-    template<class T>
+    template <class T>
     friend bool operator!=(const FieldAccessor& a, const T& b) noexcept
     {
         return a.get() != b;
     }
 
-    template<class T>
+    template <class T>
     friend bool operator==(const T& a, const FieldAccessor& b) noexcept
     {
         return a == b.get();
     }
 
-    template<class T>
+    template <class T>
     friend bool operator!=(const T& a, const FieldAccessor& b) noexcept
     {
         return a != b.get();
@@ -697,7 +697,7 @@ protected:
 
 
 /// Field accessor specialization for mixed type of non-const parent.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class FieldAccessor<Taboid, col_idx, Mixed, false>:
     public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, false>> {
 private:
@@ -758,7 +758,7 @@ public:
     ///
     /// FIXME: Consider deleting this function, since it is both
     /// unsafe and superfluous.
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_subtable() const
     {
         REALM_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
@@ -769,7 +769,7 @@ public:
     /// returns a reference to it.
     ///
     /// \tparam T The subtable type. It must not be const-qualified.
-    template<class T>
+    template <class T>
     BasicTableRef<T> set_subtable() const
     {
         BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
@@ -779,7 +779,7 @@ public:
 
     /// Overwrites the current value with a copy of the specified
     /// table and returns a reference to the copy.
-    template<class T>
+    template <class T>
     typename T::Ref set_subtable(const T& t) const
     {
         t.set_into_mixed(Base::m_table->get_impl(), col_idx, Base::m_row_idx);
@@ -792,7 +792,7 @@ public:
 
 
 /// Field accessor specialization for mixed type of const parent.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class FieldAccessor<Taboid, col_idx, Mixed, true>:
     public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, true>> {
 private:
@@ -807,7 +807,7 @@ public:
 
     /// FIXME: Consider deleting this function, since it is both
     /// unsafe and superfluous.
-    template<class T>
+    template <class T>
     BasicTableRef<const T> get_subtable() const
     {
         REALM_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
@@ -825,12 +825,12 @@ public:
 ///
 /// \tparam Taboid Either a table or a table view. Constness of access
 /// is controlled by what is allowed to be done with/on a 'Taboid*'.
-template<class Taboid, int col_idx, class Type>
+template <class Taboid, int col_idx, class Type>
 class ColumnAccessor;
 
 
 /// Commmon base class for all column accessor specializations.
-template<class Taboid, int col_idx, class Type>
+template <class Taboid, int col_idx, class Type>
 class ColumnAccessorBase {
 protected:
     typedef typename GetTableFromView<Taboid>::type RealTable;
@@ -868,7 +868,7 @@ struct NotARealColumns {
 };
 
 // Select whether to use Columns<T> or NotARealColumns for the given Taboid.
-template<class Taboid, class T>
+template <class Taboid, class T>
 struct ColumnsForTaboid {
     using type = typename std::conditional<std::is_base_of<Table, Taboid>::value, Columns<T>, NotARealColumns>::type;
 };
@@ -876,7 +876,7 @@ struct ColumnsForTaboid {
 } // anonymous namespace
 
 /// Column accessor specialization for integers.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, int64_t>:
     public ColumnAccessorBase<Taboid, col_idx, int64_t>, public ColumnsForTaboid<Taboid, int64_t>::type {
 private:
@@ -941,7 +941,7 @@ public:
 
 
 /// Column accessor specialization for float
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, float>:
     public ColumnAccessorBase<Taboid, col_idx, float>, public ColumnsForTaboid<Taboid, float>::type {
 private:
@@ -1012,7 +1012,7 @@ public:
 
 
 /// Column accessor specialization for double
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, double>:
     public ColumnAccessorBase<Taboid, col_idx, double>, public ColumnsForTaboid<Taboid, double>::type {
 private:
@@ -1083,7 +1083,7 @@ public:
 
 
 /// Column accessor specialization for booleans.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, bool>: public ColumnAccessorBase<Taboid, col_idx, bool> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, bool> Base;
@@ -1119,7 +1119,7 @@ public:
 
 
 /// Column accessor specialization for enumerations.
-template<class Taboid, int col_idx, class E>
+template <class Taboid, int col_idx, class E>
 class ColumnAccessor<Taboid, col_idx, SpecBase::Enum<E>>: public ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
@@ -1145,7 +1145,7 @@ public:
 
 
 /// Column accessor specialization for dates.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, OldDateTime>: public ColumnAccessorBase<Taboid, col_idx, OldDateTime> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, OldDateTime> Base;
@@ -1181,7 +1181,7 @@ public:
 
 
 /// Column accessor specialization for strings.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, StringData>:
     public ColumnAccessorBase<Taboid, col_idx, StringData>, public ColumnsForTaboid<Taboid, StringData>::type {
 private:
@@ -1225,7 +1225,7 @@ public:
 
 
 /// Column accessor specialization for binary data.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, BinaryData>:
     public ColumnAccessorBase<Taboid, col_idx, BinaryData> {
 private:
@@ -1247,7 +1247,7 @@ public:
 
 
 /// Column accessor specialization for subtables.
-template<class Taboid, int col_idx, class Subtab>
+template <class Taboid, int col_idx, class Subtab>
 class ColumnAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>>:
             public ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> {
 private:
@@ -1259,7 +1259,7 @@ public:
 
 
 /// Column accessor specialization for mixed type.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, Mixed>: public ColumnAccessorBase<Taboid, col_idx, Mixed> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, Mixed> Base;
@@ -1277,12 +1277,12 @@ public:
 /// 'BasicTableView<Tab>'. Neither may be const-qualified.
 ///
 /// FIXME: These do not belong in this file!
-template<class Taboid, int col_idx, class Type>
+template <class Taboid, int col_idx, class Type>
 class QueryColumn;
 
 
 /// Commmon base class for all query column specializations.
-template<class Taboid, int col_idx, class Type>
+template <class Taboid, int col_idx, class Type>
 class QueryColumnBase {
 protected:
     typedef typename Taboid::Query Query;
@@ -1304,7 +1304,7 @@ protected:
 
 
 /// QueryColumn specialization for integers.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, int64_t>: public QueryColumnBase<Taboid, col_idx, int64_t> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, int64_t> Base;
@@ -1377,7 +1377,7 @@ public:
 
 
 /// QueryColumn specialization for floats.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, float>: public QueryColumnBase<Taboid, col_idx, float> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, float> Base;
@@ -1448,7 +1448,7 @@ public:
 
 
 /// QueryColumn specialization for doubles.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, double>: public QueryColumnBase<Taboid, col_idx, double> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, double> Base;
@@ -1519,7 +1519,7 @@ public:
 
 
 /// QueryColumn specialization for booleans.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, bool>: public QueryColumnBase<Taboid, col_idx, bool> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, bool> Base;
@@ -1533,7 +1533,7 @@ public:
 
 
 /// QueryColumn specialization for enumerations.
-template<class Taboid, int col_idx, class E>
+template <class Taboid, int col_idx, class E>
 class QueryColumn<Taboid, col_idx, SpecBase::Enum<E>>: public QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
@@ -1547,7 +1547,7 @@ public:
 
 
 /// QueryColumn specialization for dates.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, OldDateTime>: public QueryColumnBase<Taboid, col_idx, OldDateTime> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, OldDateTime> Base;
@@ -1615,7 +1615,7 @@ public:
 
 
 /// QueryColumn specialization for strings.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, StringData>:
     public QueryColumnBase<Taboid, col_idx, StringData> {
 private:
@@ -1658,7 +1658,7 @@ public:
 
 
 /// QueryColumn specialization for binary data.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, BinaryData>:
     public QueryColumnBase<Taboid, col_idx, BinaryData> {
 private:
@@ -1701,7 +1701,7 @@ public:
 
 
 /// QueryColumn specialization for subtables.
-template<class Taboid, int col_idx, class Subtab>
+template <class Taboid, int col_idx, class Subtab>
 class QueryColumn<Taboid, col_idx, SpecBase::Subtable<Subtab>> {
 private:
     typedef typename Taboid::Query Query;
@@ -1719,7 +1719,7 @@ public:
 
 
 /// QueryColumn specialization for mixed type.
-template<class Taboid, int col_idx>
+template <class Taboid, int col_idx>
 class QueryColumn<Taboid, col_idx, Mixed> {
 private:
     typedef typename Taboid::Query Query;

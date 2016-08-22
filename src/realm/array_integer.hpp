@@ -62,7 +62,7 @@ public:
     std::vector<int64_t> to_vector() const;
 
 private:
-    template<size_t w>
+    template <size_t w>
     bool minmax(size_t from, size_t to, uint64_t maxdiff,
                 int64_t* min, int64_t* max) const;
 };
@@ -123,36 +123,36 @@ public:
     bool find(int cond, Action action, value_type value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
 
-    template<class cond, Action action, size_t bitwidth, class Callback>
+    template <class cond, Action action, size_t bitwidth, class Callback>
     bool find(value_type value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
     // This is the one installed into the m_finder slots.
-    template<class cond, Action action, size_t bitwidth>
+    template <class cond, Action action, size_t bitwidth>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
 
-    template<class cond, Action action, class Callback>
+    template <class cond, Action action, class Callback>
     bool find(value_type value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
 
     // Optimized implementation for release mode
-    template<class cond, Action action, size_t bitwidth, class Callback>
+    template <class cond, Action action, size_t bitwidth, class Callback>
     bool find_optimized(value_type value, size_t start, size_t end, size_t baseindex,
                         QueryState<int64_t>* state, Callback callback) const;
 
     // Called for each search result
-    template<Action action, class Callback>
+    template <Action action, class Callback>
     bool find_action(size_t index, value_type value,
                      QueryState<int64_t>* state, Callback callback) const;
 
-    template<Action action, class Callback>
+    template <Action action, class Callback>
     bool find_action_pattern(size_t index, uint64_t pattern,
                              QueryState<int64_t>* state, Callback callback) const;
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
-    template<class cond>
+    template <class cond>
     size_t find_first(value_type value, size_t start = 0,
                       size_t end = npos) const;
 
@@ -175,7 +175,7 @@ public:
 protected:
     void avoid_null_collision(int64_t value);
 private:
-    template<bool find_max>
+    template <bool find_max>
     bool minmax_helper(int64_t& result, size_t start = 0, size_t end = npos,
                        size_t* return_ndx = nullptr) const;
 
@@ -488,7 +488,7 @@ size_t ArrayIntNull::count(int64_t value) const noexcept
 }
 
 // FIXME: Optimize
-template<bool find_max>
+template <bool find_max>
 inline
 bool ArrayIntNull::minmax_helper(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
@@ -562,7 +562,7 @@ bool ArrayIntNull::find(int cond, Action action, value_type value, size_t start,
     }
 }
 
-template<class cond, Action action, size_t bitwidth, class Callback>
+template <class cond, Action action, size_t bitwidth, class Callback>
 bool ArrayIntNull::find(value_type value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     if (value) {
@@ -578,7 +578,7 @@ bool ArrayIntNull::find(value_type value, size_t start, size_t end, size_t basei
 }
 
 
-template<class cond, Action action, size_t bitwidth>
+template <class cond, Action action, size_t bitwidth>
 bool ArrayIntNull::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
     return Array::find<cond, action>(value, start, end, baseindex, state,
@@ -587,7 +587,7 @@ bool ArrayIntNull::find(int64_t value, size_t start, size_t end, size_t baseinde
 }
 
 
-template<class cond, Action action, class Callback>
+template <class cond, Action action, class Callback>
 bool ArrayIntNull::find(value_type value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     if (value) {
@@ -603,7 +603,7 @@ bool ArrayIntNull::find(value_type value, size_t start, size_t end, size_t basei
 }
 
 
-template<Action action, class Callback>
+template <Action action, class Callback>
 bool ArrayIntNull::find_action(size_t index, value_type value, QueryState<int64_t>* state, Callback callback) const
 {
     if (value) {
@@ -619,7 +619,7 @@ bool ArrayIntNull::find_action(size_t index, value_type value, QueryState<int64_
 }
 
 
-template<Action action, class Callback>
+template <Action action, class Callback>
 bool ArrayIntNull::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
     return Array::find_action_pattern<action, Callback>(index, pattern, state, callback,
@@ -628,7 +628,7 @@ bool ArrayIntNull::find_action_pattern(size_t index, uint64_t pattern, QueryStat
 }
 
 
-template<class cond>
+template <class cond>
 size_t ArrayIntNull::find_first(value_type value, size_t start, size_t end) const
 {
     QueryState<int64_t> state;

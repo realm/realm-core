@@ -441,7 +441,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
 
 namespace { // anonymous namespace
 
-template<class T, class C>
+template <class T, class C>
 bool compare(T&& a, T&& b, C&& condition)
 {
     return condition(a, b, a.is_null(), b.is_null());

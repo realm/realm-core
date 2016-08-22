@@ -98,7 +98,7 @@ public:
     bool operator>=(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return *this > rhs || *this == rhs; }
     Timestamp& operator=(const Timestamp& rhs) = default;
 
-    template<class Ch, class Tr>
+    template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
     static constexpr int32_t nanoseconds_per_second = 1000000000;
 
@@ -109,7 +109,7 @@ private:
 };
 
 // LCOV_EXCL_START
-template<class C, class T>
+template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
     out << "Timestamp(" << d.m_seconds << ", " << d.m_nanoseconds << ")";

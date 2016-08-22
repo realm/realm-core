@@ -214,7 +214,7 @@ public:
     // Aggregate functions. count_target is ignored by all <int
     // function> except Count. Hack because of bug in optional
     // arguments in clang and vs2010 (fixed in 2012)
-    template<int function, typename T, typename R, class ColType>
+    template <int function, typename T, typename R, class ColType>
     R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const,
                 size_t column_ndx, T count_target, size_t* return_ndx = nullptr) const;
 
@@ -378,16 +378,16 @@ protected:
     TableViewBase& operator=(const TableViewBase&);
     TableViewBase& operator=(TableViewBase&&) noexcept;
 
-    template<class R, class V>
+    template <class R, class V>
     static R find_all_integer(V*, size_t, int64_t);
 
-    template<class R, class V>
+    template <class R, class V>
     static R find_all_float(V*, size_t, float);
 
-    template<class R, class V>
+    template <class R, class V>
     static R find_all_double(V*, size_t, double);
 
-    template<class R, class V>
+    template <class R, class V>
     static R find_all_string(V*, size_t, StringData);
 
     using HandoverPatch = TableViewHandoverPatch;
@@ -416,13 +416,13 @@ protected:
 private:
     void detach() const noexcept; // may have to remove const
     size_t find_first_integer(size_t column_ndx, int64_t value) const;
-    template<class oper>
+    template <class oper>
     Timestamp minmax_timestamp(size_t column_ndx, size_t* return_ndx) const;
 
     friend class Table;
     friend class Query;
     friend class SharedGroup;
-    template<class Tab, class View, class Impl>
+    template <class Tab, class View, class Impl>
     friend class BasicTableViewBase;
 
     // Called by table to adjust any row references:
@@ -431,7 +431,7 @@ private:
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
     void adj_row_acc_clear() noexcept;
 
-    template<typename Tab>
+    template <typename Tab>
     friend class BasicTableView;
 };
 
@@ -480,7 +480,7 @@ public:
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value);
     void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value);
-    template<class E>
+    template <class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
@@ -581,7 +581,7 @@ private:
     friend class Query;
     friend class TableViewBase;
     friend class LinkView;
-    template<typename, typename, typename>
+    template <typename, typename, typename>
     friend class BasicTableViewBase;
 };
 
@@ -1111,28 +1111,28 @@ inline size_t TableViewBase::find_first_olddatetime(size_t column_ndx, OldDateTi
 }
 
 
-template<class R, class V>
+template <class R, class V>
 R TableViewBase::find_all_integer(V* view, size_t column_ndx, int64_t value)
 {
     typedef typename std::remove_const<V>::type TNonConst;
     return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_ndx, value).find_all();
 }
 
-template<class R, class V>
+template <class R, class V>
 R TableViewBase::find_all_float(V* view, size_t column_ndx, float value)
 {
     typedef typename std::remove_const<V>::type TNonConst;
     return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_ndx, value).find_all();
 }
 
-template<class R, class V>
+template <class R, class V>
 R TableViewBase::find_all_double(V* view, size_t column_ndx, double value)
 {
     typedef typename std::remove_const<V>::type TNonConst;
     return view->m_table->where(const_cast<TNonConst*>(view)).equal(column_ndx, value).find_all();
 }
 
-template<class R, class V>
+template <class R, class V>
 R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
 {
     typedef typename std::remove_const<V>::type TNonConst;
@@ -1501,7 +1501,7 @@ inline void TableView::set_double(size_t column_ndx, size_t row_ndx, double valu
     m_table->set_double(column_ndx, to_size_t(real_ndx), value);
 }
 
-template<class E>
+template <class E>
 inline void TableView::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     const int64_t real_ndx = m_row_indexes.get(row_ndx);

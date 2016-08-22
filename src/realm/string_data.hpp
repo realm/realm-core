@@ -82,17 +82,17 @@ public:
     /// If \a external_data is 'null', \a data_size must be zero.
     StringData(const char* external_data, size_t data_size) noexcept;
 
-    template<class T, class A>
+    template <class T, class A>
     StringData(const std::basic_string<char, T, A>&);
 
-    template<class T, class A>
+    template <class T, class A>
     operator std::basic_string<char, T, A>() const;
 
     // StringData does not store data, callers must manage their own strings.
-    template<class T, class A>
+    template <class T, class A>
     StringData(std::basic_string<char, T, A>&&) = delete;
 
-    template<class T, class A>
+    template <class T, class A>
     StringData(const util::Optional<std::basic_string<char, T, A>>&);
 
     StringData(const null&) noexcept;
@@ -148,7 +148,7 @@ public:
     StringData substr(size_t i) const noexcept;
     //@}
 
-    template<class C, class T>
+    template <class C, class T>
     friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const StringData&);
 
     explicit operator bool() const noexcept;
@@ -174,20 +174,20 @@ inline StringData::StringData(const char* external_data, size_t data_size) noexc
     REALM_ASSERT_DEBUG(external_data || data_size == 0);
 }
 
-template<class T, class A>
+template <class T, class A>
 inline StringData::StringData(const std::basic_string<char, T, A>& s):
     m_data(s.data()),
     m_size(s.size())
 {
 }
 
-template<class T, class A>
+template <class T, class A>
 inline StringData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
 }
 
-template<class T, class A>
+template <class T, class A>
 inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s):
     m_data(s ? s->data() : nullptr),
     m_size(s ? s->size() : 0)
@@ -308,7 +308,7 @@ inline StringData StringData::substr(size_t i) const noexcept
     return substr(i, m_size - i);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const StringData& d)
 {
     for (const char* i = d.m_data; i != d.m_data + d.m_size; ++i)

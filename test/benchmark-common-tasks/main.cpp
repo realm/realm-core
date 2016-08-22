@@ -506,7 +506,7 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
-template<typename B>
+template <typename B>
 void run_benchmark(TestContext& test_context, BenchmarkResults& results)
 {
     typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;

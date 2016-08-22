@@ -334,28 +334,28 @@ public:
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
     TableRef get_or_insert_table(size_t index, StringData name, bool* was_added = nullptr);
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_table(size_t index);
 
-    template<class T>
+    template <class T>
     BasicTableRef<const T> get_table(size_t index) const;
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_table(StringData name);
 
-    template<class T>
+    template <class T>
     BasicTableRef<const T> get_table(StringData name) const;
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> insert_table(size_t index, StringData name, bool require_unique_name = true);
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr);
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_or_insert_table(size_t index, StringData name, bool* was_added = nullptr);
 
     void remove_table(size_t index);
@@ -513,7 +513,7 @@ public:
     //@}
 
     // Conversion
-    template<class S>
+    template <class S>
     void to_json(S& out, size_t link_depth = 0,
                  std::map<std::string, std::string>* renames = nullptr) const;
     void to_string(std::ostream& out) const;
@@ -685,7 +685,7 @@ private:
     class TransactAdvancer;
     void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&);
     void refresh_dirty_accessors();
-    template<class F>
+    template <class F>
     void update_table_indices(F&& map_function);
 
     int get_file_format_version() const noexcept;
@@ -893,7 +893,7 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     return TableRef(table);
 }
 
-template<class T>
+template <class T>
 inline BasicTableRef<T> Group::get_table(size_t table_ndx)
 {
     static_assert(IsBasicTable<T>::value, "Invalid table type");
@@ -904,7 +904,7 @@ inline BasicTableRef<T> Group::get_table(size_t table_ndx)
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T>
+template <class T>
 inline BasicTableRef<const T> Group::get_table(size_t table_ndx) const
 {
     static_assert(IsBasicTable<T>::value, "Invalid table type");
@@ -915,7 +915,7 @@ inline BasicTableRef<const T> Group::get_table(size_t table_ndx) const
     return BasicTableRef<const T>(static_cast<const T*>(table));
 }
 
-template<class T>
+template <class T>
 inline BasicTableRef<T> Group::get_table(StringData name)
 {
     static_assert(IsBasicTable<T>::value, "Invalid table type");
@@ -926,7 +926,7 @@ inline BasicTableRef<T> Group::get_table(StringData name)
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T>
+template <class T>
 inline BasicTableRef<const T> Group::get_table(StringData name) const
 {
     static_assert(IsBasicTable<T>::value, "Invalid table type");
@@ -937,7 +937,7 @@ inline BasicTableRef<const T> Group::get_table(StringData name) const
     return BasicTableRef<const T>(static_cast<const T*>(table));
 }
 
-template<class T>
+template <class T>
 inline BasicTableRef<T> Group::insert_table(size_t table_ndx, StringData name,
                                             bool require_unique_name)
 {
@@ -949,13 +949,13 @@ inline BasicTableRef<T> Group::insert_table(size_t table_ndx, StringData name,
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T>
+template <class T>
 inline BasicTableRef<T> Group::add_table(StringData name, bool require_unique_name)
 {
     return insert_table<T>(size(), name, require_unique_name);
 }
 
-template<class T>
+template <class T>
 BasicTableRef<T> Group::get_or_insert_table(size_t table_ndx, StringData name, bool* was_added)
 {
     static_assert(IsBasicTable<T>::value, "Invalid table type");
@@ -968,7 +968,7 @@ BasicTableRef<T> Group::get_or_insert_table(size_t table_ndx, StringData name, b
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class T>
+template <class T>
 BasicTableRef<T> Group::get_or_add_table(StringData name, bool* was_added)
 {
     static_assert(IsBasicTable<T>::value, "Invalid table type");
@@ -981,7 +981,7 @@ BasicTableRef<T> Group::get_or_add_table(StringData name, bool* was_added)
     return BasicTableRef<T>(static_cast<T*>(table));
 }
 
-template<class S>
+template <class S>
 void Group::to_json(S& out, size_t link_depth,
                     std::map<std::string, std::string>* renames) const
 {

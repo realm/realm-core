@@ -49,7 +49,7 @@ TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
 }
 
 
-template<class BT>
+template <class BT>
 class TimestampColumn::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(typename BT::value_type value, Allocator& alloc):

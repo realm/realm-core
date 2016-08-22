@@ -460,28 +460,28 @@ public:
     /// of all other accessors (if any) being created as part of the import.
 
     /// Type used to support handover of accessors between shared groups.
-    template<typename T>
+    template <typename T>
     struct Handover;
 
     /// thread-safe/const export (mode is Stay or Copy)
     /// during export, the following operations on the shared group is locked:
     /// - advance_read(), promote_to_write(), commit_and_continue_as_read(),
     ///   rollback_and_continue_as_read(), close()
-    template<typename T>
+    template <typename T>
     std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode);
 
     // specialization for handover of Rows
-    template<typename T>
+    template <typename T>
     std::unique_ptr<Handover<BasicRow<T>>> export_for_handover(const BasicRow<T>& accessor);
 
     // destructive export (mode is Move)
-    template<typename T>
+    template <typename T>
     std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode);
 
     /// Import an accessor wrapped in a handover object. The import will fail if the
     /// importing SharedGroup is viewing a version of the database that is different
     /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
-    template<typename T>
+    template <typename T>
     std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover);
 
     // we need to special case handling of LinkViews, because they are ref counted.
@@ -614,15 +614,15 @@ private:
 
     //@{
     /// See LangBindHelper.
-    template<class O> void advance_read(O* observer, VersionID);
-    template<class O> void promote_to_write(O* observer);
+    template <class O> void advance_read(O* observer, VersionID);
+    template <class O> void promote_to_write(O* observer);
     version_type commit_and_continue_as_read();
-    template<class O> void rollback_and_continue_as_read(O* observer);
+    template <class O> void rollback_and_continue_as_read(O* observer);
     //@}
 
     /// Returns true if, and only if _impl::History::update_early_from_top_ref()
     /// was called during the execution of this function.
-    template<class O> bool do_advance_read(O* observer, VersionID, _impl::History&);
+    template <class O> bool do_advance_read(O* observer, VersionID, _impl::History&);
 
     /// If there is an associated \ref Replication object, then this function
     /// returns `repl->get_history()` where `repl` is that Replication object,
@@ -664,7 +664,7 @@ public:
         return get_group().get_table(name); // Throws
     }
 
-    template<class T>
+    template <class T>
     BasicTableRef<const T> get_table(StringData name) const
     {
         return get_group().get_table<T>(name); // Throws
@@ -719,19 +719,19 @@ public:
         return get_group().get_or_add_table(name, was_added); // Throws
     }
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_table(StringData name) const
     {
         return get_group().get_table<T>(name); // Throws
     }
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> add_table(StringData name, bool require_unique_name = true) const
     {
         return get_group().add_table<T>(name, require_unique_name); // Throws
     }
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table<T>(name, was_added); // Throws
@@ -863,14 +863,14 @@ private:
 };
 
 
-template<typename T>
+template <typename T>
 struct SharedGroup::Handover {
     std::unique_ptr<typename T::HandoverPatch> patch;
     std::unique_ptr<T> clone;
     VersionID version;
 };
 
-template<typename T>
+template <typename T>
 std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const T& accessor, ConstSourcePayload mode)
 {
     if (m_transact_stage != transact_Reading)
@@ -887,7 +887,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
 }
 
 
-template<typename T>
+template <typename T>
 std::unique_ptr<SharedGroup::Handover<BasicRow<T>>> SharedGroup::export_for_handover(const BasicRow<T>& accessor)
 {
     if (m_transact_stage != transact_Reading)
@@ -900,7 +900,7 @@ std::unique_ptr<SharedGroup::Handover<BasicRow<T>>> SharedGroup::export_for_hand
 }
 
 
-template<typename T>
+template <typename T>
 std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& accessor, MutableSourcePayload mode)
 {
     if (m_transact_stage != transact_Reading)
@@ -913,7 +913,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& ac
 }
 
 
-template<typename T>
+template <typename T>
 std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup::Handover<T>> handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
@@ -924,7 +924,7 @@ std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup
     return result;
 }
 
-template<class O>
+template <class O>
 inline void SharedGroup::advance_read(O* observer, VersionID version_id)
 {
     if (m_transact_stage != transact_Reading)
@@ -941,7 +941,7 @@ inline void SharedGroup::advance_read(O* observer, VersionID version_id)
     do_advance_read(observer, version_id, *hist); // Throws
 }
 
-template<class O>
+template <class O>
 inline void SharedGroup::promote_to_write(O* observer)
 {
     if (m_transact_stage != transact_Reading)
@@ -975,7 +975,7 @@ inline void SharedGroup::promote_to_write(O* observer)
     m_transact_stage = transact_Writing;
 }
 
-template<class O>
+template <class O>
 inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != transact_Writing)
@@ -1019,7 +1019,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     m_transact_stage = transact_Reading;
 }
 
-template<class O>
+template <class O>
 inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist)
 {
     ReadLockInfo new_read_lock;
@@ -1099,13 +1099,13 @@ public:
         return sg.m_group;
     }
 
-    template<class O>
+    template <class O>
     static void advance_read(SharedGroup& sg, O* obs, SharedGroup::VersionID ver)
     {
         sg.advance_read(obs, ver); // Throws
     }
 
-    template<class O>
+    template <class O>
     static void promote_to_write(SharedGroup& sg, O* obs)
     {
         sg.promote_to_write(obs); // Throws
@@ -1116,7 +1116,7 @@ public:
         return sg.commit_and_continue_as_read(); // Throws
     }
 
-    template<class O>
+    template <class O>
     static void rollback_and_continue_as_read(SharedGroup& sg, O* obs)
     {
         sg.rollback_and_continue_as_read(obs); // Throws

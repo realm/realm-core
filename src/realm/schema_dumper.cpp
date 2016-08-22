@@ -63,7 +63,7 @@ namespace Logging {
 
 struct Naught {};
 
-template<typename T>
+template <typename T>
 struct LogData {
     T items;
 };
@@ -100,7 +100,7 @@ inline void print(std::ostream&, Naught)
 {
 }
 
-template<typename List>
+template <typename List>
 void Log(const char* file, int line, LogData<List>&& data)
 {
     std::cout << '[' << file << ':' << line << "] ";

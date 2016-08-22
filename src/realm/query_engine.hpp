@@ -187,7 +187,7 @@ public:
 
     virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
 
-    template<Action TAction, class TSourceColumn>
+    template <Action TAction, class TSourceColumn>
     bool column_action_specialization(QueryStateBase* st, SequentialGetterBase* source_column, size_t r)
     {
         // TResult: type of query result
@@ -272,7 +272,7 @@ protected:
         return m_table->get_column_base(ndx);
     }
 
-    template<class ColType>
+    template <class ColType>
     const ColType& get_column(size_t ndx)
     {
         auto& col = m_table->get_column_base(ndx);
@@ -285,7 +285,7 @@ protected:
         return m_table->get_real_column_type(ndx);
     }
 
-    template<class ColType>
+    template <class ColType>
     void copy_getter(SequentialGetter<ColType>& dst, size_t& dst_idx,
                      const SequentialGetter<ColType>& src, const QueryNodeHandoverPatches* patches)
     {
@@ -406,16 +406,16 @@ public:
 
 namespace _impl {
 
-template<class ColType>
+template <class ColType>
 struct CostHeuristic;
 
-template<>
+template <>
 struct CostHeuristic<IntegerColumn> {
     static constexpr double dD() { return 100.0; }
     static constexpr double dT() { return 1.0 / 4.0; }
 };
 
-template<>
+template <>
 struct CostHeuristic<IntNullColumn> {
     static constexpr double dD() { return 100.0; }
     static constexpr double dT() { return 1.0 / 4.0; }
@@ -439,7 +439,7 @@ protected:
     {
     }
 
-    template<Action TAction, class ColType>
+    template <Action TAction, class ColType>
     bool match_callback(int64_t v)
     {
         using TSourceValue = typename ColType::value_type;
@@ -482,14 +482,14 @@ protected:
     SequentialGetterBase* m_source_column = nullptr; // Column of values used in aggregate (act_FindAll, actReturnFirst, act_Sum, etc)
 };
 
-template<class ColType>
+template <class ColType>
 class IntegerNodeBase : public ColumnNodeBase {
     using ThisType = IntegerNodeBase<ColType>;
 public:
     using TConditionValue = typename ColType::value_type;
     static const bool nullable = ColType::nullable;
 
-    template<class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
+    template <class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
     bool find_callback_specialization(size_t s, size_t end_in_leaf)
     {
         using AggregateColumnType = typename GetColumnType<TDataType, Nullable>::type;
@@ -640,7 +640,7 @@ protected:
 };
 
 // FIXME: Add specialization that uses index for TConditionFunction = Equal
-template<class ColType, class TConditionFunction>
+template <class ColType, class TConditionFunction>
 class IntegerNode : public IntegerNodeBase<ColType> {
     using BaseType = IntegerNodeBase<ColType>;
     using ThisType = IntegerNode<ColType, TConditionFunction>;
@@ -734,7 +734,7 @@ protected:
         return nullptr;
     }
 
-    template<Action TAction>
+    template <Action TAction>
     static TFind_callback_specialized get_specialized_callback_2(DataType col_id, bool nullable)
     {
         switch (col_id) {
@@ -751,7 +751,7 @@ protected:
         return nullptr;
     }
 
-    template<Action TAction>
+    template <Action TAction>
     static TFind_callback_specialized get_specialized_callback_2_int(DataType col_id, bool nullable)
     {
         if (col_id == type_Int) {
@@ -761,7 +761,7 @@ protected:
         return nullptr;
     }
 
-    template<Action TAction, DataType TDataType>
+    template <Action TAction, DataType TDataType>
     static TFind_callback_specialized get_specialized_callback_3(bool nullable)
     {
         if (nullable) {
@@ -774,7 +774,7 @@ protected:
 };
 
 // This node is currently used for floats and doubles only
-template<class ColType, class TConditionFunction>
+template <class ColType, class TConditionFunction>
 class FloatDoubleNode: public ParentNode {
 public:
     using TConditionValue = typename ColType::value_type;
@@ -841,7 +841,7 @@ protected:
 };
 
 
-template<class TConditionFunction>
+template <class TConditionFunction>
 class BinaryNode: public ParentNode {
 public:
     using TConditionValue = BinaryData;
@@ -899,7 +899,7 @@ private:
 };
 
 
-template<class TConditionFunction>
+template <class TConditionFunction>
 class TimestampNode : public ParentNode {
 public:
     using TConditionValue = Timestamp;
@@ -1006,7 +1006,7 @@ protected:
 };
 
 // Conditions for strings. Note that Equal is specialized later in this file!
-template<class TConditionFunction>
+template <class TConditionFunction>
 class StringNode: public StringNodeBase {
 public:
     StringNode(StringData v, size_t column) : StringNodeBase(v, column)
@@ -1097,7 +1097,7 @@ protected:
 
 // Specialization for Equal condition on Strings - we specialize because we can utilize indexes (if they exist) for Equal.
 // Future optimization: make specialization for greater, notequal, etc
-template<>
+template <>
 class StringNode<Equal>: public StringNodeBase {
 public:
     StringNode(StringData v, size_t column): StringNodeBase(v, column)
@@ -1529,7 +1529,7 @@ private:
 
 
 // Compare two columns with eachother row-by-row
-template<class ColType, class TConditionFunction>
+template <class ColType, class TConditionFunction>
 class TwoColumnsNode: public ParentNode {
 public:
     using TConditionValue = typename ColType::value_type;

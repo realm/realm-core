@@ -9291,21 +9291,21 @@ struct QueryInitHelper;
 // type. This is done in a somewhat ridiculous CPS style to ensure complete
 // control over when the Query instances are copied.
 struct PreRun {
-    template<typename Next>
+    template <typename Next>
     auto operator()(Query& q, Next&& next) { q.count(); return next(q); }
 };
 struct CopyQuery {
-    template<typename Next>
+    template <typename Next>
     auto operator()(Query& q, Next&& next) {  Query copy(q); return next(copy); }
 };
 struct AndQuery {
-    template<typename Next>
+    template <typename Next>
     auto operator()(Query& q, Next&& next) {
         return next(q.get_table()->where().and_query(q));
     }
 };
 struct HandoverQuery {
-    template<typename Next>
+    template <typename Next>
     auto operator()(Query& q, Next&& next)
     {
         auto main_table = next.state.table;
@@ -9326,7 +9326,7 @@ struct HandoverQuery {
     }
 };
 struct InsertColumn {
-    template<typename Next>
+    template <typename Next>
     auto operator()(Query& q, Next&& next)
     {
         LangBindHelper::advance_read(*next.state.sg);
@@ -9337,13 +9337,13 @@ struct GetCount {
     auto operator()(Query& q) {  return q.count(); }
 };
 
-template<typename Func, typename... Rest>
+template <typename Func, typename... Rest>
 struct Compose {
     QueryInitHelper& state;
     auto operator()(Query& q) { return Func()(q, Compose<Rest...>{state}); }
 };
 
-template<typename Func>
+template <typename Func>
 struct Compose<Func> {
     QueryInitHelper& state;
     auto operator()(Query& q) { return Func()(q); }
@@ -9356,14 +9356,14 @@ struct QueryInitHelper {
     SharedGroup::VersionID initial_version, extra_col_version;
     Table* table;
 
-    template<typename Func>
+    template <typename Func>
     REALM_NOINLINE void operator()(Func&& fn);
 
-    template<typename Func, typename... Mutations>
+    template <typename Func, typename... Mutations>
     REALM_NOINLINE size_t run(Func& fn);
 };
 
-template<typename Func>
+template <typename Func>
 void QueryInitHelper::operator()(Func&& fn)
 {
     // get baseline result with no copies
@@ -9402,7 +9402,7 @@ void QueryInitHelper::operator()(Func&& fn)
     CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn, HandoverQuery>(fn)));
 }
 
-template<typename Func, typename... Mutations>
+template <typename Func, typename... Mutations>
 size_t QueryInitHelper::run(Func& fn)
 {
     auto& group = sg->begin_read(initial_version);

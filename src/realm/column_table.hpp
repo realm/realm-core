@@ -82,17 +82,17 @@ protected:
         // was the last entry in the map.
         bool remove(Table*) noexcept;
         void update_from_parent(size_t old_baseline) const noexcept;
-        template<bool fix_ndx_in_parent>
+        template <bool fix_ndx_in_parent>
         void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept;
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
-        template<bool fix_ndx_in_parent>
+        template <bool fix_ndx_in_parent>
         bool adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept;
         // Returns true if, and only if an entry was found and removed, and it
         // was the last entry in the map.
-        template<bool fix_ndx_in_parent>
+        template <bool fix_ndx_in_parent>
         bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
-        template<bool fix_ndx_in_parent>
+        template <bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
@@ -394,7 +394,7 @@ inline void SubtableColumnBase::SubtableMap::add(size_t subtable_ndx, Table* tab
     m_entries.push_back(e);
 }
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
     for (auto& entry : m_entries) {
@@ -407,7 +407,7 @@ void SubtableColumnBase::SubtableMap::adj_insert_rows(size_t row_ndx, size_t num
     }
 }
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept
 {
     if (m_entries.empty())
@@ -437,7 +437,7 @@ bool SubtableColumnBase::SubtableMap::adj_erase_rows(size_t row_ndx, size_t num_
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 bool SubtableColumnBase::SubtableMap::adj_move_over(size_t from_row_ndx,
                                                     size_t to_row_ndx) noexcept
 {
@@ -474,7 +474,7 @@ bool SubtableColumnBase::SubtableMap::adj_move_over(size_t from_row_ndx,
     return m_entries.empty();
 }
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     using tf = _impl::TableFriend;

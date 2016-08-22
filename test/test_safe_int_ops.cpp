@@ -96,7 +96,7 @@ TEST(SafeIntOps_AddWithOverflowDetect)
 
 namespace {
 
-template<class T_1, class T_2>
+template <class T_1, class T_2>
 void test_two_args(TestContext& test_context, const std::set<super_int>& values)
 {
 //    if (!(std::is_same<T_1, bool>::value && std::is_same<T_2, char>::value))
@@ -211,7 +211,7 @@ typedef TypeAppend<types_12, unsigned long long>::type types_13;
 typedef types_13 types;
 
 
-template<class T, int>
+template <class T, int>
 struct add_min_max {
     static void exec(std::set<super_int>* values)
     {
@@ -221,9 +221,9 @@ struct add_min_max {
     }
 };
 
-template<class T_1, int>
+template <class T_1, int>
 struct test_two_args_1 {
-    template<class T_2, int>
+    template <class T_2, int>
     struct test_two_args_2 {
         static void exec(TestContext* test_context, const std::set<super_int>* values)
         {

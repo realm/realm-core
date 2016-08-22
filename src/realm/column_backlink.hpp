@@ -104,7 +104,7 @@ private:
     TableRef        m_origin_table;
     LinkColumnBase* m_origin_column = nullptr;
 
-    template<typename Func>
+    template <typename Func>
     size_t for_each_link(size_t row_ndx, bool do_destroy, Func&& f);
 };
 

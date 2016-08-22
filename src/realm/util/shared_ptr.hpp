@@ -24,7 +24,7 @@
 namespace realm {
 namespace util {
 
-template<class T>
+template <class T>
 class SharedPtr {
 public:
     SharedPtr(T* p)

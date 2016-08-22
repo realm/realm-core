@@ -65,7 +65,7 @@ public:
     /// 60]. Note that the range allows for leap seconds.
     OldDateTime(int year, int month, int day, int hours = 0, int minutes = 0, int seconds = 0);
 
-    template<class Ch, class Tr>
+    template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const OldDateTime&);
 
     // This is used by query_expression.hpp to generalize its templates and simplify the code *alot*; it is needed
@@ -75,7 +75,7 @@ public:
 private:
     int_fast64_t m_time; // Seconds since Jan 1 00:00:00 UTC 1970.
     static std::time_t assemble(int year, int month, int day, int hours, int minutes, int seconds);
-    template<typename T>
+    template <typename T>
     friend class Value;
 };
 
@@ -120,7 +120,7 @@ inline OldDateTime::operator int_fast64_t() noexcept
 inline OldDateTime::OldDateTime(int year, int month, int day, int hours, int minutes, int seconds):
     m_time(assemble(year, month, day, hours, minutes, seconds)) {}
 
-template<class Ch, class Tr>
+template <class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const OldDateTime& d)
 {
     out << "OldDateTime(" << d.m_time << ")";

@@ -36,7 +36,7 @@
 struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< void,     type1 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         ColNames(Init i) noexcept: name1(i) {} \
@@ -76,7 +76,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< void,     type1 >::type Columns1; \
     typedef ::realm::util::TypeAppend< Columns1, type2 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -119,7 +119,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns1, type2 >::type Columns2; \
     typedef ::realm::util::TypeAppend< Columns2, type3 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -165,7 +165,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns2, type3 >::type Columns3; \
     typedef ::realm::util::TypeAppend< Columns3, type4 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -214,7 +214,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns3, type4 >::type Columns4; \
     typedef ::realm::util::TypeAppend< Columns4, type5 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -266,7 +266,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns4, type5 >::type Columns5; \
     typedef ::realm::util::TypeAppend< Columns5, type6 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -321,7 +321,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns5, type6 >::type Columns6; \
     typedef ::realm::util::TypeAppend< Columns6, type7 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -379,7 +379,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns6, type7 >::type Columns7; \
     typedef ::realm::util::TypeAppend< Columns7, type8 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -440,7 +440,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns7, type8 >::type Columns8; \
     typedef ::realm::util::TypeAppend< Columns8, type9 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -504,7 +504,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns8, type9 >::type Columns9; \
     typedef ::realm::util::TypeAppend< Columns9, type10 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -571,7 +571,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns9, type10 >::type Columns10; \
     typedef ::realm::util::TypeAppend< Columns10, type11 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -641,7 +641,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns10, type11 >::type Columns11; \
     typedef ::realm::util::TypeAppend< Columns11, type12 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -714,7 +714,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns11, type12 >::type Columns12; \
     typedef ::realm::util::TypeAppend< Columns12, type13 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -790,7 +790,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns12, type13 >::type Columns13; \
     typedef ::realm::util::TypeAppend< Columns13, type14 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \
@@ -869,7 +869,7 @@ struct Table##Spec: ::realm::SpecBase { \
     typedef ::realm::util::TypeAppend< Columns13, type14 >::type Columns14; \
     typedef ::realm::util::TypeAppend< Columns14, type15 >::type Columns; \
  \
-    template<template<int> class Col, class Init> \
+    template <template <int> class Col, class Init> \
     struct ColNames { \
         typename Col<0>::type name1; \
         typename Col<1>::type name2; \

@@ -2657,7 +2657,7 @@ size_t Table::get_index_in_group() const noexcept
 
 namespace realm {
 
-template<>
+template <>
 bool Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2674,7 +2674,7 @@ bool Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<>
+template <>
 int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2691,7 +2691,7 @@ int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<>
+template <>
 OldDateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2708,7 +2708,7 @@ OldDateTime Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
 }
 
-template<>
+template <>
 float Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2723,7 +2723,7 @@ float Table::get(size_t col_ndx, size_t ndx) const noexcept
         return f;
 }
 
-template<>
+template <>
 double Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2738,7 +2738,7 @@ double Table::get(size_t col_ndx, size_t ndx) const noexcept
         return d;
 }
 
-template<>
+template <>
 StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
@@ -2761,7 +2761,7 @@ StringData Table::get(size_t col_ndx, size_t ndx) const noexcept
     return sd;
 }
 
-template<>
+template <>
 BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
@@ -2772,7 +2772,7 @@ BinaryData Table::get(size_t col_ndx, size_t ndx) const noexcept
     return col.get(ndx);
 }
 
-template<>
+template <>
 Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
     REALM_ASSERT_3(col_ndx, <, m_columns.size());
@@ -2786,7 +2786,7 @@ Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 
 } // namespace realm;
 
-template<class ColType, class T>
+template <class ColType, class T>
 size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
 {
     size_t found_ndx = not_found;
@@ -3684,7 +3684,7 @@ util::Optional<int64_t> upgrade_optional_int(util::Optional<OldDateTime> value)
     return value ? some<int64_t>(value->get_olddatetime()) : none;
 }
 
-template<class T>
+template <class T>
 T upgrade_optional_int(T value)
 {
     // No conversion
@@ -3694,7 +3694,7 @@ T upgrade_optional_int(T value)
 } // anonymous namespace
 
 
-template<class T>
+template <class T>
 size_t Table::find_first(size_t col_ndx, T value) const
 {
     using type_traits = ColumnTypeTraits<T>;
@@ -3789,7 +3789,7 @@ size_t Table::find_first_null(size_t column_ndx) const
     return where().equal(column_ndx, null{}).find();
 }
 
-template<class T>
+template <class T>
 TableView Table::find_all(size_t col_ndx, T value)
 {
     return where().equal(col_ndx, value).find_all();
@@ -4637,7 +4637,7 @@ inline void out_binary(std::ostream& out, const BinaryData bin)
     }
 }
 
-template<class T>
+template <class T>
 void out_floats(std::ostream& out, T value)
 {
     std::streamsize old = out.precision();

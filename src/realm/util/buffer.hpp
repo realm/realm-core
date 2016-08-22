@@ -35,7 +35,7 @@ namespace util {
 
 /// A simple buffer concept that owns a region of memory and knows its
 /// size.
-template<class T>
+template <class T>
 class Buffer {
 public:
     Buffer() noexcept: m_size(0) {}
@@ -90,7 +90,7 @@ private:
 /// A buffer that can be efficiently resized. It acheives this by
 /// using an underlying buffer that may be larger than the logical
 /// size, and is automatically expanded in progressively larger steps.
-template<class T>
+template <class T>
 class AppendBuffer {
 public:
     AppendBuffer() noexcept;
@@ -145,21 +145,21 @@ public:
     }
 };
 
-template<class T>
+template <class T>
 inline Buffer<T>::Buffer(size_t initial_size):
     m_data(new T[initial_size]), // Throws
     m_size(initial_size)
 {
 }
 
-template<class T>
+template <class T>
 inline void Buffer<T>::set_size(size_t new_size)
 {
     m_data.reset(new T[new_size]); // Throws
     m_size = new_size;
 }
 
-template<class T>
+template <class T>
 inline void Buffer<T>::resize(size_t new_size, size_t copy_begin,
                               size_t copy_end, size_t copy_to)
 {
@@ -169,7 +169,7 @@ inline void Buffer<T>::resize(size_t new_size, size_t copy_begin,
     m_size = new_size;
 }
 
-template<class T>
+template <class T>
 inline void Buffer<T>::reserve(size_t used_size,
                                size_t min_capacity)
 {
@@ -184,7 +184,7 @@ inline void Buffer<T>::reserve(size_t used_size,
     resize(new_capacity, 0, used_size, 0); // Throws
 }
 
-template<class T>
+template <class T>
 inline void Buffer<T>::reserve_extra(size_t used_size,
                                      size_t min_extra_capacity)
 {
@@ -194,7 +194,7 @@ inline void Buffer<T>::reserve_extra(size_t used_size,
     reserve(used_size, min_capacity); // Throws
 }
 
-template<class T>
+template <class T>
 inline T* Buffer<T>::release() noexcept
 {
     m_size = 0;
@@ -202,30 +202,30 @@ inline T* Buffer<T>::release() noexcept
 }
 
 
-template<class T>
+template <class T>
 inline AppendBuffer<T>::AppendBuffer() noexcept: m_size(0)
 {
 }
 
-template<class T>
+template <class T>
 inline size_t AppendBuffer<T>::size() const noexcept
 {
     return m_size;
 }
 
-template<class T>
+template <class T>
 inline T* AppendBuffer<T>::data() noexcept
 {
     return m_buffer.data();
 }
 
-template<class T>
+template <class T>
 inline const T* AppendBuffer<T>::data() const noexcept
 {
     return m_buffer.data();
 }
 
-template<class T>
+template <class T>
 inline void AppendBuffer<T>::append(const T* append_data, size_t append_data_size)
 {
     m_buffer.reserve_extra(m_size, append_data_size); // Throws
@@ -233,20 +233,20 @@ inline void AppendBuffer<T>::append(const T* append_data, size_t append_data_siz
     m_size += append_data_size;
 }
 
-template<class T>
+template <class T>
 inline void AppendBuffer<T>::reserve(size_t min_capacity)
 {
     m_buffer.reserve(m_size, min_capacity);
 }
 
-template<class T>
+template <class T>
 inline void AppendBuffer<T>::resize(size_t new_size)
 {
     reserve(new_size);
     m_size = new_size;
 }
 
-template<class T>
+template <class T>
 inline void AppendBuffer<T>::clear() noexcept
 {
     m_size = 0;

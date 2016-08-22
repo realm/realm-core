@@ -31,7 +31,7 @@
 namespace realm {
 namespace util {
 
-template<class T>
+template <class T>
 std::string hex_dump(const T* data, size_t size, const char* separator = " ", int min_digits = -1)
 {
     using U = typename std::make_unsigned<T>::type;

@@ -107,7 +107,7 @@ private:
 
     std::unique_ptr<StringIndex> m_search_index;
 
-    template<class BT>
+    template <class BT>
     class CreateHandler;
 
     template <class Condition>

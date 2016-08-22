@@ -23,7 +23,7 @@ namespace realm {
 namespace util {
 
 
-template<class T, class A, class B>
+template <class T, class A, class B>
 struct EitherTypeIs { static const bool value = false; };
 template <class T, class A>
 struct EitherTypeIs<T, T, A> {

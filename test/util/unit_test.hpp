@@ -257,7 +257,7 @@ public:
     /// remains allocated on the same address across all invocations.
     ///
     ///  The sorting operation is stable.
-    template<class Compare> void sort(Compare);
+    template <class Compare> void sort(Compare);
 
     struct Config {
         Config() {}
@@ -339,7 +339,7 @@ TestList& get_default_test_list();
 struct PatternBasedFileOrder {
     PatternBasedFileOrder(const char** patterns_begin, const char** patterns_end);
 
-    template<size_t N>
+    template <size_t N>
     PatternBasedFileOrder(const char* (&patterns)[N]);
 
     bool operator()(const TestDetails&, const TestDetails&);
@@ -433,7 +433,7 @@ public:
 
     bool check_not(bool cond, const char* file, long line, const char* cond_text);
 
-    template<class A, class B>
+    template <class A, class B>
     bool check_compare(bool cond, const A& a, const B& b,
                        const char* file, long line, const char* macro_name,
                        const char* a_text, const char* b_text);
@@ -443,27 +443,27 @@ public:
                                const char* macro_name, const char* a_text,
                                const char* b_text, const char* eps_text);
 
-    template<class A, class B>
+    template <class A, class B>
     bool check_equal(const A& a, const B& b, const char* file, long line,
                      const char* a_text, const char* b_text);
 
-    template<class A, class B>
+    template <class A, class B>
     bool check_not_equal(const A& a, const B& b, const char* file, long line,
                          const char* a_text, const char* b_text);
 
-    template<class A, class B>
+    template <class A, class B>
     bool check_less(const A& a, const B& b, const char* file, long line,
                     const char* a_text, const char* b_text);
 
-    template<class A, class B>
+    template <class A, class B>
     bool check_less_equal(const A& a, const B& b, const char* file, long line,
                           const char* a_text, const char* b_text);
 
-    template<class A, class B>
+    template <class A, class B>
     bool check_greater(const A& a, const B& b, const char* file, long line,
                        const char* a_text, const char* b_text);
 
-    template<class A, class B>
+    template <class A, class B>
     bool check_greater_equal(const A& a, const B& b, const char* file, long line,
                              const char* a_text, const char* b_text);
 
@@ -561,7 +561,7 @@ protected:
     TestContext& test_context;
 
     /// Short hand for test_context.logger.info().
-    template<class... Params> void log(const char* message, Params...);
+    template <class... Params> void log(const char* message, Params...);
 
     TestBase(TestContext&);
 };
@@ -571,7 +571,7 @@ protected:
 
 // Implementation
 
-template<class Test> struct RegisterTest {
+template <class Test> struct RegisterTest {
     RegisterTest(TestList& list, bool allow_concur, const char* suite,
                  std::string name, const char* file, long line)
     {
@@ -586,7 +586,7 @@ template<class Test> struct RegisterTest {
 };
 
 
-template<class Compare> inline void TestList::sort(Compare compare)
+template <class Compare> inline void TestList::sort(Compare compare)
 {
     auto compare_2 = [&](const Test* a, const Test* b) { return compare(a->details, b->details); };
     std::stable_sort(m_tests.begin(), m_tests.end(), compare_2);
@@ -616,14 +616,14 @@ inline PatternBasedFileOrder::PatternBasedFileOrder(const char** patterns_begin,
 {
 }
 
-template<size_t N>
+template <size_t N>
 inline PatternBasedFileOrder::PatternBasedFileOrder(const char* (&patterns)[N]):
     m_wrap(patterns, patterns + N)
 {
 }
 
 
-template<class A, class B, bool both_are_integral>
+template <class A, class B, bool both_are_integral>
 struct Compare {
     static bool equal(const A& a, const B& b)
     {
@@ -635,7 +635,7 @@ struct Compare {
     }
 };
 
-template<class A, class B>
+template <class A, class B>
 struct Compare<A, B, true> {
     static bool equal(const A& a, const B& b)
     {
@@ -648,14 +648,14 @@ struct Compare<A, B, true> {
 };
 
 
-template<class A, class B>
+template <class A, class B>
 inline bool equal(const A& a, const B& b)
 {
     const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
     return Compare<A, B, both_are_integral>::equal(a, b);
 }
 
-template<class A, class B>
+template <class A, class B>
 inline bool less(const A& a, const B& b)
 {
     const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
@@ -696,12 +696,12 @@ inline bool definitely_less(long double a, long double b, long double epsilon)
 }
 
 
-template<class T, bool is_float>
+template <class T, bool is_float>
 struct SetPrecision {
     static void exec(std::ostream&) {}
 };
 
-template<class T>
+template <class T>
 struct SetPrecision<T, true> {
     static void exec(std::ostream& out)
     {
@@ -709,7 +709,7 @@ struct SetPrecision<T, true> {
     }
 };
 
-template<class T>
+template <class T>
 void to_string(const T& value, std::string& str)
 {
     // FIXME: Put string values in quotes, and escape non-printables as well as '"' and '\\'.
@@ -742,7 +742,7 @@ inline bool TestContext::check_not(bool cond, const char* file, long line, const
     return check_cond(!cond, file, line, "CHECK_NOT", cond_text);
 }
 
-template<class A, class B>
+template <class A, class B>
 inline bool TestContext::check_compare(bool cond, const A& a, const B& b,
                                        const char* file, long line, const char* macro_name,
                                        const char* a_text, const char* b_text)
@@ -773,7 +773,7 @@ inline bool TestContext::check_inexact_compare(bool cond, long double a, long do
     return cond;
 }
 
-template<class A, class B>
+template <class A, class B>
 inline bool TestContext::check_equal(const A& a, const B& b,
                                      const char* file, long line,
                                      const char* a_text, const char* b_text)
@@ -782,7 +782,7 @@ inline bool TestContext::check_equal(const A& a, const B& b,
     return check_compare(cond, a, b, file, line, "CHECK_EQUAL", a_text, b_text);
 }
 
-template<class A, class B>
+template <class A, class B>
 inline bool TestContext::check_not_equal(const A& a, const B& b,
                                          const char* file, long line,
                                          const char* a_text, const char* b_text)
@@ -791,7 +791,7 @@ inline bool TestContext::check_not_equal(const A& a, const B& b,
     return check_compare(cond, a, b, file, line, "CHECK_NOT_EQUAL", a_text, b_text);
 }
 
-template<class A, class B>
+template <class A, class B>
 inline bool TestContext::check_less(const A& a, const B& b,
                                     const char* file, long line,
                                     const char* a_text, const char* b_text)
@@ -800,7 +800,7 @@ inline bool TestContext::check_less(const A& a, const B& b,
     return check_compare(cond, a, b, file, line, "CHECK_LESS", a_text, b_text);
 }
 
-template<class A, class B>
+template <class A, class B>
 inline bool TestContext::check_less_equal(const A& a, const B& b,
                                           const char* file, long line,
                                           const char* a_text, const char* b_text)
@@ -809,7 +809,7 @@ inline bool TestContext::check_less_equal(const A& a, const B& b,
     return check_compare(cond, a, b, file, line, "CHECK_LESS_EQUAL", a_text, b_text);
 }
 
-template<class A, class B>
+template <class A, class B>
 inline bool TestContext::check_greater(const A& a, const B& b,
                                        const char* file, long line,
                                        const char* a_text, const char* b_text)
@@ -818,7 +818,7 @@ inline bool TestContext::check_greater(const A& a, const B& b,
     return check_compare(cond, a, b, file, line, "CHECK_GREATER", a_text, b_text);
 }
 
-template<class A, class B>
+template <class A, class B>
 inline bool TestContext::check_greater_equal(const A& a, const B& b,
                                              const char* file, long line,
                                              const char* a_text, const char* b_text)
@@ -887,7 +887,7 @@ inline TestBase::TestBase(TestContext& context):
 {
 }
 
-template<class... Params> inline void TestBase::log(const char* message, Params... params)
+template <class... Params> inline void TestBase::log(const char* message, Params... params)
 {
     test_context.logger.info(message, params...); // Throws
 }

@@ -82,7 +82,7 @@ const size_t metadata_size = sizeof(iv_table);
 const size_t blocks_per_metadata_block = block_size / metadata_size;
 
 // map an offset in the data to the actual location in the file
-template<typename Int>
+template <typename Int>
 Int real_offset(Int pos)
 {
     REALM_ASSERT(pos >= 0);
@@ -92,7 +92,7 @@ Int real_offset(Int pos)
 }
 
 // map a location in the file to the offset in the data
-template<typename Int>
+template <typename Int>
 Int fake_offset(Int pos)
 {
     REALM_ASSERT(pos >= 0);

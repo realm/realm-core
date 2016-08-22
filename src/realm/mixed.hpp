@@ -143,7 +143,7 @@ public:
     void set_olddatetime(OldDateTime) noexcept;
     void set_timestamp(Timestamp) noexcept;
 
-    template<class Ch, class Tr>
+    template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
 
 private:
@@ -170,13 +170,13 @@ private:
 // of Mixed are not explicit.
 
 // Compare mixed with integer
-template<class T>
+template <class T>
 bool operator==(Wrap<Mixed>, const T&) noexcept;
-template<class T>
+template <class T>
 bool operator!=(Wrap<Mixed>, const T&) noexcept;
-template<class T>
+template <class T>
 bool operator==(const T&, Wrap<Mixed>) noexcept;
-template<class T>
+template <class T>
 bool operator!=(const T&, Wrap<Mixed>) noexcept;
 
 // Compare mixed with boolean
@@ -391,7 +391,7 @@ inline void Mixed::set_timestamp(Timestamp v) noexcept
 // LCOV_EXCL_STOP
 
 // LCOV_EXCL_START
-template<class Ch, class Tr>
+template <class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Mixed& m)
 {
     out << "Mixed(";
@@ -436,25 +436,25 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 
 // Compare mixed with integer
 
-template<class T>
+template <class T>
 inline bool operator==(Wrap<Mixed> a, const T& b) noexcept
 {
     return Mixed(a).get_type() == type_Int && Mixed(a).get_int() == b;
 }
 
-template<class T>
+template <class T>
 inline bool operator!=(Wrap<Mixed> a, const T& b) noexcept
 {
     return Mixed(a).get_type() != type_Int || Mixed(a).get_int() != b;
 }
 
-template<class T>
+template <class T>
 inline bool operator==(const T& a, Wrap<Mixed> b) noexcept
 {
     return type_Int == Mixed(b).get_type() && a == Mixed(b).get_int();
 }
 
-template<class T>
+template <class T>
 inline bool operator!=(const T& a, Wrap<Mixed> b) noexcept
 {
     return type_Int != Mixed(b).get_type() || a != Mixed(b).get_int();

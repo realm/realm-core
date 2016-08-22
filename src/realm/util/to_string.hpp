@@ -59,7 +59,7 @@ private:
 };
 
 
-template<class T>
+template <class T>
 std::string to_string(const T& v)
 {
     return Printable(v).str();

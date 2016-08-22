@@ -38,7 +38,7 @@ std::error_code make_error_code(misc_errors);
 
 namespace std {
 
-template<>
+template <>
 class is_error_code_enum<realm::util::error::misc_errors> {
 public:
     static const bool value = true;

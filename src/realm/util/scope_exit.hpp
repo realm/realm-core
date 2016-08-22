@@ -27,7 +27,7 @@
 namespace realm {
 namespace util {
 
-template<class H>
+template <class H>
 class ScopeExit {
 public:
     explicit ScopeExit(const H& handler) noexcept(std::is_nothrow_copy_constructible<H>::value):
@@ -59,7 +59,7 @@ private:
     util::Optional<H> m_handler;
 };
 
-template<class H>
+template <class H>
 ScopeExit<typename std::remove_reference<H>::type> make_scope_exit(H&& handler)
 noexcept(noexcept(ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler))))
 {

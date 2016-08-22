@@ -282,25 +282,25 @@ private:
     /// \param ptr Must be in the range [m_transact_log_free_begin, m_transact_log_free_end]
     void advance(char* ptr) noexcept;
 
-    template<class L>
+    template <class L>
     void append_simple_instr(Instruction, const util::Tuple<L>& numbers);
 
-    template<class L>
+    template <class L>
     void append_string_instr(Instruction, const util::Tuple<L>& numbers, StringData);
 
-    template<class L>
+    template <class L>
     void append_mixed_instr(Instruction, const util::Tuple<L>& numbers, const Mixed&);
 
-    template<class L, class I>
+    template <class L, class I>
     bool append_variable_size_instr(Instruction instr, const util::Tuple<L>& numbers,
                                     I var_begin, I var_end);
 
-    template<class T>
+    template <class T>
     static char* encode_int(char*, T value);
     static char* encode_bool(char*, bool value);
     static char* encode_float(char*, float value);
     static char* encode_double(char*, double value);
-    template<class>
+    template <class>
     struct EncodeNumber;
 };
 
@@ -420,10 +420,10 @@ public:
     /// parse() promises that the path passed by reference to
     /// InstructionHandler::select_descriptor() will remain valid
     /// during subsequent calls to all descriptor modifying functions.
-    template<class InstructionHandler>
+    template <class InstructionHandler>
     void parse(InputStream&, InstructionHandler&);
 
-    template<class InstructionHandler>
+    template <class InstructionHandler>
     void parse(NoCopyInputStream&, InstructionHandler&);
 
 private:
@@ -446,11 +446,11 @@ private:
 
     REALM_NORETURN void parser_error() const;
 
-    template<class InstructionHandler>
+    template <class InstructionHandler>
     void parse_one(InstructionHandler&);
     bool has_next() noexcept;
 
-    template<class T>
+    template <class T>
     T read_int();
 
     void read_bytes(char* data, size_t size);
@@ -583,7 +583,7 @@ inline void TransactLogEncoder::advance(char* ptr) noexcept
 //     int64_t       63             64             10
 //     uint64_t      64             65             10
 //
-template<class T>
+template <class T>
 char* TransactLogEncoder::encode_int(char* ptr, T value)
 {
     static_assert(std::numeric_limits<T>::is_integer, "Integer required");
@@ -650,7 +650,7 @@ inline char* TransactLogEncoder::encode_double(char* ptr, double value)
     return std::copy(val_ptr, val_ptr + sizeof value, ptr);
 }
 
-template<class T>
+template <class T>
 struct TransactLogEncoder::EncodeNumber {
     void operator()(T value, char** ptr)
     {
@@ -658,21 +658,21 @@ struct TransactLogEncoder::EncodeNumber {
         *ptr = encode_int(*ptr, value_2);
     }
 };
-template<>
+template <>
 struct TransactLogEncoder::EncodeNumber<bool> {
     void operator()(bool value, char** ptr)
     {
         *ptr = encode_bool(*ptr, value);
     }
 };
-template<>
+template <>
 struct TransactLogEncoder::EncodeNumber<float> {
     void operator()(float value, char** ptr)
     {
         *ptr = encode_float(*ptr, value);
     }
 };
-template<>
+template <>
 struct TransactLogEncoder::EncodeNumber<double> {
     void operator()(double value, char** ptr)
     {
@@ -680,7 +680,7 @@ struct TransactLogEncoder::EncodeNumber<double> {
     }
 };
 
-template<class L>
+template <class L>
 void TransactLogEncoder::append_simple_instr(Instruction instr, const util::Tuple<L>& numbers)
 {
     size_t num_numbers = util::TypeCount<L>::value;
@@ -691,7 +691,7 @@ void TransactLogEncoder::append_simple_instr(Instruction instr, const util::Tupl
     advance(ptr);
 }
 
-template<class L>
+template <class L>
 void TransactLogEncoder::append_string_instr(Instruction instr, const util::Tuple<L>& numbers,
                                              StringData string)
 {
@@ -704,7 +704,7 @@ void TransactLogEncoder::append_string_instr(Instruction instr, const util::Tupl
     advance(ptr);
 }
 
-template<class L>
+template <class L>
 void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple<L>& numbers,
                                             const Mixed& value)
 {
@@ -760,7 +760,7 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
     REALM_ASSERT_RELEASE(false);
 }
 
-template<class L, class I>
+template <class L, class I>
 bool TransactLogEncoder::append_variable_size_instr(Instruction instr,
                                                     const util::Tuple<L>& numbers,
                                                     I var_begin, I var_end)
@@ -1517,7 +1517,7 @@ inline TransactLogParser::~TransactLogParser() noexcept
 }
 
 
-template<class InstructionHandler>
+template <class InstructionHandler>
 void TransactLogParser::parse(NoCopyInputStream& in, InstructionHandler& handler)
 {
     m_input = &in;
@@ -1527,7 +1527,7 @@ void TransactLogParser::parse(NoCopyInputStream& in, InstructionHandler& handler
         parse_one(handler); // Throws
 }
 
-template<class InstructionHandler>
+template <class InstructionHandler>
 void TransactLogParser::parse(InputStream& in, InstructionHandler& handler)
 {
     NoCopyInputStreamAdaptor in_2(in, m_input_buffer.data(), m_input_buffer.size());
@@ -1539,7 +1539,7 @@ inline bool TransactLogParser::has_next() noexcept
     return m_input_begin != m_input_end || next_input_buffer();
 }
 
-template<class InstructionHandler>
+template <class InstructionHandler>
 void TransactLogParser::parse_one(InstructionHandler& handler)
 {
     char instr;
@@ -1948,7 +1948,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
 }
 
 
-template<class T>
+template <class T>
 T TransactLogParser::read_int()
 {
     T value = 0;

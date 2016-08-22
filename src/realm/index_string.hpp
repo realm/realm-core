@@ -89,28 +89,28 @@ public:
 
     bool is_empty() const;
 
-    template<class T>
+    template <class T>
     void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
-    template<class T>
+    template <class T>
     void insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append);
 
-    template<class T>
+    template <class T>
     void set(size_t row_ndx, T new_value);
-    template<class T>
+    template <class T>
     void set(size_t row_ndx, util::Optional<T> new_value);
 
-    template<class T>
+    template <class T>
     void erase(size_t row_ndx, bool is_last);
 
-    template<class T>
+    template <class T>
     size_t find_first(T value) const;
-    template<class T>
+    template <class T>
     void find_all(IntegerColumn& result, T value) const;
-    template<class T>
+    template <class T>
     FindRes find_all(T value, ref_type& ref) const;
-    template<class T>
+    template <class T>
     size_t count(T value) const;
-    template<class T>
+    template <class T>
     void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx);
 
     void clear();
@@ -208,9 +208,9 @@ private:
 
 // Implementation:
 
-template<class T> struct GetIndexData;
+template <class T> struct GetIndexData;
 
-template<> struct GetIndexData<int64_t> {
+template <> struct GetIndexData<int64_t> {
     static StringData get_index_data(const int64_t& value, StringIndex::StringConversionBuffer& buffer)
     {
         const char* c = reinterpret_cast<const char*>(&value);
@@ -219,25 +219,25 @@ template<> struct GetIndexData<int64_t> {
     }
 };
 
-template<> struct GetIndexData<StringData> {
+template <> struct GetIndexData<StringData> {
     static StringData get_index_data(StringData data, StringIndex::StringConversionBuffer&)
     {
         return data;
     }
 };
 
-template<> struct GetIndexData<null> {
+template <> struct GetIndexData<null> {
     static StringData get_index_data(null, StringIndex::StringConversionBuffer&)
     {
         return null{};
     }
 };
 
-template<> struct GetIndexData<Timestamp> {
+template <> struct GetIndexData<Timestamp> {
     static StringData get_index_data(const Timestamp&, StringIndex::StringConversionBuffer&);
 };
 
-template<class T> struct GetIndexData<util::Optional<T>> {
+template <class T> struct GetIndexData<util::Optional<T>> {
     static StringData get_index_data(const util::Optional<T>& value, StringIndex::StringConversionBuffer& buffer)
     {
         if (value)
@@ -246,26 +246,26 @@ template<class T> struct GetIndexData<util::Optional<T>> {
     }
 };
 
-template<> struct GetIndexData<float> {
+template <> struct GetIndexData<float> {
     static StringData get_index_data(float, StringIndex::StringConversionBuffer&)
     {
         REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
     }
 };
 
-template<> struct GetIndexData<double> {
+template <> struct GetIndexData<double> {
     static StringData get_index_data(double, StringIndex::StringConversionBuffer&)
     {
         REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
     }
 };
 
-template<> struct GetIndexData<const char*>: GetIndexData<StringData> {};
+template <> struct GetIndexData<const char*>: GetIndexData<StringData> {};
 
 // to_str() is used by the integer index. The existing StringIndex is re-used for this
 // by making IntegerColumn convert its integers to strings by calling to_str().
 
-template<class T>
+template <class T>
 inline StringData to_str(T&& value, StringIndex::StringConversionBuffer& buffer)
 {
     return GetIndexData<typename std::remove_reference<T>::type>::get_index_data(value, buffer);
@@ -358,7 +358,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
     return create_key(str.substr(offset));
 }
 
-template<class T>
+template <class T>
 void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
 {
     REALM_ASSERT_3(row_ndx, !=, npos);
@@ -381,7 +381,7 @@ void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_appen
     }
 }
 
-template<class T>
+template <class T>
 void StringIndex::insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append)
 {
     if (value) {
@@ -392,7 +392,7 @@ void StringIndex::insert(size_t row_ndx, util::Optional<T> value, size_t num_row
     }
 }
 
-template<class T>
+template <class T>
 void StringIndex::set(size_t row_ndx, T new_value)
 {
     StringConversionBuffer buffer;
@@ -411,7 +411,7 @@ void StringIndex::set(size_t row_ndx, T new_value)
     }
 }
 
-template<class T>
+template <class T>
 void StringIndex::set(size_t row_ndx, util::Optional<T> new_value)
 {
     if (new_value) {
@@ -422,7 +422,7 @@ void StringIndex::set(size_t row_ndx, util::Optional<T> new_value)
     }
 }
 
-template<class T>
+template <class T>
 void StringIndex::erase(size_t row_ndx, bool is_last)
 {
     StringConversionBuffer buffer;
@@ -448,7 +448,7 @@ void StringIndex::erase(size_t row_ndx, bool is_last)
         adjust_row_indexes(row_ndx, -1);
 }
 
-template<class T>
+template <class T>
 size_t StringIndex::find_first(T value) const
 {
     // Use direct access method
@@ -456,7 +456,7 @@ size_t StringIndex::find_first(T value) const
     return m_array->index_string_find_first(to_str(value, buffer), m_target_column);
 }
 
-template<class T>
+template <class T>
 void StringIndex::find_all(IntegerColumn& result, T value) const
 {
     // Use direct access method
@@ -464,7 +464,7 @@ void StringIndex::find_all(IntegerColumn& result, T value) const
     return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column);
 }
 
-template<class T>
+template <class T>
 FindRes StringIndex::find_all(T value, ref_type& ref) const
 {
     // Use direct access method
@@ -472,7 +472,7 @@ FindRes StringIndex::find_all(T value, ref_type& ref) const
     return m_array->index_string_find_all_no_copy(to_str(value, buffer), ref, m_target_column);
 }
 
-template<class T>
+template <class T>
 size_t StringIndex::count(T value) const
 {
     // Use direct access method
@@ -480,7 +480,7 @@ size_t StringIndex::count(T value) const
     return m_array->index_string_count(to_str(value, buffer), m_target_column);
 }
 
-template<class T>
+template <class T>
 void StringIndex::update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
 {
     StringConversionBuffer buffer;

@@ -38,7 +38,7 @@
                   __VA_ARGS__)
 
 #define TEST_TYPES_EX(name, list, enabled, allow_concur, ...) \
-    template<class> \
+    template <class> \
     struct Realm_UnitTest__##name: realm::test_util::unit_test::TestBase { \
         static bool test_enabled() { return bool(enabled); } \
         Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c): TestBase(c) {} \
@@ -47,7 +47,7 @@
     realm::test_util::unit_test::RegisterTypeTests<Realm_UnitTest__##name, __VA_ARGS__> \
         realm_unit_test_reg__##name((list), (allow_concur), "DefaultSuite", \
                                     #name, __FILE__, __LINE__); \
-    template<class TEST_TYPE> void Realm_UnitTest__##name<TEST_TYPE>::test_run()
+    template <class TEST_TYPE> void Realm_UnitTest__##name<TEST_TYPE>::test_run()
 
 
 namespace realm {
@@ -72,8 +72,8 @@ inline std::string sanitize_type_test_name(const char* test_name, std::string ty
     return std::string(test_name) + '<' + type_name + '>';
 }
 
-template<template<class> class, class...> struct RegisterTypeTests;
-template<template<class> class Test, class Type, class... Types>
+template <template <class> class, class...> struct RegisterTypeTests;
+template <template <class> class Test, class Type, class... Types>
 struct RegisterTypeTests<Test, Type, Types...> {
     RegisterTypeTests(TestList& list, bool allow_concur, const char* suite, const char* name,
                       const char* file, long line)
@@ -83,7 +83,7 @@ struct RegisterTypeTests<Test, Type, Types...> {
         RegisterTypeTests<Test, Types...> dummy_2(list, allow_concur, suite, name, file, line);
     }
 };
-template<template<class> class Test> struct RegisterTypeTests<Test> {
+template <template <class> class Test> struct RegisterTypeTests<Test> {
     RegisterTypeTests(TestList&, bool, const char*, const char*, const char*, long)
     {
     }

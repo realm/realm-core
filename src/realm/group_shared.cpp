@@ -154,7 +154,7 @@ const uint_fast16_t g_shared_info_version = 7;
 //   there is no standardized support for it.
 //
 
-template<typename T>
+template <typename T>
 bool atomic_double_inc_if_even(std::atomic<T>& counter)
 {
     T oldval = counter.fetch_add(2, std::memory_order_acquire);
@@ -166,13 +166,13 @@ bool atomic_double_inc_if_even(std::atomic<T>& counter)
     return true;
 }
 
-template<typename T>
+template <typename T>
 inline void atomic_double_dec(std::atomic<T>& counter)
 {
     counter.fetch_sub(2, std::memory_order_release);
 }
 
-template<typename T>
+template <typename T>
 bool atomic_one_if_zero(std::atomic<T>& counter)
 {
     T old_val = counter.fetch_add(1, std::memory_order_acquire);
@@ -183,7 +183,7 @@ bool atomic_one_if_zero(std::atomic<T>& counter)
     return true;
 }
 
-template<typename T>
+template <typename T>
 void atomic_dec(std::atomic<T>& counter)
 {
     counter.fetch_sub(1, std::memory_order_release);

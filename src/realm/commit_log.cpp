@@ -259,7 +259,7 @@ protected:
     static void set_log_entry_internal(HistoryEntry*, const EntryHeader*, const char* log);
     static void set_log_entry_internal(BinaryData*, const EntryHeader*, const char* log);
 
-    template<typename T>
+    template <typename T>
     void get_commit_entries_internal(version_type from_version, version_type to_version,
                                      T* logs_buffer) const noexcept;
 
@@ -565,7 +565,7 @@ void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
 }
 
 
-template<typename T>
+template <typename T>
 void WriteLogCollector::get_commit_entries_internal(version_type from_version,
                                                     version_type to_version,
                                                     T* logs_buffer) const noexcept

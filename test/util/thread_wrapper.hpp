@@ -33,7 +33,7 @@ namespace test_util {
 /// available to the thread that calls ThreadWrapper::join().
 class ThreadWrapper {
 public:
-    template<class F>
+    template <class F>
     void start(const F& func)
     {
         m_except = false;
@@ -75,7 +75,7 @@ private:
     bool m_except;
     std::string m_except_msg;
 
-    template<class F>
+    template <class F>
     struct Runner {
         static void run(F func, ThreadWrapper* tw)
         {

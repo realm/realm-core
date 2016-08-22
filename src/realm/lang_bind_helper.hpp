@@ -170,12 +170,12 @@ public:
     /// version does not correspond to a bound (or tethered) snapshot.
 
     static void advance_read(SharedGroup&, VersionID = VersionID());
-    template<class O> static void advance_read(SharedGroup&, O&& observer, VersionID = VersionID());
+    template <class O> static void advance_read(SharedGroup&, O&& observer, VersionID = VersionID());
     static void promote_to_write(SharedGroup&);
-    template<class O> static void promote_to_write(SharedGroup&, O&& observer);
+    template <class O> static void promote_to_write(SharedGroup&, O&& observer);
     static SharedGroup::version_type commit_and_continue_as_read(SharedGroup&);
     static void rollback_and_continue_as_read(SharedGroup&);
-    template<class O> static void rollback_and_continue_as_read(SharedGroup&, O&& observer);
+    template <class O> static void rollback_and_continue_as_read(SharedGroup&, O&& observer);
 
     //@}
 
@@ -341,7 +341,7 @@ inline void LangBindHelper::advance_read(SharedGroup& sg, VersionID version)
     sgf::advance_read(sg, observer, version); // Throws
 }
 
-template<class O>
+template <class O>
 inline void LangBindHelper::advance_read(SharedGroup& sg, O&& observer, VersionID version)
 {
     using sgf = _impl::SharedGroupFriend;
@@ -355,7 +355,7 @@ inline void LangBindHelper::promote_to_write(SharedGroup& sg)
     sgf::promote_to_write(sg, observer); // Throws
 }
 
-template<class O>
+template <class O>
 inline void LangBindHelper::promote_to_write(SharedGroup& sg, O&& observer)
 {
     using sgf = _impl::SharedGroupFriend;
@@ -375,7 +375,7 @@ inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg)
     sgf::rollback_and_continue_as_read(sg, observer); // Throws
 }
 
-template<class O>
+template <class O>
 inline void LangBindHelper::rollback_and_continue_as_read(SharedGroup& sg, O&& observer)
 {
     using sgf = _impl::SharedGroupFriend;

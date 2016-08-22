@@ -760,7 +760,7 @@ void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
     }
 }
 
-template<size_t w>
+template <size_t w>
 size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff)
 {
     // Check if we need to copy before modifying
@@ -817,7 +817,7 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
     }
 }
 
-template<size_t w>
+template <size_t w>
 size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
 {
     REALM_ASSERT(start < (indirection ? indirection->size() : size()));
@@ -957,7 +957,7 @@ size_t Array::first_set_bit64(int64_t v) const
 
 namespace {
 
-template<size_t width>
+template <size_t width>
 inline int64_t lower_bits()
 {
     if (width == 1)
@@ -981,7 +981,7 @@ inline int64_t lower_bits()
 }
 
 // Return true if 'value' has an element (of bit-width 'width') which is 0
-template<size_t width>
+template <size_t width>
 inline bool has_zero_element(uint64_t value)
 {
     uint64_t hasZeroByte;
@@ -993,7 +993,7 @@ inline bool has_zero_element(uint64_t value)
 
 
 // Finds zero element of bit width 'width'
-template<bool eq, size_t width>
+template <bool eq, size_t width>
 size_t find_zero(uint64_t v)
 {
     size_t start = 0;
@@ -1038,7 +1038,7 @@ size_t find_zero(uint64_t v)
 } // anonymous namesapce
 
 
-template<bool find_max, size_t w>
+template <bool find_max, size_t w>
 bool Array::minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
 {
     size_t best_index = 0;
@@ -1136,7 +1136,7 @@ int64_t Array::sum(size_t start, size_t end) const
     REALM_TEMPEX(return sum, m_width, (start, end));
 }
 
-template<size_t w>
+template <size_t w>
 int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
@@ -1649,7 +1649,7 @@ void Array::copy_on_write()
 
 namespace {
 
-template<size_t width>
+template <size_t width>
 void set_direct(char* data, size_t ndx, int_fast64_t value) noexcept
 {
     if (width == 0) {
@@ -1705,7 +1705,7 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) noexcept
     }
 }
 
-template<size_t width>
+template <size_t width>
 void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) noexcept
 {
     for (size_t i = begin; i != end; ++i)
@@ -1827,7 +1827,7 @@ int_fast64_t Array::lbound_for_width(size_t width) noexcept
     REALM_TEMPEX(return lbound_for_width, width, ());
 }
 
-template<size_t width>
+template <size_t width>
 int_fast64_t Array::lbound_for_width() noexcept
 {
     if (width == 0) {
@@ -1864,7 +1864,7 @@ int_fast64_t Array::ubound_for_width(size_t width) noexcept
     REALM_TEMPEX(return ubound_for_width, width, ());
 }
 
-template<size_t width>
+template <size_t width>
 int_fast64_t Array::ubound_for_width() noexcept
 {
     if (width == 0) {
@@ -1898,7 +1898,7 @@ int_fast64_t Array::ubound_for_width() noexcept
 
 
 
-template<size_t width>
+template <size_t width>
 struct Array::VTableForWidth {
     struct PopulatedVTable : Array::VTable {
         PopulatedVTable()
@@ -1915,7 +1915,7 @@ struct Array::VTableForWidth {
     static const PopulatedVTable vtable;
 };
 
-template<size_t width>
+template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
 void Array::set_width(size_t width) noexcept
@@ -1923,7 +1923,7 @@ void Array::set_width(size_t width) noexcept
     REALM_TEMPEX(set_width, width, ());
 }
 
-template<size_t width>
+template <size_t width>
 void Array::set_width() noexcept
 {
     m_lbound = lbound_for_width<width>();
@@ -1937,7 +1937,7 @@ void Array::set_width() noexcept
 
 // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
 // exceed array length; in this case, remainder of res[8] will be left untouched.
-template<size_t w>
+template <size_t w>
 void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
@@ -1994,7 +1994,7 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 }
 
 
-template<size_t width>
+template <size_t width>
 void Array::set(size_t ndx, int64_t value)
 {
     set_direct<width>(m_data, ndx, value);
@@ -2158,7 +2158,7 @@ void Array::verify() const
     REALM_ASSERT_3(ref_in_parent, ==, m_ref);
 }
 
-template<class C, class T>
+template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats stats)
 {
     std::ostringstream out_2;
@@ -2510,7 +2510,7 @@ namespace {
 
 // Direct access methods
 
-template<int w>
+template <int w>
 int64_t get_direct(const char* data, size_t ndx) noexcept
 {
     if (w == 0) {
@@ -2553,7 +2553,7 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) noexcept
 }
 
 
-template<int width>
+template <int width>
 inline std::pair<int64_t, int64_t> get_two(const char* data, size_t ndx) noexcept
 {
     return std::make_pair(to_size_t(get_direct<width>(data, ndx + 0)),
@@ -2566,7 +2566,7 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
 }
 
 
-template<int width>
+template <int width>
 inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
 {
     v0 = to_ref(get_direct<width>(data, ndx + 0));
@@ -2601,7 +2601,7 @@ inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, 
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-template<int width>
+template <int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 {
 // The binary search used here is carefully optimized. Key trick is to use a single
@@ -2687,7 +2687,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) noexcept
 }
 
 // See lower_bound()
-template<int width>
+template <int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) noexcept
 {
     size_t low = 0;
@@ -2793,7 +2793,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 }
 
 
-template<IndexMethod method, class T>
+template <IndexMethod method, class T>
 size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
 {
     bool first(method == index_FindFirst);
@@ -2986,7 +2986,7 @@ namespace {
 // the specified 'offsets' array.
 //
 // Returns (child_ndx, ndx_in_child).
-template<int width>
+template <int width>
 inline std::pair<size_t, size_t>
 find_child_from_offsets(const char* offsets_header, size_t elem_ndx) noexcept
 {
@@ -3038,7 +3038,7 @@ inline std::pair<size_t, size_t> find_bptree_child(Array& node, size_t ndx) noex
 
 
 // Returns (child_ref, ndx_in_child)
-template<int width>
+template <int width>
 inline std::pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
                                                      const Allocator& alloc) noexcept
 {

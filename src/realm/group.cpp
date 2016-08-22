@@ -1748,7 +1748,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-template<class F>
+template <class F>
 void Group::update_table_indices(F&& map_function)
 {
     using tf = _impl::TableFriend;

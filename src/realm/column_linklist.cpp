@@ -478,7 +478,7 @@ void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexc
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
     prune_list_accessor_tombstones();
@@ -497,7 +497,7 @@ void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) n
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept
 {
     prune_list_accessor_tombstones();
@@ -525,7 +525,7 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     prune_list_accessor_tombstones();
@@ -573,7 +573,7 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     prune_list_accessor_tombstones();

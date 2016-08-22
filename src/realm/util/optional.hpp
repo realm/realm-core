@@ -28,13 +28,13 @@
 namespace realm {
 namespace util {
 
-template<class T>
+template <class T>
 class Optional;
 
 // some() should be the equivalent of the proposed C++17 `make_optional`.
-template<class T, class... Args>
+template <class T, class... Args>
 Optional<T> some(Args&&...);
-template<class T>
+template <class T>
 struct Some;
 
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
@@ -53,10 +53,10 @@ struct BadOptionalAccess : std::logic_error {
 
 namespace _impl {
 
-template<class T, bool = std::is_trivially_destructible<T>::value>
+template <class T, bool = std::is_trivially_destructible<T>::value>
 struct OptionalStorage;
 
-template<class T, class U>
+template <class T, class U>
 struct TypeIsAssignableToOptional {
     // Constraints from [optional.object.assign.18]
     static const bool value = (std::is_same<typename std::remove_reference<U>::type, T>::value
@@ -69,7 +69,7 @@ struct TypeIsAssignableToOptional {
 namespace util {
 
 // Note: Should conform with the future std::optional.
-template<class T>
+template <class T>
 class Optional : private _impl::OptionalStorage<T> {
 public:
     using value_type = T;
@@ -82,7 +82,7 @@ public:
     constexpr Optional(T&& value);
     constexpr Optional(const T& value);
 
-    template<class... Args>
+    template <class... Args>
     constexpr Optional(InPlace tag, Args&&...);
     // FIXME: std::optional specifies an std::initializer_list constructor overload as well.
 
@@ -90,7 +90,7 @@ public:
     Optional<T>& operator=(Optional<T>&& other);
     Optional<T>& operator=(const Optional<T>& other);
 
-    template<class U, class = typename std::enable_if<_impl::TypeIsAssignableToOptional<T, U>::value>::type>
+    template <class U, class = typename std::enable_if<_impl::TypeIsAssignableToOptional<T, U>::value>::type>
     Optional<T>& operator=(U && value);
 
     explicit constexpr operator bool() const;
@@ -101,15 +101,15 @@ public:
     constexpr const T* operator->() const; // Throws
     T* operator->(); // Throws, FIXME: Can be constexpr with C++14
 
-    template<class U>
+    template <class U>
     constexpr T value_or(U&& value) const&;
 
-    template<class U>
+    template <class U>
     T value_or(U&& value) &&;
 
     void swap(Optional<T>& other); // FIXME: Add noexcept() clause
 
-    template<class... Args>
+    template <class... Args>
     void emplace(Args&&...);
     // FIXME: std::optional specifies an std::initializer_list overload for `emplace` as well.
 private:
@@ -126,7 +126,7 @@ private:
 /// Note: C++17 does not (yet) specify this specialization, but it is convenient
 /// as a "safer bool", especially in the presence of `fmap`.
 /// Disabled for compliance with std::optional.
-// template<>
+// template <>
 // class Optional<void> {
 // public:
 //     Optional() {}
@@ -142,7 +142,7 @@ private:
 /// An Optional<T&> is a non-owning nullable pointer that throws on dereference.
 // FIXME: Visual Studio 2015's constexpr support isn't sufficient to allow Optional<T&> to compile
 // in constexpr contexts.
-template<class T>
+template <class T>
 class Optional<T&> {
 public:
     using value_type = T&;
@@ -151,9 +151,9 @@ public:
     constexpr Optional() {}
     constexpr Optional(None) {} // FIXME: Was a delegating constructor, but not fully supported in VS2015
     Optional(const Optional<T&>& other) = default;
-    template<class U>
+    template <class U>
     Optional(const Optional<U&>& other) : m_ptr(other.m_ptr) {}
-    template<class U>
+    template <class U>
     Optional(std::reference_wrapper<U> ref) : m_ptr(&ref.get()) {}
 
     constexpr Optional(T& init_value) : m_ptr(&init_value) {}
@@ -162,7 +162,7 @@ public:
     Optional<T&>& operator=(None) { m_ptr = nullptr; return *this; }
     Optional<T&>& operator=(const Optional<T&>& other) { m_ptr = other.m_ptr; return *this; }
 
-    template<class U>
+    template <class U>
     Optional<T&>& operator=(std::reference_wrapper<U> ref) { m_ptr = &ref.get(); return *this; }
 
     explicit constexpr operator bool() const { return m_ptr; }
@@ -177,24 +177,24 @@ public:
 private:
     T* m_ptr = nullptr;
 
-    template<class U>
+    template <class U>
     friend class Optional;
 };
 
 
-template<class T> struct RemoveOptional {
+template <class T> struct RemoveOptional {
     using type = T;
 };
-template<class T> struct RemoveOptional<Optional<T>> {
+template <class T> struct RemoveOptional<Optional<T>> {
     using type = typename RemoveOptional<T>::type; // Remove recursively
 };
 
 
 /// Implementation:
 
-template<class T>
+template <class T>
 struct Some {
-    template<class... Args>
+    template <class... Args>
     static Optional<T> some(Args&&... args)
     {
         return Optional<T> {std::forward<Args>(args)...};
@@ -202,7 +202,7 @@ struct Some {
 };
 
 /// Disabled for compliance with std::optional.
-// template<>
+// template <>
 // struct Some<void> {
 //     static Optional<void> some()
 //     {
@@ -212,24 +212,24 @@ struct Some {
 //     }
 // };
 
-template<class T, class... Args>
+template <class T, class... Args>
 Optional<T> some(Args&&... args)
 {
     return Some<T>::some(std::forward<Args>(args)...);
 }
 
 
-template<class T>
+template <class T>
 constexpr Optional<T>::Optional(): Storage(none)
 {
 }
 
-template<class T>
+template <class T>
 constexpr Optional<T>::Optional(None): Storage(none)
 {
 }
 
-template<class T>
+template <class T>
 Optional<T>::Optional(Optional<T>&& other): Storage(none)
 {
     if (other.m_engaged) {
@@ -238,7 +238,7 @@ Optional<T>::Optional(Optional<T>&& other): Storage(none)
     }
 }
 
-template<class T>
+template <class T>
 Optional<T>::Optional(const Optional<T>& other): Storage(none)
 {
     if (other.m_engaged) {
@@ -247,23 +247,23 @@ Optional<T>::Optional(const Optional<T>& other): Storage(none)
     }
 }
 
-template<class T>
+template <class T>
 constexpr Optional<T>::Optional(T&& r_value): Storage(std::move(r_value))
 {
 }
 
-template<class T>
+template <class T>
 constexpr Optional<T>::Optional(const T& l_value): Storage(l_value)
 {
 }
 
-template<class T>
-template<class... Args>
+template <class T>
+template <class... Args>
 constexpr Optional<T>::Optional(InPlace, Args&&... args): Storage(std::forward<Args>(args)...)
 {
 }
 
-template<class T>
+template <class T>
 void Optional<T>::clear()
 {
     if (m_engaged) {
@@ -272,14 +272,14 @@ void Optional<T>::clear()
     }
 }
 
-template<class T>
+template <class T>
 Optional<T>& Optional<T>::operator=(None)
 {
     clear();
     return *this;
 }
 
-template<class T>
+template <class T>
 Optional<T>& Optional<T>::operator=(Optional<T>&& other)
 {
     if (m_engaged) {
@@ -299,7 +299,7 @@ Optional<T>& Optional<T>::operator=(Optional<T>&& other)
     return *this;
 }
 
-template<class T>
+template <class T>
 Optional<T>& Optional<T>::operator=(const Optional<T>& other)
 {
     if (m_engaged) {
@@ -319,8 +319,8 @@ Optional<T>& Optional<T>::operator=(const Optional<T>& other)
     return *this;
 }
 
-template<class T>
-template<class U, class>
+template <class T>
+template <class U, class>
 Optional<T>& Optional<T>::operator=(U&& r_value)
 {
     if (m_engaged) {
@@ -333,19 +333,19 @@ Optional<T>& Optional<T>::operator=(U&& r_value)
     return *this;
 }
 
-template<class T>
+template <class T>
 constexpr Optional<T>::operator bool() const
 {
     return m_engaged;
 }
 
-template<class T>
+template <class T>
 constexpr const T& Optional<T>::value() const
 {
     return m_engaged ? m_value : (throw BadOptionalAccess{"bad optional access"}, m_value);
 }
 
-template<class T>
+template <class T>
 T& Optional<T>::value()
 {
     if (!m_engaged) {
@@ -354,13 +354,13 @@ T& Optional<T>::value()
     return m_value;
 }
 
-template<class T>
+template <class T>
 constexpr const typename Optional<T&>::target_type& Optional<T&>::value() const
 {
     return m_ptr ? *m_ptr : (throw BadOptionalAccess{"bad optional access"}, *m_ptr);
 }
 
-template<class T>
+template <class T>
 typename Optional<T&>::target_type& Optional<T&>::value()
 {
     if (!m_ptr) {
@@ -369,43 +369,43 @@ typename Optional<T&>::target_type& Optional<T&>::value()
     return *m_ptr;
 }
 
-template<class T>
+template <class T>
 constexpr const T& Optional<T>::operator*() const
 {
     // Note: This differs from std::optional, which doesn't throw.
     return value();
 }
 
-template<class T>
+template <class T>
 T& Optional<T>::operator*()
 {
     // Note: This differs from std::optional, which doesn't throw.
     return value();
 }
 
-template<class T>
+template <class T>
 constexpr const T* Optional<T>::operator->() const
 {
     // Note: This differs from std::optional, which doesn't throw.
     return &value();
 }
 
-template<class T>
+template <class T>
 T* Optional<T>::operator->()
 {
     // Note: This differs from std::optional, which doesn't throw.
     return &value();
 }
 
-template<class T>
-template<class U>
+template <class T>
+template <class U>
 constexpr T Optional<T>::value_or(U&& otherwise) const&
 {
     return m_engaged ? T{m_value} : T{std::forward<U>(otherwise)};
 }
 
-template<class T>
-template<class U>
+template <class T>
+template <class U>
 T Optional<T>::value_or(U&& otherwise) &&
 {
     if (is_engaged()) {
@@ -416,7 +416,7 @@ T Optional<T>::value_or(U&& otherwise) &&
     }
 }
 
-template<class T>
+template <class T>
 void Optional<T>::swap(Optional<T>& other)
 {
     // FIXME: This might be optimizable.
@@ -425,8 +425,8 @@ void Optional<T>::swap(Optional<T>& other)
     *this = std::move(tmp);
 }
 
-template<class T>
-template<class... Args>
+template <class T>
+template <class... Args>
 void Optional<T>::emplace(Args&&... args)
 {
     clear();
@@ -435,7 +435,7 @@ void Optional<T>::emplace(Args&&... args)
 }
 
 
-template<class T>
+template <class T>
 constexpr Optional<typename std::decay<T>::type>
 make_optional(T&& value)
 {
@@ -443,7 +443,7 @@ make_optional(T&& value)
     return some<Type>(std::forward<T>(value));
 }
 
-template<class T>
+template <class T>
 bool operator==(const Optional<T>& lhs, const Optional<T>& rhs)
 {
     if (!lhs && !rhs) { return true; }
@@ -451,13 +451,13 @@ bool operator==(const Optional<T>& lhs, const Optional<T>& rhs)
     return false;
 }
 
-template<class T>
+template <class T>
 bool operator!=(const Optional<T>& lhs, const Optional<T>& rhs)
 {
     return !(lhs == rhs);
 }
 
-template<class T>
+template <class T>
 bool operator<(const Optional<T>& lhs, const Optional<T>& rhs)
 {
     if (!rhs) { return false; }
@@ -465,7 +465,7 @@ bool operator<(const Optional<T>& lhs, const Optional<T>& rhs)
     return std::less<T> {}(*lhs, *rhs);
 }
 
-template<class T>
+template <class T>
 bool operator>(const util::Optional<T>& lhs, const util::Optional<T>& rhs)
 {
     if (!lhs) { return false; }
@@ -473,74 +473,74 @@ bool operator>(const util::Optional<T>& lhs, const util::Optional<T>& rhs)
     return std::greater<T> {}(*lhs, *rhs);
 }
 
-template<class T>
+template <class T>
 bool operator==(const Optional<T>& lhs, None)
 {
     return !bool(lhs);
 }
 
-template<class T>
+template <class T>
 bool operator!=(const Optional<T>& lhs, None)
 {
     return bool(lhs);
 }
 
-template<class T>
+template <class T>
 bool operator<(const Optional<T>& lhs, None)
 {
     static_cast<void>(lhs);
     return false;
 }
 
-template<class T>
+template <class T>
 bool operator==(None, const Optional<T>& rhs)
 {
     return !bool(rhs);
 }
 
-template<class T>
+template <class T>
 bool operator!=(None, const Optional<T>& rhs)
 {
     return bool(rhs);
 }
 
-template<class T>
+template <class T>
 bool operator<(None, const Optional<T>& rhs)
 {
     return bool(rhs);
 }
 
-template<class T, class U>
+template <class T, class U>
 bool operator==(const Optional<T>& lhs, const U& rhs)
 {
     return lhs ? *lhs == rhs : false;
 }
 
-template<class T>
+template <class T>
 bool operator<(const Optional<T>& lhs, const T& rhs)
 {
     return lhs ? std::less<T> {}(*lhs, rhs) : true;
 }
 
-template<class T, class U>
+template <class T, class U>
 bool operator==(const T& lhs, const Optional<U>& rhs)
 {
     return rhs ? lhs == *rhs : false;
 }
 
-template<class T>
+template <class T>
 bool operator<(const T& lhs, const Optional<T>& rhs)
 {
     return rhs ? std::less<T> {}(lhs, *rhs) : false;
 }
 
-template<class T, class F>
+template <class T, class F>
 auto operator>>(Optional<T> lhs, F&& rhs) -> decltype(fmap(lhs, std::forward<F>(rhs)))
 {
     return fmap(lhs, std::forward<F>(rhs));
 }
 
-template<class OS, class T>
+template <class OS, class T>
 OS& operator<<(OS& os, const Optional<T>& rhs)
 {
     if (rhs) {
@@ -552,25 +552,25 @@ OS& operator<<(OS& os, const Optional<T>& rhs)
     return os;
 }
 
-template<class T>
+template <class T>
 T unwrap(T&& value)
 {
     return value;
 }
 
-template<class T>
+template <class T>
 T unwrap(util::Optional<T>&& value)
 {
     return *value;
 }
 
-template<class T>
+template <class T>
 T unwrap(const util::Optional<T>& value)
 {
     return *value;
 }
 
-template<class T>
+template <class T>
 T unwrap(util::Optional<T>& value)
 {
     return *value;
@@ -581,7 +581,7 @@ T unwrap(util::Optional<T>& value)
 namespace _impl {
 
 // T is trivially destructible.
-template<class T>
+template <class T>
 struct OptionalStorage<T, true> {
     union {
         T m_value;
@@ -592,12 +592,12 @@ struct OptionalStorage<T, true> {
     constexpr OptionalStorage(realm::util::None) : m_null_state() { }
     constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) { }
 
-    template<class... Args>
+    template <class... Args>
     constexpr OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
 };
 
 // T is not trivially destructible.
-template<class T>
+template <class T>
 struct OptionalStorage<T, false> {
     union {
         T m_value;
@@ -608,7 +608,7 @@ struct OptionalStorage<T, false> {
     constexpr OptionalStorage(realm::util::None) : m_null_state() { }
     constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) { }
 
-    template<class... Args>
+    template <class... Args>
     constexpr OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
 
     ~OptionalStorage()

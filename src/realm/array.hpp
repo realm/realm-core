@@ -18,7 +18,7 @@
 
 /*
 Searching: The main finding function is:
-    template<class cond, Action action, size_t bitwidth, class Callback>
+    template <class cond, Action action, size_t bitwidth, class Callback>
     void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState *state, Callback callback) const
 
     cond:       One of Equal, NotEqual, Greater, etc. classes
@@ -76,7 +76,7 @@ enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll,
              act_CallbackVal, act_CallbackNone, act_CallbackBoth, act_Average
             };
 
-template<class T>
+template <class T>
 inline T no0(T v) { return v == 0 ? 1 : v; }
 
 /// Special index value. It has various meanings depending on
@@ -151,7 +151,7 @@ const size_t not_found = npos;
 class Array;
 class StringColumn;
 class GroupWriter;
-template<class T>
+template <class T>
 class QueryState;
 namespace _impl { class ArrayWriterBase; }
 
@@ -162,7 +162,7 @@ struct MemStats {
     size_t used = 0;
     size_t array_count = 0;
 };
-template<class C, class T>
+template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats stats);
 #endif
 
@@ -393,17 +393,17 @@ public:
 
     void set_as_ref(size_t ndx, ref_type ref);
 
-    template<size_t w>
+    template <size_t w>
     void set(size_t ndx, int64_t value);
 
     int64_t get(size_t ndx) const noexcept;
 
-    template<size_t w>
+    template <size_t w>
     int64_t get(size_t ndx) const noexcept;
 
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
-    template<size_t w>
+    template <size_t w>
     void get_chunk(size_t ndx, int64_t res[8]) const noexcept;
 
     ref_type get_as_ref(size_t ndx) const noexcept;
@@ -701,42 +701,42 @@ public:
               QueryState<int64_t>* state) const;
     */
 
-    template<class cond, Action action, size_t bitwidth, class Callback>
+    template <class cond, Action action, size_t bitwidth, class Callback>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback, bool nullable_array = false, bool find_null = false) const;
 
     // This is the one installed into the m_vtable->finder slots.
-    template<class cond, Action action, size_t bitwidth>
+    template <class cond, Action action, size_t bitwidth>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
 
-    template<class cond, Action action, class Callback>
+    template <class cond, Action action, class Callback>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
               Callback callback, bool nullable_array = false, bool find_null = false) const;
 
     /*
-    template<class cond, Action action, class Callback>
+    template <class cond, Action action, class Callback>
     bool find(null, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state, Callback callback) const;
     */
 
     // Optimized implementation for release mode
-    template<class cond, Action action, size_t bitwidth, class Callback>
+    template <class cond, Action action, size_t bitwidth, class Callback>
     bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex,
                         QueryState<int64_t>* state, Callback callback, bool nullable_array = false, bool find_null = false) const;
 
     // Called for each search result
-    template<Action action, class Callback>
+    template <Action action, class Callback>
     bool find_action(size_t index, util::Optional<int64_t> value,
                      QueryState<int64_t>* state, Callback callback) const;
 
-    template<Action action, class Callback>
+    template <Action action, class Callback>
     bool find_action_pattern(size_t index, uint64_t pattern,
                              QueryState<int64_t>* state, Callback callback) const;
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
-    template<class cond>
+    template <class cond>
     size_t find_first(int64_t value, size_t start = 0,
                       size_t end = size_t(-1)) const;
 
@@ -747,77 +747,77 @@ public:
                       size_t end = size_t(-1)) const;
 
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
-    template<class cond, Action action, size_t bitwidth, class Callback>
+    template <class cond, Action action, size_t bitwidth, class Callback>
     bool compare(int64_t value, size_t start, size_t end, size_t baseindex,
                  QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Equal/NotEqual
-    template<bool eq, Action action, size_t width, class Callback>
+    template <bool eq, Action action, size_t width, class Callback>
     inline bool compare_equality(int64_t value, size_t start, size_t end, size_t baseindex,
                                  QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Less/Greater
-    template<bool gt, Action action, size_t bitwidth, class Callback>
+    template <bool gt, Action action, size_t bitwidth, class Callback>
     bool compare_relation(int64_t value, size_t start, size_t end, size_t baseindex,
                           QueryState<int64_t>* state, Callback callback) const;
 
-    template<class cond, Action action, size_t foreign_width, class Callback, size_t width>
+    template <class cond, Action action, size_t foreign_width, class Callback, size_t width>
     bool compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex,
                          QueryState<int64_t>* state, Callback callback) const;
 
-    template<class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
+    template <class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
     bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                        QueryState<int64_t>* state, Callback callback) const;
 
-    template<class cond, Action action, class Callback>
+    template <class cond, Action action, class Callback>
     bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                        QueryState<int64_t>* state, Callback callback) const;
 
-    template<class cond, Action action, size_t width, class Callback>
+    template <class cond, Action action, size_t width, class Callback>
     bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
                        QueryState<int64_t>* state, Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef REALM_COMPILER_SSE
-    template<class cond, Action action, size_t width, class Callback>
+    template <class cond, Action action, size_t width, class Callback>
     bool find_sse(int64_t value, __m128i* data, size_t items, QueryState<int64_t>* state,
                   size_t baseindex, Callback callback) const;
 
-    template<class cond, Action action, size_t width, class Callback>
+    template <class cond, Action action, size_t width, class Callback>
     REALM_FORCEINLINE bool find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                            QueryState<int64_t>* state, size_t baseindex,
                                            Callback callback) const;
 
 #endif
 
-    template<size_t width>
+    template <size_t width>
     inline bool test_zero(uint64_t value) const; // Tests value for 0-elements
 
-    template<bool eq, size_t width>
+    template <bool eq, size_t width>
     size_t find_zero(uint64_t v) const;          // Finds position of 0/non-zero element
 
-    template<size_t width, bool zero>
+    template <size_t width, bool zero>
     uint64_t cascade(uint64_t a) const;          // Sets lowermost bits of zero or non-zero elements
 
-    template<bool gt, size_t width>
+    template <bool gt, size_t width>
     int64_t find_gtlt_magic(int64_t v) const;    // Compute magic constant needed for searching for value 'v' using bit hacks
 
-    template<size_t width>
+    template <size_t width>
     inline int64_t lower_bits() const;           // Return chunk with lower bit set in each element
 
     size_t first_set_bit(unsigned int v) const;
     size_t first_set_bit64(int64_t v) const;
 
-    template<size_t w>
+    template <size_t w>
     int64_t get_universal(const char* const data, const size_t ndx) const;
 
     // Find value greater/less in 64-bit chunk - only works for positive values
-    template<bool gt, Action action, size_t width, class Callback>
+    template <bool gt, Action action, size_t width, class Callback>
     bool find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex,
                         Callback callback) const;
 
     // Find value greater/less in 64-bit chunk - no constraints
-    template<bool gt, Action action, size_t width, class Callback>
+    template <bool gt, Action action, size_t width, class Callback>
     bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex,
                    Callback callback) const;
 
@@ -932,14 +932,14 @@ public:
         size_t m_split_size;
     };
 
-    template<class TreeTraits>
+    template <class TreeTraits>
     struct TreeInsert: TreeInsertBase {
         typename TreeTraits::value_type m_value;
         bool m_nullable;
     };
 
     /// Same as bptree_insert() but insert after the last element.
-    template<class TreeTraits>
+    template <class TreeTraits>
     ref_type bptree_append(TreeInsert<TreeTraits>& state);
 
     /// Insert an element into the B+-subtree rooted at this array
@@ -947,7 +947,7 @@ public:
     /// index. This function must be called on an inner B+-tree node,
     /// never a leaf. If this inner node had to be split, this
     /// function returns the `ref` of the new sibling.
-    template<class TreeTraits>
+    template <class TreeTraits>
     ref_type bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state);
 
     ref_type bptree_leaf_insert(size_t ndx, int64_t, TreeInsertBase& state);
@@ -1049,7 +1049,7 @@ protected:
 
     bool do_erase_bptree_elem(size_t elem_ndx, EraseHandler&);
 
-    template<IndexMethod method, class T>
+    template <IndexMethod method, class T>
     size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                         ColumnBase* column) const;
 protected:
@@ -1093,19 +1093,19 @@ protected:
 
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template<size_t width>
+    template <size_t width>
     static int_fast64_t lbound_for_width() noexcept;
 
     static int_fast64_t lbound_for_width(size_t width) noexcept;
 
     // This returns the maximum value ("inclusive upper bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template<size_t width>
+    template <size_t width>
     static int_fast64_t ubound_for_width() noexcept;
 
     static int_fast64_t ubound_for_width(size_t width) noexcept;
 
-    template<size_t width>
+    template <size_t width>
     void set_width() noexcept;
     void set_width(size_t) noexcept;
     void alloc(size_t init_size, size_t width);
@@ -1113,16 +1113,16 @@ protected:
 
 private:
 
-    template<size_t w>
+    template <size_t w>
     int64_t sum(size_t start, size_t end) const;
 
-    template<bool max, size_t w>
+    template <bool max, size_t w>
     bool minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const;
 
-    template<size_t w>
+    template <size_t w>
     size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
 
-    template<size_t w>
+    template <size_t w>
     size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
 
 protected:
@@ -1173,7 +1173,7 @@ protected:
         Setter setter;
         Finder finder[cond_VTABLE_FINDER_COUNT]; // one for each active function pointer
     };
-    template<size_t w>
+    template <size_t w>
     struct VTableForWidth;
 
 protected:
@@ -1297,7 +1297,7 @@ public:
 
 class QueryStateBase { virtual void dyncast() {} };
 
-template<>
+template <>
 class QueryState<int64_t>: public QueryStateBase {
 public:
     int64_t m_state;
@@ -1305,7 +1305,7 @@ public:
     size_t m_limit;
     size_t m_minmax_index; // used only for min/max, to save index of current min/max value
 
-    template<Action action>
+    template <Action action>
     bool uses_val()
     {
         if (action == act_Max || action == act_Min || action == act_Sum)
@@ -1339,7 +1339,7 @@ public:
         }
     }
 
-    template<Action action, bool pattern>
+    template <Action action, bool pattern>
     inline bool match(size_t index, uint64_t indexpattern, int64_t value)
     {
         if (pattern) {
@@ -1390,7 +1390,7 @@ public:
         return (m_limit > m_match_count);
     }
 
-    template<Action action, bool pattern>
+    template <Action action, bool pattern>
     inline bool match(size_t index, uint64_t indexpattern, util::Optional<int64_t> value)
     {
         // FIXME: This is a temporary hack for nullable integers.
@@ -1417,7 +1417,7 @@ public:
 };
 
 // Used only for Basic-types: currently float and double
-template<class R>
+template <class R>
 class QueryState : public QueryStateBase {
 public:
     R m_state;
@@ -1425,7 +1425,7 @@ public:
     size_t m_limit;
     size_t m_minmax_index; // used only for min/max, to save index of current min/max value
 
-    template<Action action>
+    template <Action action>
     bool uses_val()
     {
         return (action == act_Max || action == act_Min || action == act_Sum || action == act_Count);
@@ -1450,7 +1450,7 @@ public:
         }
     }
 
-    template<Action action, bool pattern, typename resulttype>
+    template <Action action, bool pattern, typename resulttype>
     inline bool match(size_t index, uint64_t /*indexpattern*/, resulttype value)
     {
         if (pattern)
@@ -2212,7 +2212,7 @@ inline void Array::ensure_bptree_offsets(Array& offsets)
 }
 
 
-template<class TreeTraits>
+template <class TreeTraits>
 ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
 {
     // FIXME: Consider exception safety. Especially, how can the split
@@ -2281,7 +2281,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
 }
 
 
-template<class TreeTraits>
+template <class TreeTraits>
 ref_type Array::bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state)
 {
     REALM_ASSERT_3(size(), >=, 1 + 1 + 1); // At least one child
@@ -2345,13 +2345,13 @@ ref_type Array::bptree_insert(size_t elem_ndx, TreeInsert<TreeTraits>& state)
 // Finding code                                                                       *
 //*************************************************************************************
 
-template<size_t w>
+template <size_t w>
 int64_t Array::get(size_t ndx) const noexcept
 {
     return get_universal<w>(m_data, ndx);
 }
 
-template<size_t w>
+template <size_t w>
 int64_t Array::get_universal(const char* data, size_t ndx) const
 {
     if (w == 0) {
@@ -2409,7 +2409,7 @@ computations for the given search criteria makes it feasible to construct such a
 // These wrapper functions only exist to enable a possibility to make the compiler see that 'value' and/or 'index' are unused, such that caller's
 // computation of these values will not be made. Only works if find_action() and find_action_pattern() rewritten as macros. Note: This problem has been fixed in
 // next upcoming array.hpp version
-template<Action action, class Callback>
+template <Action action, class Callback>
 bool Array::find_action(size_t index, util::Optional<int64_t> value, QueryState<int64_t>* state, Callback callback) const
 {
     if (action == act_CallbackIdx)
@@ -2417,7 +2417,7 @@ bool Array::find_action(size_t index, util::Optional<int64_t> value, QueryState<
     else
         return state->match<action, false>(index, 0, value);
 }
-template<Action action, class Callback>
+template <Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
     static_cast<void>(callback);
@@ -2429,7 +2429,7 @@ bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64
 }
 
 
-template<size_t width, bool zero>
+template <size_t width, bool zero>
 uint64_t Array::cascade(uint64_t a) const
 {
     // Takes a chunk of values as argument and sets the least significant bit for each
@@ -2546,7 +2546,7 @@ uint64_t Array::cascade(uint64_t a) const
 //
 // If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set,
 // then nullable_array must be set too.
-template<class cond, Action action, size_t bitwidth, class Callback>
+template <class cond, Action action, size_t bitwidth, class Callback>
 bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback, bool nullable_array, bool find_null) const
 {
     REALM_ASSERT(!(find_null && !nullable_array));
@@ -2695,7 +2695,7 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
 #endif
 }
 
-template<size_t width>
+template <size_t width>
 inline int64_t Array::lower_bits() const
 {
     if (width == 1)
@@ -2719,7 +2719,7 @@ inline int64_t Array::lower_bits() const
 }
 
 // Tests if any chunk in 'value' is 0
-template<size_t width>
+template <size_t width>
 inline bool Array::test_zero(uint64_t value) const
 {
     uint64_t hasZeroByte;
@@ -2731,7 +2731,7 @@ inline bool Array::test_zero(uint64_t value) const
 
 // Finds first zero (if eq == true) or non-zero (if eq == false) element in v and returns its position.
 // IMPORTANT: This function assumes that at least 1 item matches (test this with test_zero() or other means first)!
-template<bool eq, size_t width>
+template <bool eq, size_t width>
 size_t Array::find_zero(uint64_t v) const
 {
     size_t start = 0;
@@ -2781,7 +2781,7 @@ size_t Array::find_zero(uint64_t v) const
 }
 
 // Generate a magic constant used for later bithacks
-template<bool gt, size_t width>
+template <bool gt, size_t width>
 int64_t Array::find_gtlt_magic(int64_t v) const
 {
     uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
@@ -2790,7 +2790,7 @@ int64_t Array::find_gtlt_magic(int64_t v) const
     return magic;
 }
 
-template<bool gt, Action action, size_t width, class Callback>
+template <bool gt, Action action, size_t width, class Callback>
 bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v.
@@ -2820,7 +2820,7 @@ bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* 
 }
 
 
-template<bool gt, Action action, size_t width, class Callback>
+template <bool gt, Action action, size_t width, class Callback>
 bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
@@ -2975,7 +2975,7 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
 
 
 /// Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
-template<bool eq, Action action, size_t width, class Callback>
+template <bool eq, Action action, size_t width, class Callback>
 inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
@@ -3043,20 +3043,20 @@ inline bool Array::compare_equality(int64_t value, size_t start, size_t end, siz
 // takes as most as possible to get best performance.
 
 // This is the one installed into the m_vtable->finder slots.
-template<class cond, Action action, size_t bitwidth>
+template <class cond, Action action, size_t bitwidth>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
     return find<cond, action, bitwidth>(value, start, end, baseindex, state, CallbackDummy());
 }
 
-template<class cond, Action action, class Callback>
+template <class cond, Action action, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                  Callback callback, bool nullable_array, bool find_null) const
 {
     REALM_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback, nullable_array, find_null));
 }
 
-template<class cond, Action action, size_t bitwidth, class Callback>
+template <class cond, Action action, size_t bitwidth, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                  Callback callback, bool nullable_array, bool find_null) const
 {
@@ -3065,7 +3065,7 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 
 #ifdef REALM_COMPILER_SSE
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
-template<class cond, Action action, size_t width, class Callback>
+template <class cond, Action action, size_t width, class Callback>
 bool Array::find_sse(int64_t value, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex,
                      Callback callback) const
 {
@@ -3089,7 +3089,7 @@ bool Array::find_sse(int64_t value, __m128i* data, size_t items, QueryState<int6
 
 // Compares packed action_data with packed data (equal, less, etc) and performs aggregate action (max, min, sum,
 // find_all, etc) on value inside action_data for first match, if any
-template<class cond, Action action, size_t width, class Callback>
+template <class cond, Action action, size_t width, class Callback>
 REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
                                               QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
@@ -3162,7 +3162,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 }
 #endif //REALM_COMPILER_SSE
 
-template<class cond, Action action, class Callback>
+template <class cond, Action action, class Callback>
 bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                           Callback callback) const
 {
@@ -3211,7 +3211,7 @@ bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t
 }
 
 
-template<class cond, Action action, size_t width, class Callback>
+template <class cond, Action action, size_t width, class Callback>
 bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     size_t fw = foreign->m_width;
@@ -3221,7 +3221,7 @@ bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t
 }
 
 
-template<class cond, Action action, size_t width, class Callback, size_t foreign_width>
+template <class cond, Action action, size_t width, class Callback, size_t foreign_width>
 bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                             Callback callback) const
 {
@@ -3291,7 +3291,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
 }
 
 
-template<class cond, Action action, size_t bitwidth, class Callback>
+template <class cond, Action action, size_t bitwidth, class Callback>
 bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                     Callback callback) const
 {
@@ -3311,7 +3311,7 @@ bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
     return ret;
 }
 
-template<bool gt, Action action, size_t bitwidth, class Callback>
+template <bool gt, Action action, size_t bitwidth, class Callback>
 bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                              Callback callback) const
 {
@@ -3389,7 +3389,7 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
 
 }
 
-template<class cond>
+template <class cond>
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);

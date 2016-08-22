@@ -747,13 +747,13 @@ private:
     }
 
 #ifdef REALM_DEBUG
-    template<class... Params> void log(const char* message, Params... params)
+    template <class... Params> void log(const char* message, Params... params)
     {
         if (m_logger)
             m_logger->trace(message, params...); // Throws
     }
 #else
-    template<class... Params> void log(const char*, Params...)
+    template <class... Params> void log(const char*, Params...)
     {
     }
 #endif

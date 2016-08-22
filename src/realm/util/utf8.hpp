@@ -37,7 +37,7 @@ namespace util {
 ///
 /// \tparam Traits16 Must define to_int_type() and to_char_type() for
 /// \a Char16.
-template<class Char16, class Traits16 = std::char_traits<Char16>>
+template <class Char16, class Traits16 = std::char_traits<Char16>>
 struct Utf8x16 {
     /// Transcode as much as possible of the specified UTF-8 input, to
     /// UTF-16. Returns true if all input characters were transcoded, or
@@ -87,7 +87,7 @@ struct Utf8x16 {
 // Adapted from reference implementation.
 // http://www.unicode.org/resources/utf8.html
 // http://www.bsdua.org/files/unicode.tar.gz
-template<class Char16, class Traits16>
+template <class Char16, class Traits16>
 inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const char* const in_end,
                                                 Char16*& out_begin, Char16* const out_end)
 {
@@ -212,7 +212,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
 }
 
 
-template<class Char16, class Traits16>
+template <class Char16, class Traits16>
 inline size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& in_begin,
         const char* const in_end)
 {
@@ -268,7 +268,7 @@ inline size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& in_beg
 // Adapted from reference implementation.
 // http://www.unicode.org/resources/utf8.html
 // http://www.bsdua.org/files/unicode.tar.gz
-template<class Char16, class Traits16>
+template <class Char16, class Traits16>
 inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Char16* const in_end,
                                                char*& out_begin, char* const out_end)
 {
@@ -350,7 +350,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
 }
 
 
-template<class Char16, class Traits16>
+template <class Char16, class Traits16>
 inline size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& in_begin,
                                                             const Char16* const in_end)
 {

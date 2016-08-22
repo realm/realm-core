@@ -30,7 +30,7 @@ namespace _impl {
 /// when the guard is destroyed. For arrays (`T` = `Array`) this means
 /// that the array is destroyed in a shallow fashion. See
 /// `DeepArrayDestroyGuard` for an alternative.
-template<class T>
+template <class T>
 class DestroyGuard {
 public:
     DestroyGuard() noexcept;
@@ -102,26 +102,26 @@ private:
 
 // DestroyGuard<T>
 
-template<class T>
+template <class T>
 inline DestroyGuard<T>::DestroyGuard() noexcept:
     m_ptr(nullptr)
 {
 }
 
-template<class T>
+template <class T>
 inline DestroyGuard<T>::DestroyGuard(T* ptr) noexcept:
     m_ptr(ptr)
 {
 }
 
-template<class T>
+template <class T>
 inline DestroyGuard<T>::~DestroyGuard() noexcept
 {
     if (m_ptr)
         m_ptr->destroy();
 }
 
-template<class T>
+template <class T>
 inline void DestroyGuard<T>::reset(T* ptr) noexcept
 {
     if (m_ptr)
@@ -129,13 +129,13 @@ inline void DestroyGuard<T>::reset(T* ptr) noexcept
     m_ptr = ptr;
 }
 
-template<class T>
+template <class T>
 inline T* DestroyGuard<T>::get() const noexcept
 {
     return m_ptr;
 }
 
-template<class T>
+template <class T>
 inline T* DestroyGuard<T>::release() noexcept
 {
     T* ptr = m_ptr;

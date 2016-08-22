@@ -30,7 +30,7 @@ namespace realm {
 /// Tab>.
 ///
 /// \tparam Impl Is either TableView or ConstTableView.
-template<class Tab, class View, class Impl>
+template <class Tab, class View, class Impl>
 class BasicTableViewBase {
 public:
     typedef typename Tab::spec_type spec_type;
@@ -59,14 +59,14 @@ public:
 private:
     typedef typename Tab::spec_type Spec;
 
-    template<int col_idx>
+    template <int col_idx>
     struct Col {
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<View, col_idx, value_type> type;
     };
     typedef typename Spec::template ColNames<Col, View*> ColsAccessor;
 
-    template<int col_idx>
+    template <int col_idx>
     struct ConstCol {
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<const View, col_idx, value_type> type;
@@ -85,7 +85,7 @@ public:
     }
 
 private:
-    template<int col_idx>
+    template <int col_idx>
     struct Field {
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<View, col_idx, value_type, std::is_const<Tab>::value> type;
@@ -93,7 +93,7 @@ private:
     typedef std::pair<View*, size_t> FieldInit;
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
 
-    template<int col_idx>
+    template <int col_idx>
     struct ConstField {
         typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<const View, col_idx, value_type, true> type;
@@ -113,13 +113,13 @@ public:
     }
 
 protected:
-    template<class, int, class, bool>
+    template <class, int, class, bool>
     friend class _impl::FieldAccessor;
 
-    template<class, int, class>
+    template <class, int, class>
     friend class _impl::MixedFieldAccessorBase;
 
-    template<class Spec>
+    template <class Spec>
     friend class BasicTable;
 
     Impl m_impl;
@@ -168,7 +168,7 @@ protected:
 /// \tparam Tab The possibly const-qualified parent table type. This
 /// must always be an instance of the BasicTable template.
 ///
-template<class Tab>
+template <class Tab>
 class BasicTableView: public BasicTableViewBase<Tab, BasicTableView<Tab>, TableView> {
 private:
     typedef BasicTableViewBase<Tab, BasicTableView<Tab>, TableView> Base;
@@ -247,14 +247,14 @@ private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
     BasicTableView(TableView tv): Base(std::move(tv)) {}
 
-    template<class Subtab>
+    template <class Subtab>
     Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx)
     {
         return get_parent().template
                get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
-    template<class Subtab>
+    template <class Subtab>
     const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
     {
         return get_parent().template
@@ -263,16 +263,16 @@ private:
 
     friend class BasicTableView<const Tab>;
 
-    template<class, int, class, bool>
+    template <class, int, class, bool>
     friend class _impl::FieldAccessor;
 
-    template<class, int, class>
+    template <class, int, class>
     friend class _impl::MixedFieldAccessorBase;
 
-    template<class, int, class>
+    template <class, int, class>
     friend class _impl::ColumnAccessorBase;
 
-    template<class, int, class>
+    template <class, int, class>
     friend class _impl::ColumnAccessor;
 
     friend class Tab::Query;
@@ -283,7 +283,7 @@ private:
 
 /// Specialization for 'const' access to parent table.
 ///
-template<class Tab>
+template <class Tab>
 class BasicTableView<const Tab>:
         public BasicTableViewBase<const Tab, BasicTableView<const Tab>, ConstTableView> {
 private:
@@ -315,23 +315,23 @@ private:
     BasicTableView(BasicTableView* tv): Base(move(tv->m_impl)) {}
     BasicTableView(ConstTableView tv): Base(std::move(tv)) {}
 
-    template<class Subtab>
+    template <class Subtab>
     const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
     {
         return get_parent().template
                get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
-    template<class, int, class, bool>
+    template <class, int, class, bool>
     friend class _impl::FieldAccessor;
 
-    template<class, int, class>
+    template <class, int, class>
     friend class _impl::MixedFieldAccessorBase;
 
-    template<class, int, class>
+    template <class, int, class>
     friend class _impl::ColumnAccessorBase;
 
-    template<class, int, class>
+    template <class, int, class>
     friend class _impl::ColumnAccessor;
 
     friend class Tab::Query;
@@ -342,26 +342,26 @@ private:
 
 // Implementation
 
-template<class Tab>
+template <class Tab>
 inline BasicTableView<Tab>& BasicTableView<Tab>::operator=(BasicTableView tv)
 {
     Base::m_impl = std::move(tv.m_impl);
     return *this;
 }
 
-template<class Tab>
+template <class Tab>
 inline void BasicTableView<Tab>::remove(size_t ndx, RemoveMode underlying_mode)
 {
     Base::m_impl.remove(ndx, underlying_mode);
 }
 
-template<class Tab>
+template <class Tab>
 inline void BasicTableView<Tab>::remove_last(RemoveMode underlying_mode)
 {
     Base::m_impl.remove_last(underlying_mode);
 }
 
-template<class Tab>
+template <class Tab>
 inline void BasicTableView<Tab>::clear(RemoveMode underlying_mode)
 {
     Base::m_impl.clear(underlying_mode);

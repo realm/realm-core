@@ -48,7 +48,7 @@ REALM_NORETURN void terminate_with_info(const char* message, const char* file, l
                                         std::initializer_list<Printable>&& = {}) noexcept;
 
 // LCOV_EXCL_START
-template<class... Ts>
+template <class... Ts>
 REALM_NORETURN void terminate(const char* message, const char* file, long line, Ts... infos) noexcept
 {
     static_assert(sizeof...(infos) == 2 || sizeof...(infos) == 4 || sizeof...(infos) == 6,
@@ -56,7 +56,7 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line, 
     terminate(message, file, line, {Printable(infos)...});
 }
 
-template<class... Args>
+template <class... Args>
 REALM_NORETURN void terminate_with_info(const char* assert_message, int line, const char* file,
                                         const char* interesting_names,
                                         Args&&... interesting_values) noexcept

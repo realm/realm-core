@@ -33,7 +33,7 @@ void ArrayInteger::create(Array::Type type, bool context_flag)
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
-template<size_t w>
+template <size_t w>
 bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max) const
 {
     int64_t min2;

@@ -68,7 +68,7 @@ using StringCompareCallback = std::function<bool(const char* string1, const char
 extern signed char sse_support;
 extern signed char avx_support;
 
-template<int version>
+template <int version>
 REALM_FORCEINLINE bool sseavx()
 {
     /*
@@ -160,7 +160,7 @@ inline size_t to_size_t(int_fast64_t v) noexcept
 }
 
 
-template<typename ReturnType, typename OriginalType>
+template <typename ReturnType, typename OriginalType>
 ReturnType type_punning(OriginalType variable) noexcept
 {
     union Both {
@@ -189,18 +189,18 @@ enum IndexMethod {
 
 // realm::is_any<T, U1, U2, U3, ...> ==
 // std::is_same<T, U1>::value || std::is_same<T, U2>::value || std::is_same<T, U3>::value ...
-template<typename... T>
+template <typename... T>
 struct is_any : std::false_type { };
 
-template<typename T, typename... Ts>
+template <typename T, typename... Ts>
 struct is_any<T, T, Ts...> : std::true_type { };
 
-template<typename T, typename U, typename... Ts>
+template <typename T, typename U, typename... Ts>
 struct is_any<T, U, Ts...> : is_any<T, Ts...> { };
 
 
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
-template<class InputIterator1, class InputIterator2>
+template <class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
 {
 #if defined(_MSC_VER) && defined(_DEBUG)
@@ -216,7 +216,7 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 }
 
 
-template<class T>
+template <class T>
 struct Wrap {
     Wrap(const T& v): m_value(v) {}
     operator T() const { return m_value; }
@@ -227,7 +227,7 @@ private:
 // PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
 // placement new. It simply calls the object's destructor without freeing the memory.
 struct PlacementDelete {
-    template<class T>
+    template <class T>
     void operator()(T* v) const
     {
         v->~T();

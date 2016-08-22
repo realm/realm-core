@@ -42,13 +42,13 @@ public:
     static const int digits = val_lim::digits;
 
     super_int() noexcept;
-    template<class T>
+    template <class T>
     explicit super_int(T value) noexcept;
 
-    template<class T>
+    template <class T>
     bool cast_has_overflow() const noexcept;
 
-    template<class T>
+    template <class T>
     bool get_as(T&) const noexcept;
 
     //@{
@@ -69,7 +69,7 @@ public:
     friend bool operator>(super_int, super_int) noexcept;
     friend bool operator>=(super_int, super_int) noexcept;
 
-    template<class C, class T>
+    template <class C, class T>
     friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, super_int);
 
     bool add_with_overflow_detect(super_int) noexcept;
@@ -98,7 +98,7 @@ inline super_int::super_int() noexcept
     m_sign_bit = false;
 }
 
-template<class T>
+template <class T>
 inline super_int::super_int(T value) noexcept
 {
     typedef std::numeric_limits<T> lim_t;
@@ -112,7 +112,7 @@ inline super_int::super_int(T value) noexcept
     m_sign_bit = lim_t::is_signed && util::is_negative(value);
 }
 
-template<class T>
+template <class T>
 inline bool super_int::cast_has_overflow() const noexcept
 {
     typedef std::numeric_limits<T> lim_t;
@@ -123,7 +123,7 @@ inline bool super_int::cast_has_overflow() const noexcept
     return false;
 }
 
-template<class T>
+template <class T>
 bool super_int::get_as(T& v) const noexcept
 {
     // Ensure that the value represented by `*this` is also be
@@ -227,7 +227,7 @@ inline bool operator>=(super_int a, super_int b) noexcept
     return !(a < b);
 }
 
-template<class C, class T>
+template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, super_int i)
 {
     typedef super_int::val_uint val_uint;

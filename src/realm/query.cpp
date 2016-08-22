@@ -260,7 +260,7 @@ Query& Query::contains(size_t column_ndx, BinaryData b)
 
 namespace {
 
-template<class Node>
+template <class Node>
 struct MakeConditionNode {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, typename Node::TConditionValue value)
     {
@@ -280,28 +280,28 @@ struct MakeConditionNode {
         return std::unique_ptr<ParentNode> {new Node(std::move(value), col_ndx)};
     }
 
-    template<class T>
+    template <class T>
     static std::unique_ptr<ParentNode> make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
     }
 };
 
-template<class Cond>
+template <class Cond>
 struct MakeConditionNode<IntegerNode<IntegerColumn, Cond>> {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, int64_t value)
     {
         return std::unique_ptr<ParentNode> {new IntegerNode<IntegerColumn, Cond>(std::move(value), col_ndx)};
     }
 
-    template<class T>
+    template <class T>
     static std::unique_ptr<ParentNode> make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
     }
 };
 
-template<class Cond>
+template <class Cond>
 struct MakeConditionNode<StringNode<Cond>> {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, StringData value)
     {
@@ -313,14 +313,14 @@ struct MakeConditionNode<StringNode<Cond>> {
         return std::unique_ptr<ParentNode> {new StringNode<Cond>(null{}, col_ndx)};
     }
 
-    template<class T>
+    template <class T>
     static std::unique_ptr<ParentNode> make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
     }
 };
 
-template<class Cond, class T>
+template <class Cond, class T>
 std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, size_t column_ndx, T value)
 {
     DataType type = descriptor.get_column_type(column_ndx);
@@ -369,7 +369,7 @@ void Query::fetch_descriptor()
 }
 
 
-template<typename TConditionFunction, class T>
+template <typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
     REALM_ASSERT_DEBUG(m_current_descriptor);
@@ -379,7 +379,7 @@ Query& Query::add_condition(size_t column_ndx, T value)
 }
 
 
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2));
@@ -388,35 +388,35 @@ Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 }
 
 // Two column methods, any type
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::less(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2));
@@ -990,7 +990,7 @@ Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t
 
 // Average
 
-template<typename T, bool Nullable>
+template <typename T, bool Nullable>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if (limit == 0 || m_table->is_degenerate()) {

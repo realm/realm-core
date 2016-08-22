@@ -138,7 +138,7 @@ Importer::Importer():
 
 // Convert string to int64_t. Set can_fail = true if you also want to verify if your string was of that type. In this
 // case, provide the optional 'success' argument. If the string is null (as defined by is_null()) it will return 0
-template<bool can_fail>
+template <bool can_fail>
 int64_t Importer::parse_integer(const char* col, bool* success)
 {
     int64_t x = 0;
@@ -193,7 +193,7 @@ int64_t Importer::parse_integer(const char* col, bool* success)
 
 // Convert string to bool. Set can_fail = true if you also want to verify if your string was of that type. In this
 // case, provide the optional 'success' argument. If the string is null (as defined by is_null()) it will return false
-template<bool can_fail>
+template <bool can_fail>
 bool Importer::parse_bool(const char* col, bool* success)
 {
     // Must be tuples of {true value, false value}
@@ -242,7 +242,7 @@ bool Importer::parse_bool(const char* col, bool* success)
 //
 // If the string contains more than 6 significant digits (5.259862, -9.1869e11), it will return *success = false
 // because a 32-bit float cannot represent so many significants. In that case, use double instead
-template<bool can_fail>
+template <bool can_fail>
 float Importer::parse_float(const char* col, bool* success)
 {
     bool s;
@@ -263,7 +263,7 @@ float Importer::parse_float(const char* col, bool* success)
 // Convert string to double. Supports normal representation (1.234) and scientific (-4.43e6). Set can_fail = true if you
 // also want to verify if your string was of that type. In this case, provide the optional 'success' argument. If the
 // string is null (as defined by is_null()) it will return 0.0
-template<bool can_fail>
+template <bool can_fail>
 double Importer::parse_double(const char* col, bool* success, size_t* significants)
 {
     const char* orig_col = col;

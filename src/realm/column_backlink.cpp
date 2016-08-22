@@ -206,7 +206,7 @@ void BacklinkColumn::swap_backlinks(size_t row_ndx, size_t origin_row_ndx_1,
 }
 
 
-template<typename Func>
+template <typename Func>
 size_t BacklinkColumn::for_each_link(size_t row_ndx, bool do_destroy, Func&& func)
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);

@@ -41,13 +41,13 @@ public:
     BinaryData() noexcept : m_data(nullptr), m_size(0) {}
     BinaryData(const char* external_data, size_t data_size) noexcept:
         m_data(external_data), m_size(data_size) {}
-    template<size_t N>
+    template <size_t N>
     explicit BinaryData(const char (&external_data)[N]):
         m_data(external_data), m_size(N) {}
-    template<class T, class A>
+    template <class T, class A>
     explicit BinaryData(const std::basic_string<char, T, A>&);
 
-    template<class T, class A>
+    template <class T, class A>
     explicit operator std::basic_string<char, T, A>() const;
 
     char operator[](size_t i) const noexcept { return m_data[i]; }
@@ -94,7 +94,7 @@ public:
     bool ends_with(BinaryData) const noexcept;
     bool contains(BinaryData) const noexcept;
 
-    template<class C, class T>
+    template <class C, class T>
     friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const BinaryData&);
 
     explicit operator bool() const noexcept;
@@ -123,14 +123,14 @@ public:
 
 // Implementation:
 
-template<class T, class A>
+template <class T, class A>
 inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s):
     m_data(s.data()),
     m_size(s.size())
 {
 }
 
-template<class T, class A>
+template <class T, class A>
 inline BinaryData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
@@ -200,7 +200,7 @@ inline bool BinaryData::contains(BinaryData d) const noexcept
            std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const BinaryData& d)
 {
     out << "BinaryData(" << static_cast<const void*>(d.m_data) << ", " << d.m_size << ")";

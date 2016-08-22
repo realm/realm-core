@@ -52,19 +52,19 @@ namespace util {
 ///    logger.info("Listening for peers on %1:%2", listen_address, listen_port);
 class Logger {
 public:
-    template<class... Params> void trace(const char* message, Params...);
-    template<class... Params> void debug(const char* message, Params...);
-    template<class... Params> void detail(const char* message, Params...);
-    template<class... Params> void info(const char* message, Params...);
-    template<class... Params> void warn(const char* message, Params...);
-    template<class... Params> void error(const char* message, Params...);
-    template<class... Params> void fatal(const char* message, Params...);
+    template <class... Params> void trace(const char* message, Params...);
+    template <class... Params> void debug(const char* message, Params...);
+    template <class... Params> void detail(const char* message, Params...);
+    template <class... Params> void info(const char* message, Params...);
+    template <class... Params> void warn(const char* message, Params...);
+    template <class... Params> void error(const char* message, Params...);
+    template <class... Params> void fatal(const char* message, Params...);
 
     /// Specifies criticality when passed to log(). Functions as a criticality
     /// threshold when returned from LevelThreshold::get().
     enum class Level { all, trace, debug, detail, info, warn, error, fatal, off };
 
-    template<class... Params> void log(Level, const char* message, Params...);
+    template <class... Params> void log(Level, const char* message, Params...);
 
     /// Shorthand for `int(level) >= int(level_threshold.get())`.
     bool would_log(Level level) const noexcept;
@@ -84,17 +84,17 @@ protected:
 
 private:
     struct State;
-    template<class> struct Subst;
+    template <class> struct Subst;
 
-    template<class... Params> REALM_NOINLINE void do_log(Level, const char* message, Params...);
+    template <class... Params> REALM_NOINLINE void do_log(Level, const char* message, Params...);
     void log_impl(State&);
-    template<class Param, class... Params> void log_impl(State&, const Param&, Params...);
+    template <class Param, class... Params> void log_impl(State&, const Param&, Params...);
 };
 
-template<class C, class T>
+template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, Logger::Level);
 
-template<class C, class T>
+template <class C, class T>
 std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Logger::Level&);
 
 class Logger::LevelThreshold {
@@ -218,7 +218,7 @@ struct Logger::State {
     }
 };
 
-template<class T> struct Logger::Subst {
+template <class T> struct Logger::Subst {
     void operator()(const T& param, State* state)
     {
         state->m_formatter << "%" << state->m_param_num;
@@ -236,42 +236,42 @@ template<class T> struct Logger::Subst {
     }
 };
 
-template<class... Params> inline void Logger::trace(const char* message, Params... params)
+template <class... Params> inline void Logger::trace(const char* message, Params... params)
 {
     log(Level::trace, message, params...); // Throws
 }
 
-template<class... Params> inline void Logger::debug(const char* message, Params... params)
+template <class... Params> inline void Logger::debug(const char* message, Params... params)
 {
     log(Level::debug, message, params...); // Throws
 }
 
-template<class... Params> inline void Logger::detail(const char* message, Params... params)
+template <class... Params> inline void Logger::detail(const char* message, Params... params)
 {
     log(Level::detail, message, params...); // Throws
 }
 
-template<class... Params> inline void Logger::info(const char* message, Params... params)
+template <class... Params> inline void Logger::info(const char* message, Params... params)
 {
     log(Level::info, message, params...); // Throws
 }
 
-template<class... Params> inline void Logger::warn(const char* message, Params... params)
+template <class... Params> inline void Logger::warn(const char* message, Params... params)
 {
     log(Level::warn, message, params...); // Throws
 }
 
-template<class... Params> inline void Logger::error(const char* message, Params... params)
+template <class... Params> inline void Logger::error(const char* message, Params... params)
 {
     log(Level::error, message, params...); // Throws
 }
 
-template<class... Params> inline void Logger::fatal(const char* message, Params... params)
+template <class... Params> inline void Logger::fatal(const char* message, Params... params)
 {
     log(Level::fatal, message, params...); // Throws
 }
 
-template<class... Params>
+template <class... Params>
 inline void Logger::log(Level level, const char* message, Params... params)
 {
     if (would_log(level))
@@ -297,7 +297,7 @@ inline void Logger::do_log(Logger& logger, std::string message)
     logger.do_log(std::move(message));
 }
 
-template<class... Params> void Logger::do_log(Level, const char* message, Params... params)
+template <class... Params> void Logger::do_log(Level, const char* message, Params... params)
 {
     State state(message);
     log_impl(state, params...);
@@ -308,14 +308,14 @@ inline void Logger::log_impl(State& state)
     do_log(std::move(state.m_message));
 }
 
-template<class Param, class... Params>
+template <class Param, class... Params>
 inline void Logger::log_impl(State& state, const Param& param, Params... params)
 {
     Subst<Param>()(param, &state);
     log_impl(state, params...);
 }
 
-template<class C, class T>
+template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Logger::Level level)
 {
     switch (level) {
@@ -351,7 +351,7 @@ std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Logger::Leve
     return out;
 }
 
-template<class C, class T>
+template <class C, class T>
 std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>& in, Logger::Level& level)
 {
     std::basic_string<C, T> str;

@@ -89,7 +89,7 @@ public:
 
     void set_buffer(char* begin, char* end) noexcept;
 
-    template<size_t N>
+    template <size_t N>
     void set_buffer(char (&buffer)[N]) noexcept;
 
     /// Returns the amount of data written to the underlying buffer.
@@ -188,7 +188,7 @@ inline void MemoryOutputStream::set_buffer(char* begin, char* end) noexcept
     clear();
 }
 
-template<size_t N>
+template <size_t N>
 inline void MemoryOutputStream::set_buffer(char (&buffer)[N]) noexcept
 {
     set_buffer(buffer, buffer + N);

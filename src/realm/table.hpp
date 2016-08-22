@@ -51,9 +51,9 @@ class StringIndex;
 class TableView;
 class TableViewBase;
 class TimestampColumn;
-template<class>
+template <class>
 class Columns;
-template<class>
+template <class>
 class SubQuery;
 struct LinkTargetInfo;
 
@@ -327,14 +327,14 @@ public:
     bool has_shared_type() const noexcept;
 
 
-    template<class T>
+    template <class T>
     Columns<T> column(size_t column); // FIXME: Should this one have been declared noexcept?
-    template<class T>
+    template <class T>
     Columns<T> column(const Table& origin, size_t origin_column_ndx);
 
-    template<class T>
+    template <class T>
     SubQuery<T> column(size_t column, Query subquery);
-    template<class T>
+    template <class T>
     SubQuery<T> column(const Table& origin, size_t origin_column_ndx, Query subquery);
 
     // Table size and deletion
@@ -409,7 +409,7 @@ public:
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
     Timestamp   get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
 
-    template<class T> T get(size_t c, size_t r) const noexcept;
+    template <class T> T get(size_t c, size_t r) const noexcept;
 
     size_t get_link(size_t column_ndx, size_t row_ndx) const noexcept;
     bool is_null_link(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -422,7 +422,7 @@ public:
     TableRef get_link_target(size_t column_ndx) noexcept;
     ConstTableRef get_link_target(size_t column_ndx) const noexcept;
 
-    template<class T>
+    template <class T>
     typename T::RowAccessor get_link_accessor(size_t column_ndx, size_t row_ndx);
 
     //@{
@@ -472,7 +472,7 @@ public:
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
     void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value);
     void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value);
-    template<class E>
+    template <class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
@@ -641,9 +641,9 @@ public:
     /// without any apparent reason.
     uint_fast64_t get_version_counter() const noexcept;
 private:
-    template<class T>
+    template <class T>
     size_t find_first(size_t column_ndx, T value) const; // called by above methods
-    template<class T>
+    template <class T>
     TableView find_all(size_t column_ndx, T value);
 public:
 
@@ -904,7 +904,7 @@ private:
     void do_change_link_targets(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
-    template<class ColType, class T>
+    template <class ColType, class T>
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
@@ -1080,10 +1080,10 @@ private:
     const ColumnBase& get_column_base(size_t column_ndx) const noexcept;
     ColumnBase& get_column_base(size_t column_ndx);
 
-    template<class T, ColumnType col_type>
+    template <class T, ColumnType col_type>
     T& get_column(size_t ndx);
 
-    template<class T, ColumnType col_type>
+    template <class T, ColumnType col_type>
     const T& get_column(size_t ndx) const noexcept;
 
     IntegerColumn& get_column(size_t column_ndx);
@@ -1376,17 +1376,17 @@ private:
     friend class SubtableNode;
     friend class _impl::TableFriend;
     friend class Query;
-    template<class>
+    template <class>
     friend class util::bind_ptr;
-    template<class>
+    template <class>
     friend class SimpleQuerySupport;
     friend class LangBindHelper;
     friend class TableViewBase;
-    template<class T>
+    template <class T>
     friend class Columns;
     friend class Columns<StringData>;
     friend class ParentNode;
-    template<class>
+    template <class>
     friend class SequentialGetter;
     friend class RowBase;
     friend class LinksToNode;
@@ -1564,7 +1564,7 @@ inline DataType Table::get_column_type(size_t ndx) const noexcept
     return m_spec.get_public_column_type(ndx);
 }
 
-template<class Col, ColumnType col_type>
+template <class Col, ColumnType col_type>
 inline Col& Table::get_column(size_t ndx)
 {
     ColumnBase& col = get_column_base(ndx);
@@ -1575,7 +1575,7 @@ inline Col& Table::get_column(size_t ndx)
     return static_cast<Col&>(col);
 }
 
-template<class Col, ColumnType col_type>
+template <class Col, ColumnType col_type>
 inline const Col& Table::get_column(size_t ndx) const noexcept
 {
     const ColumnBase& col = get_column_base(ndx);
@@ -1692,7 +1692,7 @@ inline TableRef Table::copy(Allocator& alloc) const
 }
 
 // For use by queries
-template<class T>
+template <class T>
 inline Columns<T> Table::column(size_t column_ndx)
 {
     std::vector<size_t> link_chain = std::move(m_link_chain);
@@ -1721,7 +1721,7 @@ inline Columns<T> Table::column(size_t column_ndx)
     return Columns<T>(column_ndx, this, std::move(link_chain));
 }
 
-template<class T>
+template <class T>
 inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
 {
     static_assert(std::is_same<T, BackLink>::value, "");
@@ -1737,14 +1737,14 @@ inline Columns<T> Table::column(const Table& origin, size_t origin_col_ndx)
     return Columns<T>(backlink_col_ndx, this, std::move(link_chain));
 }
 
-template<class T>
+template <class T>
 SubQuery<T> Table::column(size_t column_ndx, Query subquery)
 {
     static_assert(std::is_same<T, LinkList>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(column_ndx), std::move(subquery));
 }
 
-template<class T>
+template <class T>
 SubQuery<T> Table::column(const Table& origin, size_t origin_col_ndx, Query subquery)
 {
     static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
@@ -1840,7 +1840,7 @@ inline ConstTableRef Table::get_link_target(size_t col_ndx) const noexcept
     return const_cast<Table*>(this)->get_link_target(col_ndx);
 }
 
-template<class E>
+template <class E>
 inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     set_int(column_ndx, row_ndx, value);
@@ -1932,7 +1932,7 @@ inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*) noexc
     return begin;
 }
 
-template<class T>
+template <class T>
 typename T::RowAccessor Table::get_link_accessor(size_t column_ndx, size_t row_ndx)
 {
     size_t row_pos_in_target = get_link(column_ndx, row_ndx);

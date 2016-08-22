@@ -28,7 +28,7 @@
 namespace realm {
 namespace util {
 
-template<class Ref>
+template <class Ref>
 class CFPtr {
 public:
     explicit CFPtr(Ref ref = nullptr) noexcept:
@@ -87,13 +87,13 @@ private:
     Ref m_ref;
 };
 
-template<class Ref>
+template <class Ref>
 CFPtr<Ref> adoptCF(Ref ptr)
 {
     return CFPtr<Ref>(ptr);
 }
 
-template<class Ref>
+template <class Ref>
 CFPtr<Ref> retainCF(Ref ptr)
 {
     CFRetain(ptr);

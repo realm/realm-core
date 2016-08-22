@@ -3539,7 +3539,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
 }
 namespace {
 
-template<typename T>
+template <typename T>
 class ConcurrentQueue {
 public:
     ConcurrentQueue(size_t size) : sz(size)
@@ -7604,7 +7604,7 @@ public:
 };
 
 struct AdvanceReadTransact {
-    template<typename Func>
+    template <typename Func>
     static void call(SharedGroup& sg, Func&& func)
     {
         LangBindHelper::advance_read(sg, std::forward < Func && > (func));
@@ -7612,7 +7612,7 @@ struct AdvanceReadTransact {
 };
 
 struct PromoteThenRollback {
-    template<typename Func>
+    template <typename Func>
     static void call(SharedGroup& sg, Func&& func)
     {
         LangBindHelper::promote_to_write(sg, std::forward < Func && > (func));
@@ -9873,7 +9873,7 @@ namespace {
 // verifies them (by comparing with its own local, but identical query)
 REALM_TABLE_1(TheTable, first, Int)
 
-template<typename T>
+template <typename T>
 struct HandoverControl {
     Mutex m_lock;
     CondVar m_changed;
