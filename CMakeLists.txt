@@ -23,20 +23,34 @@ project(
 # Include general CMake modules
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
-include(FindOpenSSL)
 include(GetGitRevisionDescription)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
 
 # Project-wide build flags
-set(CMAKE_CXX_STANDARD 14)
+if(CMAKE_VERSION VERSION_LESS "3.1")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+else()
+    set(CMAKE_CXX_STANDARD 14)
+    set(CMAKE_CXX_STANDARD_REQUIRED on)
+    set(CMAKE_CXX_EXTENSIONS off)
+endif()
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic $ENV{EXTRA_CFLAGS}")
 set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
-# Add REALM_DEBUG=1 to compile definitions for Debug targets
+if(CMAKE_CONFIGURATION_TYPES)
+    # Add the MinSizeDebug configuration, used for packaging releases for Cocoa.
+    list(APPEND CMAKE_CONFIGURATION_TYPES MinSizeDebug)
+    list(REMOVE_DUPLICATES CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES}" CACHE STRING "Add MinSizeDebug configuration" FORCE)
+endif()
+
+# Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
     $<$<CONFIG:Debug>:REALM_DEBUG=1>
+    $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 
 # Coverage-specific build flags
@@ -46,7 +60,6 @@ endif()
 
 # Platform-specific build configuration
 if(APPLE)
-    set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
     find_library(Foundation Foundation)
 
     # Enable Apple-specific platforms on Xcode
@@ -57,17 +70,43 @@ if(APPLE)
         set(CMAKE_XCODE_EFFECTIVE_PLATFORMS
             "-macosx;-iphoneos;-iphonesimulator;-appletvos;-appletvsimulator;-watchos;-watchsimulator"
         )
-        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO") # Overridden by Rakefile
         set(CMAKE_OSX_SYSROOT $(PLATFORM_NAME))
+        set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+
+        # Deployment targets
+        set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "10.8")
         set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "7.0")
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Os") # FIXME: CMake does not recognize -Oz
+        set(CMAKE_XCODE_ATTRIBUTE_WATCHOS_DEPLOYMENT_TARGET "2.0")
+        set(CMAKE_XCODE_ATTRIBUTE_TVOS_DEPLOYMENT_TARGET "9.0")
+
+        # Architectures. Everything but iOS uses the default architectures.
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphoneos*] "\$(ARCHS_iphoneos_\$(CONFIGURATION))")
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_Debug "\$(ARCHS)")
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_MinSizeDebug "\$(ARCHS)")
+        # iOS release configurations need to build for armv7s for sake of CocoaPods.
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_Release "armv7 armv7s arm64")
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_RelWithDebInfo "armv7 armv7s arm64")
+        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_MinSizeRel "armv7 armv7s arm64")
+
+        # Bitcode. May be overridden by Rakefile.
+        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=iphone*] "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=watch*] "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=appletv*] "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE "\$(BITCODE_GENERATION_MODE_\$(CONFIGURATION))")
+        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_Debug "marker")
+        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_MinSizeDebug "marker")
+        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_Release "bitcode")
+        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_RelWithDebInfo "bitcode")
+        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_MinSizeRel "bitcode")
     endif()
 endif(APPLE)
 
 # Find dependencies
-# Note: OpenSSL was already found through the `FindOpenSSL` CMake module
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+if(NOT APPLE)
+    include(FindOpenSSL)
+endif()
 
 # Options (passed to CMake)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode.")
